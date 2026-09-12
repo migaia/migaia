@@ -6,7 +6,7 @@ import { memoryReactive } from '../../src/plugins/reactive/memory.js'
 import { createStorageHost } from '../../src/host/index.js'
 import { createStorageReactiveService } from '../../src/host/reactive.js'
 import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
-import { memoryStorage } from '../../src/backends/memory.js'
+import { memoryStorageHost } from '../../src/backends/memory.js'
 
 /** R11 proves Host query state is Resource-owned and backend changes trigger authoritative refresh. */
 describe('SWV4-B05 R11 Resource-backed queries', () => {
@@ -304,7 +304,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       throw resourceFailure
     })
     const service = createStorageReactiveService()
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!
     const signal: IAbortSignal = {
       aborted: false,
@@ -619,7 +619,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     const listenerFailure = new Error('lifecycle listener cleanup failed')
     const lifecycleFailure = new Error('lifecycle release failed')
     const service = createStorageReactiveService()
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!
     const adapter = service.registerAdapter({
       backendId: 'r11-cleanup-lifecycle',

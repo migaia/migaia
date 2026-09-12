@@ -1,7 +1,7 @@
 import { IDBFactory, IDBIndex, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { defineEntity } from '../../src/entity'
-import { indexedDb } from '../../src/backends'
+import { indexedDbHost } from '../../src/backends'
 import { StorageError, StorageErrorCode } from '../../src/types/errors'
 import type { IStorageKey } from '../../src/types/context'
 import { asIndexedDbBackfillStore } from '../../src/backends/indexed-db-backfill'
@@ -13,13 +13,13 @@ type IUser = { id: string; name: string; email: string }
 const users = defineEntity<IUser>({ name: 'users', key: 'id' })
 
 const freshIndexedDb = () =>
-  indexedDb({
+  indexedDbHost({
     factory: new IDBFactory(),
     keyRange: IDBKeyRange,
     dbName: `entity-idb-${Math.random().toString(36).slice(2)}`
   })
 
-describe('repository over real indexedDb backend', () => {
+describe('repository over real indexedDbHost backend', () => {
   it('SWV4-R07 uses the complete sidecar for exact/range/list/stream queries', async () => {
     type IIndexedUser = { id: string; score: number }
     const store = freshIndexedDb()
@@ -142,8 +142,8 @@ describe('repository over real indexedDb backend', () => {
     type IUniqueUser = { id: string; email: string }
     const factory = new IDBFactory()
     const dbName = `native-unique-${Math.random().toString(36).slice(2)}`
-    const firstStore = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
-    const secondStore = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const firstStore = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const secondStore = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
     const entity = defineEntity<IUniqueUser>()({
       name: 'native-unique-users',
       key: 'id',

@@ -11,9 +11,9 @@
  */
 export const StorageErrorCode = Object.freeze({
   /**
-   * 存储后端不可用：隐私模式探测失败、localStorage/IndexedDB/document 被禁用或缺失。
+   * 存储后端不可用：隐私模式探测失败、localStorageHost/IndexedDB/document 被禁用或缺失。
    *
-   * 调用方不应重试同一后端；可显式降级到 `memoryStorage`，或提示用户开启存储权限。落实 §10.1 的可用性探测契约。
+   * 调用方不应重试同一后端；可显式降级到 `memoryStorageHost`，或提示用户开启存储权限。落实 §10.1 的可用性探测契约。
    */
   unavailable: 'BACKEND_UNAVAILABLE',
 

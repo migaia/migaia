@@ -1,12 +1,13 @@
-import { describe, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createEndpoint } from '../src/index.js'
 import { createFullEndpoint } from '../src/full.js'
 import { createClientEndpoint } from '../src/client.js'
 import { createProviderEndpoint } from '../src/provider.js'
 import { createComposedEndpoint } from '../src/core.js'
-import { canonicalChunk as chunk } from '../src/features/canonical-chunk.js'
-import { provider } from '../src/features/provider.js'
+import { createFirstPartyRoots } from '../src/internal/first-party-roots.js'
+import { createProviderFirstPartyRoots } from '../src/internal/provider-first-party-roots.js'
 import { defineFeature } from '../src/feature.js'
+import { defineMiddleware } from '../src/middleware.js'
 import { connect } from '../src/middleware/connect.js'
 import { codec } from '../src/middleware/codec.js'
 import { framer } from '../src/middleware/framer.js'
@@ -27,7 +28,8 @@ import {
   messageFramerV1
 } from '@migaia/rpc-contract/framing'
 
-type IAutomaticMiddlewareList = readonly [ReturnType<typeof connect>]
+/** Explicitly preserves the runtime default rather than widening `connect`'s generic return. */
+type IAutomaticMiddlewareList = readonly [ReturnType<typeof connect<'automatic'>>]
 type IManualMiddlewareList = readonly [
   ReturnType<typeof connect<'manual'>>,
   ReturnType<typeof ping>
@@ -63,19 +65,55 @@ void assertInferredFactoryContract
 async function assertSelectedRootProjection(): Promise<void> {
   const chunkOnly = await createComposedEndpoint(
     { id: 'chunk-only', transport: undefined as never, middlewares: [] },
-    [chunk()] as const
+    createFirstPartyRoots(new Set(['first-party-chunk'] as const))
   )
   // @ts-expect-error chunk root has no implicit outbound capability
   void chunkOnly.send
 
   const discoveryOnly = await createComposedEndpoint(
     { id: 'discovery-only', transport: undefined as never, middlewares: [] },
-    [(await import('../src/features/discovery.js')).discovery()] as const
+    createFirstPartyRoots(new Set(['first-party-discovery'] as const))
   )
   // @ts-expect-error discovery roots do not inherit outbound methods from dependencies
   void discoveryOnly.send
+
+  const provider = await createComposedEndpoint(
+    { id: 'provider-root', transport: undefined as never, middlewares: [] },
+    createProviderFirstPartyRoots()
+  )
+  void provider.send
+  void provider.provide
+  // @ts-expect-error provider preset omits unselected discovery controls.
+  void provider.discover
+
+  const publicFeature = defineFeature(() => ({
+    prepare: () => ({ public: { x: 1 } }),
+    other: 2
+  }))
+  const publicFeatureEndpoint = await createComposedEndpoint(
+    { id: 'public-feature-root', transport: undefined as never, middlewares: [] },
+    { feature: publicFeature }
+  )
+  void publicFeatureEndpoint.prepare
+  void publicFeatureEndpoint.other
+  // @ts-expect-error a non-first-party prepare-shaped output does not project its nested public value.
+  void publicFeatureEndpoint.x
 }
 void assertSelectedRootProjection
+
+/** Proves the runtime guard rejects an untyped legacy tuple before endpoint construction. */
+it('YS19 rejects an untyped legacy tuple before native composition', async () => {
+  /** The tuple models a JavaScript caller bypassing the root-record TypeScript signature. */
+  const forgedRoots = [{}] as unknown as Readonly<
+    Record<string, import('../src/feature.js').IWebRpcFeature>
+  >
+  await expect(
+    createComposedEndpoint(
+      { id: 'retired-module-runtime-rejection', transport: undefined as never, middlewares: [] },
+      forgedRoots
+    )
+  ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+})
 
 /** W1 proves the public async factory preserves each adjacent pipeline edge. */
 const validPipeline: IWebRpcFactoryConfig<
@@ -191,9 +229,10 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
   await createEndpoint({ id: 'root-semantic', middlewares: [], transport: semantic })
   await createClientEndpoint({ id: 'client-opaque', middlewares: [], transport: opaque })
   await createProviderEndpoint({ id: 'provider-semantic', middlewares: [], transport: semantic })
-  await createComposedEndpoint({ id: 'core-opaque', middlewares: [], transport: opaque }, [
-    provider()
-  ] as const)
+  await createComposedEndpoint(
+    { id: 'core-opaque', middlewares: [], transport: opaque },
+    createProviderFirstPartyRoots()
+  )
 
   const json = defineJsonCodec({ version: 1 })
   const frames = createStringFramer()
@@ -231,9 +270,10 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
   // @ts-expect-error provider default semantic envelopes cannot use a string-only sink.
   await createProviderEndpoint({ id: 'provider-default-string', middlewares: [], transport: text })
   // @ts-expect-error core default semantic envelopes cannot use a string-only sink.
-  await createComposedEndpoint({ id: 'core-default-string', middlewares: [], transport: text }, [
-    provider()
-  ] as const)
+  await createComposedEndpoint(
+    { id: 'core-default-string', middlewares: [], transport: text },
+    createProviderFirstPartyRoots()
+  )
   await createFullEndpoint<'peer', readonly []>({
     id: 'legacy-string',
     middlewares: [],
@@ -327,9 +367,8 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
   })
 
   const feature = defineFeature({
-    key: 'type-matrix',
-    claims: { publicKeys: ['typeMatrix'] },
-    install: () => ({ typeMatrix: () => 1 })
+    install: () => ({ typeMatrix: () => 1 }),
+    publicKeys: ['typeMatrix']
   })
   const featured = await createFullEndpoint({
     id: 'feature-surface',
@@ -339,6 +378,38 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
   })
   const exact: number = featured.typeMatrix()
   void exact
+  const requiredFeature = defineFeature<
+    { readonly root: () => string },
+    Record<never, never>,
+    { readonly alias: () => string }
+  >((core) => ({ root: () => core.featureExpose.alias() }))
+  // @ts-expect-error feature records require their declared featureExpose contract.
+  void defineMiddleware('missing-feature-expose', () => ({ expose: () => ({}) }), {
+    alias: requiredFeature
+  })
+  const objectMiddleware = defineMiddleware({
+    name: 'object-component-contribution',
+    metadata: {
+      claims: {
+        routes: [],
+        provides: [],
+        consumes: [],
+        publicKeys: [],
+        exposedKeys: [],
+        activator: false
+      }
+    },
+    discoveryMode: 'manual' as const,
+    pingCapability: true as const,
+    install: () => ({ extension: {}, shared: {} })
+  })
+  const objectComponentEndpoint = await createFullEndpoint({
+    id: 'object-component-contribution',
+    transport: opaque,
+    middlewares: [objectMiddleware] as const
+  })
+  void objectComponentEndpoint.connect.query
+  void objectComponentEndpoint.ping
 }
 void assertPublicFactoryPipelineMatrix
 

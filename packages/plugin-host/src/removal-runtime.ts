@@ -88,6 +88,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     registration.scope?.close()
     this.#removeOwnedPublication(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.idle
+    registration.featureExposeValid = false
     return errors
   }
 
@@ -141,6 +142,9 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     }
     this.#removeOwnedPublication(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.idle
+    void registration.featurePending?.drain().then(() => {
+      registration.featureExposeValid = false
+    })
     return errors
   }
 

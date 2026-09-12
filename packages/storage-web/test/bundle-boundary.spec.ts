@@ -110,7 +110,7 @@ const packedPackages: readonly IPackageDefinition[] = [
 ]
 /** Exact memory-only retained graph after package-manager installation of the packed root. */
 const expectedRetainedModules = [
-  '@migaia/event-subscriber/dist/index.js',
+  '@migaia/event-subscriber/dist/channel-D8-zrqiP.js',
   '@migaia/lifecycle/dist/error-code.js',
   '@migaia/lifecycle/dist/errors.js',
   '@migaia/lifecycle/dist/quiescence-tracker.js',
@@ -272,10 +272,10 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
       writeFileSync(
         join(consumerDirectory, 'native-esm.mjs'),
         [
-          "import { memoryStorage } from '@migaia/storage-web/memory'",
+          "import { memoryStorageHost } from '@migaia/storage-web/memory'",
           "const routes = ['/local-storage', '/session-storage', '/cookies', '/indexed-db', '/host', '/plugins/memory', '/plugins/local-storage', '/plugins/session-storage', '/plugins/cookies', '/plugins/indexed-db', '/plugins/reactive', '/plugins/reactive/memory', '/plugins/reactive/local-storage', '/plugins/reactive/session-storage', '/plugins/reactive/cookies', '/plugins/reactive/indexed-db', '/reactive-adapter', '/entity', '/schema', '/serialize']",
           'await Promise.all(routes.map((route) => import(`@migaia/storage-web${route}`)))',
-          'const storage = memoryStorage()',
+          'const storage = memoryStorageHost()',
           "if (storage.capabilities.secondaryIndexes !== false) throw new Error('secondary index capability promoted')",
           'await storage.dispose()'
         ].join('\n'),
@@ -286,11 +286,63 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
         stdio: 'pipe'
       })
 
+      /** The breaking-cutover factories remain exact named exports on every existing subpath. */
+      const factoryExports = [
+        ['local-storage', 'localStorageHost', 'localStorage'],
+        ['session-storage', 'sessionStorageHost', 'sessionStorage'],
+        ['cookies', 'cookiesHost', 'cookies'],
+        ['memory', 'memoryStorageHost', 'memoryStorage'],
+        ['indexed-db', 'indexedDbHost', 'indexedDb']
+      ] as const
+      writeFileSync(
+        join(consumerDirectory, 'current-exports.mjs'),
+        [
+          "import { localStorageHost } from '@migaia/storage-web/local-storage'",
+          "import { sessionStorageHost } from '@migaia/storage-web/session-storage'",
+          "import { cookiesHost } from '@migaia/storage-web/cookies'",
+          "import { memoryStorageHost } from '@migaia/storage-web/memory'",
+          "import { indexedDbHost } from '@migaia/storage-web/indexed-db'",
+          "if ([localStorageHost, sessionStorageHost, cookiesHost, memoryStorageHost, indexedDbHost].some((factory) => typeof factory !== 'function')) throw new Error('missing Host factory')"
+        ].join('\n'),
+        'utf8'
+      )
+      execFileSync(process.execPath, ['current-exports.mjs'], {
+        cwd: consumerDirectory,
+        stdio: 'pipe'
+      })
+      for (const [subpath, currentName, removedName] of factoryExports) {
+        const declaration = readFileSync(
+          join(
+            consumerDirectory,
+            'node_modules',
+            '@migaia',
+            'storage-web',
+            'dist',
+            `${subpath}.d.ts`
+          ),
+          'utf8'
+        )
+        expect(declaration).toMatch(new RegExp(`export\\s*\\{\\s*${currentName}\\s*\\}`))
+        expect(declaration).not.toMatch(new RegExp(`export\\s*\\{\\s*${removedName}\\s*\\}`))
+        const oldImport = join(consumerDirectory, `removed-${subpath}.mjs`)
+        writeFileSync(
+          oldImport,
+          `import { ${removedName} } from '@migaia/storage-web/${subpath}'\nvoid ${removedName}\n`,
+          'utf8'
+        )
+        const removedResult = spawnSync(process.execPath, [oldImport], {
+          cwd: consumerDirectory,
+          encoding: 'utf8'
+        })
+        expect(removedResult.status, subpath).not.toBe(0)
+        expect(removedResult.stderr).toContain(`does not provide an export named '${removedName}'`)
+      }
+
       const bundleEntry = join(consumerDirectory, 'bundle-entry.js')
       const bundleDirectory = join(consumerDirectory, 'bundle')
       writeFileSync(
         bundleEntry,
-        "import { memoryStorage } from '@migaia/storage-web/memory'; const storage = memoryStorage(); export const accepted = storage.capabilities.secondaryIndexes === false; await storage.dispose();\n",
+        "import { memoryStorageHost } from '@migaia/storage-web/memory'; const storage = memoryStorageHost(); export const accepted = storage.capabilities.secondaryIndexes === false; await storage.dispose();\n",
         'utf8'
       )
       const retainedModuleIds = new Set<string>()
@@ -375,6 +427,100 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
         cwd: consumerDirectory,
         stdio: 'pipe'
       })
+    } finally {
+      rmSync(smokeDirectory, { recursive: true, force: true })
+    }
+  }, 120_000)
+
+  it('YS20 rejects a restored old alias and a restored StorageHostFacade factory in isolated packed consumers', () => {
+    const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-storage-ys20-sensitivity-'))
+    try {
+      const artifacts = packReleaseArtifacts(smokeDirectory)
+      const sourceArtifact = artifactFor(artifacts, '@migaia/storage-web')
+      const runOldAliasOracle = (directory: string) =>
+        spawnSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '--eval',
+            "import { memoryStorage, memoryStorageHost } from '@migaia/storage-web/memory'; if (memoryStorage !== memoryStorageHost) throw new Error('old alias changed factory'); process.stdout.write('old alias is exact factory')"
+          ],
+          { cwd: directory, encoding: 'utf8' }
+        )
+      const runDirectStoreOracle = (directory: string) =>
+        spawnSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '--eval',
+            "import { memoryStorageHost } from '@migaia/storage-web/memory'; const store = memoryStorageHost(); if (!('capabilities' in store)) throw new Error('factory returned facade'); await store.dispose(); process.stdout.write('direct Store')"
+          ],
+          { cwd: directory, encoding: 'utf8' }
+        )
+      const install = (name: string, rootArtifact = sourceArtifact): string => {
+        const directory = join(smokeDirectory, name)
+        installPackedConsumer(directory, artifacts, configuredPnpmStoreDirectory, rootArtifact)
+        return directory
+      }
+
+      const aliasClean = runOldAliasOracle(install('alias-clean'))
+      expect(aliasClean.status).not.toBe(0)
+      expect(aliasClean.stderr).toContain("does not provide an export named 'memoryStorage'")
+      const aliasArtifact = createStorageWebMutationArtifact(
+        smokeDirectory,
+        sourceArtifact,
+        'old-alias',
+        (packageDirectory) => {
+          const entry = join(packageDirectory, 'dist', 'memory.js')
+          const original = readFileSync(entry, 'utf8')
+          expect(original.match(/export \{ e as memoryStorageHost \};/g)).toHaveLength(1)
+          writeFileSync(
+            entry,
+            original.replace(
+              'export { e as memoryStorageHost };',
+              'export { e as memoryStorageHost, e as memoryStorage };'
+            ),
+            'utf8'
+          )
+          expect(readFileSync(entry, 'utf8')).toContain('e as memoryStorage };')
+        }
+      )
+      const aliasPoisoned = runOldAliasOracle(install('alias-poisoned', aliasArtifact))
+      expect(aliasPoisoned.status).toBe(0)
+      expect(aliasPoisoned.stdout).toBe('old alias is exact factory')
+      const aliasRestored = runOldAliasOracle(install('alias-restored'))
+      expect(aliasRestored.status).not.toBe(0)
+      expect(aliasRestored.stderr).toContain("does not provide an export named 'memoryStorage'")
+
+      const facadeClean = runDirectStoreOracle(install('facade-clean'))
+      expect(facadeClean.status).toBe(0)
+      expect(facadeClean.stdout).toBe('direct Store')
+      const facadeArtifact = createStorageWebMutationArtifact(
+        smokeDirectory,
+        sourceArtifact,
+        'facade-return',
+        (packageDirectory) => {
+          const entry = join(packageDirectory, 'dist', 'memory.js')
+          const original = readFileSync(entry, 'utf8')
+          expect(original.match(/export \{ e as memoryStorageHost \};/g)).toHaveLength(1)
+          writeFileSync(
+            entry,
+            [
+              'import { StorageHostFacade } from "./host.js";',
+              'const memoryStorageHost = () => new StorageHostFacade();',
+              'export { memoryStorageHost };'
+            ].join('\n'),
+            'utf8'
+          )
+          expect(readFileSync(entry, 'utf8')).toContain('new StorageHostFacade()')
+        }
+      )
+      const facadePoisoned = runDirectStoreOracle(install('facade-poisoned', facadeArtifact))
+      expect(facadePoisoned.status).not.toBe(0)
+      expect(facadePoisoned.stderr).toContain('factory returned facade')
+      const facadeRestored = runDirectStoreOracle(install('facade-restored'))
+      expect(facadeRestored.status).toBe(0)
+      expect(facadeRestored.stdout).toBe('direct Store')
     } finally {
       rmSync(smokeDirectory, { recursive: true, force: true })
     }
@@ -775,6 +921,27 @@ function createDependencyOmissionArtifact(
   return {
     ...sourceArtifact,
     extractDirectory: malformedPackage,
+    integrity: storageV2TarballIntegrity(readFileSync(tarballPath)),
+    tarballPath
+  }
+}
+
+/** Repackages a disposable Storage artifact after one isolated packed-runtime perturbation. */
+function createStorageWebMutationArtifact(
+  smokeDirectory: string,
+  sourceArtifact: IPackedArtifact,
+  name: string,
+  mutate: (packageDirectory: string) => void
+): IPackedArtifact {
+  const mutationRoot = join(smokeDirectory, `ys20-${name}`)
+  const packageDirectory = join(mutationRoot, 'package')
+  const tarballPath = join(smokeDirectory, `migaia-storage-web-${name}.tgz`)
+  cpSync(sourceArtifact.extractDirectory, packageDirectory, { recursive: true })
+  mutate(packageDirectory)
+  execFileSync('tar', ['-czf', tarballPath, '-C', mutationRoot, 'package'])
+  return {
+    ...sourceArtifact,
+    extractDirectory: packageDirectory,
     integrity: storageV2TarballIntegrity(readFileSync(tarballPath)),
     tarballPath
   }

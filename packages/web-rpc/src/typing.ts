@@ -1,6 +1,10 @@
 import type { IWebRpcError } from './errors.js'
 import type { IWebRpcTransport } from './transport.js'
 import type { IWebRpcFeature } from './feature.js'
+import type {
+  IWebRpcMiddlewareComponentContribution,
+  IWebRpcNativeMiddleware
+} from './middleware.js'
 import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '@migaia/rpc-contract'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { IWebRpcPlatformValue as IProtocolWebRpcPlatform } from './transport-constants.js'
@@ -290,9 +294,12 @@ export type IWebRpcPlugin<TComponents extends object = {}> = {
     scope: IWebRpcPluginInstallScope
   ) => IWebRpcPluginInstallResult | Promise<IWebRpcPluginInstallResult>
 } & Readonly<TComponents>
+
+/** One factory tuple may contain legacy WebRPC middleware or direct PluginHost middleware. */
+export type IWebRpcMiddleware = IWebRpcPlugin | IWebRpcNativeMiddleware
 export type IWebRpcFactoryConfig<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
   TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[],
   TEnvelope extends IRpcEnvelope = IRpcEnvelope,
   TEncoded = unknown,
@@ -333,16 +340,41 @@ export type IWebRpcFactoryConfig<
     readonly timeoutMs?: number | false
   }
 }
-export type IFactoryDiscoveryMode<TMiddlewares extends readonly IWebRpcPlugin[]> = [
-  Extract<TMiddlewares[number], { readonly discoveryMode: 'manual' }>
+/**
+ * Reads component slots only from native middleware definitions. The optional unique-symbol marker
+ * is otherwise structurally compatible with legacy middleware and would incorrectly infer a ping
+ * capability from an ordinary `connect()` descriptor.
+ */
+type INativeMiddlewareComponentContribution<TMiddleware> =
+  TMiddleware extends IWebRpcNativeMiddleware &
+    IWebRpcMiddlewareComponentContribution<infer TComponents>
+    ? TComponents
+    : never
+export type IFactoryDiscoveryMode<TMiddlewares extends readonly IWebRpcMiddleware[]> = [
+  Extract<
+    TMiddlewares[number] | INativeMiddlewareComponentContribution<TMiddlewares[number]>,
+    { readonly discoveryMode: 'manual' }
+  >
 ] extends [never]
   ? 'automatic'
   : 'manual'
-export type IFactoryPingCapability<TMiddlewares extends readonly IWebRpcPlugin[]> = [
-  Extract<TMiddlewares[number], { readonly pingCapability: true }>
-] extends [never]
-  ? false
-  : true
+/** Distinguishes an explicitly selected ping capability from the optional legacy slot. */
+type IRequiredPingCapability<TMiddleware> = TMiddleware extends object
+  ? 'pingCapability' extends keyof TMiddleware
+    ? {} extends Pick<TMiddleware, 'pingCapability'>
+      ? false
+      : TMiddleware extends { readonly pingCapability: true }
+        ? true
+        : false
+    : false
+  : false
+/** Selects the public ping surface only when a middleware actually requires that capability. */
+export type IFactoryPingCapability<TMiddlewares extends readonly IWebRpcMiddleware[]> =
+  true extends IRequiredPingCapability<
+    TMiddlewares[number] | INativeMiddlewareComponentContribution<TMiddlewares[number]>
+  >
+    ? true
+    : false
 export type IWebRpcPingEndpointSurface<TPing extends boolean> = boolean extends TPing
   ? {
       ping(targetId: string, receiverId?: string, options?: IWebRpcPingOptions): Promise<boolean>
@@ -376,7 +408,7 @@ export type IWebRpcEndpoint<
 } & IWebRpcPingEndpointSurface<TPing>
 export type IWebRpcEndpointFactory = <
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[]
+  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[]
 >(
   config: IWebRpcFactoryConfig<TTargetId, TMiddlewares>
 ) => Promise<

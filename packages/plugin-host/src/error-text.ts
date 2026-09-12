@@ -67,6 +67,93 @@ const ERROR_TEXT = {
   get INVALID_OPTION() {
     return localize('plugin-host 选项读取失败', 'plugin-host option read failed')
   },
+  /** Feature definition validation uses these stable boundary messages under `INVALID_OPTION`. */
+  get FEATURE_FACTORY_REQUIRED() {
+    return localize('Feature factory 必须是函数', 'feature factory must be a function')
+  },
+  get FEATURE_DEPENDENCIES_RECORD() {
+    return localize(
+      'Feature dependencies 必须是 plain record',
+      'feature dependencies must be a plain record'
+    )
+  },
+  get FEATURE_DEPENDENCIES_DATA() {
+    return localize(
+      'Feature dependencies 必须包含 enumerable string data properties',
+      'feature dependencies must contain enumerable string data properties'
+    )
+  },
+  get FEATURE_DEPENDENCIES_DEFINED() {
+    return localize(
+      'Feature dependencies 必须包含已定义 Feature',
+      'feature dependencies must contain defined features'
+    )
+  },
+  get FEATURE_DEPENDENCIES_CYCLE() {
+    return localize('Feature dependencies 不得成环', 'feature dependencies must not cycle')
+  },
+  get FEATURE_FACTORY_OUTPUT() {
+    return localize(
+      'Feature factory 必须同步返回对象',
+      'feature factory must return a synchronous object'
+    )
+  },
+  get PLUGIN_FEATURES_RECORD() {
+    return localize('plugin features 必须是 record', 'plugin features must be a record')
+  },
+  get PLUGIN_FEATURES_DEFINED() {
+    return localize(
+      'plugin features 必须包含已定义 Feature',
+      'plugin features must contain defined features'
+    )
+  },
+  get PLUGIN_FEATURE_EXPOSE() {
+    return localize(
+      'plugin featureExpose 必须是对象或函数',
+      'plugin featureExpose must be an object or function'
+    )
+  },
+  get PLUGIN_FEATURE_EXPOSE_OUTPUT() {
+    return localize(
+      'plugin featureExpose 必须返回对象',
+      'plugin featureExpose must return an object'
+    )
+  },
+  get PLUGIN_FEATURE_EXPOSE_DATA() {
+    return localize(
+      'plugin featureExpose 必须包含 enumerable method data properties',
+      'plugin featureExpose must contain enumerable method data properties'
+    )
+  },
+  /**
+   * Descriptor factories are a synchronous registration contract and cannot publish values
+   * directly.
+   */
+  get PLUGIN_DESCRIPTOR_OUTPUT() {
+    return localize(
+      'plugin descriptor factory 必须返回对象',
+      'plugin descriptor factory must return an object'
+    )
+  },
+  /** Only descriptor lifecycle hooks are admitted so callbacks cannot smuggle arbitrary state. */
+  get PLUGIN_DESCRIPTOR_HOOK() {
+    return localize('plugin descriptor 包含未知 hook', 'plugin descriptor contains an unknown hook')
+  },
+  /** Descriptor hooks are captured as data properties to prevent delayed getter side effects. */
+  get PLUGIN_DESCRIPTOR_HOOK_DATA() {
+    return localize(
+      'plugin descriptor hook 必须是数据属性函数',
+      'plugin descriptor hooks must be data-property functions'
+    )
+  },
+  /** Factories cannot observe Feature values until the Host finishes the registration-local plan. */
+  get PLUGIN_FEATURE_CORE_PENDING() {
+    return localize('Feature core 尚未就绪', 'Feature core is not ready')
+  },
+  /** Public definition dispatch accepts only the canonical string or object forms. */
+  get PLUGIN_DEFINITION() {
+    return localize('plugin definition 必须是对象', 'plugin definition must be an object')
+  },
   /** Identifies a lifecycle scheduler whose getters cannot be read during Host construction. */
   get SCHEDULER_GETTER_FAILED() {
     return localize('scheduler getter 读取失败', 'scheduler getter failed')

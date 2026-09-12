@@ -20,6 +20,7 @@ export {
   type IPluginHostDisposalProvenance
 } from './host-runtime.js'
 export { definePlugin } from './define-plugin.js'
+export { defineFeature } from './define-feature.js'
 export { setupHost } from './setup-host.js'
 export type { IPluginHostInstalledPlugins } from './host-runtime.js'
 export {
@@ -44,6 +45,8 @@ export type {
   IPlugin,
   IPluginConfig,
   IPluginConstraint,
+  IPluginFeatureCore,
+  IPluginFeatureOptions,
   IPluginDisposer,
   IPluginAwaitable,
   IPluginInstaller,
@@ -88,6 +91,17 @@ export type {
   IGeneratorPipelineStage,
   IAsyncGeneratorPipelineStage
 } from './typing.js'
+export type {
+  IFeature,
+  IFeatureCore,
+  IFeatureFactory,
+  IFeatureInspection,
+  IFeatureOutput,
+  IFeatureOutputs,
+  IFeatureRecord,
+  IFeatureRequiredExpose,
+  IFeatureRecordRequiredExpose
+} from './feature-types.js'
 export { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED } from './typing.js'
 export {
   adaptGeneratorStageToAsyncGenerator,

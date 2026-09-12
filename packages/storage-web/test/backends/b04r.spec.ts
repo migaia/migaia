@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { isPlainObject } from '@migaia/utils/object'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
-import { memoryStorage } from '../../src/backends/memory.js'
+import { memoryStorageHost } from '../../src/backends/memory.js'
 import { safeJsonPayloadByteLength } from '../../src/utils/json.js'
 
 /** B04R causal probes for the shared lifecycle and JSON-domain owners. */
 describe('SWV4-B04R owner convergence', () => {
   it('keeps one controller lease across publication until disposal drains', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!
     const changes: unknown[] = []
     const unsubscribe = controller.subscribe((change) => changes.push(change))

@@ -1,17 +1,18 @@
 import { invokeCaptured } from '@migaia/plugin-host'
+import { createManualScheduler } from '@migaia/lifecycle'
 import { snapshotKeyValueStoreDetailed } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
 import {
+  assertStorageBackendId,
   createStorageHost,
-  defineStorageBackendKind,
-  defineStorageBackendPlugin,
+  definePlugin,
   StorageHostFacade
 } from '../../src/host/index.js'
 import { cookieBackendPlugin } from '../../src/plugins/cookies.js'
 import { localStorageBackendPlugin } from '../../src/plugins/local-storage.js'
 import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { sessionStorageBackendPlugin } from '../../src/plugins/session-storage.js'
-import { memoryStorage } from '../../src/backends/memory.js'
+import { memoryStorageHost } from '../../src/backends/memory.js'
 import type { IKeyValueStore, IWebStorageLike } from '../../src/types/storage.js'
 
 /** Minimal injected Web Storage implementation for the two browser-backed built-ins. */
@@ -33,7 +34,7 @@ const createWebStorage = (): IWebStorageLike => {
   }
 }
 
-/** Deferred promise used to prove bounded factory settlement and late-store ownership. */
+/** Deferred Store settlement proves Host deadline ownership after native installation times out. */
 const deferred = <T>() => {
   let resolve!: (value: T) => void
   let reject!: (error: unknown) => void
@@ -46,7 +47,7 @@ const deferred = <T>() => {
 
 /** Builds a store whose disposer requires the original receiver and private state. */
 const createReceiverDependentStore = () => {
-  const source = memoryStorage()
+  const source = memoryStorageHost()
   const counts = { getterReads: 0, calls: 0 }
   class ReceiverDependentStore {
     /** Tracks whether this store has already completed its one allowed disposal. */
@@ -80,23 +81,23 @@ const createReceiverDependentStore = () => {
 
 describe('SWV4-B02 R03 PluginHost materialization', () => {
   it('materializes custom and four canonical synchronous backends with exact identities', async () => {
-    const localStorage = createWebStorage()
-    const sessionStorage = createWebStorage()
+    const localStorageHost = createWebStorage()
+    const sessionStorageHost = createWebStorage()
     const cookieDocument = { cookie: '' }
-    const customKind = defineStorageBackendKind<IKeyValueStore>()('custom')
-    const customStore = memoryStorage()
-    const customPlugin = defineStorageBackendPlugin({
-      backendKind: customKind,
-      id: 'custom',
-      create: () => customStore
-    })
+    const customStore = memoryStorageHost()
+    const customPlugin = definePlugin('custom', (core) => ({
+      install: () => {
+        core.registerStore(customStore)
+        return {}
+      }
+    }))
     const host = await createStorageHost({
       plugins: [
         customPlugin,
         memoryBackendPlugin({ id: 'memory' }),
-        localStorageBackendPlugin({ id: 'local', storage: localStorage }),
-        sessionStorageBackendPlugin({ id: 'session', storage: sessionStorage }),
-        cookieBackendPlugin({ id: 'cookies', document: cookieDocument })
+        localStorageBackendPlugin({ id: 'local', storage: localStorageHost }),
+        sessionStorageBackendPlugin({ id: 'session', storage: sessionStorageHost }),
+        cookieBackendPlugin({ id: 'cookiesHost', document: cookieDocument })
       ] as const
     })
 
@@ -105,16 +106,15 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
     expect(host.hasBackend('memory')).toBe(true)
     expect(host.hasBackend('local')).toBe(true)
     expect(host.hasBackend('session')).toBe(true)
-    expect(host.hasBackend('cookies')).toBe(true)
+    expect(host.hasBackend('cookiesHost')).toBe(true)
     expect(host.hasReactiveBackend('memory')).toBe(false)
     await host.dispose()
   })
 
   it('keeps the prior registry intact and rolls back a failed dynamic batch', async () => {
     const host = await createStorageHost()
-    const kind = defineStorageBackendKind<IKeyValueStore>()('rollback')
-    const firstStore = memoryStorage()
-    const failedStore = memoryStorage()
+    const firstStore = memoryStorageHost()
+    const failedStore = memoryStorageHost()
     let failedStoreDisposals = 0
     const trackedFailedStore = {
       ...failedStore,
@@ -123,23 +123,23 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
         await failedStore.dispose()
       }
     } as IKeyValueStore
-    const first = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'first',
-      create: () => firstStore
-    })
-    const failed = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'failed',
-      create: () => trackedFailedStore
-    })
-    const throws = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'throws',
-      create: () => {
+    const first = definePlugin('first', (core) => ({
+      install: () => {
+        core.registerStore(firstStore)
+        return {}
+      }
+    }))
+    const failed = definePlugin('failed', (core) => ({
+      install: () => {
+        core.registerStore(trackedFailedStore)
+        return {}
+      }
+    }))
+    const throws = definePlugin('throws', () => ({
+      install: () => {
         throw new Error('factory failure')
       }
-    })
+    }))
     const installed = await host.use(first)
     await expect(host.use(failed, throws)).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
@@ -152,7 +152,7 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
   })
 
   it('snapshots a hostile store once before publication and leaves failed batches absent', async () => {
-    const source = memoryStorage()
+    const source = memoryStorageHost()
     let backendReads = 0
     const hostileStore = Object.create(source) as IKeyValueStore
     Object.defineProperty(hostileStore, 'backend', {
@@ -164,12 +164,12 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
         return source.backend
       }
     })
-    const kind = defineStorageBackendKind<IKeyValueStore>()('hostile-snapshot')
-    const plugin = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'hostile',
-      create: () => hostileStore
-    })
+    const plugin = definePlugin('hostile', (core) => ({
+      install: () => {
+        core.registerStore(hostileStore)
+        return {}
+      }
+    }))
     const host = await createStorageHost({ plugins: [plugin] as const })
     expect(backendReads).toBe(1)
     expect(host.backend('hostile')).toBe(hostileStore)
@@ -177,7 +177,7 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
   })
 
   it('retains the exact cause from a hostile contract accessor as native coded TypeError', async () => {
-    const source = memoryStorage()
+    const source = memoryStorageHost()
     const cause = new Error('capabilities accessor failure')
     const hostileStore = Object.create(source) as IKeyValueStore
     Object.defineProperty(hostileStore, 'capabilities', {
@@ -187,12 +187,12 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
         throw cause
       }
     })
-    const kind = defineStorageBackendKind<IKeyValueStore>()('hostile-cause')
-    const plugin = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'hostile-cause',
-      create: () => hostileStore
-    })
+    const plugin = definePlugin('hostile-cause', (core) => ({
+      install: () => {
+        core.registerStore(hostileStore)
+        return {}
+      }
+    }))
     const host = await createStorageHost()
     const failure = (await host.use(plugin).catch((error: unknown) => error)) as {
       readonly cause?: { readonly cause?: unknown }
@@ -207,35 +207,7 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
     await host.dispose()
   })
 
-  it('snapshots descriptor and Host option getters once with exact native causes', () => {
-    const kind = defineStorageBackendKind<IKeyValueStore>()('descriptor-cause')
-    const descriptorCause = new Error('descriptor accessor failure')
-    const descriptor = new Proxy(
-      {
-        backendKind: kind,
-        id: 'descriptor-cause',
-        create: () => memoryStorage()
-      },
-      {
-        get: (target, property, receiver) => {
-          if (property === 'timeoutMs') throw descriptorCause
-          return Reflect.get(target, property, receiver)
-        }
-      }
-    )
-    let descriptorError: unknown
-    try {
-      defineStorageBackendPlugin(descriptor as never)
-    } catch (error) {
-      descriptorError = error
-    }
-    expect(descriptorError).toBeInstanceOf(TypeError)
-    expect(descriptorError).toMatchObject({
-      source: '@migaia/storage-web',
-      code: 'BACKEND_PLUGIN_INVALID'
-    })
-    expect((descriptorError as Error).cause).toBe(descriptorCause)
-
+  it('snapshots Host option getters once with exact native causes', () => {
     const optionsCause = new Error('Host option accessor failure')
     const options = Object.defineProperty({}, 'installTimeoutMs', {
       configurable: true,
@@ -258,8 +230,7 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
   })
 
   it('uses the captured disposer exactly once during rollback and Host disposal', async () => {
-    const kind = defineStorageBackendKind<IKeyValueStore>()('captured-disposer')
-    const rollbackStore = memoryStorage()
+    const rollbackStore = memoryStorageHost()
     let rollbackGetterReads = 0
     let rollbackCalls = 0
     const hostileRollbackStore = Object.create(rollbackStore) as IKeyValueStore
@@ -274,18 +245,17 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
         }
       }
     })
-    const rollback = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'captured-rollback',
-      create: () => hostileRollbackStore
-    })
-    const throws = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'captured-throws',
-      create: () => {
+    const rollback = definePlugin('captured-rollback', (core) => ({
+      install: () => {
+        core.registerStore(hostileRollbackStore)
+        return {}
+      }
+    }))
+    const throws = definePlugin('captured-throws', () => ({
+      install: () => {
         throw new Error('rollback')
       }
-    })
+    }))
     const host = await createStorageHost()
     await expect(host.use(rollback, throws)).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
@@ -294,7 +264,7 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
     expect(rollbackCalls).toBe(1)
     await host.dispose()
 
-    const disposeStore = memoryStorage()
+    const disposeStore = memoryStorageHost()
     let disposeGetterReads = 0
     let disposeCalls = 0
     const hostileDisposeStore = Object.create(disposeStore) as IKeyValueStore
@@ -309,21 +279,23 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
         }
       }
     })
-    const installed = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'captured-dispose',
-      create: () => hostileDisposeStore
-    })
+    const installed = definePlugin('captured-dispose', (core) => ({
+      install: () => {
+        core.registerStore(hostileDisposeStore)
+        return {}
+      }
+    }))
     const installedHost = await createStorageHost({ plugins: [installed] as const })
     await installedHost.dispose()
     expect(disposeGetterReads).toBe(1)
     expect(disposeCalls).toBe(1)
   })
 
-  it('bounds a factory and disposes a late store exactly once', async () => {
+  it('bounds a native async install and disposes its late Store exactly once', async () => {
+    const scheduler = createManualScheduler()
     const late = deferred<IKeyValueStore>()
     let disposals = 0
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const lateStore = {
       ...store,
       dispose: async () => {
@@ -331,15 +303,17 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
         await store.dispose()
       }
     } as IKeyValueStore
-    const kind = defineStorageBackendKind<IKeyValueStore>()('deadline')
-    const plugin = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'late',
-      timeoutMs: 1,
-      create: () => late.promise
-    })
-    const host = await createStorageHost()
-    await expect(host.use(plugin)).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
+    const plugin = definePlugin('late', (core) => ({
+      install: async () => {
+        core.registerStore(await late.promise)
+        return {}
+      }
+    }))
+    const host = await createStorageHost({ scheduler, installTimeoutMs: 1 })
+    const installation = host.use(plugin)
+    await Promise.resolve()
+    scheduler.advance(1)
+    await expect(installation).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
     late.resolve(lateStore)
     await Promise.resolve()
     await Promise.resolve()
@@ -348,10 +322,11 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
     await host.dispose()
   })
 
-  it('seals an initial failed host and cleans a late factory result', async () => {
+  it('seals an initially failed native Host and cleans its late Store', async () => {
+    const scheduler = createManualScheduler()
     const late = deferred<IKeyValueStore>()
     let disposals = 0
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const lateStore = {
       ...store,
       dispose: async () => {
@@ -359,20 +334,145 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
         await store.dispose()
       }
     } as IKeyValueStore
-    const kind = defineStorageBackendKind<IKeyValueStore>()('initial-failure')
-    const plugin = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'initial',
-      timeoutMs: 1,
-      create: () => late.promise
+    const plugin = definePlugin('initial', (core) => ({
+      install: async () => {
+        core.registerStore(await late.promise)
+        return {}
+      }
+    }))
+    const creation = createStorageHost({
+      plugins: [plugin] as const,
+      scheduler,
+      installTimeoutMs: 1
     })
-    await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
-      code: 'BACKEND_INSTALL_FAILED'
-    })
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    scheduler.advance(1)
+    await expect(creation).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
     late.resolve(lateStore)
     await Promise.resolve()
     await Promise.resolve()
     expect(disposals).toBe(1)
+  })
+
+  it('rolls back a registered Store when native install times out, then accepts a retry', async () => {
+    const scheduler = createManualScheduler()
+    const late = deferred<void>()
+    let disposals = 0
+    const source = memoryStorageHost()
+    const store = {
+      ...source,
+      dispose: async () => {
+        disposals += 1
+        await source.dispose()
+      }
+    } as IKeyValueStore
+    const blocked = definePlugin('registered-timeout', (core) => ({
+      install: async () => {
+        core.registerStore(store)
+        await late.promise
+        return {}
+      }
+    }))
+    const host = await createStorageHost({ scheduler, installTimeoutMs: 1 })
+    const installation = host.use(blocked)
+    await Promise.resolve()
+    scheduler.advance(1)
+    await expect(installation).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
+    expect(host.hasBackend('registered-timeout')).toBe(false)
+    expect(disposals).toBe(1)
+    const retry = definePlugin('retry', (core) => ({
+      install: () => {
+        core.registerStore(memoryStorageHost())
+        return {}
+      }
+    }))
+    await host.use(retry)
+    expect(host.hasBackend('retry')).toBe(true)
+    late.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(host.hasBackend('registered-timeout')).toBe(false)
+    expect(disposals).toBe(1)
+    await host.dispose()
+  })
+
+  it('keeps caller-owned Stores untouched after an ordinary native install failure', async () => {
+    let capturedCore: { readonly registerStore: (store: IKeyValueStore) => void } | undefined
+    let disposals = 0
+    const source = memoryStorageHost()
+    const callerStore = {
+      ...source,
+      dispose: async () => {
+        disposals += 1
+        await source.dispose()
+      }
+    } as IKeyValueStore
+    const plugin = definePlugin('ordinary-failure', (core) => {
+      capturedCore = core
+      return {
+        install: () => {
+          throw new Error('ordinary failure')
+        }
+      }
+    })
+    const host = await createStorageHost()
+    await expect(host.use(plugin)).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
+    expect(() => capturedCore!.registerStore(callerStore)).toThrow()
+    expect(disposals).toBe(0)
+    await host.dispose()
+  })
+
+  it('does not dispose a duplicate Store after an already-transferred install times out', async () => {
+    const scheduler = createManualScheduler()
+    const late = deferred<void>()
+    let capturedCore: { readonly registerStore: (store: IKeyValueStore) => void } | undefined
+    let firstDisposals = 0
+    let secondDisposals = 0
+    const firstSource = memoryStorageHost()
+    const secondSource = memoryStorageHost()
+    const firstStore = {
+      ...firstSource,
+      dispose: async () => {
+        firstDisposals += 1
+        await firstSource.dispose()
+      }
+    } as IKeyValueStore
+    const secondStore = {
+      ...secondSource,
+      dispose: async () => {
+        secondDisposals += 1
+        await secondSource.dispose()
+      }
+    } as IKeyValueStore
+    const plugin = definePlugin('duplicate-after-timeout', (core) => {
+      capturedCore = core
+      return {
+        install: async () => {
+          core.registerStore(firstStore)
+          await late.promise
+          return {}
+        }
+      }
+    })
+    const host = await createStorageHost({ scheduler, installTimeoutMs: 1 })
+    const installation = host.use(plugin)
+    await Promise.resolve()
+    scheduler.advance(1)
+    await expect(installation).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
+    expect(() => capturedCore!.registerStore(secondStore)).toThrow()
+    expect(firstDisposals).toBe(1)
+    expect(secondDisposals).toBe(0)
+    late.resolve()
+    await host.dispose()
   })
 
   it('preserves the receiver for direct and Host-owned private-state disposal', async () => {
@@ -385,12 +485,12 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
     expect(direct.counts.calls).toBe(1)
 
     const hostOwned = createReceiverDependentStore()
-    const kind = defineStorageBackendKind<IKeyValueStore>()('receiver-dependent')
-    const plugin = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'receiver-dependent',
-      create: () => hostOwned.store
-    })
+    const plugin = definePlugin('receiver-dependent', (core) => ({
+      install: () => {
+        core.registerStore(hostOwned.store)
+        return {}
+      }
+    }))
     const host = await createStorageHost({ plugins: [plugin] as const })
     await host.dispose()
     expect(hostOwned.counts.getterReads).toBe(1)
@@ -400,7 +500,7 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
   it('reports invalid admission as native coded TypeError', async () => {
     let invalidIdError: unknown
     try {
-      defineStorageBackendKind<IKeyValueStore>()('bad id')
+      assertStorageBackendId('bad id')
     } catch (error) {
       invalidIdError = error
     }
@@ -410,12 +510,12 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
       code: 'BACKEND_ID_INVALID'
     })
 
-    const kind = defineStorageBackendKind<IKeyValueStore>()('invalid-store')
-    const plugin = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'invalid',
-      create: () => ({}) as IKeyValueStore
-    })
+    const plugin = definePlugin('invalid', (core) => ({
+      install: () => {
+        core.registerStore({} as IKeyValueStore)
+        return {}
+      }
+    }))
     const host = await createStorageHost()
     const failure = await host.use(plugin).catch((error: unknown) => error)
     expect(failure).toMatchObject({

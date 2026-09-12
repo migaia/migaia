@@ -315,7 +315,7 @@ export async function setupHost(options: ISetupHostOptions<any, any, any>): Prom
       ISetupPluginHost<object, unknown>,
       object,
       unknown,
-      readonly unknown[]
+      readonly IPluginConstraint<any>[]
     >
   } catch (error) {
     setupController.abort(error)

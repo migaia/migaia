@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { findApiGuide, findOptionTranslation } from '../app/api-guides.js'
 import { findGuideJourney } from '../app/guide-journeys.js'
+import { parseSelectedLibrary, replaceOwnedEntries } from '../scripts/generate/signatures.js'
 
 /** Root directory used for all website-owned contract observations. */
 const websiteRoot = fileURLToPath(new URL('../', import.meta.url))
@@ -32,6 +33,50 @@ const generatedApis = generatedApiManifest.apis as Array<{
     }>
   }>
 }>
+
+test('SITE-T-SIGNATURES-DIRECT-ENTRY validates bounded writer selection before generation', () => {
+  assert.equal(parseSelectedLibrary([]), null)
+  assert.equal(parseSelectedLibrary(['--library', 'plugin-host']), 'plugin-host')
+  assert.throws(() => parseSelectedLibrary(['--library']))
+  assert.throws(() => parseSelectedLibrary(['--library', 'unknown']))
+})
+
+test('SITE-T-SIGNATURES-DIRECT-ENTRY preserves unselected order through shrink, equal, and grow', () => {
+  const previous = [
+    { library: 'utils', id: 'before' },
+    { library: 'plugin-host', id: 'old-a' },
+    { library: 'web-rpc', id: 'middle' },
+    { library: 'plugin-host', id: 'old-b' },
+    { library: 'logger', id: 'after' }
+  ]
+  const ownsPluginHost = (entry: unknown) =>
+    (entry as { readonly library?: unknown }).library === 'plugin-host'
+  for (const replacement of [
+    [{ library: 'plugin-host', id: 'new-a' }],
+    [
+      { library: 'plugin-host', id: 'new-a' },
+      { library: 'plugin-host', id: 'new-b' }
+    ],
+    [
+      { library: 'plugin-host', id: 'new-a' },
+      { library: 'plugin-host', id: 'new-b' },
+      { library: 'plugin-host', id: 'new-c' }
+    ]
+  ]) {
+    const merged = replaceOwnedEntries(previous, replacement, ownsPluginHost, 'plugin-host rows') as Array<{
+      readonly library: string
+      readonly id: string
+    }>
+    assert.deepEqual(
+      merged.filter((entry) => entry.library !== 'plugin-host').map((entry) => entry.id),
+      ['before', 'middle', 'after']
+    )
+    assert.deepEqual(
+      merged.filter(ownsPluginHost).map((entry) => entry.id),
+      replacement.map((entry) => entry.id)
+    )
+  }
+})
 
 function fileURLToPath(url: URL): string {
   return decodeURIComponent(url.pathname)
@@ -184,7 +229,7 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
   assert.equal(apiManifest.version, 1)
   assert.equal(routeManifest.version, 1)
   assert.equal(relationshipManifest.version, 1)
-  assert.equal(libraryManifest.libraries.length, 26)
+  assert.equal(libraryManifest.libraries.length, 27)
   assert.equal(
     libraryManifest.libraries.some((library: { readonly slug: string }) => library.slug === 'docs'),
     false
@@ -382,8 +427,8 @@ test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contr
       }
     }
   }
-  assert.equal(configuredApiCount, 104)
-  assert.equal(configurationFieldCount, 430)
+  assert.equal(configuredApiCount, 97)
+  assert.equal(configurationFieldCount, 357)
 
   const pluginHost = generatedApis
     .find((api) => api.id === 'plugin-host:structural')
@@ -410,7 +455,7 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
         .map((symbol) => ({ api, symbol }))
     )
 
-  assert.equal(runtimeSymbols.length, 62)
+  assert.equal(runtimeSymbols.length, 59)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
@@ -2163,26 +2208,13 @@ test('SITE-T-SERIALIZE-PLUGINS-ERRORS documents JSON configuration and native er
 
 test('SITE-T-STORAGE-WEB-BACKENDS documents durability, capability, and every constructor option', () => {
   const targets = [
-    ['memory', 'memoryStorage', []],
-    ['local-storage', 'localStorage', ['namespace', 'namespaceCodec', 'storage']],
-    ['session-storage', 'sessionStorage', ['namespace', 'namespaceCodec', 'storage']],
-    [
-      'cookies',
-      'cookies',
-      [
-        'namespace',
-        'namespaceCodec',
-        'scope.path',
-        'scope.domain',
-        'scope.sameSite',
-        'scope.secure',
-        'scope.partitioned',
-        'document'
-      ]
-    ],
+    ['memory', 'memoryStorageHost', []],
+      ['local-storage', 'localStorageHost', ['storage']],
+      ['session-storage', 'sessionStorageHost', ['storage']],
+      ['cookies', 'cookiesHost', ['namespace', 'namespaceCodec', 'scope', 'document']],
     [
       'indexed-db',
-      'indexedDb',
+      'indexedDbHost',
       [
         'dbName',
         'kvStoreName',
@@ -2289,13 +2321,6 @@ test('SITE-T-STORAGE-WEB-ENTITY documents repository composition and every defin
 test('SITE-T-STORAGE-WEB-HOST documents authority, topology, installation, and lifecycle options', () => {
   const targets = [
     ['assertStorageBackendId', ['id']],
-    ['defineStorageBackendKind', ['name']],
-    ['defineStorageBackendFeature', ['backendKind', 'capability', 'reactive']],
-    [
-      'defineStorageBackendPlugin',
-      ['backendKind', 'id', 'timeoutMs', 'features', 'create', 'prepare']
-    ],
-    ['compileStorageFeatureTopology', ['input.installedProviderIds', 'input.plugins']],
     ['createStorageHost', ['plugins', 'installTimeoutMs', 'scheduler', 'report']],
     ['StorageHostFacade', ['installTimeoutMs', 'scheduler', 'report']]
   ] as const
@@ -2323,8 +2348,6 @@ test('SITE-T-STORAGE-WEB-HOST documents authority, topology, installation, and l
 
 test('SITE-T-STORAGE-WEB-BOUNDARIES documents internal names, metadata, namespace, and errors', () => {
   const targets = [
-    ['host', 'readStorageBackendPluginMetadata', ['plugin']],
-    ['host', 'readStorageBackendFeatureMetadata', ['feature']],
     ['host', 'pluginNameFromBackendId', ['id']],
     ['host', 'reactiveAdapterNameFromBackendId', ['id']],
     ['host', 'STORAGE_LIVE_QUERY_SERVICE_NAME', []],
@@ -2358,31 +2381,9 @@ test('SITE-T-STORAGE-WEB-BOUNDARIES documents internal names, metadata, namespac
 test('SITE-T-STORAGE-WEB-PLUGINS documents non-reactive factories and custom reactive adapters', () => {
   const targets = [
     ['plugins-memory', 'memoryBackendPlugin', ['id']],
-    [
-      'plugins-local-storage',
-      'localStorageBackendPlugin',
-      ['id', 'namespace', 'namespaceCodec', 'storage']
-    ],
-    [
-      'plugins-session-storage',
-      'sessionStorageBackendPlugin',
-      ['id', 'namespace', 'namespaceCodec', 'storage']
-    ],
-    [
-      'plugins-cookies',
-      'cookieBackendPlugin',
-      [
-        'id',
-        'namespace',
-        'namespaceCodec',
-        'scope.path',
-        'scope.domain',
-        'scope.sameSite',
-        'scope.secure',
-        'scope.partitioned',
-        'document'
-      ]
-    ],
+      ['plugins-local-storage', 'localStorageBackendPlugin', ['storage']],
+      ['plugins-session-storage', 'sessionStorageBackendPlugin', ['storage']],
+      ['plugins-cookies', 'cookieBackendPlugin', ['namespace', 'namespaceCodec', 'scope', 'document']],
     [
       'plugins-indexed-db',
       'indexedDbBackendPlugin',
@@ -2428,31 +2429,9 @@ test('SITE-T-STORAGE-WEB-PLUGINS documents non-reactive factories and custom rea
 test('SITE-T-STORAGE-WEB-REACTIVE-PLUGINS documents honest visibility and every factory option', () => {
   const targets = [
     ['plugins-reactive-memory', 'memoryReactive', ['id']],
-    [
-      'plugins-reactive-local-storage',
-      'localStorageReactive',
-      ['id', 'namespace', 'namespaceCodec', 'storage']
-    ],
-    [
-      'plugins-reactive-session-storage',
-      'sessionStorageReactive',
-      ['id', 'namespace', 'namespaceCodec', 'storage']
-    ],
-    [
-      'plugins-reactive-cookies',
-      'cookiesReactive',
-      [
-        'id',
-        'namespace',
-        'namespaceCodec',
-        'scope.path',
-        'scope.domain',
-        'scope.sameSite',
-        'scope.secure',
-        'scope.partitioned',
-        'document'
-      ]
-    ],
+      ['plugins-reactive-local-storage', 'localStorageReactive', ['storage']],
+      ['plugins-reactive-session-storage', 'sessionStorageReactive', ['storage']],
+      ['plugins-reactive-cookies', 'cookiesReactive', ['namespace', 'namespaceCodec', 'scope', 'document']],
     [
       'plugins-reactive-indexed-db',
       'indexedDbReactive',

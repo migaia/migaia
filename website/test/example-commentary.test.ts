@@ -7,7 +7,7 @@ import { commentExample } from '../app/example-commentary.js'
 describe('example commentary', () => {
   it('explains storage ownership and disposal without narrating ordinary control flow', () => {
     const example = commentExample(
-      "import { localStorage } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorage({ namespace: 'settings' })\nawait settings.set('theme', 'dark')\nconst theme = await settings.get('theme')\n\nif (settings.capabilities.syncRead) {\n  settings.sync.set('density', 'compact')\n}\n\nawait settings.dispose()",
+      "import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorageHost({ namespace: 'settings' })\nawait settings.set('theme', 'dark')\nconst theme = await settings.get('theme')\n\nif (settings.capabilities.syncRead) {\n  settings.sync.set('density', 'compact')\n}\n\nawait settings.dispose()",
       'ts',
       'zh'
     )
@@ -179,7 +179,7 @@ merged.dispose()`,
   })
 
   it('does not invent storage ownership when the example omits concrete configuration', () => {
-    const example = commentExample('localStorage(options)', 'ts', 'zh')
+    const example = commentExample('localStorageHost(options)', 'ts', 'zh')
 
     expect(example.notes).toEqual([])
   })
@@ -226,7 +226,7 @@ console.log(count.value)`,
         (call) => call.includes('code={symbol.signature}') && call.includes("kind: 'signature'")
       )
 
-    expect(explainedCalls).toHaveLength(5)
+    expect(explainedCalls).toHaveLength(7)
     expect(routeSource).toMatch(/code=\{symbol\.signature\}[\s\S]*?公开类型签名/)
     expect(signatureCall).toContain('explain')
     expect(signatureCall).toContain("kind: 'signature'")

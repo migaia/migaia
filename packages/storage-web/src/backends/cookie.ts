@@ -164,8 +164,8 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
   }
 }
 
-/** Document.cookie 后端。不处理服务端 cookie；SSR 场景由调用方在服务端 自行解析 `req.headers.cookie` 并注入 memoryStorage。 */
-export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICookieStore> => {
+/** Document.cookie 后端。不处理服务端 cookie；SSR 场景由调用方在服务端 自行解析 `req.headers.cookie` 并注入 memoryStorageHost。 */
+export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<ICookieStore> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
@@ -291,7 +291,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
           backend: StorageBackend.cookie,
           key: stripped,
           operation,
-          cause: new Error('multiple visible cookies share one physical name')
+          cause: new Error('multiple visible cookiesHost share one physical name')
         })
       seenPhysicalKeys.add(rawKey)
       collected.push({ physicalKey: rawKey, logicalKey: stripped })
@@ -317,7 +317,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
         backend: StorageBackend.cookie,
         key: logicalKey,
         operation,
-        cause: new Error('multiple visible cookies share one physical name')
+        cause: new Error('multiple visible cookiesHost share one physical name')
       })
     return visible
   }

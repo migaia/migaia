@@ -86,9 +86,9 @@ pnpm add @migaia/web-rpc
 | 只发请求/通知                      | `createClientEndpoint` from `@migaia/web-rpc/client`     | `send`、`sendAll`、`dispatch`、`dispatchAll`、`on`、`hooks`、`dispose` |
 | 提供方法，同时允许主动回调对端     | `createProviderEndpoint` from `@migaia/web-rpc/provider` | client 能力 + `provide`                                                |
 | 精确选择 Feature                   | `createComposedEndpoint` from `@migaia/web-rpc/core`     | kernel 能力 + 所选 Feature 的根投影                                    |
-| 自定义组合的 Feature token         | `@migaia/web-rpc/features/{outbound,provider,...}`       | 由 token tuple 静态推导                                                |
+| 自定义原生 Feature/Middleware     | `defineFeature` / `defineMiddleware` from `@migaia/web-rpc` | 定义显式返回的 surface 决定 endpoint 投影                         |
 
-这些子路径不是兼容别名。它们是 tree-shaking 边界：例如 client 入口不会把 provider、discovery、control、chunk 的实现带入 retained graph；provider 只私下安装它必须依赖的 outbound 安全闭包。Feature 的依赖会自动安装，但**依赖不会偷偷扩大根对象**：只选择 `discovery()` 时，不会因为它内部依赖 outbound 就额外得到 `send()`。
+这些子路径不是兼容别名。它们是 tree-shaking 边界：例如 client 入口不会把 provider、discovery、control、chunk 的实现带入 retained graph。原生 Feature 的依赖可以自动安装，但**依赖不会偷偷扩大根对象**：只有定义显式返回的 surface 会投影到 endpoint。
 
 ### 7.2 最小可运行示例：client 调 provider
 
@@ -162,41 +162,41 @@ endpoint.provide('add', (ctx) => {
 - `replay?: { maxEntries?: number; ttlMs?: number }` —— 出站请求 id 重放保护窗口，默认容量 4096、TTL 310 秒
 - `construction?: { signal?: IWebRpcAbortSignal; timeoutMs?: number | false }` —— 构造期本身的取消/超时；取消/超时后仍会正确回滚已安装成功的中间件
 
-`middlewares` 现在只接受原生 `IWebRpcPlugin` 描述符（包含 `metadata` 与 Host install scope）。0.x 的 `IWebRpcMiddlewareContext`/`install(context)` 形状已移除；继续传入旧形状会在任何传输副作用前以 `INVALID_CONFIG` 拒绝。自定义插件应通过 `scope.getShared` 读取依赖，并通过 `scope.own` 注册清理。
+`middlewares` 接受由 `defineMiddleware` 或首方 middleware 工厂创建的原生定义；它们与 Feature 一起作为同一个 PluginHost 批次安装，资源清理由 `core.own()` 归属。0.x 的 `IWebRpcMiddlewareContext`/`install(context)` 形状已移除；继续传入旧形状会在任何传输副作用前以 `INVALID_CONFIG` 拒绝。
 
-### 7.4 自定义 Feature 组合
+### 7.4 自定义原生 Feature 与 Middleware
 
-Feature 从独立子路径导入；`createComposedEndpoint` 会解析依赖、在任何 transport 订阅前检查冲突，再通过一个 PluginHost batch 原子安装。安装失败会回滚已经取得的资源，原始错误保留在 `cause`/`AggregateError.errors` 链上。
+用 `defineFeature` 和 `defineMiddleware` 定义扩展。二者会和首方能力一起进入同一个 PluginHost 原子安装批次：依赖检查发生在 transport 订阅前；失败会回滚已经取得的资源，原始错误保留在 `cause`/`AggregateError.errors` 链上。
 
 ```ts
-import { connect, ping } from '@migaia/web-rpc'
-import { createComposedEndpoint } from '@migaia/web-rpc/core'
-import { outbound } from '@migaia/web-rpc/features/outbound'
-import { discovery } from '@migaia/web-rpc/features/discovery'
-import { control } from '@migaia/web-rpc/features/control'
+import {
+  connect,
+  createFullEndpoint,
+  defineFeature,
+  defineMiddleware
+} from '@migaia/web-rpc'
 
-const endpoint = await createComposedEndpoint(
-  {
-    id: 'probe',
-    transport,
-    middlewares: [connect({ transport }), ping()] as const
+const observed = defineFeature(() => ({ observe: () => 'ready' }))
+const metrics = defineMiddleware('metrics', (core) => ({
+  install: () => {
+    core.own({}, () => console.log('metrics disposed'))
+    return {}
   },
-  [outbound(), discovery(), control()] as const
-)
+  expose: () => ({ metricEndpointId: () => core.id })
+}))
 
-await endpoint.send('service', 'health', undefined)
-const alive = await endpoint.ping('service')
+const endpoint = await createFullEndpoint({
+  id: 'probe',
+  transport,
+  middlewares: [connect({ transport }), metrics] as const,
+  features: [observed] as const
+})
+
+endpoint.observe()
+endpoint.metricEndpointId()
 ```
 
-官方 token：
-
-- `outbound()`：`send` / `sendAll` / `dispatch` / `dispatchAll`。
-- `provider()`：`provide`，并把 inseparable outbound closure 投影到根对象。
-- `discovery()`：`connect` / `discovery`；内部依赖 outbound，但单独选择时不暴露发送方法。
-- `control()`：ping/pong 控制面；公开 `ping` / `pingAll` 还要求 middleware tuple 包含 `ping()`。
-- `framer()`：分片 framing，没有独立公开方法；具体限制来自 framing descriptor 配置。
-
-`Feature` 和 layer descriptor 不是重复实现：前者决定运行时模块与公开 surface，后者只提供配置/capability。分片能力由 framing layer 负责，策略由 framer descriptor 决定。
+`Feature` 选择业务根投影；`Middleware` 提供配置、协议或横切能力。不要恢复 endpoint token tuple、转换器或独立安装缓存来组合它们。
 
 ### 7.5 Endpoint 方法
 

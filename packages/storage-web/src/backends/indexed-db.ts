@@ -430,7 +430,7 @@ const toIdbRecordIndexRange = (
  *
  * 连接管理、写入-等-commit、onblocked/onversionchange 处理，都是从早期 实现直接搬运的已验证坑位处理，未改动核心逻辑，详见各处注释。
  */
-export const indexedDb = <TValue = unknown>(
+export const indexedDbHost = <TValue = unknown>(
   options: IIndexedDbOptions = {}
 ): IRecordStore<TValue> & ISecondaryIndexRecordStore<TValue> & IChangeFeedStore => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))

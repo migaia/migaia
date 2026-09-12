@@ -1,7 +1,7 @@
 import { rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
 import type { identityCodecV1 } from '@migaia/serialize/codec'
 import type { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import type { IWebRpcFactoryConfig, IWebRpcPlugin } from './typing.js'
+import type { IWebRpcFactoryConfig, IWebRpcMiddleware } from './typing.js'
 import type { IWebRpcFeature, IWebRpcFiniteFeatureTuple } from './feature.js'
 import type { IWebRpcTransport, IWebRpcSendOptions } from './transport.js'
 
@@ -79,7 +79,7 @@ type IAnyComponent<T> =
 
 /** Retains configured middleware tuple precision. */
 export type IMiddlewares<T> = T extends {
-  readonly middlewares: infer TValue extends readonly IWebRpcPlugin[]
+  readonly middlewares: infer TValue extends readonly IWebRpcMiddleware[]
 }
   ? TValue
   : readonly []
@@ -103,14 +103,14 @@ export type ICheckedInput = Omit<
   readonly codec?: unknown
   readonly framer?: unknown
   readonly transport?: unknown
-  readonly middlewares: readonly IWebRpcPlugin[]
+  readonly middlewares: readonly IWebRpcMiddleware[]
   readonly features?: readonly IWebRpcFeature[]
 }
 
 /** Retains explicit default-factory calls while fixing their send boundary to semantic envelopes. */
 export type ILegacyDefault<
   TTarget extends string,
-  TMiddlewares extends readonly IWebRpcPlugin[],
+  TMiddlewares extends readonly IWebRpcMiddleware[],
   TFeatures extends readonly IWebRpcFeature[]
 > = Omit<
   IWebRpcFactoryConfig<TTarget, TMiddlewares, TFeatures>,

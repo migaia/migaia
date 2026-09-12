@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { definePlugin, PluginHost, setupHost } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost, setupHost } from '../src/index.js'
 import { PluginHostErrorCode } from '../src/error-code.js'
 
 const hostOptions = {
@@ -22,11 +22,154 @@ const median = (values: readonly number[]): number => {
 
 describe('PHV3 acceptance contract', () => {
   it('PHV3-T01: accepts short and full functional definitions', async () => {
-    const short = definePlugin('short', () => ({ short: true }))
+    const short = definePlugin('short', () => ({ install: () => ({ short: true }) }))
     const full = definePlugin({ name: 'full', install: () => ({ full: true }) })
     const host = new AcceptanceHost(hostOptions)
     const view = await host.use(short, full)
     expect(view.extensions).toMatchObject({ short: true, full: true })
+    await host.dispose()
+  })
+
+  it('YS24: rejects a forged Feature batch before any descriptor factory runs', async () => {
+    let descriptorCalls = 0
+    const valid = definePlugin('ys24-valid', () => {
+      descriptorCalls += 1
+      return { install: () => ({}) }
+    })
+    const forged = {
+      name: 'ys24-forged',
+      features: { forged: {} },
+      featureExpose: {},
+      install: () => ({})
+    }
+    const host = new AcceptanceHost(hostOptions)
+    expect(() => host.use(valid, forged as never)).toThrowError(
+      expect.objectContaining({ code: PluginHostErrorCode.invalidOption })
+    )
+    expect(descriptorCalls).toBe(0)
+    await host.dispose()
+  })
+
+  it('YS26: rejects equal install and expose keys without publishing the candidate', async () => {
+    const host = new AcceptanceHost(hostOptions)
+    /** Detects whether collision validation runs before the Plugin-only shared hook. */
+    let sharedCalls = 0
+    // @ts-expect-error YS26 forbids every overlapping Host extension key.
+    const collision = definePlugin('ys26-collision', () => ({
+      install: () => ({ duplicate: 1 }),
+      expose: () => ({ duplicate: 1 }),
+      shared: () => {
+        sharedCalls += 1
+        return { shouldNotPublish: true }
+      }
+    }))
+    await expect(host.use(collision)).rejects.toMatchObject({
+      cause: { code: PluginHostErrorCode.extensionDuplicate }
+    })
+    expect(host.getCurrentView().extensions).not.toHaveProperty('duplicate')
+    expect(sharedCalls).toBe(0)
+    await host.dispose()
+  })
+
+  it('YS26: rejects an awaitable descriptor factory result before it becomes an empty descriptor', async () => {
+    const host = new AcceptanceHost(hostOptions)
+    const descriptor = definePlugin(
+      'ys26-thenable-descriptor',
+      () => Promise.resolve({ install: () => ({ shouldNotMount: true }) }) as never
+    )
+    await expect(host.use(descriptor)).rejects.toMatchObject({
+      code: PluginHostErrorCode.pluginInstallFailed
+    })
+    expect(host.getCurrentView().extensions).not.toHaveProperty('shouldNotMount')
+    await host.dispose()
+  })
+
+  it('YS26: contains every late descriptor-hook rejection when diagnostics throw', async () => {
+    for (const hook of ['descriptor', 'featureExpose', 'expose', 'shared'] as const) {
+      const original = new Error(`late-${hook}`)
+      const rejected = Promise.reject(original)
+      let installCalls = 0
+      let diagnosticCalls = 0
+      const plugin =
+        hook === 'descriptor'
+          ? definePlugin(`ys26-${hook}`, () => rejected as never)
+          : definePlugin(
+              `ys26-${hook}`,
+              () =>
+                ({
+                  install: () => {
+                    installCalls += 1
+                    return { retained: true }
+                  },
+                  ...(hook === 'featureExpose' ? { featureExpose: () => rejected as never } : {}),
+                  ...(hook === 'expose' ? { expose: () => rejected as never } : {}),
+                  ...(hook === 'shared' ? { shared: () => rejected as never } : {})
+                }) as never
+            )
+      const host = new AcceptanceHost({
+        ...hostOptions,
+        diagnostic: () => {
+          diagnosticCalls += 1
+          throw new Error(`diagnostic-${hook}`)
+        }
+      })
+      let observed: unknown
+      try {
+        await host.use(plugin as never)
+      } catch (error) {
+        observed = error
+      }
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(observed).toMatchObject({ code: PluginHostErrorCode.pluginInstallFailed })
+      const causes: unknown[] = []
+      let current: unknown = observed
+      for (let index = 0; index < 4 && current instanceof Error; index += 1) {
+        current = current.cause
+        causes.push(current)
+      }
+      expect(causes).toContain(original)
+      expect(diagnosticCalls).toBe(1)
+      expect(installCalls).toBe(hook === 'expose' || hook === 'shared' ? 1 : 0)
+      expect(host.getCurrentView().extensions).not.toHaveProperty('retained')
+      await host.dispose()
+    }
+  })
+
+  it('YS27: injects only featureExpose into Feature factories and preserves Plugin shared for a later Plugin', async () => {
+    /**
+     * Captures the exact Feature core surface without masking assertion failures in Host lifecycle
+     * wrapping.
+     */
+    let observedCoreKeys: readonly PropertyKey[] = []
+    /** Records whether forbidden Plugin-only capabilities leaked into the Feature core. */
+    let observedForbiddenCapabilities = false
+    const feature = defineFeature<
+      { readonly read: () => number },
+      Record<never, never>,
+      { readonly read: () => number }
+    >((core) => {
+      observedCoreKeys = Reflect.ownKeys(core)
+      observedForbiddenCapabilities = 'getShared' in core || 'onDispose' in core || 'own' in core
+      return { read: () => core.featureExpose.read() }
+    })
+    const provider = definePlugin({
+      name: 'ys27-provider',
+      features: { feature },
+      featureExpose: { read: () => 7 },
+      shared: () => ({ pluginOnly: true }),
+      install: (core) => ({ read: core.features.feature.read() })
+    })
+    const consumer = definePlugin({
+      name: 'ys27-consumer',
+      install: (core) => ({ observed: core.getShared('pluginOnly') === true })
+    })
+    const host = new AcceptanceHost(hostOptions)
+    await expect(host.use(provider, consumer)).resolves.toMatchObject({
+      extensions: { read: 7, observed: true }
+    })
+    expect(observedCoreKeys).toEqual(['featureExpose'])
+    expect(observedForbiddenCapabilities).toBe(false)
     await host.dispose()
   })
 
@@ -72,7 +215,7 @@ describe('PHV3 acceptance contract', () => {
   })
 
   it('PHV3-T05: uses structural fallback for clones', async () => {
-    const trusted = definePlugin('trusted', () => ({ trusted: true }))
+    const trusted = definePlugin({ name: 'trusted', install: () => ({ trusted: true }) })
     const clone = { ...trusted }
     const host = new AcceptanceHost(hostOptions)
     const view = await host.use(clone as never)
@@ -80,8 +223,35 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
+  it('PHV3-T05F: structural fallback initializes native Feature roots', async () => {
+    let factoryCalls = 0
+    const feature = defineFeature<
+      { readonly read: () => number },
+      Record<never, never>,
+      { readonly read: () => number }
+    >((core) => {
+      factoryCalls += 1
+      return { read: core.featureExpose.read }
+    })
+    const raw = {
+      name: 'structural-feature',
+      features: { feature },
+      featureExpose: { read: () => 42 },
+      install: (core: {
+        readonly features: { readonly feature: { readonly read: () => number } }
+      }) => {
+        return { value: core.features.feature.read() }
+      }
+    }
+    const host = new AcceptanceHost(hostOptions)
+    const view = await host.use(raw)
+    expect((view.extensions as { readonly value: number }).value).toBe(42)
+    expect(factoryCalls).toBe(1)
+    await host.dispose()
+  })
+
   it('PHV3-T06: preserves mixed admission order and duplicate atomicity', async () => {
-    const first = definePlugin('first', () => ({ first: true }))
+    const first = definePlugin('first', () => ({ install: () => ({ first: true }) }))
     const host = new AcceptanceHost(hostOptions)
     const view = await host.use(first, {
       name: 'second',
@@ -138,7 +308,7 @@ describe('PHV3 acceptance contract', () => {
     const genericSamples: number[] = []
     const coldTrustedSamples: number[] = []
     const warmTrustedSamples: number[] = []
-    const warmPlugin = definePlugin('trusted-warm', () => ({}))
+    const warmPlugin = definePlugin('trusted-warm', () => ({ install: () => ({}) }))
     for (let index = 0; index < 15; index += 1) {
       const genericHost = new AcceptanceHost(hostOptions)
       let started = process.hrtime.bigint()
@@ -280,7 +450,7 @@ describe('PHV3 acceptance contract', () => {
 
   it('PHV3-T18: snapshots setup getters before Core invocation', async () => {
     const counts = { host: 0, timeout: 0, core: 0, plugins: 0, signal: 0 }
-    const plugin = definePlugin('single-read', () => ({ ready: true }))
+    const plugin = definePlugin('single-read', () => ({ install: () => ({ ready: true }) }))
     const options = Object.defineProperties(
       {},
       {

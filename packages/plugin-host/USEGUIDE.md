@@ -151,7 +151,7 @@ const prefix: IPlugin<IPluginCore, { greet(name: string): void }, IPluginConfig>
 import { definePlugin } from '@migaia/plugin-host/defined'
 
 const health = definePlugin('health', () => ({
-  check: () => ({ ok: true as const })
+  install: () => ({ check: () => ({ ok: true as const }) })
 }))
 
 const configurable = definePlugin({
@@ -162,7 +162,7 @@ const configurable = definePlugin({
 })
 ```
 
-第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。
+第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。
 
 安装时获得的 `core` 是一个稳定的 facade（`src/core.ts` 的 `createPluginCore`）。它包含子类提供的领域方法，加上下面的通用能力：
 

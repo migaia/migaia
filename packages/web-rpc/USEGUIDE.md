@@ -88,15 +88,13 @@ type IWebRpcTransport = {
 
 ### 1.3 Feature（功能模块）
 
-Feature 决定 endpoint 运行时安装哪些领域能力、根对象公开哪些方法。当前可组合 Feature 为 `outbound()`、`provider()`、`discovery()`、`control()`，分片由 framing layer 负责。
-
-Feature 会自动安装其私有依赖，但依赖不会自动扩大根对象的公开 API。例如 `discovery()` 内部依赖 outbound，却只公开 `connect` 和 `discovery`；要在同一个 endpoint 上调用 `send()`，仍需显式选择 `outbound()`。
+Feature 由 `defineFeature((core) => surface)` 定义，决定 endpoint 运行时安装哪些领域能力和根对象公开哪些方法。Feature 的私有依赖不会自动扩大根对象的公开 API；只有 Feature 明确返回的 surface 才会投影到 endpoint。
 
 ### 1.4 Middleware（中间件）
 
-Middleware 是 PluginHost 管理的配置、协议和策略插件，例如 `connect()`、`contract()`、`timeout()`、`ping()`。它不负责选择 endpoint 根对象的业务表面。
+Middleware 由 `defineMiddleware(name, (core) => descriptor)` 定义，是 PluginHost 管理的配置、协议和策略插件；首方 `connect()`、`contract()`、`timeout()`、`ping()`也使用同一安装归属。它不负责选择 endpoint 根对象的业务表面。
 
-Feature 与 Middleware 必须分开理解：framing layer 选择分片帧处理能力，根入口导出的 `framer({...})` descriptor 配置分片策略；`features/control` 选择控制帧能力，middleware `ping()` 才让 `ping` / `pingAll` 出现在精确推导出的类型上。完整参考见 [§3](#3-中间件详细参考)。
+Feature 与 Middleware 必须分开理解：Feature 返回的 surface 才会投影为 endpoint 方法；Middleware 通过 `core.own()` 归属资源，并可通过 `expose()` 提供明确的横切方法。二者随同一个原生 PluginHost batch 安装和回滚，完整参考见 [§3](#3-中间件详细参考)。
 
 ### 1.5 Provider（提供者）与 Contract（契约）
 
@@ -142,14 +140,14 @@ contract({
 
 ### 2.1 应该从哪里导入
 
-| 入口                                   | 工厂/Token               | endpoint 根对象的公开能力                         | 适用场景                     |
+| 入口                                   | 工厂/定义                | endpoint 根对象的公开能力                         | 适用场景                     |
 | -------------------------------------- | ------------------------ | ------------------------------------------------- | ---------------------------- |
 | `@migaia/web-rpc`                      | `createEndpoint`         | 完整预设；等同 `createFullEndpoint`               | 兼容性入口、需要全部一等能力 |
 | `@migaia/web-rpc/full`                 | `createFullEndpoint`     | outbound + provider + discovery + control + chunk | 显式完整端点                 |
 | `@migaia/web-rpc/client`               | `createClientEndpoint`   | kernel + outbound                                 | 只发请求/事件                |
 | `@migaia/web-rpc/provider`             | `createProviderEndpoint` | kernel + outbound + `provide`                     | 暴露方法且可能回调对端       |
-| `@migaia/web-rpc/core`                 | `createComposedEndpoint` | kernel + 显式 Feature 的根投影                    | 自定义最小能力集合           |
-| `@migaia/web-rpc/features/*`           | Feature token            | 由所选 token 决定                                 | 与 `/core` 配合              |
+| `@migaia/web-rpc/core`                 | `createComposedEndpoint` | kernel + 显式原生 Feature 的根投影                | 自定义最小能力集合           |
+| `@migaia/web-rpc`                      | `defineFeature` / `defineMiddleware` | 定义返回的 surface 决定            | 原生扩展                     |
 | `@migaia/web-rpc/adapters/<transport>` | transport factory        | 不改变 endpoint 表面                              | 按宿主环境选择传输           |
 
 所有 endpoint 都有 kernel 表面：`on()`、`hooks.on()`、`dispose()`。只有完整预设或显式选择的 Feature 才增加其他方法。要获得可靠 tree-shaking，应直接导入最窄预设或 `/core` 与单独 Feature 子路径，不要从根入口导入完整预设后再只使用其中一部分。
@@ -195,36 +193,34 @@ const result = await client.send<number>('provider', 'sum', [1, 2, 3])
 
 根入口的 `createEndpoint` 与 `/full` 的 `createFullEndpoint` 是同一函数引用。完整预设适合确实需要完整表面的应用；它不是推荐给所有调用方的默认最小 bundle。
 
-### 2.3 自定义 Feature 组合
+### 2.3 自定义原生 Feature 与 Middleware
 
 ```ts
-import { createComposedEndpoint } from '@migaia/web-rpc/core'
-import { outbound } from '@migaia/web-rpc/features/outbound'
-import { discovery } from '@migaia/web-rpc/features/discovery'
-import { control } from '@migaia/web-rpc/features/control'
-import { connect, ping } from '@migaia/web-rpc'
+import { connect, createFullEndpoint, defineFeature, defineMiddleware } from '@migaia/web-rpc'
 
-const endpoint = await createComposedEndpoint(
-  {
-    id: 'dashboard',
-    transport,
-    middlewares: [connect({ transport }), ping({ timeoutMs: 2_000 })] as const
+const status = defineFeature(() => ({ status: () => 'ready' }))
+const metrics = defineMiddleware('metrics', (core) => ({
+  install: () => {
+    core.own({}, () => console.log('metrics disposed'))
+    return {}
   },
-  [outbound(), discovery(), control()] as const
-)
+  expose: () => ({ endpointId: () => core.id })
+}))
 
-await endpoint.send('worker', 'refresh', undefined)
-const alive = await endpoint.ping('worker')
+const endpoint = await createFullEndpoint({
+  id: 'dashboard',
+  transport,
+  middlewares: [connect({ transport }), metrics] as const,
+  features: [status] as const
+})
+
+endpoint.status()
+endpoint.endpointId()
 ```
 
-组合器遵守以下规则：
-
-- Feature tuple 不能为空，重复 token 会以 `CAPABILITY_CONFLICT` 拒绝。
-- Feature 的运行时依赖由组合器安装并去重；依赖是私有安装关系，不等于公开根投影。
-- `provider()` 的公开闭包特意包含 outbound，因此选择 provider 后可以 `send()`；framing layer 的私有 outbound 依赖不会公开 `send()`。
-- framing layer 不增加独立方法，只安装分片帧所有者；它与 `framer({...})` descriptor 一起使用。
-- middleware tuple 使用 `as const`，TypeScript 才能精确推断手动发现模式和 `ping()` 带来的条件方法。
-- 构造是异步、原子的：任何 Feature 或 middleware 安装失败时，已安装项会逆序清理，原始失败保留在 `cause` / `AggregateError.errors` 链中。
+- Feature 返回的 surface 决定公开根投影；私有依赖不扩大公开 API。
+- Middleware 通过 `core.own()` 交给 Host 清理，并可通过 `expose()` 明确投影横切方法。
+- 构造是异步、原子的：任何 Feature 或 Middleware 安装失败时，已安装项会逆序清理，原始失败保留在 `cause` / `AggregateError.errors` 链中。
 
 ### 2.4 完整构造配置
 
@@ -247,7 +243,7 @@ type IWebRpcFactoryConfig<TTargetId extends string = string> = {
 - **`id`**：整个通信拓扑里必须唯一。它出现在每一条消息的 `senderId` 字段里，但**不是身份凭证**——见 [§11](#11-安全注意事项)。
 - **`targetIds`**：只是"我已知这些 id"的预声明，不是必需的。自动发现模式下，第一次对未知 `targetId` 调用 `send`/`dispatch`/`ping` 会触发一次懒查询并缓存结果；`endpoint.discovery` 暴露的远端快照永远不包含 endpoint 自己。
 - **`transport`**：可以在工厂配置或 `connect({ transport })` 中提供；两处都提供时必须是同一个对象。没有可解析出的 transport、或出现冲突，会在订阅消息前以 `INVALID_CONFIG` 失败。
-- **中间件迁移**：`middlewares` 只接受原生 `IWebRpcPlugin`（`metadata` + Host install scope）。旧版 `IWebRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义插件请使用 `scope.getShared` 与 `scope.own`。
+- **中间件迁移**：`middlewares` 接受 `defineMiddleware` 或首方工厂返回的原生定义，并在同一个 PluginHost 批次中安装。旧版 `IWebRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义定义通过 `core.getShared()` 读取依赖，并用 `core.own()` 归属清理。
 - **`provider`**：等价于在 `createEndpoint` 返回前，对每一项调用一次 `endpoint.provide(method, fn)`；纯粹是"少写几行"的便利写法。
 - **`replay`**：出站请求/消息 id 会在一个有界窗口内保留，防止重放攻击复用同一个 id 让已完成的请求再跑一次 provider。普通请求的 id 在整个 TTL 内都不释放（哪怕响应已经收到）——这是有意为之，防止晚到的重复响应复活一个"看起来还在等"的旧请求；dispatch-only（单向通知）的 id 在发送结算后立即释放，因为它天生不会有响应需要防重放。默认容量 4096、TTL 310 秒；高频单向通知场景一般不需要调大，持续的双向请求量很大时可以按需调整。
 - **`construction.signal` / `construction.timeoutMs`**：构造 `createEndpoint()` 本身也是异步的（要跑完全部中间件的 `install()`），可以用这两个字段取消或限时。取消会 reject 构造过程，并且仍然会清理已经安装成功的中间件（不会留下半初始化的资源）。中间件的 `install(context)` 会收到同一个 `signal`，如果中间件自己的初始化工作是可取消的，应该监听它。
@@ -909,7 +905,7 @@ framing layer 决定是否安装分片帧运行时所有者；`framer()` descrip
 `dispose()` 的清理是尽力而为——即使 reject，能清理的部分也已经清理完了，`cleanupErrors` 只是告诉你哪些具体资源没清理干净（通常需要人工介入，比如某个外部连接对象自己的 `close()` 抛了异常）。不需要重试 `dispose()`（幂等，重试也只会拿到同一个结果），根据 `cleanupErrors` 里列出的资源名针对性排查即可。
 
 **Q：TypeScript 提示 `endpoint.ping` 不存在。**
-`ping` / `pingAll` 同时要求 full/control Feature 与 `ping()` middleware。`endpoint.connect` / `endpoint.discovery` 要求 discovery Feature；其中手动方法（`query` / `register` / ...）还要求 middleware tuple 把 `discoveryMode: 'manual'` 保留为字面量。自定义组合与 middleware 数组建议写 `as const`，否则宽化后的联合类型只能给出保守表面。
+`ping` / `pingAll` 同时要求 full/control Feature 与 `ping()` middleware。`endpoint.connect` / `endpoint.discovery` 要求 discovery Feature；其中手动方法（`query` / `register` / ...）还要求 `discoveryMode: 'manual'` 的原生 middleware 定义。自定义组合与 middleware 数组建议写 `as const`，否则宽化后的联合类型只能给出保守表面。
 
 **Q：想知道某条消息为什么被拒绝，去哪里看？**
 装上 `hooks()` 中间件，订阅全部事件打日志，[§10](#10-可观测性hooks-事件参考) 的事件表基本覆盖了所有"消息被拒绝/丢弃"的原因分类。生产环境建议至少常驻订阅 `receive.failure`、`authentication.rejected`、`transport.failure`、`dispose.failure` 这几个和"东西坏了"直接相关的事件。

@@ -10,11 +10,11 @@ import { createEndpointKernel } from '../../src/endpoint-kernel.js'
 import { createClientEndpoint } from '../../src/client.js'
 import { createFullEndpoint } from '../../src/full.js'
 import { createProviderEndpoint } from '../../src/provider.js'
-import { outbound } from '../../src/features/outbound.js'
-import { provider as providerFeature } from '../../src/features/provider.js'
-import { discovery } from '../../src/features/discovery.js'
-import { control } from '../../src/features/control.js'
-import { canonicalChunk as chunkFeature } from '../../src/features/canonical-chunk.js'
+import { createClientFirstPartyRoots } from '../../src/internal/client-first-party-roots.js'
+import {
+  createFirstPartyRoots,
+  type IWebRpcFirstPartyRootName
+} from '../../src/internal/first-party-roots.js'
 import { authentication } from '../../src/middleware/authentication.js'
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer.js'
 import { WebRpcCanonicalChunkAttachment as WebRpcChunkAttachment } from '../../src/internal/canonical-chunk-attachment.js'
@@ -227,7 +227,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         transport: coreTransport,
         middlewares: [connect({ transport: coreTransport })]
       },
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     const [clientTransport] = createMemoryTransportPair()
     const client = await createClientEndpoint({
@@ -254,7 +254,15 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         transport: customTransport,
         middlewares: [connect({ transport: customTransport })]
       },
-      [outbound(), providerFeature(), discovery(), control(), chunkFeature()]
+      createFirstPartyRoots(
+        new Set<IWebRpcFirstPartyRootName>([
+          'first-party-chunk',
+          'first-party-outbound',
+          'first-party-provider',
+          'first-party-discovery',
+          'first-party-control'
+        ])
+      )
     )
 
     expect(readEndpointDebugSnapshot(core)?.owners).toEqual(coreRuntimeOwnerKeys)

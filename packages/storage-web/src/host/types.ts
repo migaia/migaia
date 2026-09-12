@@ -1,6 +1,7 @@
 import type { IAbortSignal, ILifecycleScheduler } from '@migaia/lifecycle'
 import type { IComputedValue, IRuntime } from '@migaia/reactive/runtime'
 import type { IKeyValueStore, IStorageChange } from '@migaia/storage-contract'
+import type { IPlugin, IMergePluginExts } from '@migaia/plugin-host'
 
 /** Module-private brand authority for exact backend-kind tokens. */
 const storageBackendKindBrand: unique symbol = Symbol('storage-web/backend-kind')
@@ -10,31 +11,13 @@ const storageBackendPluginBrand: unique symbol = Symbol('storage-web/backend-plu
 const storageBackendPluginKindBrand: unique symbol = Symbol('storage-web/backend-plugin-kind')
 /** Module-private brand authority for reactive capability presence. */
 const storageBackendReactiveBrand: unique symbol = Symbol('storage-web/backend-reactive')
-/** Module-private brand authority for exact feature descriptors. */
-const storageBackendFeatureBrand: unique symbol = Symbol('storage-web/backend-feature')
+/** Module-private carrier keeps Plugin extensions distinct from the installed Store. */
+export declare const storageBackendPluginExtensionsBrand: unique symbol
 
 /** Opaque backend identity whose store binding cannot be forged by object literals. */
 export type IStorageBackendKind<TName extends string, TStore extends IKeyValueStore> = {
   readonly name: TName
   readonly [storageBackendKindBrand]: TStore
-}
-
-/** Derives the exact store type bound to a backend kind token. */
-export type IStorageBackendKindStore<
-  TBackendKind extends IStorageBackendKind<string, IKeyValueStore>
-> = TBackendKind extends IStorageBackendKind<string, infer TStore> ? TStore : never
-
-/** Feature descriptor with a private exact-kind and capability binding. */
-export type IStorageBackendFeature<
-  TStore extends IKeyValueStore,
-  TBackendKind extends IStorageBackendKind<string, IKeyValueStore>,
-  TCapability extends string
-> = {
-  readonly [storageBackendFeatureBrand]: {
-    readonly store: TStore
-    readonly backendKind: TBackendKind
-    readonly capability: TCapability
-  }
 }
 
 /** Reactive source metadata consumed only by the Host adapter materializer. */
@@ -43,6 +26,8 @@ export type IStorageReactiveSourceDisposer = () => void | Promise<void>
 /** Exact store/context passed to an advanced adapter source at synchronous admission. */
 export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = {
   readonly store: TStore
+  /** Host-snapshotted scheduler shared with source timing and installation deadlines. */
+  readonly scheduler: ILifecycleScheduler
   readonly signal: IAbortSignal
   readonly report: (error: unknown) => void
   /** Invalidates Resource-owned query generations after an admitted backend change. */
@@ -68,11 +53,15 @@ export type IStorageReactiveFeatureMetadata<TStore extends IKeyValueStore = IKey
 }
 
 /** Publicly consumable backend plugin identity shell; runtime metadata stays in WeakMaps. */
-export type IStorageBackendPluginHandle = {
+export type IStorageBackendPluginHandle<
+  TExtensions extends object = Record<never, never>,
+  TStore extends IKeyValueStore = IKeyValueStore
+> = {
   readonly id: string
-  readonly [storageBackendPluginBrand]: IKeyValueStore
+  readonly [storageBackendPluginBrand]: TStore
   readonly [storageBackendPluginKindBrand]: unknown
   readonly [storageBackendReactiveBrand]: boolean
+  readonly [storageBackendPluginExtensionsBrand]: TExtensions
 }
 
 /** Exact backend plugin handle returned by a definition factory. */
@@ -80,55 +69,14 @@ export type IStorageBackendPlugin<
   TStore extends IKeyValueStore,
   TBackendKind extends IStorageBackendKind<string, IKeyValueStore>,
   TId extends string,
-  TReactive extends boolean = false
-> = IStorageBackendPluginHandle & {
+  TReactive extends boolean = false,
+  TExtensions extends object = Record<never, never>
+> = IStorageBackendPluginHandle<TExtensions, TStore> & {
   readonly id: TId
   readonly [storageBackendPluginBrand]: TStore
   readonly [storageBackendPluginKindBrand]: TBackendKind
   readonly [storageBackendReactiveBrand]: TReactive
 }
-
-/** Store creation context reserved for the later materialization slice. */
-export type IStorageBackendPluginContext = {
-  readonly signal: IAbortSignal
-  readonly report: (error: unknown) => void
-}
-
-/** Optional preparation hook that runs after the synchronous store is lifecycle-registered. */
-export type IStorageBackendPluginPrepare<TStore extends IKeyValueStore> = (
-  store: TStore,
-  context: IStorageBackendPluginContext
-) => void | PromiseLike<void>
-
-/** Immutable backend definition captured before topology admission. */
-export type IStorageBackendPluginDefinition<
-  TStore extends IKeyValueStore,
-  TBackendKind extends IStorageBackendKind<string, IKeyValueStore>,
-  TId extends string,
-  TFeatures extends readonly IStorageBackendFeature<TStore, TBackendKind, string>[]
-> = {
-  readonly backendKind: TBackendKind
-  readonly id: TId
-  readonly timeoutMs?: number
-  readonly features?: TFeatures
-  readonly create: (context: IStorageBackendPluginContext) => TStore | PromiseLike<TStore>
-  readonly prepare?: IStorageBackendPluginPrepare<TStore>
-}
-
-/** Capability name extracted from one exact feature descriptor. */
-export type IFeatureCapability<TFeature> = TFeature extends {
-  readonly [storageBackendFeatureBrand]: { readonly capability: infer TCapability extends string }
-}
-  ? TCapability
-  : never
-
-/** Exact reactive capability result for a feature tuple. */
-export type IFeaturesEnableReactive<TFeatures extends readonly unknown[]> =
-  string extends IFeatureCapability<TFeatures[number]>
-    ? false
-    : 'reactive' extends IFeatureCapability<TFeatures[number]>
-      ? true
-      : false
 
 /** Plugin ID extracted from an admitted plugin tuple. */
 export type IStoragePluginId<TPlugin> = TPlugin extends {
@@ -145,6 +93,20 @@ export type IStoragePluginStore<TPlugin> = TPlugin extends {
 }
   ? TStore
   : never
+
+/** Adapts Storage's opaque extension carrier to PluginHost's canonical merger. */
+type IStoragePluginExtensionCarrier<TPlugin> = TPlugin extends {
+  readonly [storageBackendPluginExtensionsBrand]: infer TExtensions extends object
+}
+  ? TExtensions extends Record<string, unknown>
+    ? IPlugin<object, TExtensions>
+    : IPlugin<object, Record<never, never>>
+  : never
+
+export type IStoragePluginExtensions<TPlugin> = IMergePluginExts<
+  [IStoragePluginExtensionCarrier<TPlugin>]
+> &
+  object
 
 /** Reactive backend IDs extracted without widening unknown feature tuples. */
 export type IStoragePluginReactiveId<TPlugin> = TPlugin extends {
@@ -253,14 +215,17 @@ export type IReactiveConsistency = Readonly<{
 /** Non-reactive Host operations shared by every conditional Host view. */
 export type IStorageHostBase<
   TStores extends Record<string, IKeyValueStore>,
-  TReactiveIds extends keyof TStores & string = never
+  TReactiveIds extends keyof TStores & string = never,
+  TExtensions extends object = Record<never, never>
 > = {
+  readonly extensions: Readonly<TExtensions>
   use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(
     ...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>
   ): Promise<
     IStorageHost<
       TStores & IPluginStoreMap<TPlugins>,
-      TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>
+      TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>,
+      TExtensions & IStoragePluginExtensions<TPlugins[number]>
     >
   >
   backend<TId extends keyof TStores & string>(id: TId): TStores[TId]
@@ -325,30 +290,9 @@ export type IStorageHostReactiveApi<
 /** Conditional Host type shell preserving exact backend IDs and reactive capability honesty. */
 export type IStorageHost<
   TStores extends Record<string, IKeyValueStore>,
-  TReactiveIds extends keyof TStores & string = never
-> = IStorageHostBase<TStores, TReactiveIds> &
+  TReactiveIds extends keyof TStores & string = never,
+  TExtensions extends object = Record<never, never>
+> = IStorageHostBase<TStores, TReactiveIds, TExtensions> &
   ([TReactiveIds] extends [never]
     ? Record<never, never>
     : IStorageHostReactiveApi<TStores, TReactiveIds>)
-
-/** Internal metadata retained by the feature compiler without exposing brands to callers. */
-export type IStorageFeatureMetadata = {
-  readonly backendKind: IStorageBackendKind<string, IKeyValueStore>
-  readonly capability: string
-  readonly reactive?: IStorageReactiveFeatureMetadata
-}
-
-/** Runtime descriptor envelope consumed by the pure topology adapter. */
-export type IStorageFeatureNode = {
-  readonly id: string
-  readonly dependencies: readonly { readonly provider: string; readonly required: true }[]
-  readonly ordinal: number
-  readonly materialize: boolean
-  readonly feature?: IStorageFeatureMetadata
-}
-
-/** Pure compiler result; synthetic providers never appear in materialized output. */
-export type IStorageFeatureCompilation = {
-  readonly ordered: readonly IStorageFeatureNode[]
-  readonly materialized: readonly IStorageFeatureNode[]
-}

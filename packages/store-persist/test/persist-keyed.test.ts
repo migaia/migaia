@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { createAtomStore, familyDef } from '@migaia/store-keyed'
 import { createRuntime } from '@migaia/reactive'
 import { persistKeyed, clearFamily } from '../src/keyed-index'
@@ -9,7 +9,7 @@ describe('persistKeyed（store-keyed）', () => {
     const runtime = createRuntime()
     const atomStore = createAtomStore(runtime)
     const definition = familyDef(() => ({ name: '' }))
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     let reads = 0
     const options = { storage } as { namespace: string; storage: typeof storage }
     Object.defineProperty(options, 'namespace', {
@@ -37,7 +37,7 @@ describe('persistKeyed（store-keyed）', () => {
     const runtime = createRuntime()
     const atomStore = createAtomStore(runtime)
     const userProfile = familyDef(() => ({ name: '' }))
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     expect(() =>
       persistKeyed(atomStore, userProfile('u1'), undefined as never, {
         namespace: 'users',
@@ -52,7 +52,7 @@ describe('persistKeyed（store-keyed）', () => {
     ).toThrow('[store] persist namespace must be a string')
   })
   it('立即同步返回默认值，hydrate 命中后异步覆盖', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     await storage.set('users:u1', JSON.stringify({ version: 0, state: { name: 'Ada' } }))
     const runtime = createRuntime()
     const atomStore = createAtomStore(runtime)
@@ -71,7 +71,7 @@ describe('persistKeyed（store-keyed）', () => {
 
   it('partialize/merge：只持久化 refreshToken，其余字段保持内存值', async () => {
     type ISession = { accessToken: string; refreshToken: string }
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const runtime = createRuntime()
     const atomStore = createAtomStore(runtime)
     const session = familyDef((): ISession => ({ accessToken: '', refreshToken: '' }))
@@ -95,7 +95,7 @@ describe('persistKeyed（store-keyed）', () => {
   })
 
   it('dispose 后不再写回', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const runtime = createRuntime()
     const atomStore = createAtomStore(runtime)
     const cart = familyDef((): number => 0)
@@ -120,7 +120,7 @@ describe('clearFamily', () => {
     })
   })
   it('只删除匹配 namespace 前缀的 key，不影响其他 namespace', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     await storage.set('users:u1', 'a')
     await storage.set('users:u2', 'b')
     await storage.set('sessions:s1', 'c')
@@ -132,13 +132,13 @@ describe('clearFamily', () => {
   })
 
   it('无匹配 key 时返回 0，不报错', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const removed = await clearFamily(storage, 'nothing-here')
     expect(removed).toBe(0)
   })
 
   it('不触碰内存中已实例化的 AtomStore 状态', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const runtime = createRuntime()
     const atomStore = createAtomStore(runtime)
     const cart = familyDef((): number => 0)

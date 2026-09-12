@@ -3,14 +3,14 @@ import type { ICookiesOptions } from '../../src/backends/cookie.js'
 import type { ICookieScope } from '../../src/types/cookie.js'
 import type { IExtensionStage } from '../../src/types/errors.js'
 import type { ISyncCapableStore } from '../../src/types/storage.js'
-import { memoryStorage } from '../../src/memory.js'
+import { memoryStorageHost } from '../../src/memory.js'
 
 expectTypeOf<ICookiesOptions>().toMatchTypeOf<{ scope?: ICookieScope }>()
 expectTypeOf<IExtensionStage>().toEqualTypeOf<
   'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
 >()
-type IMemoryStore = ReturnType<typeof memoryStorage>
-expectTypeOf(memoryStorage()).toMatchTypeOf<ISyncCapableStore<IMemoryStore>>()
+type IMemoryStore = ReturnType<typeof memoryStorageHost>
+expectTypeOf(memoryStorageHost()).toMatchTypeOf<ISyncCapableStore<IMemoryStore>>()
 import type { ICodec } from '../../src/serialize/index.js'
 import type { ISchemaAdapter } from '../../src/schema/index.js'
 

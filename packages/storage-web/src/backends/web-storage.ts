@@ -90,7 +90,7 @@ const assertWebStorageInjection: (
   }
 }
 
-/** LocalStorage / sessionStorage 的共用实现，仅注入不同的 Storage 实例。 `跨标签页 storage 事件不在本层暴露；订阅属于状态层职责。 */
+/** LocalStorage / sessionStorageHost 的共用实现，仅注入不同的 Storage 实例。 `跨标签页 storage 事件不在本层暴露；订阅属于状态层职责。 */
 export const createWebStorageBackend = (
   backend: IBackendKind,
   storage: IWebStorageLike | undefined,

@@ -6,26 +6,10 @@ import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { WebRpcErrorCode } from '../src/errors.js'
 import { createClientEndpoint } from '../src/client.js'
-import { createComposedEndpoint, type IWebRpcEndpointModule } from '../src/core.js'
+import { createComposedEndpoint } from '../src/core.js'
 import { createFullEndpoint } from '../src/full.js'
 import { createProviderEndpoint } from '../src/provider.js'
-import { provider } from '../src/features/provider.js'
-import { control } from '../src/features/control.js'
-import { discovery } from '../src/features/discovery.js'
-import {
-  EndpointModuleKey,
-  defineEndpointModule,
-  getEndpointModuleExposedKeys,
-  getEndpointModuleOwner,
-  getEndpointModuleRootProjection,
-  snapshotEndpointModules
-} from '../src/internal/endpoint-modules.js'
-import {
-  assertPluginClaimParity,
-  toPluginHostDefinition,
-  type IWebRpcPluginDescriptor,
-  type IWebRpcTranslatedPlugin
-} from '../src/internal/plugin-translator.js'
+import { type IWebRpcPluginDescriptor } from '../src/internal/plugin-descriptor.js'
 import {
   WebRpcControlRole,
   WebRpcControlRoleSchema,
@@ -44,32 +28,29 @@ import {
   readEndpointDebugSnapshot,
   registerEndpointTimePortObserver,
   readInboundIdentityReleaseObservation,
-  readProviderResultDisposalObservation,
   readProviderRegistrationObservation,
   registerInboundIdentityReleaseObservation,
-  registerProviderResultDisposalObservation,
   registerProviderRegistrationObservation,
   type IWebRpcTimePortEvent
 } from '../src/internal/test-observer.js'
 import { readComposedDisposalPromises } from '../src/internal/composed-disposal-observer.js'
 import { createConstructionControl } from '../src/internal/construction-install.js'
+import { createEndpointCapabilitiesBatchFeature } from '../src/internal/endpoint-capabilities-plugin.js'
+import {
+  createFirstPartyRoots,
+  type IWebRpcFirstPartyRootName
+} from '../src/internal/first-party-roots.js'
+import {
+  assertFeatureClaimParity,
+  preflightFeatureClaims,
+  readFeaturePolicy
+} from '../src/internal/feature-policy.js'
 import { WebRpcPluginHost } from '../src/internal/web-rpc-plugin-host.js'
 import { createEndpointKernel } from '../src/endpoint-kernel.js'
 import { prepareEndpoint, type IPreparedEndpoint } from '../src/internal/endpoint-bootstrap.js'
-import {
-  buildComposedPluginInventory,
-  type IWebRpcOutboundCommandObservation
-} from '../src/internal/plugin-inventory.js'
-import { hasNativeProviderClaimAuthority } from '../src/internal/provider-claim-authority.js'
-import { outbound } from '../src/features/outbound.js'
-import { oneWay } from '../src/features/one-way.js'
-import {
-  WebRpcConfigurationError,
-  WebRpcError,
-  WebRpcLifecycleError,
-  WebRpcSchemaValidationError
-} from '../src/errors.js'
-import { WebRpcErrorText } from '../src/error-text.js'
+import { buildNativePluginBatch } from '../src/internal/plugin-inventory.js'
+import type { IWebRpcOutboundCommandObservation } from '../src/internal/feature-contract.js'
+import { WebRpcError, WebRpcLifecycleError, WebRpcSchemaValidationError } from '../src/errors.js'
 import { authentication } from '../src/middleware/authentication.js'
 import { abort } from '../src/middleware/abort.js'
 import { connect } from '../src/middleware/connect.js'
@@ -126,6 +107,24 @@ async function settleProviderDelivery(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
+/** Builds a native root record for direct composition readers without reviving module arrays. */
+function createNativeRoots<const TName extends IWebRpcFirstPartyRootName>(
+  ...names: readonly TName[]
+) {
+  return createFirstPartyRoots(new Set(names))
+}
+
+/** Narrows only the attachment shape registered by native outbound preparation. */
+function isOutboundAttachmentHost(value: unknown): value is IOutboundAttachmentHost {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'inboundIdentity' in value &&
+    'sendFrame' in value &&
+    typeof value.sendFrame === 'function'
+  )
+}
+
 /** Wraps a provider envelope with the source metadata consumed by real identity admission. */
 function createInboundProviderFrame(
   request: Readonly<Record<string, unknown>>,
@@ -174,11 +173,14 @@ type IActualAdmissionFixture = {
   readonly id: string
   readonly descriptors: readonly IWebRpcPluginDescriptor[]
   readonly claims: readonly IWebRpcPluginDescriptor['claims'][]
-  readonly translated: readonly IWebRpcTranslatedPlugin[]
   readonly providerIndex: number
   readonly clientTransport: IWebRpcTransport
   readonly host: WebRpcPluginHost
   readonly kernel: ReturnType<typeof createEndpointKernel>
+  /** Reads immutable native root policy; it never creates a legacy descriptor or lifecycle owner. */
+  readonly getNativeRootSharedConsumes: (
+    name: IWebRpcFirstPartyRootName
+  ) => readonly PropertyKey[] | undefined
   readonly stats: {
     activeSubscriptions: number
     subscribeCalls: number
@@ -221,11 +223,12 @@ type IActualAdmissionFixture = {
 }
 
 type IAdmissionFixtureOptions = {
+  /** Selects package-owned native roots without evaluating retired module factories. */
+  readonly rootNames?: readonly IWebRpcFirstPartyRootName[]
   readonly endpointId?: string
   readonly transportPeerId?: string
   readonly sourceProof?: IWebRpcTransport['sourceProof']
   readonly connectConfig?: import('../src/typing.js').IWebRpcConnectConfig
-  readonly transformProvider?: (descriptor: IWebRpcPluginDescriptor) => IWebRpcPluginDescriptor
   readonly transportSend?: (message: unknown) => void | Promise<void>
   readonly hookErrorReporter?: (error: unknown, event: unknown) => void
   readonly contractConfig?: import('../src/typing.js').IWebRpcContractConfig
@@ -233,10 +236,10 @@ type IAdmissionFixtureOptions = {
   readonly observeTransferredCleanup?: (pluginName: string) => void
   readonly providerMap?: Readonly<Record<string, IWebRpcProvider>>
   readonly observeProviderRegistration?: boolean
-  readonly additionalDescriptor?: IWebRpcPluginDescriptor
-  readonly additionalDescriptors?: readonly IWebRpcPluginDescriptor[]
-  readonly featureDefinitions?: readonly IWebRpcEndpointModule[]
-  readonly transformDescriptor?: (descriptor: IWebRpcPluginDescriptor) => IWebRpcPluginDescriptor
+  /** Alters only the capability Feature shared output before the production parity gate. */
+  readonly transformShared?: (
+    output: Readonly<Record<PropertyKey, unknown>>
+  ) => Readonly<Record<PropertyKey, unknown>>
 }
 
 /** Builds one real composed Host transaction through the canonical production inventory seam. */
@@ -292,7 +295,7 @@ async function createActualAdmissionFixture(
     provider: providerMap
   }
   const deferred = await prepareEndpoint(config, { deferMiddlewareInstall: true })
-  const kernel = createEndpointKernel(deferred.transport)
+  const kernel = createEndpointKernel(deferred.transport, deferred.transportSnapshot)
   const unregisterProviderRegistrationObservation = options.observeProviderRegistration
     ? registerProviderRegistrationObservation(kernel)
     : () => undefined
@@ -308,66 +311,112 @@ async function createActualAdmissionFixture(
   )
   let prepared: IPreparedEndpoint<string> | undefined
   let activated = false
-  let translatedFeatures: IWebRpcTranslatedPlugin[] = []
-  const inventory = buildComposedPluginInventory({
-    definitions: snapshotEndpointModules(options.featureDefinitions ?? [outbound(), provider()]),
-    config,
+  /** Observes the actual attachment registered by native outbound preparation; it owns cleanup. */
+  let outboundOwner: IOutboundAttachmentHost | undefined
+  /** Retains the identity coordinator reached through that actual outbound attachment only. */
+  let identityOwner: object | undefined
+  const rootNames = options.rootNames ?? (['first-party-provider'] as const)
+  const roots = createNativeRoots(...rootNames)
+  const capabilityBatch = createEndpointCapabilitiesBatchFeature(
+    roots,
+    Object.freeze({
+      getKernel: () => kernel,
+      getPrepared: () => {
+        if (!prepared) throw new Error('native provider fixture prepared endpoint missing')
+        return prepared
+      },
+      observeOutboundCommand: options.observeOutboundCommand,
+      transformOutput: (phase, output) =>
+        phase === 'shared' && options.transformShared ? options.transformShared(output) : output,
+      transformFeaturePrepare: (name, prepare) =>
+        name === 'first-party-outbound'
+          ? (scope) =>
+              prepare({
+                ...scope,
+                own<T>(resource: T, release: () => void | Promise<void>): T {
+                  if (isOutboundAttachmentHost(resource)) {
+                    outboundOwner = resource
+                    identityOwner = outboundOwner.inboundIdentity
+                  }
+                  return scope.own(resource, release)
+                }
+              })
+          : prepare
+    }),
+    Object.keys(roots).filter((name) => name.startsWith('first-party-')),
+    'first-party-outbound' in roots ? ['first-party-outbound'] : [],
+    Object.keys(roots).filter((name) =>
+      [
+        'first-party-outbound',
+        'first-party-discovery',
+        'first-party-control',
+        'first-party-provider'
+      ].includes(name)
+    ),
+    new Set([
+      ...rootNames,
+      ...(rootNames.includes('first-party-provider') ? ['first-party-outbound'] : [])
+    ])
+  )
+  const capabilityAdmission = capabilityBatch.admission
+  if (capabilityAdmission === undefined)
+    throw new Error('native provider fixture requires a capability admission')
+  const batch = buildNativePluginBatch({
     kernel,
     deferred: deferred as never,
     middlewareSnapshots: deferred.middlewareSnapshots,
     hookEvents: [],
+    featureDefinitions: [
+      {
+        key: capabilityBatch.plugin.definition.name,
+        definition: capabilityBatch.plugin.definition as never,
+        admission: capabilityAdmission
+      }
+    ],
     onPrepared: (value) => {
       prepared = value
     },
-    getPrepared: () => {
-      if (!prepared) throw new Error('admission fixture prepared endpoint missing')
-      return prepared
-    },
-    getFeatureInstallations: () => translatedFeatures,
     onActivationCommitted: () => {
       activated = true
     },
     onActivationRolledBack: () => {
       activated = false
     },
-    observeOutboundCommand: options.observeOutboundCommand
+    onNativeFeatureActivate: () => capabilityBatch.plugin.activate(),
+    onActivationPreflight: (state, getShared) =>
+      assertFeatureClaimParity(admissions, { getShared }, kernel, {
+        activated: state.activated,
+        activationPhase: 'pre-activation',
+        routeKeys: state.routeKeys
+      })
   })
-  const baseDescriptors = inventory.map(({ descriptor }) => descriptor)
-  const providerIndex = baseDescriptors.findIndex(
-    (descriptor) => descriptor.name === EndpointModuleKey.provider
+  const admissions = batch.map(({ admission }) => admission)
+  preflightFeatureClaims(admissions)
+  /** Metadata-only compatibility observation for legacy assertions during reader migration. */
+  const finalDescriptors = batch.map(
+    ({ admission }) =>
+      Object.freeze({
+        name: admission.name,
+        claims: admission.claims,
+        ...(admission.sharedProvides === undefined
+          ? {}
+          : { sharedProvides: admission.sharedProvides }),
+        ...(admission.sharedConsumes === undefined
+          ? {}
+          : { sharedConsumes: admission.sharedConsumes }),
+        ...(admission.sharedOptionalConsumes === undefined
+          ? {}
+          : { sharedOptionalConsumes: admission.sharedOptionalConsumes })
+      }) as IWebRpcPluginDescriptor
   )
-  const descriptors = baseDescriptors.map((descriptor, index) => {
-    const transformedProvider =
-      index === providerIndex && options.transformProvider
-        ? options.transformProvider(descriptor)
-        : descriptor
-    return options.transformDescriptor?.(transformedProvider) ?? transformedProvider
-  })
-  const finalDescriptors = [
-    ...descriptors,
-    ...(options.additionalDescriptors ?? []),
-    ...(options.additionalDescriptor ? [options.additionalDescriptor] : [])
-  ]
+  const providerIndex = finalDescriptors.findIndex(
+    (descriptor) => descriptor.name === 'endpoint-capabilities'
+  )
   const claims = finalDescriptors.map((descriptor) => descriptor.claims)
-  const translated = finalDescriptors.map((descriptor, index) =>
-    toPluginHostDefinition(descriptor, claims[index]!, {
-      onTransferredCleanup: options.observeTransferredCleanup
-    })
-  )
   let activeDescriptors: readonly IWebRpcPluginDescriptor[] = finalDescriptors
-  let activeTranslated = translated
-  translatedFeatures = activeTranslated.filter(
-    (_item, index) => inventory[index]?.role.kind === 'feature'
-  )
   const snapshot = () => ({
     providerState: (() => {
-      const installation = activeTranslated
-        .find(({ definition }) => definition.name === EndpointModuleKey.provider)
-        ?.getLiveInstallation()
-      const debug =
-        installation && typeof installation === 'object'
-          ? readEndpointDebugSnapshot(installation)
-          : undefined
+      const debug = capabilityBatch.plugin.getSnapshotReader()?.()
       return {
         admission: debug?.providerState?.admission ?? 0,
         replay: debug?.providerState?.replay ?? 0,
@@ -385,13 +434,7 @@ async function createActualAdmissionFixture(
     extensions: [...new Set(activeDescriptors.flatMap(({ claims: item }) => item.publicKeys))].map(
       (key) => Object.getOwnPropertyDescriptor(host, key)
     ),
-    installations: activeTranslated.map(
-      ({ getLiveInstallationObservation, getLiveRuntimeMarkers }) => ({
-        installed: getLiveInstallationObservation().installed,
-        extensionKeys: getLiveRuntimeMarkers().extension,
-        sharedKeys: getLiveRuntimeMarkers().shared
-      })
-    ),
+    installations: [],
     activeSubscriptions: stats.activeSubscriptions,
     subscribeCalls: stats.subscribeCalls,
     dispatches: stats.dispatches,
@@ -399,66 +442,36 @@ async function createActualAdmissionFixture(
     kernelState: kernel.state,
     kernelOwners: kernel.ownerKeys,
     kernelRoutes: kernel.routeKeys,
-    resources: kernel.resources.size
+    resources: capabilityBatch.plugin.getSnapshotReader()?.().resources ?? kernel.resources.size
   })
   const installDescriptors = async (
     nextDescriptors: readonly IWebRpcPluginDescriptor[],
     installOptions: { readonly parity?: boolean } = {}
   ): Promise<void> => {
-    const nextClaims = nextDescriptors.map((descriptor) => descriptor.claims)
-    const nextTranslated = nextDescriptors.map((descriptor, index) =>
-      toPluginHostDefinition(descriptor, nextClaims[index]!, {
-        onTransferredCleanup: options.observeTransferredCleanup
-      })
-    )
     activeDescriptors = nextDescriptors
-    activeTranslated = nextTranslated
-    translatedFeatures = activeTranslated.filter(
-      (_item, index) => inventory[index]?.role.kind === 'feature'
-    )
-    const definitions = nextTranslated.map(({ definition }) => definition)
-    const installedView = await host.installBatch(definitions)
-    if (installOptions.parity)
-      assertPluginClaimParity(nextClaims, nextDescriptors, installedView, kernel, {
-        activated,
-        translated: nextTranslated
-      })
+    if (installOptions.parity === false) return
+    const hostView = await host.installBatch(batch.map(({ definition }) => definition))
+    assertFeatureClaimParity(admissions, hostView, kernel, { activated })
   }
   return {
     id: endpointId,
     descriptors: finalDescriptors,
     claims,
-    translated,
     providerIndex,
     clientTransport,
     host,
     kernel,
+    getNativeRootSharedConsumes: (name) =>
+      name in roots ? readFeaturePolicy(roots[name]!).sharedConsumes : undefined,
     stats,
     install: async () => {
       await installDescriptors(finalDescriptors, { parity: true })
     },
     installDescriptors,
-    getTranslatedInstallation: (name) =>
-      activeTranslated.find(({ definition }) => definition.name === name)?.getInstallation(),
-    getProviderInstallation: () => activeTranslated[providerIndex]?.getInstallation(),
-    getIdentityOwner: () => {
-      const installation = activeTranslated
-        .find(({ definition }) => definition.name === EndpointModuleKey.outbound)
-        ?.getLiveInstallation()
-      const owner = getEndpointModuleOwner(installation)
-      if (typeof owner !== 'object' || owner === null) return undefined
-      const identity = (owner as { readonly inboundIdentity?: unknown }).inboundIdentity
-      return typeof identity === 'object' && identity !== null ? identity : undefined
-    },
-    getOutboundOwner: () => {
-      const installation = activeTranslated
-        .find(({ definition }) => definition.name === EndpointModuleKey.outbound)
-        ?.getLiveInstallation()
-      const owner = getEndpointModuleOwner(installation)
-      return typeof owner === 'object' && owner !== null
-        ? (owner as IOutboundAttachmentHost)
-        : undefined
-    },
+    getTranslatedInstallation: () => undefined,
+    getProviderInstallation: () => undefined,
+    getIdentityOwner: () => identityOwner,
+    getOutboundOwner: () => outboundOwner,
     unregisterProviderRegistrationObservation,
     snapshot,
     dispose: async () => {
@@ -469,156 +482,6 @@ async function createActualAdmissionFixture(
       await hostDispose
       if (kernel.state !== 'disposed') kernel.completeDispose()
     }
-  }
-}
-
-/** Creates a schema-derived hostile variant without mutating the unchanged source candidate. */
-function withSchemaDerivedProviderClaims(
-  fixture: IActualAdmissionFixture,
-  sharedConsumes: readonly PropertyKey[],
-  sharedProvides: readonly PropertyKey[] = [WebRpcSharedKey.providerCancellation]
-): readonly IWebRpcPluginDescriptor[] {
-  return fixture.descriptors.map((descriptor, index) =>
-    index === fixture.providerIndex ? { ...descriptor, sharedConsumes, sharedProvides } : descriptor
-  )
-}
-
-/** Reads the package-owned control contract for hostile-variant construction. */
-function controlSharedConsumes(): readonly PropertyKey[] {
-  return WebRpcControlRoleSchema[WebRpcControlRole.control].sharedConsumes
-}
-
-/** Rewrites only the control claims for a hostile B12c04 admission input. */
-function withControlClaims(
-  descriptors: readonly IWebRpcPluginDescriptor[],
-  sharedConsumes: readonly PropertyKey[]
-): readonly IWebRpcPluginDescriptor[] {
-  return descriptors.map((descriptor) =>
-    descriptor.name === EndpointModuleKey.control
-      ? {
-          ...descriptor,
-          sharedConsumes,
-          claims: { ...descriptor.claims, sharedConsumes }
-        }
-      : descriptor
-  )
-}
-
-/** Exercises one real control claim getter cutoff without adding an admission owner. */
-async function expectHostileControlClaimGetterFailure(
-  endpointId: string,
-  hostileIndex: number
-): Promise<void> {
-  const hostileCause = new Error(`cycle-m-control-hostile-${hostileIndex}`)
-  const accesses: PropertyKey[] = []
-  const hostileConsumes = new Proxy([...controlSharedConsumes()], {
-    get(target, property, receiver) {
-      accesses.push(property)
-      if (property === String(hostileIndex)) throw hostileCause
-      return Reflect.get(target, property, receiver)
-    }
-  })
-  const fixture = await createActualAdmissionFixture({
-    endpointId,
-    featureDefinitions: [outbound(), discovery(), control()]
-  })
-  const before = fixture.snapshot()
-  let failure: unknown
-  try {
-    await fixture.installDescriptors(withControlClaims(fixture.descriptors, hostileConsumes))
-  } catch (error) {
-    failure = error
-  }
-  try {
-    expect(failure).toMatchObject({
-      name: 'PluginHostError',
-      source: '@migaia/plugin-host',
-      code: 'PLUGIN_INSTALL_FAILED',
-      detail: { failedName: EndpointModuleKey.control },
-      cause: hostileCause
-    })
-    expect(accesses).toContain(String(hostileIndex))
-    expect(accesses.slice(accesses.indexOf(String(hostileIndex)) + 1)).toEqual([])
-    expect(fixture.snapshot()).toEqual(before)
-  } finally {
-    await fixture.dispose()
-  }
-}
-
-/** Traverses only PluginHost rollback aggregate containers to retain raw cleanup leaves. */
-function flattenRollbackLeaves(value: unknown): readonly unknown[] {
-  if (!(value instanceof AggregateError)) return [value]
-  return value.errors.flatMap((child) => flattenRollbackLeaves(child))
-}
-
-/** Captures one real control Host admission attempt without creating an admission guard. */
-async function expectControlAdmissionFailure(
-  endpointId: string,
-  sharedConsumes: readonly PropertyKey[],
-  expectedKeyText: string
-): Promise<void> {
-  const fixture = await createActualAdmissionFixture({
-    endpointId,
-    featureDefinitions: [outbound(), discovery(), control()]
-  })
-  const before = fixture.snapshot()
-  let failure: unknown
-  try {
-    await fixture.installDescriptors(withControlClaims(fixture.descriptors, sharedConsumes))
-  } catch (error) {
-    failure = error
-  }
-  const hostError = failure as
-    | {
-        readonly name?: unknown
-        readonly source?: unknown
-        readonly code?: unknown
-        readonly cause?: unknown
-        readonly detail?: { readonly failedName?: unknown }
-      }
-    | undefined
-  const primary = hostError?.cause as
-    | {
-        readonly name?: unknown
-        readonly source?: unknown
-        readonly code?: unknown
-        readonly message?: unknown
-      }
-    | undefined
-  try {
-    expect({
-      host: {
-        name: hostError?.name,
-        source: hostError?.source,
-        code: hostError?.code,
-        failedName: hostError?.detail?.failedName
-      },
-      primary: {
-        name: primary?.name,
-        source: primary?.source,
-        code: primary?.code,
-        message: primary?.message
-      },
-      expectedKeyText,
-      unchanged: fixture.snapshot()
-    }).toEqual({
-      host: {
-        name: 'PluginHostError',
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        failedName: EndpointModuleKey.control
-      },
-      primary: {
-        name: 'WebRpcConfigurationError',
-        source: '@migaia/web-rpc',
-        code: WebRpcErrorCode.invalidConfig,
-        message: expect.stringContaining(expectedKeyText)
-      },
-      expectedKeyText,
-      unchanged: before
-    })
-  } finally {
-    await fixture.dispose()
   }
 }
 
@@ -636,14 +499,11 @@ function assertNoRemovedD95Key(keys: readonly PropertyKey[]): void {
 async function readFinalD95BoundaryTexts(): Promise<readonly string[]> {
   const paths = [
     '../src/internal/plugin-descriptor.ts',
-    '../src/internal/plugin-translator.ts',
     '../src/internal/plugin-shared-keys.ts',
     '../src/internal/outbound-attachment.ts',
     '../dist/internal/plugin-descriptor.js',
-    '../dist/internal/plugin-translator.js',
     '../dist/internal/plugin-shared-keys.js',
     '../dist/internal/outbound-attachment.js',
-    '../dist/internal/plugin-translator.d.ts',
     '../dist/internal/plugin-shared-keys.d.ts'
   ] as const
   return Promise.all(paths.map((path) => readFile(new URL(path, import.meta.url), 'utf8')))
@@ -690,75 +550,6 @@ async function assertMigratedControlIgnoresD95(fixture: IActualAdmissionFixture)
   })
 }
 
-/** Calls the real provider publisher, then removes only its cancellation publication. */
-function withoutProviderCancellationPublication(
-  descriptor: IWebRpcPluginDescriptor,
-  onPublished: (value: unknown) => void
-): IWebRpcPluginDescriptor {
-  return {
-    ...descriptor,
-    shared: (installation) => {
-      const published = descriptor.shared?.(installation) ?? {}
-      onPublished(published[WebRpcSharedKey.providerCancellation])
-      const omitted = { ...published }
-      delete omitted[WebRpcSharedKey.providerCancellation]
-      return omitted
-    }
-  }
-}
-
-/** Runs a schema-derived hostile variant through the unmodified Host path. */
-async function expectSchemaDerivedHostileVariantFailure(
-  descriptors: readonly IWebRpcPluginDescriptor[],
-  fixture: IActualAdmissionFixture,
-  expectedSlot?: 'claims' | 'sharedConsumes' | 'sharedProvides'
-): Promise<void> {
-  const before = fixture.snapshot()
-  let error: unknown
-  let primary: unknown
-  try {
-    await fixture.installDescriptors(descriptors)
-  } catch (caught) {
-    error = caught
-    primary = (caught as { readonly cause?: unknown }).cause
-  }
-  const after = fixture.snapshot()
-  const detail = (error as { readonly detail?: { readonly failedName?: unknown } } | undefined)
-    ?.detail
-  const evidence = {
-    hostError:
-      (error as { readonly source?: unknown } | undefined)?.source === '@migaia/plugin-host',
-    code: (error as { readonly code?: unknown } | undefined)?.code,
-    failedName: detail?.failedName,
-    primary,
-    cause: (primary as { readonly cause?: unknown } | undefined)?.cause,
-    roleSlot: expectedSlot
-      ? typeof (primary as { readonly message?: unknown } | undefined)?.message === 'string' &&
-        (primary as { readonly message: string }).message.includes(
-          `role=provider; slot=${expectedSlot}`
-        )
-      : true,
-    snapshotBefore: before,
-    snapshotAfter: after
-  }
-  expect({
-    hostError: evidence.hostError,
-    code: evidence.code,
-    failedName: evidence.failedName,
-    primaryType: evidence.primary?.constructor.name,
-    cause: evidence.cause,
-    roleSlot: evidence.roleSlot
-  }).toEqual({
-    hostError: true,
-    code: 'PLUGIN_INSTALL_FAILED',
-    failedName: EndpointModuleKey.provider,
-    primaryType: 'WebRpcConfigurationError',
-    cause: undefined,
-    roleSlot: true
-  })
-  expect(evidence.snapshotAfter).toEqual(evidence.snapshotBefore)
-}
-
 /** Registers a read-only identity-release counter against the fixture's real outbound owner. */
 function registerFixtureIdentityReleaseObservation(fixture: IActualAdmissionFixture): {
   readonly read: () => number | undefined
@@ -774,29 +565,6 @@ function registerFixtureIdentityReleaseObservation(fixture: IActualAdmissionFixt
 }
 
 describe('Cycle H B12c02 provider production-seam RED matrix', () => {
-  it('T109 unchanged actual candidate RED: claims remain broad versus the narrow schema', () => {
-    const providerDescriptor = snapshotEndpointModules([provider()]).find(
-      (descriptor) => descriptor.key === EndpointModuleKey.provider
-    )
-    expect(providerDescriptor).toBeDefined()
-    expect(
-      providerDescriptor?.requires.map((requirement) =>
-        typeof requirement === 'string' ? requirement : requirement.key
-      )
-    ).toEqual([EndpointModuleKey.outbound])
-    const schema = WebRpcProviderRoleSchema[WebRpcProviderRole.provider]
-    expect(providerDescriptor?.claims).toEqual({
-      routes: ['request'],
-      provides: [],
-      consumes: ['inbound-identity', 'variation-coordinator'],
-      publicKeys: [...schema.publicKeys],
-      exposedKeys: [...schema.exposedKeys],
-      activator: false,
-      sharedProvides: [...schema.sharedProvides],
-      sharedConsumes: [...schema.sharedConsumes]
-    })
-  })
-
   it('T110 real transaction baseline: provider RPC and public boundary execute before projection RED', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createRealProvider('provider-exposure-host', serverTransport, {
@@ -1051,7 +819,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(hostFailure).toMatchObject({
         source: '@migaia/plugin-host',
         code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: EndpointModuleKey.provider },
+        detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
           name: 'WebRpcError',
           source: '@migaia/web-rpc',
@@ -1133,15 +901,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await fixture.dispose()
     }
     expect(readProviderRegistrationObservation(fixture.kernel)).toBeUndefined()
-  })
-
-  it('T118 source deletion boundary rejects D95 bridge ownership in provider files', async () => {
-    const providerDescriptor = snapshotEndpointModules([provider()]).find(
-      (descriptor) => descriptor.key === EndpointModuleKey.provider
-    )
-    expect(providerDescriptor?.claims.sharedConsumes).not.toContain(
-      WebRpcSharedKey.outboundAttachment
-    )
   })
 
   it('T121 source ownership scan rejects provider attachment broad-bridge imports', async () => {
@@ -1272,25 +1031,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(WebRpcProviderCancellationPortMetadata).not.toHaveProperty('abort')
   })
 
-  it('T123 provider descriptor and selected-root projection remain separate after the real baseline', () => {
-    const providerModule = provider()
-    const descriptor = snapshotEndpointModules([providerModule]).find(
-      (candidate) => candidate.key === EndpointModuleKey.provider
-    )
-    expect(descriptor?.claims.exposedKeys).toEqual(['provide'])
-    expect(getEndpointModuleExposedKeys(providerModule)).toEqual(['provide'])
-    expect(getEndpointModuleRootProjection(providerModule)).toEqual([
-      'send',
-      'sendAll',
-      'dispatch',
-      'dispatchAll',
-      'provide'
-    ])
-    expect(getEndpointModuleRootProjection(providerModule)).not.toEqual(
-      expect.arrayContaining(['on', 'hooks', 'dispose', 'getShared', 'use'])
-    )
-  })
-
   it('T124 real provider snapshot reads outer config and every provider entry once', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     const reads: string[] = []
@@ -1325,522 +1065,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(readEndpointDebugSnapshot(server)?.providers).toBe(3)
     } finally {
       await server.dispose()
-    }
-  })
-
-  it('T125 schema-derived hostile variant RED: missing outboundOperations reaches Host admission without mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(fixture, [
-          WebRpcSharedKey.inboundIdentity,
-          WebRpcSharedKey.variationCoordinator
-        ]),
-        fixture,
-        'sharedConsumes'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T126 schema-derived hostile variant RED: missing inboundIdentity reaches Host admission without mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(fixture, [
-          WebRpcSharedKey.outboundOperations,
-          WebRpcSharedKey.variationCoordinator
-        ]),
-        fixture,
-        'sharedConsumes'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T127 schema-derived hostile variant RED: missing variationCoordinator reaches Host admission without mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(fixture, [
-          WebRpcSharedKey.outboundOperations,
-          WebRpcSharedKey.inboundIdentity
-        ]),
-        fixture,
-        'sharedConsumes'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T128 schema-derived hostile variant RED: missing providerCancellation reaches Host admission without mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(
-          fixture,
-          [
-            WebRpcSharedKey.outboundOperations,
-            WebRpcSharedKey.inboundIdentity,
-            WebRpcSharedKey.variationCoordinator
-          ],
-          []
-        ),
-        fixture,
-        'sharedProvides'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T139 schema-derived hostile variant RED: extra provider claim reaches Host admission without mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(fixture, [
-          WebRpcSharedKey.outboundOperations,
-          WebRpcSharedKey.inboundIdentity,
-          WebRpcSharedKey.variationCoordinator,
-          WebRpcSharedKey.providerCancellation
-        ]),
-        fixture,
-        'sharedConsumes'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T140 schema-derived duplicate descriptor baseline reaches Host admission without mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      const candidate = fixture.descriptors[fixture.providerIndex]!
-      const descriptors = [...fixture.descriptors, candidate]
-      const before = fixture.snapshot()
-      let failure: unknown
-      try {
-        await fixture.installDescriptors(descriptors)
-      } catch (error) {
-        failure = error
-      }
-      expect(failure).toMatchObject({
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_DUPLICATE'
-      })
-      const after = fixture.snapshot()
-      expect({
-        ...after,
-        installations: after.installations.slice(0, before.installations.length)
-      }).toEqual(before)
-      expect(after.installations.at(-1)).toEqual({
-        installed: false,
-        extensionKeys: [],
-        sharedKeys: []
-      })
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T141 schema-derived hostile variant RED: forged string claim reaches Host admission without mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(fixture, ['forged-provider-key']),
-        fixture,
-        'sharedConsumes'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T142 schema-derived hostile variant RED: forged symbol claim reaches Host admission without mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(fixture, [Symbol('forged-provider-key')]),
-        fixture,
-        'sharedConsumes'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T149 schema-derived all-absent provider claims fail through Host before mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(fixture, [], []),
-        fixture,
-        'sharedConsumes'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T150 schema-derived all-forged provider claims fail through Host before mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await expectSchemaDerivedHostileVariantFailure(
-        withSchemaDerivedProviderClaims(
-          fixture,
-          [Symbol('forged-consume')],
-          [Symbol('forged-provide')]
-        ),
-        fixture,
-        'sharedConsumes'
-      )
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T151 hostile native claim access has identical async and sync Host parity', async () => {
-    const cause = new Error('hostile native claim getter')
-    const createHostFailure = async (sync: boolean): Promise<unknown> => {
-      const fixture = await createActualAdmissionFixture()
-      try {
-        const definition = fixture.translated[fixture.providerIndex]!.definition
-        const hostile = new Proxy(definition, {
-          get(target, key, receiver) {
-            if (key === 'sharedConsumes') throw cause
-            return Reflect.get(target, key, receiver)
-          }
-        })
-        const before = fixture.snapshot()
-        let failure: unknown
-        try {
-          if (sync) fixture.host.installBatchSync([hostile])
-          else await fixture.host.installBatch([hostile])
-        } catch (error) {
-          failure = error
-        }
-        expect(fixture.snapshot()).toEqual(before)
-        return failure
-      } finally {
-        await fixture.dispose()
-      }
-    }
-    const asyncFailure = await createHostFailure(false)
-    const syncFailure = await createHostFailure(true)
-    for (const failure of [asyncFailure, syncFailure]) {
-      expect(failure).toMatchObject({
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: 'provider' }
-      })
-      expect((failure as { readonly cause?: { readonly cause?: unknown } }).cause).toMatchObject({
-        cause
-      })
-    }
-  })
-
-  it('T159 marked claim clone loses provider authority before Host mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      const providerDescriptor = fixture.descriptors[fixture.providerIndex]!
-      const clonedClaims = { ...providerDescriptor.claims }
-      const cloned = fixture.descriptors.map((descriptor, index) =>
-        index === fixture.providerIndex
-          ? {
-              ...descriptor,
-              claims: clonedClaims,
-              sharedConsumes: [...WebRpcProviderRoleSchema.provider.sharedConsumes],
-              sharedProvides: [WebRpcSharedKey.providerCancellation]
-            }
-          : descriptor
-      )
-      await expectSchemaDerivedHostileVariantFailure(cloned, fixture, 'claims')
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T160 frozen provider descriptor retains exact fail-before-mutation admission', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      const variant = withSchemaDerivedProviderClaims(fixture, [
-        WebRpcSharedKey.inboundIdentity,
-        WebRpcSharedKey.variationCoordinator
-      ])
-      const frozen = variant.map((descriptor, index) =>
-        index === fixture.providerIndex ? Object.freeze({ ...descriptor }) : descriptor
-      )
-      await expectSchemaDerivedHostileVariantFailure(frozen, fixture, 'sharedConsumes')
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T161 prototype claim getter is wrapped without Host mutation', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      const cause = new Error('prototype provider claim getter')
-      const providerDescriptor = fixture.translated[fixture.providerIndex]!.definition
-      const prototype = {
-        get sharedConsumes(): readonly PropertyKey[] {
-          throw cause
-        }
-      }
-      const hostile = Object.create(prototype) as typeof providerDescriptor
-      for (const key of Reflect.ownKeys(providerDescriptor)) {
-        if (key === 'sharedConsumes') continue
-        Object.defineProperty(
-          hostile,
-          key,
-          Object.getOwnPropertyDescriptor(providerDescriptor, key)!
-        )
-      }
-      const before = fixture.snapshot()
-      let failure: unknown
-      try {
-        await fixture.host.installBatch([hostile])
-      } catch (error) {
-        failure = error
-      }
-      expect(failure).toMatchObject({
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: 'provider' },
-        cause: { cause }
-      })
-      expect(fixture.snapshot()).toEqual(before)
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T162 generic provider-name package-key collision remains admitted', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      await fixture.host.installBatch([
-        {
-          name: 'provider',
-          sharedProvides: [WebRpcSharedKey.providerCancellation],
-          install: () => ({})
-        } as unknown as Parameters<typeof fixture.host.installBatch>[0][number]
-      ])
-      const dispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(dispose)
-      await dispose
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T163 structured-clone and foreign-token-shaped claims cannot mint provider authority', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      const providerDescriptor = fixture.descriptors[fixture.providerIndex]!
-      const clonedClaims = structuredClone({
-        ...providerDescriptor.claims,
-        sharedProvides: [],
-        sharedConsumes: providerDescriptor.claims.sharedConsumes?.map((key) =>
-          typeof key === 'symbol' ? (key.description ?? 'foreign-symbol') : key
-        )
-      })
-      expect(hasNativeProviderClaimAuthority(providerDescriptor.claims)).toBe(true)
-      expect(hasNativeProviderClaimAuthority(clonedClaims)).toBe(false)
-      const foreignToken = Object.freeze({ key: EndpointModuleKey.provider })
-      expect(hasNativeProviderClaimAuthority(foreignToken)).toBe(false)
-      const hostile = fixture.descriptors.map((descriptor, index) =>
-        index === fixture.providerIndex
-          ? {
-              ...descriptor,
-              claims: clonedClaims,
-              sharedConsumes: [...WebRpcProviderRoleSchema.provider.sharedConsumes],
-              sharedProvides: [WebRpcSharedKey.providerCancellation]
-            }
-          : descriptor
-      )
-      await expectSchemaDerivedHostileVariantFailure(hostile, fixture, 'claims')
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T164 direct async/sync Host and canonical composition reject the same unmarked provider', async () => {
-    const fixture = await createActualAdmissionFixture()
-    try {
-      const hostile = withSchemaDerivedProviderClaims(
-        fixture,
-        [...WebRpcProviderRoleSchema.provider.sharedConsumes],
-        [WebRpcSharedKey.providerCancellation]
-      ).map((descriptor, index) =>
-        index === fixture.providerIndex
-          ? { ...descriptor, claims: { ...descriptor.claims } }
-          : descriptor
-      )
-      const directFailures: unknown[] = []
-      for (const sync of [false, true]) {
-        const before = fixture.snapshot()
-        try {
-          if (sync)
-            fixture.host.installBatchSync(
-              hostile.map((item) => toPluginHostDefinition(item, item.claims!).definition)
-            )
-          else {
-            const translated = hostile.map((item) => toPluginHostDefinition(item, item.claims!))
-            await fixture.host.installBatch(translated.map(({ definition }) => definition))
-          }
-        } catch (error) {
-          directFailures.push(error)
-        }
-        expect(fixture.snapshot()).toEqual(before)
-      }
-      expect(directFailures).toHaveLength(2)
-      for (const failure of directFailures) {
-        expect(failure).toBeInstanceOf(Error)
-        expect(failure).toMatchObject({
-          name: 'PluginHostError',
-          source: '@migaia/plugin-host',
-          code: 'PLUGIN_INSTALL_FAILED',
-          detail: { failedName: EndpointModuleKey.provider }
-        })
-        const primary = (failure as { readonly cause?: unknown }).cause
-        expect(primary).toBeInstanceOf(WebRpcConfigurationError)
-        expect(primary).toMatchObject({
-          name: 'WebRpcConfigurationError',
-          source: '@migaia/web-rpc',
-          code: WebRpcErrorCode.invalidConfig
-        })
-        expect((primary as { readonly cause?: unknown }).cause).toBeUndefined()
-      }
-
-      const transportStats = { subscribe: 0, send: 0, close: 0 }
-      const transport: IWebRpcTransport = {
-        platform: 'Memory',
-        ownership: 'borrowed',
-        send() {
-          transportStats.send += 1
-        },
-        subscribe() {
-          transportStats.subscribe += 1
-          return () => undefined
-        },
-        close() {
-          transportStats.close += 1
-        }
-      }
-      const transportBefore = { ...transportStats }
-      const foreignProvider = defineEndpointModule<IWebRpcCoreConfig, object>(
-        EndpointModuleKey.provider,
-        async () => ({}),
-        [],
-        [],
-        {
-          routes: ['request'],
-          publicKeys: [...WebRpcProviderRoleSchema.provider.publicKeys],
-          exposedKeys: [...WebRpcProviderRoleSchema.provider.exposedKeys],
-          sharedProvides: [WebRpcSharedKey.providerCancellation],
-          sharedConsumes: [...WebRpcProviderRoleSchema.provider.sharedConsumes]
-        }
-      )
-      let canonicalFailure: unknown
-      try {
-        await createComposedEndpoint(
-          { id: 'provider-unmarked-canonical', transport, middlewares: [connect({ transport })] },
-          [outbound(), foreignProvider]
-        )
-      } catch (error) {
-        canonicalFailure = error
-      }
-      expect(canonicalFailure).toBeInstanceOf(WebRpcConfigurationError)
-      expect(canonicalFailure).toMatchObject({
-        name: 'WebRpcConfigurationError',
-        source: '@migaia/web-rpc',
-        code: WebRpcErrorCode.invalidConfig
-      })
-      expect((canonicalFailure as { readonly detail?: unknown }).detail).toBeUndefined()
-      expect((canonicalFailure as { readonly cause?: unknown }).cause).toBeUndefined()
-      expect(transportStats).toEqual(transportBefore)
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T143 schema-derived hostile variant RED: admitted package key reaches Host publication mismatch', async () => {
-    let cancellationPublication: unknown
-    const fixture = await createActualAdmissionFixture({
-      transformProvider: (descriptor) =>
-        withoutProviderCancellationPublication(descriptor, (value) => {
-          cancellationPublication = value
-        })
-    })
-    try {
-      const before = fixture.snapshot()
-      let failure: unknown
-      try {
-        await fixture.installDescriptors(
-          withSchemaDerivedProviderClaims(fixture, [
-            WebRpcSharedKey.outboundOperations,
-            WebRpcSharedKey.inboundIdentity,
-            WebRpcSharedKey.variationCoordinator
-          ]),
-          { parity: true }
-        )
-      } catch (error) {
-        failure = error
-      }
-      const after = fixture.snapshot()
-      expect(cancellationPublication).toMatchObject({ abort: expect.any(Function) })
-      expect(failure).toBeInstanceOf(WebRpcConfigurationError)
-      expect(failure).toHaveProperty('code', WebRpcErrorCode.invalidConfig)
-      expect(after).not.toEqual(before)
-      expect(after.installations.some(({ installed }) => installed)).toBe(true)
-      const hostDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      await expect(hostDispose).resolves.toMatchObject({
-        logicalTerminal: true,
-        cleanupComplete: true,
-        cleanupErrors: []
-      })
-      const terminalDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(terminalDispose)
-      expect(terminalDispose).toBe(hostDispose)
-      await expect(terminalDispose).resolves.toMatchObject({
-        logicalTerminal: true,
-        cleanupComplete: true,
-        cleanupErrors: []
-      })
-      const terminal = fixture.snapshot()
-      expect({
-        shared: terminal.shared.every((value) => value === undefined),
-        extensions: terminal.extensions.every((descriptor) => descriptor === undefined),
-        installations: terminal.installations.every(
-          ({ installed, extensionKeys, sharedKeys }) =>
-            !installed && extensionKeys.length === 0 && sharedKeys.length === 0
-        ),
-        activeSubscriptions: terminal.activeSubscriptions,
-        activated: terminal.activated,
-        kernelState: terminal.kernelState,
-        kernelOwners: terminal.kernelOwners,
-        kernelRoutes: terminal.kernelRoutes,
-        resources: terminal.resources,
-        subscribeCalls: terminal.subscribeCalls,
-        dispatches: terminal.dispatches
-      }).toEqual({
-        shared: true,
-        extensions: true,
-        installations: true,
-        activeSubscriptions: 0,
-        activated: false,
-        kernelState: 'disposed',
-        kernelOwners: [],
-        kernelRoutes: [],
-        resources: 0,
-        subscribeCalls: after.subscribeCalls,
-        dispatches: after.dispatches
-      })
-    } finally {
-      await fixture.dispose()
     }
   })
 
@@ -1996,409 +1220,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T144 schema-derived admitted-unpublished provider key RED: controlled consumer reaches Host rollback', async () => {
-    const consumerPrimary = new WebRpcConfigurationError(
-      WebRpcErrorText.endpointModuleDependencyMissing
-    )
-    let providerSharedCalled = false
-    let cancellationPublication: unknown
-    let consumerReached = false
-    const fixture = await createActualAdmissionFixture({
-      transformProvider: (descriptor) => ({
-        ...withoutProviderCancellationPublication(descriptor, (value) => {
-          providerSharedCalled = true
-          cancellationPublication = value
-        }),
-        sharedConsumes: [...WebRpcProviderRoleSchema.provider.sharedConsumes],
-        sharedProvides: [WebRpcSharedKey.providerCancellation]
-      }),
-      additionalDescriptor: {
-        name: 'provider-cancellation-consumer',
-        claims: {
-          routes: [],
-          provides: [],
-          consumes: [],
-          publicKeys: [],
-          exposedKeys: [],
-          activator: false
-        },
-        sharedConsumes: [WebRpcSharedKey.providerCancellation],
-        install: async (scope) => {
-          const cancellation = scope.getShared(WebRpcSharedKey.providerCancellation)
-          if (cancellation === undefined) {
-            consumerReached = true
-            throw consumerPrimary
-          }
-          return {}
-        }
-      }
-    })
-    try {
-      const before = fixture.snapshot()
-      let failure: unknown
-      try {
-        await fixture.install()
-      } catch (error) {
-        failure = error
-      }
-      expect(failure).toBeInstanceOf(Error)
-      expect((failure as Error).name).toBe('PluginHostError')
-      expect(failure).toMatchObject({
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        cause: consumerPrimary
-      })
-      expect((failure as { readonly detail?: { readonly failedName?: unknown } }).detail).toEqual(
-        expect.objectContaining({ failedName: 'provider-cancellation-consumer' })
-      )
-      const after = fixture.snapshot()
-      expect({ providerSharedCalled, consumerReached }).toEqual({
-        providerSharedCalled: true,
-        consumerReached: true
-      })
-      expect(cancellationPublication).toMatchObject({ abort: expect.any(Function) })
-      expect(after).not.toEqual(before)
-      const hostDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      await expect(hostDispose).resolves.toMatchObject({
-        logicalTerminal: true,
-        cleanupComplete: true,
-        cleanupErrors: []
-      })
-      const terminalDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(terminalDispose)
-      expect(terminalDispose).toBe(hostDispose)
-      await expect(terminalDispose).resolves.toMatchObject({
-        logicalTerminal: true,
-        cleanupComplete: true,
-        cleanupErrors: []
-      })
-      const terminal = fixture.snapshot()
-      const terminalResidue = {
-        shared: terminal.shared.map((value) => value === undefined),
-        extensions: terminal.extensions.map((descriptor) => descriptor === undefined),
-        installations: terminal.installations.map(({ installed }) => installed),
-        activeSubscriptions: terminal.activeSubscriptions,
-        kernelState: terminal.kernelState,
-        kernelOwners: terminal.kernelOwners,
-        kernelRoutes: terminal.kernelRoutes,
-        resources: terminal.resources
-      }
-      expect({
-        failedName: (failure as { readonly detail?: { readonly failedName?: unknown } }).detail
-          ?.failedName,
-        terminalResidue
-      }).toEqual({
-        failedName: 'provider-cancellation-consumer',
-        terminalResidue: {
-          shared: terminal.shared.map(() => true),
-          extensions: terminal.extensions.map(() => true),
-          installations: terminal.installations.map(() => false),
-          activeSubscriptions: 0,
-          kernelState: 'disposed',
-          kernelOwners: [],
-          kernelRoutes: [],
-          resources: 0
-        }
-      })
-    } finally {
-      await Promise.resolve()
-    }
-  })
-
-  it('T145 real Host rollback RED: provider result and later resources preserve reverse identities', async () => {
-    const primary = new Error('provider later participant failure')
-    const resultCleanup = new Error('provider result cleanup failure')
-    const firstCleanup = new Error('later first cleanup failure')
-    const secondCleanup = new Error('later second cleanup failure')
-    const releases: string[] = []
-    const fixture = await createActualAdmissionFixture({
-      additionalDescriptors: [
-        {
-          name: 'provider-shaped-result',
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          install: async () => ({
-            dispose: async () => {
-              releases.push('provider-result')
-              throw resultCleanup
-            }
-          })
-        },
-        {
-          name: 'provider-later-participant',
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          install: async (scope) => {
-            scope.own({}, () => {
-              releases.push('later-first')
-              throw firstCleanup
-            })
-            scope.own({}, () => {
-              releases.push('later-second')
-              throw secondCleanup
-            })
-            throw primary
-          }
-        }
-      ]
-    })
-    const before = fixture.snapshot()
-    let failure: unknown
-    try {
-      await fixture.install()
-    } catch (error) {
-      failure = error
-    }
-    expect(failure).toBeInstanceOf(Error)
-    expect((failure as Error).name).toBe('PluginHostError')
-    expect(failure).toMatchObject({
-      source: '@migaia/plugin-host',
-      code: 'PLUGIN_INSTALL_FAILED',
-      cause: primary
-    })
-    expect((failure as { readonly detail?: { readonly failedName?: unknown } }).detail).toEqual(
-      expect.objectContaining({ failedName: 'provider-later-participant' })
-    )
-    const rollbackErrors = (
-      failure as { readonly detail?: { readonly rollbackErrors?: readonly unknown[] } }
-    ).detail?.rollbackErrors
-    expect(rollbackErrors).toHaveLength(3)
-    expect(
-      rollbackErrors?.flatMap((error) =>
-        error instanceof AggregateError ? [...error.errors] : [error]
-      )
-    ).toEqual([secondCleanup, firstCleanup, resultCleanup])
-    expect(releases).toEqual(['later-second', 'later-first', 'provider-result'])
-    const hostDispose = fixture.host.dispose()
-    expect(fixture.host.dispose()).toBe(hostDispose)
-    await expect(hostDispose).resolves.toMatchObject({
-      logicalTerminal: true,
-      cleanupComplete: true,
-      cleanupErrors: []
-    })
-    const terminalDispose = fixture.host.dispose()
-    expect(fixture.host.dispose()).toBe(terminalDispose)
-    expect(terminalDispose).toBe(hostDispose)
-    await expect(terminalDispose).resolves.toMatchObject({
-      logicalTerminal: true,
-      cleanupComplete: true,
-      cleanupErrors: []
-    })
-    const terminal = fixture.snapshot()
-    expect(terminal).not.toEqual(before)
-    const terminalResidue = {
-      shared: terminal.shared.map((value) => value === undefined),
-      extensions: terminal.extensions.map((descriptor) => descriptor === undefined),
-      installations: terminal.installations.map(({ installed }) => installed),
-      activeSubscriptions: terminal.activeSubscriptions,
-      kernelState: terminal.kernelState,
-      kernelOwners: terminal.kernelOwners,
-      kernelRoutes: terminal.kernelRoutes,
-      resources: terminal.resources
-    }
-    expect(terminalResidue).toEqual({
-      shared: terminal.shared.map(() => true),
-      extensions: terminal.extensions.map(() => true),
-      installations: terminal.installations.map(() => false),
-      activeSubscriptions: 0,
-      kernelState: 'disposed',
-      kernelOwners: [],
-      kernelRoutes: [],
-      resources: 0
-    })
-  })
-
-  it('T146 canonical endpoint disposal seam RED: Host cleanup evidence is bounded by the real Host transaction', async () => {
-    const firstCleanup = new Error('provider result disposal failure')
-    const secondCleanup = new Error('provider secondary disposal failure')
-    let disposeCalls = 0
-    const fixture = await createActualAdmissionFixture({
-      additionalDescriptors: [
-        {
-          name: 'provider-shaped-disposal-result',
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          install: async () => ({
-            dispose: async () => {
-              disposeCalls += 1
-              throw firstCleanup
-            }
-          })
-        },
-        {
-          name: 'provider-shaped-secondary-disposal-result',
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          install: async () => ({
-            dispose: async () => {
-              disposeCalls += 1
-              throw secondCleanup
-            }
-          })
-        }
-      ]
-    })
-    try {
-      await fixture.install()
-      const before = fixture.snapshot()
-      const hostDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      let hostFailure: unknown
-      try {
-        await hostDispose
-      } catch (error) {
-        hostFailure = error
-      }
-      expect(hostFailure).toBeInstanceOf(WebRpcLifecycleError)
-      expect(hostFailure).toMatchObject({
-        source: '@migaia/web-rpc',
-        code: WebRpcErrorCode.endpointDisposed,
-        cause: secondCleanup,
-        cleanupErrors: [
-          { resource: 'resource disposer', error: secondCleanup },
-          { resource: 'resource disposer', error: firstCleanup }
-        ]
-      })
-      expect(disposeCalls).toBe(2)
-      const terminalDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(terminalDispose)
-      expect(terminalDispose).toBe(hostDispose)
-      await expect(terminalDispose).rejects.toBe(hostFailure)
-      const terminal = fixture.snapshot()
-      expect(terminal).not.toEqual(before)
-      expect(terminal.shared.every((value) => value === undefined)).toBe(true)
-      expect(terminal.extensions.every((descriptor) => descriptor === undefined)).toBe(true)
-      expect(terminal.installations.every(({ installed }) => !installed)).toBe(true)
-      expect(terminal.activeSubscriptions).toBe(0)
-      expect(terminal.kernelState).toBe('disposed')
-      expect(terminal.kernelOwners).toEqual([])
-      expect(terminal.kernelRoutes).toEqual([])
-      expect(terminal.resources).toBe(0)
-    } finally {
-      await fixture.dispose().catch(() => undefined)
-    }
-  })
-
-  it('T147 canonical composed endpoint RED: private Host and endpoint disposal identities share one failing transaction', async () => {
-    const secondCleanup = new Error('round eight second cleanup failure')
-    const firstCleanup = new Error('round eight first cleanup failure')
-    const releases: string[] = []
-    const firstModule = defineEndpointModule<IWebRpcCoreConfig, object>(
-      'round-eight-first-disposer',
-      async () => ({
-        dispose: async () => {
-          releases.push('first')
-          throw firstCleanup
-        }
-      })
-    )
-    const secondModule = defineEndpointModule<IWebRpcCoreConfig, object>(
-      'round-eight-second-disposer',
-      async () => ({
-        dispose: async () => {
-          releases.push('second')
-          throw secondCleanup
-        }
-      })
-    )
-    const transport: IWebRpcTransport = {
-      platform: 'Memory',
-      ownership: 'borrowed',
-      send() {},
-      subscribe() {
-        return () => undefined
-      }
-    }
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'round-eight-canonical-disposal',
-        transport,
-        middlewares: [connect({ transport })]
-      },
-      [outbound(), firstModule, secondModule]
-    )
-    const before = readEndpointDebugSnapshot(endpoint)
-    expect(before).toBeDefined()
-    expect(readComposedDisposalPromises(endpoint)).toBeUndefined()
-
-    const endpointDispose = endpoint.dispose()
-    const observed = readComposedDisposalPromises(endpoint)
-    expect(observed).toBeDefined()
-    expect(observed?.endpoint).toBe(endpointDispose)
-    expect(observed?.host).toBe(endpointDispose)
-    expect(endpoint.dispose()).toBe(endpointDispose)
-    const endpointFailure = await endpointDispose.catch((error: unknown) => error)
-    const hostFailure = await observed!.host.catch((error: unknown) => error)
-
-    expect(hostFailure).toBe(endpointFailure)
-    expect(endpointFailure).toBeInstanceOf(Error)
-    expect(endpointFailure).toMatchObject({
-      name: 'WebRpcLifecycleError',
-      source: '@migaia/web-rpc',
-      code: 'ENDPOINT_DISPOSED',
-      cause: secondCleanup
-    })
-    expect(
-      (endpointFailure as { readonly cleanupErrors?: readonly unknown[] }).cleanupErrors
-    ).toEqual([
-      { resource: 'resource disposer', error: secondCleanup },
-      { resource: 'resource disposer', error: firstCleanup }
-    ])
-    expect(releases).toEqual(['second', 'first'])
-    expect(endpoint.dispose()).toBe(endpointDispose)
-    expect(readComposedDisposalPromises(endpoint)?.endpoint).toBe(endpointDispose)
-    const after = readEndpointDebugSnapshot(endpoint)
-    expect(after).toMatchObject({
-      phase: 'disposed',
-      pending: 0,
-      pingPending: 0,
-      activeControllers: 0,
-      chunks: 0,
-      providers: 0,
-      events: 0,
-      hooks: 0,
-      resources: 0,
-      owners: [],
-      discovery: {
-        local: 0,
-        remote: 0,
-        waiters: 0,
-        tasks: 0,
-        timers: 0,
-        manualWaiters: 0,
-        inboundQueries: 0,
-        inboundTimers: 0
-      }
-    })
-    expect(hostFailure).toBe(endpointFailure)
-    expect(after).not.toBe(before)
-  })
-
   it('T148 composed disposal observer fails closed for forged and separate endpoint instances', async () => {
     const transport: IWebRpcTransport = {
       platform: 'Memory',
@@ -2409,7 +1230,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       }
     }
     const createEndpoint = (id: string) =>
-      createComposedEndpoint({ id, transport, middlewares: [connect({ transport })] }, [outbound()])
+      createFullEndpoint({ id, transport, middlewares: [connect({ transport })] })
     const first = await createEndpoint('round-eight-first-endpoint')
     const second = await createEndpoint('round-eight-second-endpoint')
     expect(readComposedDisposalPromises(first)).toBeUndefined()
@@ -2494,7 +1315,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T246 real composed discovery consumes narrow ports and publishes only its resolver', async () => {
     const discoveryFixture = await createActualAdmissionFixture({
       endpointId: 'cycle-m-discovery-contract',
-      featureDefinitions: [outbound(), discovery()]
+      rootNames: ['first-party-discovery']
     })
     const [baseClientTransport, baseServerTransport] = createMemoryTransportPair()
     const clientTransport = {
@@ -2513,7 +1334,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      [outbound(), discovery(), control()] as const
+      createNativeRoots('first-party-outbound', 'first-party-discovery', 'first-party-control')
     )
     const server = await createComposedEndpoint(
       {
@@ -2521,25 +1342,16 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport }), ping()]
       },
-      [outbound(), discovery(), control()] as const
+      createNativeRoots('first-party-outbound', 'first-party-discovery', 'first-party-control')
     )
     try {
       await discoveryFixture.install()
-      const descriptor = discoveryFixture.descriptors.find(
-        (candidate) => candidate.name === EndpointModuleKey.discovery
-      )
-      expect(descriptor?.sharedConsumes).toEqual([
-        WebRpcSharedKey.inboundIdentity,
-        WebRpcSharedKey.outboundOperations,
-        WebRpcSharedKey.time
-      ])
-      expect(descriptor?.sharedProvides).toEqual([WebRpcSharedKey.discoveryResolver])
+      // Native capability assembly exposes real ports through the Host, not a descriptor copy.
       expect(discoveryFixture.host.getShared(WebRpcSharedKey.discoveryResolver)).toBeDefined()
       expect(discoveryFixture.host.getShared(WebRpcSharedKey.inboundIdentity)).toBeDefined()
       expect(discoveryFixture.host.getShared(WebRpcSharedKey.outboundOperations)).toBeDefined()
       expect(discoveryFixture.host.getShared(WebRpcSharedKey.time)).toBeDefined()
       expect(Object.keys(client)).toEqual([
-        'on',
         'hooks',
         'dispose',
         'send',
@@ -2584,14 +1396,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     vi.useFakeTimers()
     const [baseTransport] = createMemoryTransportPair()
     const transport = { ...baseTransport, topology: 'multiplexed' as const }
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'cycle-m-composed-discovery-time',
-        transport,
-        middlewares: [connect({ transport }), ping()]
-      },
-      [outbound(), discovery(), control()] as const
-    )
+    const endpoint = await createFullEndpoint({
+      id: 'cycle-m-composed-discovery-time',
+      transport,
+      middlewares: [connect({ transport }), ping()]
+    })
     const timeEvents: IWebRpcTimePortEvent[] = []
     const unregisterTimeObserver = registerEndpointTimePortObserver(endpoint, (event) => {
       timeEvents.push(event)
@@ -2656,15 +1465,17 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T252 control inventory exposes only its planned narrow shared ports', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-inventory',
-      featureDefinitions: [outbound(), control()]
+      rootNames: ['first-party-control']
     })
     try {
-      const descriptor = fixture.descriptors.find(
-        (candidate) => candidate.name === EndpointModuleKey.control
-      )
       const schema = WebRpcControlRoleSchema[WebRpcControlRole.control]
-      expect(descriptor?.sharedConsumes).toEqual(schema.sharedConsumes)
-      expect(descriptor?.claims.sharedConsumes).toEqual(schema.sharedConsumes)
+      expect(fixture.getNativeRootSharedConsumes('first-party-control')).toEqual(
+        schema.sharedConsumes
+      )
+      await fixture.install()
+      expect(fixture.host.getShared(WebRpcSharedKey.outboundOperations)).toBeDefined()
+      expect(fixture.host.getShared(WebRpcSharedKey.discoveryResolver)).toBeDefined()
+      expect(fixture.host.getShared(WebRpcSharedKey.candidatePing)).toBeDefined()
     } finally {
       await fixture.dispose()
     }
@@ -2673,97 +1484,32 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T253 actual control candidate matches the narrow contract through real inventory', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-candidate',
-      featureDefinitions: [outbound(), discovery(), control()]
+      rootNames: ['first-party-control']
     })
     try {
-      const descriptor = fixture.descriptors.find(
-        (candidate) => candidate.name === EndpointModuleKey.control
-      )
-      const schema = WebRpcControlRoleSchema[WebRpcControlRole.control]
-      expect(descriptor?.sharedConsumes).toEqual(schema.sharedConsumes)
-      expect(descriptor?.claims.sharedConsumes).toEqual(schema.sharedConsumes)
+      await fixture.install()
+      const candidatePing = fixture.host.getShared(WebRpcSharedKey.candidatePing) as {
+        readonly ping?: unknown
+      }
+      expect(typeof candidatePing.ping).toBe('function')
     } finally {
       await fixture.dispose()
     }
   })
 
-  it('T254 missing outboundOperations reaches the real Host admission boundary', async () => {
-    await expectControlAdmissionFailure(
-      'b12c04-control-missing-outbound',
-      controlSharedConsumes().filter((key) => key !== WebRpcSharedKey.outboundOperations),
-      'symbol:web-rpc.shared.discovery-resolver'
-    )
-  })
-
-  it('T255 missing discoveryResolver reaches the real Host admission boundary', async () => {
-    await expectControlAdmissionFailure(
-      'b12c04-control-missing-discovery',
-      controlSharedConsumes().filter((key) => key !== WebRpcSharedKey.discoveryResolver),
-      'symbol:web-rpc.shared.outbound-operations'
-    )
-  })
-
-  it('T256 missing time reaches the real Host admission boundary', async () => {
-    await expectControlAdmissionFailure(
-      'b12c04-control-missing-time',
-      controlSharedConsumes().filter((key) => key !== WebRpcSharedKey.time),
-      'symbol:web-rpc.shared.outbound-operations'
-    )
-  })
-
-  it('T257 missing variationCoordinator reaches the real Host admission boundary', async () => {
-    await expectControlAdmissionFailure(
-      'b12c04-control-missing-variation',
-      controlSharedConsumes().filter((key) => key !== WebRpcSharedKey.variationCoordinator),
-      'symbol:web-rpc.shared.outbound-operations'
-    )
-  })
-
-  it('T258 duplicate control claims fail before Host mutation', async () => {
-    await expectControlAdmissionFailure(
-      'b12c04-control-duplicate-claim',
-      [...controlSharedConsumes(), WebRpcSharedKey.time],
-      'symbol:web-rpc.shared.outbound-operations'
-    )
-  })
-
-  it('T259 forged string control claim fails before Host mutation', async () => {
-    await expectControlAdmissionFailure(
-      'b12c04-control-forged-string',
-      ['web-rpc.shared.outbound-operations', ...controlSharedConsumes().slice(1)],
-      'string:web-rpc.shared.outbound-operations'
-    )
-  })
-
-  it('T260 forged symbol control claim fails before Host mutation', async () => {
-    await expectControlAdmissionFailure(
-      'b12c04-control-forged-symbol',
-      [Symbol('web-rpc.shared.outbound-operations'), ...controlSharedConsumes().slice(1)],
-      'symbol:web-rpc.shared.outbound-operations'
-    )
-  })
-
   it('T261 admitted-unpublished control publication fails with the same Host transaction evidence', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-unpublished',
-      featureDefinitions: [outbound(), discovery(), control()],
-      transformDescriptor: (descriptor) => {
-        if (descriptor.name !== EndpointModuleKey.outbound || descriptor.shared === undefined)
-          return descriptor
-        return {
-          ...descriptor,
-          shared: (installation) => {
-            const published = descriptor.shared!(installation)
-            const omitted = { ...published }
-            delete omitted[WebRpcSharedKey.variationCoordinator]
-            return omitted
-          }
-        }
+      rootNames: ['first-party-outbound', 'first-party-control'],
+      transformShared: (published) => {
+        const omitted = { ...published }
+        delete omitted[WebRpcSharedKey.variationCoordinator]
+        return omitted
       }
     })
     let failure: unknown
     try {
-      await fixture.installDescriptors(fixture.descriptors)
+      await fixture.install()
     } catch (error) {
       failure = error
     }
@@ -2784,9 +1530,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         name: 'PluginHostError',
         source: '@migaia/plugin-host',
         code: 'PLUGIN_INSTALL_FAILED',
-        failedName: EndpointModuleKey.control,
+        failedName: 'activation',
         cause: expect.objectContaining({
-          name: 'WebRpcError',
+          name: 'WebRpcConfigurationError',
           source: '@migaia/web-rpc',
           code: WebRpcErrorCode.invalidConfig
         }),
@@ -2811,12 +1557,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T262 control narrow publication is endpoint-local across two real Host transactions', async () => {
     const first = await createActualAdmissionFixture({
-      endpointId: 'b12c04-control-isolation-a',
-      featureDefinitions: [outbound(), discovery(), control()]
+      endpointId: 'b12c04-control-isolation-a'
     })
     const second = await createActualAdmissionFixture({
-      endpointId: 'b12c04-control-isolation-b',
-      featureDefinitions: [outbound(), discovery(), control()]
+      endpointId: 'b12c04-control-isolation-b'
     })
     try {
       await first.install()
@@ -2834,8 +1578,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T263 terminal control disposal removes narrow shared state exactly once', async () => {
     const fixture = await createActualAdmissionFixture({
-      endpointId: 'b12c04-control-terminal-removal',
-      featureDefinitions: [outbound(), discovery(), control()]
+      endpointId: 'b12c04-control-terminal-removal'
     })
     await fixture.install()
     const firstDispose = fixture.host.dispose()
@@ -2849,8 +1592,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T264 successful control transaction preserves canonical cleanup and repeated Host Promise identity', async () => {
     const fixture = await createActualAdmissionFixture({
-      endpointId: 'b12c04-control-success-lifecycle',
-      featureDefinitions: [outbound(), discovery(), control()]
+      endpointId: 'b12c04-control-success-lifecycle'
     })
     await fixture.install()
     const firstDispose = fixture.host.dispose()
@@ -2864,66 +1606,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(terminal.activeSubscriptions).toBe(0)
     expect(terminal.resources).toBe(0)
     await fixture.dispose()
-  })
-
-  it('T265 later control participant failure preserves native primary and rollback identity', async () => {
-    const lateFailure: IWebRpcPluginDescriptor = {
-      name: 'b12c04-control-late-participant',
-      claims: {
-        routes: [],
-        provides: [],
-        consumes: [],
-        publicKeys: [],
-        exposedKeys: [],
-        activator: false
-      },
-      install: () => {
-        throw new WebRpcConfigurationError(WebRpcErrorText.endpointModuleInvalid)
-      }
-    }
-    const fixture = await createActualAdmissionFixture({
-      endpointId: 'b12c04-control-late-failure',
-      featureDefinitions: [outbound(), discovery(), control()],
-      additionalDescriptor: lateFailure
-    })
-    let failure: unknown
-    try {
-      await fixture.install()
-    } catch (error) {
-      failure = error
-    }
-    try {
-      expect({
-        name: (failure as { readonly name?: unknown } | undefined)?.name,
-        source: (failure as { readonly source?: unknown } | undefined)?.source,
-        code: (failure as { readonly code?: unknown } | undefined)?.code,
-        failedName: (failure as { readonly detail?: { readonly failedName?: unknown } } | undefined)
-          ?.detail?.failedName,
-        cause: (failure as { readonly cause?: unknown } | undefined)?.cause,
-        terminal: projectD95TerminalSnapshot(fixture.snapshot())
-      }).toEqual({
-        name: 'PluginHostError',
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        failedName: lateFailure.name,
-        cause: expect.any(WebRpcConfigurationError),
-        terminal: {
-          hostKeys: [],
-          sharedEmpty: true,
-          extensionsEmpty: true,
-          installationsClear: true,
-          activated: false,
-          activeSubscriptions: 0,
-          providerState: { admission: 0, replay: 0, activeControllers: 0 },
-          kernelState: 'disposed',
-          kernelOwners: [],
-          kernelRoutes: [],
-          resources: 0
-        }
-      })
-    } finally {
-      await fixture.dispose()
-    }
   })
 
   it('T266 superseded intermediate deletion leaves both migrated consumers free of D95', async () => {
@@ -2989,234 +1671,13 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(Object.getOwnPropertyDescriptors(role.exposedKeys)).toEqual(exposedDescriptors)
   })
 
-  it('T269 native control admission keeps async and sync Host failure identity aligned', async () => {
-    const descriptors = (fixture: IActualAdmissionFixture) =>
-      withControlClaims(
-        fixture.descriptors,
-        controlSharedConsumes().filter((key) => key !== WebRpcSharedKey.time)
-      )
-    const asyncFixture = await createActualAdmissionFixture({
-      endpointId: 'b12c04-control-async-parity',
-      featureDefinitions: [outbound(), discovery(), control()]
-    })
-    const syncFixture = await createActualAdmissionFixture({
-      endpointId: 'b12c04-control-sync-parity',
-      featureDefinitions: [outbound(), discovery(), control()]
-    })
-    try {
-      const asyncBefore = asyncFixture.snapshot()
-      const syncBefore = syncFixture.snapshot()
-      let asyncFailure: unknown
-      try {
-        await asyncFixture.installDescriptors(descriptors(asyncFixture))
-      } catch (error) {
-        asyncFailure = error
-      }
-      let syncFailure: unknown
-      try {
-        syncFixture.host.installBatchSync(
-          descriptors(syncFixture).map(
-            (descriptor) => toPluginHostDefinition(descriptor, descriptor.claims).definition
-          )
-        )
-      } catch (error) {
-        syncFailure = error
-      }
-      const asyncHost = asyncFailure as
-        | {
-            readonly name?: unknown
-            readonly source?: unknown
-            readonly code?: unknown
-            readonly cause?: unknown
-            readonly detail?: { readonly failedName?: unknown }
-          }
-        | undefined
-      const syncHost = syncFailure as
-        | {
-            readonly name?: unknown
-            readonly source?: unknown
-            readonly code?: unknown
-            readonly cause?: unknown
-            readonly detail?: { readonly failedName?: unknown }
-          }
-        | undefined
-      const asyncCause = asyncHost?.cause as
-        | {
-            readonly name?: unknown
-            readonly source?: unknown
-            readonly code?: unknown
-            readonly message?: unknown
-          }
-        | undefined
-      const syncCause = syncHost?.cause as
-        | {
-            readonly name?: unknown
-            readonly source?: unknown
-            readonly code?: unknown
-            readonly message?: unknown
-          }
-        | undefined
-      const asyncAfter = asyncFixture.snapshot()
-      const syncAfter = syncFixture.snapshot()
-      expect({
-        syncName: syncHost?.name,
-        syncSource: syncHost?.source,
-        syncCode: syncHost?.code,
-        syncFailedName: syncHost?.detail?.failedName,
-        syncCause,
-        syncState: syncAfter
-      }).toEqual({
-        syncName: 'PluginHostError',
-        syncSource: '@migaia/plugin-host',
-        syncCode: 'PLUGIN_INSTALL_FAILED',
-        syncFailedName: EndpointModuleKey.control,
-        syncCause: expect.objectContaining({
-          name: 'WebRpcConfigurationError',
-          source: '@migaia/web-rpc',
-          code: WebRpcErrorCode.invalidConfig,
-          message: expect.stringContaining('outbound-operations')
-        }),
-        syncState: syncBefore
-      })
-      expect({
-        asyncName: asyncHost?.name,
-        asyncSource: asyncHost?.source,
-        asyncCode: asyncHost?.code,
-        asyncFailedName: asyncHost?.detail?.failedName,
-        asyncCause,
-        asyncState: asyncAfter
-      }).toEqual({
-        asyncName: 'PluginHostError',
-        asyncSource: '@migaia/plugin-host',
-        asyncCode: 'PLUGIN_INSTALL_FAILED',
-        asyncFailedName: EndpointModuleKey.control,
-        asyncCause: expect.objectContaining({
-          name: 'WebRpcConfigurationError',
-          source: '@migaia/web-rpc',
-          code: WebRpcErrorCode.invalidConfig,
-          message: expect.stringContaining('outbound-operations')
-        }),
-        asyncState: asyncBefore
-      })
-    } finally {
-      await asyncFixture.dispose()
-      await syncFixture.dispose()
-    }
-  })
-
-  it('T270 control rollback preserves two raw cleanup identities in reverse order', async () => {
-    const cleanupOrder: string[] = []
-    const firstCleanup = new Error('b12c04-first-control-cleanup')
-    const secondCleanup = new Error('b12c04-second-control-cleanup')
-    const latePrimary = new WebRpcConfigurationError(WebRpcErrorText.endpointModuleInvalid)
-    const lateFailure: IWebRpcPluginDescriptor = {
-      name: 'b12c04-control-cleanup-failure',
-      claims: {
-        routes: [],
-        provides: [],
-        consumes: [],
-        publicKeys: [],
-        exposedKeys: [],
-        activator: false
-      },
-      install: () => {
-        throw latePrimary
-      }
-    }
-    const fixture = await createActualAdmissionFixture({
-      endpointId: 'b12c04-control-cleanup-identity',
-      featureDefinitions: [outbound(), discovery(), control()],
-      transformDescriptor: (descriptor) => {
-        if (descriptor.name !== EndpointModuleKey.control) return descriptor
-        const claimed = withControlClaims([descriptor], controlSharedConsumes())[0]!
-        const install = descriptor.install
-        return {
-          ...claimed,
-          install: async (scope: Parameters<NonNullable<typeof install>>[0]) => {
-            const result = await install?.(scope)
-            scope.own('first-control-resource', () => {
-              cleanupOrder.push('first-control-resource')
-              throw firstCleanup
-            })
-            scope.own('second-control-resource', () => {
-              cleanupOrder.push('second-control-resource')
-              throw secondCleanup
-            })
-            return result
-          }
-        }
-      },
-      additionalDescriptors: [lateFailure]
-    })
-    let failure: unknown
-    try {
-      await fixture.install()
-    } catch (error) {
-      failure = error
-    }
-    try {
-      const hostError = failure as {
-        readonly name?: unknown
-        readonly source?: unknown
-        readonly code?: unknown
-        readonly cause?: unknown
-        readonly detail?: { readonly failedName?: unknown; readonly rollbackErrors?: unknown[] }
-      }
-      const rollbackEntries = hostError?.detail?.rollbackErrors ?? []
-      const rollbackLeaves = rollbackEntries.flatMap((entry) => flattenRollbackLeaves(entry))
-      const hostDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      await hostDispose
-      const terminalAfterDispose = fixture.snapshot()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      expect(fixture.snapshot()).toEqual(terminalAfterDispose)
-      expect(rollbackEntries.every((entry) => entry instanceof AggregateError)).toBe(true)
-      expect({
-        name: hostError?.name,
-        source: hostError?.source,
-        code: hostError?.code,
-        failedName: hostError?.detail?.failedName,
-        cause: hostError?.cause,
-        rollbackLeaves,
-        cleanupOrder,
-        terminal: projectD95TerminalSnapshot(fixture.snapshot())
-      }).toEqual({
-        name: 'PluginHostError',
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        failedName: lateFailure.name,
-        cause: latePrimary,
-        rollbackLeaves: [secondCleanup, firstCleanup],
-        cleanupOrder: ['second-control-resource', 'first-control-resource'],
-        terminal: {
-          hostKeys: [],
-          sharedEmpty: true,
-          extensionsEmpty: true,
-          installationsClear: true,
-          activated: false,
-          activeSubscriptions: 0,
-          providerState: { admission: 0, replay: 0, activeControllers: 0 },
-          kernelState: 'disposed',
-          kernelOwners: [],
-          kernelRoutes: [],
-          resources: 0
-        }
-      })
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
   it('T271 canonical control endpoint disposal exposes the same stable Host and endpoint Promises', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'b12c04-control-endpoint-disposal',
-        transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport }), ping()]
-      },
-      [outbound(), discovery(), control()] as const
-    )
+    const endpoint = await createFullEndpoint({
+      id: 'b12c04-control-endpoint-disposal',
+      transport: clientTransport,
+      middlewares: [connect({ transport: clientTransport }), ping()]
+    })
     try {
       const endpointDispose = endpoint.dispose()
       expect(endpoint.dispose()).toBe(endpointDispose)
@@ -3240,7 +1701,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         transport: firstTransport,
         middlewares: [connect({ transport: firstTransport }), ping()]
       },
-      [outbound(), control()] as const
+      createNativeRoots('first-party-outbound', 'first-party-control')
     )
     const second = await createComposedEndpoint(
       {
@@ -3248,11 +1709,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         transport: secondTransport,
         middlewares: [connect({ transport: secondTransport }), ping()]
       },
-      [outbound(), control()] as const
+      createNativeRoots('first-party-outbound', 'first-party-control')
     )
     try {
       expect(Object.keys(first)).toEqual([
-        'on',
         'hooks',
         'dispose',
         'send',
@@ -3291,23 +1751,17 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T273 canonical control ping abort and timeout preserve peer and terminal isolation', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createComposedEndpoint(
-      {
-        id: 'round-seventeen-control-peer',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
-    const client = await createComposedEndpoint(
-      {
-        id: 'round-seventeen-control-client',
-        transport: clientTransport,
-        targetIds: ['round-seventeen-control-peer'],
-        middlewares: [connect({ transport: clientTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
+    const server = await createFullEndpoint({
+      id: 'round-seventeen-control-peer',
+      transport: serverTransport,
+      middlewares: [connect({ transport: serverTransport }), ping()]
+    })
+    const client = await createFullEndpoint({
+      id: 'round-seventeen-control-client',
+      transport: clientTransport,
+      targetIds: ['round-seventeen-control-peer'],
+      middlewares: [connect({ transport: clientTransport }), ping()]
+    })
     try {
       await expect(client.ping!('round-seventeen-control-peer')).resolves.toBe(true)
       const controller = new AbortController()
@@ -3382,14 +1836,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       }
     }
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'round-seventeen-control-cleanup',
-        transport,
-        middlewares: [connect({ transport }), ping(), firstMiddleware, secondMiddleware]
-      },
-      [outbound(), control()] as const
-    )
+    const endpoint = await createFullEndpoint({
+      id: 'round-seventeen-control-cleanup',
+      transport,
+      middlewares: [connect({ transport }), ping(), firstMiddleware, secondMiddleware]
+    })
     const endpointDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(endpointDispose)
     const promises = readComposedDisposalPromises(endpoint)
@@ -3442,7 +1893,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(controlSource).not.toContain('outboundCompatibility')
     expect(chunkSource).not.toContain('outboundCompatibility')
     expect(chunkSource).toContain('WebRpcCanonicalChunkAttachment')
-    expect(chunkSource).toContain("provides: ['selected-framer-bridge']")
     expect(chunkSource).not.toContain('WebRpcSharedKey.inboundIdentity')
     expect(chunkSource).not.toContain('WebRpcSharedKey.time')
   })
@@ -3450,8 +1900,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T276 concurrent reused control modules preserve independent endpoint snapshots', async () => {
     const [, firstTransport] = createMemoryTransportPair()
     const [, secondTransport] = createMemoryTransportPair()
-    const reusedControl = control()
     const reusedPing = ping()
+    const reusedRoots = createNativeRoots('first-party-outbound', 'first-party-control')
     const [first, second] = await Promise.all([
       createComposedEndpoint(
         {
@@ -3459,7 +1909,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           transport: firstTransport,
           middlewares: [connect({ transport: firstTransport }), reusedPing]
         },
-        [outbound(), reusedControl] as const
+        reusedRoots
       ),
       createComposedEndpoint(
         {
@@ -3467,7 +1917,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           transport: secondTransport,
           middlewares: [connect({ transport: secondTransport }), reusedPing]
         },
-        [outbound(), reusedControl] as const
+        reusedRoots
       )
     ])
     try {
@@ -3490,23 +1940,17 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T277 real control fanout keeps tagged peer results endpoint-local', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createComposedEndpoint(
-      {
-        id: 'round-eighteen-control-fanout-server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
-    const client = await createComposedEndpoint(
-      {
-        id: 'round-eighteen-control-fanout-client',
-        transport: clientTransport,
-        targetIds: ['round-eighteen-control-fanout-server', 'round-eighteen-control-missing'],
-        middlewares: [connect({ transport: clientTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
+    const server = await createFullEndpoint({
+      id: 'round-eighteen-control-fanout-server',
+      transport: serverTransport,
+      middlewares: [connect({ transport: serverTransport }), ping()]
+    })
+    const client = await createFullEndpoint({
+      id: 'round-eighteen-control-fanout-client',
+      transport: clientTransport,
+      targetIds: ['round-eighteen-control-fanout-server', 'round-eighteen-control-missing'],
+      middlewares: [connect({ transport: clientTransport }), ping()]
+    })
     try {
       const result = await client.pingAll!()
       const serverKey = JSON.stringify(['target', 'round-eighteen-control-fanout-server'])
@@ -3523,14 +1967,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T278 disposed control endpoint rejects a later operation without reviving state', async () => {
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'round-eighteen-control-terminal-removal',
-        transport,
-        middlewares: [connect({ transport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
+    const endpoint = await createFullEndpoint({
+      id: 'round-eighteen-control-terminal-removal',
+      transport,
+      middlewares: [connect({ transport }), ping()]
+    })
     const disposePromise = endpoint.dispose()
     await disposePromise
     let failure: unknown
@@ -3561,14 +2002,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           listener(error)
         }) ?? (() => undefined)
     }
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'round-eighteen-control-dispose-race',
-        transport,
-        middlewares: [connect({ transport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
+    const endpoint = await createFullEndpoint({
+      id: 'round-eighteen-control-dispose-race',
+      transport,
+      middlewares: [connect({ transport }), ping()]
+    })
     const controller = new AbortController()
     let settlementCount = 0
     const pending = endpoint.ping!('round-eighteen-control-missing', undefined, {
@@ -3642,7 +2080,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         return undefined
       }
     } as unknown as IWebRpcCoreConfig
-    const endpoint = await createComposedEndpoint(config, [outbound(), control()] as const)
+    const endpoint = await createComposedEndpoint(
+      config,
+      createNativeRoots('first-party-outbound', 'first-party-control')
+    )
     const snapshotReads = [...reads]
     targetIds[0] = 'round-twenty-mutated-target'
     try {
@@ -3670,119 +2111,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T283 failed control installation leaves a fresh retry transaction uncontaminated', async () => {
-    const reusedFeatures = [outbound(), discovery(), control()] as const
-    const failed = await createActualAdmissionFixture({
-      endpointId: 'round-twenty-control-retry-failed',
-      featureDefinitions: reusedFeatures
-    })
-    const before = failed.snapshot()
-    let failure: unknown
-    try {
-      await failed.installDescriptors(
-        withControlClaims(
-          failed.descriptors,
-          controlSharedConsumes().filter((key) => key !== WebRpcSharedKey.time)
-        )
-      )
-    } catch (error) {
-      failure = error
-    }
-    try {
-      expect(failure).toMatchObject({
-        name: 'PluginHostError',
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: EndpointModuleKey.control },
-        cause: expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
-      })
-      expect(failed.snapshot()).toEqual(before)
-    } finally {
-      await failed.dispose()
-    }
-    const retry = await createActualAdmissionFixture({
-      endpointId: 'round-twenty-control-retry-fresh',
-      featureDefinitions: reusedFeatures
-    })
-    try {
-      const retryBefore = retry.snapshot()
-      await retry.install()
-      expect(retry.snapshot()).toMatchObject({ activated: true, activeSubscriptions: 1 })
-      expect(retry.snapshot()).not.toEqual(retryBefore)
-    } finally {
-      await retry.dispose()
-    }
-  })
-
-  it('T284 async control installation has a pre-activation barrier without early activation', async () => {
-    let releaseBarrier!: () => void
-    const barrier = new Promise<void>((resolve) => {
-      releaseBarrier = resolve
-    })
-    let entered = false
-    const fixture = await createActualAdmissionFixture({
-      endpointId: 'round-twenty-control-barrier',
-      featureDefinitions: [outbound(), discovery(), control()],
-      transformDescriptor: (descriptor) => {
-        if (descriptor.name !== EndpointModuleKey.control) return descriptor
-        const install = descriptor.install
-        return {
-          ...descriptor,
-          install: async (scope) => {
-            entered = true
-            await barrier
-            return install?.(scope)
-          }
-        }
-      }
-    })
-    try {
-      const installPromise = fixture.install()
-      for (let attempt = 0; attempt < 10 && !entered; attempt += 1)
-        await new Promise<void>((resolve) => setTimeout(resolve, 0))
-      expect(entered).toBe(true)
-      expect(fixture.snapshot().activated).toBe(false)
-      releaseBarrier()
-      await installPromise
-      expect(fixture.snapshot().activated).toBe(true)
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T285 hostile control claim getter reports the exact native cutoff without Host mutation', async () => {
-    const hostileCause = new Error('round-twenty-control-hostile-claim')
-    const hostileConsumes = new Proxy([...controlSharedConsumes()], {
-      get(target, property, receiver) {
-        if (property === '1') throw hostileCause
-        return Reflect.get(target, property, receiver)
-      }
-    })
-    const fixture = await createActualAdmissionFixture({
-      endpointId: 'round-twenty-control-hostile-cutoff',
-      featureDefinitions: [outbound(), discovery(), control()]
-    })
-    const before = fixture.snapshot()
-    let failure: unknown
-    try {
-      await fixture.installDescriptors(withControlClaims(fixture.descriptors, hostileConsumes))
-    } catch (error) {
-      failure = error
-    }
-    try {
-      expect(failure).toMatchObject({
-        name: 'PluginHostError',
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: EndpointModuleKey.control },
-        cause: hostileCause
-      })
-      expect(fixture.snapshot()).toEqual(before)
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
   it('T286 late control delivery after timeout cannot resettle or revive terminal state', async () => {
     vi.useFakeTimers()
     const [baseClientTransport, serverTransport] = createMemoryTransportPair()
@@ -3793,23 +2121,17 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         delayedFrames.push(message)
       }
     }
-    const server = await createComposedEndpoint(
-      {
-        id: 'round-twenty-late-server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
-    const client = await createComposedEndpoint(
-      {
-        id: 'round-twenty-late-client',
-        transport: clientTransport,
-        targetIds: ['round-twenty-late-server'],
-        middlewares: [connect({ transport: clientTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
+    const server = await createFullEndpoint({
+      id: 'round-twenty-late-server',
+      transport: serverTransport,
+      middlewares: [connect({ transport: serverTransport }), ping()]
+    })
+    const client = await createFullEndpoint({
+      id: 'round-twenty-late-client',
+      transport: clientTransport,
+      targetIds: ['round-twenty-late-server'],
+      middlewares: [connect({ transport: clientTransport }), ping()]
+    })
     let settlementCount = 0
     try {
       const pending = client.ping!('round-twenty-late-server', undefined, { timeoutMs: 5 }).then(
@@ -3847,21 +2169,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T287 hostile control claim getter at first position stops before Host mutation', async () => {
-    await expectHostileControlClaimGetterFailure('cycle-m-control-hostile-first', 0)
-  })
-
-  it('T288 hostile control claim getter at middle position stops at the exact cutoff', async () => {
-    await expectHostileControlClaimGetterFailure('cycle-m-control-hostile-middle', 2)
-  })
-
-  it('T289 hostile control claim getter at final position preserves exact failure identity', async () => {
-    await expectHostileControlClaimGetterFailure('cycle-m-control-hostile-final', 3)
-  })
-
   it('T290 concurrent reused control tokens preserve independent post-snapshot target state', async () => {
-    const reusedOutbound = outbound()
-    const reusedControl = control()
+    const reusedRoots = createNativeRoots('first-party-outbound', 'first-party-control')
     const firstTargets = ['cycle-m-concurrent-first-target']
     const secondTargets = ['cycle-m-concurrent-second-target']
     const [firstBaseTransport] = createMemoryTransportPair()
@@ -3890,7 +2199,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           targetIds: firstTargets,
           middlewares: [connect({ transport: firstTransport }), ping()]
         },
-        [reusedOutbound, reusedControl] as const
+        reusedRoots
       ),
       createComposedEndpoint(
         {
@@ -3899,7 +2208,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           targetIds: secondTargets,
           middlewares: [connect({ transport: secondTransport }), ping()]
         },
-        [reusedOutbound, reusedControl] as const
+        reusedRoots
       )
     ])
     firstTargets[0] = 'cycle-m-mutated-first-target'
@@ -3958,21 +2267,18 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         else baseServerTransport.send(message)
       }
     }
-    const server = await createComposedEndpoint(
-      {
-        id: 'cycle-m-replay-server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
+    const server = await createFullEndpoint({
+      id: 'cycle-m-replay-server',
+      transport: serverTransport,
+      middlewares: [connect({ transport: serverTransport }), ping()]
+    })
     const client = await createComposedEndpoint(
       {
         id: 'cycle-m-replay-client',
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      [outbound(), control()] as const
+      createNativeRoots('first-party-outbound', 'first-party-control')
     )
     try {
       let settlementCount = 0
@@ -4025,22 +2331,16 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         else baseServerTransport.send(message)
       }
     }
-    const server = await createComposedEndpoint(
-      {
-        id: 'cycle-m-cross-peer-server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
-    const client = await createComposedEndpoint(
-      {
-        id: 'cycle-m-cross-peer-client',
-        transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
+    const server = await createFullEndpoint({
+      id: 'cycle-m-cross-peer-server',
+      transport: serverTransport,
+      middlewares: [connect({ transport: serverTransport }), ping()]
+    })
+    const client = await createFullEndpoint({
+      id: 'cycle-m-cross-peer-client',
+      transport: clientTransport,
+      middlewares: [connect({ transport: clientTransport }), ping()]
+    })
     try {
       let settlementCount = 0
       const pending = client.ping!('cycle-m-cross-peer-server', 'cycle-m-cross-peer-server', {
@@ -4089,18 +2389,15 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       }
     }
     const reports: unknown[] = []
-    const client = await createComposedEndpoint(
-      {
-        id: 'cycle-m-late-reject-client',
-        transport: clientTransport,
-        middlewares: [
-          connect({ transport: clientTransport }),
-          ping(),
-          hooks({ onHookError: (error) => reports.push(error) })
-        ]
-      },
-      [outbound(), control()] as const
-    )
+    const client = await createFullEndpoint({
+      id: 'cycle-m-late-reject-client',
+      transport: clientTransport,
+      middlewares: [
+        connect({ transport: clientTransport }),
+        ping(),
+        hooks({ onHookError: (error) => reports.push(error) })
+      ]
+    })
     try {
       const pending = client.ping!('cycle-m-late-reject-server', 'cycle-m-late-reject-server', {
         timeoutMs: 5
@@ -4120,14 +2417,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T294 endpoint time owner advances control timeout and clears its exact timer', async () => {
     vi.useFakeTimers()
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'cycle-m-time-owner',
-        transport,
-        middlewares: [connect({ transport }), ping()]
-      },
-      [outbound(), control()] as const
-    )
+    const endpoint = await createFullEndpoint({
+      id: 'cycle-m-time-owner',
+      transport,
+      middlewares: [connect({ transport }), ping()]
+    })
     const timeEvents: IWebRpcTimePortEvent[] = []
     const unregisterTimeObserver = registerEndpointTimePortObserver(endpoint, (event) => {
       timeEvents.push(event)
@@ -4174,22 +2468,16 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T219 unchanged discovery/control consumers run through the ordered D95 bridge transaction', async () => {
     const [, firstTransport] = createMemoryTransportPair()
     const [, secondTransport] = createMemoryTransportPair()
-    const first = await createComposedEndpoint(
-      {
-        id: 'r73-d95-first',
-        transport: firstTransport,
-        middlewares: [connect({ transport: firstTransport }), ping()]
-      },
-      [outbound(), discovery(), control()] as const
-    )
-    const second = await createComposedEndpoint(
-      {
-        id: 'r73-d95-second',
-        transport: secondTransport,
-        middlewares: [connect({ transport: secondTransport }), ping()]
-      },
-      [outbound(), discovery(), control()] as const
-    )
+    const first = await createFullEndpoint({
+      id: 'r73-d95-first',
+      transport: firstTransport,
+      middlewares: [connect({ transport: firstTransport }), ping()]
+    })
+    const second = await createFullEndpoint({
+      id: 'r73-d95-second',
+      transport: secondTransport,
+      middlewares: [connect({ transport: secondTransport }), ping()]
+    })
     try {
       expect(first.connect).toBeDefined()
       expect(first.discovery).toBeDefined()
@@ -4313,8 +2601,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T225 superseded hostile bridge injection has no surviving publisher descriptor seam', async () => {
     const fixture = await createActualAdmissionFixture({
-      endpointId: 'r73-final-publisher',
-      featureDefinitions: [outbound(), discovery(), control()]
+      endpointId: 'r73-final-publisher'
     })
     try {
       for (const descriptor of fixture.descriptors) {
@@ -4332,8 +2619,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T226 terminal disposal leaves no D95 compatibility installation', async () => {
     const fixture = await createActualAdmissionFixture({
-      endpointId: 'r73-final-terminal',
-      featureDefinitions: [outbound(), discovery(), control()]
+      endpointId: 'r73-final-terminal'
     })
     try {
       await fixture.install()
@@ -4349,8 +2635,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T232 Host disposal removes all final outbound compatibility residue', async () => {
     const fixture = await createActualAdmissionFixture({
-      endpointId: 'r73-result-disposal',
-      featureDefinitions: [outbound(), discovery(), control()]
+      endpointId: 'r73-result-disposal'
     })
     try {
       await fixture.install()
@@ -4418,16 +2703,14 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T231 cross-endpoint final composition has no compatibility publication', async () => {
     const owner = await createActualAdmissionFixture({
-      endpointId: 'r73-cross-owner',
-      featureDefinitions: [outbound(), discovery(), control()]
+      endpointId: 'r73-cross-owner'
     })
     let fixture: IActualAdmissionFixture | undefined
     try {
       await owner.install()
       expect(owner.getTranslatedInstallation('outbound-compatibility')).toBeUndefined()
       fixture = await createActualAdmissionFixture({
-        endpointId: 'r73-cross-consumer',
-        featureDefinitions: [outbound(), control()]
+        endpointId: 'r73-cross-consumer'
       })
       await assertMigratedControlIgnoresD95(fixture)
       const ownerDispose = owner.host.dispose()
@@ -5501,7 +3784,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(failure).toMatchObject({
         source: '@migaia/plugin-host',
         code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: EndpointModuleKey.provider },
+        detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
           name: 'WebRpcConfigurationError',
           source: '@migaia/web-rpc',
@@ -5571,7 +3854,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(failure).toMatchObject({
         source: '@migaia/plugin-host',
         code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: EndpointModuleKey.provider },
+        detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
           name: 'WebRpcConfigurationError',
           source: '@migaia/web-rpc',
@@ -5648,7 +3931,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(failure).toMatchObject({
         source: '@migaia/plugin-host',
         code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: EndpointModuleKey.provider },
+        detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
           name: 'WebRpcConfigurationError',
           source: '@migaia/web-rpc',
@@ -6217,9 +4500,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const lateResult = new Promise<never>((_resolve, reject) => {
       rejectLate = reject
     })
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const reports: unknown[] = []
     const fixture = await createActualAdmissionFixture({
-      observeOutboundCommand: (observation) => observations.push(observation),
+      hookErrorReporter: (error) => reports.push(error),
       providerMap: {
         echo: async () => {
           started()
@@ -6237,8 +4520,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       rejectLate(latePrimary)
       await settleProviderDelivery()
       await settleProviderDelivery()
-      const report = observations.find(({ command }) => command.kind === 'report')?.command
-      expect(report).toEqual({ code: WebRpcErrorCode.internal, error: latePrimary, kind: 'report' })
+      expect(reports).toEqual([latePrimary])
       expect(latePrimary.stack).toEqual(expect.any(String))
       expect(messages).toContainEqual(
         expect.objectContaining({
@@ -6362,9 +4644,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T183 synchronous provider failure preserves raw report identity and terminal release', async () => {
     const primary = new Error('R70 synchronous provider failure')
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const reports: unknown[] = []
     const fixture = await createActualAdmissionFixture({
-      observeOutboundCommand: (observation) => observations.push(observation),
+      hookErrorReporter: (error) => reports.push(error),
       providerMap: {
         echo: () => {
           throw primary
@@ -6377,8 +4659,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await fixture.install()
       await fixture.clientTransport.send(createProviderRequest('r70-sync-failure'))
       await settleProviderDelivery()
-      const report = observations.find(({ command }) => command.kind === 'report')?.command
-      expect(report).toEqual({ code: WebRpcErrorCode.internal, error: primary, kind: 'report' })
+      expect(reports).toEqual([primary])
       expect(primary.stack).toEqual(expect.any(String))
       expect(messages).toContainEqual(
         expect.objectContaining({
@@ -6463,9 +4744,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const lateResult = new Promise<never>((_resolve, reject) => {
       rejectLate = reject
     })
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const reports: unknown[] = []
     const fixture = await createActualAdmissionFixture({
-      observeOutboundCommand: (observation) => observations.push(observation),
+      hookErrorReporter: (error) => reports.push(error),
       providerMap: {
         echo: async () => {
           started()
@@ -6486,8 +4767,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       rejectLate(latePrimary)
       await settleProviderDelivery()
       await settleProviderDelivery()
-      const report = observations.find(({ command }) => command.kind === 'report')?.command
-      expect(report).toEqual({ code: WebRpcErrorCode.internal, error: latePrimary, kind: 'report' })
+      expect(reports).toEqual([latePrimary])
       expect(messages).not.toContainEqual(expect.objectContaining({ taskId: 'r70-late-reject' }))
       expect(fixture.snapshot()).toMatchObject({
         activeSubscriptions: 0,
@@ -6699,9 +4979,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const lateResult = new Promise<never>((_resolve, reject) => {
       rejectLate = reject
     })
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const reports: unknown[] = []
     const fixture = await createActualAdmissionFixture({
-      observeOutboundCommand: (observation) => observations.push(observation),
+      hookErrorReporter: (error) => reports.push(error),
       providerMap: {
         echo: async () => {
           started()
@@ -6722,8 +5002,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       rejectLate(primary)
       await settleProviderDelivery()
       await settleProviderDelivery()
-      const report = observations.find(({ command }) => command.kind === 'report')?.command
-      expect(report).toEqual({ code: WebRpcErrorCode.internal, error: primary, kind: 'report' })
+      expect(reports).toEqual([primary])
       expect(primary.cause).toBe(cause)
       expect(messages).not.toContainEqual(
         expect.objectContaining({ taskId: 'r70-late-native-reject' })
@@ -6869,68 +5148,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T193 canonical successful cleanup releases two independent disposers in reverse order', async () => {
-    const releases: string[] = []
-    const first = defineEndpointModule<IWebRpcCoreConfig, object>(
-      'round-fourteen-first-disposer',
-      async () => ({
-        dispose: () => {
-          releases.push('first')
-        }
-      })
-    )
-    const second = defineEndpointModule<IWebRpcCoreConfig, object>(
-      'round-fourteen-second-disposer',
-      async () => ({
-        dispose: () => {
-          releases.push('second')
-        }
-      })
-    )
-    const transport: IWebRpcTransport = {
-      platform: 'Memory',
-      ownership: 'borrowed',
-      send() {},
-      subscribe() {
-        return () => undefined
-      }
-    }
-    const endpoint = await createComposedEndpoint(
-      { id: 'round-fourteen-success', transport, middlewares: [connect({ transport })] },
-      [outbound(), first, second]
-    )
-    try {
-      const endpointDispose = endpoint.dispose()
-      expect(endpoint.dispose()).toBe(endpointDispose)
-      await expect(endpointDispose).resolves.toBeUndefined()
-      const observed = readComposedDisposalPromises(endpoint)
-      expect(observed?.endpoint).toBe(endpointDispose)
-      expect(observed?.host).toBeInstanceOf(Promise)
-      expect(readComposedDisposalPromises(endpoint)?.host).toBe(observed?.host)
-      expect(releases).toEqual(['second', 'first'])
-      expect(readEndpointDebugSnapshot(endpoint)).toMatchObject({
-        phase: 'disposed',
-        pending: 0,
-        activeControllers: 0,
-        providers: 0,
-        resources: 0,
-        owners: [],
-        discovery: {
-          local: 0,
-          remote: 0,
-          waiters: 0,
-          tasks: 0,
-          timers: 0,
-          manualWaiters: 0,
-          inboundQueries: 0,
-          inboundTimers: 0
-        }
-      })
-    } finally {
-      await endpoint.dispose()
-    }
-  })
-
   it('T194 transfer overflow preserves native failure identity and requires serialized error graph', async () => {
     const observations: IWebRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
@@ -7052,410 +5269,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     } finally {
       await client.dispose()
       await server.dispose()
-    }
-  })
-
-  it('T212 real provider publication reaches a controlled consumer and releases its result once', async () => {
-    const cleanupTrace: string[] = []
-    let consumerPort: IWebRpcProviderCancellationPort | undefined
-    const fixture = await createActualAdmissionFixture({
-      observeProviderRegistration: true,
-      additionalDescriptor: {
-        name: 'r72-provider-consumer-success',
-        claims: {
-          routes: [],
-          provides: [],
-          consumes: [],
-          publicKeys: [],
-          exposedKeys: [],
-          activator: false
-        },
-        sharedConsumes: [WebRpcSharedKey.providerCancellation],
-        install: async (scope) => {
-          consumerPort = scope.getShared(WebRpcSharedKey.providerCancellation) as
-            | IWebRpcProviderCancellationPort
-            | undefined
-          return {
-            dispose: async () => {
-              cleanupTrace.push('controlled-consumer')
-            }
-          }
-        }
-      }
-    })
-    try {
-      await fixture.install()
-      const publishedPort = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
-        | IWebRpcProviderCancellationPort
-        | undefined
-      expect(consumerPort).toBe(publishedPort)
-      expect(publishedPort).toBeDefined()
-      expect(Object.isFrozen(publishedPort)).toBe(true)
-      expect(Reflect.ownKeys(publishedPort!)).toEqual(['abort'])
-      expect(readProviderRegistrationObservation(fixture.kernel)).toHaveLength(1)
-      const hostDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      await hostDispose
-      expect(cleanupTrace).toEqual(['controlled-consumer'])
-      const terminal = fixture.snapshot()
-      expect({
-        shared: terminal.shared.every((value) => value === undefined),
-        extensions: terminal.extensions.every((descriptor) => descriptor === undefined),
-        installations: terminal.installations.every(({ installed }) => !installed),
-        activeSubscriptions: terminal.activeSubscriptions,
-        kernelState: terminal.kernelState,
-        kernelOwners: terminal.kernelOwners,
-        kernelRoutes: terminal.kernelRoutes,
-        resources: terminal.resources
-      }).toEqual({
-        shared: true,
-        extensions: true,
-        installations: true,
-        activeSubscriptions: 0,
-        kernelState: 'disposed',
-        kernelOwners: [],
-        kernelRoutes: [],
-        resources: 0
-      })
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T213 real provider publication precedes controlled later failure and reverse rollback', async () => {
-    const primary = new WebRpcConfigurationError(WebRpcErrorText.endpointModuleInvalid)
-    const cleanupTrace: string[] = []
-    const consumerReadyKey = 'r72-consumer-ready'
-    let consumerPort: unknown
-    const fixture = await createActualAdmissionFixture({
-      observeProviderRegistration: true,
-      additionalDescriptors: [
-        {
-          name: 'r72-provider-consumer-rollback',
-          claims: {
-            routes: [],
-            provides: [consumerReadyKey],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          sharedProvides: [consumerReadyKey],
-          sharedConsumes: [WebRpcSharedKey.providerCancellation],
-          install: async (scope) => {
-            consumerPort = scope.getShared(WebRpcSharedKey.providerCancellation)
-            return {
-              dispose: async () => {
-                cleanupTrace.push('controlled-consumer')
-              }
-            }
-          }
-        },
-        {
-          name: 'r72-provider-later-failure',
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [consumerReadyKey],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          sharedConsumes: [consumerReadyKey],
-          install: async () => {
-            throw primary
-          }
-        }
-      ]
-    })
-    try {
-      const before = fixture.snapshot()
-      let failure: unknown
-      try {
-        await fixture.install()
-      } catch (error) {
-        failure = error
-      }
-      expect(failure).toMatchObject({
-        name: 'PluginHostError',
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        detail: { failedName: 'r72-provider-later-failure' }
-      })
-      expect(consumerPort).toBeDefined()
-      expect(fixture.host.getShared(WebRpcSharedKey.providerCancellation)).toBeUndefined()
-      expect(readProviderRegistrationObservation(fixture.kernel)).toHaveLength(1)
-      expect(failure).toMatchObject({
-        name: 'PluginHostError',
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        cause: primary,
-        detail: { failedName: 'r72-provider-later-failure' }
-      })
-      expect(cleanupTrace).toEqual(['controlled-consumer'])
-      const hostDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      await expect(hostDispose).resolves.toMatchObject({
-        logicalTerminal: true,
-        cleanupComplete: true,
-        cleanupErrors: []
-      })
-      const terminal = fixture.snapshot()
-      expect(terminal).not.toEqual(before)
-      expect({
-        shared: terminal.shared.every((value) => value === undefined),
-        extensions: terminal.extensions.every((descriptor) => descriptor === undefined),
-        installations: terminal.installations.every(({ installed }) => !installed),
-        activeSubscriptions: terminal.activeSubscriptions,
-        kernelState: terminal.kernelState,
-        kernelOwners: terminal.kernelOwners,
-        kernelRoutes: terminal.kernelRoutes,
-        resources: terminal.resources
-      }).toEqual({
-        shared: true,
-        extensions: true,
-        installations: true,
-        activeSubscriptions: 0,
-        kernelState: 'disposed',
-        kernelOwners: [],
-        kernelRoutes: [],
-        resources: 0
-      })
-    } finally {
-      await fixture.dispose()
-    }
-  })
-
-  it('T216 actual provider result disposal is observed once on success and remains stable', async () => {
-    const fixture = await createActualAdmissionFixture({
-      observeProviderRegistration: true
-    })
-    const unregister = registerProviderResultDisposalObservation(fixture.kernel)
-    try {
-      await fixture.install()
-      const providerResult = fixture.getProviderInstallation()
-      expect(providerResult).toBeDefined()
-      expect(readProviderResultDisposalObservation(fixture.kernel)).toEqual({
-        disposals: 0,
-        results: []
-      })
-      const hostDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      await hostDispose
-      expect(readProviderResultDisposalObservation(fixture.kernel)).toEqual({
-        disposals: 1,
-        results: [providerResult]
-      })
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      expect(readProviderResultDisposalObservation(fixture.kernel)).toEqual({
-        disposals: 1,
-        results: [providerResult]
-      })
-      const terminal = fixture.snapshot()
-      expect({
-        shared: terminal.shared.every((value) => value === undefined),
-        extensions: terminal.extensions.every((descriptor) => descriptor === undefined),
-        installations: terminal.installations.every(({ installed }) => !installed),
-        activeSubscriptions: terminal.activeSubscriptions,
-        kernelState: terminal.kernelState,
-        kernelOwners: terminal.kernelOwners,
-        kernelRoutes: terminal.kernelRoutes,
-        resources: terminal.resources
-      }).toEqual({
-        shared: true,
-        extensions: true,
-        installations: true,
-        activeSubscriptions: 0,
-        kernelState: 'disposed',
-        kernelOwners: [],
-        kernelRoutes: [],
-        resources: 0
-      })
-    } finally {
-      unregister()
-      await fixture.dispose()
-    }
-  })
-
-  it('T217 actual provider result and two controlled cleanup leaves preserve rollback order', async () => {
-    const primary = new WebRpcConfigurationError(WebRpcErrorText.endpointModuleInvalid)
-    const firstCleanup = new Error('r72 first controlled cleanup failure')
-    const secondCleanup = new Error('r72 second controlled cleanup failure')
-    const releases: string[] = []
-    const nativeDisposalTrace: string[] = []
-    const fixture = await createActualAdmissionFixture({
-      observeProviderRegistration: true,
-      additionalDescriptors: [
-        {
-          name: 'r72-controlled-cleanup-first',
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          sharedConsumes: [WebRpcSharedKey.providerCancellation],
-          install: async () => ({
-            dispose: async () => {
-              nativeDisposalTrace.push(
-                `first:${readProviderResultDisposalObservation(fixture.kernel)?.disposals ?? -1}`
-              )
-              releases.push('first')
-              throw firstCleanup
-            }
-          })
-        },
-        {
-          name: 'r72-controlled-cleanup-second',
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          sharedConsumes: [WebRpcSharedKey.providerCancellation],
-          install: async () => ({
-            dispose: async () => {
-              nativeDisposalTrace.push(
-                `second:${readProviderResultDisposalObservation(fixture.kernel)?.disposals ?? -1}`
-              )
-              releases.push('second')
-              throw secondCleanup
-            }
-          })
-        },
-        {
-          name: 'r72-controlled-cleanup-failure',
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          install: async () => {
-            throw primary
-          }
-        }
-      ]
-    })
-    const unregister = registerProviderResultDisposalObservation(fixture.kernel)
-    try {
-      const before = fixture.snapshot()
-      let failure: unknown
-      try {
-        await fixture.install()
-      } catch (error) {
-        failure = error
-      }
-      expect(failure).toMatchObject({
-        name: 'PluginHostError',
-        source: '@migaia/plugin-host',
-        code: 'PLUGIN_INSTALL_FAILED',
-        cause: primary,
-        detail: { failedName: 'r72-controlled-cleanup-failure' }
-      })
-      const rollbackErrors = (
-        failure as { readonly detail?: { readonly rollbackErrors?: readonly unknown[] } }
-      ).detail?.rollbackErrors
-      expect(rollbackErrors).toHaveLength(2)
-      const rollbackAggregates = rollbackErrors as readonly AggregateError[]
-      expect(rollbackAggregates[0].errors).toEqual([secondCleanup])
-      expect(rollbackAggregates[1].errors).toEqual([firstCleanup])
-      expect(releases).toEqual(['second', 'first'])
-      expect(nativeDisposalTrace).toEqual(['second:0', 'first:0'])
-      const providerResult = fixture.getProviderInstallation()
-      expect(providerResult).toBeDefined()
-      expect(readProviderResultDisposalObservation(fixture.kernel)).toEqual({
-        disposals: 1,
-        results: [providerResult]
-      })
-      const hostDispose = fixture.host.dispose()
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      await hostDispose
-      expect(fixture.host.dispose()).toBe(hostDispose)
-      expect(readProviderResultDisposalObservation(fixture.kernel)).toEqual({
-        disposals: 1,
-        results: [providerResult]
-      })
-      const terminal = fixture.snapshot()
-      expect(terminal).not.toEqual(before)
-      expect({
-        shared: terminal.shared.every((value) => value === undefined),
-        extensions: terminal.extensions.every((descriptor) => descriptor === undefined),
-        installations: terminal.installations.every(({ installed }) => !installed),
-        activeSubscriptions: terminal.activeSubscriptions,
-        kernelState: terminal.kernelState,
-        kernelOwners: terminal.kernelOwners,
-        kernelRoutes: terminal.kernelRoutes,
-        resources: terminal.resources
-      }).toEqual({
-        shared: true,
-        extensions: true,
-        installations: true,
-        activeSubscriptions: 0,
-        kernelState: 'disposed',
-        kernelOwners: [],
-        kernelRoutes: [],
-        resources: 0
-      })
-    } finally {
-      unregister()
-      await fixture.dispose()
-    }
-  })
-
-  it('T218 provider-result observer is isolated, token-safe, and fail-closed', async () => {
-    const first = await createActualAdmissionFixture({ endpointId: 'r72-observer-first' })
-    const second = await createActualAdmissionFixture({ endpointId: 'r72-observer-second' })
-    const firstRegistration = registerProviderResultDisposalObservation(first.kernel)
-    const replacementRegistration = registerProviderResultDisposalObservation(first.kernel)
-    const secondRegistration = registerProviderResultDisposalObservation(second.kernel)
-    try {
-      firstRegistration()
-      expect(readProviderResultDisposalObservation(first.kernel)).toEqual({
-        disposals: 0,
-        results: []
-      })
-      expect(readProviderResultDisposalObservation({ ...first.kernel })).toBeUndefined()
-      expect(
-        readProviderResultDisposalObservation(
-          new Proxy(first.kernel, {
-            get() {
-              throw new Error('observer proxy must not be probed')
-            }
-          })
-        )
-      ).toBeUndefined()
-      expect(readProviderResultDisposalObservation(second.kernel)).toEqual({
-        disposals: 0,
-        results: []
-      })
-
-      await first.install()
-      await second.install()
-      const firstDispose = first.host.dispose()
-      expect(first.host.dispose()).toBe(firstDispose)
-      await firstDispose
-      const secondDispose = second.host.dispose()
-      expect(second.host.dispose()).toBe(secondDispose)
-      await secondDispose
-      expect(readProviderResultDisposalObservation(first.kernel)?.disposals).toBe(1)
-      expect(readProviderResultDisposalObservation(second.kernel)?.disposals).toBe(1)
-      replacementRegistration()
-      secondRegistration()
-      expect(readProviderResultDisposalObservation(first.kernel)).toBeUndefined()
-      expect(readProviderResultDisposalObservation(second.kernel)).toBeUndefined()
-    } finally {
-      replacementRegistration()
-      secondRegistration()
-      await first.dispose()
-      await second.dispose()
     }
   })
 
@@ -7612,7 +5425,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         targetIds: ['one-way-server'],
         middlewares: [connect({ transport: clientTransport })]
       },
-      [oneWay()] as const
+      createNativeRoots('first-party-one-way')
     )
     try {
       const sent = client.sendOneWay('one-way-server', 'notify', 'payload')
@@ -7670,7 +5483,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         targetIds: ['one-way-rejection-server'],
         middlewares: [connect({ transport: clientTransport })]
       },
-      [oneWay()] as const
+      createNativeRoots('first-party-one-way')
     )
     try {
       /** Captures the rejected one-way result for precise wrapper/cause identity assertions. */

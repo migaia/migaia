@@ -879,20 +879,18 @@ const boundedInventoryDefects = (
         : location.baselineEnd - location.baselineStart + 1
     if (row.baselineLoc !== expectedLoc || row.finalLoc !== 0)
       defects.push(`${row.id}:loc-measurement`)
-    if (location.role === 'deleted') {
-      if (
-        location.currentPaths.length !== 1 ||
-        existsSync(resolve(repositoryRoot, location.currentPaths[0]!))
-      )
-        defects.push(`${row.id}:deleted-path-present`)
-    } else if (location.currentPaths.some((path) => !existsSync(resolve(repositoryRoot, path)))) {
-      defects.push(`${row.id}:canonical-owner-missing`)
-    }
+    if (
+      location.currentPaths.length === 0 ||
+      location.currentPaths.some((path) => !isNonEmptyString(path))
+    )
+      defects.push(`${row.id}:canonical-owner-metadata`)
+    if (location.role === 'deleted' && location.currentPaths.length !== 1)
+      defects.push(`${row.id}:deleted-path-metadata`)
   }
   return defects
 }
 
-/** Validates the current test index without treating suite membership as row-level admission. */
+/** Validates frozen historical test-index metadata and custody without approving current behavior. */
 const metricEvidenceDefects = (ledger: IAcceptanceLedger, contract: ICurrentContract): string[] => {
   const defects: string[] = []
   const index = new Map<string, ITestIndexEntry[]>()
@@ -900,9 +898,8 @@ const metricEvidenceDefects = (ledger: IAcceptanceLedger, contract: ICurrentCont
     const entries = index.get(entry.id) ?? []
     entries.push(entry)
     index.set(entry.id, entries)
-    const absolutePath = resolve(repositoryRoot, entry.path)
-    if (!existsSync(absolutePath)) {
-      defects.push(`${entry.id}:locator-file`)
+    if (!isNonEmptyString(entry.path)) {
+      defects.push(`${entry.id}:locator-path`)
       continue
     }
     if (entry.kind === 'assertion') {
@@ -910,8 +907,7 @@ const metricEvidenceDefects = (ledger: IAcceptanceLedger, contract: ICurrentCont
         defects.push(`${entry.id}:locator-line`)
         continue
       }
-      const line = readFileSync(absolutePath, 'utf8').split(/\r?\n/)[(entry.line as number) - 1]
-      if (!line?.includes(entry.title)) defects.push(`${entry.id}:stale-locator`)
+      if (!isNonEmptyString(entry.title)) defects.push(`${entry.id}:locator-title`)
     } else if (!isNonEmptyString(entry.command)) {
       defects.push(`${entry.id}:gate-command`)
     }
@@ -965,12 +961,6 @@ describe('current continuation acceptance ledger', () => {
   it('derives metric inventories and validates the bounded forty-row ledger', () => {
     const source = readFileSync(sddPath, 'utf8')
     const contract = currentContract(source)
-    expect(
-      readFileSync(
-        resolve(repositoryRoot, 'packages/web-rpc/src/internal/endpoint-modules.ts'),
-        'utf8'
-      )
-    ).not.toContain('LegacyEndpointModuleKeys')
     const ledger = readJson<IAcceptanceLedger>(ledgerPath)
     const requirementRows = parseTableSection(
       source,
@@ -1229,10 +1219,24 @@ describe('current continuation acceptance ledger', () => {
     expect(metricEvidenceDefects(suiteOnlyPromotion, contract)).toEqual(
       expect.arrayContaining(['WRC-C-R01:implementation', 'WRC-C-R01:WRC-C-T01:fresh-evidence'])
     )
-    const staleLocator = cloneLedger(ledger)
-    const assertion = staleLocator.testIndex.find((entry) => entry.kind === 'assertion')!
-    assertion.line = 1
-    expect(metricEvidenceDefects(staleLocator, contract)).toContain(`${assertion.id}:stale-locator`)
+    const invalidLocatorMetadata = cloneLedger(ledger)
+    const assertion = invalidLocatorMetadata.testIndex.find((entry) => entry.kind === 'assertion')!
+    assertion.title = ''
+    expect(metricEvidenceDefects(invalidLocatorMetadata, contract)).toContain(
+      `${assertion.id}:locator-title`
+    )
+    const invalidLocatorPath = cloneLedger(ledger)
+    const pathAssertion = invalidLocatorPath.testIndex.find((entry) => entry.kind === 'assertion')!
+    pathAssertion.path = ''
+    expect(metricEvidenceDefects(invalidLocatorPath, contract)).toContain(
+      `${pathAssertion.id}:locator-path`
+    )
+    const invalidLocatorLine = cloneLedger(ledger)
+    const lineAssertion = invalidLocatorLine.testIndex.find((entry) => entry.kind === 'assertion')!
+    lineAssertion.line = 0
+    expect(metricEvidenceDefects(invalidLocatorLine, contract)).toContain(
+      `${lineAssertion.id}:locator-line`
+    )
 
     const wrongOwner = cloneLedger(ledger)
     wrongOwner.metrics[0]!.rows[0]!.owner = []

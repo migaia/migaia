@@ -15,6 +15,15 @@ import { WebRpcPluginHost } from '../../src/internal/web-rpc-plugin-host.js'
 const transport = {} as IWebRpcTransport
 const signal = new AbortController().signal as IWebRpcAbortSignal
 
+/** Exercises PluginHost's inherited synchronous primitive without restoring a WebRPC wrapper. */
+const installHostSyncForTest = (
+  host: WebRpcPluginHost,
+  plugins: readonly IWebRpcPluginConstraint[]
+): unknown =>
+  (host as unknown as { useSync(values: readonly IWebRpcPluginConstraint[]): unknown }).useSync(
+    plugins
+  )
+
 describe('B12a WebRPC PluginHost shell', () => {
   it('uses typed shared symbols and one host rollback transaction', async () => {
     let disposed = 0
@@ -413,7 +422,7 @@ describe('B12a WebRPC PluginHost shell', () => {
     await failedHost.dispose()
   })
 
-  it('supports synchronous batch installation through the same host shell', async () => {
+  it('supports direct synchronous PluginHost installation only in the isolated host test', async () => {
     const events: string[] = []
     const host = new WebRpcPluginHost(
       'shell',
@@ -422,7 +431,7 @@ describe('B12a WebRPC PluginHost shell', () => {
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
-    host.installBatchSync([
+    installHostSyncForTest(host, [
       {
         name: 'kernel',
         install: () => {
@@ -442,7 +451,7 @@ describe('B12a WebRPC PluginHost shell', () => {
     await host.dispose()
   })
 
-  it('preserves async and sync primary, reverse rollback, and completion identities', async () => {
+  it('preserves async and direct-host synchronous rollback identities', async () => {
     const primary = new Error('primary')
     const firstRollback = new Error('first rollback')
     const secondRollback = new Error('second rollback')
@@ -499,7 +508,7 @@ describe('B12a WebRPC PluginHost shell', () => {
       }
     }
     try {
-      syncHost.installBatchSync([
+      installHostSyncForTest(syncHost, [
         rollbackPlugin('first', firstRollback),
         rollbackPlugin('second', secondRollback),
         {

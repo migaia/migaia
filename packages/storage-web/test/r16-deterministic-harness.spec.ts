@@ -1,11 +1,12 @@
 import { createRuntime } from '@migaia/reactive'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fakeCookieDocument } from '../src/testing/fake-cookie-document.js'
 import { fakeWebStorage } from '../src/testing/fake-web-storage.js'
-import { memoryStorage } from '../src/backends/memory.js'
+import { memoryStorageHost } from '../src/backends/memory.js'
 import { getBackendReactiveController } from '../src/backends/reactive-controller.js'
-import { createStorageHost } from '../src/host/index.js'
+import type { IStoragePluginCore } from '../src/host/contracts.js'
+import { createStorageHost, definePlugin } from '../src/host/index.js'
 import { cookiesReactive } from '../src/plugins/reactive/cookies.js'
 import { indexedDbReactive } from '../src/plugins/reactive/indexed-db.js'
 import { localStorageReactive } from '../src/plugins/reactive/local-storage.js'
@@ -15,8 +16,89 @@ import { captureOperationCleanup } from './helpers/operation-reporter.js'
 
 /** Deterministic R16 business probes over the canonical lifecycle, Resource, and Host owners. */
 describe('SWV4 R16 deterministic shared harness', () => {
+  it('rejects duplicate IDs before native install or legacy create runs', async () => {
+    const firstInstall = vi.fn(() => ({}))
+    const secondInstall = vi.fn(() => ({}))
+    const firstDescriptor = vi.fn((core: IStoragePluginCore) => ({
+      install: () => {
+        core.registerStore(memoryStorageHost())
+        return firstInstall()
+      }
+    }))
+    const secondDescriptor = vi.fn((core: IStoragePluginCore) => ({
+      install: () => {
+        core.registerStore(memoryStorageHost())
+        return secondInstall()
+      }
+    }))
+    const first = definePlugin('r16-native-duplicate', firstDescriptor)
+    const second = definePlugin('r16-native-duplicate', secondDescriptor)
+    await expect(createStorageHost({ plugins: [first, second] as never })).rejects.toMatchObject({
+      code: 'BACKEND_INSTALL_FAILED',
+      cause: { code: 'REACTIVE_TOPOLOGY_INVALID' }
+    })
+    // Host admission precedes native descriptor construction as well as installation.
+    expect(firstDescriptor).not.toHaveBeenCalled()
+    expect(secondDescriptor).not.toHaveBeenCalled()
+    expect(firstInstall).not.toHaveBeenCalled()
+    expect(secondInstall).not.toHaveBeenCalled()
+
+    const mixedInstall = vi.fn(() => ({}))
+    const mixedDuplicateNative = definePlugin('r16-mixed-duplicate', (core) => ({
+      install: () => {
+        core.registerStore(memoryStorageHost())
+        return mixedInstall()
+      }
+    }))
+    const mixedCreate = vi.fn(() => memoryStorageHost())
+    const mixedNative = definePlugin('r16-mixed-duplicate', (core) => ({
+      install: () => {
+        core.registerStore(mixedCreate())
+        return {}
+      }
+    }))
+    await expect(
+      createStorageHost({ plugins: [mixedNative, mixedDuplicateNative] as never })
+    ).rejects.toMatchObject({
+      code: 'BACKEND_INSTALL_FAILED',
+      cause: { code: 'REACTIVE_TOPOLOGY_INVALID' }
+    })
+    expect(mixedInstall).not.toHaveBeenCalled()
+    expect(mixedCreate).not.toHaveBeenCalled()
+
+    const installed = await createStorageHost({
+      plugins: [
+        definePlugin('r16-installed-duplicate', (core) => ({
+          install: () => {
+            core.registerStore(memoryStorageHost())
+            return {}
+          }
+        }))
+      ] as const
+    })
+    const installedCreate = vi.fn(() => memoryStorageHost())
+    const installedNative = definePlugin('r16-installed-duplicate', (core) => ({
+      install: () => {
+        core.registerStore(installedCreate())
+        return {}
+      }
+    }))
+    try {
+      await expect(
+        (installed as unknown as { readonly use: (plugin: unknown) => Promise<unknown> }).use(
+          installedNative
+        )
+      ).rejects.toMatchObject({
+        code: 'BACKEND_INSTALL_FAILED',
+        cause: { code: 'REACTIVE_TOPOLOGY_INVALID' }
+      })
+      expect(installedCreate).not.toHaveBeenCalled()
+    } finally {
+      await installed.dispose()
+    }
+  })
   it('SWV4-T15/T16/T17 commits once, contains listener failure, and preserves disposal identity', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)
     if (controller === undefined) throw new Error('missing memory controller')
     const events: unknown[] = []
@@ -92,8 +174,8 @@ describe('SWV4 R16 deterministic shared harness', () => {
           storage: fakeWebStorage()
         }),
         cookiesReactive({
-          id: 'r16-five-cookies',
-          namespace: 'r16-five-cookies',
+          id: 'r16-five-cookiesHost',
+          namespace: 'r16-five-cookiesHost',
           document: fakeCookieDocument()
         }),
         indexedDbReactive({
@@ -109,7 +191,7 @@ describe('SWV4 R16 deterministic shared harness', () => {
       'r16-five-memory',
       'r16-five-local',
       'r16-five-session',
-      'r16-five-cookies',
+      'r16-five-cookiesHost',
       'r16-five-indexed'
     ] as const
     try {

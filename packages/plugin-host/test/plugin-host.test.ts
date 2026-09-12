@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { PluginHost } from '../src/host-runtime'
 import { PluginHostError } from '../src/error-text'
-import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '../src/index.js'
+import {
+  defineFeature,
+  definePlugin,
+  PluginHost as PublicPluginHost,
+  PluginHostDisposalNodeKind,
+  readPluginHostDisposalProvenance
+} from '../src/index.js'
 import * as pluginHostPublic from '../src/index.js'
-import type { IPluginHostCore } from '../src/typing'
+import type { IPluginConstraint, IPluginHostCore, IPluginHostOptions } from '../src/typing'
 import {
   GENERATOR_CONTINUE as middlewareContinue,
   GENERATOR_HALT as middlewareHalt,
@@ -41,6 +47,23 @@ class Host extends PluginHost<IExt, number> {
   }
 }
 
+class FeatureHost extends PublicPluginHost<{}> {
+  /** Supplies the same unbounded lifecycle policy for native Feature integration checks. */
+  constructor(
+    options: Omit<IPluginHostOptions, 'execution'> &
+      Partial<Pick<IPluginHostOptions, 'execution'>> = {}
+  ) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+
+  installSync(plugins: readonly IPluginConstraint<{}>[]) {
+    return this.useSync(plugins)
+  }
+}
+
 const plugin = (
   name: string,
   install: (core: IExt) => unknown,
@@ -48,6 +71,335 @@ const plugin = (
 ) => ({ name, install, ...extra }) as never
 
 describe('PluginHost', () => {
+  it('YS23: keeps object extension members named install and expose while rejecting the legacy function sentinel', async () => {
+    const object = definePlugin({
+      name: 'ys23-object',
+      install: () => ({ install: true, expose: true })
+    })
+    const legacySentinel = definePlugin('ys23-legacy-sentinel', () => ({ legacy: true }) as never)
+    const host = new FeatureHost()
+    const view = await host.use(object)
+    expect(view.extensions).toMatchObject({ install: true, expose: true })
+    await expect(host.use(legacySentinel)).rejects.toMatchObject({
+      cause: { code: 'INVALID_OPTION' }
+    })
+    expect(host.getCurrentView().extensions).not.toHaveProperty('legacy')
+    await host.dispose()
+  })
+
+  it('YS25: captures one descriptor per registration and forwards only its declared hooks', async () => {
+    let descriptorCalls = 0
+    let installCalls = 0
+    let exposeCalls = 0
+    let sharedCalls = 0
+    const plugin = definePlugin('descriptor-hooks', (core) => {
+      descriptorCalls += 1
+      expect(typeof core.getShared).toBe('function')
+      return {
+        install: () => {
+          installCalls += 1
+          return { installed: descriptorCalls }
+        },
+        expose: () => {
+          exposeCalls += 1
+          return { exposed: descriptorCalls }
+        },
+        shared: () => {
+          sharedCalls += 1
+          return { token: descriptorCalls }
+        }
+      }
+    })
+    const first = await new FeatureHost().use(plugin)
+    const second = await new FeatureHost().use(plugin)
+    expect(first.extensions).toMatchObject({ installed: 1, exposed: 1 })
+    expect(second.extensions).toMatchObject({ installed: 2, exposed: 2 })
+    expect([descriptorCalls, installCalls, exposeCalls, sharedCalls]).toEqual([2, 2, 2, 2])
+  })
+
+  it('rejects descriptor expose collisions without invoking callback results as hooks', async () => {
+    // @ts-expect-error YS28 rejects overlapping install/expose Host projections statically.
+    const plugin = definePlugin('descriptor-collision', () => ({
+      install: () => ({ duplicate: 1 }),
+      expose: () => ({ duplicate: 2 })
+    }))
+    await expect(new FeatureHost().use(plugin)).rejects.toMatchObject({
+      cause: { code: 'EXTENSION_DUPLICATE' }
+    })
+  })
+
+  it('YS25: rejects Feature-core reads from a descriptor before Feature initialization', async () => {
+    const plugin = definePlugin('early-feature-read', (core) => {
+      void (core as unknown as { readonly features: object }).features
+      return { install: () => ({}) }
+    })
+    await expect(new FeatureHost().use(plugin)).rejects.toMatchObject({
+      cause: {
+        code: 'INVALID_OPTION',
+        message: expect.stringContaining('Feature core is not ready')
+      }
+    })
+  })
+
+  it('YS25: initializes Feature output after descriptor featureExpose and before install', async () => {
+    const feature = defineFeature<
+      { readonly read: () => number },
+      Record<never, never>,
+      { readonly read: () => number }
+    >((core) => ({ read: core.featureExpose.read }))
+    const plugin = definePlugin(
+      'feature-ready',
+      (core) => ({
+        featureExpose: () => ({ read: () => 11 }),
+        install: () => ({ value: core.features.feature.read() })
+      }),
+      { feature }
+    )
+    const host = new FeatureHost()
+    await expect(host.use(plugin)).resolves.toMatchObject({ extensions: { value: 11 } })
+    await host.dispose()
+  })
+
+  it('snapshots only trusted enumerable direct Feature dependencies without running factories', () => {
+    let calls = 0
+    const dependency = defineFeature(() => {
+      calls += 1
+      return { dependency: true }
+    })
+    const feature = defineFeature(() => ({ feature: true }), { dependency })
+    expect(feature).toEqual({})
+    expect(Object.isFrozen(feature)).toBe(true)
+    expect(calls).toBe(0)
+    expect(() => defineFeature(() => ({}), { dependency, invalid: {} as never })).toThrow(
+      'feature dependencies must contain defined features'
+    )
+    expect(() => defineFeature(() => ({}), Object.create({ dependency }))).toThrow(
+      'feature dependencies must be a plain record'
+    )
+  })
+
+  it('accepts descriptor Feature shorthand on the same opaque authority', async () => {
+    let calls = 0
+    const feature = defineFeature({ install: () => ({ value: ++calls }) })
+    const plugin = definePlugin({
+      name: 'descriptor-feature',
+      features: { feature },
+      featureExpose: {},
+      install: (core) => ({ value: (core as any).features.feature.value })
+    })
+    const result = await new FeatureHost().use(plugin)
+    expect(result.extensions.value).toBe(1)
+    expect(calls).toBe(1)
+  })
+
+  it('rejects forged Feature records before any factory callback', () => {
+    let getterCalls = 0
+    const descriptor = Object.defineProperty({}, 'install', {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1
+        return () => ({})
+      }
+    })
+    expect(() => defineFeature(descriptor as never)).toThrow()
+    expect(getterCalls).toBe(0)
+    let calls = 0
+    const valid = defineFeature(() => {
+      calls += 1
+      return {}
+    })
+    expect(() =>
+      definePlugin({
+        name: 'forged-feature',
+        install: () => ({}),
+        features: { valid, forged: {} as never },
+        featureExpose: {}
+      })
+    ).toThrow()
+    expect(calls).toBe(0)
+  })
+
+  it('injects only featureExpose into Feature factories, never Plugin shared or lifecycle core', async () => {
+    const feature = defineFeature<
+      { readonly read: () => number },
+      Record<never, never>,
+      { readonly read: () => number }
+    >((core) => {
+      expect('getShared' in core).toBe(false)
+      expect('onDispose' in core).toBe(false)
+      return { read: () => core.featureExpose.read() }
+    })
+    const plugin = definePlugin({
+      name: 'feature-core-isolation',
+      features: { feature },
+      featureExpose: { read: () => 7 },
+      shared: () => ({ privateToPlugins: true }),
+      install: (core) => ({ read: core.features.feature.read() })
+    })
+    const host = new FeatureHost()
+    await expect(host.use(plugin)).resolves.toMatchObject({ extensions: { read: 7 } })
+    await host.dispose()
+  })
+
+  it('reports rejected Feature thenables without awaiting or publishing them', async () => {
+    const original = new Error('late-feature-rejection')
+    const diagnostics: string[] = []
+    const invalid = defineFeature((() => Promise.reject(original)) as never)
+    const host = new FeatureHost({
+      diagnostic: (message: string) => diagnostics.push(message)
+    } as any)
+    let thrown: any
+    try {
+      await host.use(
+        definePlugin({
+          name: 'invalid-feature',
+          install: () => ({}),
+          features: { invalid },
+          featureExpose: {}
+        })
+      )
+    } catch (error) {
+      thrown = error
+    }
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(thrown.cause.cause).toBe(original)
+    expect(diagnostics.join('|')).toContain('late-feature-rejection')
+  })
+
+  it('contains synchronous and asynchronous diagnostic failures without replacing a late Feature cause', async () => {
+    const original = new Error('feature-late-cause')
+    const reporterFailure = new Error('reporter-late-failure')
+    const invalid = defineFeature((() => Promise.reject(original)) as never)
+    const host = new FeatureHost({ diagnostic: () => Promise.reject(reporterFailure) } as any)
+    await expect(
+      host.use(
+        definePlugin({
+          name: 'invalid-reporter',
+          install: () => ({}),
+          features: { invalid },
+          featureExpose: {}
+        })
+      )
+    ).rejects.toMatchObject({ cause: { cause: original } })
+    await Promise.resolve()
+    const throwingHost = new FeatureHost({
+      diagnostic: () => {
+        throw reporterFailure
+      }
+    } as any)
+    await expect(
+      throwingHost.use(
+        definePlugin({
+          name: 'invalid-throwing-reporter',
+          install: () => ({}),
+          features: { invalid },
+          featureExpose: {}
+        })
+      )
+    ).rejects.toMatchObject({ cause: { cause: original } })
+  })
+
+  it('captures a custom Feature thenable once and rejects useSync before it settles', async () => {
+    let getterCalls = 0
+    let thenCalls = 0
+    let reject!: (error: unknown) => void
+    const original = new Error('custom-late')
+    // oxlint-disable-next-line unicorn/no-thenable -- hostile Feature output verifies observed late rejection.
+    const value = Object.defineProperty({}, 'then', {
+      get: () => {
+        getterCalls += 1
+        return (_resolve: unknown, onReject: (error: unknown) => void) => {
+          thenCalls += 1
+          reject = onReject
+        }
+      }
+    })
+    const invalid = defineFeature((() => value) as never)
+    let installs = 0
+    const host = new FeatureHost()
+    let thrown: any
+    try {
+      host.installSync([
+        definePlugin({
+          name: 'custom-invalid',
+          features: { invalid },
+          featureExpose: {},
+          install: () => {
+            installs += 1
+            return {}
+          }
+        })
+      ])
+    } catch (error) {
+      thrown = error
+    }
+    expect(installs).toBe(0)
+    expect(getterCalls).toBe(1)
+    expect(thenCalls).toBe(1)
+    reject(original)
+    await Promise.resolve()
+    expect(thrown.cause.cause).toBe(original)
+  })
+
+  it('preserves a throwing then getter as the Feature failure cause', () => {
+    const original = new Error('then-getter')
+    const invalid = defineFeature((() =>
+      // oxlint-disable-next-line unicorn/no-thenable -- hostile Feature output verifies getter-failure preservation.
+      Object.defineProperty({}, 'then', {
+        get: () => {
+          throw original
+        }
+      })) as never)
+    const host = new FeatureHost()
+    let thrown: any
+    try {
+      host.installSync([
+        definePlugin({
+          name: 'getter-invalid',
+          install: () => ({}),
+          features: { invalid },
+          featureExpose: {}
+        })
+      ])
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown.cause.cause).toBe(original)
+  })
+
+  it('constructs Feature outputs per registration before plugin install', async () => {
+    const expose = { value: () => 21 }
+    const base = defineFeature(
+      (core: { readonly featureExpose: { readonly value: () => number } }) => ({
+        read: () => core.featureExpose.value()
+      })
+    )
+    const derived = defineFeature(
+      (_core, dependencies) => ({
+        twice: () => dependencies.base.read() * 2
+      }),
+      { base }
+    )
+    const plugin = definePlugin({
+      name: 'native-feature',
+      features: { derived },
+      featureExpose: expose,
+      install: (core) => {
+        const featureCore = core as typeof core & {
+          readonly features: { readonly derived: { readonly twice: () => number } }
+        }
+        return { result: featureCore.features.derived.twice() }
+      }
+    })
+    const host = new FeatureHost()
+    const first = await host.use(plugin)
+    expect(first.extensions.result).toBe(42)
+    const second = await new FeatureHost().use(plugin)
+    expect(second.extensions.result).toBe(42)
+    expect(Object.isFrozen(expose)).toBe(false)
+  })
+
   it('keeps the exported disposal discriminator immutable and exact', () => {
     const expectedKeys = ['hostError', 'aggregate', 'disposerWrapper']
     expect(Object.isFrozen(PluginHostDisposalNodeKind)).toBe(true)
@@ -931,7 +1283,7 @@ describe('PluginHost', () => {
     await host.use(plugin('allowed-finally', () => ({ finally: () => undefined })))
   })
 
-  it('preflights an entire batch before running install', async () => {
+  it('YS24: preflights an entire batch before running install', async () => {
     let installed = 0
     const host = new Host()
     const first = plugin('first', () => {

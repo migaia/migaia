@@ -1,33 +1,22 @@
 import type { IWebRpcPlugin, IWebRpcPluginInstallResult } from '../typing.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import type { IWebRpcPluginDescriptor } from './plugin-translator.js'
+import type { IWebRpcPluginInstallScope } from './plugin-contract.js'
 import { safeRead } from './safe-value.js'
+
+/** Current domain install input consumed by the native PluginHost batch. */
+export type IWebRpcPluginDescriptor<TInstallation = unknown> = {
+  readonly name: string
+  readonly claims: IWebRpcPlugin['metadata']['claims']
+  readonly sharedProvides?: readonly PropertyKey[]
+  readonly sharedConsumes?: readonly PropertyKey[]
+  readonly sharedOptionalConsumes?: readonly PropertyKey[]
+  readonly install: (scope: IWebRpcPluginInstallScope) => TInstallation | Promise<TInstallation>
+  readonly shared?: (installation: TInstallation) => Record<PropertyKey, unknown>
+}
 
 /** Freezes a fresh descriptor snapshot so each factory call has independent identity. */
 export function freezePlugin<TPlugin extends IWebRpcPlugin>(plugin: TPlugin): TPlugin {
   return Object.freeze({ ...plugin }) as TPlugin
-}
-
-/** Converts one native WebRPC descriptor into the permanent PluginHost boundary shape. */
-export function toPluginDescriptor(plugin: IWebRpcPlugin): IWebRpcPluginDescriptor {
-  const metadata = plugin.metadata
-  return {
-    name: plugin.name,
-    claims: metadata.claims,
-    sharedProvides: metadata.sharedProvides,
-    sharedConsumes: metadata.sharedConsumes,
-    sharedOptionalConsumes: metadata.sharedOptionalConsumes,
-    install: async (scope) => {
-      const result = await plugin.install({
-        ...scope,
-        own: <T>(resource: T, release: () => void | Promise<void>): T =>
-          scope.own(resource, release)
-      })
-      assertPluginInstallResult(result)
-      return result
-    },
-    shared: (installation) => (installation as IWebRpcPluginInstallResult).shared
-  }
 }
 
 /** Validates the stable result shape returned by a native plugin body. */

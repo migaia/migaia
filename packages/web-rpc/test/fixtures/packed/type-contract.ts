@@ -1,12 +1,5 @@
-import { createComposedEndpoint, type IWebRpcEndpointModule } from '@migaia/web-rpc/core'
+import { createComposedEndpoint } from '@migaia/web-rpc/core'
 import { createProviderEndpoint } from '@migaia/web-rpc/provider'
-import { discovery } from '@migaia/web-rpc/features/discovery'
-import { provider } from '@migaia/web-rpc/features/provider'
-import {
-  oneWay,
-  type IOneWaySurface,
-  type IWebRpcOneWayOptions
-} from '@migaia/web-rpc/features/one-way'
 import { createFullEndpoint } from '@migaia/web-rpc/full'
 import { createClientEndpoint } from '@migaia/web-rpc/client'
 import {
@@ -14,6 +7,7 @@ import {
   codec,
   createEndpoint,
   defineFeature,
+  defineMiddleware,
   framer,
   protocol as canonicalProtocol,
   type IWebRpcFeature,
@@ -30,9 +24,6 @@ import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { IWebRpcTransport } from '@migaia/web-rpc'
 
-type ICustomSurface = {
-  custom(): string
-}
 declare const semantic: IWebRpcTransport<IRpcEnvelope>
 declare const opaque: IWebRpcTransport<unknown>
 declare const text: IWebRpcTransport<string>
@@ -87,11 +78,27 @@ async function verifyPackedContracts(): Promise<void> {
   void root.provide('echo', (context) => context.success(context.data)).connect
   void root.provide('echo', (context) => context.success(context.data)).discovery
 
-  const packedFeature = defineFeature({
-    key: 'packed-custom',
-    claims: { publicKeys: ['custom'] },
-    install: () => ({ custom: () => 'packed-custom' })
+  const nativeMiddleware = defineMiddleware('packed-native-surface', () => ({
+    install: () => ({ foo: 1 as const }),
+    expose: () => ({ bar: () => 'packed-bar' as const })
+  }))
+  const fullWithNativeMiddleware = await createFullEndpoint({
+    ...config('packed-native-surface'),
+    middlewares: [connect(), nativeMiddleware] as const
   })
+  const nativeFoo: 1 = fullWithNativeMiddleware.foo
+  const nativeBar: 'packed-bar' = fullWithNativeMiddleware.bar()
+  const fluentNativeFoo: 1 = fullWithNativeMiddleware.provide('echo', (context) =>
+    context.success(context.data)
+  ).foo
+  const fluentNativeBar: 'packed-bar' = fullWithNativeMiddleware
+    .provide('echo', (context) => context.success(context.data))
+    .bar()
+  void [nativeFoo, nativeBar, fluentNativeFoo, fluentNativeBar]
+  // @ts-expect-error unexposed native middleware keys remain absent from the endpoint surface.
+  void fullWithNativeMiddleware.missingNativeKey
+
+  const packedFeature = defineFeature(() => ({ custom: () => 'packed-custom' }))
   const rootWithFeature = await createEndpoint({
     ...config('packed-root-feature-types'),
     features: [packedFeature] as const
@@ -115,34 +122,18 @@ async function verifyPackedContracts(): Promise<void> {
   // @ts-expect-error slim provider roots do not expose connect
   void providerEndpoint.connect
 
-  const custom = {} as IWebRpcEndpointModule<ICustomSurface>
-  const grown = await createComposedEndpoint(config('packed-custom-types'), [custom] as const)
+  const grown = await createComposedEndpoint(config('packed-custom-types'), {
+    custom: packedFeature
+  })
   void grown.custom()
 
-  const publicTuple = await createComposedEndpoint(config('packed-public-tuple-types'), [
-    provider(),
-    discovery()
-  ] as const)
+  const publicTuple = await createFullEndpoint(config('packed-public-tuple-types'))
   void publicTuple.send
   void publicTuple.connect
   void publicTuple.discovery
 
-  const discoveryOnly = await createComposedEndpoint(config('packed-discovery-only-types'), [
-    discovery()
-  ] as const)
-  // @ts-expect-error discovery roots do not inherit outbound methods from dependencies
-  void discoveryOnly.send
-
-  const oneWayEndpoint = await createComposedEndpoint(
-    { id: 'packed-one-way-semantic', transport: semantic, middlewares: [connect()] as const },
-    [oneWay()] as const
-  )
-  const oneWayResult: Promise<void> = oneWayEndpoint.sendOneWay('peer', 'notify', null)
-  const oneWayOptions: IWebRpcOneWayOptions = { transfer: [] }
-  const oneWaySurface: IOneWaySurface = oneWayEndpoint
-  void oneWayResult
-  void oneWayOptions
-  void oneWaySurface
+  // @ts-expect-error default public roots do not expose the private one-way capability.
+  void publicTuple.sendOneWay
   const clientWithoutOneWay = await createClientEndpoint({
     id: 'packed-client-no-one-way',
     transport: semantic,
@@ -178,9 +169,10 @@ async function verifyPackedPipelineMatrix(): Promise<void> {
     middlewares: [],
     transport: semantic
   })
-  await createComposedEndpoint({ id: 'packed-core-opaque', middlewares: [], transport: opaque }, [
-    provider()
-  ] as const)
+  await createComposedEndpoint(
+    { id: 'packed-core-opaque', middlewares: [], transport: opaque },
+    { packed: defineFeature(() => ({ packed: true as const })) }
+  )
   await createFullEndpoint<'packed-legacy-semantic', readonly []>({
     id: 'packed-legacy-semantic',
     middlewares: [],
@@ -207,9 +199,10 @@ async function verifyPackedPipelineMatrix(): Promise<void> {
   // @ts-expect-error provider default semantic envelopes cannot use a string-only sink.
   await createProviderEndpoint({ id: 'packed-provider-string', middlewares: [], transport: text })
   // @ts-expect-error core default semantic envelopes cannot use a string-only sink.
-  await createComposedEndpoint({ id: 'packed-core-string', middlewares: [], transport: text }, [
-    provider()
-  ] as const)
+  await createComposedEndpoint(
+    { id: 'packed-core-string', middlewares: [], transport: text },
+    { packed: defineFeature(() => ({ packed: true as const })) }
+  )
 
   const json = defineJsonCodec({ version: 1 })
   const stringFrames = createStringFramer()

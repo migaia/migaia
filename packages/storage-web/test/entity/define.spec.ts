@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity'
-import { memoryStorage } from '../../src/backends/memory'
+import { memoryStorageHost } from '../../src/backends/memory'
 import { StorageErrorCode } from '../../src/types/errors'
 import { StorageContractErrorCode } from '@migaia/storage-contract'
 
@@ -123,7 +123,7 @@ describe('defineEntity runtime contract', () => {
     const entity = defineEntity<{ id: string }>({ name: 'store-guard', key: 'id' })
     for (const store of [null, undefined, [], {}, { backend: 'memory' }])
       expect(() => entity.connect(store as never)).toThrow(StorageErrorCode.invalidConfig)
-    expect(() => entity.connect(memoryStorage())).not.toThrow()
+    expect(() => entity.connect(memoryStorageHost())).not.toThrow()
     const alienStore = {
       backend: 'alien',
       capabilities: {},
@@ -267,7 +267,7 @@ describe('defineEntity runtime contract', () => {
         return undefined
       }
     })
-    await definition.connect(memoryStorage()).put({ id: 'stable' })
+    await definition.connect(memoryStorageHost()).put({ id: 'stable' })
     expect(optionReads).toBe(9)
     expect(schemaReads).toBe(5)
     expect(migrationReads).toBe(1)

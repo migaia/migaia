@@ -4,9 +4,14 @@ export {
   defineFeature,
   type IWebRpcFeature,
   type IWebRpcFeatureDefinition,
-  type IWebRpcFeatureInstallScope,
   type IWebRpcFeatureSurface
 } from './feature.js'
+export {
+  defineMiddleware,
+  type IWebRpcMiddlewareCore,
+  type IWebRpcMiddlewareDescriptor,
+  type IWebRpcNativeMiddleware
+} from './middleware.js'
 export type * from './typing.js'
 export * from './transport-constants.js'
 export {

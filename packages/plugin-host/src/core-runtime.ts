@@ -99,7 +99,11 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
     const ownedResource = () => Promise.resolve(disposer())
     owner.own(
       ownedResource,
-      this.#port.cleanupRuntime.createStepDescriptor('resource disposer', disposer)
+      this.#port.cleanupRuntime.createStepDescriptor(
+        'resource disposer',
+        disposer,
+        registration.featurePending
+      )
     )
     registration.resourceDisposers.push(
       Object.freeze({ resource: ownedResource, dispose: disposer })

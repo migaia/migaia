@@ -1526,6 +1526,31 @@ try {
     })
   }
 
+/** RPC Contract guide entries introduced by rpc-contract exports used by WebRPC runtime setup. */
+const rpcContractGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
+  'rpc-contract:index:createDescriptor': guide({
+    purposeEn:
+      'Creates a typed contract descriptor for versioned RPC operations and keeps the resulting identity stable across endpoint creation and test coverage.',
+    purposeZh:
+      '创建可用于版本化 RPC 的类型化契约 descriptor，并在 endpoint 创建与测试中保持生成身份稳定。',
+    quickStart:
+      "import { createDescriptor } from '@migaia/rpc-contract'\n\nconst readOrders = createDescriptor('read-orders', 1)",
+    useEn: [
+      'A public endpoint method or custom protocol needs a stable descriptor before any request is accepted.'
+    ],
+    useZh: ['自定义 protocol 方法或端点方法在接收请求前，需要稳定的 descriptor。'],
+    avoidEn: [
+      'Ad-hoc runtime objects replace shared descriptors across services.',
+      'Only runtime string literals are used without a contract-level version.'
+    ],
+    avoidZh: [
+      '服务间 ad-hoc 对象代替共享 descriptor 导致行为不一致。',
+      '在跨服务通信时没有版本化的 contract 约束。'
+    ],
+    options: []
+  })
+}
+
 /**
  * Public root middleware routes and feature routes share one complete composition guide. The
  * Website flattens feature URLs, so both identities must explain the same Host workflow.
@@ -1825,6 +1850,7 @@ const webRpcConstantGuides: Readonly<Record<string, Readonly<Record<IGuideLocale
 }
 
 export const webRpcApiGuides = {
+  ...rpcContractGuides,
   ...webRpcCoreGuides,
   ...webRpcErrorGuides,
   ...webRpcConstantGuides

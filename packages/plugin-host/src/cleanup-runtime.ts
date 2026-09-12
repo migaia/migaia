@@ -41,15 +41,29 @@ export class PluginHostCleanupRuntime {
   }
 
   /** Builds one lifecycle release descriptor with the Host's timeout and abandonment policy. */
-  createStepDescriptor(phase: string, run: () => void | PromiseLike<void>): IReleaseDescriptor {
+  createStepDescriptor(
+    phase: string,
+    run: () => void | PromiseLike<void>,
+    observer?: IPendingTracker
+  ): IReleaseDescriptor {
     const timeoutMs = this.#options.disposeStepTimeoutMs
-    if (timeoutMs === false) return { graceful: run, force: () => {} }
+    if (timeoutMs === false)
+      return {
+        graceful: () => {
+          const result = run()
+          if (result && typeof (result as PromiseLike<void>).then === 'function')
+            void observer?.track(Promise.resolve(result))
+          return result
+        },
+        force: () => {}
+      }
     let settled = false
     return {
       graceful: async () => {
         const pending = Promise.resolve().then(async () => {
           await run()
         })
+        void observer?.track(pending)
         try {
           await this.#options.pending.track(pending)
         } finally {
@@ -72,14 +86,16 @@ export class PluginHostCleanupRuntime {
   async disposeGroup(
     disposers: readonly (() => void | PromiseLike<void>)[],
     phase: string,
-    preserveErrorIdentity = false
+    preserveErrorIdentity = false,
+    observer?: IPendingTracker
   ): Promise<unknown[]> {
     if (disposers.length === 0) return []
     const scope = createLifecycleScope({
       errorPolicy: 'collect',
       scheduler: this.#options.scheduler
     })
-    for (const dispose of disposers) scope.own(dispose, this.createStepDescriptor(phase, dispose))
+    for (const dispose of disposers)
+      scope.own(dispose, this.createStepDescriptor(phase, dispose, observer))
     return this.#wrapCollected(await scope.dispose(), phase, preserveErrorIdentity)
   }
 

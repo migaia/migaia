@@ -1,5 +1,6 @@
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
+import { snapshotFeatureRecord } from './define-feature.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginDefinition } from './registry.js'
@@ -37,6 +38,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       readonly update: unknown
       readonly dispose: unknown
       readonly shared: unknown
+      readonly features: unknown
+      readonly featureExpose: unknown
       readonly disposer: ReturnType<typeof snapshotDisposer>
     }
     try {
@@ -47,12 +50,24 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
         update: plugin?.update,
         dispose: plugin?.dispose,
         shared: plugin?.shared,
+        features: plugin?.features,
+        featureExpose: plugin?.featureExpose,
         disposer: snapshotDisposer(plugin as IPluginResource)
       }
     } catch (cause) {
       throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause })
     }
-    const { name, config: rawConfig, install, update, dispose, shared, disposer } = captured
+    const {
+      name,
+      config: rawConfig,
+      install,
+      update,
+      dispose,
+      shared,
+      features,
+      featureExpose,
+      disposer
+    } = captured
     if (typeof name !== 'string' || name.length === 0)
       throw createPluginHostTypeError('plugin name must be a non-empty string')
     if (name.includes('.')) throw createPluginHostTypeError('plugin name must not contain "."')
@@ -84,7 +99,9 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       update: update as IPluginConstraint<any>['update'],
       dispose: dispose as IPluginConstraint<any>['dispose'],
       shared: shared as IPluginConstraint<any>['shared'],
-      disposer: disposer.disposer
+      disposer: disposer.disposer,
+      features: snapshotFeatureRecord(features),
+      featureExpose: featureExpose as IPluginDefinition<any>['featureExpose']
     }
   })
 }

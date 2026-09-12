@@ -1,6 +1,11 @@
 import { asyncDisposeKey, disposeKey } from './symbols.js'
 import type { IAbortSignal, ILifecycleScheduler } from '@migaia/lifecycle'
 import type { PluginHostError } from './error-text.js'
+import type {
+  IFeatureOutputs,
+  IFeatureRecord,
+  IFeatureRecordRequiredExpose
+} from './feature-types.js'
 
 /** Values accepted at every asynchronous plugin lifecycle boundary. */
 export type IPluginAwaitable<T> = T | PromiseLike<T>
@@ -146,16 +151,30 @@ export type IPlugin<
   TCore,
   TExt extends Record<string, unknown> = Record<string, never>,
   TConfig extends IPluginConfig = IPluginConfig,
-  TShared extends object = Record<string, never>
+  TShared extends object = Record<string, never>,
+  TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object = Record<never, never>
 > = {
   readonly name: string
   readonly config?: TConfig
+  readonly features?: TFeatures
+  readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose)
   /** 声明跨插件共享能力。共享函数优先使用箭头函数，确保它被提取、缓存或传递后 仍绑定当前插件实例；只有明确不访问插件实例状态时才使用普通函数。 */
-  shared?: (core: TCore & IPluginLifecycleCore<TConfig>) => TShared
-  install: (core: TCore & IPluginLifecycleCore<TConfig>) => IPluginAwaitable<TExt>
+  shared?: (
+    core: TCore &
+      IPluginLifecycleCore<TConfig> &
+      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
+  ) => TShared
+  install: (
+    core: TCore &
+      IPluginLifecycleCore<TConfig> &
+      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
+  ) => IPluginAwaitable<TExt>
   update?: (
     next: IReadonlyConfig<TConfig>,
-    core: TCore & IPluginLifecycleCore<TConfig>
+    core: TCore &
+      IPluginLifecycleCore<TConfig> &
+      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
   ) => IPluginAwaitable<void>
   dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
@@ -163,16 +182,91 @@ export type IPlugin<
 }
 
 /** 用于约束插件元组，同时保留每个插件自身的精确泛型。 */
-export type IPluginConstraint<TCore> = {
+export type IPluginConstraint<
+  TCore,
+  TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object = Record<never, never>
+> = {
   readonly name: string
   readonly config?: unknown
-  shared?: (core: TCore & IPluginLifecycleCore<any>) => object
-  install: (core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<Record<string, unknown>>
-  update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<void>
+  readonly features?: TFeatures
+  readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>) => TExpose)
+  shared?: (
+    core: TCore &
+      IPluginLifecycleCore<any> &
+      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
+  ) => object
+  install: (
+    core: TCore &
+      IPluginLifecycleCore<any> &
+      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
+  ) => IPluginAwaitable<Record<string, unknown>>
+  update?: (
+    next: never,
+    core: TCore &
+      IPluginLifecycleCore<any> &
+      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
+  ) => IPluginAwaitable<void>
   dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
 }
+
+/** Extracts one candidate's native Feature roots without widening a tuple element. */
+export type IPluginConstraintFeatures<TPlugin> = TPlugin extends {
+  readonly features: infer TFeatures extends IFeatureRecord
+}
+  ? TFeatures
+  : Record<never, never>
+
+/** Extracts a candidate's expose value while preserving its concrete method surface. */
+export type IPluginConstraintExpose<TPlugin> = TPlugin extends {
+  readonly featureExpose: infer TExpose
+}
+  ? TExpose extends (...args: never[]) => infer TFactoryExpose
+    ? TFactoryExpose extends object
+      ? TFactoryExpose
+      : never
+    : TExpose extends object
+      ? TExpose
+      : never
+  : Record<never, never>
+
+/** Validates every candidate against its own Feature/expose shape and the Host core. */
+export type IPluginConstraintTuple<TCore, TPlugins extends readonly unknown[]> = {
+  readonly [K in keyof TPlugins]: IPluginConstraint<
+    TCore,
+    IPluginConstraintFeatures<TPlugins[K]>,
+    IPluginConstraintExpose<TPlugins[K]>
+  > &
+    (TPlugins[K] extends { readonly [definedPluginBrand]: { readonly core: infer TRequired } }
+      ? TRequired extends Record<string, never>
+        ? unknown
+        : TCore extends TRequired
+          ? unknown
+          : never
+      : unknown)
+}
+
+/** Feature fields injected into Plugin hooks from selected roots and one registration expose. */
+export type IPluginFeatureCore<
+  TFeatures extends IFeatureRecord,
+  TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>
+> = Readonly<{
+  readonly features: IFeatureOutputs<TFeatures>
+  readonly featureExpose: TExpose
+}>
+
+/** Definition-time Feature options shared by functional and object Plugin declarations. */
+export type IPluginFeatureOptions<
+  TCore extends object,
+  TConfig extends IPluginConfig,
+  TFeatures extends IFeatureRecord,
+  TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>
+> = Readonly<{
+  readonly features?: TFeatures
+  readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose)
+}>
 
 /** Opaque compile-time provenance carried by definitions made through `definePlugin`. */
 declare const definedPluginBrand: unique symbol
@@ -182,8 +276,10 @@ export type IDefinedPluginConstraint<
   TExtension extends Record<string, unknown> = Record<string, unknown>,
   TConfig extends IPluginConfig = IPluginConfig,
   TShared extends object = Record<string, never>,
-  TName extends string = string
-> = IPlugin<any, TExtension, TConfig, TShared> &
+  TName extends string = string,
+  TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object = Record<never, never>
+> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose> &
   Readonly<{
     readonly name: TName
     /** Required only in declarations; runtime authority remains the private WeakMap. */
@@ -207,7 +303,8 @@ export type ISetupHostOptions<
   readonly setupTimeoutMs: number | false
   readonly signal?: IAbortSignal
   readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>
-  readonly plugins?: TPlugins
+  readonly plugins?: TPlugins &
+    IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>
 }>
 
 /** Structural Host surface exposed by setupHost; concrete runtime class stays private. */
@@ -215,10 +312,10 @@ export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{
   readonly pipelineMode: IPipelineMode
   readonly revision: number
   getShared(key: PropertyKey): unknown
-  getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>>
+  getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>, TCore, TValue>
   use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(
-    ...plugins: TPlugins
-  ): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins>>
+    ...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>
+  ): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins, TCore, TValue>>
   usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
   useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
   useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
@@ -233,7 +330,7 @@ export type ISetupHostView<
   THost,
   _TCore extends object = object,
   _TValue = never,
-  TPlugins extends readonly any[] = readonly []
+  TPlugins extends readonly IPluginConstraint<any>[] = readonly []
 > = Readonly<{
   readonly host: THost
   readonly extensions: Readonly<Record<PropertyKey, unknown>>
@@ -242,7 +339,7 @@ export type ISetupHostView<
   dispose(): Promise<IPluginHostDisposalResult>
   [asyncDisposeKey](): Promise<void>
 }> &
-  IPluginHostView<THost, TPlugins & readonly IPluginConstraint<any>[]>
+  IPluginHostView<THost, TPlugins, _TCore, _TValue>
 
 export type IExtractPluginExt<TPlugin> =
   TPlugin extends IPlugin<infer _TCore, infer TExt, infer _TConfig, infer _TShared>
@@ -349,7 +446,9 @@ export type IPluginHostOptions = {
 /** Immutable publication view returned by V2 composition and removal operations. */
 export type IPluginHostView<
   THost,
-  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly [],
+  TCore extends object = object,
+  TValue = never
 > = Readonly<{
   readonly host: THost
   readonly extensions: Readonly<IMergePluginExts<TInstalled>>
@@ -359,16 +458,28 @@ export type IPluginHostView<
   ): IMergePluginShared<TInstalled>[TKey] | undefined
   getShared(key: PropertyKey): unknown
   use<const TPlugins extends readonly IPluginConstraint<any>[]>(
-    ...plugins: TPlugins
-  ): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins]>>
+    ...plugins: TPlugins &
+      IPluginConstraintTuple<
+        TCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>,
+        TPlugins
+      >
+  ): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins], TCore, TValue>>
   unUse<const TName extends IInstalledPluginName<TInstalled>>(
     name: TName
-  ): Promise<IPluginRemovalResult<IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>>>>
-  unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>
+  ): Promise<
+    IPluginRemovalResult<
+      IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>, TCore, TValue>
+    >
+  >
+  unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost, TCore, TValue>>>
 }>
 
 /** Runtime-unknown view returned when a dynamic plugin name cannot be narrowed statically. */
-export type IPluginHostDynamicView<THost> = Readonly<{
+export type IPluginHostDynamicView<
+  THost,
+  TCore extends object = object,
+  TValue = never
+> = Readonly<{
   readonly host: THost
   readonly extensions: Readonly<Record<PropertyKey, unknown>>
   readonly config: {
@@ -379,8 +490,10 @@ export type IPluginHostDynamicView<THost> = Readonly<{
     ): Promise<void>
   }
   getShared(key: PropertyKey): unknown
-  use(...plugins: readonly IPluginConstraint<any>[]): Promise<IPluginHostDynamicView<THost>>
-  unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>
+  use<const TPlugins extends readonly IPluginConstraint<any>[]>(
+    ...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>
+  ): Promise<IPluginHostDynamicView<THost, TCore, TValue>>
+  unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost, TCore, TValue>>>
 }>
 
 /** Structured result for logical removal and any cleanup errors. */

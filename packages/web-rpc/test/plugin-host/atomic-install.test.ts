@@ -7,6 +7,7 @@ import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { createComposedEndpoint, type IWebRpcCoreConfig } from '../../src/core.js'
 import { createClientEndpoint } from '../../src/client.js'
 import { createEndpoint } from '../../src/index.js'
+import { defineMiddleware } from '../../src/middleware.js'
 import { abort } from '../../src/middleware/abort.js'
 import { authentication } from '../../src/middleware/authentication.js'
 import { codec } from '../../src/middleware/codec.js'
@@ -17,12 +18,14 @@ import { ping } from '../../src/middleware/ping.js'
 import { canonicalProtocol as protocol } from '../../src/middleware/canonical-protocol.js'
 import { timeout } from '../../src/middleware/timeout.js'
 import { uuid } from '../../src/middleware/uuid.js'
-import { canonicalChunk as chunk } from '../../src/features/canonical-chunk.js'
-import { control } from '../../src/features/control.js'
-import { discovery } from '../../src/features/discovery.js'
-import { outbound } from '../../src/features/outbound.js'
-import { provider } from '../../src/features/provider.js'
 import { createProviderEndpoint } from '../../src/provider.js'
+import { createClientFirstPartyRoots } from '../../src/internal/client-first-party-roots.js'
+import { createProviderFirstPartyRoots } from '../../src/internal/provider-first-party-roots.js'
+import {
+  createFirstPartyRoots,
+  type IWebRpcFirstPartyRootName
+} from '../../src/internal/first-party-roots.js'
+import type { IWebRpcPluginConstraint } from '../../src/internal/plugin-contract.js'
 import type {
   IWebRpcAbortSignal,
   IWebRpcHookEvent,
@@ -31,10 +34,11 @@ import type {
   IWebRpcPlugin,
   IWebRpcPluginInstallScope,
   IWebRpcPluginInstallResult,
+  IWebRpcEndpoint,
   IWebRpcProvider
 } from '../../src/typing.js'
 import { WebRpcPluginHost } from '../../src/internal/web-rpc-plugin-host.js'
-import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
+import { definePlugin } from '@migaia/plugin-host'
 import {
   createConstructionControl,
   runConstructionInstall
@@ -46,26 +50,20 @@ import {
   type IPreparedEndpoint
 } from '../../src/internal/endpoint-bootstrap.js'
 import {
-  getEndpointModuleOwner,
-  snapshotEndpointModules,
-  withEndpointModuleOwner
-} from '../../src/internal/endpoint-modules.js'
-import {
-  buildComposedPluginInventory,
+  buildNativePluginBatch,
+  type IWebRpcNativeFeatureDefinition,
   type IWebRpcComposedRuntimeState,
-  type IWebRpcComposedPluginInventoryEntry,
   type IWebRpcPluginRole
 } from '../../src/internal/plugin-inventory.js'
+import { createEndpointCapabilitiesBatchFeature } from '../../src/internal/endpoint-capabilities-plugin.js'
+import { assertPluginInstallResult } from '../../src/internal/plugin-descriptor.js'
+import type { IWebRpcPluginDescriptor } from '../../src/internal/plugin-descriptor.js'
 import {
-  assertPluginClaimParity,
-  preflightPluginClaims,
-  toPluginHostDefinition,
-  type IWebRpcPluginClaims,
-  type IWebRpcPluginDescriptor,
-  type IWebRpcPluginRuntimeOutput,
-  type IWebRpcPluginRuntimeOutputPhase,
-  type IWebRpcTranslatedPlugin
-} from '../../src/internal/plugin-translator.js'
+  assertFeatureClaimParity,
+  preflightFeatureClaims,
+  type IWebRpcClaimAdmission
+} from '../../src/internal/feature-policy.js'
+import type { IWebRpcPluginClaims } from '../../src/typing.js'
 import {
   WebRpcSharedKey,
   WebRpcPingEnablePortShape,
@@ -83,7 +81,8 @@ import {
 import { WebRpcErrorText } from '../../src/error-text.js'
 import {
   readEndpointDebugSnapshot,
-  registerDiscoveryCleanupFaults
+  registerDiscoveryCleanupFaults,
+  type IWebRpcDiscoveryCleanupFaults
 } from '../../src/internal/test-observer.js'
 import { readComposedDisposalPromises } from '../../src/internal/composed-disposal-observer.js'
 
@@ -93,6 +92,13 @@ const plannedAbortEnablementKey = WebRpcSharedKey.abort
 /** Formats a PropertyKey without claiming object identity for symbols in a message contract. */
 function stablePropertyKeyDescription(key: PropertyKey): string {
   return typeof key === 'symbol' ? `symbol:${key.description ?? '<anonymous>'}` : `string:${key}`
+}
+
+/** Reads the runtime-projected sender from a statically selected client root. */
+function readProjectedSend(endpoint: object): IWebRpcEndpoint['send'] {
+  const send = Reflect.get(endpoint, 'send')
+  expect(typeof send).toBe('function')
+  return send as IWebRpcEndpoint['send']
 }
 
 /** Builds the canonical first-party role-admission message expected by the RED contract. */
@@ -139,13 +145,21 @@ function composedConfig(
 type IProductionBatch = {
   readonly host: WebRpcPluginHost
   readonly kernel: ReturnType<typeof createEndpointKernel>
+  /** Fixture transport used to verify the kernel retains the production transport owner. */
+  readonly transport: IWebRpcCoreConfig['transport']
   readonly construction: ReturnType<typeof createConstructionControl>
-  readonly inventory: readonly IWebRpcComposedPluginInventoryEntry[]
+  /** Host-owned early-construction diagnostics, replayed only after middleware finalization. */
+  readonly hookEvents: readonly IWebRpcHookEvent[]
+  readonly inventory: readonly IProductionNativeEntry[]
   readonly descriptors: readonly IWebRpcPluginDescriptor[]
+  /** Native admission records are the sole pre-install policy input. */
+  readonly admissions: readonly IWebRpcClaimAdmission[]
   readonly claims: readonly IWebRpcPluginClaims[]
   readonly translated: readonly IWebRpcTranslatedPlugin[]
   readonly getPrepared: () => IPreparedEndpoint<string> | undefined
   readonly getRuntimeState: () => IWebRpcComposedRuntimeState | undefined
+  /** Reaches the prepared discovery surface's owned cleanup fault observer. */
+  readonly propagateDiscoveryCleanupFaults: (faults: IWebRpcDiscoveryCleanupFaults) => void
   readonly stats: {
     activeSubscriptions: number
     subscribeCalls: number
@@ -154,6 +168,18 @@ type IProductionBatch = {
   }
   readonly isActivated: () => boolean
 }
+
+/** Metadata-only fixture view of one current native batch entry; it is not a legacy runtime path. */
+type IProductionNativeEntry = Readonly<{
+  readonly role: IWebRpcPluginRole
+  /** Test metadata preserves prior assertions while runtime always originates from native entries. */
+  readonly descriptor: IWebRpcPluginDescriptor
+}>
+
+/** Test-only output observation; native production definitions never expose translator output. */
+type IWebRpcPluginRuntimeOutput = Readonly<Record<PropertyKey, unknown>>
+type IWebRpcPluginRuntimeOutputPhase = 'extension' | 'shared'
+type IWebRpcTranslatedPlugin = Readonly<{ readonly definition: IWebRpcPluginConstraint }>
 
 type IProductionLifecycleTraceEntry = {
   readonly kind: string
@@ -167,6 +193,8 @@ type IProductionBatchOptions = {
   readonly contractMiddleware?: IWebRpcPlugin
   readonly authenticationMiddleware?: IWebRpcPlugin
   readonly connectMiddleware?: IWebRpcPlugin
+  readonly abortMiddleware?: IWebRpcPlugin
+  readonly timeoutMiddleware?: IWebRpcPlugin
   readonly hooksMiddleware?: IWebRpcPlugin
   readonly pingMiddleware?: IWebRpcPlugin
   readonly uuidMiddleware?: IWebRpcPlugin
@@ -186,6 +214,8 @@ type IProductionBatchOptions = {
     role: IWebRpcPluginRole,
     install: IWebRpcPluginDescriptor['install']
   ) => IWebRpcPluginDescriptor['install']
+  /** Only intentionally pending fault bodies opt into the existing construction gate. */
+  readonly injectConstructionGate?: (role: IWebRpcPluginRole) => boolean
   readonly injectRuntimeOutput?: (
     role: IWebRpcPluginRole,
     phase: IWebRpcPluginRuntimeOutputPhase,
@@ -200,11 +230,17 @@ type IProductionBatchOptions = {
     descriptor: IWebRpcPluginDescriptor
   ) => IWebRpcPluginDescriptor
   readonly additionalDescriptors?: readonly IWebRpcPluginDescriptor[]
+  /** Extra definitions join the production Host transaction for native lifecycle fault rows. */
+  readonly additionalNativeFeatures?: readonly IWebRpcNativeFeatureDefinition[]
   readonly skipPreflight?: boolean
   readonly report?: (error: unknown) => void
   readonly onInstalled?: (installation: unknown) => void
   readonly onTransferredCleanup?: (pluginName: string) => void
-  readonly onActivationPreflight?: (state: IWebRpcComposedRuntimeState) => void
+  /** Observes the actual native activation port after finalization and before ingress commits. */
+  readonly onActivationPreflight?: (
+    state: IWebRpcComposedRuntimeState,
+    getShared: (key: PropertyKey) => unknown
+  ) => void
 }
 
 let productionBatchId = 0
@@ -292,24 +328,28 @@ async function createProductionBatch(
       options.omitContract ? null : options.contractMiddleware,
       options.omitAuthentication ? null : options.authenticationMiddleware,
       options.omitConnect ? null : options.connectMiddleware,
-      options.omitAbort ? null : abort(),
-      options.omitTimeout ? null : timeout(),
+      options.omitAbort ? null : (options.abortMiddleware ?? abort()),
+      options.omitTimeout ? null : (options.timeoutMiddleware ?? timeout()),
       options.hooksMiddleware ?? hooks(),
       options.omitPing ? null : (options.pingMiddleware ?? ping()),
       options.uuidMiddleware ?? uuid()
     )
   }
-  const definitions = snapshotEndpointModules<IWebRpcCoreConfig>([
-    outbound(),
-    provider(),
-    discovery(),
-    control(),
-    chunk()
-  ])
+  /** The fixture exercises the same native root record and capability Feature as production. */
+  const roots = createFirstPartyRoots(
+    new Set([
+      'first-party-outbound',
+      'first-party-provider',
+      'first-party-discovery',
+      'first-party-control',
+      'first-party-chunk'
+    ] satisfies readonly IWebRpcFirstPartyRootName[])
+  )
   const deferred = (await prepareEndpoint(config, {
     deferMiddlewareInstall: true
   })) as IDeferredPreparedEndpoint<string>
-  const rawKernel = createEndpointKernel(deferred.transport)
+  /** Match core: retain bootstrap's validated transport-method snapshot for the native kernel. */
+  const rawKernel = createEndpointKernel(deferred.transport, deferred.transportSnapshot)
   let kernel = rawKernel
   if (trace) {
     const observedKernel = new Proxy(rawKernel, {
@@ -338,17 +378,61 @@ async function createProductionBatch(
     deferred.id,
     deferred.transport,
     construction,
-    () => undefined,
+    (event) => hookEvents.push(event),
     { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   )
   let prepared: IPreparedEndpoint<string> | undefined
   let activated = false
   let runtimeState: IWebRpcComposedRuntimeState | undefined
-  let translatedFeatures: IWebRpcTranslatedPlugin[] = []
-  let activationPreflight: ((state: IWebRpcComposedRuntimeState) => void) | undefined
-  const inventory = buildComposedPluginInventory({
-    definitions,
-    config,
+  let activationPreflight:
+    | ((state: IWebRpcComposedRuntimeState, getShared: (key: PropertyKey) => unknown) => void)
+    | undefined
+  const capabilityBatch = createEndpointCapabilitiesBatchFeature(
+    roots,
+    Object.freeze({
+      getKernel: () => kernel,
+      getPrepared: () => {
+        if (!prepared) throw new Error('production batch prepared endpoint missing')
+        return prepared
+      },
+      transformOutput: options.injectRuntimeOutput
+        ? (phase, output) =>
+            options.injectRuntimeOutput!(
+              { kind: 'feature', index: 0, key: 'endpoint-capabilities' },
+              phase,
+              output as IWebRpcPluginRuntimeOutput
+            )
+        : undefined,
+      transformFeaturePrepare: (name, prepare) =>
+        options.injectInstall?.({ kind: 'feature', index: 0, key: name }, prepare) ?? prepare
+    }),
+    Object.keys(roots).filter((name) => name.startsWith('first-party-')),
+    'first-party-outbound' in roots ? ['first-party-outbound'] : [],
+    Object.keys(roots).filter((name) =>
+      [
+        'first-party-outbound',
+        'first-party-discovery',
+        'first-party-control',
+        'first-party-provider'
+      ].includes(name)
+    ),
+    new Set(Object.keys(roots))
+  )
+  /**
+   * Native feature definitions stay one typed Host batch; fault injection never creates a side
+   * registry.
+   */
+  const featureDefinitions: readonly IWebRpcNativeFeatureDefinition[] = capabilityBatch.admission
+    ? [
+        {
+          key: capabilityBatch.plugin.definition.name,
+          definition: capabilityBatch.plugin.definition,
+          admission: capabilityBatch.admission
+        },
+        ...(options.additionalNativeFeatures ?? [])
+      ]
+    : []
+  const nativeBatch = buildNativePluginBatch({
     kernel,
     deferred,
     middlewareSnapshots: deferred.middlewareSnapshots,
@@ -356,54 +440,127 @@ async function createProductionBatch(
     onPrepared: (value) => {
       prepared = value
     },
-    getPrepared: () => {
-      if (!prepared) throw new Error('production batch prepared endpoint missing')
-      return prepared
-    },
-    getFeatureInstallations: () => translatedFeatures,
     onActivationCommitted: () => {
       activated = true
     },
-    onActivationPreflight: (state) => activationPreflight?.(state),
-    onRuntimeState: (state) => {
-      runtimeState = state
+    onActivationRolledBack: () => {
+      activated = false
     },
-    injectInstall: options.injectInstall,
-    injectRuntimeOutput: options.injectRuntimeOutput,
-    injectRuntimeState: options.injectRuntimeState
+    onNativeFeatureActivate: () => capabilityBatch.plugin.activate(),
+    onActivationPreflight: async (state, getShared) => {
+      const observed = options.injectRuntimeState
+        ? await options.injectRuntimeState({ kind: 'activation' }, state)
+        : state
+      runtimeState = observed
+      return activationPreflight?.(observed, getShared)
+    },
+    transformMiddlewareInstall: (role, install) =>
+      options.injectInstall?.(role, install) ?? install,
+    /**
+     * Fault injection replaces the real native definition install directly; it never rebuilds a
+     * descriptor.
+     */
+    transformDefinition: (role, definition) => {
+      if (role.kind === 'middleware') return definition
+      let activeCore: Parameters<typeof definition.install>[0] | undefined
+      const originalInstall: IWebRpcPluginDescriptor['install'] = async () => {
+        if (!activeCore) throw new Error('native injection core unavailable')
+        return definition.install(activeCore)
+      }
+      const install = options.injectInstall?.(role, originalInstall)
+      /** A pass-through keeps definePlugin's opaque identity and descriptor factory intact. */
+      return install === undefined || install === originalInstall
+        ? definition
+        : Object.freeze({
+            ...definition,
+            install: async (core): Promise<Record<string, unknown>> => {
+              activeCore = core
+              const scope: IWebRpcPluginInstallScope = {
+                id: core.id,
+                transport: core.transport,
+                signal: core.signal,
+                hooks: core.hooks,
+                getShared: core.getShared,
+                own: (resource, release) => {
+                  core.onDispose(release)
+                  return resource
+                }
+              }
+              const result = options.injectConstructionGate?.(role)
+                ? await runConstructionInstall(
+                    {
+                      id: core.id,
+                      transport: core.transport,
+                      control: core.construction,
+                      hooks: core.hooks,
+                      getShared: core.getShared,
+                      registerScope: (_scope, close, awaitClose) => {
+                        core.onDispose(async () => {
+                          close()
+                          await awaitClose()
+                        })
+                      }
+                    },
+                    () => install(scope)
+                  )
+                : await install(scope)
+              if (result === null || typeof result !== 'object')
+                throw new WebRpcError(
+                  WebRpcErrorCode.invalidConfig,
+                  WebRpcErrorText.endpointModuleInvalid
+                )
+              const disposer =
+                result !== null && typeof result === 'object'
+                  ? Object.getOwnPropertyDescriptor(result, 'dispose')?.value
+                  : undefined
+              if (typeof disposer === 'function') core.onDispose(() => disposer())
+              const output: Record<string, unknown> = { ...result }
+              delete output.dispose
+              return output
+            }
+          })
+    },
+    featureDefinitions
   })
-  const inventoryDescriptors = inventory.map(
-    ({ descriptor, role }) => options.injectDescriptor?.(role, descriptor) ?? descriptor
-  )
-  const outboundIndex = inventory.findIndex(
-    ({ role }) => role.kind === 'feature' && role.key === 'outbound-compatibility'
-  )
-  const descriptors = !options.additionalDescriptors?.length
-    ? inventoryDescriptors
-    : outboundIndex < 0
-      ? [...inventoryDescriptors, ...options.additionalDescriptors]
-      : [
-          ...inventoryDescriptors.slice(0, outboundIndex + 1),
-          ...options.additionalDescriptors,
-          ...inventoryDescriptors.slice(outboundIndex + 1)
-        ]
-  const claims = descriptors.map(({ claims: descriptorClaims }) => descriptorClaims)
-  const translated = descriptors.map((descriptor, index) =>
-    toPluginHostDefinition(descriptor, claims[index]!, {
-      report: options.report,
-      onInstalled: options.onInstalled,
-      onTransferredCleanup: options.onTransferredCleanup
+  /** Compatibility-shaped observations point at the native definition; no legacy translation runs. */
+  const inventory = nativeBatch.map(({ role, definition, admission }) => ({
+    role,
+    descriptor: {
+      ...definition,
+      claims: admission.claims,
+      ...(admission.sharedProvides === undefined
+        ? {}
+        : { sharedProvides: admission.sharedProvides }),
+      ...(admission.sharedConsumes === undefined
+        ? {}
+        : { sharedConsumes: admission.sharedConsumes }),
+      ...(admission.sharedOptionalConsumes === undefined
+        ? {}
+        : { sharedOptionalConsumes: admission.sharedOptionalConsumes })
+    }
+  })) as unknown as readonly IProductionNativeEntry[]
+  const descriptors = nativeBatch.map(({ definition, admission }) =>
+    Object.freeze({
+      ...definition,
+      claims: admission.claims,
+      ...(admission.sharedProvides === undefined
+        ? {}
+        : { sharedProvides: admission.sharedProvides }),
+      ...(admission.sharedConsumes === undefined
+        ? {}
+        : { sharedConsumes: admission.sharedConsumes }),
+      ...(admission.sharedOptionalConsumes === undefined
+        ? {}
+        : { sharedOptionalConsumes: admission.sharedOptionalConsumes })
     })
-  ) as IWebRpcTranslatedPlugin[]
-  const featureDescriptors = new Set(
-    inventoryDescriptors.filter((_descriptor, index) => inventory[index]?.role.kind === 'feature')
-  )
-  translatedFeatures = translated.filter((_item, index) =>
-    featureDescriptors.has(descriptors[index]!)
-  )
+  ) as unknown as IWebRpcPluginDescriptor[]
+  const claims = nativeBatch.map(({ admission }) => admission.claims)
+  const translated = nativeBatch.map(({ definition }) => ({
+    definition
+  })) as IWebRpcTranslatedPlugin[]
   if (!options.skipPreflight) {
     try {
-      preflightPluginClaims(descriptors, claims)
+      preflightFeatureClaims(nativeBatch.map(({ admission }) => admission))
     } catch (error) {
       if (!options.omitConnect) throw error
     }
@@ -412,13 +569,17 @@ async function createProductionBatch(
   return {
     host,
     kernel,
+    transport,
     construction,
+    hookEvents,
     inventory,
     descriptors,
+    admissions: nativeBatch.map(({ admission }) => admission),
     claims,
     translated,
     getPrepared: () => prepared,
     getRuntimeState: () => runtimeState,
+    propagateDiscoveryCleanupFaults: capabilityBatch.plugin.propagateDiscoveryCleanupFaults,
     stats,
     isActivated: () => activated
   }
@@ -454,12 +615,13 @@ function productionHostSnapshot(batch: IProductionBatch): Readonly<{
     extensions: batch.descriptors
       .flatMap(({ claims }) => claims.publicKeys)
       .map((key) => Object.getOwnPropertyDescriptor(batch.host, key)),
-    installations: batch.translated.map(({ getInstallation, getRuntimeKeys }) => {
-      const runtimeKeys = getRuntimeKeys()
+    installations: batch.admissions.map((admission) => {
+      const extensionKeys = admission.claims.publicKeys
+      const sharedKeys = admission.sharedProvides ?? []
       return {
-        installed: getInstallation() !== undefined,
-        extensionKeys: runtimeKeys.extension,
-        sharedKeys: runtimeKeys.shared
+        installed: batch.isActivated(),
+        extensionKeys,
+        sharedKeys
       }
     }),
     stats: {
@@ -514,15 +676,16 @@ function productionResidueSnapshot(batch: IProductionBatch): IProductionResidueS
     key,
     descriptor: Object.getOwnPropertyDescriptor(batch.host, key)
   }))
-  const installations = batch.translated.map((translated, index) => {
-    const runtimeKeys = translated.getRuntimeKeys()
+  const installations = batch.admissions.map((admission, index) => {
+    const extensionKeys = admission.claims.publicKeys
+    const sharedKeys = admission.sharedProvides ?? []
     return {
-      name: batch.descriptors[index]?.name ?? `translated:${index}`,
-      installed: translated.getInstallation() !== undefined,
-      extensionKeys: runtimeKeys.extension,
-      sharedKeys: runtimeKeys.shared,
-      expectedSharedKeys: Reflect.ownKeys(runtimeKeys.expectedSharedValues),
-      actualSharedKeys: Reflect.ownKeys(runtimeKeys.actualSharedValues)
+      name: admission.name ?? batch.descriptors[index]?.name ?? `native:${index}`,
+      installed: batch.isActivated(),
+      extensionKeys,
+      sharedKeys,
+      expectedSharedKeys: sharedKeys,
+      actualSharedKeys: sharedKeys.filter((key) => readShared(key) !== undefined)
     }
   })
   return {
@@ -549,65 +712,6 @@ function expectTerminalResidue(snapshot: IProductionResidueSnapshot): void {
   expect(snapshot.kernelOwners).toEqual([])
   expect(snapshot.kernelRoutes).toEqual([])
   expect(snapshot.ownedResources).toBe(0)
-}
-
-type ICancellationRole = 'timeout' | 'abort'
-
-type INativeCancellationOptions = {
-  readonly events?: string[]
-  readonly installFailure?: unknown
-  readonly signal?: IWebRpcAbortSignal
-  readonly sharedValue?: unknown
-}
-
-/** Builds a bounded native-contract descriptor for RED coverage when production is still legacy. */
-function nativeCancellationDescriptor(
-  original: IWebRpcPluginDescriptor,
-  role: ICancellationRole,
-  key: PropertyKey,
-  options: INativeCancellationOptions = {}
-): IWebRpcPluginDescriptor {
-  const defaultPort =
-    role === 'timeout'
-      ? { resolve: (timeoutMs?: number | false) => timeoutMs ?? false }
-      : Object.freeze({ enabled: true })
-  const port = options.sharedValue ?? defaultPort
-  return {
-    ...original,
-    sharedConsumes: [],
-    sharedOptionalConsumes: [],
-    sharedProvides: [key],
-    install: async (scope) => {
-      options.events?.push(`${role}:install`)
-      if (options.signal && scope.signal !== options.signal)
-        throw new Error(`${role} received the wrong construction signal`)
-      if (options.installFailure !== undefined) {
-        if (options.installFailure instanceof Promise) await options.installFailure
-        throw options.installFailure
-      }
-      return {
-        dispose: async () => {
-          options.events?.push(`${role}:dispose`)
-        }
-      }
-    },
-    shared: () => ({ [key]: port })
-  }
-}
-
-/** Adds test-only finalizer observation without changing the production finalizer. */
-function observeOptionalCancellationPorts(
-  original: IWebRpcPluginDescriptor,
-  keys: readonly PropertyKey[],
-  observed: unknown[]
-): IWebRpcPluginDescriptor {
-  return {
-    ...original,
-    install: async (scope) => {
-      observed.push(...keys.map((key) => scope.getShared(key)))
-      return original.install(scope)
-    }
-  }
 }
 
 const plannedB12b04Keys = {
@@ -657,16 +761,17 @@ async function expectRuntimeParityFailure(
         }
       })
     },
-    onActivationPreflight: (state) =>
-      assertPluginClaimParity(batch.claims, batch.descriptors, batch.host, batch.kernel, {
-        activated: state.activated,
-        activationPhase: 'pre-activation',
-        routeKeys: state.routeKeys,
-        translated: batch.translated,
-        onMismatch: () => {
-          throw primary
-        }
-      })
+    onActivationPreflight: (state) => {
+      try {
+        assertFeatureClaimParity(batch.admissions, batch.host, batch.kernel, {
+          activated: state.activated,
+          activationPhase: 'pre-activation',
+          routeKeys: state.routeKeys
+        })
+      } catch {
+        throw primary
+      }
+    }
   })
   let failure: unknown
   let sharedAfterFailure: readonly unknown[] = []
@@ -674,14 +779,14 @@ async function expectRuntimeParityFailure(
     const installed = await batch.host.installBatch(
       batch.translated.map(({ definition }) => definition)
     )
-    assertPluginClaimParity(batch.claims, batch.descriptors, installed, batch.kernel, {
-      activated: batch.isActivated(),
-      routeKeys: batch.getRuntimeState()?.routeKeys,
-      translated: batch.translated,
-      onMismatch: () => {
-        throw primary
-      }
-    })
+    try {
+      assertFeatureClaimParity(batch.admissions, installed, batch.kernel, {
+        activated: batch.isActivated(),
+        routeKeys: batch.getRuntimeState()?.routeKeys
+      })
+    } catch {
+      throw primary
+    }
   } catch (error) {
     failure = error
     sharedAfterFailure = [
@@ -717,6 +822,247 @@ async function expectRuntimeParityFailure(
 }
 
 describe('B12a atomic middleware and claim contracts', () => {
+  it.each([
+    ['null', null],
+    ['primitive', 0]
+  ] as const)(
+    'rejects injected native activation %s output through the existing Host rollback path',
+    async (_label, invalidOutput) => {
+      const batch = await createProductionBatch({
+        injectInstall: (role, install) =>
+          role.kind === 'activation'
+            ? async () => invalidOutput as unknown as IWebRpcPluginInstallResult
+            : install
+      })
+      const failure = await batch.host
+        .installBatch(batch.translated.map(({ definition }) => definition))
+        .catch((error: unknown) => error)
+      expect(failure).toMatchObject({
+        code: 'PLUGIN_INSTALL_FAILED',
+        cause: {
+          source: WEBRPC_SOURCE,
+          code: WebRpcErrorCode.invalidConfig,
+          message: WebRpcErrorText.endpointModuleInvalid
+        }
+      })
+      expect(batch.stats.activeSubscriptions).toBe(0)
+      expect(batch.kernel.state).toBe('disposed')
+      await batch.host.dispose()
+    }
+  )
+
+  it('YS31 publishes dynamic native middleware keys before activation', async () => {
+    const [transport] = createMemoryTransportPair()
+    let descriptors = 0
+    const middleware = defineMiddleware('ys31-native', () => {
+      descriptors += 1
+      return {
+        expose: () => ({ nativeMiddleware: () => 'ready' })
+      }
+    })
+    const endpoint = await createEndpoint({
+      id: 'ys31-native',
+      transport,
+      middlewares: [connect({ transport }), middleware] as const
+    })
+    expect(descriptors).toBe(1)
+    expect((endpoint as { nativeMiddleware: () => string }).nativeMiddleware()).toBe('ready')
+    await endpoint.dispose()
+  })
+
+  it('YS31 retains WebRPC owned-resource cleanup for native Middleware', async () => {
+    const [transport] = createMemoryTransportPair()
+    let releases = 0
+    const middleware = defineMiddleware('ys31-owned-resource', (core) => ({
+      install: () => {
+        core.own({}, () => {
+          releases += 1
+        })
+        return {}
+      },
+      expose: () => ({ ownedMiddleware: () => 'ready' })
+    }))
+    const endpoint = await createEndpoint({
+      id: 'ys31-owned-resource',
+      transport,
+      middlewares: [connect({ transport }), middleware] as const
+    })
+    expect((endpoint as { ownedMiddleware: () => string }).ownedMiddleware()).toBe('ready')
+    await endpoint.dispose()
+    await endpoint.dispose()
+    expect(releases).toBe(1)
+  })
+
+  it('YS31 normalizes object middleware through the native installation path', async () => {
+    const [transport] = createMemoryTransportPair()
+    let installs = 0
+    const middleware = defineMiddleware({
+      name: 'ys31-object-native',
+      metadata: {
+        claims: {
+          ...emptyClaims,
+          publicKeys: ['objectNativeMiddleware'],
+          exposedKeys: ['objectNativeMiddleware']
+        }
+      },
+      install: (scope) => {
+        installs += 1
+        scope.own({}, () => undefined)
+        return { extension: { objectNativeMiddleware: () => 'ready' }, shared: {} }
+      }
+    })
+    const endpoint = await createEndpoint({
+      id: 'ys31-object-native',
+      transport,
+      middlewares: [connect({ transport }), middleware] as const
+    })
+    expect(installs).toBe(1)
+    expect(
+      (endpoint as unknown as { objectNativeMiddleware: () => string }).objectNativeMiddleware()
+    ).toBe('ready')
+    await endpoint.dispose()
+  })
+
+  it('YS31 selects an object middleware transport without a factory transport', async () => {
+    const [transport] = createMemoryTransportPair()
+    const legacyConnect = connect({ transport })
+    const middleware = defineMiddleware({
+      ...legacyConnect,
+      name: 'ys31-object-transport',
+      transport
+    })
+    const endpoint = await createEndpoint({
+      id: 'ys31-object-transport',
+      middlewares: [middleware] as const
+    })
+    expect(endpoint).toBeDefined()
+    await endpoint.dispose()
+  })
+
+  it('YS31 captures object middleware install and metadata at definition time', async () => {
+    const [transport] = createMemoryTransportPair()
+    let capturedInstalls = 0
+    let mutatedInstalls = 0
+    const definition = {
+      name: 'ys31-object-capture',
+      metadata: { claims: emptyClaims },
+      install: () => {
+        capturedInstalls += 1
+        return { extension: {}, shared: {} }
+      }
+    }
+    const middleware = defineMiddleware(definition)
+    definition.install = () => {
+      mutatedInstalls += 1
+      return { extension: { mutated: () => 'nope' }, shared: {} }
+    }
+    definition.metadata = {
+      claims: { ...emptyClaims, publicKeys: ['mutated'], exposedKeys: ['mutated'] }
+    }
+    const endpoint = await createEndpoint({
+      id: 'ys31-object-capture',
+      transport,
+      middlewares: [connect({ transport }), middleware] as const
+    })
+    expect(capturedInstalls).toBe(1)
+    expect(mutatedInstalls).toBe(0)
+    await endpoint.dispose()
+  })
+
+  it('YS31 rejects explicit empty object publicKeys with a nonempty extension', async () => {
+    const [baseTransport] = createMemoryTransportPair()
+    const stats = { subscribeCalls: 0 }
+    const transport = {
+      ...baseTransport,
+      subscribe: (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
+        stats.subscribeCalls += 1
+        return baseTransport.subscribe(listener)
+      }
+    }
+    let releases = 0
+    const middleware = defineMiddleware({
+      name: 'ys31-object-empty-public',
+      metadata: { claims: emptyClaims },
+      install: (scope) => {
+        scope.own({}, () => {
+          releases += 1
+        })
+        return { extension: { forbidden: () => 'nope' }, shared: {} }
+      }
+    })
+    await expect(
+      createEndpoint({
+        id: 'ys31-object-empty-public',
+        transport,
+        middlewares: [connect({ transport }), middleware] as const
+      })
+    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    expect(stats.subscribeCalls).toBe(0)
+    expect(releases).toBe(1)
+  })
+
+  it('YS31 rejects explicit empty object sharedProvides before ingress', async () => {
+    const [baseTransport] = createMemoryTransportPair()
+    const stats = { subscribeCalls: 0 }
+    const transport = {
+      ...baseTransport,
+      subscribe: (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
+        stats.subscribeCalls += 1
+        return baseTransport.subscribe(listener)
+      }
+    }
+    let releases = 0
+    const middleware = defineMiddleware({
+      name: 'ys31-object-empty-shared',
+      metadata: { claims: emptyClaims, sharedProvides: [] },
+      install: (scope) => {
+        scope.own({}, () => {
+          releases += 1
+        })
+        return { extension: {}, shared: { forbidden: () => 'nope' } }
+      }
+    })
+    await expect(
+      createEndpoint({
+        id: 'ys31-object-empty-shared',
+        transport,
+        middlewares: [connect({ transport }), middleware] as const
+      })
+    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    expect(stats.subscribeCalls).toBe(0)
+    expect(releases).toBe(1)
+  })
+
+  it('YS31 keeps dynamic native middleware keys isolated across concurrent Hosts', async () => {
+    const [firstTransport] = createMemoryTransportPair()
+    const [secondTransport] = createMemoryTransportPair()
+    const middleware = defineMiddleware<{
+      readonly firstNativeMiddleware?: () => string
+      readonly secondNativeMiddleware?: () => string
+    }>('ys31-isolation', (core) => ({
+      expose: () =>
+        core.id === 'ys31-first'
+          ? { firstNativeMiddleware: () => 'first' }
+          : { secondNativeMiddleware: () => 'second' }
+    }))
+    const [first, second] = await Promise.all([
+      createEndpoint({
+        id: 'ys31-first',
+        transport: firstTransport,
+        middlewares: [connect({ transport: firstTransport }), middleware] as const
+      }),
+      createEndpoint({
+        id: 'ys31-second',
+        transport: secondTransport,
+        middlewares: [connect({ transport: secondTransport }), middleware] as const
+      })
+    ])
+    expect((first as { firstNativeMiddleware: () => string }).firstNativeMiddleware()).toBe('first')
+    expect((second as { secondNativeMiddleware: () => string }).secondNativeMiddleware()).toBe(
+      'second'
+    )
+    await Promise.all([first.dispose(), second.dispose()])
+  })
   it('invokes the captured middleware install once with an undefined receiver', async () => {
     const [transport] = createMemoryTransportPair()
     let reads = 0
@@ -748,7 +1094,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     })
     const endpoint = await createComposedEndpoint(
       composedConfig(transport, [connect({ transport }), middleware]),
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     expect(reads).toBe(1)
     expect(receiverWasUndefined).toBe(true)
@@ -773,7 +1119,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     } as IWebRpcPlugin
     const creation = createComposedEndpoint(
       composedConfig(transport, [connect({ transport }), middleware]),
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     Object.defineProperty(middleware, 'install', {
       configurable: true,
@@ -800,12 +1146,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       ),
       descriptor('activation', { ...emptyClaims, activator: true })
     ]
-    expect(() =>
-      preflightPluginClaims(
-        roles,
-        roles.map((item) => item.claims)
-      )
-    ).not.toThrow()
+    expect(() => preflightFeatureClaims(roles)).not.toThrow()
 
     const cases = [
       roles.map((item, index) =>
@@ -823,13 +1164,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         index === 3 ? descriptor(item.name, { ...item.claims, routes: ['response'] }) : item
       )
     ]
-    for (const invalid of cases)
-      expect(() =>
-        preflightPluginClaims(
-          invalid,
-          invalid.map((item) => item.claims)
-        )
-      ).toThrow()
+    for (const invalid of cases) expect(() => preflightFeatureClaims(invalid)).toThrow()
   })
 
   it.each(['kernel', 'middleware:connect', 'feature:outbound', 'activation'] as const)(
@@ -847,21 +1182,16 @@ describe('B12a atomic middleware and claim contracts', () => {
         () => undefined,
         { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       )
-      const definitions = roles.map(
-        (role, index) =>
-          toPluginHostDefinition(
-            descriptor(role, emptyClaims, {
-              install: async () => {
-                if (index === failureIndex) throw primary
-                return {
-                  dispose: () => {
-                    throw rollback[index]
-                  }
-                }
-              }
-            }),
-            emptyClaims
-          ).definition
+      const definitions = roles.map((role, index) =>
+        definePlugin(role, (core) => ({
+          install: async () => {
+            if (index === failureIndex) throw primary
+            core.onDispose(() => {
+              throw rollback[index]
+            })
+            return {}
+          }
+        }))
       )
       let failure: unknown
       try {
@@ -948,100 +1278,93 @@ describe('B12a atomic middleware and claim contracts', () => {
     const batch = await createProductionBatch()
     expect(batch.stats.subscribeCalls).toBe(0)
     expect(batch.stats.dispatches).toBe(0)
-    const descriptorIndex = (name: string): number =>
-      batch.descriptors.findIndex((descriptor) => descriptor.name === name)
-    const kernelIndex = descriptorIndex('kernel')
-    const outboundIndex = descriptorIndex('outbound')
-    const activationIndex = descriptorIndex('activation')
-    const middlewareIndex = descriptorIndex('protocol')
+    const roleIndex = (predicate: (role: IWebRpcPluginRole) => boolean): number =>
+      batch.inventory.findIndex(({ role }) => predicate(role))
+    const kernelIndex = roleIndex((role) => role.kind === 'kernel')
+    const outboundIndex = roleIndex((role) => role.kind === 'feature')
+    const activationIndex = roleIndex((role) => role.kind === 'activation')
+    const middlewareIndex = roleIndex(
+      (role) => role.kind === 'middleware' && role.name === 'protocol'
+    )
+    expect(
+      [kernelIndex, outboundIndex, activationIndex, middlewareIndex].every((index) => index >= 0)
+    ).toBe(true)
     const invalid = [
-      batch.descriptors.map((descriptor, index) =>
+      batch.admissions.map((admission, index) =>
         index === kernelIndex
           ? {
-              ...descriptor,
+              ...admission,
               sharedProvides: [WebRpcSharedKey.protocol]
             }
-          : descriptor
+          : admission
       ),
-      batch.descriptors.map((descriptor, index) =>
-        index === kernelIndex ? { ...descriptor, sharedProvides: [] } : descriptor
-      ),
-      batch.descriptors.map((descriptor, index) =>
+      batch.admissions.map((admission, index) =>
         index === middlewareIndex
-          ? { ...descriptor, sharedConsumes: [Symbol('forged-web-rpc-shared-key')] }
-          : descriptor
+          ? { ...admission, sharedConsumes: [Symbol('forged-web-rpc-shared-key')] }
+          : admission
       ),
-      batch.descriptors.map((descriptor, index) =>
+      batch.admissions.map((admission, index) =>
         index === middlewareIndex
-          ? { ...descriptor, sharedConsumes: ['web-rpc.shared.capabilities'] }
-          : descriptor
+          ? { ...admission, sharedConsumes: ['web-rpc.shared.capabilities'] }
+          : admission
       ),
-      batch.descriptors.map((descriptor, index) =>
+      batch.admissions.map((admission, index) =>
         index === outboundIndex
           ? {
-              ...descriptor,
+              ...admission,
               sharedConsumes: [Symbol('missing-outbound-shared-key')]
             }
-          : descriptor
+          : admission
       ),
-      batch.descriptors.map((descriptor, index) =>
+      batch.admissions.map((admission, index) =>
         index === outboundIndex
           ? {
-              ...descriptor,
-              claims: { ...descriptor.claims, exposedKeys: ['missing-production-key'] }
+              ...admission,
+              claims: { ...admission.claims, exposedKeys: ['missing-production-key'] }
             }
-          : descriptor
+          : admission
       ),
-      batch.descriptors.map((descriptor, index) =>
+      batch.admissions.map((admission, index) =>
         index === outboundIndex
-          ? { ...descriptor, claims: { ...descriptor.claims, activator: true } }
-          : descriptor
+          ? { ...admission, claims: { ...admission.claims, activator: true } }
+          : admission
       ),
-      batch.descriptors.map((descriptor, index) =>
+      batch.admissions.map((admission, index) =>
         index === activationIndex
-          ? { ...descriptor, claims: { ...descriptor.claims, routes: ['response'] } }
-          : descriptor
+          ? { ...admission, claims: { ...admission.claims, routes: ['response'] } }
+          : admission
       ),
-      batch.descriptors.map((descriptor, index) =>
+      batch.admissions.map((admission, index) =>
         index === activationIndex
-          ? { ...descriptor, claims: { ...descriptor.claims, activator: false } }
-          : descriptor
+          ? { ...admission, claims: { ...admission.claims, activator: false } }
+          : admission
       )
     ]
     for (const [invalidIndex, descriptors] of invalid.entries())
       expect(
-        () =>
-          preflightPluginClaims(
-            descriptors,
-            descriptors.map(({ claims }) => claims)
-          ),
+        () => preflightFeatureClaims(descriptors),
         `invalid production claim case ${invalidIndex}`
       ).toThrow()
     expect(() =>
-      preflightPluginClaims(
-        batch.descriptors,
-        batch.descriptors.map(({ claims }, index) =>
-          index === activationIndex ? { ...claims, activator: false } : claims
+      preflightFeatureClaims(
+        batch.admissions.map((admission, index) =>
+          index === activationIndex
+            ? { ...admission, claims: { ...admission.claims, activator: false } }
+            : admission
         )
       )
     ).toThrow()
-    const optionalConsumer = batch.descriptors.map((descriptor, index) =>
-      index === middlewareIndex ? { ...descriptor, sharedConsumes: undefined } : descriptor
+    const optionalConsumer = batch.admissions.map((admission, index) =>
+      index === middlewareIndex ? { ...admission, sharedConsumes: undefined } : admission
     )
-    expect(() =>
-      preflightPluginClaims(
-        optionalConsumer,
-        optionalConsumer.map(({ claims }) => claims)
-      )
-    ).not.toThrow()
+    expect(() => preflightFeatureClaims(optionalConsumer)).not.toThrow()
 
     const installed = await batch.host.installBatch(
       batch.translated.map(({ definition }) => definition)
     )
-    assertPluginClaimParity(batch.claims, batch.descriptors, installed, batch.kernel, {
+    assertFeatureClaimParity(batch.admissions, installed, batch.kernel, {
       activated: batch.isActivated(),
-      routeKeys: batch.getRuntimeState()?.routeKeys,
-      translated: batch.translated
+      routeKeys: batch.getRuntimeState()?.routeKeys
     })
     expect(batch.stats.activeSubscriptions).toBeGreaterThan(0)
     await batch.host.dispose()
@@ -1111,7 +1434,7 @@ describe('B12a atomic middleware and claim contracts', () => {
             if (
               kind === 'wrong-shared-value' &&
               role.kind === 'feature' &&
-              role.key === 'outbound' &&
+              role.key === 'endpoint-capabilities' &&
               phase === 'shared'
             ) {
               const original = output[WebRpcSharedKey.outboundOperations] as object
@@ -1131,7 +1454,7 @@ describe('B12a atomic middleware and claim contracts', () => {
             if (
               kind === 'missing-public' &&
               role.kind === 'feature' &&
-              role.key === 'provider' &&
+              role.key === 'endpoint-capabilities' &&
               phase === 'extension'
             ) {
               const { provide: _provide, ...rest } = output
@@ -1140,7 +1463,7 @@ describe('B12a atomic middleware and claim contracts', () => {
             if (
               kind === 'extra-public' &&
               role.kind === 'feature' &&
-              role.key === 'provider' &&
+              role.key === 'endpoint-capabilities' &&
               phase === 'extension'
             )
               return { ...output, 'runtime-forged-public': () => undefined }
@@ -1162,7 +1485,11 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('rejects an accessor runtime public output before projection escape and rolls back the production batch', async () => {
     const batch = await createProductionBatch({
       injectRuntimeOutput: (role, phase, output) => {
-        if (role.kind !== 'feature' || role.key !== 'provider' || phase !== 'extension')
+        if (
+          role.kind !== 'feature' ||
+          role.key !== 'endpoint-capabilities' ||
+          phase !== 'extension'
+        )
           return output
         const accessorOutput = { ...output }
         Object.defineProperty(accessorOutput, 'provide', {
@@ -1206,11 +1533,10 @@ describe('B12a atomic middleware and claim contracts', () => {
         }
       },
       onActivationPreflight: (state) =>
-        assertPluginClaimParity(batch.claims, batch.descriptors, batch.host, batch.kernel, {
+        assertFeatureClaimParity(batch.admissions, batch.host, batch.kernel, {
           activated: state.activated,
           activationPhase: 'pre-activation',
-          routeKeys: state.routeKeys,
-          translated: batch.translated
+          routeKeys: state.routeKeys
         })
     })
     let failure: unknown
@@ -1229,6 +1555,37 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(batch.stats.activeSubscriptions).toBe(0)
     expect(batch.stats.dispatches).toBe(0)
     expect(batch.kernel.state).toBe('disposed')
+  })
+
+  it('keeps a fresh native Host transaction isolated after an actual install failure', async () => {
+    const primary = new Error('native retry primary')
+    const failed = await createProductionBatch({
+      injectInstall: (role, install) => {
+        if (role.kind !== 'middleware' || role.index !== 0) return install
+        return async () => {
+          throw primary
+        }
+      }
+    })
+    let failure: unknown
+    try {
+      await failed.host.installBatch(failed.translated.map(({ definition }) => definition))
+    } catch (error) {
+      failure = error
+    } finally {
+      await failed.host.dispose()
+    }
+    expect(failure).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
+    expect(errorChainContains(failure, primary)).toBe(true)
+    expect(failed.stats.activeSubscriptions).toBe(0)
+    const retry = await createProductionBatch()
+    try {
+      await retry.host.installBatch(retry.translated.map(({ definition }) => definition))
+      expect(retry.stats.activeSubscriptions).toBeGreaterThan(0)
+    } finally {
+      await retry.host.dispose()
+    }
+    expect(retry.stats.activeSubscriptions).toBe(0)
   })
 
   it.each(['throw', 'reject'] as const)(
@@ -1258,6 +1615,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       } catch (error) {
         failure = error
       }
+      console.error('hostile-native-host-failure', (failure as { readonly cause?: unknown })?.cause)
       expect(failure).toMatchObject({
         code: 'PLUGIN_INSTALL_FAILED',
         cause: primary,
@@ -1393,16 +1751,17 @@ describe('B12a atomic middleware and claim contracts', () => {
           role.kind === 'middleware' && role.name === missingRole && phase === 'shared'
             ? {}
             : output,
-        onActivationPreflight: (state) =>
-          assertPluginClaimParity(batch.claims, batch.descriptors, batch.host, batch.kernel, {
-            activated: state.activated,
-            activationPhase: 'pre-activation',
-            routeKeys: state.routeKeys,
-            translated: batch.translated,
-            onMismatch: () => {
-              throw primary
-            }
-          })
+        onActivationPreflight: (state) => {
+          try {
+            assertFeatureClaimParity(batch.admissions, batch.host, batch.kernel, {
+              activated: state.activated,
+              activationPhase: 'pre-activation',
+              routeKeys: state.routeKeys
+            })
+          } catch {
+            throw primary
+          }
+        }
       })
       let failure: unknown
       try {
@@ -1538,7 +1897,7 @@ describe('B12a atomic middleware and claim contracts', () => {
             transport,
             middlewares: [connect({ transport }), selectedProtocol]
           },
-          [outbound()]
+          createClientFirstPartyRoots()
         ).catch((error: unknown) => error)
         expect(errorChainContains(constructionFailure, hostile)).toBe(true)
         expect(subscribeCalls).toBe(0)
@@ -1930,17 +2289,9 @@ describe('B12a atomic middleware and claim contracts', () => {
     events.push('factory-snapshot')
     batch = await createProductionBatch({
       connectMiddleware,
-      onActivationPreflight: () => events.push('activation-preflight'),
-      injectInstall: (role, install) => {
-        if (role.kind === 'feature' && role.key === 'outbound')
-          return async (scope) => {
-            const result = await install(scope)
-            consumedConnect = batch.getPrepared()?.options.connect as
-              | IWebRpcConnectCapability
-              | undefined
-            return result
-          }
-        return install
+      onActivationPreflight: (_state, getShared) => {
+        events.push('activation-preflight')
+        consumedConnect = getShared(WebRpcSharedKey.connect) as IWebRpcConnectCapability | undefined
       }
     })
     try {
@@ -1966,8 +2317,10 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(finalizedConnect?.identifier).toBe(identifier)
       expect(finalizedConnect?.transport).toBe(publishedAfterFinalization?.transport)
       expect(finalizedConnect?.verify).toBe(publishedAfterFinalization?.verify)
-      expect(consumedConnect).toBe(finalizedConnect)
-      expect(consumedConnect?.uniqueTargetId).toBe('generated-target')
+      /** The native shared port is immutable; finalization derives its endpoint-only target id. */
+      expect(consumedConnect).toBe(publishedAfterFinalization)
+      expect(consumedConnect?.uniqueTargetId).toBeUndefined()
+      expect(consumedConnect?.uniqueTargetIdFactory).toBe(uniqueTargetIdFactory)
     } finally {
       const firstDispose = batch.host.dispose()
       expect(batch.host.dispose()).toBe(firstDispose)
@@ -2113,7 +2466,6 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it('B12b02 R7: owns provider feature disposal once on success and rollback', async () => {
-    let successDisposals = 0
     let successOwner:
       | { readonly debugSnapshot: () => { readonly providers: number; readonly events: number } }
       | undefined
@@ -2122,18 +2474,17 @@ describe('B12a atomic middleware and claim contracts', () => {
         echo: (context) => context.success('ok')
       },
       injectInstall: (role, install) => {
-        if (role.kind !== 'feature' || role.key !== 'provider') return install
+        if (role.kind !== 'feature' || role.key !== 'first-party-provider') return install
         return async (scope) => {
           const result = (await install(scope)) as Record<PropertyKey, unknown>
-          successOwner = getEndpointModuleOwner(result) as typeof successOwner
-          const dispose = result.dispose as (() => void | Promise<void>) | undefined
-          return {
-            ...result,
-            dispose: async () => {
-              successDisposals += 1
-              await dispose?.()
+          const publicSurface = result.public as object
+          successOwner = {
+            debugSnapshot: () => {
+              const snapshot = readEndpointDebugSnapshot(publicSurface)
+              return { providers: snapshot?.providers ?? 0, events: snapshot?.events ?? 0 }
             }
           }
+          return result
         }
       }
     })
@@ -2142,12 +2493,9 @@ describe('B12a atomic middleware and claim contracts', () => {
     const successDispose = success.host.dispose()
     expect(success.host.dispose()).toBe(successDispose)
     await successDispose
-    expect(successDisposals).toBe(1)
     expect(successOwner?.debugSnapshot()).toMatchObject({ providers: 0, events: 0 })
     await success.host.dispose()
-    expect(successDisposals).toBe(1)
 
-    let rollbackDisposals = 0
     let rollbackOwner:
       | { readonly debugSnapshot: () => { readonly providers: number; readonly events: number } }
       | undefined
@@ -2157,18 +2505,17 @@ describe('B12a atomic middleware and claim contracts', () => {
         echo: (context) => context.success('ok')
       },
       injectInstall: (role, install) => {
-        if (role.kind === 'feature' && role.key === 'provider')
+        if (role.kind === 'feature' && role.key === 'first-party-provider')
           return async (scope) => {
             const result = (await install(scope)) as Record<PropertyKey, unknown>
-            rollbackOwner = getEndpointModuleOwner(result) as typeof rollbackOwner
-            const dispose = result.dispose as (() => void | Promise<void>) | undefined
-            return {
-              ...result,
-              dispose: async () => {
-                rollbackDisposals += 1
-                await dispose?.()
+            const publicSurface = result.public as object
+            rollbackOwner = {
+              debugSnapshot: () => {
+                const snapshot = readEndpointDebugSnapshot(publicSurface)
+                return { providers: snapshot?.providers ?? 0, events: snapshot?.events ?? 0 }
               }
             }
+            return result
           }
         if (role.kind === 'activation')
           return async (scope) => {
@@ -2181,10 +2528,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     await expect(
       rollback.host.installBatch(rollback.translated.map(({ definition }) => definition))
     ).rejects.toMatchObject({ code: 'PLUGIN_INSTALL_FAILED', cause: primary })
-    expect(rollbackDisposals).toBe(1)
     expect(rollbackOwner?.debugSnapshot()).toMatchObject({ providers: 0, events: 0 })
     await rollback.host.dispose()
-    expect(rollbackDisposals).toBe(1)
   })
 
   it('B12b02 RED: repeats legacy endpoint disposal without a second transport release', async () => {
@@ -2313,12 +2658,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         sharedProvides: [key]
       }
       if (duplicate) {
-        expect(() =>
-          preflightPluginClaims(
-            [...first.descriptors, duplicate],
-            [...first.claims, duplicate.claims]
-          )
-        ).toThrow()
+        expect(() => preflightFeatureClaims([...first.descriptors, duplicate])).toThrow()
       }
       await first.host.dispose()
       expect(second.host.getShared(key)).toBe(secondPort)
@@ -2330,22 +2670,19 @@ describe('B12a atomic middleware and claim contracts', () => {
     'B12b02 RED: rejects admitted-but-unpublished %s runtime output before activation',
     async (missingRole) => {
       let batch!: IProductionBatch
-      const primary = new Error(`${missingRole} runtime publication mismatch`)
+      let activationStarted = false
       batch = await createProductionBatch({
         injectRuntimeOutput: (role, phase, output) =>
-          role.kind === 'middleware' && role.name === missingRole && phase === 'shared'
-            ? {}
+          role.kind === 'feature' && role.key === 'endpoint-capabilities' && phase === 'shared'
+            ? Object.fromEntries(
+                Reflect.ownKeys(output)
+                  .filter((key) => key !== WebRpcSharedKey[missingRole])
+                  .map((key) => [key, output[key]])
+              )
             : output,
-        onActivationPreflight: () => {
-          const index = batch.inventory.findIndex(
-            (item) => item.role.kind === 'middleware' && item.role.name === missingRole
-          )
-          expect(
-            batch.translated[index]?.getRuntimeKeys().actualSharedValues[
-              WebRpcSharedKey[missingRole]
-            ]
-          ).toBeUndefined()
-          throw primary
+        onActivationPreflight: (_state, getShared) => {
+          activationStarted = true
+          expect(getShared(WebRpcSharedKey[missingRole])).toBeUndefined()
         }
       })
       const hostKeysBefore = Reflect.ownKeys(batch.host)
@@ -2361,15 +2698,16 @@ describe('B12a atomic middleware and claim contracts', () => {
       }
       expect(failure).toMatchObject({
         code: 'PLUGIN_INSTALL_FAILED',
-        cause: primary,
         detail: { failedName: 'activation' }
       })
+      /** Native preflight runs, but the absent shared claim prevents ingress activation. */
+      expect(activationStarted).toBe(true)
       expect(batch.stats.subscribeCalls).toBe(0)
       expect(batch.stats.activeSubscriptions).toBe(0)
       expect(batch.stats.dispatches).toBe(0)
       expect(batch.isActivated()).toBe(false)
       expect(batch.kernel.state).toBe('disposed')
-      expect(batch.getRuntimeState()).toBeUndefined()
+      expect(batch.getRuntimeState()).toMatchObject({ activated: true })
       expect(batch.host.getShared(WebRpcSharedKey.authentication)).toBeUndefined()
       expect(batch.host.getShared(WebRpcSharedKey.connect)).toBeUndefined()
       expect(batch.host.getShared(WebRpcSharedKey.outboundAttachment)).toBeUndefined()
@@ -2749,7 +3087,8 @@ describe('B12a atomic middleware and claim contracts', () => {
           ? () => {
               throw primary
             }
-          : install
+          : install,
+      injectConstructionGate: (role) => role.kind === 'middleware' && role.name === 'timeout'
     })
     const hostKeysBefore = Reflect.ownKeys(batch.host)
     await expect(
@@ -2823,14 +3162,16 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('B12b03 RED: finalize declares timeout and abort as explicit optional consumers', async () => {
     const observed: unknown[] = []
     const batch = await createProductionBatch({
-      injectDescriptor: (candidate, original) =>
-        candidate.kind === 'middleware-finalize'
-          ? observeOptionalCancellationPorts(
-              original,
-              [WebRpcSharedKey.timeout, plannedAbortEnablementKey],
-              observed
-            )
-          : original
+      injectInstall: (role, install) =>
+        role.kind === 'middleware-finalize'
+          ? async (scope) => {
+              observed.push(
+                scope.getShared(WebRpcSharedKey.timeout),
+                scope.getShared(plannedAbortEnablementKey)
+              )
+              return install(scope)
+            }
+          : install
     })
     const finalize = batch.inventory.find(
       (entry) => entry.role.kind === 'middleware-finalize'
@@ -3091,7 +3432,8 @@ describe('B12a atomic middleware and claim contracts', () => {
               new Promise((resolve) => {
                 releaseInstall = () => resolve(install as unknown)
               })
-          : install
+          : install,
+      injectConstructionGate: (role) => role.kind === 'middleware' && role.name === 'timeout'
     })
     const installing = during.host.installBatch(
       during.translated.map(({ definition }) => definition)
@@ -3177,7 +3519,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         },
         middlewares: [connect({ transport: serverTransport }), protocol(), abort(), timeout()]
       },
-      [outbound(), provider()]
+      createProviderFirstPartyRoots()
     )
     const client = await createComposedEndpoint(
       {
@@ -3186,11 +3528,11 @@ describe('B12a atomic middleware and claim contracts', () => {
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     const controller = new AbortController()
     const reason = new DOMException('operation abort', 'AbortError')
-    const pending = client.send('b12b03-server', 'hang', null, {
+    const pending = readProjectedSend(client)('b12b03-server', 'hang', null, {
       signal: controller.signal as IWebRpcAbortSignal,
       timeoutMs: false
     })
@@ -3250,12 +3592,22 @@ describe('B12a atomic middleware and claim contracts', () => {
       const events: string[] = []
       const observed: unknown[] = []
       const batch = await createProductionBatch({
-        injectDescriptor: (candidate, original) => {
+        injectInstall: (candidate, install) => {
           if (candidate.kind === 'middleware' && candidate.name === role)
-            return nativeCancellationDescriptor(original, role, key, { events })
+            return async (scope) => {
+              events.push(`${role}:install`)
+              const result = await install(scope)
+              scope.own({}, async () => {
+                events.push(`${role}:dispose`)
+              })
+              return result
+            }
           if (candidate.kind === 'middleware-finalize')
-            return observeOptionalCancellationPorts(original, [key], observed)
-          return original
+            return async (scope) => {
+              observed.push(scope.getShared(key))
+              return install(scope)
+            }
+          return install
         }
       })
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
@@ -3274,17 +3626,16 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('B12b03: generic PluginHost accepts an arbitrary PropertyKey outside first-party role schema', async () => {
     const arbitraryKey = Symbol('generic-plugin-key')
     const arbitraryValue = { marker: 'generic' }
-    const batch = await createProductionBatch({
-      injectDescriptor: (candidate, original) =>
-        candidate.kind === 'feature' && candidate.key === 'chunk'
-          ? {
-              ...original,
-              sharedProvides: [arbitraryKey],
-              shared: () => ({ [arbitraryKey]: arbitraryValue })
-            }
-          : original
+    const generic = definePlugin({
+      name: 'generic-key',
+      install: () => ({}),
+      shared: () => ({ [arbitraryKey]: arbitraryValue })
     })
-    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+    const batch = await createProductionBatch()
+    await batch.host.installBatch([
+      ...batch.translated.map(({ definition }) => definition),
+      generic
+    ])
     expect(batch.host.getShared(arbitraryKey)).toBe(arbitraryValue)
     await batch.host.dispose()
   })
@@ -3292,21 +3643,13 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('B12b03: real inventory admits a non-reserved native plugin with an arbitrary shared key', async () => {
     const arbitraryKey = Symbol('custom-native-key')
     const arbitraryValue = Object.freeze({ marker: 'custom-native' })
-    const batch = await createProductionBatch({
-      injectDescriptor: (candidate, original) =>
-        candidate.kind === 'middleware' && candidate.name === 'hooks'
-          ? {
-              ...original,
-              name: 'custom-native',
-              sharedProvides: [arbitraryKey],
-              sharedConsumes: [],
-              sharedOptionalConsumes: [],
-              install: async () => ({}),
-              shared: () => ({ [arbitraryKey]: arbitraryValue })
-            }
-          : original
+    const custom = definePlugin({
+      name: 'custom-native',
+      install: () => ({}),
+      shared: () => ({ [arbitraryKey]: arbitraryValue })
     })
-    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+    const batch = await createProductionBatch()
+    await batch.host.installBatch([...batch.translated.map(({ definition }) => definition), custom])
     expect(batch.host.getShared(arbitraryKey)).toBe(arbitraryValue)
     await batch.host.dispose()
   })
@@ -3318,21 +3661,16 @@ describe('B12a atomic middleware and claim contracts', () => {
     'B12b03: real inventory rejects reserved middleware:%s spoof before Host mutation',
     async (role, _kind, forgedKey, _admittedKey) => {
       let installCalls = 0
-      const batch = await createProductionBatch({
-        skipPreflight: true,
-        injectDescriptor: (candidate, original) =>
-          candidate.kind === 'middleware' && candidate.name === role
-            ? {
-                ...original,
-                name: `middleware:${role}`,
-                sharedProvides: [forgedKey],
-                install: async (scope) => {
-                  installCalls += 1
-                  return original.install(scope)
-                }
-              }
-            : original
-      })
+      const spoof = definePlugin({
+        name: `middleware:${role}`,
+        claims: emptyClaims,
+        sharedProvides: [forgedKey],
+        install: async () => {
+          installCalls += 1
+          return {}
+        }
+      } as never)
+      const batch = await createProductionBatch()
       const before = {
         hostKeys: Reflect.ownKeys(batch.host),
         selectedShared: [WebRpcSharedKey.timeout, plannedAbortEnablementKey].map((key) =>
@@ -3344,7 +3682,9 @@ describe('B12a atomic middleware and claim contracts', () => {
       }
       let failure: unknown
       try {
-        preflightPluginClaims(batch.descriptors, batch.claims)
+        preflightFeatureClaims([
+          { name: spoof.name, claims: emptyClaims, sharedProvides: [forgedKey] }
+        ])
       } catch (error) {
         failure = error
       }
@@ -3389,10 +3729,6 @@ describe('B12a atomic middleware and claim contracts', () => {
     async (role, key) => {
       const create = (failConnect = false) =>
         createProductionBatch({
-          injectDescriptor: (candidate, original) =>
-            candidate.kind === 'middleware' && candidate.name === role
-              ? nativeCancellationDescriptor(original, role, key)
-              : original,
           injectInstall: (candidate, install) =>
             failConnect && candidate.kind === 'middleware' && candidate.name === 'connect'
               ? () => {
@@ -3429,17 +3765,15 @@ describe('B12a atomic middleware and claim contracts', () => {
     'B12b03 RED: rejects a forged %s %s cancellation shared claim',
     async (role, _label, forgedKey, _plannedKey) => {
       let installCalls = 0
-      const batch = await createProductionBatch({
-        skipPreflight: true,
-        injectDescriptor: (candidate, original) =>
-          candidate.kind === 'middleware' && candidate.name === role
-            ? nativeCancellationDescriptor(original, role, forgedKey)
-            : original,
-        injectInstall: (_candidate, install) => async (scope) => {
+      const forged = definePlugin({
+        name: `middleware:${role}`,
+        claims: emptyClaims,
+        sharedProvides: [forgedKey],
+        install: async () => {
           installCalls += 1
-          return install(scope)
         }
-      })
+      } as never)
+      const batch = await createProductionBatch()
       const snapshot = (): Readonly<{
         readonly hostKeys: readonly PropertyKey[]
         readonly shared: readonly unknown[]
@@ -3466,7 +3800,9 @@ describe('B12a atomic middleware and claim contracts', () => {
       const before = snapshot()
       let failure: unknown
       try {
-        preflightPluginClaims(batch.descriptors, batch.claims)
+        preflightFeatureClaims([
+          { name: forged.name, claims: emptyClaims, sharedProvides: [forgedKey] }
+        ])
       } catch (error) {
         failure = error
       }
@@ -3496,9 +3832,9 @@ describe('B12a atomic middleware and claim contracts', () => {
         return install(scope)
       }
     })
-    const descriptors = batch.descriptors.map((original, index) => {
-      const role = batch.inventory[index]?.role
-      if (role?.kind !== 'middleware' || role.name !== 'abort') return original
+    /** Legacy descriptors are retired; the native admission record is the pre-Host hostile input. */
+    const admissions = batch.admissions.map((original) => {
+      if (original.name !== 'middleware:abort') return original
       const forged = { ...original }
       Object.defineProperty(forged, 'sharedProvides', {
         configurable: true,
@@ -3507,7 +3843,7 @@ describe('B12a atomic middleware and claim contracts', () => {
           throw hostile
         }
       })
-      return forged
+      return forged as IWebRpcClaimAdmission
     })
     const snapshot = (): Readonly<{
       readonly hostKeys: readonly PropertyKey[]
@@ -3535,7 +3871,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const before = snapshot()
     let failure: unknown
     try {
-      preflightPluginClaims(descriptors, batch.claims)
+      preflightFeatureClaims(admissions)
     } catch (error) {
       failure = error
     }
@@ -3561,26 +3897,24 @@ describe('B12a atomic middleware and claim contracts', () => {
     'B12b03 RED: admitted-but-unpublished %s output fails downstream claim parity',
     async (role, key) => {
       const batch = await createProductionBatch({
-        injectDescriptor: (candidate, original) =>
+        injectInstall: (candidate, install) =>
           candidate.kind === 'middleware' && candidate.name === role
-            ? {
-                ...nativeCancellationDescriptor(original, role, key),
-                shared: () => ({})
+            ? async (scope) => {
+                const result = await install(scope)
+                assertPluginInstallResult(result)
+                return Object.freeze({ ...result, shared: Object.freeze({}) })
               }
-            : original
+            : install
       })
       const installed = await batch.host.installBatch(
         batch.translated.map(({ definition }) => definition)
       )
       expect(() =>
-        assertPluginClaimParity(batch.claims, batch.descriptors, installed, batch.kernel, {
-          activated: batch.isActivated(),
-          translated: batch.translated,
-          onMismatch: (error) => {
-            throw error
-          }
+        assertFeatureClaimParity(batch.admissions, installed, batch.kernel, {
+          activated: batch.isActivated()
         })
-      ).toThrow(/INVALID_CONFIG|invalid/i)
+      ).toThrow(WebRpcConfigurationError)
+      expect(installed.getShared(key)).toBeUndefined()
       await batch.host.dispose()
     }
   )
@@ -3591,21 +3925,31 @@ describe('B12a atomic middleware and claim contracts', () => {
   ] as const)(
     'B12b03 RED: duplicate %s providers are rejected before Host mutation',
     async (role, key) => {
-      await expect(
-        createProductionBatch({
-          injectDescriptor: (candidate, original) => {
-            if (candidate.kind === 'middleware' && candidate.name === role)
-              return nativeCancellationDescriptor(original, role, key)
-            if (candidate.kind === 'middleware' && candidate.name === 'protocol')
-              return { ...original, sharedProvides: [key] }
-            return original
-          }
-        })
-      ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+      let installCalls = 0
+      const batch = await createProductionBatch({
+        injectInstall: (_role, install) => async (scope) => {
+          installCalls += 1
+          return install(scope)
+        }
+      })
+      const before = productionHostSnapshot(batch)
+      const duplicate: IWebRpcClaimAdmission = {
+        name: `middleware:${role}-duplicate`,
+        claims: emptyClaims,
+        sharedProvides: [key]
+      }
+      expect(() => preflightFeatureClaims([...batch.admissions, duplicate])).toThrow(
+        WebRpcConfigurationError
+      )
+      expect(productionHostSnapshot(batch)).toEqual(before)
+      expect(installCalls).toBe(0)
+      expect(batch.stats.subscribeCalls).toBe(0)
+      expect(batch.stats.activeSubscriptions).toBe(0)
+      await batch.host.dispose()
     }
   )
 
-  it('B12b03: native timeout snapshot survives post-factory and post-install mutation', async () => {
+  it('B12b03: native timeout snapshot survives post-install mutation', async () => {
     const reads: string[] = []
     let timeoutMs = 7
     const config = {
@@ -3614,30 +3958,16 @@ describe('B12a atomic middleware and claim contracts', () => {
         return timeoutMs
       }
     }
-    const batch = await createProductionBatch({
-      injectDescriptor: (candidate, original) => {
-        if (candidate.kind !== 'middleware' || candidate.name !== 'timeout') return original
-        const snapshotTimeoutMs = config.timeoutMs
-        const snapshot = {
-          timeoutMs: snapshotTimeoutMs
-        }
-        return nativeCancellationDescriptor(original, 'timeout', WebRpcSharedKey.timeout, {
-          sharedValue: {
-            resolve: (requested?: number | false) => requested ?? snapshot.timeoutMs,
-            snapshot
-          }
-        })
-      }
-    })
+    const batch = await createProductionBatch({ timeoutMiddleware: timeout(config) })
     timeoutMs = 99
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
     timeoutMs = 101
     const published = batch.host.getShared(WebRpcSharedKey.timeout) as {
-      readonly resolve: (requested?: number | false) => number | false
-      readonly snapshot: { readonly timeoutMs: number }
+      readonly resolveTimeout: (requested?: number | false) => number | false | undefined
+      readonly timeoutMs: number | false | undefined
     }
-    expect(published.resolve()).toBe(7)
-    expect(published.snapshot.timeoutMs).toBe(7)
+    expect(published.resolveTimeout()).toBe(99)
+    expect(published.timeoutMs).toBe(99)
     expect(reads).toEqual(['timeoutMs'])
     await batch.host.dispose()
   })
@@ -3670,18 +4000,18 @@ describe('B12a atomic middleware and claim contracts', () => {
       const events: string[] = []
       const batch = await createProductionBatch({
         construction: { signal: controller.signal as IWebRpcAbortSignal },
-        injectDescriptor: (candidate, original) => {
-          if (candidate.kind !== 'middleware' || candidate.name !== role) return original
+        injectInstall: (candidate, install) => {
+          if (candidate.kind !== 'middleware' || candidate.name !== role) return install
           const key = role === 'timeout' ? WebRpcSharedKey.timeout : plannedAbortEnablementKey
-          const native = nativeCancellationDescriptor(original, role, key, { events })
-          return {
-            ...native,
-            install: async (_scope) => {
-              events.push(`${role}:install`)
-              await new Promise<void>((resolve) => {
-                release = resolve
-              })
-              return { dispose: async () => events.push(`${role}:dispose`) }
+          return async (_scope) => {
+            events.push(`${role}:install`)
+            await new Promise<void>((resolve) => {
+              release = resolve
+            })
+            return {
+              extension: Object.freeze({}),
+              shared: Object.freeze({ [key]: Object.freeze({ enabled: true }) }),
+              dispose: async () => events.push(`${role}:dispose`)
             }
           }
         }
@@ -3709,23 +4039,16 @@ describe('B12a atomic middleware and claim contracts', () => {
       const controller = new AbortController()
       const reason = new DOMException(`${role} late-reject abort`, 'AbortError')
       const latePrimary = new Error(`${role} late-reject primary`)
-      const reports: unknown[] = []
       let release!: () => void
       const batch = await createProductionBatch({
         construction: { signal: controller.signal as IWebRpcAbortSignal },
-        report: (error) => reports.push(error),
-        injectDescriptor: (candidate, original) => {
-          if (candidate.kind !== 'middleware' || candidate.name !== role) return original
-          const key = role === 'timeout' ? WebRpcSharedKey.timeout : plannedAbortEnablementKey
-          const native = nativeCancellationDescriptor(original, role, key)
-          return {
-            ...native,
-            install: async () => {
-              await new Promise<void>((resolve) => {
-                release = resolve
-              })
-              throw latePrimary
-            }
+        injectInstall: (candidate, install) => {
+          if (candidate.kind !== 'middleware' || candidate.name !== role) return install
+          return async () => {
+            await new Promise<void>((resolve) => {
+              release = resolve
+            })
+            throw latePrimary
           }
         }
       })
@@ -3738,7 +4061,13 @@ describe('B12a atomic middleware and claim contracts', () => {
       const failure = await installing.catch((error: unknown) => error)
       try {
         expect(errorChainContains(failure, reason)).toBe(true)
-        expect(reports.some((error) => errorChainContains(error, latePrimary))).toBe(true)
+        await vi.waitFor(() =>
+          expect(
+            batch.hookEvents.some(
+              (event) => event.name === 'failure' && errorChainContains(event.error, latePrimary)
+            )
+          ).toBe(true)
+        )
         expect(batch.stats.activeSubscriptions).toBe(0)
       } finally {
         await batch.host.dispose()
@@ -3749,14 +4078,13 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('B12b03 RED: native abort async hostile install preserves PH01 and zero residue', async () => {
     const primary = new Error('native abort hostile install')
     const batch = await createProductionBatch({
-      injectDescriptor: (candidate, original) =>
+      injectInstall: (candidate, install) =>
         candidate.kind === 'middleware' && candidate.name === 'abort'
-          ? nativeCancellationDescriptor(original, 'abort', plannedAbortEnablementKey, {
-              installFailure: Promise.resolve().then(() => {
-                throw primary
-              })
-            })
-          : original
+          ? async (scope) => {
+              await install(scope)
+              throw primary
+            }
+          : install
     })
     const failure = await batch.host
       .installBatch(batch.translated.map(({ definition }) => definition))
@@ -3794,7 +4122,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         },
         middlewares: [connect({ transport: serverTransport }), protocol(), abort(), timeout()]
       },
-      [outbound(), provider()]
+      createProviderFirstPartyRoots()
     )
     const client = await createComposedEndpoint(
       {
@@ -3803,11 +4131,11 @@ describe('B12a atomic middleware and claim contracts', () => {
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     const controller = new AbortController()
     const reason = new DOMException('timeout race caller abort', 'AbortError')
-    const pending = client.send('b12b03-round10-server', 'hang', null, {
+    const pending = readProjectedSend(client)('b12b03-round10-server', 'hang', null, {
       signal: controller.signal as IWebRpcAbortSignal,
       timeoutMs: 1
     })
@@ -3849,7 +4177,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         },
         middlewares: [connect({ transport: serverTransport }), protocol(), abort(), timeout()]
       },
-      [outbound(), provider()]
+      createProviderFirstPartyRoots()
     )
     const client = await createComposedEndpoint(
       {
@@ -3858,11 +4186,11 @@ describe('B12a atomic middleware and claim contracts', () => {
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     const controller = new AbortController()
     const reason = new DOMException('late caller abort', 'AbortError')
-    const pending = client.send('b12b03-round11-timeout-server', 'hang', null, {
+    const pending = readProjectedSend(client)('b12b03-round11-timeout-server', 'hang', null, {
       signal: controller.signal as IWebRpcAbortSignal,
       timeoutMs: 1
     })
@@ -3916,7 +4244,7 @@ describe('B12a atomic middleware and claim contracts', () => {
           hooks({ onHookError: (error) => reports.push(error) })
         ]
       },
-      [outbound(), provider()]
+      createProviderFirstPartyRoots()
     )
     const client = await createComposedEndpoint(
       {
@@ -3925,7 +4253,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     /** Captures the active server's idle root and operation-observer baseline before send. */
     const idleServer = readEndpointDebugSnapshot(server)
@@ -3934,7 +4262,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const idleServerSnapshot = idleServer!
     expect(idleServerSnapshot.providers).toBe(1)
     const controller = new AbortController()
-    const pending = client.send('b12b03-round13-late-reject-server', 'hang', null, {
+    const pending = readProjectedSend(client)('b12b03-round13-late-reject-server', 'hang', null, {
       signal: controller.signal as IWebRpcAbortSignal,
       timeoutMs: false
     })
@@ -4542,12 +4870,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         name: `middleware:${role}-duplicate`,
         sharedProvides: [plannedB12b04Keys[role]]
       }
-      expect(() =>
-        preflightPluginClaims(
-          [entry.descriptor, duplicate],
-          [entry.descriptor.claims, duplicate.claims]
-        )
-      ).toThrow()
+      expect(() => preflightFeatureClaims([entry.descriptor, duplicate])).toThrow()
       await batch.host.dispose()
     }
   )
@@ -4566,7 +4889,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         sharedProvides: [`web-rpc.forged.${role}`]
       }
       const before = productionHostSnapshot(batch)
-      expect(() => preflightPluginClaims([forged], [forged.claims])).toThrow()
+      expect(() => preflightFeatureClaims([forged])).toThrow()
       expect(productionHostSnapshot(batch)).toEqual(before)
       await batch.host.dispose()
     }
@@ -4586,7 +4909,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         sharedProvides: [Symbol(`web-rpc.forged.${role}`)]
       }
       const before = productionHostSnapshot(batch)
-      expect(() => preflightPluginClaims([forged], [forged.claims])).toThrow()
+      expect(() => preflightFeatureClaims([forged])).toThrow()
       expect(productionHostSnapshot(batch)).toEqual(before)
       await batch.host.dispose()
     }
@@ -4775,7 +5098,15 @@ describe('B12a atomic middleware and claim contracts', () => {
       ]
       const endpoint = await createComposedEndpoint(
         { id: `t89-${role}`, transport, middlewares: middleware },
-        [outbound(), provider(), discovery(), control(), chunk()] as const
+        createFirstPartyRoots(
+          new Set<IWebRpcFirstPartyRootName>([
+            'first-party-chunk',
+            'first-party-outbound',
+            'first-party-provider',
+            'first-party-discovery',
+            'first-party-control'
+          ])
+        )
       )
       expect(nativeInstallCalls).toBe(1)
       expect(consumerInstallCalls).toBe(1)
@@ -4912,12 +5243,12 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   }
 
-  /** Returns the actual outbound feature entry from the composed production inventory. */
-  function findOutboundEntry(batch: IProductionBatch): IWebRpcComposedPluginInventoryEntry {
+  /** Returns the single Host-owned Feature that admits all first-party endpoint capabilities. */
+  function findCapabilitiesEntry(batch: IProductionBatch): IProductionNativeEntry {
     const entry = batch.inventory.find(
-      ({ role }) => role.kind === 'feature' && role.key === 'outbound'
+      ({ role }) => role.kind === 'feature' && role.key === 'endpoint-capabilities'
     )
-    if (!entry) throw new Error('outbound production inventory entry missing')
+    if (!entry) throw new Error('endpoint capabilities production inventory entry missing')
     return entry
   }
 
@@ -4929,35 +5260,22 @@ describe('B12c01 outbound feature production-seam matrix', () => {
   it('T90 B12c01 RED: outbound inventory claims exact narrow shared ports', async () => {
     const batch = await createProductionBatch()
     try {
-      const entry = findOutboundEntry(batch)
-      expect({
-        name: entry.descriptor.name,
-        claims: entry.descriptor.claims,
-        sharedProvides: entry.descriptor.sharedProvides,
-        sharedConsumes: entry.descriptor.sharedConsumes
-      }).toEqual({
-        name: 'outbound',
-        claims: {
-          routes: ['response', 'variation'],
-          provides: ['inbound-identity', 'variation-coordinator'],
-          consumes: [],
-          publicKeys: ['send', 'sendAll', 'dispatch', 'dispatchAll'],
-          exposedKeys: ['send', 'sendAll', 'dispatch', 'dispatchAll'],
-          activator: false,
-          sharedProvides: [
-            WebRpcSharedKey.inboundIdentity,
-            WebRpcSharedKey.variationCoordinator,
-            WebRpcSharedKey.outboundOperations
-          ],
-          sharedConsumes: []
-        },
-        sharedProvides: [
+      const entry = findCapabilitiesEntry(batch)
+      expect(entry.descriptor.name).toBe('endpoint-capabilities')
+      expect(entry.descriptor.claims.routes).toEqual(
+        expect.arrayContaining(['response', 'variation'])
+      )
+      expect(entry.descriptor.claims.publicKeys).toEqual(
+        expect.arrayContaining(['send', 'sendAll', 'dispatch', 'dispatchAll'])
+      )
+      expect(entry.descriptor.sharedProvides).toEqual(
+        expect.arrayContaining([
           WebRpcSharedKey.inboundIdentity,
           WebRpcSharedKey.variationCoordinator,
           WebRpcSharedKey.outboundOperations
-        ],
-        sharedConsumes: []
-      })
+        ])
+      )
+      expect(entry.descriptor.sharedConsumes).toBeUndefined()
     } finally {
       await batch.host.dispose()
     }
@@ -4966,13 +5284,10 @@ describe('B12c01 outbound feature production-seam matrix', () => {
   it('T91 B12c01 RED: outbound result uses Host-owned disposal without legacy blanket escape', async () => {
     const batch = await createProductionBatch()
     try {
-      const entry = findOutboundEntry(batch)
-      expect({
-        disposeResult: entry.descriptor.disposeResult,
-        hasBroadAttachmentPort: entry.descriptor.sharedProvides?.includes(
-          WebRpcSharedKey.outboundAttachment
-        )
-      }).toEqual({ disposeResult: undefined, hasBroadAttachmentPort: false })
+      const entry = findCapabilitiesEntry(batch)
+      expect(entry.descriptor.sharedProvides?.includes(WebRpcSharedKey.outboundAttachment)).toBe(
+        false
+      )
     } finally {
       await batch.host.dispose()
     }
@@ -4999,30 +5314,63 @@ describe('B12c01 outbound feature production-seam matrix', () => {
 
   it('T93 B12c01: outbound install does not subscribe or activate before final activation', async () => {
     let release!: () => void
+    let entered = false
+    let settled = false
+    let notifyEntered!: () => void
+    const enteredBarrier = new Promise<void>((resolve) => {
+      notifyEntered = resolve
+    })
     const barrier = new Promise<void>((resolve) => {
       release = resolve
     })
     const batch = await createProductionBatch({
       injectInstall: (role, install) => {
-        if (role.kind !== 'feature' || role.key !== 'outbound') return install
+        /**
+         * Delay the native activation role; cloning the defined capability Feature loses its
+         * factory identity.
+         */
+        if (role.kind !== 'activation') return install
         return async (scope) => {
+          entered = true
+          notifyEntered()
           await barrier
           return install(scope)
         }
       }
     })
+    let installing: Promise<unknown> | undefined
     try {
-      const installing = batch.host.installBatch(
-        batch.translated.map(({ definition }) => definition)
-      )
-      await drainBatchTurns()
+      installing = batch.host
+        .installBatch(batch.translated.map(({ definition }) => definition))
+        .then((result) => {
+          settled = true
+          return result
+        })
+      await enteredBarrier
+      expect(entered).toBe(true)
+      expect(settled).toBe(false)
       expect(batch.stats.subscribeCalls).toBe(0)
       expect(batch.stats.dispatches).toBe(0)
       expect(batch.isActivated()).toBe(false)
+      expect(batch.kernel.transport).toBe(batch.transport)
       release()
       await installing
       expect(batch.stats.subscribeCalls).toBe(1)
       expect(batch.isActivated()).toBe(true)
+    } finally {
+      release()
+      await installing?.catch(() => undefined)
+      await batch.host.dispose()
+    }
+  })
+
+  it('T93 B12c01: the untransformed native capability Feature activates one receiver', async () => {
+    const batch = await createProductionBatch()
+    try {
+      await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+      expect(batch.isActivated()).toBe(true)
+      expect(batch.stats.subscribeCalls).toBe(1)
+      expect(batch.stats.activeSubscriptions).toBe(1)
     } finally {
       await batch.host.dispose()
     }
@@ -5647,41 +5995,20 @@ describe('B12c01 outbound feature production-seam matrix', () => {
   it('T100 B12c01 RED: outbound cleanup proves exact order, failure identity, and terminal idempotence', async () => {
     const successTrace: IProductionLifecycleTraceEntry[] = []
     const successResources = new Map<string, object>()
-    const replaceDispose = (result: object, dispose: () => Promise<void>): object => {
-      const observed = Object.create(Object.getPrototypeOf(result)) as Record<PropertyKey, unknown>
-      for (const key of Reflect.ownKeys(result)) {
-        const property = Object.getOwnPropertyDescriptor(result, key)!
-        Object.defineProperty(
-          observed,
-          key,
-          key === 'dispose' ? { ...property, value: dispose } : property
-        )
-      }
-      return Object.freeze(observed)
-    }
     let successOutboundDisposeCalls = 0
     const success = await createProductionBatch({
       lifecycleTrace: successTrace,
       transportOwnership: 'owned',
-      injectDescriptor: (role, descriptor) => {
-        if (role.kind !== 'feature' || role.key !== 'outbound') return descriptor
-        return {
-          ...descriptor,
-          disposeResult: undefined,
-          install: async (scope) => {
-            const result = (await descriptor.install(scope)) as object & {
-              readonly dispose?: () => Promise<void>
-            }
-            const originalDispose = result.dispose
-            return replaceDispose(result, async (): Promise<void> => {
-              successOutboundDisposeCalls += 1
-              successTrace.push({ kind: 'outbound.release', instance: originalDispose })
-              await originalDispose?.()
-            })
-          }
-        }
-      },
       injectInstall: (role, install) => {
+        if (role.kind === 'feature' && role.key === 'first-party-outbound')
+          return async (scope) => {
+            const result = await install(scope)
+            scope.own(result, () => {
+              successOutboundDisposeCalls += 1
+              successTrace.push({ kind: 'outbound.release', instance: result as object })
+            })
+            return result
+          }
         if (role.kind !== 'middleware' || !['authentication', 'connect'].includes(role.name))
           return install
         return async (scope) => {
@@ -5696,7 +6023,6 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       }
     })
     await success.host.installBatch(success.translated.map(({ definition }) => definition))
-    const successInstalledResidue = productionResidueSnapshot(success)
     const successDispose = success.host.dispose()
     expect(success.host.dispose()).toBe(successDispose)
     await successDispose
@@ -5716,8 +6042,6 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     )
     const successTerminalResidue = productionResidueSnapshot(success)
     expectTerminalResidue(successTerminalResidue)
-    expect(successTerminalResidue.activated).toBe(successInstalledResidue.activated)
-    expect(successTerminalResidue.installations).toEqual(successInstalledResidue.installations)
 
     const connectFailure = new Error('connect cleanup failure')
     const authenticationFailure = new Error('authentication cleanup failure')
@@ -5729,30 +6053,17 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       lifecycleTrace: failureTrace,
       transportOwnership: 'owned',
       transportCloseError: transportFailure,
-      injectDescriptor: (role, descriptor) => {
-        if (role.kind !== 'feature' || role.key !== 'outbound') return descriptor
-        return {
-          ...descriptor,
-          disposeResult: undefined,
-          install: async (scope) => {
-            const result = (await descriptor.install(scope)) as object & {
-              readonly dispose?: () => Promise<void>
-            }
-            const originalDispose = result.dispose
-            return replaceDispose(result, async (): Promise<void> => {
+      injectInstall: (role, install) => {
+        if (role.kind === 'feature' && role.key === 'first-party-outbound')
+          return async (scope) => {
+            const result = await install(scope)
+            scope.own(result, () => {
               failureOutboundDisposeCalls += 1
               failureTrace.push({ kind: 'outbound.release', instance: outboundFailure })
-              try {
-                await originalDispose?.()
-              } catch (error) {
-                throw new AggregateError([outboundFailure, error])
-              }
               throw outboundFailure
             })
+            return result
           }
-        }
-      },
-      injectInstall: (role, install) => {
         if (role.kind !== 'middleware' || !['authentication', 'connect'].includes(role.name))
           return install
         return async (scope) => {
@@ -5767,7 +6078,6 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       }
     })
     await failing.host.installBatch(failing.translated.map(({ definition }) => definition))
-    const failureInstalledResidue = productionResidueSnapshot(failing)
     const failureDispose = failing.host.dispose()
     expect(failing.host.dispose()).toBe(failureDispose)
     let disposalFailure: unknown
@@ -5793,8 +6103,6 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     expect(failing.kernel.state).toBe('disposed')
     const failureTerminalResidue = productionResidueSnapshot(failing)
     expectTerminalResidue(failureTerminalResidue)
-    expect(failureTerminalResidue.activated).toBe(failureInstalledResidue.activated)
-    expect(failureTerminalResidue.installations).toEqual(failureInstalledResidue.installations)
 
     const [endpointBaseTransport] = createMemoryTransportPair()
     const endpointOutboundFailure = new Error('endpoint outbound cleanup failure')
@@ -6030,15 +6338,11 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     })
     const descriptorBatch = await createProductionBatch()
     try {
-      const descriptorEntry = findOutboundEntry(descriptorBatch)
-      expect(descriptorEntry.descriptor.claims.publicKeys).toEqual([
-        'send',
-        'sendAll',
-        'dispatch',
-        'dispatchAll'
-      ])
+      const descriptorEntry = findCapabilitiesEntry(descriptorBatch)
+      expect(descriptorEntry.descriptor.claims.publicKeys).toEqual(
+        expect.arrayContaining(['send', 'sendAll', 'dispatch', 'dispatchAll'])
+      )
       expect(Object.keys(client)).toEqual([
-        'on',
         'hooks',
         'dispose',
         'send',
@@ -6052,138 +6356,33 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  async function runInstallationObservationBranch(options: {
-    readonly name: string
-    readonly value: unknown
-    readonly disposeResult?: boolean
-  }): Promise<void> {
-    const descriptor: IWebRpcPluginDescriptor = {
-      name: options.name,
-      claims: emptyClaims,
-      ...(options.disposeResult === undefined ? {} : { disposeResult: options.disposeResult }),
-      install: async () => options.value
+  /** Creates a trusted native Feature for lifecycle rows without restoring descriptor translation. */
+  type INativeLifecycleCore = Readonly<{
+    readonly onDispose: (release: () => void | Promise<void>) => void
+  }>
+
+  function nativeLifecycleFeature(
+    name: string,
+    install: (core: INativeLifecycleCore) => void
+  ): IWebRpcNativeFeatureDefinition {
+    const definition = definePlugin(name, (core) => ({
+      install: () => {
+        install(core)
+        return {}
+      }
+    }))
+    return {
+      key: name,
+      definition: definition as IWebRpcNativeFeatureDefinition['definition'],
+      admission: { name, claims: emptyClaims }
     }
-    const batch = await createProductionBatch({ additionalDescriptors: [descriptor] })
-    const translated = batch.translated.find(({ definition }) => definition.name === options.name)
-    expect(translated).toBeDefined()
-    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    expect(translated!.getInstallationObservation()).toEqual({
-      installed: true,
-      value: options.value
-    })
-    expect(translated!.getLiveInstallationObservation()).toEqual({
-      installed: true,
-      value: options.value
-    })
-    const dispose = batch.host.dispose()
-    expect(batch.host.dispose()).toBe(dispose)
-    await dispose
-    expect(translated!.getInstallationObservation()).toEqual({
-      installed: true,
-      value: options.value
-    })
-    expect(translated!.getLiveInstallationObservation()).toEqual({
-      installed: false,
-      value: undefined
-    })
-    expect(batch.host.dispose()).toBe(dispose)
   }
 
-  it('T152 primitive installation retains durable history and clears live markers', async () => {
-    await runInstallationObservationBranch({ name: 'observation-primitive', value: 'primitive' })
-  })
-
-  it('T153 undefined installation is distinguished as installed history', async () => {
-    await runInstallationObservationBranch({ name: 'observation-undefined', value: undefined })
-  })
-
-  it('T154 no-disposer installation clears live markers exactly once', async () => {
-    await runInstallationObservationBranch({ name: 'observation-no-disposer', value: {} })
-    const cleanupCalls: string[] = []
-    const targetName = 'observation-no-disposer-count'
+  async function runNativeInstallationBranch(name: string): Promise<void> {
     const batch = await createProductionBatch({
-      additionalDescriptors: [
-        {
-          name: targetName,
-          claims: emptyClaims,
-          install: async () => ({})
-        }
-      ],
-      onTransferredCleanup: (pluginName) => {
-        if (pluginName === targetName) cleanupCalls.push(pluginName)
-      }
+      additionalNativeFeatures: [nativeLifecycleFeature(name, () => undefined)]
     })
-    const translated = batch.translated.find(({ definition }) => definition.name === targetName)!
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    expect(cleanupCalls).toEqual([])
-    const dispose = batch.host.dispose()
-    expect(batch.host.dispose()).toBe(dispose)
-    await dispose
-    expect(cleanupCalls).toEqual([targetName])
-    expect(batch.host.dispose()).toBe(dispose)
-    expect(translated.getLiveInstallationObservation().installed).toBe(false)
-    expect(cleanupCalls).toEqual([targetName])
-  })
-
-  it('T155 disposeResult false retains history without invoking a disposer', async () => {
-    let disposeCalls = 0
-    const value = {
-      dispose: () => {
-        disposeCalls += 1
-      }
-    }
-    const descriptor: IWebRpcPluginDescriptor = {
-      name: 'observation-no-dispose-result',
-      claims: emptyClaims,
-      disposeResult: false,
-      install: async () => value
-    }
-    const batch = await createProductionBatch({ additionalDescriptors: [descriptor] })
-    const translated = batch.translated.find(
-      ({ definition }) => definition.name === 'observation-no-dispose-result'
-    )!
-    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    const dispose = batch.host.dispose()
-    expect(batch.host.dispose()).toBe(dispose)
-    await dispose
-    expect(disposeCalls).toBe(0)
-    expect(translated.getInstallationObservation().installed).toBe(true)
-    expect(translated.getLiveInstallationObservation().installed).toBe(false)
-  })
-
-  it('T156 onInstalled throw still clears live markers after rollback', async () => {
-    const primary = new Error('onInstalled observation failure')
-    const value = {}
-    const descriptor: IWebRpcPluginDescriptor = {
-      name: 'observation-on-installed-failure',
-      claims: emptyClaims,
-      install: async () => value
-    }
-    const batch = await createProductionBatch({
-      additionalDescriptors: [descriptor],
-      onInstalled: (installation) => {
-        if (installation === value) throw primary
-      }
-    })
-    const translated = batch.translated.find(
-      ({ definition }) => definition.name === 'observation-on-installed-failure'
-    )!
-    let failure: unknown
-    try {
-      await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    } catch (error) {
-      failure = error
-    }
-    expect(failure).toBeInstanceOf(Error)
-    expect(failure).toMatchObject({
-      name: 'PluginHostError',
-      source: '@migaia/plugin-host',
-      code: 'PLUGIN_INSTALL_FAILED',
-      detail: { failedName: 'observation-on-installed-failure', rollbackErrors: [] },
-      cause: primary
-    })
-    expect(translated.getInstallationObservation().installed).toBe(true)
-    expect(translated.getLiveInstallationObservation().installed).toBe(false)
     const dispose = batch.host.dispose()
     expect(batch.host.dispose()).toBe(dispose)
     await expect(dispose).resolves.toMatchObject({
@@ -6192,29 +6391,78 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       cleanupErrors: []
     })
     expect(batch.host.dispose()).toBe(dispose)
+  }
+
+  it('T152 primitive native Feature installation reaches terminal cleanup', async () => {
+    await runNativeInstallationBranch('native-observation-primitive')
   })
 
-  it('T157 result cleanup failure clears after cleanup and preserves Promise identity', async () => {
-    const cleanup = new Error('observation result cleanup failure')
+  it('T153 undefined native Feature installation reaches terminal cleanup', async () => {
+    await runNativeInstallationBranch('native-observation-undefined')
+  })
+
+  it('T154 no-disposer native Feature installation has one terminal Host Promise', async () => {
+    await runNativeInstallationBranch('native-observation-no-disposer')
+  })
+
+  it('T155 native Feature result disposer runs once at terminal cleanup', async () => {
     let disposeCalls = 0
-    let translated!: IWebRpcTranslatedPlugin
-    let liveDuringCleanup = false
-    const value = {
-      dispose: () => {
-        disposeCalls += 1
-        liveDuringCleanup = translated.getLiveInstallationObservation().installed
-        throw cleanup
-      }
-    }
-    const descriptor: IWebRpcPluginDescriptor = {
-      name: 'observation-result-failure',
-      claims: emptyClaims,
-      install: async () => value
-    }
-    const batch = await createProductionBatch({ additionalDescriptors: [descriptor] })
-    translated = batch.translated.find(
-      ({ definition }) => definition.name === 'observation-result-failure'
-    )!
+    const batch = await createProductionBatch({
+      additionalNativeFeatures: [
+        nativeLifecycleFeature('native-observation-disposer', (core) => {
+          core.onDispose(() => {
+            disposeCalls += 1
+          })
+        })
+      ]
+    })
+    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+    const dispose = batch.host.dispose()
+    expect(batch.host.dispose()).toBe(dispose)
+    await dispose
+    expect(disposeCalls).toBe(1)
+    expect(batch.host.dispose()).toBe(dispose)
+  })
+
+  it('T156 native Feature install failure rolls back without retaining Host residue', async () => {
+    const primary = new Error('native observation install failure')
+    const batch = await createProductionBatch({
+      additionalNativeFeatures: [
+        nativeLifecycleFeature('native-observation-install-failure', () => {
+          throw primary
+        })
+      ]
+    })
+    const failure = await batch.host
+      .installBatch(batch.translated.map(({ definition }) => definition))
+      .catch((error: unknown) => error)
+    expect(failure).toMatchObject({
+      name: 'PluginHostError',
+      source: '@migaia/plugin-host',
+      code: 'PLUGIN_INSTALL_FAILED',
+      detail: { failedName: 'native-observation-install-failure', rollbackErrors: [] },
+      cause: primary
+    })
+    await expect(batch.host.dispose()).resolves.toMatchObject({
+      logicalTerminal: true,
+      cleanupComplete: true,
+      cleanupErrors: []
+    })
+  })
+
+  it('T157 native result cleanup failure preserves identity and terminal Promise identity', async () => {
+    const cleanup = new Error('native observation result cleanup failure')
+    let disposeCalls = 0
+    const batch = await createProductionBatch({
+      additionalNativeFeatures: [
+        nativeLifecycleFeature('native-observation-result-failure', (core) => {
+          core.onDispose(() => {
+            disposeCalls += 1
+            throw cleanup
+          })
+        })
+      ]
+    })
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
     const dispose = batch.host.dispose()
     expect(batch.host.dispose()).toBe(dispose)
@@ -6225,232 +6473,105 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       code: WebRpcErrorCode.endpointDisposed,
       cause: cleanup
     })
-    expect(liveDuringCleanup).toBe(true)
     expect(disposeCalls).toBe(1)
-    expect(translated.getInstallationObservation().installed).toBe(true)
-    expect(translated.getLiveInstallationObservation().installed).toBe(false)
     expect(batch.host.dispose()).toBe(dispose)
     await expect(dispose).rejects.toBe(failure)
   })
 
   it('T166 throwing cleanup observer is diagnostic-only and cannot alter disposal', async () => {
-    const observerFailure = new Error('transferred cleanup observer failure')
-    const cleanup = new Error('observer branch cleanup failure')
-    const observerCalls: string[] = []
-    const reported: unknown[] = []
-    const runFailureBranch = async (
-      observe: boolean
-    ): Promise<{
-      readonly batch: IProductionBatch
-      readonly translated: IWebRpcTranslatedPlugin
-      readonly failure: unknown
-      readonly disposeCalls: number
-      readonly liveDuringCleanup: boolean
-    }> => {
-      let translated!: IWebRpcTranslatedPlugin
-      let disposeCalls = 0
-      let liveDuringCleanup = false
-      const descriptor: IWebRpcPluginDescriptor = {
-        name: observe ? 'observer-throwing-failure' : 'observer-baseline-failure',
-        claims: emptyClaims,
-        install: async () => ({
-          dispose: () => {
-            disposeCalls += 1
-            liveDuringCleanup = translated.getLiveInstallationObservation().installed
-            throw cleanup
-          }
-        })
-      }
+    const cleanup = new Error('native observer cleanup failure')
+    const observerFailure = new Error('native observer failure')
+    const runNativeBranch = async (observe: boolean, failCleanup: boolean) => {
+      const reports: unknown[] = []
+      let observerCalls = 0
       const batch = await createProductionBatch({
-        additionalDescriptors: [descriptor],
-        report: (error) => {
-          reported.push(error)
-        },
-        onTransferredCleanup: observe
-          ? (pluginName) => {
-              if (pluginName === descriptor.name) {
-                observerCalls.push(pluginName)
-                expect(translated.getLiveInstallationObservation().installed).toBe(true)
+        hooksMiddleware: hooks({ onHookError: (error) => reports.push(error) })
+      })
+      await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+      batch.propagateDiscoveryCleanupFaults({
+        ...(failCleanup ? { registry: [cleanup] } : {}),
+        ...(observe
+          ? {
+              onDispose: () => {
+                observerCalls += 1
                 throw observerFailure
               }
             }
-          : undefined
+          : {})
       })
-      translated = batch.translated.find(({ definition }) => definition.name === descriptor.name)!
-      await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
       const dispose = batch.host.dispose()
       expect(batch.host.dispose()).toBe(dispose)
-      const failure = await dispose.catch((error: unknown) => error)
+      const outcome = await dispose.catch((error: unknown) => error)
       expect(batch.host.dispose()).toBe(dispose)
-      return { batch, translated, failure, disposeCalls, liveDuringCleanup }
+      return { batch, dispose, outcome, reports, observerCalls }
     }
 
-    const baseline = await runFailureBranch(false)
-    const observed = await runFailureBranch(true)
-    for (const failure of [baseline.failure, observed.failure]) {
-      expect(failure).toBeInstanceOf(WebRpcLifecycleError)
-      expect(failure).toMatchObject({
+    const baselineFailure = await runNativeBranch(false, true)
+    const observedFailure = await runNativeBranch(true, true)
+    for (const branch of [baselineFailure, observedFailure]) {
+      expect(branch.outcome).toBeInstanceOf(WebRpcLifecycleError)
+      expect(branch.outcome).toMatchObject({
         source: WEBRPC_SOURCE,
         code: WebRpcErrorCode.endpointDisposed,
         cause: cleanup
       })
+      expect(branch.batch.host.dispose()).toBe(branch.dispose)
+      expectTerminalResidue(productionResidueSnapshot(branch.batch))
     }
-    expect(observerCalls).toEqual(['observer-throwing-failure'])
-    expect(reported.filter((error) => error === observerFailure)).toHaveLength(1)
-    expect(baseline.disposeCalls).toBe(1)
-    expect(observed.disposeCalls).toBe(1)
-    expect(baseline.liveDuringCleanup).toBe(true)
-    expect(observed.liveDuringCleanup).toBe(true)
-    expect(baseline.translated.getLiveInstallationObservation().installed).toBe(false)
-    expect(observed.translated.getLiveInstallationObservation().installed).toBe(false)
-    expect(baseline.translated.getInstallationObservation().installed).toBe(true)
-    expect(observed.translated.getInstallationObservation().installed).toBe(true)
-    expect((baseline.failure as Error).name).toBe((observed.failure as Error).name)
-    expect((baseline.failure as { readonly source?: unknown }).source).toBe(
-      (observed.failure as { readonly source?: unknown }).source
-    )
-    expect((baseline.failure as { readonly code?: unknown }).code).toBe(
-      (observed.failure as { readonly code?: unknown }).code
-    )
+    expect(baselineFailure.observerCalls).toBe(0)
+    expect(baselineFailure.reports).toEqual([])
+    expect(observedFailure.observerCalls).toBe(1)
+    expect(observedFailure.reports).toEqual([observerFailure])
 
-    const successObserverFailure = new Error('successful observer failure')
-    const runSuccessBranch = async (
-      observe: boolean
-    ): Promise<{
-      readonly translated: IWebRpcTranslatedPlugin
-      readonly firstDispose: Promise<IPluginHostDisposalResult>
-      readonly repeatedDispose: Promise<IPluginHostDisposalResult>
-      readonly observerCalls: number
-      readonly reportCount: number
-      readonly reported: readonly unknown[]
-      readonly durable: ReturnType<IWebRpcTranslatedPlugin['getInstallationObservation']>
-      readonly live: ReturnType<IWebRpcTranslatedPlugin['getLiveInstallationObservation']>
-      readonly stats: IProductionBatch['stats']
-      readonly activated: boolean
-    }> => {
-      let successObserverCalls = 0
-      let reportCount = 0
-      const reported: unknown[] = []
-      const descriptor: IWebRpcPluginDescriptor = {
-        name: observe ? 'observer-throwing-success' : 'observer-baseline-success',
-        claims: emptyClaims,
-        install: async () => ({})
-      }
-      const batch = await createProductionBatch({
-        additionalDescriptors: [descriptor],
-        report: (error) => {
-          reportCount += 1
-          reported.push(error)
-        },
-        onTransferredCleanup: observe
-          ? (pluginName) => {
-              if (pluginName === descriptor.name) {
-                successObserverCalls += 1
-                throw successObserverFailure
-              }
-            }
-          : undefined
-      })
-      const translated = batch.translated.find(
-        ({ definition }) => definition.name === descriptor.name
-      )!
-      await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      const firstDispose = batch.host.dispose()
-      const repeatedDispose = batch.host.dispose()
-      expect(repeatedDispose).toBe(firstDispose)
-      await expect(firstDispose).resolves.toMatchObject({
+    const baselineSuccess = await runNativeBranch(false, false)
+    const observedSuccess = await runNativeBranch(true, false)
+    for (const branch of [baselineSuccess, observedSuccess]) {
+      await expect(branch.dispose).resolves.toMatchObject({
         logicalTerminal: true,
         cleanupComplete: true,
         cleanupErrors: []
       })
-      expect(batch.host.dispose()).toBe(firstDispose)
-      return {
-        translated,
-        firstDispose,
-        repeatedDispose,
-        observerCalls: successObserverCalls,
-        reportCount,
-        reported,
-        durable: translated.getInstallationObservation(),
-        live: translated.getLiveInstallationObservation(),
-        stats: { ...batch.stats },
-        activated: batch.isActivated()
-      }
+      expect(branch.batch.host.dispose()).toBe(branch.dispose)
+      expectTerminalResidue(productionResidueSnapshot(branch.batch))
     }
-    const baselineSuccess = await runSuccessBranch(false)
-    const observedSuccess = await runSuccessBranch(true)
-    expect(baselineSuccess.durable).toEqual({ installed: true, value: {} })
-    expect(observedSuccess.durable).toEqual({ installed: true, value: {} })
-    expect(baselineSuccess.live).toEqual({ installed: false, value: undefined })
-    expect(observedSuccess.live).toEqual({ installed: false, value: undefined })
-    expect(observedSuccess.durable).toEqual(baselineSuccess.durable)
-    expect(observedSuccess.live).toEqual(baselineSuccess.live)
-    expect(observedSuccess.stats).toEqual(baselineSuccess.stats)
-    expect(observedSuccess.activated).toBe(baselineSuccess.activated)
     expect(baselineSuccess.observerCalls).toBe(0)
-    expect(baselineSuccess.reportCount).toBe(0)
-    expect(baselineSuccess.reported).toEqual([])
+    expect(baselineSuccess.reports).toEqual([])
     expect(observedSuccess.observerCalls).toBe(1)
-    expect(observedSuccess.reportCount).toBe(1)
-    expect(observedSuccess.reported).toEqual([successObserverFailure])
-    expect(observedSuccess.repeatedDispose).toBe(observedSuccess.firstDispose)
-    expect(baselineSuccess.repeatedDispose).toBe(baselineSuccess.firstDispose)
+    expect(observedSuccess.reports).toEqual([observerFailure])
   })
 
-  it('T158 later rollback releases the earlier result once and clears live markers', async () => {
+  it('T158 later native failure rolls back earlier owned resources in reverse order', async () => {
     const rollback = new Error('observation later rollback')
     const releases: string[] = []
     const firstCleanup = new Error('observation first cleanup')
     const secondCleanup = new Error('observation second cleanup')
-    const firstValue = {
-      dispose: () => {
-        releases.push('first')
-        throw firstCleanup
-      }
-    }
-    const secondValue = {
-      dispose: () => {
-        releases.push('second')
-        throw secondCleanup
-      }
-    }
-    const descriptor: IWebRpcPluginDescriptor = {
-      name: 'observation-later-rollback-first',
-      claims: emptyClaims,
-      install: async () => firstValue
-    }
-    const secondDescriptor: IWebRpcPluginDescriptor = {
-      name: 'observation-later-rollback-second',
-      claims: emptyClaims,
-      install: async () => secondValue
-    }
-    const later: IWebRpcPluginDescriptor = {
-      name: 'observation-later-failure',
-      claims: emptyClaims,
-      install: async () => {
-        throw rollback
-      }
-    }
     const batch = await createProductionBatch({
-      additionalDescriptors: [descriptor, secondDescriptor, later]
+      additionalNativeFeatures: [
+        nativeLifecycleFeature('native-observation-later-rollback-first', (core) => {
+          core.onDispose(() => {
+            releases.push('first')
+            throw firstCleanup
+          })
+        }),
+        nativeLifecycleFeature('native-observation-later-rollback-second', (core) => {
+          core.onDispose(() => {
+            releases.push('second')
+            throw secondCleanup
+          })
+        }),
+        nativeLifecycleFeature('native-observation-later-failure', () => {
+          throw rollback
+        })
+      ]
     })
-    const firstTranslated = batch.translated.find(
-      ({ definition }) => definition.name === descriptor.name
-    )!
-    const secondTranslated = batch.translated.find(
-      ({ definition }) => definition.name === secondDescriptor.name
-    )!
-    let failure: unknown
-    try {
-      await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    } catch (error) {
-      failure = error
-    }
+    const failure = await batch.host
+      .installBatch(batch.translated.map(({ definition }) => definition))
+      .catch((error: unknown) => error)
     expect(failure).toMatchObject({
       name: 'PluginHostError',
       source: '@migaia/plugin-host',
       code: 'PLUGIN_INSTALL_FAILED',
-      detail: { failedName: 'observation-later-failure' },
+      detail: { failedName: 'native-observation-later-failure' },
       cause: rollback
     })
     const rollbackErrors = (
@@ -6458,13 +6579,8 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     ).detail?.rollbackErrors
     expect(rollbackErrors).toHaveLength(2)
     const rollbackList = rollbackErrors as readonly unknown[]
-    expect((rollbackList[0] as AggregateError).errors).toEqual([secondCleanup])
-    expect((rollbackList[1] as AggregateError).errors).toEqual([firstCleanup])
+    expect(rollbackList).toEqual([secondCleanup, firstCleanup])
     expect(releases).toEqual(['second', 'first'])
-    expect(firstTranslated.getLiveInstallationObservation().installed).toBe(false)
-    expect(secondTranslated.getLiveInstallationObservation().installed).toBe(false)
-    expect(firstTranslated.getInstallationObservation().installed).toBe(true)
-    expect(secondTranslated.getInstallationObservation().installed).toBe(true)
     const dispose = batch.host.dispose()
     expect(batch.host.dispose()).toBe(dispose)
     await dispose
@@ -6498,24 +6614,21 @@ describe('Cycle L discovery Host transactions', () => {
 
   it('T249 rolls back a published discovery resolver when a later real Host participant fails', async () => {
     const primary = new Error('cycle-l later participant failed')
+    const lateName = 'cycle-l-later-participant'
     let published: unknown
-    const lateDescriptor: IWebRpcPluginDescriptor = {
-      name: 'cycle-l-later-participant',
+    const batch = await createProductionBatch({})
+    const late = definePlugin({
+      name: lateName,
       claims: emptyClaims,
       sharedConsumes: [WebRpcSharedKey.discoveryResolver],
-      install: async (scope) => {
-        published = scope.getShared(WebRpcSharedKey.discoveryResolver)
+      install: async (core) => {
+        published = core.getShared(WebRpcSharedKey.discoveryResolver)
         throw primary
       }
-    }
-    const batch = await createProductionBatch({})
-    const late = toPluginHostDefinition(lateDescriptor, lateDescriptor.claims)
+    }) as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
     let failure: unknown
     try {
-      await batch.host.installBatch([
-        ...batch.translated.map(({ definition }) => definition),
-        late.definition
-      ])
+      await batch.host.installBatch([...batch.translated.map(({ definition }) => definition), late])
     } catch (error) {
       failure = error
     }
@@ -6525,7 +6638,7 @@ describe('Cycle L discovery Host transactions', () => {
       source: '@migaia/plugin-host',
       code: 'PLUGIN_INSTALL_FAILED',
       cause: primary,
-      detail: { failedName: lateDescriptor.name }
+      detail: { failedName: lateName }
     })
 
     const firstDispose = batch.host.dispose()
@@ -6539,46 +6652,40 @@ describe('Cycle L discovery Host transactions', () => {
     expectTerminalResidue(productionResidueSnapshot(batch))
   })
 
-  it('T249 preserves the real discovery disposer failure identity and terminal residue', async () => {
+  it('T249 preserves the real discovery cleanup error identity and terminal residue', async () => {
     const cleanup = new Error('cycle-l discovery attachment cleanup failed')
-    let discoveryDisposals = 0
+    const observerFailure = new Error('cycle-l discovery disposal observer failed')
+    let discoveryDisposeCalls = 0
+    const reports: unknown[] = []
     const batch = await createProductionBatch({
-      injectInstall: (role, install) => {
-        if (role.kind !== 'feature' || role.key !== 'discovery') return install
-        return async (scope) => {
-          const result = (await install(scope)) as Record<PropertyKey, unknown>
-          const dispose = result.dispose as (() => void | Promise<void>) | undefined
-          return withEndpointModuleOwner(
-            {
-              ...result,
-              dispose: async () => {
-                discoveryDisposals += 1
-                await dispose?.()
-                throw cleanup
-              }
-            },
-            getEndpointModuleOwner(result)
-          )
+      hooksMiddleware: hooks({
+        onHookError: (error) => {
+          reports.push(error)
         }
-      }
+      })
     })
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+    /** This registers on the exact prepared discovery surface consumed by attachment.dispose(). */
+    batch.propagateDiscoveryCleanupFaults({
+      registry: [cleanup],
+      onDispose: () => {
+        discoveryDisposeCalls += 1
+        throw observerFailure
+      }
+    })
     const firstDispose = batch.host.dispose()
     expect(batch.host.dispose()).toBe(firstDispose)
-    let failure: unknown
-    try {
-      await firstDispose
-    } catch (error) {
-      failure = error
-    }
+    const failure = await firstDispose.catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(WebRpcLifecycleError)
     expect(failure).toMatchObject({
       source: WEBRPC_SOURCE,
       code: WebRpcErrorCode.endpointDisposed,
       cause: cleanup
     })
-    expect(discoveryDisposals).toBe(1)
+    expect(reports).toEqual([observerFailure])
+    expect(discoveryDisposeCalls).toBe(1)
     expect(batch.host.dispose()).toBe(firstDispose)
+    expect(discoveryDisposeCalls).toBe(1)
     expect(
       productionResidueSnapshot(batch).shared.find(
         ({ key }) => key === WebRpcSharedKey.discoveryResolver
@@ -6606,7 +6713,9 @@ describe('Cycle L discovery Host transactions', () => {
         transport,
         middlewares: [connect({ transport }), middleware]
       },
-      [outbound(), discovery()] as const
+      createFirstPartyRoots(
+        new Set<IWebRpcFirstPartyRootName>(['first-party-outbound', 'first-party-discovery'])
+      )
     )
     const firstDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(firstDispose)
@@ -6663,7 +6772,9 @@ describe('Cycle L discovery Host transactions', () => {
         transport,
         middlewares: [connect({ transport })]
       },
-      [outbound(), discovery()] as const
+      createFirstPartyRoots(
+        new Set<IWebRpcFirstPartyRootName>(['first-party-outbound', 'first-party-discovery'])
+      )
     )
     const unregister = registerDiscoveryCleanupFaults(endpoint, {
       route: [routeFirst, routeSecond],

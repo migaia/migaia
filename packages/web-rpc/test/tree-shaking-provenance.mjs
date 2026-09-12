@@ -158,7 +158,9 @@ for (const item of chunksWithCode) {
     })
 }
 const semanticModules = normalizeOwnedSemanticModules(semanticRecords, knownOwners)
+/** Rolldown's NUL-prefixed helpers are virtual modules, never readable provenance inputs. */
 const retainedInputs = [...moduleEntries.keys()]
+  .filter((module) => !module.startsWith('\0'))
   .sort()
   .map((module) => hashInput(module, 'retained-module'))
 const lockfilePath = resolve(repositoryRoot, 'pnpm-lock.yaml')

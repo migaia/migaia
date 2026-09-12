@@ -1,7 +1,7 @@
-import { cookies } from '../src/cookies.js'
-import { indexedDb } from '../src/indexed-db.js'
-import { localStorage } from '../src/local-storage.js'
-import { memoryStorage } from '../src/memory.js'
+import { cookiesHost } from '../src/cookies.js'
+import { indexedDbHost } from '../src/indexed-db.js'
+import { localStorageHost } from '../src/local-storage.js'
+import { memoryStorageHost } from '../src/memory.js'
 
 type IWorkerResult = {
   readonly memory: string | null
@@ -20,15 +20,15 @@ const getFailureCode = (factory: () => unknown): string | undefined => {
 }
 
 self.onmessage = async (): Promise<void> => {
-  const memory = memoryStorage()
+  const memory = memoryStorageHost()
   await memory.set('worker-memory', 'ok')
-  const database = indexedDb({ dbName: `worker-${crypto.randomUUID()}` })
+  const database = indexedDbHost({ dbName: `worker-${crypto.randomUUID()}` })
   await database.set('worker-indexeddb', 'ok')
   const result: IWorkerResult = {
     memory: await memory.get('worker-memory'),
     indexedDb: await database.get('worker-indexeddb'),
-    localStorageCode: getFailureCode(() => localStorage()),
-    cookiesCode: getFailureCode(() => cookies({ namespace: 'worker' }))
+    localStorageCode: getFailureCode(() => localStorageHost()),
+    cookiesCode: getFailureCode(() => cookiesHost({ namespace: 'worker' }))
   }
   await memory.dispose()
   await database.dispose()

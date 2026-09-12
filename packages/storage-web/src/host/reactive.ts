@@ -2,7 +2,9 @@ import { createEventChannel } from '@migaia/event-subscriber'
 import {
   createAbortController,
   createSyncLifecycleScope,
-  createLifecycleScope
+  createLifecycleScope,
+  systemScheduler,
+  type ILifecycleScheduler
 } from '@migaia/lifecycle'
 import { Resource } from '@migaia/resource'
 import type { IComputedValue, IRuntime } from '@migaia/reactive/runtime'
@@ -136,7 +138,9 @@ export type IStorageReactiveQueryInput<T> = {
 }
 
 /** Creates the one service instance owned by one StorageHost. */
-export const createStorageReactiveService = (): IStorageReactiveService => {
+export const createStorageReactiveService = (
+  scheduler: ILifecycleScheduler = systemScheduler
+): IStorageReactiveService => {
   const adapters = new Map<string, IStorageReactiveAdapter>()
   const serviceScope = createLifecycleScope({ errorPolicy: 'collect' })
   const serviceRecord = {}
@@ -263,6 +267,7 @@ export const createStorageReactiveService = (): IStorageReactiveService => {
       try {
         result = (input.subscribe ?? ((context) => input.controller.subscribe(context.onChange)))({
           store: input.store,
+          scheduler,
           signal: sourceAbort.signal,
           report: (error) => report(input.report, error),
           onChange: publishChange

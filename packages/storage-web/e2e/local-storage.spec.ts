@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test('localStorage 写满真实配额时抛 QUOTA_EXCEEDED', async ({ page }) => {
+test('localStorageHost 写满真实配额时抛 QUOTA_EXCEEDED', async ({ page }) => {
   await page.goto('/')
   const result = await page.evaluate(() => window.runLocalStorageQuotaScenario())
   expect(result.wroteCount).toBeGreaterThan(0)

@@ -1,12 +1,12 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
-import { indexedDb } from '../../src/backends/indexed-db.js'
+import { indexedDbHost } from '../../src/backends/indexed-db.js'
 import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
 
 /** Opens a database with one deliberately forgeable public metadata record. */
 const createStore = (dbName: string) => {
   const factory = new IDBFactory()
-  return indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+  return indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
 }
 
 /** Counts lifecycle admissions and releases without changing the controller's behavior. */
@@ -54,7 +54,7 @@ const createMalformedSidecarStore = async (
     }
     request.onerror = () => reject(request.error)
   })
-  return indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+  return indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
 }
 
 /** Creates two complete production handles, then appends a mixed legacy batch for ordering checks. */
@@ -97,7 +97,7 @@ const createMixedLegacyStore = async (dbName: string, keys: readonly IDBValidKey
     { scope: 'a', generation: 'ga', fingerprint: '[]' },
     { scope: 'b', generation: 'gb', fingerprint: '[]' }
   ] as const
-  const preflightStore = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+  const preflightStore = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
   const initialReadiness = await Promise.all(
     handles.map((handle) => preflightStore.getRecordIndexReadiness(handle))
   )
@@ -115,7 +115,7 @@ const createMixedLegacyStore = async (dbName: string, keys: readonly IDBValidKey
     request.onerror = () => reject(request.error)
   })
   return {
-    store: indexedDb({ factory, keyRange: IDBKeyRange, dbName }),
+    store: indexedDbHost({ factory, keyRange: IDBKeyRange, dbName }),
     handles,
     initialReadiness
   }
@@ -174,7 +174,7 @@ describe('SWV4-R05 IndexedDB preparation and mutation ownership', () => {
       }
       request.onerror = () => reject(request.error)
     })
-    const store = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
     await expect(store.get('probe')).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     await expect(store.get('probe-again')).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     await store.dispose()
@@ -277,7 +277,7 @@ describe('SWV4-R05 IndexedDB preparation and mutation ownership', () => {
       }
       request.onerror = () => reject(request.error)
     })
-    const store = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
     await expect(store.get('probe')).resolves.toBeNull()
     for (const scope of ['a', 'b'])
       await expect(

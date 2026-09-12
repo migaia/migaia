@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { createClientEndpoint } from '../src/client.js'
 import { createProviderEndpoint } from '../src/provider.js'
 import { createComposedEndpoint } from '../src/core.js'
-import { outbound } from '../src/features/outbound.js'
-import { control } from '../src/features/control.js'
+import {
+  createFirstPartyRoots,
+  type IWebRpcFirstPartyRootName
+} from '../src/internal/first-party-roots.js'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
 import { connect } from '../src/middleware/connect.js'
 import { ping } from '../src/middleware/ping.js'
@@ -57,7 +59,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport }), ping()]
       },
-      [outbound(), control()] as const
+      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
     )
     const client = await createComposedEndpoint(
       {
@@ -66,7 +68,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
         targetIds: ['__proto__'],
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      [outbound(), control()] as const
+      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
     )
     try {
       const { fulfilled, rejected } = await client.pingAll!()
@@ -90,7 +92,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
         targetIds: ['unreachable'],
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      [outbound(), control()] as const
+      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
     )
     await client.dispose()
     await expect(client.pingAll!()).rejects.toBeInstanceOf(WebRpcLifecycleError)

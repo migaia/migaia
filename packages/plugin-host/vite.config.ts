@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 
 /** Runtime dependencies that must stay external to preserve one owner per package boundary. */
 const runtimeExternals = [
+  '@migaia/capability',
   '@migaia/lifecycle',
   '@migaia/middleware-pipeline',
   '@migaia/utils'

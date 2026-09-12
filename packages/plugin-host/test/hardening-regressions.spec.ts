@@ -1,6 +1,14 @@
 /** Hardening regression cases for lifecycle, config, and extension invariants. */
 import { describe, expect, it, vi } from 'vitest'
-import { asyncDisposeKey, disposeKey, PluginHost, PluginHostError } from '../src/index.js'
+import {
+  asyncDisposeKey,
+  defineFeature,
+  definePlugin,
+  disposeKey,
+  PluginHost,
+  PluginHostError
+} from '../src/index.js'
+import { createManualScheduler } from '@migaia/lifecycle'
 
 class Host extends PluginHost<Record<string, never>, string> {
   /** Supplies an explicit unbounded test policy while preserving test overrides. */
@@ -20,6 +28,138 @@ class ConfigDate extends Date {
   label = 'date'
   self = this
 }
+
+describe('native Feature synchronous installation', () => {
+  it('uses the same registration initializer for useSync', () => {
+    const feature = defineFeature(() => ({ value: () => 7 }))
+    const plugin = definePlugin({
+      name: 'sync-feature',
+      features: { feature },
+      featureExpose: {},
+      install: (core) => ({ value: core.features.feature.value() })
+    })
+    const view = new Host().install([plugin])
+    expect(view.extensions.value).toBe(7)
+  })
+
+  it('keeps Feature expose valid through disposer execution and revokes it after cleanup', async () => {
+    let expose: { readonly read: () => number } | undefined
+    const feature = defineFeature<
+      { readonly read: () => number },
+      Record<never, never>,
+      { readonly read: () => number }
+    >((core) => ({ read: core.featureExpose.read }))
+    const plugin = definePlugin({
+      name: 'feature-physical-dispose',
+      features: { feature },
+      featureExpose: { read: () => 1 },
+      install: (core) => {
+        expose = core.featureExpose as { readonly read: () => number }
+        core.onDispose(() => expect(core.features.feature.read()).toBe(1))
+        return {}
+      }
+    })
+    const host = new Host()
+    host.install([plugin])
+    await host.dispose()
+    expect(() => expose!.read()).toThrow()
+  })
+
+  it('keeps Feature expose valid until timed-out physical cleanup settles', async () => {
+    {
+      const scheduler = createManualScheduler()
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let expose: { readonly read: () => number } | undefined
+      let oldCore: any
+      let entered!: () => void
+      const enteredGate = new Promise<void>((resolve) => {
+        entered = resolve
+      })
+      const feature = defineFeature<
+        { readonly read: () => number },
+        Record<never, never>,
+        { readonly read: () => number }
+      >((core) => ({ read: core.featureExpose.read }))
+      const plugin = definePlugin({
+        name: 'feature-timeout-dispose',
+        features: { feature },
+        featureExpose: { read: () => 1 },
+        install: (core) => {
+          oldCore = core
+          expose = core.featureExpose as { readonly read: () => number }
+          core.onDispose(async () => {
+            expect(expose!.read()).toBe(1)
+            expect(() => oldCore.getShared('missing')).toThrow()
+            entered()
+            await gate
+          })
+          return {}
+        }
+      })
+      const host = new Host({ scheduler, disposeStepTimeoutMs: 10 } as any)
+      host.install([plugin])
+      const dispose = host.dispose().catch((error: unknown) => error as any)
+      await enteredGate
+      for (let index = 0; index < 10; index += 1) await Promise.resolve()
+      scheduler.advance(10)
+      const outcome: any = await dispose
+      expect(outcome.cleanupComplete).toBe(false)
+      expect(expose!.read()).toBe(1)
+      release()
+      await outcome.physicalCompletion
+      expect(() => expose!.read()).toThrow()
+    }
+  })
+
+  it('does not let another registration pending cleanup extend a settled Feature expose', async () => {
+    let firstExpose!: { readonly read: () => number }
+    let release!: () => void
+    let entered!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const enteredGate = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const scheduler = createManualScheduler()
+    const feature = defineFeature<
+      { readonly read: () => number },
+      Record<never, never>,
+      { readonly read: () => number }
+    >((core) => ({ read: core.featureExpose.read }))
+    const first = definePlugin({
+      name: 'first-isolated-feature',
+      features: { feature },
+      featureExpose: { read: () => 1 },
+      install: (core) => {
+        firstExpose = core.featureExpose as { readonly read: () => number }
+        return {}
+      }
+    })
+    const second = {
+      name: 'second-pending-dispose',
+      install: (core: any) => {
+        core.onDispose(async () => {
+          entered()
+          await gate
+        })
+        return {}
+      }
+    }
+    const host = new Host({ scheduler, disposeStepTimeoutMs: 10 } as any)
+    host.install([first, second])
+    const dispose = host.dispose().catch((error: unknown) => error as any)
+    await enteredGate
+    scheduler.advance(10)
+    await dispose
+    expect(() => firstExpose.read()).toThrow()
+    release()
+    await dispose
+  })
+})
 
 class ConfigRegExp extends RegExp {
   label = 'regexp'
@@ -1168,6 +1308,46 @@ describe('#5 扩展属性被外部覆写后，unUse 静默放弃卸载', () => {
 })
 
 describe('#6（重新裁定，见 SDD §5.6/M-T15）useSync 回滚改为两阶段：close 同步 + dispose 异步', () => {
+  it('keeps Feature expose through late useSync rollback cleanup only', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let expose!: { readonly read: () => number }
+    const feature = defineFeature<
+      { readonly read: () => number },
+      Record<never, never>,
+      { readonly read: () => number }
+    >((core) => ({ read: core.featureExpose.read }))
+    const first = definePlugin({
+      name: 'sync-feature-late-rollback',
+      features: { feature },
+      featureExpose: { read: () => 1 },
+      install: (core) => {
+        expose = core.featureExpose as { readonly read: () => number }
+        core.onDispose(async () => {
+          expect(expose.read()).toBe(1)
+          await gate
+        })
+        return {}
+      }
+    })
+    expect(() =>
+      new Host().install([
+        first,
+        {
+          name: 'fail',
+          install: () => {
+            throw new Error('install-boom')
+          }
+        }
+      ])
+    ).toThrow('install-boom')
+    expect(expose.read()).toBe(1)
+    release()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(() => expose.read()).toThrow()
+  })
   // §5.6：useSync 的同步性只覆盖 close（撤销 extensions/registrations/shared 等 host 可见状态），
   // 不再覆盖实际跑 disposer——那部分和普通异步 dispose 走同一条路径，fire-and-forget，失败通过
   // diagnostic 通道上报，不再折进 useSync 同步抛出的错误链。原始构造错误（install-boom）保持为

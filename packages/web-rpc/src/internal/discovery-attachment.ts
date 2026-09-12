@@ -1454,6 +1454,12 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       return
     }
     this.#disposed = true
+    /** Test observation shares the real disposal edge and must never alter cleanup outcomes. */
+    try {
+      faults?.onDispose?.()
+    } catch (error) {
+      this.#report(error)
+    }
     const cleanupErrors: unknown[] = []
     for (const [index, release] of this.#releaseRoutes.toReversed().entries()) {
       try {

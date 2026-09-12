@@ -136,6 +136,83 @@ await app.dispose()`
 export const completionApiGuides: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>
 > = {
+  'plugin-host:index:defineFeature': guide({
+    purposeEn:
+      'Defines one synchronous, opaque Feature capability. It does not create a Host, install a Plugin, start resources, or publish methods. A Plugin declares the Feature in its static record; during installation the factory receives only featureExpose and direct dependency outputs. Put asynchronous work and cleanup in the Plugin install hook.',
+    purposeZh:
+      '定义一项同步且不透明的 Feature 能力；它不会创建 Host、安装 Plugin、启动资源或发布方法。Plugin 在静态 record 中声明 Feature；安装时 factory 只能收到 featureExpose 与直接依赖的输出。异步工作和清理必须放在 Plugin 的 install hook 中。',
+    quickStart: `import { defineFeature } from '@migaia/plugin-host'
+import type { IFeatureCore } from '@migaia/plugin-host'
+import { definePlugin, setupHost } from '@migaia/plugin-host/defined'
+
+const metrics = defineFeature((core: IFeatureCore<{ readCount(): number }>) => ({
+  read: () => core.featureExpose.readCount()
+}))
+
+const counter = definePlugin('counter', (core) => ({
+  featureExpose: () => ({ readCount: () => 1 }),
+  install() {
+    return { readMetric: () => core.features.metrics.read() }
+  }
+}), { metrics })
+
+const host = await setupHost({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+  setupTimeoutMs: false,
+  core: () => ({}),
+  plugins: [counter] as const
+})
+host.extensions.readMetric()
+await host.dispose()`,
+    scenariosEn: [
+      'Define a reusable synchronous capability with explicitly declared direct dependencies.',
+      'Keep Feature output private until its owning Plugin explicitly projects it.'
+    ],
+    scenariosZh: ['定义带明确直接依赖的可复用同步能力。', '由所属 Plugin 显式投影 Feature 输出。'],
+    avoidEn: [
+      'You need to allocate resources or run asynchronous setup; use Plugin install instead.',
+      'You need undeclared or transitive dependency output; declare the direct dependency first.'
+    ],
+    avoidZh: [
+      '需要分配资源或异步初始化时；应使用 Plugin install。',
+      '需要未声明或传递依赖输出时；先声明直接依赖。'
+    ]
+  }),
+  'plugin-host:composition:inspectFeatures': guide({
+    purposeEn:
+      'Inspects trusted static Feature roots without invoking factories or creating registration state. Use ordered for dependency order and roots for the declared aliases before Plugin installation.',
+    purposeZh:
+      '检查可信的静态 Feature roots，不调用 factory，也不创建 registration 状态。Plugin 安装前可用 ordered 取得依赖顺序，用 roots 读取声明的别名。',
+    quickStart: `import { defineFeature } from '@migaia/plugin-host'
+import { inspectFeatures } from '@migaia/plugin-host/composition'
+
+let factoryCalls = 0
+const metrics = defineFeature(() => {
+  factoryCalls += 1
+  return { read: () => 1 }
+})
+
+const inspection = inspectFeatures({ metrics })
+console.log(inspection.roots.metrics === metrics)
+console.log(inspection.ordered[0] === metrics)
+console.log(factoryCalls) // 0: inspection never invokes factories`,
+    scenariosEn: [
+      'Check a trusted static Feature dependency order before installation.',
+      'Read declared root aliases without allocating Feature output.'
+    ],
+    scenariosZh: [
+      '安装前检查可信静态 Feature 的依赖顺序。',
+      '不分配 Feature 输出即可读取声明 root 别名。'
+    ],
+    avoidEn: [
+      'You need Feature output; install its owning Plugin first.',
+      'You need to validate untrusted objects; admission rejects forged Features.'
+    ],
+    avoidZh: [
+      '需要 Feature 输出时；先安装所属 Plugin。',
+      '需要校验不可信对象时；准入会拒绝伪造 Feature。'
+    ]
+  }),
   'plugin-host:defined:definePlugin': guide({
     purposeEn:
       'Defines and validates a reusable plugin descriptor; it does not install the plugin. Installation through setupHost() or host.use() gives the plugin a core, publishes shared capabilities for later plugins, and merges the object returned by install() into the Host extensions view. The full descriptor also owns configuration updates and cleanup, so one definition describes the complete install-to-dispose lifecycle.',
@@ -201,9 +278,9 @@ await app.dispose()`,
     examplesEn: [
       {
         id: 'short-form',
-        title: 'Short form: definePlugin(name, install)',
+        title: 'Short form: definePlugin(name, descriptorFactory)',
         description:
-          'Use this overload when a stable name and one installer are enough. The returned object becomes the typed Host extension after installation; use core.onDispose() for resources created inside install. Choose the descriptor form when the plugin also needs config, shared, update, metadata, or a top-level disposer.',
+          'Use this form when a stable name and per-install descriptor are enough. Its install hook returns the typed Host extension; use core.onDispose() for resources created inside install. Use the retained object form for config, shared, update, metadata, or a top-level disposer.',
         code: `import { definePlugin, setupHost } from '@migaia/plugin-host/defined'
 
 type IAppCore = { audit(message: string): void }
@@ -240,9 +317,9 @@ await app.dispose()`
     examplesZh: [
       {
         id: 'short-form',
-        title: '短写法：definePlugin(name, install)',
+        title: '短写法：definePlugin(name, descriptorFactory)',
         description:
-          '只有稳定名称与一个 installer 就足够时使用这个重载。安装成功后，installer 返回的对象会成为有类型的 Host extension；install 内创建的资源可用 core.onDispose() 登记。需要 config、shared、update、metadata 或顶层 disposer 时改用完整 descriptor 写法。',
+          '只有稳定名称与逐安装 descriptor 时使用这个形式。其 install hook 返回的对象成为有类型的 Host extension；install 内创建的资源可用 core.onDispose() 登记。需要 config、shared、update、metadata 或顶层 disposer 时使用保留对象形。',
         code: `import { definePlugin, setupHost } from '@migaia/plugin-host/defined'
 
 type IAppCore = { audit(message: string): void }
@@ -300,9 +377,9 @@ await app.dispose()`
     ],
     optionsEn: [
       {
-        name: 'definePlugin(name, install)',
+        name: 'definePlugin(name, descriptorFactory)',
         description:
-          'Short form for a stable name and an installer that only returns Host extensions.',
+          'Short form for a stable name and a descriptor factory whose install hook returns Host extensions.',
         whenToUse:
           'Use when the plugin has no config, shared capability, update hook, metadata, or explicit disposer.',
         type: 'IDefinedPluginConstraint',
@@ -351,8 +428,8 @@ await app.dispose()`
     ],
     optionsZh: [
       {
-        name: 'definePlugin(name, install)',
-        description: '短写法：只声明稳定名称与返回宿主 extension 的安装函数。',
+        name: 'definePlugin(name, descriptorFactory)',
+        description: '短写法：声明稳定名称与返回逐安装 descriptor 的工厂。',
         whenToUse: '插件没有 config、shared、update、额外元数据或显式 disposer 时使用。',
         type: 'IDefinedPluginConstraint',
         optional: false
@@ -400,7 +477,7 @@ await app.dispose()`
     purposeZh:
       '先创建领域 core，再把首批插件作为一个事务安装，最后返回可直接使用的不可变视图。取消或失败时，会先清理 core 与插件已经创建的资源再 reject。',
     quickStart:
-      "import { definePlugin, setupHost } from '@migaia/plugin-host/defined'\n\nconst greeting = definePlugin('greeting', (core: { prefix: string }) => ({\n  greet: (name: string) => `${core.prefix}, ${name}`\n}))\n\nconst app = await setupHost({\n  host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },\n  setupTimeoutMs: 10_000,\n  core: () => ({ prefix: 'Hello' }),\n  plugins: [greeting]\n})\n\nconsole.log(app.extensions.greet('Ada'))\nawait app.dispose()",
+      "import { definePlugin, setupHost } from '@migaia/plugin-host/defined'\n\nconst greeting = definePlugin('greeting', (core: { prefix: string }) => ({\n  install: () => ({\n    greet: (name: string) => `${core.prefix}, ${name}`\n  })\n}))\n\nconst app = await setupHost({\n  host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },\n  setupTimeoutMs: 10_000,\n  core: () => ({ prefix: 'Hello' }),\n  plugins: [greeting]\n})\n\nconsole.log(app.extensions.greet('Ada'))\nawait app.dispose()",
     scenariosEn: [
       'Application startup needs a core and plugins to become visible only after all setup succeeds.',
       'Core resources and plugin resources require one disposal authority.'

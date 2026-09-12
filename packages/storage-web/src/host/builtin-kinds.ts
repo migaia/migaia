@@ -1,25 +1,25 @@
-import { defineStorageBackendKind } from './contracts.js'
-import type { cookies } from '../backends/cookie.js'
-import type { localStorage } from '../backends/local-storage.js'
-import type { memoryStorage } from '../backends/memory.js'
-import type { sessionStorage } from '../backends/session-storage.js'
-import type { indexedDb } from '../backends/indexed-db.js'
+import { defineBuiltInBackendKind } from './contracts.js'
+import type { cookiesHost } from '../backends/cookie.js'
+import type { localStorageHost } from '../backends/local-storage.js'
+import type { memoryStorageHost } from '../backends/memory.js'
+import type { sessionStorageHost } from '../backends/session-storage.js'
+import type { indexedDbHost } from '../backends/indexed-db.js'
 
 /** Built-in plugin IDs stay caller-selectable while their kind tokens remain package-private. */
 export type IBuiltInPluginId<TId extends string> = { readonly id?: TId }
 
 /** Canonical store types retained by built-in kind tokens and plugin declarations. */
-export type IMemoryBackendStore = ReturnType<typeof memoryStorage>
-export type ILocalStorageBackendStore = ReturnType<typeof localStorage>
-export type ISessionStorageBackendStore = ReturnType<typeof sessionStorage>
-export type ICookieBackendStore = ReturnType<typeof cookies>
-export type IIndexedDbBackendStore = ReturnType<typeof indexedDb>
+export type IMemoryBackendStore = ReturnType<typeof memoryStorageHost>
+export type ILocalStorageBackendStore = ReturnType<typeof localStorageHost>
+export type ISessionStorageBackendStore = ReturnType<typeof sessionStorageHost>
+export type ICookieBackendStore = ReturnType<typeof cookiesHost>
+export type IIndexedDbBackendStore = ReturnType<typeof indexedDbHost>
 
 /** Sole owner of the four R03 built-in kind identities; this module imports no backend code. */
-export const memoryBackendKind = defineStorageBackendKind<IMemoryBackendStore>()('memory')
+export const memoryBackendKind = defineBuiltInBackendKind<IMemoryBackendStore>()('memory')
 export const localStorageBackendKind =
-  defineStorageBackendKind<ILocalStorageBackendStore>()('local-storage')
+  defineBuiltInBackendKind<ILocalStorageBackendStore>()('local-storage')
 export const sessionStorageBackendKind =
-  defineStorageBackendKind<ISessionStorageBackendStore>()('session-storage')
-export const cookieBackendKind = defineStorageBackendKind<ICookieBackendStore>()('cookies')
-export const indexedDbBackendKind = defineStorageBackendKind<IIndexedDbBackendStore>()('indexed-db')
+  defineBuiltInBackendKind<ISessionStorageBackendStore>()('session-storage')
+export const cookieBackendKind = defineBuiltInBackendKind<ICookieBackendStore>()('cookies')
+export const indexedDbBackendKind = defineBuiltInBackendKind<IIndexedDbBackendStore>()('indexed-db')

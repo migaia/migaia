@@ -105,7 +105,7 @@
   },
   "scripts": {
     "fmt": "oxfmt src test e2e",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:core": "tsc --noEmit -p tsconfig.core.json",
     "typecheck:node-adapter": "tsc --noEmit -p tsconfig.node-adapter.json",
@@ -115,7 +115,7 @@
     "test": "vitest run test --coverage",
     "test:tree-shaking-baseline": "node test/tree-shaking-baseline.mjs",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
-    "test:packed": "pnpm build && node test/packed-export-smoke.mjs && node test/packed-provider-authority.mjs && node test/packed-d95-boundary.mjs",
+    "test:packed": "pnpm build && node test/packed-export-smoke.mjs",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"

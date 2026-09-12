@@ -5,7 +5,7 @@ import { memoryReactive } from '../../src/plugins/reactive/memory.js'
 import { createStorageHost } from '../../src/host/index.js'
 import { createStorageReactiveService } from '../../src/host/reactive.js'
 import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
-import { memoryStorage } from '../../src/backends/memory.js'
+import { memoryStorageHost } from '../../src/backends/memory.js'
 
 /** R12 proves the public Host capability projection and runtime guard remain exact. */
 describe('SWV4-B05 R12 Host capability and computed state', () => {
@@ -48,7 +48,7 @@ describe('SWV4-B05 R12 Host capability and computed state', () => {
   })
 
   it('rejects forged consistency visibility before adapter publication', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)
     const service = createStorageReactiveService()
     expect(controller).toBeDefined()

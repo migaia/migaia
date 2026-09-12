@@ -27,10 +27,14 @@ globalThis.connectServiceWorker = async (uniqueId: string) => {
     )
   }
   const controller = navigator.serviceWorker.controller!
-  const ready = new Promise<string>((resolve) => {
+  const ready = new Promise<string>((resolve, reject) => {
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data?.e2e === 'ready') resolve(event.data.clientId)
-      if (event.data?.e2e === 'error') serverErrors.push(String(event.data.message))
+      if (event.data?.e2e === 'error') {
+        const message = String(event.data.message)
+        serverErrors.push(message)
+        reject(new Error(message))
+      }
     })
   })
   controller.postMessage({ e2e: 'connect' })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createWebStorageBackend } from '../../src/backends/web-storage'
-import { localStorage } from '../../src/backends/local-storage'
-import { sessionStorage } from '../../src/backends/session-storage'
+import { localStorageHost } from '../../src/backends/local-storage'
+import { sessionStorageHost } from '../../src/backends/session-storage'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage'
 
 const unavailableStorage: Storage = {
@@ -26,7 +26,7 @@ describe('createWebStorageBackend', () => {
   })
 
   it('local/session wrapper 在解构前拒绝非法 options', () => {
-    for (const factory of [localStorage, sessionStorage])
+    for (const factory of [localStorageHost, sessionStorageHost])
       for (const options of [null, [], 'options', 1])
         expect(() => factory(options as never)).toThrowError(
           expect.objectContaining({ code: 'INVALID_CONFIG' })
@@ -34,7 +34,7 @@ describe('createWebStorageBackend', () => {
   })
 
   it('local/session wrapper 归一化 storage getter 异常', () => {
-    for (const factory of [localStorage, sessionStorage])
+    for (const factory of [localStorageHost, sessionStorageHost])
       expect(() =>
         factory({
           get storage(): ReturnType<typeof fakeWebStorage> {
@@ -45,7 +45,7 @@ describe('createWebStorageBackend', () => {
   })
 
   it('local/session wrapper 对三个构造字段各读取一次', () => {
-    for (const factory of [localStorage, sessionStorage]) {
+    for (const factory of [localStorageHost, sessionStorageHost]) {
       let reads = 0
       const store = factory({
         get namespace() {
@@ -68,7 +68,7 @@ describe('createWebStorageBackend', () => {
 
   it('namespace getter 异常统一返回 INVALID_CONFIG', () => {
     expect(() =>
-      localStorage({
+      localStorageHost({
         get namespace(): string {
           throw new Error('hostile namespace')
         }

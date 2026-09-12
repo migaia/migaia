@@ -6526,7 +6526,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst persistence = persist(settings, {\n  key: 'settings',\n  storage: indexedDb({ dbName: 'app' }),\n  version: 1,\n  debounceMs: 250\n})\n\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\npersistence.dispose()\nawait settings.$dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst persistence = persist(settings, {\n  key: 'settings',\n  storage: indexedDbHost({ dbName: 'app' }),\n  version: 1,\n  debounceMs: 250\n})\n\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'list',
@@ -6558,7 +6558,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst persistence = persist(settings, {\n  key: 'settings',\n  storage: indexedDb({ dbName: 'app' }),\n  version: 1,\n  debounceMs: 250\n})\n\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\npersistence.dispose()\nawait settings.$dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst persistence = persist(settings, {\n  key: 'settings',\n  storage: indexedDbHost({ dbName: 'app' }),\n  version: 1,\n  debounceMs: 250\n})\n\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'list',
@@ -15224,7 +15224,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { memoryStorage } from '@migaia/storage-web/memory'\n\nconst cache = memoryStorage<{ id: string; value: number }>()\n\nconst unsubscribe = cache.subscribeChanges((change) => {\n  console.log(change.operation, change.keys)\n})\n\nawait cache.set('theme', 'dark')\nawait cache.putRecord({ id: 'score', value: 42 }, 'score')\nconst score = await cache.getRecord('score')\n\nunsubscribe()\nawait cache.dispose()"
+                code: "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cache = memoryStorageHost<{ id: string; value: number }>()\n\nconst unsubscribe = cache.subscribeChanges((change) => {\n  console.log(change.operation, change.keys)\n})\n\nawait cache.set('theme', 'dark')\nawait cache.putRecord({ id: 'score', value: 42 }, 'score')\nconst score = await cache.getRecord('score')\n\nunsubscribe()\nawait cache.dispose()"
               },
               {
                 type: 'list',
@@ -15248,7 +15248,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { localStorage } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorage({ namespace: 'settings' })\n\nawait settings.set('theme', 'dark')\nconst theme = await settings.get('theme')\nawait settings.remove('theme')\n\nawait settings.dispose()"
+                code: "import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorageHost({ namespace: 'settings' })\n\nawait settings.set('theme', 'dark')\nconst theme = await settings.get('theme')\nawait settings.remove('theme')\n\nawait settings.dispose()"
               },
               {
                 type: 'list',
@@ -15267,12 +15267,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'localStorage() 的精确返回类型固定包含 sync，因此这里直接调用，不需要检查 capabilities.syncRead。同步入口会立即阻塞当前线程；只有调用方明确接受 Web Storage 的同步成本、且不需要切换到 IndexedDB 时才使用。'
+                text: 'localStorageHost() 的精确返回类型固定包含 sync，因此这里直接调用，不需要检查 capabilities.syncRead。同步入口会立即阻塞当前线程；只有调用方明确接受 Web Storage 的同步成本、且不需要切换到 IndexedDB 时才使用。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { localStorage } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorage({ namespace: 'settings' })\n\nsettings.sync.set('density', 'compact')\nconst density = settings.sync.get('density')\nsettings.sync.remove('density')\n\nawait settings.dispose()"
+                code: "import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorageHost({ namespace: 'settings' })\n\nsettings.sync.set('density', 'compact')\nconst density = settings.sync.get('density')\nsettings.sync.remove('density')\n\nawait settings.dispose()"
               },
               {
                 type: 'list',
@@ -15291,7 +15291,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst checkout = sessionStorage({ namespace: 'checkout-flow' })\n\nawait checkout.set('step', 'payment')\nconst step = await checkout.get('step')\nawait checkout.remove('step')\n\nawait checkout.dispose()"
+                code: "import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst checkout = sessionStorageHost({ namespace: 'checkout-flow' })\n\nawait checkout.set('step', 'payment')\nconst step = await checkout.get('step')\nawait checkout.remove('step')\n\nawait checkout.dispose()"
               },
               {
                 type: 'list',
@@ -15310,11 +15310,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst checkout = sessionStorage({ namespace: 'checkout-flow' })\n\ncheckout.sync.set('step', 'payment')\nconst currentStep = checkout.sync.get('step')\ncheckout.sync.remove('step')\n\nawait checkout.dispose()"
+                code: "import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst checkout = sessionStorageHost({ namespace: 'checkout-flow' })\n\ncheckout.sync.set('step', 'payment')\nconst currentStep = checkout.sync.get('step')\ncheckout.sync.remove('step')\n\nawait checkout.dispose()"
               },
               {
                 type: 'paragraph',
-                text: '精确的 sessionStorage() 返回类型保证 sync 存在，因此不做动态 capability 分支。它与 Local Storage 的同步限制相同，但数据生命周期缩短为当前标签页。'
+                text: '精确的 sessionStorageHost() 返回类型保证 sync 存在，因此不做动态 capability 分支。它与 Local Storage 的同步限制相同，但数据生命周期缩短为当前标签页。'
               }
             ]
           },
@@ -15325,7 +15325,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { cookies } from '@migaia/storage-web/cookies'\n\nconst preferences = cookies({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\nawait preferences.set('locale', 'zh-CN', { maxAge: 60 * 60 * 24 * 30 })\nconst locale = await preferences.get('locale')\n\nif (preferences.capabilities.opaqueEntries) {\n  console.log('HttpOnly 或其他 scope 的同名 Cookie 可能对 JavaScript 不可见')\n}\n\nawait preferences.remove('locale')\nawait preferences.dispose()"
+                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst preferences = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\nawait preferences.set('locale', 'zh-CN', { maxAge: 60 * 60 * 24 * 30 })\nconst locale = await preferences.get('locale')\n\nif (preferences.capabilities.opaqueEntries) {\n  console.log('HttpOnly 或其他 scope 的同名 Cookie 可能对 JavaScript 不可见')\n}\n\nawait preferences.remove('locale')\nawait preferences.dispose()"
               },
               {
                 type: 'list',
@@ -15344,11 +15344,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { cookies } from '@migaia/storage-web/cookies'\n\nconst preferences = cookies({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\npreferences.sync.set('locale', 'zh-CN', { maxAge: 60 * 60 })\nconst locale = preferences.sync.get('locale')\npreferences.sync.remove('locale')\n\nawait preferences.dispose()"
+                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst preferences = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\npreferences.sync.set('locale', 'zh-CN', { maxAge: 60 * 60 })\nconst locale = preferences.sync.get('locale')\npreferences.sync.remove('locale')\n\nawait preferences.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'cookies() 的精确类型保证 sync 存在，但 opaqueEntries 仍为 true：同步读取不到 HttpOnly 或其他 scope 的同名 Cookie，不代表它们不存在。'
+                text: 'cookiesHost() 的精确类型保证 sync 存在，但 opaqueEntries 仍为 true：同步读取不到 HttpOnly 或其他 scope 的同名 Cookie，不代表它们不存在。'
               }
             ]
           },
@@ -15363,7 +15363,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst records = indexedDb<{ id: string; name: string }>({\n  dbName: 'app-data',\n  recordsStoreName: 'users'\n})\n\nawait records.putRecord({ id: 'u-1', name: 'Ada' }, 'u-1')\nconst user = await records.getRecord('u-1')\nawait records.dispose()"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst records = indexedDbHost<{ id: string; name: string }>({\n  dbName: 'app-data',\n  recordsStoreName: 'users'\n})\n\nawait records.putRecord({ id: 'u-1', name: 'Ada' }, 'u-1')\nconst user = await records.getRecord('u-1')\nawait records.dispose()"
               },
               {
                 type: 'paragraph',
@@ -15539,7 +15539,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { memoryStorage } from '@migaia/storage-web/memory'\n\nconst cache = memoryStorage<{ id: string; value: number }>()\n\nconst unsubscribe = cache.subscribeChanges((change) => {\n  console.log(change.operation, change.keys)\n})\n\nawait cache.set('theme', 'dark')\nawait cache.putRecord({ id: 'score', value: 42 }, 'score')\nconst score = await cache.getRecord('score')\n\nunsubscribe()\nawait cache.dispose()"
+                code: "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cache = memoryStorageHost<{ id: string; value: number }>()\n\nconst unsubscribe = cache.subscribeChanges((change) => {\n  console.log(change.operation, change.keys)\n})\n\nawait cache.set('theme', 'dark')\nawait cache.putRecord({ id: 'score', value: 42 }, 'score')\nconst score = await cache.getRecord('score')\n\nunsubscribe()\nawait cache.dispose()"
               },
               {
                 type: 'list',
@@ -15563,7 +15563,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { localStorage } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorage({ namespace: 'settings' })\n\nawait settings.set('theme', 'dark')\nconst theme = await settings.get('theme')\nawait settings.remove('theme')\n\nawait settings.dispose()"
+                code: "import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorageHost({ namespace: 'settings' })\n\nawait settings.set('theme', 'dark')\nconst theme = await settings.get('theme')\nawait settings.remove('theme')\n\nawait settings.dispose()"
               },
               {
                 type: 'list',
@@ -15582,12 +15582,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The precise localStorage() return type always includes sync, so call it directly without checking capabilities.syncRead. This entry blocks the current thread immediately; use it only when the caller accepts Web Storage costs and will not switch to IndexedDB.'
+                text: 'The precise localStorageHost() return type always includes sync, so call it directly without checking capabilities.syncRead. This entry blocks the current thread immediately; use it only when the caller accepts Web Storage costs and will not switch to IndexedDB.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { localStorage } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorage({ namespace: 'settings' })\n\nsettings.sync.set('density', 'compact')\nconst density = settings.sync.get('density')\nsettings.sync.remove('density')\n\nawait settings.dispose()"
+                code: "import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorageHost({ namespace: 'settings' })\n\nsettings.sync.set('density', 'compact')\nconst density = settings.sync.get('density')\nsettings.sync.remove('density')\n\nawait settings.dispose()"
               },
               {
                 type: 'list',
@@ -15606,7 +15606,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst checkout = sessionStorage({ namespace: 'checkout-flow' })\n\nawait checkout.set('step', 'payment')\nconst step = await checkout.get('step')\nawait checkout.remove('step')\n\nawait checkout.dispose()"
+                code: "import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst checkout = sessionStorageHost({ namespace: 'checkout-flow' })\n\nawait checkout.set('step', 'payment')\nconst step = await checkout.get('step')\nawait checkout.remove('step')\n\nawait checkout.dispose()"
               },
               {
                 type: 'list',
@@ -15625,11 +15625,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst checkout = sessionStorage({ namespace: 'checkout-flow' })\n\ncheckout.sync.set('step', 'payment')\nconst currentStep = checkout.sync.get('step')\ncheckout.sync.remove('step')\n\nawait checkout.dispose()"
+                code: "import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst checkout = sessionStorageHost({ namespace: 'checkout-flow' })\n\ncheckout.sync.set('step', 'payment')\nconst currentStep = checkout.sync.get('step')\ncheckout.sync.remove('step')\n\nawait checkout.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'The precise sessionStorage() return type guarantees sync, so no dynamic capability branch is needed. Its blocking behavior matches Local Storage while its data lifetime ends with the current tab.'
+                text: 'The precise sessionStorageHost() return type guarantees sync, so no dynamic capability branch is needed. Its blocking behavior matches Local Storage while its data lifetime ends with the current tab.'
               }
             ]
           },
@@ -15640,7 +15640,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { cookies } from '@migaia/storage-web/cookies'\n\nconst preferences = cookies({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\nawait preferences.set('locale', 'en-US', { maxAge: 60 * 60 * 24 * 30 })\nconst locale = await preferences.get('locale')\n\nif (preferences.capabilities.opaqueEntries) {\n  console.log('An HttpOnly or differently scoped cookie may be invisible to JavaScript')\n}\n\nawait preferences.remove('locale')\nawait preferences.dispose()"
+                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst preferences = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\nawait preferences.set('locale', 'en-US', { maxAge: 60 * 60 * 24 * 30 })\nconst locale = await preferences.get('locale')\n\nif (preferences.capabilities.opaqueEntries) {\n  console.log('An HttpOnly or differently scoped cookie may be invisible to JavaScript')\n}\n\nawait preferences.remove('locale')\nawait preferences.dispose()"
               },
               {
                 type: 'list',
@@ -15659,11 +15659,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { cookies } from '@migaia/storage-web/cookies'\n\nconst preferences = cookies({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\npreferences.sync.set('locale', 'en-US', { maxAge: 60 * 60 })\nconst locale = preferences.sync.get('locale')\npreferences.sync.remove('locale')\n\nawait preferences.dispose()"
+                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst preferences = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\npreferences.sync.set('locale', 'en-US', { maxAge: 60 * 60 })\nconst locale = preferences.sync.get('locale')\npreferences.sync.remove('locale')\n\nawait preferences.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'The precise cookies() type guarantees sync, but opaqueEntries remains true: a missing synchronous read does not prove that no HttpOnly or differently scoped cookie exists.'
+                text: 'The precise cookiesHost() type guarantees sync, but opaqueEntries remains true: a missing synchronous read does not prove that no HttpOnly or differently scoped cookie exists.'
               }
             ]
           },
@@ -15678,7 +15678,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst records = indexedDb<{ id: string; name: string }>({\n  dbName: 'app-data',\n  recordsStoreName: 'users'\n})\n\nawait records.putRecord({ id: 'u-1', name: 'Ada' }, 'u-1')\nconst user = await records.getRecord('u-1')\nawait records.dispose()"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst records = indexedDbHost<{ id: string; name: string }>({\n  dbName: 'app-data',\n  recordsStoreName: 'users'\n})\n\nawait records.putRecord({ id: 'u-1', name: 'Ada' }, 'u-1')\nconst user = await records.getRecord('u-1')\nawait records.dispose()"
               },
               {
                 type: 'paragraph',
@@ -15790,7 +15790,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'IndexedDB 只有异步契约。indexedDb() 立即返回受生命周期管理的 store，但实际打开连接、升级和每次请求都通过 Promise 完成；所有调用都必须 await，并在页面或宿主结束时 dispose。'
+                text: 'IndexedDB 只有异步契约。indexedDbHost() 立即返回受生命周期管理的 store，但实际打开连接、升级和每次请求都通过 Promise 完成；所有调用都必须 await，并在页面或宿主结束时 dispose。'
               }
             ]
           },
@@ -15801,7 +15801,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\ntype ICounterRecord = { readonly id: string; readonly count: number }\n\nconst db = indexedDb<ICounterRecord>({\n  dbName: 'app-data',\n  recordsStoreName: 'counters'\n})\n\ntry {\n  const key = await db.putRecord({ id: 'orders', count: 1 }, 'orders')\n  const created = await db.getRecord(key)\n\n  if (created !== undefined) {\n    await db.putRecord({ ...created, count: created.count + 1 }, key, {\n      conflictPolicy: 'replace'\n    })\n  }\n\n  for await (const [recordKey, value] of db.iterateRecords()) {\n    console.log(recordKey, value.count)\n  }\n\n  await db.deleteRecord(key)\n} finally {\n  await db.dispose()\n}"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\ntype ICounterRecord = { readonly id: string; readonly count: number }\n\nconst db = indexedDbHost<ICounterRecord>({\n  dbName: 'app-data',\n  recordsStoreName: 'counters'\n})\n\ntry {\n  const key = await db.putRecord({ id: 'orders', count: 1 }, 'orders')\n  const created = await db.getRecord(key)\n\n  if (created !== undefined) {\n    await db.putRecord({ ...created, count: created.count + 1 }, key, {\n      conflictPolicy: 'replace'\n    })\n  }\n\n  for await (const [recordKey, value] of db.iterateRecords()) {\n    console.log(recordKey, value.count)\n  }\n\n  await db.deleteRecord(key)\n} finally {\n  await db.dispose()\n}"
               },
               {
                 type: 'list',
@@ -15844,7 +15844,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' })\n\nawait db.set('theme', 'dark')\nawait db.setBytes('avatar', new Uint8Array([137, 80, 78, 71]))\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\n\nconst theme = await db.get('theme')\nconst avatar = await db.getBytes('avatar')\nconst user = await db.getRecord('ada')\n\nawait db.dispose()"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<{ id: string; name: string }>({ dbName: 'app-data' })\n\nawait db.set('theme', 'dark')\nawait db.setBytes('avatar', new Uint8Array([137, 80, 78, 71]))\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\n\nconst theme = await db.get('theme')\nconst avatar = await db.getBytes('avatar')\nconst user = await db.getRecord('ada')\n\nawait db.dispose()"
               },
               {
                 type: 'paragraph',
@@ -15972,7 +15972,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'IndexedDB has an asynchronous contract only. indexedDb() returns the lifecycle-owned store immediately, but connection opening, upgrades, and requests settle through Promises. Await every operation and dispose the store when its page or host ends.'
+                text: 'IndexedDB has an asynchronous contract only. indexedDbHost() returns the lifecycle-owned store immediately, but connection opening, upgrades, and requests settle through Promises. Await every operation and dispose the store when its page or host ends.'
               }
             ]
           },
@@ -15983,7 +15983,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\ntype ICounterRecord = { readonly id: string; readonly count: number }\n\nconst db = indexedDb<ICounterRecord>({\n  dbName: 'app-data',\n  recordsStoreName: 'counters'\n})\n\ntry {\n  const key = await db.putRecord({ id: 'orders', count: 1 }, 'orders')\n  const created = await db.getRecord(key)\n\n  if (created !== undefined) {\n    await db.putRecord({ ...created, count: created.count + 1 }, key, {\n      conflictPolicy: 'replace'\n    })\n  }\n\n  for await (const [recordKey, value] of db.iterateRecords()) {\n    console.log(recordKey, value.count)\n  }\n\n  await db.deleteRecord(key)\n} finally {\n  await db.dispose()\n}"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\ntype ICounterRecord = { readonly id: string; readonly count: number }\n\nconst db = indexedDbHost<ICounterRecord>({\n  dbName: 'app-data',\n  recordsStoreName: 'counters'\n})\n\ntry {\n  const key = await db.putRecord({ id: 'orders', count: 1 }, 'orders')\n  const created = await db.getRecord(key)\n\n  if (created !== undefined) {\n    await db.putRecord({ ...created, count: created.count + 1 }, key, {\n      conflictPolicy: 'replace'\n    })\n  }\n\n  for await (const [recordKey, value] of db.iterateRecords()) {\n    console.log(recordKey, value.count)\n  }\n\n  await db.deleteRecord(key)\n} finally {\n  await db.dispose()\n}"
               },
               {
                 type: 'list',
@@ -16042,7 +16042,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' })\n\nawait db.set('theme', 'dark')\nawait db.setBytes('avatar', new Uint8Array([137, 80, 78, 71]))\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\n\nconst theme = await db.get('theme')\nconst avatar = await db.getBytes('avatar')\nconst user = await db.getRecord('ada')\n\nawait db.dispose()"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<{ id: string; name: string }>({ dbName: 'app-data' })\n\nawait db.set('theme', 'dark')\nawait db.setBytes('avatar', new Uint8Array([137, 80, 78, 71]))\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\n\nconst theme = await db.get('theme')\nconst avatar = await db.getBytes('avatar')\nconst user = await db.getRecord('ada')\n\nawait db.dispose()"
               },
               {
                 type: 'paragraph',
@@ -16158,7 +16158,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "type IUser = { id: string; name: string }\n\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(indexedDb({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', name: 'Ada' })\nconst ada = await users.get('ada')"
+                code: "type IUser = { id: string; name: string }\n\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(indexedDbHost({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', name: 'Ada' })\nconst ada = await users.get('ada')"
               },
               {
                 type: 'list',
@@ -16216,7 +16216,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date(),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot)\nawait db.putRecord(encoded, 'latest')\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored)\n\nawait db.dispose()"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDbHost({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date(),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot)\nawait db.putRecord(encoded, 'latest')\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored)\n\nawait db.dispose()"
               },
               {
                 type: 'list',
@@ -16236,7 +16236,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { localStorage } from '@migaia/storage-web/local-storage'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\n\nconst bytes = new TextEncoder().encode('hello')\nconst binaryStore = indexedDb({ dbName: 'app-data' })\nconst direct = selectCodec(binaryCodec, binaryStore.capabilities)\nconst directValue = await direct.encode(bytes) // Uint8Array\nawait binaryStore.setBytes('greeting', directValue as Uint8Array)\n\nconst textStore = localStorage({ namespace: 'binary-fallback' })\nconst fallback = selectCodec(binaryCodec, textStore.capabilities, (message) => {\n  console.warn(message)\n})\nconst textValue = await fallback.encode(bytes) // base64 string，体积约增加 33%\nawait textStore.set('greeting', textValue as string)\n\nawait binaryStore.dispose()\nawait textStore.dispose()"
+                code: "import { localStorageHost } from '@migaia/storage-web/local-storage'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\n\nconst bytes = new TextEncoder().encode('hello')\nconst binaryStore = indexedDbHost({ dbName: 'app-data' })\nconst direct = selectCodec(binaryCodec, binaryStore.capabilities)\nconst directValue = await direct.encode(bytes) // Uint8Array\nawait binaryStore.setBytes('greeting', directValue as Uint8Array)\n\nconst textStore = localStorageHost({ namespace: 'binary-fallback' })\nconst fallback = selectCodec(binaryCodec, textStore.capabilities, (message) => {\n  console.warn(message)\n})\nconst textValue = await fallback.encode(bytes) // base64 string，体积约增加 33%\nawait textStore.set('greeting', textValue as string)\n\nawait binaryStore.dispose()\nawait textStore.dispose()"
               },
               {
                 type: 'list',
@@ -16256,7 +16256,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type { IStorageCapabilities } from '@migaia/storage-contract'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nfunction selectEntityCodec(store: { readonly capabilities: IStorageCapabilities }) {\n  return selectCodec(structuredCodec, store.capabilities, (message) => {\n    console.warn(message)\n  })\n}\n\nconst storage = indexedDb({ dbName: 'app-data' })\n// 对 IndexedDB/Memory 的 records 后端成功；对纯文本后端立即失败。\nconst codec = selectEntityCodec(storage)\nconst encoded = await codec.encode({ id: 'ada', name: 'Ada' })\nawait storage.putRecord(encoded, 'ada')\nawait storage.dispose()"
+                code: "import type { IStorageCapabilities } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nfunction selectEntityCodec(store: { readonly capabilities: IStorageCapabilities }) {\n  return selectCodec(structuredCodec, store.capabilities, (message) => {\n    console.warn(message)\n  })\n}\n\nconst storage = indexedDbHost({ dbName: 'app-data' })\n// 对 IndexedDB/Memory 的 records 后端成功；对纯文本后端立即失败。\nconst codec = selectEntityCodec(storage)\nconst encoded = await codec.encode({ id: 'ada', name: 'Ada' })\nawait storage.putRecord(encoded, 'ada')\nawait storage.dispose()"
               },
               {
                 type: 'paragraph',
@@ -16284,7 +16284,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "type IUser = { id: string; name: string }\n\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(indexedDb({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', name: 'Ada' })\nconst ada = await users.get('ada')"
+                code: "type IUser = { id: string; name: string }\n\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(indexedDbHost({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', name: 'Ada' })\nconst ada = await users.get('ada')"
               },
               {
                 type: 'list',
@@ -16346,7 +16346,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date(),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot)\nawait db.putRecord(encoded, 'latest')\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored)\n\nawait db.dispose()"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDbHost({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date(),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot)\nawait db.putRecord(encoded, 'latest')\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored)\n\nawait db.dispose()"
               },
               {
                 type: 'list',
@@ -16367,7 +16367,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { localStorage } from '@migaia/storage-web/local-storage'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\n\nconst bytes = new TextEncoder().encode('hello')\nconst binaryStore = indexedDb({ dbName: 'app-data' })\nconst direct = selectCodec(binaryCodec, binaryStore.capabilities)\nconst directValue = await direct.encode(bytes) // Uint8Array\nawait binaryStore.setBytes('greeting', directValue as Uint8Array)\n\nconst textStore = localStorage({ namespace: 'binary-fallback' })\nconst fallback = selectCodec(binaryCodec, textStore.capabilities, (message) => {\n  console.warn(message)\n})\nconst textValue = await fallback.encode(bytes) // base64 string, about 33% larger\nawait textStore.set('greeting', textValue as string)\n\nawait binaryStore.dispose()\nawait textStore.dispose()"
+                code: "import { localStorageHost } from '@migaia/storage-web/local-storage'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\n\nconst bytes = new TextEncoder().encode('hello')\nconst binaryStore = indexedDbHost({ dbName: 'app-data' })\nconst direct = selectCodec(binaryCodec, binaryStore.capabilities)\nconst directValue = await direct.encode(bytes) // Uint8Array\nawait binaryStore.setBytes('greeting', directValue as Uint8Array)\n\nconst textStore = localStorageHost({ namespace: 'binary-fallback' })\nconst fallback = selectCodec(binaryCodec, textStore.capabilities, (message) => {\n  console.warn(message)\n})\nconst textValue = await fallback.encode(bytes) // base64 string, about 33% larger\nawait textStore.set('greeting', textValue as string)\n\nawait binaryStore.dispose()\nawait textStore.dispose()"
               },
               {
                 type: 'list',
@@ -16387,7 +16387,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type { IStorageCapabilities } from '@migaia/storage-contract'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nfunction selectEntityCodec(store: { readonly capabilities: IStorageCapabilities }) {\n  return selectCodec(structuredCodec, store.capabilities, (message) => {\n    console.warn(message)\n  })\n}\n\nconst storage = indexedDb({ dbName: 'app-data' })\n// Succeeds for IndexedDB/Memory record backends and fails immediately for text-only stores.\nconst codec = selectEntityCodec(storage)\nconst encoded = await codec.encode({ id: 'ada', name: 'Ada' })\nawait storage.putRecord(encoded, 'ada')\nawait storage.dispose()"
+                code: "import type { IStorageCapabilities } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nfunction selectEntityCodec(store: { readonly capabilities: IStorageCapabilities }) {\n  return selectCodec(structuredCodec, store.capabilities, (message) => {\n    console.warn(message)\n  })\n}\n\nconst storage = indexedDbHost({ dbName: 'app-data' })\n// Succeeds for IndexedDB/Memory record backends and fails immediately for text-only stores.\nconst codec = selectEntityCodec(storage)\nconst encoded = await codec.encode({ id: 'ada', name: 'Ada' })\nawait storage.putRecord(encoded, 'ada')\nawait storage.dispose()"
               },
               {
                 type: 'paragraph',
@@ -17157,7 +17157,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const jar = cookies({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nawait jar.remove('session')"
+                code: "const jar = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nawait jar.remove('session')"
               },
               {
                 type: 'list',
@@ -17198,7 +17198,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   "'/account' 会匹配自身和 '/account/...'，但不会误匹配 '/accounting'。",
                   '更窄的 path 只减少 Cookie 被自动携带的范围，不是安全边界；同源 JavaScript 仍不应把敏感信息放进非 HttpOnly Cookie。',
                   'path 不包含查询字符串和 hash；/account?tab=billing 仍按 /account 判断。',
-                  '不要依赖浏览器推导默认目录；构造 cookies() 时显式写出稳定 path，部署到不同路由后行为才不会漂移。'
+                  '不要依赖浏览器推导默认目录；构造 cookiesHost() 时显式写出稳定 path，部署到不同路由后行为才不会漂移。'
                 ]
               }
             ]
@@ -17210,7 +17210,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { cookies } from '@migaia/storage-web/cookies'\n\n// 在整个站点可见，例如语言偏好。\nconst sitePreferences = cookies({\n  namespace: 'site-preferences',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\n// 只在 /account 和它的子路径可见，例如账户区最近打开的面板。\nconst accountPreferences = cookies({\n  namespace: 'account-preferences',\n  scope: { path: '/account', secure: true, sameSite: 'lax' }\n})\n\nawait sitePreferences.set('locale', 'zh-CN', { maxAge: 60 * 60 * 24 * 365 })\nawait accountPreferences.set('panel', 'billing', { maxAge: 60 * 60 })\n\n// 在 /account/settings 页面，两者都能读取。\nconst locale = await sitePreferences.get('locale')\nconst panel = await accountPreferences.get('panel')\n\nawait sitePreferences.dispose()\nawait accountPreferences.dispose()"
+                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\n// 在整个站点可见，例如语言偏好。\nconst sitePreferences = cookiesHost({\n  namespace: 'site-preferences',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\n// 只在 /account 和它的子路径可见，例如账户区最近打开的面板。\nconst accountPreferences = cookiesHost({\n  namespace: 'account-preferences',\n  scope: { path: '/account', secure: true, sameSite: 'lax' }\n})\n\nawait sitePreferences.set('locale', 'zh-CN', { maxAge: 60 * 60 * 24 * 365 })\nawait accountPreferences.set('panel', 'billing', { maxAge: 60 * 60 })\n\n// 在 /account/settings 页面，两者都能读取。\nconst locale = await sitePreferences.get('locale')\nconst panel = await accountPreferences.get('panel')\n\nawait sitePreferences.dispose()\nawait accountPreferences.dispose()"
               },
               {
                 type: 'list',
@@ -17281,7 +17281,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const jar = cookies({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nawait jar.remove('session')"
+                code: "const jar = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nawait jar.remove('session')"
               },
               {
                 type: 'list',
@@ -17334,7 +17334,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { cookies } from '@migaia/storage-web/cookies'\n\nconst sitePreferences = cookies({\n  namespace: 'site-preferences',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nconst accountPreferences = cookies({\n  namespace: 'account-preferences',\n  scope: { path: '/account', secure: true, sameSite: 'lax' }\n})\n\nawait sitePreferences.set('locale', 'en-US', { maxAge: 60 * 60 * 24 * 365 })\nawait accountPreferences.set('panel', 'billing', { maxAge: 60 * 60 })\n\n// Both are visible from /account/settings.\nconst locale = await sitePreferences.get('locale')\nconst panel = await accountPreferences.get('panel')\n\nawait sitePreferences.dispose()\nawait accountPreferences.dispose()"
+                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst sitePreferences = cookiesHost({\n  namespace: 'site-preferences',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nconst accountPreferences = cookiesHost({\n  namespace: 'account-preferences',\n  scope: { path: '/account', secure: true, sameSite: 'lax' }\n})\n\nawait sitePreferences.set('locale', 'en-US', { maxAge: 60 * 60 * 24 * 365 })\nawait accountPreferences.set('panel', 'billing', { maxAge: 60 * 60 })\n\n// Both are visible from /account/settings.\nconst locale = await sitePreferences.get('locale')\nconst panel = await accountPreferences.get('panel')\n\nawait sitePreferences.dispose()\nawait accountPreferences.dispose()"
               },
               {
                 type: 'list',
@@ -17444,7 +17444,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDb({ dbName: 'app-data' })\nconst controller = new AbortController()\n\n// 例如用户关闭搜索面板时调用：controller.abort('search panel closed')\nconst closeSearchPanel = () => controller.abort('search panel closed')\n\ntry {\n  const result = await db.getRecord('search-result', {\n    signal: controller.signal\n  })\n  renderResult(result)\n} catch (error) {\n  if (\n    error instanceof StorageContractError &&\n    error.code === StorageContractErrorCode.aborted\n  ) {\n    // 这是预期的用户操作：停止 loading 即可，不显示红色故障提示。\n    stopLoading()\n  } else {\n    throw error\n  }\n} finally {\n  await db.dispose()\n}"
+                code: "import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost({ dbName: 'app-data' })\nconst controller = new AbortController()\n\n// 例如用户关闭搜索面板时调用：controller.abort('search panel closed')\nconst closeSearchPanel = () => controller.abort('search panel closed')\n\ntry {\n  const result = await db.getRecord('search-result', {\n    signal: controller.signal\n  })\n  renderResult(result)\n} catch (error) {\n  if (\n    error instanceof StorageContractError &&\n    error.code === StorageContractErrorCode.aborted\n  ) {\n    // 这是预期的用户操作：停止 loading 即可，不显示红色故障提示。\n    stopLoading()\n  } else {\n    throw error\n  }\n} finally {\n  await db.dispose()\n}"
               },
               {
                 type: 'list',
@@ -17535,7 +17535,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { memoryStorage } from '@migaia/storage-web/memory'\n\nconst firstStore = memoryStorage()\nawait firstStore.set('key', 'value')\nawait firstStore.dispose()\n\n// 错误：firstStore 已进入终态，继续 get 会得到 STORE_DISPOSED。\n// await firstStore.get('key')\n\n// 正确：为新的页面、请求或测试创建新实例。\nconst nextStore = memoryStorage()\nawait nextStore.set('key', 'next value')\nawait nextStore.dispose()"
+                code: "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst firstStore = memoryStorageHost()\nawait firstStore.set('key', 'value')\nawait firstStore.dispose()\n\n// 错误：firstStore 已进入终态，继续 get 会得到 STORE_DISPOSED。\n// await firstStore.get('key')\n\n// 正确：为新的页面、请求或测试创建新实例。\nconst nextStore = memoryStorageHost()\nawait nextStore.set('key', 'next value')\nawait nextStore.dispose()"
               },
               {
                 type: 'list',
@@ -17604,7 +17604,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDb({ dbName: 'app-data' })\nconst controller = new AbortController()\nconst closeSearchPanel = () => controller.abort('search panel closed')\n\ntry {\n  const result = await db.getRecord('search-result', { signal: controller.signal })\n  renderResult(result)\n} catch (error) {\n  if (\n    error instanceof StorageContractError &&\n    error.code === StorageContractErrorCode.aborted\n  ) {\n    stopLoading()\n  } else {\n    throw error\n  }\n} finally {\n  await db.dispose()\n}"
+                code: "import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost({ dbName: 'app-data' })\nconst controller = new AbortController()\nconst closeSearchPanel = () => controller.abort('search panel closed')\n\ntry {\n  const result = await db.getRecord('search-result', { signal: controller.signal })\n  renderResult(result)\n} catch (error) {\n  if (\n    error instanceof StorageContractError &&\n    error.code === StorageContractErrorCode.aborted\n  ) {\n    stopLoading()\n  } else {\n    throw error\n  }\n} finally {\n  await db.dispose()\n}"
               },
               {
                 type: 'list',
@@ -17699,7 +17699,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { memoryStorage } from '@migaia/storage-web/memory'\n\nconst firstStore = memoryStorage()\nawait firstStore.set('key', 'value')\nawait firstStore.dispose()\n\n// Wrong: firstStore.get('key') now fails with STORE_DISPOSED.\n\nconst nextStore = memoryStorage()\nawait nextStore.set('key', 'next value')\nawait nextStore.dispose()"
+                code: "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst firstStore = memoryStorageHost()\nawait firstStore.set('key', 'value')\nawait firstStore.dispose()\n\n// Wrong: firstStore.get('key') now fails with STORE_DISPOSED.\n\nconst nextStore = memoryStorageHost()\nawait nextStore.set('key', 'next value')\nawait nextStore.dispose()"
               },
               {
                 type: 'list',

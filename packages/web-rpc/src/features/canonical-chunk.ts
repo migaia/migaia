@@ -1,28 +1,38 @@
-import { defineEndpointModule, EndpointModuleKey } from '../internal/endpoint-modules.js'
 import { WebRpcCanonicalChunkAttachment } from '../internal/canonical-chunk-attachment.js'
-import type { IWebRpcCoreConfig, IWebRpcKernelSurface } from '../core.js'
+import { defineFeature, type IWebRpcFeature } from '../feature.js'
+import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
+import type { IWebRpcPluginInstallScope } from '../typing.js'
 
-/** Chunk contributes canonical framing behavior without adding a public method. */
-export type ICanonicalChunkSurface = IWebRpcKernelSurface
-
-/** Canonical chunk feature token used by migrated WebRPC readers. */
-const canonicalChunkModule = defineEndpointModule<IWebRpcCoreConfig, ICanonicalChunkSurface>(
-  EndpointModuleKey.chunk,
-  async ({ kernel, prepared }) => {
-    const attachment = new WebRpcCanonicalChunkAttachment(
-      kernel,
-      prepared.options.components?.framer
-    )
-    return Object.freeze({ dispose: () => attachment.dispose() }) as ICanonicalChunkSurface
-  },
-  [],
-  [],
-  {
-    provides: ['selected-framer-bridge']
-  }
-)
-
-/** Returns the migrated chunk feature module. */
-export function canonicalChunk() {
-  return canonicalChunkModule
-}
+/** Creates the native chunk Feature with the existing attachment and root ResourceScope owner. */
+export const createCanonicalChunkFeature = (): IWebRpcFeature<
+  Readonly<{
+    readonly prepare: (scope: IWebRpcPluginInstallScope) => WebRpcCanonicalChunkAttachment
+  }>,
+  Record<never, never>,
+  IEndpointCapabilitiesFeatureExpose
+> =>
+  defineFeature<
+    Readonly<{
+      readonly prepare: (scope: IWebRpcPluginInstallScope) => WebRpcCanonicalChunkAttachment
+    }>,
+    Record<never, never>,
+    IEndpointCapabilitiesFeatureExpose
+  >({
+    publicKeys: [],
+    install: (core) => {
+      /** Defers attachment allocation to the endpoint-capabilities Plugin installation stage. */
+      let attachment: WebRpcCanonicalChunkAttachment | undefined
+      const prepare = (scope: IWebRpcPluginInstallScope): WebRpcCanonicalChunkAttachment => {
+        if (attachment) return attachment
+        const prepared = core.featureExpose.getPrepared()
+        const created = new WebRpcCanonicalChunkAttachment(
+          core.featureExpose.getKernel(),
+          prepared.options.components?.framer
+        )
+        scope.own(created, () => created.dispose())
+        attachment = created
+        return created
+      }
+      return Object.freeze({ prepare })
+    }
+  })

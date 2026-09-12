@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { createClientEndpoint } from '../src/client.js'
 import { createComposedEndpoint } from '../src/core.js'
 import { createProviderEndpoint } from '../src/provider.js'
-import { defineEndpointModule, EndpointModuleKey } from '../src/internal/endpoint-modules.js'
-import { outbound } from '../src/features/outbound.js'
-import { provider } from '../src/features/provider.js'
-import { discovery } from '../src/features/discovery.js'
-import { control } from '../src/features/control.js'
-import { canonicalChunk as chunk } from '../src/features/canonical-chunk.js'
+import { createFullEndpoint } from '../src/full.js'
+import { defineRpcFeature } from '../src/internal/define-rpc-feature.js'
 import { WebRpcErrorCode } from '../src/errors.js'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
-import type { IWebRpcCoreConfig, IWebRpcKernelSurface } from '../src/core.js'
+import type { IWebRpcCoreConfig } from '../src/core.js'
+import type { IWebRpcPluginInstallScope } from '../src/typing.js'
 import { connect } from '../src/middleware/connect.js'
 import { InboundIdentityCoordinator } from '../src/internal/inbound-identity.js'
 import { WebRpcVariationCoordinator } from '../src/internal/variation-coordinator.js'
@@ -36,18 +33,22 @@ function createConfig(
   }
 }
 
-/** Creates a package-owned test module with a controlled installer and disposer. */
-function moduleWith(
-  key: string,
-  install: () => Promise<{ readonly dispose: () => void }>,
-  requires: readonly string[] = [],
-  conflicts: readonly string[] = []
-) {
-  return defineEndpointModule<IWebRpcCoreConfig, IWebRpcKernelSurface>(
-    key,
-    async () => install(),
-    requires,
-    conflicts
+/** Creates a first-party native prepare root whose cleanup is owned by the real construction scope. */
+function definePrepareRoot(install: (scope: IWebRpcPluginInstallScope) => object) {
+  return defineRpcFeature(
+    {
+      publicKeys: [],
+      claims: {
+        routes: [],
+        provides: [],
+        consumes: [],
+        publicKeys: [],
+        exposedKeys: [],
+        activator: false
+      }
+    },
+    () => Object.freeze({ prepare: install }),
+    {}
   )
 }
 
@@ -337,10 +338,7 @@ describe('composition topology and rollback', () => {
   it('accepts provider dependency closure without a duplicate outbound owner', async () => {
     let subscriptions = 0
 
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => subscriptions++),
-      [outbound(), provider()]
-    )
+    const endpoint = await createProviderEndpoint(createConfig(() => subscriptions++))
     expect(endpoint.send).toEqual(expect.any(Function))
     expect('provide' in endpoint).toBe(true)
     expect(subscriptions).toBe(1)
@@ -349,10 +347,7 @@ describe('composition topology and rollback', () => {
 
   it('composes all five first-party features with one transport subscription', async () => {
     let subscriptions = 0
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => subscriptions++),
-      [outbound(), provider(), discovery(), control(), chunk()] as const
-    )
+    const endpoint = await createFullEndpoint(createConfig(() => subscriptions++))
 
     expect(endpoint.send).toEqual(expect.any(Function))
     expect(endpoint.provide).toEqual(expect.any(Function))
@@ -365,35 +360,59 @@ describe('composition topology and rollback', () => {
   it('rejects a declared directional conflict before subscription or installation', async () => {
     let subscriptions = 0
     let installations = 0
-    const conflicting = moduleWith(
-      'conflicting',
-      async () => {
-        installations += 1
-        return { dispose: () => undefined }
+    const conflicting = defineRpcFeature(
+      {
+        publicKeys: ['conflict'],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: ['conflict'],
+          exposedKeys: [],
+          activator: false
+        }
       },
-      [],
-      ['blocked']
+      () => {
+        installations += 1
+        return Object.freeze({
+          prepare: () => Object.freeze({ public: { conflict: () => undefined } })
+        })
+      },
+      {}
     )
-    const blocked = moduleWith('blocked', async () => {
-      installations += 1
-      return { dispose: () => undefined }
-    })
+    const blocked = defineRpcFeature(
+      {
+        publicKeys: ['conflict'],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: ['conflict'],
+          exposedKeys: [],
+          activator: false
+        }
+      },
+      () => {
+        installations += 1
+        return Object.freeze({
+          prepare: () => Object.freeze({ public: { conflict: () => undefined } })
+        })
+      },
+      {}
+    )
 
     await expect(
       createComposedEndpoint(
         createConfig(() => subscriptions++),
-        [blocked, conflicting]
+        { 'first-party-blocked': blocked, 'first-party-conflicting': conflicting }
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.capabilityConflict })
+    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
     expect(subscriptions).toBe(0)
     expect(installations).toBe(0)
   })
 
   it('keeps coordinator lifecycle ownership when composing provider surface', async () => {
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => undefined),
-      [provider()]
-    )
+    const endpoint = await createProviderEndpoint(createConfig(() => undefined))
     const firstDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(firstDispose)
     await firstDispose
@@ -405,7 +424,7 @@ describe('composition topology and rollback', () => {
       *[Symbol.iterator](): IterableIterator<never> {
         throw new Error('iterator failure')
       }
-    } as unknown as readonly ReturnType<typeof moduleWith>[]
+    } as unknown as Readonly<Record<string, import('../src/feature.js').IWebRpcFeature>>
 
     await expect(
       createComposedEndpoint(
@@ -413,43 +432,67 @@ describe('composition topology and rollback', () => {
         hostile
       )
     ).rejects.toMatchObject({
-      code: WebRpcErrorCode.invalidConfig,
-      cause: expect.any(Error)
+      code: WebRpcErrorCode.invalidConfig
     })
     expect(subscriptions).toBe(0)
   })
 
-  it('rejects missing requires before transport subscription', async () => {
-    const dependent = moduleWith('dependent', async () => ({ dispose: () => undefined }), [
-      EndpointModuleKey.outbound
-    ])
+  it('rejects a missing native prepare output before transport subscription', async () => {
+    const dependent = defineRpcFeature(
+      {
+        publicKeys: [],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: [],
+          exposedKeys: [],
+          activator: false
+        }
+      },
+      () => Object.freeze({}),
+      {}
+    )
     let subscriptions = 0
 
     await expect(
       createComposedEndpoint(
         createConfig(() => subscriptions++),
-        [dependent]
+        { 'first-party-dependent': dependent }
       )
     ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
     expect(subscriptions).toBe(0)
   })
 
-  it('rejects duplicate and cyclic topology before transport subscription', async () => {
+  it('rejects retired iterable roots and malformed native roots before transport subscription', async () => {
     let subscriptions = 0
-    const duplicate = moduleWith('duplicate', async () => ({ dispose: () => undefined }))
-    const cycleA = moduleWith('cycle-a', async () => ({ dispose: () => undefined }), ['cycle-b'])
-    const cycleB = moduleWith('cycle-b', async () => ({ dispose: () => undefined }), ['cycle-a'])
+    const root = definePrepareRoot(() => ({}))
+    const malformed = defineRpcFeature(
+      {
+        publicKeys: [],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: [],
+          exposedKeys: [],
+          activator: false
+        }
+      },
+      () => Object.freeze({}),
+      {}
+    )
 
     await expect(
       createComposedEndpoint(
         createConfig(() => subscriptions++),
-        [duplicate, duplicate]
+        [root] as unknown as Readonly<Record<string, import('../src/feature.js').IWebRpcFeature>>
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.capabilityConflict })
+    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
     await expect(
       createComposedEndpoint(
         createConfig(() => subscriptions++),
-        [cycleA, cycleB]
+        { 'first-party-malformed': malformed }
       )
     ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
     expect(subscriptions).toBe(0)
@@ -457,16 +500,30 @@ describe('composition topology and rollback', () => {
 
   it('rolls back installed modules in reverse order and preserves primary failure', async () => {
     const disposed: string[] = []
-    const first = moduleWith('first', async () => ({ dispose: () => disposed.push('first') }))
-    const second = moduleWith('second', async () => ({ dispose: () => disposed.push('second') }))
-    const failing = moduleWith('failing', async () => {
+    const first = definePrepareRoot((scope) => {
+      scope.own('first', () => {
+        disposed.push('first')
+      })
+      return {}
+    })
+    const second = definePrepareRoot((scope) => {
+      scope.own('second', () => {
+        disposed.push('second')
+      })
+      return {}
+    })
+    const failing = definePrepareRoot(() => {
       throw new Error('primary install failure')
     })
 
     await expect(
       createComposedEndpoint(
         createConfig(() => undefined),
-        [first, second, failing]
+        {
+          'first-party-first': first,
+          'first-party-second': second,
+          'first-party-failing': failing
+        }
       )
     ).rejects.toMatchObject({ message: 'primary install failure' })
     expect(disposed).toEqual(['second', 'first'])
@@ -477,26 +534,32 @@ describe('composition topology and rollback', () => {
     const firstCleanup = new Error('first cleanup failure')
     const secondCleanup = new Error('second cleanup failure')
     const disposed: string[] = []
-    const first = moduleWith('first-cleanup', async () => ({
-      dispose: () => {
+    const first = definePrepareRoot((scope) => {
+      scope.own('first', () => {
         disposed.push('first')
         throw firstCleanup
-      }
-    }))
-    const second = moduleWith('second-cleanup', async () => ({
-      dispose: () => {
+      })
+      return {}
+    })
+    const second = definePrepareRoot((scope) => {
+      scope.own('second', () => {
         disposed.push('second')
         throw secondCleanup
-      }
-    }))
-    const failing = moduleWith('failing-cleanup', async () => {
+      })
+      return {}
+    })
+    const failing = definePrepareRoot(() => {
       throw primary
     })
 
     await expect(
       createComposedEndpoint(
         createConfig(() => undefined),
-        [first, second, failing]
+        {
+          'first-party-first-cleanup': first,
+          'first-party-second-cleanup': second,
+          'first-party-failing-cleanup': failing
+        }
       )
     ).rejects.toMatchObject({
       message: expect.any(String),
@@ -511,44 +574,44 @@ describe('composition topology and rollback', () => {
     const getterFailure = new Error('dispose getter failure')
     const rejection = new Error('async cleanup failure')
     const disposed: string[] = []
-    const getterModule = defineEndpointModule<IWebRpcCoreConfig, object>(
-      'getter-cleanup',
-      async () => {
-        const surface: { readonly dispose?: () => void } = {}
-        Object.defineProperty(surface, 'dispose', {
-          get: () => {
-            throw getterFailure
-          }
-        })
-        return surface
-      }
-    )
-    const asyncModule = defineEndpointModule<IWebRpcCoreConfig, object>(
-      'async-cleanup',
-      async () => ({
-        dispose: async () => {
-          disposed.push('async')
-          throw rejection
+    let getterReads = 0
+    const getterModule = definePrepareRoot((scope) => {
+      const resource: { readonly dispose?: () => void } = {}
+      Object.defineProperty(resource, 'dispose', {
+        get: () => {
+          getterReads += 1
+          throw getterFailure
         }
       })
-    )
-    const failing = moduleWith('primary-cleanup', async () => {
+      scope.own(resource, () => resource.dispose!())
+      return {}
+    })
+    const asyncModule = definePrepareRoot((scope) => {
+      scope.own('async-cleanup', async () => {
+        disposed.push('async')
+        throw rejection
+      })
+      return {}
+    })
+    const failing = definePrepareRoot(() => {
       throw primary
     })
 
     await expect(
       createComposedEndpoint(
         createConfig(() => undefined),
-        [getterModule, asyncModule, failing]
+        {
+          'first-party-getter-cleanup': getterModule,
+          'first-party-async-cleanup': asyncModule,
+          'first-party-primary-cleanup': failing
+        }
       )
     ).rejects.toMatchObject({
       cause: primary,
-      cleanupErrors: [
-        { resource: 'endpoint-module-0', error: rejection },
-        { resource: 'endpoint-module-1', error: getterFailure }
-      ]
+      cleanupErrors: [{ error: rejection }, { error: getterFailure }]
     })
     expect(disposed).toEqual(['async'])
+    expect(getterReads).toBe(1)
   })
 
   it('disposes prepared middleware when a non-outbound installer fails', async () => {
@@ -572,27 +635,24 @@ describe('composition topology and rollback', () => {
         return { extension: {}, shared: {} }
       }
     }
-    const failing = moduleWith('middleware-failing', async () => {
+    const failing = definePrepareRoot(() => {
       throw new Error('installer failure')
     })
 
     await expect(
       createComposedEndpoint(
         createConfig(() => undefined, [trackedMiddleware]),
-        [failing]
+        { 'first-party-middleware-failing': failing }
       )
     ).rejects.toThrow('installer failure')
     expect(disposed).toBe(1)
   })
 
   it('accepts a surface without optional disposer or debug reader', async () => {
-    const noLifecycleSurface = defineEndpointModule<IWebRpcCoreConfig, object>(
-      'surface-without-lifecycle',
-      async () => ({})
-    )
+    const noLifecycleSurface = definePrepareRoot(() => ({}))
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [noLifecycleSurface]
+      { 'first-party-surface-without-lifecycle': noLifecycleSurface }
     )
 
     await endpoint.dispose()
@@ -600,34 +660,60 @@ describe('composition topology and rollback', () => {
 
   it('merges selected surfaces and disposes every feature once in reverse order', async () => {
     const disposed: string[] = []
-    const first = defineEndpointModule<IWebRpcCoreConfig, { readonly first: () => string }>(
-      'surface-first',
-      async () => ({
-        first: () => 'first',
-        dispose: () => disposed.push('first')
-      }),
-      [],
-      [],
-      { publicKeys: ['first'] }
+    const first = defineRpcFeature(
+      {
+        publicKeys: ['first'],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: ['first'],
+          exposedKeys: [],
+          activator: false
+        }
+      },
+      () =>
+        Object.freeze({
+          prepare: (scope: IWebRpcPluginInstallScope) => {
+            scope.own('first', () => {
+              disposed.push('first')
+            })
+            return Object.freeze({ public: { first: () => 'first' } })
+          }
+        }),
+      {}
     )
-    const second = defineEndpointModule<IWebRpcCoreConfig, { readonly second: () => string }>(
-      'surface-second',
-      async () => ({
-        second: () => 'second',
-        dispose: () => disposed.push('second')
-      }),
-      [],
-      [],
-      { publicKeys: ['second'] }
+    const second = defineRpcFeature(
+      {
+        publicKeys: ['second'],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: ['second'],
+          exposedKeys: [],
+          activator: false
+        }
+      },
+      () =>
+        Object.freeze({
+          prepare: (scope: IWebRpcPluginInstallScope) => {
+            scope.own('second', () => {
+              disposed.push('second')
+            })
+            return Object.freeze({ public: { second: () => 'second' } })
+          }
+        }),
+      {}
     )
 
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [first, second]
+      { 'first-party-surface-first': first, 'first-party-surface-second': second }
     )
 
-    expect(endpoint.first()).toBe('first')
-    expect(endpoint.second()).toBe('second')
+    expect((Reflect.get(endpoint, 'first') as () => string)()).toBe('first')
+    expect((Reflect.get(endpoint, 'second') as () => string)()).toBe('second')
     const firstDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(firstDispose)
     await firstDispose

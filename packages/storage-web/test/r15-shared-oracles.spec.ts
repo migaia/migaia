@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../src/entity.js'
 import { getBackendReactiveController } from '../src/backends/reactive-controller.js'
-import { memoryStorage } from '../src/backends/memory.js'
+import { memoryStorageHost } from '../src/backends/memory.js'
 import { safeJsonPayloadByteLength } from '../src/utils/json.js'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 
@@ -46,7 +46,7 @@ describe('SWV4 R15 shared oracle clusters', () => {
         tags: { path: 'tags', multiEntry: true }
       }
     })
-    const repository = entity.connect(memoryStorage())
+    const repository = entity.connect(memoryStorageHost())
     await repository.put({ id: 'u2', email: 'same@example.com', tags: ['staff'] })
     await repository.put({ id: 'u1', email: 'same@example.com', tags: ['admin', 'staff'] })
     await repository.put({ id: 'u3', email: 'z@example.com', tags: ['staff'] })
@@ -86,7 +86,7 @@ describe('SWV4 R15 shared oracle clusters', () => {
   })
 
   it('SWV4-T68 proves one mutation lease drains before controller disposal', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)
     if (controller === undefined) throw new Error('memory controller is not registered')
     const release = controller.beginMutation()

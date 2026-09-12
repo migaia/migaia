@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { createMemoryTransportPair } from '../../src/adapters/memory.js'
 import { connect } from '../../src/middleware/connect.js'
+import { defineFeature } from '../../src/feature.js'
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer.js'
+import {
+  createFirstPartyRoots,
+  type IWebRpcFirstPartyRootName
+} from '../../src/internal/first-party-roots.js'
 import {
   clientRuntimeOwnerKeys,
   defaultRuntimeOwnerKeys,
@@ -43,47 +49,45 @@ describe('WRC-B01 static composition contracts', () => {
     const coreEntrypoint = '../../src/core.js'
     const core = await import(coreEntrypoint)
     const forged = {}
-    const transport = {
-      subscribe: () => {
-        throw new Error('subscribe must not run')
-      }
-    }
+    const [transport] = createMemoryTransportPair()
     await expect(
       core.createComposedEndpoint({ id: 'forged', transport, middlewares: [] }, [forged])
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   })
 
-  it('rejects duplicate module identity before transport side effects', async () => {
+  it('rejects duplicate native public identity before transport side effects', async () => {
     const coreEntrypoint = '../../src/core.js'
-    const outboundEntrypoint = '../../src/features/outbound.js'
     const core = await import(coreEntrypoint)
-    const outbound = await import(outboundEntrypoint)
-    const module = outbound.outbound()
-    const transport = {
-      subscribe: () => {
-        throw new Error('subscribe must not run')
-      }
-    }
+    const first = defineFeature({
+      install: () => ({ duplicate: () => 'first' }),
+      publicKeys: ['duplicate']
+    })
+    const second = defineFeature({
+      install: () => ({ duplicate: () => 'second' }),
+      publicKeys: ['duplicate']
+    })
+    const [transport] = createMemoryTransportPair()
     await expect(
-      core.createComposedEndpoint({ id: 'duplicate', transport, middlewares: [] }, [module, module])
-    ).rejects.toMatchObject({ code: 'CAPABILITY_CONFLICT' })
+      core.createComposedEndpoint(
+        {
+          id: 'duplicate',
+          transport,
+          middlewares: [connect({ transport })],
+          features: [first, second] as const
+        },
+        Object.create(null)
+      )
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   })
 
   it('accepts every pair with one canonical outbound dependency closure', async () => {
     const core = await import('../../src/core.js')
-    const [outbound, provider, discovery, control, chunk] = await Promise.all([
-      import('../../src/features/outbound.js'),
-      import('../../src/features/provider.js'),
-      import('../../src/features/discovery.js'),
-      import('../../src/features/control.js'),
-      import('../../src/features/canonical-chunk.js')
-    ])
-    const modules = [
-      outbound.outbound(),
-      provider.provider(),
-      discovery.discovery(),
-      control.control(),
-      chunk.canonicalChunk()
+    const roots: readonly IWebRpcFirstPartyRootName[] = [
+      'first-party-outbound',
+      'first-party-provider',
+      'first-party-discovery',
+      'first-party-control',
+      'first-party-chunk'
     ]
     let subscriptions = 0
     const transport = {
@@ -94,11 +98,11 @@ describe('WRC-B01 static composition contracts', () => {
       },
       platform: 'Memory' as const
     }
-    for (let left = 0; left < modules.length; left += 1)
-      for (let right = left + 1; right < modules.length; right += 1) {
+    for (let left = 0; left < roots.length; left += 1)
+      for (let right = left + 1; right < roots.length; right += 1) {
         const endpoint = await core.createComposedEndpoint(
           { id: `overlap-${left}-${right}`, transport, middlewares: [connect()] },
-          [modules[left], modules[right]]
+          createFirstPartyRoots(new Set([roots[left]!, roots[right]!]))
         )
         await endpoint.dispose()
       }
@@ -151,15 +155,10 @@ describe('WRC-B01 static composition contracts', () => {
 
   it('projects selected root keys from exposed metadata', async () => {
     const core = await import('../../src/core.js')
-    const [{ provider }, { discovery }, { canonicalChunk: chunk }] = await Promise.all([
-      import('../../src/features/provider.js'),
-      import('../../src/features/discovery.js'),
-      import('../../src/features/canonical-chunk.js')
-    ])
     const [transport] = createMemoryTransportPair()
     const providerEndpoint = await core.createComposedEndpoint(
       { id: 'exposed-provider', transport, middlewares: [connect({ transport })] },
-      [provider()]
+      createFirstPartyRoots(new Set(['first-party-provider']))
     )
     expect(Object.keys(providerEndpoint).sort()).toEqual([
       'dispatch',
@@ -181,7 +180,7 @@ describe('WRC-B01 static composition contracts', () => {
         transport: discoveryTransport,
         middlewares: [connect({ transport: discoveryTransport })]
       },
-      [discovery()]
+      createFirstPartyRoots(new Set(['first-party-discovery']))
     )
     expect('connect' in discoveryEndpoint).toBe(true)
     expect('discovery' in discoveryEndpoint).toBe(true)
@@ -191,16 +190,16 @@ describe('WRC-B01 static composition contracts', () => {
     const [chunkTransport] = createMemoryTransportPair()
     const chunkEndpoint = await core.createComposedEndpoint(
       { id: 'exposed-chunk', transport: chunkTransport, middlewares: [connect()] },
-      [chunk()]
+      createFirstPartyRoots(new Set(['first-party-chunk']))
     )
-    expect(Object.keys(chunkEndpoint).sort()).toEqual(['dispose', 'hooks', 'on'])
+    expect(Object.keys(chunkEndpoint).sort()).toEqual(['dispose'])
     expect('send' in chunkEndpoint).toBe(false)
     await chunkEndpoint.dispose()
 
     const [fullTransport] = createMemoryTransportPair()
     const fullEndpoint = await core.createComposedEndpoint(
       { id: 'exposed-full', transport: fullTransport, middlewares: [connect()] },
-      [provider(), discovery()]
+      createFirstPartyRoots(new Set(['first-party-provider', 'first-party-discovery']))
     )
     expect('send' in fullEndpoint).toBe(true)
     expect('connect' in fullEndpoint).toBe(true)
@@ -236,15 +235,14 @@ describe('WRC-B01 static composition contracts', () => {
     await Promise.all([clientEndpoint.dispose(), providerEndpoint.dispose()])
   })
 
-  it('constructs and disposes each remaining valid legacy singleton token', async () => {
+  it('constructs and disposes each remaining valid native singleton root', async () => {
     const core = await import('../../src/core.js')
-    const [discovery, control, chunk] = await Promise.all([
-      import('../../src/features/discovery.js'),
-      import('../../src/features/control.js'),
-      import('../../src/features/canonical-chunk.js')
-    ])
-    const modules = [discovery.discovery(), control.control(), chunk.canonicalChunk()]
-    for (const [index, module] of modules.entries()) {
+    const roots: readonly IWebRpcFirstPartyRootName[] = [
+      'first-party-discovery',
+      'first-party-control',
+      'first-party-chunk'
+    ]
+    for (const [index, root] of roots.entries()) {
       const [transport] = createMemoryTransportPair()
       const endpoint = await core.createComposedEndpoint(
         {
@@ -252,7 +250,7 @@ describe('WRC-B01 static composition contracts', () => {
           transport,
           middlewares: [connect({ transport })]
         },
-        [module]
+        createFirstPartyRoots(new Set([root]))
       )
       await endpoint.dispose()
     }
@@ -305,248 +303,65 @@ describe('WRC-B01 static composition contracts', () => {
   })
 })
 
-const currentGenesisFixturePath = resolve(
+const readerEvidencePath = resolve(
   import.meta.dirname,
-  '../fixtures/tree-shaking/reader-occurrence-v16-current-genesis.json'
-)
-const readerInventoryGeneratorPath = resolve(
-  import.meta.dirname,
-  '../../../../docs/rpc-contract/rpc-contract-reader-inventory.mjs'
+  '../../../../docs/plugin-host/native-feature-reader-evidence.mjs'
 )
 const workspaceRoot = resolve(import.meta.dirname, '../../../..')
 
-/**
- * Read the append-only current-genesis fixture without allowing a package test to consult
- * controller state.
- */
-const readCurrentGenesisFixture = () =>
-  JSON.parse(readFileSync(currentGenesisFixturePath, 'utf8')) as {
-    schema: string
-    workspaceRelative: boolean
-    historical: {
-      digest: string
-      status: string
-      fieldLevelDelta: string
-      predecessorRows: null
-      transition: null
-    }
-    current: {
-      counts: Record<string, number>
-      hashes: Record<string, string>
-      edges: Array<Record<string, unknown>>
-      semantic: Array<Record<string, unknown>>
-      coordinate: Array<Record<string, unknown>>
-    }
-    controls: {
-      coordinateAnchor: {
-        digest: string
-        computedDigest: string
-      }
-    }
-  }
-
-/**
- * Produce the current inventory through the installed generator and keep the package test
- * independently attributable.
- */
-const readGeneratedCurrentGenesis = () =>
+/** Runs the current PC03 reader oracle without consulting protected rpc-contract custody. */
+const readCurrentReaderEvidence = () =>
   JSON.parse(
-    execFileSync(process.execPath, [readerInventoryGeneratorPath, '--final', workspaceRoot], {
+    execFileSync(process.execPath, [readerEvidencePath, workspaceRoot], {
       cwd: workspaceRoot,
       encoding: 'utf8'
     })
   ) as {
-    schema: string
-    counts: Record<string, number>
-    hashes: Record<string, string>
-    controls: {
-      legacyImportType: {
-        owner: {
-          disposition: string
-        }
-      }
-      providerImportTypeControls: {
-        missingPackageRejected: boolean
-        missingExportRejected: boolean
-        missingTargetRejected: boolean
-        targetRealpathEscapeRejected: boolean
-        resolverEscapeRejected: boolean
-        resolverMismatchRejected: boolean
-        qualifierPreserved: boolean
-        resolvedIdentityMatchesUnresolved: boolean
-      }
-    }
-    genesis: {
-      historical: {
-        digest: string
-        status: string
-        fieldLevelDelta: string
-        predecessorRows: null
-        transition: null
-      }
-      current: {
-        counts: Record<string, number>
-        hashes: Record<string, string>
-        edges: Array<Record<string, unknown>>
-        semantic: Array<Record<string, unknown>>
-        coordinate: Array<Record<string, unknown>>
-      }
-    }
+    readonly schema: string
+    readonly roots: readonly string[]
+    readonly scannedFiles: number
+    readonly activeReaders: readonly unknown[]
+    readonly result: 'PASS' | 'FAIL'
   }
 
-/** Serialize fixture projections with fixed insertion order, as required by the custody contract. */
-const canonicalSerialize = (value: unknown) => JSON.stringify(value)
-
-/** Hash package-owned evidence independently of the generator's expected anchor. */
-const independentDigest = (value: unknown) =>
-  execFileSync(
-    process.execPath,
-    [
-      '--input-type=module',
-      '-e',
-      "import { createHash } from 'node:crypto'; process.stdout.write(createHash('sha256').update(process.argv[1]).digest('hex'))",
-      '--',
-      canonicalSerialize(value)
-    ],
-    { input: canonicalSerialize(value), encoding: 'utf8' }
-  )
-
-/** Project complete edge rows to the exact coordinate tuple owned by this independent host. */
-const independentCoordinateProjection = (edges: Array<Record<string, unknown>>) =>
-  edges.map(({ reader, line, column }) => ({ reader, line, column }))
-
-/** WRC-B01-T17 proves current reader custody without laundering unavailable history. */
-describe('WRC-B01 current-genesis reader custody', () => {
-  it('keeps historical custody immutable while deriving a current live ledger', () => {
-    const fixture = readCurrentGenesisFixture()
-    const generated = readGeneratedCurrentGenesis()
-    expect(generated.schema).toBe('rpc-contract-reader-inventory/v10')
-    expect(generated.genesis.historical).toEqual(fixture.historical)
-    expect(fixture.current.counts.occurrences).toBe(93)
-    expect(fixture.current.counts.removable).toBe(0)
-    expect(fixture.current.counts.retainedNegatives).toBe(93)
-    expect(fixture.current.counts.ownerOperations).toBe(40)
-    expect(fixture.current.counts.ownerRemovalOperations).toBe(0)
-    expect(fixture.current.counts.ownerRetainedOperations).toBe(40)
-    expect(fixture.current.edges).toHaveLength(93)
-    expect(fixture.current.semantic).toHaveLength(93)
-    expect(fixture.current.coordinate).toHaveLength(93)
-    expect(fixture.current.hashes.full).toBe(
-      'e9553af296e5280f4973532cb2b8da38e5e9bc6200eb878cd445ee909551994d'
+/** WRC-B01-T17 proves current reader closure through the task-owned NF evidence producer. */
+describe('WRC-B01 current native-feature reader closure', () => {
+  it('reads the complete nonwebsite owner universe without using protected historical custody', () => {
+    const evidence = readCurrentReaderEvidence()
+    expect(evidence.schema).toBe('native-feature-reader-evidence/v1')
+    expect(evidence.result).toBe('PASS')
+    expect(evidence.activeReaders).toEqual([])
+    expect(evidence.scannedFiles).toBeGreaterThan(0)
+    expect(evidence.roots).toEqual(
+      expect.arrayContaining([
+        'packages/plugin-host/src',
+        'packages/web-rpc/src',
+        'packages/storage-web/src',
+        'packages/store-persist/src',
+        'fixtures/consumers'
+      ])
     )
-    expect(fixture.current.hashes.semantic).toBe(
-      '1d9fc658fcba85c638c97b8802d3252c31eca1b102c797802300372dfce0089b'
-    )
-    expect(fixture.current.hashes.coordinate).toBe(
-      '615f9aab6eb2a3620fa13302571307b4ba0be04f6e8d4d2bc19bb080def93f8d'
-    )
-    expect(generated.counts.removable).toBe(0)
-    expect(generated.counts.ownerRemovalOperations).toBe(0)
-    expect(independentDigest(fixture.current.edges)).toBe(fixture.current.hashes.full)
-    expect(independentDigest(fixture.current.semantic)).toBe(fixture.current.hashes.semantic)
-    expect(independentDigest(fixture.current.coordinate)).toBe(fixture.current.hashes.coordinate)
-    expect(independentDigest(generated.genesis.current.edges)).toBe(generated.hashes.occurrences)
-    const generatedCoordinates = independentCoordinateProjection(generated.genesis.current.edges)
-    expect(independentDigest(generatedCoordinates)).toBe(generated.hashes.coordinate)
   })
 
-  it('keeps historical custody opaque and rejects anti-laundering substitutions', () => {
-    const fixture = readCurrentGenesisFixture()
-    const historical = fixture.historical
-    expect(historical.digest).toBe(
-      '93942fd9acac3376eff76cce7cbdfa4a552e25051bf97505e7488debd84df830'
-    )
-    expect(historical.status).toBe('UNEXPANDED_HISTORICAL_DIGEST')
-    expect(historical.fieldLevelDelta).toBe('UNAVAILABLE_NOT_CLAIMED')
-    expect(historical.predecessorRows).toBeNull()
-    expect(historical.transition).toBeNull()
-    expect(fixture.current.hashes.full).not.toBe(historical.digest)
-
-    const controls = readGeneratedCurrentGenesis().genesis.current
-    const full = canonicalSerialize(controls.edges)
-    const removeAndAdd = [
-      ...controls.edges.slice(1),
-      { ...controls.edges[0], reader: 'forged-reader' }
-    ]
-    const duplicate = [...controls.edges, controls.edges[0]]
-    const omission = controls.edges.slice(0, -1)
-    const reorder = [...controls.edges].reverse()
-    expect(canonicalSerialize(removeAndAdd)).not.toBe(full)
-    expect(canonicalSerialize(duplicate)).not.toBe(full)
-    expect(canonicalSerialize(omission)).not.toBe(full)
-    expect(canonicalSerialize(reorder)).not.toBe(full)
-  })
-
-  it('separates semantic-field and coordinate mutations', () => {
-    const generated = readGeneratedCurrentGenesis()
-    const controls = generated.genesis.current
-    const semanticFields = [
-      'reader',
-      'kind',
-      'owner',
-      'symbol',
-      'local',
-      'disposition',
-      'packet',
-      'verification'
-    ]
-    const semantic = canonicalSerialize(controls.semantic)
-    const full = canonicalSerialize(controls.edges)
-    for (const field of semanticFields) {
-      const mutated = controls.semantic.map((edge) => ({
-        ...edge,
-        [field]: `${String(edge[field])}:mutated`
-      }))
-      expect(canonicalSerialize(mutated), field).not.toBe(semantic)
-      expect(
-        canonicalSerialize(
-          mutated.map((edge, index) => ({
-            ...edge,
-            line: controls.edges[index].line,
-            column: controls.edges[index].column
-          }))
-        ),
-        field
-      ).not.toBe(full)
+  it('fails when a disposable same-directory legacy translator alias is introduced', () => {
+    const specimenDirectory = mkdtempSync(join(tmpdir(), 'native-feature-reader-'))
+    const specimenPath = join(specimenDirectory, 'alias.ts')
+    /** Joins the prohibited test fixture without making this test itself a reader finding. */
+    const retiredSpecifier = './internal/' + 'plugin-' + 'translator.js'
+    try {
+      writeFileSync(specimenPath, `import '${retiredSpecifier}'\n`, 'utf8')
+      expect(() =>
+        execFileSync(
+          process.execPath,
+          [readerEvidencePath, workspaceRoot, '--specimen', specimenPath],
+          {
+            cwd: workspaceRoot,
+            encoding: 'utf8'
+          }
+        )
+      ).toThrow()
+    } finally {
+      rmSync(specimenDirectory, { recursive: true, force: true })
     }
-    const lineMutation = controls.edges.map((edge, index) =>
-      index === 0 ? { ...edge, line: Number(edge.line) + 1 } : edge
-    )
-    const columnMutation = controls.edges.map((edge, index) =>
-      index === 0 ? { ...edge, column: Number(edge.column) + 1 } : edge
-    )
-    expect(
-      canonicalSerialize(lineMutation.map(({ line: _line, column: _column, ...edge }) => edge))
-    ).toBe(semantic)
-    expect(
-      canonicalSerialize(columnMutation.map(({ line: _line, column: _column, ...edge }) => edge))
-    ).toBe(semantic)
-    expect(canonicalSerialize(lineMutation)).not.toBe(full)
-    expect(canonicalSerialize(columnMutation)).not.toBe(full)
-  })
-
-  it('exposes generator hostile controls as executable evidence', () => {
-    const generated = readGeneratedCurrentGenesis()
-    const source = readFileSync(readerInventoryGeneratorPath, 'utf8')
-    expect(source).toContain('UNEXPANDED_HISTORICAL_DIGEST')
-    expect(source).toContain('UNAVAILABLE_NOT_CLAIMED')
-    expect(source).toContain('MIXED_OWNER_STABLE_NAME_MISSING')
-    expect(source).toContain('REQUIRED_FINAL_ROOTS_MISSING')
-    expect(generated.genesis.current.hashes.coordinate).toBe(generated.hashes.coordinate)
-    expect(generated.controls.legacyImportType.owner.disposition).toBe('MIGRATE')
-  })
-
-  it('fails closed for manifest, target, and legacy provider evidence variants', () => {
-    const generated = readGeneratedCurrentGenesis()
-    expect(generated.controls.providerImportTypeControls).toEqual({
-      missingPackageRejected: true,
-      missingExportRejected: true,
-      missingTargetRejected: true,
-      targetRealpathEscapeRejected: true,
-      resolverEscapeRejected: true,
-      resolverMismatchRejected: true,
-      qualifierPreserved: true,
-      resolvedIdentityMatchesUnresolved: true
-    })
   })
 })
