@@ -78,7 +78,7 @@ describe('Storage Web backend guide', () => {
         'transaction',
         'upgrade-and-shutdown'
       ])
-      expect(code).toContain("import { indexedDb } from '@migaia/storage-web/indexed-db'")
+      expect(code).toContain("import { indexedDbHost } from '@migaia/storage-web/indexed-db'")
       expect(code).toContain('await db.putRecord')
       expect(code).toContain('await db.getRecord')
       expect(code).toContain('await db.deleteRecord')
@@ -255,7 +255,7 @@ describe('Storage Web backend guide', () => {
       expect(code).toContain('StorageErrorCode.unavailable')
       expect(code).toContain('error.cause')
       expect(code).toContain('await firstStore.dispose()')
-      expect(code).toContain('const nextStore = memoryStorage()')
+      expect(code).toContain('const nextStore = memoryStorageHost()')
 
       const text = JSON.stringify(sections)
       expect(text).toContain('STORE_DISPOSED')

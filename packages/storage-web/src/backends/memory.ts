@@ -35,12 +35,12 @@ import {
 import type { IStorageCapabilities } from '../types/capabilities.js'
 
 /**
- * `changeFeed: true` only for this backend: `memoryStorage()` creates one isolated, unshared store
- * per call (§ own doc comment below), so SWV2-R16's "same-page multiple instances" and "cross-tab"
- * clauses have no referent here — there is no second instance or tab that could ever observe the
- * same data, unlike localStorage/sessionStorage/IndexedDB. The single-instance local change feed
- * below is therefore this backend's _entire_ meaningful scope for SWV2-B05/R05/R16, not a partial
- * slice of a larger cross-tab feature still to come.
+ * `changeFeed: true` only for this backend: `memoryStorageHost()` creates one isolated, unshared
+ * store per call (§ own doc comment below), so SWV2-R16's "same-page multiple instances" and
+ * "cross-tab" clauses have no referent here — there is no second instance or tab that could ever
+ * observe the same data, unlike localStorageHost/sessionStorageHost/IndexedDB. The single-instance
+ * local change feed below is therefore this backend's _entire_ meaningful scope for
+ * SWV2-B05/R05/R16, not a partial slice of a larger cross-tab feature still to come.
  */
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -58,7 +58,7 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
  * 纯内存实现。用于测试、SSR 服务端、以及其他后端不可用时的显式降级目标。 每个实例持有独立存储，天然隔离，不需要命名空间参数。 实现全部 L0 + L1 接口（record 使用
  * structured clone），v1 不提供原生二级索引。
  */
-export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>> &
+export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>> &
   IChangeFeedStore => {
   const kv = new Map<string, string>()
   const bytes = new Map<string, Uint8Array>()

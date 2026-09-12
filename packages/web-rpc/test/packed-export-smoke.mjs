@@ -89,6 +89,7 @@ async function main() {
         'dir'
       )
     }
+    assertPackedCoreRuntimeHidden(consumerDirectory)
     assertPackedLegacyEnvelopeRejection(consumerDirectory)
     assertPackedLegacyEnvelopePerturbation(
       consumerDirectory,
@@ -136,6 +137,21 @@ async function main() {
   } finally {
     rmSync(smokeDirectory, { recursive: true, force: true })
   }
+}
+
+/** Ensures the public `./core` subpath never leaks the unchecked composition implementation. */
+function assertPackedCoreRuntimeHidden(consumerDirectory) {
+  const probe = join(consumerDirectory, 'core-runtime-hidden.mjs')
+  writeFileSync(
+    probe,
+    [
+      "import * as core from '@migaia/web-rpc/core'",
+      "if ('createComposedEndpointRuntime' in core)",
+      "  throw new Error('packed core exposed unchecked composition runtime')"
+    ].join('\n'),
+    'utf8'
+  )
+  execFileSync(process.execPath, [probe], { cwd: consumerDirectory, stdio: 'inherit' })
 }
 
 /** Rejects three retired WebRPC semantic shapes through the packed rpc-contract normalizer. */
@@ -363,14 +379,13 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
   const original = readFileSync(canonicalFeaturePath)
   const source = original.toString('utf8')
   /** Exact compiled install statement that causally bounds the injected legacy route. */
-  const anchor =
-    'const attachment = new WebRpcCanonicalChunkAttachment(kernel, prepared.options.components?.framer);'
+  const anchor = 'const prepared = core.featureExpose.getPrepared();'
   if (!source.includes(anchor))
     throw new Error('Packed canonical feature route mutation anchor is unavailable')
   /** One-line perturbation that makes the real canonical feature claim the retired route. */
   const mutated = source.replace(
     anchor,
-    `${anchor}\n    kernel.registerRoute('chunk', () => undefined);`
+    `${anchor}\n        core.featureExpose.getKernel().registerRoute('chunk', () => undefined);`
   )
   /** Fresh child-process probe that preserves the packed outbound-to-canonical dependency path. */
   const probe = join(consumerDirectory, 'canonical-feature-route-probe.mjs')
@@ -382,17 +397,15 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
     writeFileSync(
       probe,
       [
-        "import { createComposedEndpoint } from '@migaia/web-rpc/core'",
-        "import { outbound } from '@migaia/web-rpc/features/outbound'",
+        "import { createClientEndpoint } from '@migaia/web-rpc/client'",
         "import { connect, protocol, codec } from '@migaia/web-rpc'",
         "import { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'",
         "import { createStringFramer } from '@migaia/rpc-contract/framing'",
         "import { defineJsonCodec } from '@migaia/serialize/codecs/json'",
         'const [transport] = createMemoryTransportPair()',
         'try {',
-        '  const endpoint = await createComposedEndpoint(',
+        '  const endpoint = await createClientEndpoint(',
         "    { id: 'packed-canonical-feature-route', transport, framer: createStringFramer(), middlewares: [protocol(), codec(defineJsonCodec({ version: 1 })), connect({ transport })] },",
-        '    [outbound()]',
         '  )',
         "  if ('chunk' in endpoint) throw new Error('Canonical feature leaked a root chunk surface')",
         '  await endpoint.dispose()',
@@ -423,7 +436,7 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
     writeFileSync(canonicalFeaturePath, mutated, 'utf8')
     if (
       !readFileSync(canonicalFeaturePath, 'utf8').includes(
-        "kernel.registerRoute('chunk', () => undefined);"
+        "core.featureExpose.getKernel().registerRoute('chunk', () => undefined);"
       )
     )
       throw new Error('Packed canonical feature route mutation was not written')
@@ -582,7 +595,6 @@ function readFeatureDocumentationManifest(rootPath) {
   const names = [
     'defineFeature',
     'IWebRpcFeatureDefinition',
-    'IWebRpcFeatureInstallScope',
     'IWebRpcFeature',
     'IWebRpcFeatureSurface'
   ]
@@ -631,7 +643,15 @@ function readFeatureDocumentationManifest(rootPath) {
           name: tag.name.getText(),
           documentation: normalizeJSDocComment(tag.comment)
         }))
-        const typeParameter = overloadTags.typeParam?.match(/^([^\s-]+)\s*-\s*(.+)$/u)
+        const typeParameters = documentationTags
+          .filter((tag) => tag.tagName.text === 'typeParam')
+          .map((tag) => {
+            const parsed = normalizeJSDocComment(tag.comment).match(/^([^\s-]+)\s*-\s*(.+)$/u)
+            return {
+              name: parsed?.[1] ?? '',
+              documentation: parsed?.[2] ?? ''
+            }
+          })
         const expectedParameters = declaration.parameters.map((parameter) =>
           parameter.name.getText()
         )
@@ -640,9 +660,11 @@ function readFeatureDocumentationManifest(rootPath) {
           JSON.stringify(parameters.map((parameter) => parameter.name)) !==
             JSON.stringify(expectedParameters) ||
           parameters.some((parameter) => !parameter.documentation) ||
-          !typeParameter ||
-          typeParameter[1] !== 'TSurface' ||
-          !typeParameter[2] ||
+          JSON.stringify(typeParameters.map((parameter) => parameter.name)) !==
+            JSON.stringify(
+              declaration.typeParameters?.map((parameter) => parameter.name.text) ?? []
+            ) ||
+          typeParameters.some((parameter) => !parameter.documentation) ||
           !['remarks', 'returns', 'throws'].every((tag) => overloadTags[tag])
         )
           throw new Error(`defineFeature overload documentation is incomplete in ${rootPath}`)
@@ -650,7 +672,7 @@ function readFeatureDocumentationManifest(rootPath) {
           documentation: overloadDocumentation,
           parameters,
           tags: overloadTags,
-          typeParameters: [{ name: typeParameter[1], documentation: typeParameter[2] }]
+          typeParameters
         }
       })
       manifest[name] = { documentation, tags, overloads: overloadManifest }
@@ -794,17 +816,7 @@ const [clientTransport] = memory.createMemoryTransportPair();
 const [providerTransport] = memory.createMemoryTransportPair();
 const [fullTransport] = memory.createMemoryTransportPair();
 const middleware = root.connect();
-let packedFeatureReleases = 0;
-const packedFeature = root.defineFeature({
-  key: 'packed-custom',
-  claims: { publicKeys: ['packedCustom'] },
-  install: ({ own }) => {
-    own({}, () => {
-      packedFeatureReleases += 1;
-    });
-    return { packedCustom: () => 'packed-custom' };
-  }
-});
+const packedFeature = root.defineFeature(() => ({ packedCustom: () => 'packed-custom' }));
 try {
   await root.createEndpoint({
     id: 'packed-legacy-shape',
@@ -831,18 +843,8 @@ const full = await root.createEndpoint({
   middlewares: [middleware],
   features: [packedFeature]
 });
-const core = await import('@migaia/web-rpc/core');
-const providerFeature = await import('@migaia/web-rpc/features/provider');
-const discoveryFeature = await import('@migaia/web-rpc/features/discovery');
-const oneWayFeature = await import('@migaia/web-rpc/features/one-way');
-const tuple = await core.createComposedEndpoint(
-  { id: 'packed-public-tuple', transport: fullTransport, middlewares: [middleware] },
-  [providerFeature.provider(), discoveryFeature.discovery()]
-);
 if (typeof client.send !== 'function' || typeof provider.provide !== 'function')
   throw new Error('Packed selected preset surface missing runtime capability');
-if (typeof oneWayFeature.oneWay !== 'function')
-  throw new Error('Packed one-way feature export missing runtime factory');
 if (
   typeof full.send !== 'function' ||
   typeof full.provide !== 'function' ||
@@ -854,15 +856,9 @@ if (full.packedCustom() !== 'packed-custom')
   throw new Error('Packed root custom feature runtime projection failed');
 if ('connect' in provider || 'discovery' in provider)
   throw new Error('Packed provider surface leaked unselected capabilities');
-const tupleKeys = Object.keys(tuple).sort().join(',');
-if (tupleKeys !== 'connect,discovery,dispatch,dispatchAll,dispose,hooks,on,provide,send,sendAll')
-  throw new Error('Packed public tuple runtime keys do not match its selected capabilities: ' + tupleKeys);
 await client.dispose();
 await provider.dispose();
 await full.dispose();
-await tuple.dispose();
-if (packedFeatureReleases !== 1)
-  throw new Error('Packed custom feature resource was not disposed exactly once');
 `
 }
 

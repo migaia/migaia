@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { cookies, localStorage, sessionStorage, memoryStorage } from '../../src/backends'
+import {
+  cookiesHost,
+  localStorageHost,
+  sessionStorageHost,
+  memoryStorageHost
+} from '../../src/backends'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage'
 import { fakeCookieDocument } from '../../src/testing/fake-cookie-document'
 
 describe('同步通道与异步通道一致性', () => {
-  it('localStorage：sync 与 async 对同一序列操作的最终状态一致', async () => {
-    const store = localStorage({ namespace: 'sync-check', storage: fakeWebStorage() })
+  it('localStorageHost：sync 与 async 对同一序列操作的最终状态一致', async () => {
+    const store = localStorageHost({ namespace: 'sync-check', storage: fakeWebStorage() })
     store.sync!.set('a', '1')
     await store.set('b', '2')
     store.sync!.remove('a')
@@ -16,8 +21,8 @@ describe('同步通道与异步通道一致性', () => {
     await expect(store.get('b')).resolves.toBe('2')
   })
 
-  it('sessionStorage 提供完整 sync 通道', () => {
-    const store = sessionStorage({ namespace: 'sync-check', storage: fakeWebStorage() })
+  it('sessionStorageHost 提供完整 sync 通道', () => {
+    const store = sessionStorageHost({ namespace: 'sync-check', storage: fakeWebStorage() })
     expect(store.sync).toBeDefined()
     store.sync!.set('k', 'v')
     expect(store.sync!.get('k')).toBe('v')
@@ -28,7 +33,7 @@ describe('同步通道与异步通道一致性', () => {
   })
 
   it('memory 提供完整 sync 通道', () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     expect(store.sync).toBeDefined()
     store.sync!.set('k', 'v')
     expect(store.sync!.get('k')).toBe('v')
@@ -36,10 +41,10 @@ describe('同步通道与异步通道一致性', () => {
 
   it('所有同步写入口拒绝非法 options、policy 与异步生命周期字段', () => {
     const stores = [
-      memoryStorage(),
-      localStorage({ namespace: 'sync-guard-local', storage: fakeWebStorage() }),
-      sessionStorage({ namespace: 'sync-guard-session', storage: fakeWebStorage() }),
-      cookies({ namespace: 'sync-guard-cookie', document: fakeCookieDocument() })
+      memoryStorageHost(),
+      localStorageHost({ namespace: 'sync-guard-local', storage: fakeWebStorage() }),
+      sessionStorageHost({ namespace: 'sync-guard-session', storage: fakeWebStorage() }),
+      cookiesHost({ namespace: 'sync-guard-cookie', document: fakeCookieDocument() })
     ]
     for (const store of stores)
       for (const options of [
@@ -60,10 +65,10 @@ describe('同步通道与异步通道一致性', () => {
 
   it('所有同步写入口只读取一次 options 字段', () => {
     const stores = [
-      memoryStorage(),
-      localStorage({ namespace: 'sync-snapshot-local', storage: fakeWebStorage() }),
-      sessionStorage({ namespace: 'sync-snapshot-session', storage: fakeWebStorage() }),
-      cookies({ namespace: 'sync-snapshot-cookie', document: fakeCookieDocument() })
+      memoryStorageHost(),
+      localStorageHost({ namespace: 'sync-snapshot-local', storage: fakeWebStorage() }),
+      sessionStorageHost({ namespace: 'sync-snapshot-session', storage: fakeWebStorage() }),
+      cookiesHost({ namespace: 'sync-snapshot-cookie', document: fakeCookieDocument() })
     ]
     for (const store of stores) {
       let reads = 0

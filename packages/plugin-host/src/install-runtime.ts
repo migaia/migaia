@@ -1,8 +1,11 @@
 import {
   assimilateCapturedThen,
   createAbortController,
+  createPendingTracker,
   createLifecycleScope,
   createProvisionalScope,
+  containAsyncRejection,
+  probeThenable,
   type ILifecycleScheduler
 } from '@migaia/lifecycle'
 import { copyConfig, readPlainDataRecord } from './config.js'
@@ -10,8 +13,9 @@ import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-
 import { PluginHostErrorCode } from './error-code.js'
 import { mountPluginExtensions } from './extension.js'
 import { invokeCaptured } from './invocation.js'
+import { compileFeatures, instantiateFeatures, snapshotFeatureExpose } from './feature-runtime.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IInstallEntry, IRegistration, ISharedEntry } from './registry.js'
+import type { IInstallEntry, IPluginDescriptor, IRegistration, ISharedEntry } from './registry.js'
 import type {
   IAsyncGeneratorPipelineStage,
   IAsyncPipelineStage,
@@ -102,7 +106,9 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           installed: false,
           lifecycle: PluginHostRegistrationLifecycle.install,
           lifecycleController: createAbortController(),
-          scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler })
+          scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler }),
+          featureExposeValid: true,
+          featurePending: createPendingTracker()
         }
         installed.push(registration)
         try {
@@ -111,9 +117,8 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
             parentSignal: registration.operation?.signal
           })
           this.#port.setHookRegistration(registration)
-          const installResult = invokeCaptured(plugin.install, plugin.owner, [
-            this.#port.createCore(registration, batch)
-          ])
+          const core = this.#initializeFeatureCore(registration, batch)
+          const installResult = this.#invokeInstall(registration, core)
           if (
             installResult &&
             typeof installResult === 'object' &&
@@ -135,13 +140,12 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
             registration
           )
           this.#port.assertOperationCurrent(registration)
-          if (plugin.shared) {
+          const extensions = this.#mergeDescriptorExpose(registration, installedValue)
+          if (this.#sharedHook(registration)) {
             this.#port.setHookRegistration(registration)
             let sharedValue: unknown
             try {
-              sharedValue = invokeCaptured(plugin.shared, plugin.owner, [
-                this.#port.createCore(registration, batch)
-              ])
+              sharedValue = this.#invokeShared(registration, batch)
             } finally {
               this.#port.setHookRegistration(undefined)
             }
@@ -158,7 +162,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           }
           mountPluginExtensions(
             registration,
-            installedValue,
+            extensions,
             batch.extensionOwners,
             this.#port.diagnostic
           )
@@ -218,17 +222,18 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           installed: false,
           lifecycle: PluginHostRegistrationLifecycle.install,
           lifecycleController: createAbortController(),
-          scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler })
+          scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler }),
+          featureExposeValid: true,
+          featurePending: createPendingTracker()
         }
         installed.push(registration)
         try {
           this.#port.beginOperation(registration)
           this.#port.setHookRegistration(registration)
+          const core = this.#initializeFeatureCore(registration, batch)
           let installedValue: unknown
           try {
-            installedValue = invokeCaptured(plugin.install, plugin.owner, [
-              this.#port.createCore(registration, batch)
-            ])
+            installedValue = this.#invokeInstall(registration, core)
           } finally {
             this.#port.setHookRegistration(undefined)
           }
@@ -246,13 +251,12 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
               `plugin ${registration.name} returned an awaitable during synchronous installation`
             )
           }
-          if (plugin.shared) {
+          const extensions = this.#mergeDescriptorExpose(registration, installedValue)
+          if (this.#sharedHook(registration)) {
             this.#port.setHookRegistration(registration)
             let sharedValue: unknown
             try {
-              sharedValue = invokeCaptured(plugin.shared, plugin.owner, [
-                this.#port.createCore(registration, batch)
-              ])
+              sharedValue = this.#invokeShared(registration, batch)
             } finally {
               this.#port.setHookRegistration(undefined)
             }
@@ -269,7 +273,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           }
           mountPluginExtensions(
             registration,
-            installedValue,
+            extensions,
             batch.extensionOwners,
             this.#port.diagnostic
           )
@@ -311,6 +315,164 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     } finally {
       this.#port.setActiveBatch(undefined)
     }
+  }
+
+  /** Initializes the one registration-local Feature surface shared by async and sync installation. */
+  #initializeFeatureCore(
+    registration: IRegistration<TDomainCore, TValue>,
+    batch: IInstallBatchContext<TDomainCore, TValue>
+  ): TDomainCore & IPluginHostCore<TValue> {
+    const core = this.#port.createCore(registration, batch) as Record<PropertyKey, unknown>
+    const featurePlan = compileFeatures(registration.plugin.features)
+    const rejectEarlyFeatureRead = (): never => {
+      throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_FEATURE_CORE_PENDING)
+    }
+    Object.defineProperties(core, {
+      featureExpose: { configurable: true, get: rejectEarlyFeatureRead },
+      features: { configurable: true, get: rejectEarlyFeatureRead }
+    })
+    registration.descriptor = registration.plugin.descriptorFactory
+      ? this.#snapshotDescriptor(
+          registration,
+          invokeCaptured(registration.plugin.descriptorFactory, registration.plugin.owner, [core])
+        )
+      : undefined
+    const expose = registration.descriptor?.featureExpose
+      ? registration.descriptor.featureExpose()
+      : typeof registration.plugin.featureExpose === 'function'
+        ? invokeCaptured(registration.plugin.featureExpose, registration.plugin.owner, [core])
+        : (registration.plugin.featureExpose ?? {})
+    this.#rejectThenable(expose, ERROR_TEXT.PLUGIN_FEATURE_EXPOSE_OUTPUT)
+    if (!expose || typeof expose !== 'object')
+      throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_FEATURE_EXPOSE_OUTPUT)
+    registration.featureExpose = snapshotFeatureExpose(
+      expose,
+      () => registration.featureExposeValid === true
+    )
+    registration.featureOutputs = instantiateFeatures(
+      registration.plugin.features,
+      registration.featureExpose,
+      featurePlan,
+      (error) => this.#port.diagnostic(String(error), PluginHostErrorCode.pluginInstallFailed)
+    )
+    Object.defineProperty(core, 'featureExpose', {
+      value: registration.featureExpose,
+      enumerable: true
+    })
+    Object.defineProperty(core, 'features', {
+      value: registration.featureOutputs,
+      enumerable: true
+    })
+    return core as TDomainCore & IPluginHostCore<TValue>
+  }
+
+  /** Rejects descriptor getters and unknown hooks without executing a returned capability. */
+  #snapshotDescriptor(
+    registration: IRegistration<TDomainCore, TValue>,
+    value: unknown
+  ): IPluginDescriptor {
+    if (!value || typeof value !== 'object')
+      throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_DESCRIPTOR_OUTPUT)
+    this.#rejectThenable(value, ERROR_TEXT.PLUGIN_DESCRIPTOR_OUTPUT)
+    const descriptor: Record<string, unknown> = {}
+    for (const key of Reflect.ownKeys(value)) {
+      if (
+        typeof key !== 'string' ||
+        !['install', 'expose', 'featureExpose', 'shared'].includes(key)
+      )
+        throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_DESCRIPTOR_HOOK)
+      const property = Object.getOwnPropertyDescriptor(value, key)
+      if (!property || !('value' in property) || typeof property.value !== 'function')
+        throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_DESCRIPTOR_HOOK_DATA)
+      descriptor[key] = property.value
+    }
+    return Object.freeze(descriptor) as IPluginDescriptor
+  }
+
+  /** Invokes the descriptor install hook after Feature outputs become ready. */
+  #invokeInstall(
+    registration: IRegistration<TDomainCore, TValue>,
+    core: TDomainCore & IPluginHostCore<TValue>
+  ): unknown {
+    const hook = registration.descriptor?.install
+    return hook
+      ? hook()
+      : invokeCaptured(registration.plugin.install, registration.plugin.owner, [core])
+  }
+
+  /** Selects descriptor shared output without exposing it to Feature factories. */
+  #sharedHook(registration: IRegistration<TDomainCore, TValue>): unknown {
+    return registration.descriptor?.shared ?? registration.plugin.shared
+  }
+
+  /** Invokes shared through its owning descriptor or legacy Plugin core. */
+  #invokeShared(
+    registration: IRegistration<TDomainCore, TValue>,
+    batch: IInstallBatchContext<TDomainCore, TValue>
+  ): unknown {
+    const shared = registration.descriptor?.shared
+      ? registration.descriptor.shared()
+      : invokeCaptured(registration.plugin.shared!, registration.plugin.owner, [
+          this.#port.createCore(registration, batch)
+        ])
+    this.#rejectThenable(shared, ERROR_TEXT.PLUGIN_DESCRIPTOR_OUTPUT)
+    return shared
+  }
+
+  /** Merges descriptor install/expose outputs only after rejecting their own-key collision. */
+  #mergeDescriptorExpose(
+    registration: IRegistration<TDomainCore, TValue>,
+    installValue: unknown
+  ): unknown {
+    const expose = registration.descriptor?.expose?.()
+    if (expose === undefined) return installValue
+    this.#rejectThenable(expose, ERROR_TEXT.PLUGIN_DESCRIPTOR_OUTPUT)
+    const install = readPlainDataRecord(installValue, 'plugin install', false)
+    const publicSurface = readPlainDataRecord(expose, 'plugin expose', false)
+    const merged: Record<PropertyKey, unknown> = {}
+    for (const key of Reflect.ownKeys(install))
+      Object.defineProperty(merged, key, Object.getOwnPropertyDescriptor(install, key)!)
+    for (const key of Reflect.ownKeys(publicSurface)) {
+      if (Object.hasOwn(install, key))
+        throw new PluginHostError(
+          PluginHostErrorCode.extensionDuplicate,
+          ERROR_TEXT.EXTENSION_DUPLICATE(registration.name, key)
+        )
+      Object.defineProperty(merged, key, Object.getOwnPropertyDescriptor(publicSurface, key)!)
+    }
+    return merged
+  }
+
+  /** Rejects hook thenables immediately while reporting any late rejection through host diagnostics. */
+  #rejectThenable(value: unknown, text: string): void {
+    if (!value || (typeof value !== 'object' && typeof value !== 'function')) return
+    const thenable = probeThenable(value)
+    if (thenable?.kind === 'failed') {
+      const error = createPluginHostTypeError(text)
+      Object.defineProperty(error, 'cause', { value: thenable.error })
+      this.#reportThenableRejection(thenable.error)
+      throw error
+    }
+    if (thenable?.kind === 'thenable') {
+      const rejection = createPluginHostTypeError(text)
+      void assimilateCapturedThen(thenable.thenFn, value).catch((error) => {
+        try {
+          Object.defineProperty(rejection, 'cause', { value: error })
+        } catch {}
+        this.#reportThenableRejection(error)
+      })
+      throw rejection
+    }
+  }
+
+  /** Reports a late hook rejection without allowing diagnostics to replace its original cause. */
+  #reportThenableRejection(error: unknown): void {
+    try {
+      containAsyncRejection(
+        this.#port.diagnostic(String(error), PluginHostErrorCode.pluginInstallFailed),
+        () => undefined
+      )
+    } catch {}
   }
 
   /** Reports rollback failures without replacing the original installation error. */

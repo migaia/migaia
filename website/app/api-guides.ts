@@ -418,7 +418,7 @@ const optionTranslations: Readonly<
   'storage-web:*:*:document': {
     en: 'Document injection point for tests. Browser hosts default to globalThis.document.'
   },
-  'storage-web:cookies:cookies:scope': {
+  'storage-web:cookies:cookiesHost:scope': {
     en: 'Cookie scope used to filter invalidation. Changes that cannot be proven unrelated conservatively trigger a refresh.'
   },
   'storage-web:plugins-reactive-cookies:cookiesReactive:scope': {
@@ -2588,13 +2588,13 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   ...completionApiGuides,
   ...webRpcApiGuides,
   ...utilsApiGuides,
-  'storage-web:memory:memoryStorage': createStorageWebGuide({
+  'storage-web:memory:memoryStorageHost': createStorageWebGuide({
     purposeEn:
       'Creates an isolated synchronous in-memory record store with text, byte, structured-record, transaction, iteration, metadata, and post-commit change-feed channels. It is process-local and loses all data when the instance is discarded.',
     purposeZh:
       '创建隔离的 synchronous in-memory record store，提供 text、byte、structured-record、transaction、iteration、metadata 与 post-commit change-feed channel。它仅存在于当前 process，instance 丢弃后全部数据消失。',
     quickStart:
-      "const storage = memoryStorage<User>()\nawait storage.putRecord({ id: 1, name: 'Ada' }, 1)\nconst user = await storage.getRecord(1)",
+      "const storage = memoryStorageHost<User>()\nawait storage.putRecord({ id: 1, name: 'Ada' }, 1)\nconst user = await storage.getRecord(1)",
     scenariosEn: [
       'Tests need a real contract implementation without browser globals.',
       'Ephemeral application state needs record and transaction semantics.',
@@ -2616,13 +2616,13 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'owner lifecycle 无法约束 memory growth。'
     ]
   }),
-  'storage-web:local-storage:localStorage': createStorageWebGuide({
+  'storage-web:local-storage:localStorageHost': createStorageWebGuide({
     purposeEn:
       'Creates a namespaced synchronous key-value store over Web Storage localStorage. It persists text values across reloads, exposes sync and async views, and never claims record, binary, transaction, or change-feed capabilities.',
     purposeZh:
       '在 Web Storage localStorage 上创建 namespaced synchronous key-value store。它跨 reload 持久化 text value，提供 sync/async view，并且不会声称支持 record、binary、transaction 或 change-feed。',
     quickStart:
-      "const settings = localStorage({ namespace: 'settings' })\nsettings.sync.set('theme', 'dark')\nconsole.log(await settings.get('theme'))",
+      "const settings = localStorageHost({ storage: globalThis.localStorage })\nsettings.sync.set('theme', 'dark')\nconsole.log(await settings.get('theme'))",
     scenariosEn: [
       'Small durable browser settings.',
       'Immediate synchronous reads are required at startup.',
@@ -2645,22 +2645,6 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     ],
     optionsEn: [
       {
-        name: 'namespace',
-        description: 'Logical prefix isolating physical keys from other store instances.',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: 'Give each application or feature a stable key domain.',
-        example: "'settings'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'Advanced physical-key codec; changing it changes the persisted key format.',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: 'Only for an explicitly migrated custom key layout.',
-        example: 'customNamespaceCodec'
-      },
-      {
         name: 'storage',
         description: 'Injected Web Storage-compatible surface.',
         defaultValue: 'globalThis.localStorage',
@@ -2671,22 +2655,6 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     ],
     optionsZh: [
       {
-        name: 'namespace',
-        description: '把 physical key 与其他 store instance 隔离的 logical prefix。',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: '为每个 application 或 feature 提供稳定 key domain。',
-        example: "'settings'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'advanced physical-key codec；改变它就会改变 persisted key format。',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: '仅用于已经显式迁移的 custom key layout。',
-        example: 'customNamespaceCodec'
-      },
-      {
         name: 'storage',
         description: 'injected Web Storage-compatible surface。',
         defaultValue: 'globalThis.localStorage',
@@ -2696,13 +2664,13 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:session-storage:sessionStorage': createStorageWebGuide({
+  'storage-web:session-storage:sessionStorageHost': createStorageWebGuide({
     purposeEn:
       'Creates a namespaced synchronous key-value store over sessionStorage. Values survive reload within one browsing context but are discarded when that tab or window session ends.',
     purposeZh:
       '在 sessionStorage 上创建 namespaced synchronous key-value store。value 在同一 browsing context 的 reload 后仍存在，但 tab/window session 结束时会被丢弃。',
     quickStart:
-      "const draft = sessionStorage({ namespace: 'checkout' })\ndraft.sync.set('step', 'shipping')",
+      "const draft = sessionStorageHost({ storage: globalThis.sessionStorage })\ndraft.sync.set('step', 'shipping')",
     scenariosEn: [
       'Per-tab drafts survive reload.',
       'Sensitive workflow state should not persist indefinitely.',
@@ -2725,22 +2693,6 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     ],
     optionsEn: [
       {
-        name: 'namespace',
-        description: 'Logical prefix isolating physical keys.',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: 'Separate independent session workflows.',
-        example: "'checkout'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'Advanced physical-key codec with persisted-format consequences.',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: 'Use only with an explicit format migration.',
-        example: 'customNamespaceCodec'
-      },
-      {
         name: 'storage',
         description: 'Injected Web Storage-compatible surface.',
         defaultValue: 'globalThis.sessionStorage',
@@ -2751,22 +2703,6 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     ],
     optionsZh: [
       {
-        name: 'namespace',
-        description: '隔离 physical key 的 logical prefix。',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: '分离 independent session workflow。',
-        example: "'checkout'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: '会影响 persisted format 的 advanced physical-key codec。',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: '仅配合显式 format migration 使用。',
-        example: 'customNamespaceCodec'
-      },
-      {
         name: 'storage',
         description: 'injected Web Storage-compatible surface。',
         defaultValue: 'globalThis.sessionStorage',
@@ -2776,13 +2712,13 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:cookies:cookies': createStorageWebGuide({
+  'storage-web:cookies:cookiesHost': createStorageWebGuide({
     purposeEn:
       'Creates a namespaced synchronous cookie-backed text store with one fixed scope for every write and removal. Cookie limits and visibility apply: a missing JavaScript-visible key does not prove an HttpOnly cookie is absent.',
     purposeZh:
       '创建 namespaced synchronous cookie-backed text store，并为每次 write/removal 使用同一个 fixed scope。cookie limit 与 visibility 仍然成立：JavaScript 看不到 key，并不能证明 HttpOnly cookie 不存在。',
     quickStart:
-      "const preferences = cookies({ namespace: 'prefs', scope: { path: '/', sameSite: 'lax', secure: true } })\nawait preferences.set('theme', 'dark', { maxAge: 86_400 })",
+      "const preferences = cookiesHost({ namespace: 'prefs', scope: { path: '/', sameSite: 'lax', secure: true } })\nawait preferences.set('theme', 'dark', { maxAge: 86_400 })",
     scenariosEn: [
       'A small value must accompany HTTP requests.',
       'Cookie write and delete scope must remain identical.',
@@ -2937,13 +2873,13 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:indexed-db:indexedDb': createStorageWebGuide({
+  'storage-web:indexed-db:indexedDbHost': createStorageWebGuide({
     purposeEn:
       'Creates the durable structured browser store: text, bytes, records, transactions, iteration, metadata, secondary indexes, and post-commit change feed. Opening and schema work remain lazy until the first operation.',
     purposeZh:
       '创建 durable structured browser store，提供 text、bytes、records、transactions、iteration、metadata、secondary indexes 与 post-commit change feed。open 与 schema work 会延迟到首次 operation。',
     quickStart:
-      "const db = indexedDb<User>({ dbName: 'app-data', recordsStoreName: 'users' })\nawait db.putRecord({ id: 1, email: 'ada@example.com' }, 1)\nfor await (const [key, user] of db.iterateRecords()) consume(key, user)",
+      "const db = indexedDbHost<User>({ dbName: 'app-data', recordsStoreName: 'users' })\nawait db.putRecord({ id: 1, email: 'ada@example.com' }, 1)\nfor await (const [key, user] of db.iterateRecords()) consume(key, user)",
     scenariosEn: [
       'Durable structured records exceed Web Storage limits.',
       'Transactions, iteration, indexes, or change feeds are required.',
@@ -3455,7 +3391,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '声明一个 versioned domain record，之后再把 immutable definition 连接到 concrete store。生成的 repository 统一负责 validation、codec selection、migration、entity-key isolation、index、list、stream 与 transactional batch behavior。',
     quickStart:
-      "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\n\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: { email: { path: 'email', unique: true } }\n})\nconst repository = users.connect(indexedDb({ dbName: 'app' }))\nawait repository.put({ id: 1, email: 'ada@example.com' })",
+      "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\n\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: { email: { path: 'email', unique: true } }\n})\nconst repository = users.connect(indexedDbHost({ dbName: 'app' }))\nawait repository.put({ id: 1, email: 'ada@example.com' })",
     scenariosEn: [
       'Domain records need one backend-neutral repository contract.',
       'Persisted data requires validation and ordered version migration.',
@@ -3717,11 +3653,11 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'Creates an opaque backend-kind factory that binds one store type to validated kind names. The private identity prevents a look-alike object from claiming compatibility with plugin and feature definitions.',
     purposeZh:
       '创建 opaque backend-kind factory，把一种 store type 绑定到 validated kind name。private identity 防止 look-alike object 冒充与 plugin、feature definition 兼容。',
-    quickStart: `import { memoryStorage } from '@migaia/storage-web/memory'
+    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { defineStorageBackendKind } from '@migaia/storage-web/host'
 
 // ReturnType 把 kind 精确绑定到这个示例实际创建的 store。
-type ICacheStore = ReturnType<typeof memoryStorage>
+type ICacheStore = ReturnType<typeof memoryStorageHost>
 const defineCacheKind = defineStorageBackendKind<ICacheStore>()
 const cacheKind = defineCacheKind('cache')`,
     scenariosEn: [
@@ -3772,7 +3708,7 @@ const cacheKind = defineCacheKind('cache')`,
       'Defines one optional capability for a Storage Host. A bare Host has only its basic management operations: it can install plugins, look up installed backends, and dispose them. It has no backend and no usable backend Feature yet. For example, liveQuery is not available until a backend Plugin carrying the reactive Feature has been installed. A Feature and a Plugin are different things: the Feature is a read-only description of one capability, while the Plugin is the complete backend package that the Host actually installs and removes. The Plugin creates the storage instance and may carry zero, one, or several Features in its features array. A Feature is bound to a backend kind, not to one particular Plugin ID: any Plugin created with that exact backendKind may include it, but a Plugin for another kind is rejected. When such a Plugin is installed, the Host materializes a separate copy of the capability for that installed backend. Calling this function alone therefore does not create a Host, open a database, or enable anything. Put the returned Feature in defineStorageBackendPlugin({ features: [...] }); createStorageHost() or host.use() then installs the Plugin and activates the capability for that backend.',
     purposeZh:
       '这个 API 用来给 Storage Host 定义一项可选能力。裸 Host 只有安装插件、查找已安装后端和统一释放资源等基础管理能力；它还没有任何存储后端，也没有任何可用的后端 Feature。例如，在安装一个携带 reactive Feature 的后端 Plugin 之前，不能使用 liveQuery。Feature 和 Plugin 不是一回事：Feature 只是一项能力的只读“说明书”；Plugin 才是 Host 真正安装和卸载的完整后端包，它负责创建存储实例，并通过 features 数组携带零项、一项或多项 Feature。Feature 绑定的是 backend kind（后端种类），不是某个特定的 Plugin ID：任何使用同一个 backendKind 创建的 Plugin 都可以携带它，其他种类的 Plugin 则会被拒绝。Plugin 安装后，Host 会为这个已安装后端单独接入一份该能力。因此，只调用这个 API 不会创建 Host、不会打开数据库，也不会启用任何能力。把返回的 Feature 放进 defineStorageBackendPlugin({ features: [...] })，再由 createStorageHost() 或 host.use() 安装这个 Plugin，能力才会对这个后端生效。',
-    quickStart: `import { memoryStorage } from '@migaia/storage-web/memory'
+    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
 import {
   defineStorageBackendFeature,
   defineStorageBackendKind,
@@ -3780,7 +3716,7 @@ import {
 } from '@migaia/storage-web/host'
 
 // 先定义一种后端。这里用内存存储实现一个示例 cache 后端。
-type ICacheStore = ReturnType<typeof memoryStorage>
+type ICacheStore = ReturnType<typeof memoryStorageHost>
 const cacheKind = defineStorageBackendKind<ICacheStore>()('cache')
 
 // Feature 只描述一项能力，它本身不能安装，也不会创建存储实例。
@@ -3794,7 +3730,7 @@ const reactive = defineStorageBackendFeature(cacheKind, 'reactive', {
 const cachePlugin = defineStorageBackendPlugin({
   backendKind: cacheKind,
   id: 'cache',
-  create: () => memoryStorage(),
+  create: () => memoryStorageHost(),
   features: [reactive] as const
 })`,
     scenariosEn: [
@@ -3808,12 +3744,12 @@ const cachePlugin = defineStorageBackendPlugin({
       '同一个项目有多种后端，需要防止某个 Feature 被误装到不匹配的后端上。'
     ],
     avoidEn: [
-      'You only want to use memoryStorage(), indexedDb(), or another backend directly and do not need a Storage Host.',
+      'You only want to use memoryStorageHost(), indexedDbHost(), or another backend directly and do not need a Storage Host.',
       'A built-in reactive plugin already provides the capability; install that plugin instead of redefining it.',
       'You cannot yet explain how changes are detected, when they become visible, or how change listeners are stopped.'
     ],
     avoidZh: [
-      '你只是想直接使用 memoryStorage()、indexedDb() 等存储，不需要 Storage Host；直接创建并使用后端即可。',
+      '你只是想直接使用 memoryStorageHost()、indexedDbHost() 等存储，不需要 Storage Host；直接创建并使用后端即可。',
       '内置插件已经提供了所需的响应式能力；应直接安装现成插件，不要重复定义。',
       '你还说不清数据变化如何被发现、何时对查询可见，或者怎样停止变化监听；先把这些行为设计清楚。'
     ],
@@ -3886,19 +3822,19 @@ const cachePlugin = defineStorageBackendPlugin({
       'Snapshots one backend factory, optional preparation step, feature tuple, and deadline into an opaque installable plugin handle. Creation remains unpublished until the Host commits the complete installation batch.',
     purposeZh:
       '把 backend factory、可选 prepare step、feature tuple 与 deadline snapshot 为 opaque installable plugin handle。Host 提交整个 installation batch 前，创建出的 store 不会被 publish。',
-    quickStart: `import { memoryStorage } from '@migaia/storage-web/memory'
+    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
 import {
   defineStorageBackendKind,
   defineStorageBackendPlugin
 } from '@migaia/storage-web/host'
 
-type ICacheStore = ReturnType<typeof memoryStorage>
+type ICacheStore = ReturnType<typeof memoryStorageHost>
 const cacheKind = defineStorageBackendKind<ICacheStore>()('cache')
 
 const cachePlugin = defineStorageBackendPlugin({
   backendKind: cacheKind,
   id: 'cache',
-  create: () => memoryStorage()
+  create: () => memoryStorageHost()
 })`,
     scenariosEn: [
       'A store must be installed atomically with Host lifecycle ownership.',
@@ -3928,7 +3864,7 @@ const cachePlugin = defineStorageBackendPlugin({
         optional: false,
         type: 'IStorageBackendKind',
         whenToUse: 'Associate the plugin with its backend implementation family.',
-        example: "defineStorageBackendKind<ReturnType<typeof memoryStorage>>()('cache')"
+        example: "defineStorageBackendKind<ReturnType<typeof memoryStorageHost>>()('cache')"
       },
       {
         name: 'id',
@@ -3964,7 +3900,7 @@ const cachePlugin = defineStorageBackendPlugin({
         optional: false,
         type: '(context) => TStore | PromiseLike<TStore>',
         whenToUse: 'Construct the store without publishing it elsewhere.',
-        example: '() => memoryStorage()'
+        example: '() => memoryStorageHost()'
       },
       {
         name: 'prepare',
@@ -3984,7 +3920,7 @@ const cachePlugin = defineStorageBackendPlugin({
         optional: false,
         type: 'IStorageBackendKind',
         whenToUse: '把 plugin 关联到 backend implementation family。',
-        example: "defineStorageBackendKind<ReturnType<typeof memoryStorage>>()('cache')"
+        example: "defineStorageBackendKind<ReturnType<typeof memoryStorageHost>>()('cache')"
       },
       {
         name: 'id',
@@ -4019,7 +3955,7 @@ const cachePlugin = defineStorageBackendPlugin({
         optional: false,
         type: '(context) => TStore | PromiseLike<TStore>',
         whenToUse: '构建 store，但不要在外部提前 publish。',
-        example: '() => memoryStorage()'
+        example: '() => memoryStorageHost()'
       },
       {
         name: 'prepare',
@@ -5287,18 +5223,15 @@ const cachePlugin = defineStorageBackendPlugin({
   }),
   'storage-web:reactive-adapter:defineReactiveAdapterFeature': createStorageWebGuide({
     purposeEn:
-      'Defines an advanced custom reactive capability for one opaque backend kind. The adapter declares consistency visibility and supplies a lifecycle-owned source that invalidates Host live queries; built-in backends should use their dedicated reactive plugin factories instead.',
+      'Defines a kind-hidden advanced custom reactive capability. Plugin installation supplies its exact Store and Host-snapshotted scheduler; the adapter declares consistency visibility and supplies a lifecycle-owned source that invalidates Host live queries.',
     purposeZh:
-      '为一个 opaque backend kind 定义 advanced custom reactive capability。adapter 声明 consistency visibility，并提供 lifecycle-owned source 来 invalidate Host live query；built-in backend 应使用专用 reactive plugin factory。',
-    quickStart: `import { memoryStorage } from '@migaia/storage-web/memory'
-import { defineStorageBackendKind } from '@migaia/storage-web/host'
+      '定义 kind-hidden advanced custom reactive capability。Plugin 安装时提供 exact Store 和 Host 已快照 scheduler；adapter 声明 consistency visibility，并提供 lifecycle-owned source 来 invalidate Host live query。',
+    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { defineReactiveAdapterFeature } from '@migaia/storage-web/reactive-adapter'
 
-type ICacheStore = ReturnType<typeof memoryStorage>
-const cacheKind = defineStorageBackendKind<ICacheStore>()('cache')
+type ICacheStore = ReturnType<typeof memoryStorageHost>
 
-const reactive = defineReactiveAdapterFeature({
-  backendKind: cacheKind,
+const reactive = defineReactiveAdapterFeature<ICacheStore>({
   mode: 'polling',
   pollIntervalMs: 1_000,
   visibility: 'instance',
@@ -5333,7 +5266,7 @@ const reactive = defineReactiveAdapterFeature({
         optional: false,
         type: 'IStorageBackendKind',
         whenToUse: 'Bind the adapter to its custom backend authority.',
-        example: "defineStorageBackendKind<ReturnType<typeof memoryStorage>>()('cache')"
+        example: "defineStorageBackendKind<ReturnType<typeof memoryStorageHost>>()('cache')"
       },
       {
         name: 'mode',
@@ -5380,7 +5313,7 @@ const reactive = defineReactiveAdapterFeature({
         optional: false,
         type: 'IStorageBackendKind',
         whenToUse: '把 adapter 绑定到 custom backend authority。',
-        example: "defineStorageBackendKind<ReturnType<typeof memoryStorage>>()('cache')"
+        example: "defineStorageBackendKind<ReturnType<typeof memoryStorageHost>>()('cache')"
       },
       {
         name: 'mode',

@@ -4,10 +4,10 @@
 
 ## 目录
 
-- [`localStorage` / `sessionStorage` 模块](#web-storage-模块)
-- [`cookies` 模块](#cookies-模块)
-- [`indexedDb` 模块](#indexeddb-模块)
-- [`memoryStorage` 模块](#memorystorage-模块)
+- [`localStorageHost` / `sessionStorageHost` 模块](#web-storage-模块)
+- [`cookiesHost` 模块](#cookiesHost-模块)
+- [`indexedDbHost` 模块](#indexeddb-模块)
+- [`memoryStorageHost` 模块](#memorystorage-模块)
 - [契约与能力模块](#契约与能力模块)
 - [序列化（codec）模块](#序列化-codec-模块)
 - [Schema 模块](#schema-模块)
@@ -22,9 +22,9 @@
 
 ```ts
 // 按后端与扩展点分别导入，避免把 DOM/IDB 类型拉入无关消费者
-import { localStorage } from '@migaia/storage-web/local-storage'
-import { indexedDb } from '@migaia/storage-web/indexed-db'
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { localStorageHost } from '@migaia/storage-web/local-storage'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { defineEntity } from '@migaia/storage-web/entity'
 ```
 
@@ -50,14 +50,14 @@ await host.dispose()
 
 <a id="web-storage-模块"></a>
 
-## `localStorage` / `sessionStorage` 模块
+## `localStorageHost` / `sessionStorageHost` 模块
 
 源码：`src/backends/local-storage.ts`、`src/backends/session-storage.ts`、`src/backends/web-storage.ts`。两者共享同一个 `createWebStorageBackend` 实现，仅注入不同的宿主 `Storage` 对象。
 
-### `localStorage`
+### `localStorageHost`
 
 ```ts
-function localStorage(options?: ILocalStorageOptions): ISyncCapableStore<IKeyValueStore>
+function localStorageHost(options?: ILocalStorageOptions): ISyncCapableStore<IKeyValueStore>
 
 type ILocalStorageOptions = IWebStorageOptions & {
   readonly storage?: IWebStorageLike
@@ -85,7 +85,7 @@ type IWebStorageLike = {
 }
 ```
 
-**构造期探测**：`createWebStorageBackend` 在返回 store 前，会用 `probeWebStorage` 真实写一次探测 key（`namespacedKey(namespace, '__probe__', ...)`）再删除/还原。Safari 隐私模式下 `localStorage` 对象存在但 `setItem` 抛异常（旧版本 `SecurityError`，新版本 quota=0 的 `QuotaExceededError`），只有真实写入才能可靠探测到这种情况；探测失败立即抛 `StorageError(BACKEND_UNAVAILABLE)`，而不是等到第一次业务写入才发现。若探测 key 原本已存在非空值，探测会退避到一个带时间戳/随机数后缀的临时 key，避免覆盖调用方数据。
+**构造期探测**：`createWebStorageBackend` 在返回 store 前，会用 `probeWebStorage` 真实写一次探测 key（`namespacedKey(namespace, '__probe__', ...)`）再删除/还原。Safari 隐私模式下 `localStorageHost` 对象存在但 `setItem` 抛异常（旧版本 `SecurityError`，新版本 quota=0 的 `QuotaExceededError`），只有真实写入才能可靠探测到这种情况；探测失败立即抛 `StorageError(BACKEND_UNAVAILABLE)`，而不是等到第一次业务写入才发现。若探测 key 原本已存在非空值，探测会退避到一个带时间戳/随机数后缀的临时 key，避免覆盖调用方数据。
 
 **能力**（`store.capabilities`，`Object.freeze` 恒定值）：
 
@@ -133,9 +133,9 @@ type ISyncKeyValueStore = {
 **5 秒可运行示例**：
 
 ```ts
-import { localStorage } from '@migaia/storage-web/local-storage'
+import { localStorageHost } from '@migaia/storage-web/local-storage'
 
-const store = localStorage({ namespace: 'settings' })
+const store = localStorageHost({ namespace: 'settings' })
 await store.set('theme', 'dark')
 console.log(await store.get('theme')) // 'dark'
 store.sync.set('theme', 'light') // 同步 API，Web Storage 天然同步
@@ -145,35 +145,35 @@ console.log(await store.has('theme')) // false
 await store.dispose()
 ```
 
-### `sessionStorage`
+### `sessionStorageHost`
 
 ```ts
-function sessionStorage(options?: ISessionStorageOptions): ISyncCapableStore<IKeyValueStore>
+function sessionStorageHost(options?: ISessionStorageOptions): ISyncCapableStore<IKeyValueStore>
 
 type ISessionStorageOptions = IWebStorageOptions & {
   readonly storage?: IWebStorageLike
 }
 ```
 
-选项与行为与 `localStorage` **完全一致**，唯一区别是默认注入 `globalThis.sessionStorage` 而非 `globalThis.localStorage`；`backend` 字段为 `'session'`。
+选项与行为与 `localStorageHost` **完全一致**，唯一区别是默认注入 `globalThis.sessionStorage` 而非 `globalThis.localStorage`；`backend` 字段为 `'session'`。
 
 ```ts
-import { sessionStorage } from '@migaia/storage-web/session-storage'
+import { sessionStorageHost } from '@migaia/storage-web/session-storage'
 
-const store = sessionStorage({ storage: myFakeStorage }) // 测试环境注入
+const store = sessionStorageHost({ storage: myFakeStorage }) // 测试环境注入
 await store.set('draft', JSON.stringify({ step: 1 }))
 ```
 
 ---
 
-<a id="cookies-模块"></a>
+<a id="cookiesHost-模块"></a>
 
-## `cookies` 模块
+## `cookiesHost` 模块
 
-源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorage`）。
+源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorageHost`）。
 
 ```ts
-function cookies(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>
+function cookiesHost(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>
 
 type ICookiesOptions = {
   readonly namespace?: string
@@ -278,9 +278,9 @@ type ISyncCookieStore = {
 **5 秒可运行示例**：
 
 ```ts
-import { cookies } from '@migaia/storage-web/cookies'
+import { cookiesHost } from '@migaia/storage-web/cookiesHost'
 
-const jar = cookies({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })
+const jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })
 await jar.set('session', 'abc123', { maxAge: 3600 })
 console.log(await jar.get('session')) // 'abc123'
 await jar.remove('session')
@@ -291,12 +291,12 @@ console.log(await jar.get('session')) // null
 
 <a id="indexeddb-模块"></a>
 
-## `indexedDb` 模块
+## `indexedDbHost` 模块
 
 源码：`src/backends/indexed-db.ts`。是本包中唯一原生支持字节（bytes）、记录（record，structured clone）、事务（transaction）与游标迭代（iteration）的浏览器后端。实现体量最大，下面按选项、生命周期、能力、L0/L1 方法、事务、迭代分别展开。
 
 ```ts
-function indexedDb<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue>
+function indexedDbHost<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue>
 
 type IIndexedDbOptions = {
   readonly dbName?: string
@@ -387,9 +387,9 @@ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterato
 **可运行示例**：
 
 ```ts
-import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 
-const db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' })
+const db = indexedDbHost<{ id: string; name: string }>({ dbName: 'app-data' })
 await db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')
 console.log(await db.getRecord('ada')) // { id: 'ada', name: 'Ada' }
 for await (const [key, value] of db.iterateRecords()) console.log(key, value)
@@ -445,18 +445,18 @@ readonly metadata: {
 };
 ```
 
-只有 `indexedDb` 后端提供（`IRecordStore.metadata` 是可选字段）。读写 `meta` object store，供 `repository.migrate()` 持久化可恢复的迁移检查点使用（见[Entity 模块](#entity-模块)）。`memoryStorage`/KV-only 后端没有这个通道，因此其 `migrate()` 无法跨调用恢复，只能在单次调用内完整扫描。
+只有 `indexedDbHost` 后端提供（`IRecordStore.metadata` 是可选字段）。读写 `meta` object store，供 `repository.migrate()` 持久化可恢复的迁移检查点使用（见[Entity 模块](#entity-模块)）。`memoryStorageHost`/KV-only 后端没有这个通道，因此其 `migrate()` 无法跨调用恢复，只能在单次调用内完整扫描。
 
 ---
 
 <a id="memorystorage-模块"></a>
 
-## `memoryStorage` 模块
+## `memoryStorageHost` 模块
 
 源码：`src/backends/memory.ts`。
 
 ```ts
-function memoryStorage<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>>
+function memoryStorageHost<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>>
 ```
 
 无入参，无选项。每次调用创建一个独立、进程内、易失的存储，天然隔离，不需要命名空间参数。实现全部 L0（值）+ L1（字节/记录/迭代/事务）接口，`record` 通道使用 `structuredClone` 做深拷贝隔离（因此不能存函数、不可克隆的宿主对象等）。
@@ -480,7 +480,7 @@ function memoryStorage<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValu
 ### 行为要点
 
 - `sync` 通道只暴露 L0（`get`/`set`/`remove`/`has`/`keys`/`clearValues`）；异步 L0/L1/事务方法是完整实现，不是对 `sync` 的包装。
-- 跨通道冲突检测（value/bytes/record 共享同一逻辑 key）与 `indexedDb` 遵循相同的 `planChannelWrite` 规则（见[契约与能力模块](#契约与能力模块)）。
+- 跨通道冲突检测（value/bytes/record 共享同一逻辑 key）与 `indexedDbHost` 遵循相同的 `planChannelWrite` 规则（见[契约与能力模块](#契约与能力模块)）。
 - `transaction(run, ctx?)`：与 IndexedDB 相同的乐观并发模型——草稿隔离、提交前比对 `recordEpoch`（对应 `clearAll`）与每个访问过的 key 的 revision；不一致抛 `TRANSACTION_CONFLICT`。**与旧实现的关键差异**：草稿在提交前完全不触碰真实的 `documents` Map；早期实现直接在真实 Map 上写入、失败时用开头拍的快照整体覆盖回去——如果事务执行期间（`run(scope)` 内任意一次 `await` 之间）有其他并发的 `putRecord` 或另一个事务成功提交，那次快照恢复会把那次无关的成功写入一起抹掉。当前实现下失败只需丢弃草稿，真实数据从未被动过；成功时的合并循环是纯同步的（没有 `await`），不会被其他调用交错。
 - `iterateRecords(range?, ctx?)`：对当前全部记录按 `compareStorageKeys` 排序后再按 range 过滤 yield；不分页（内存数据集通常不需要）。
 - `dispose()`：置位 `disposed` 并清空全部内部 Map（`kv`/`bytes`/`documents`）。
@@ -489,9 +489,9 @@ function memoryStorage<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValu
 **可运行示例**：
 
 ```ts
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 
-const store = memoryStorage<{ id: string }>()
+const store = memoryStorageHost<{ id: string }>()
 await store.putRecord({ id: '1' }, '1')
 console.log(await store.getRecord('1')) // { id: '1' }
 await store.transaction(async (tx) => {
@@ -522,9 +522,9 @@ function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>
 
 ```ts
 import { asRecordStore, isRecordStore } from '@migaia/storage-contract'
-import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 
-const store = indexedDb()
+const store = indexedDbHost()
 if (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')
 const records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)
 ```
@@ -563,7 +563,7 @@ type INamespaceCodec = {
 const lengthPrefixedNamespaceCodec: INamespaceCodec
 ```
 
-默认物理 key 编码器（`localStorage`/`sessionStorage`/`cookies` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。
+默认物理 key 编码器（`localStorageHost`/`sessionStorageHost`/`cookiesHost` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。
 
 ```ts
 lengthPrefixedNamespaceCodec.encode('app', 'theme') // 'sw1:3:app:theme'
@@ -646,7 +646,7 @@ type IKeyRange = {
 
 **Key 域限制**（`KEY_DOMAIN_LIMITS`，来自 `@migaia/storage-contract`）：`maxDepth: 32`（嵌套数组最大深度）、`maxNodes: 4096`（校验期间遍历的节点总数上限）、`maxBinaryBytes: 1024 * 1024`（`ArrayBuffer` 作为 key 时的最大字节数）。超出任一限制，或 key 是空数组、包含循环引用、类型不在 `IStorageKey` 联合内，`assertStorageKey`/`snapshotStorageKey` 抛 `StorageContractError(INVALID_KEY)`。
 
-`ITransactionScope<TValue>`（`indexedDb`/`memoryStorage` 的 `transaction()` 回调参数类型，详见各自章节）：
+`ITransactionScope<TValue>`（`indexedDbHost`/`memoryStorageHost` 的 `transaction()` 回调参数类型，详见各自章节）：
 
 ```ts
 type ITransactionScope<TValue = unknown> = {
@@ -740,14 +740,14 @@ type ISelectedCodec = {
 
 ```ts
 import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'
-import { sessionStorage } from '@migaia/storage-web/session-storage'
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { sessionStorageHost } from '@migaia/storage-web/session-storage'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 
-const textOnly = sessionStorage()
+const textOnly = sessionStorageHost()
 const selected = selectCodec(binaryCodec, textOnly.capabilities, (msg) => console.warn(msg))
 await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断
 
-const recordBackend = memoryStorage()
+const recordBackend = memoryStorageHost()
 const direct = selectCodec(binaryCodec, recordBackend.capabilities)
 await direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级
 ```
@@ -907,7 +907,7 @@ const definition = defineEntity<IPreference>({
   migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }
 })
 
-const preferences = definition.connect(indexedDb({ dbName: 'app-data' }))
+const preferences = definition.connect(indexedDbHost({ dbName: 'app-data' }))
 await preferences.put({ id: 'appearance', theme: 'dark' })
 console.log(await preferences.get('appearance')) // { id: 'appearance', theme: 'dark' }
 ```
@@ -991,7 +991,7 @@ type IMigrateResult = {
 
 批量把库中全部记录升级到当前 entity `version`（同时把历史存储形态的记录搬迁为 v2 key 形态）。返回值各字段：`scanned`（扫描到的记录总数）、`eligible`（版本低于当前、需要迁移的记录数）、`migrated`（成功迁移的记录数）、`skipped`（因 `onInvalid` 策略被跳过的坏记录数）、`alreadyCurrent`（扫描时已经是当前版本，无需迁移）、`conflicted`（结构化后端事务提交冲突后，逐条重试仍失败/让位给并发写入的记录数）。
 
-- **断点续跑**：仅 IndexedDB 提供 `metadata` 通道，可在 `` `repository:${name}:migration` `` key 下持久化检查点（`status`/`phase`/`scanned`/`migrated`/... 等全部计数器 + `lastPhysicalKey`），跨调用恢复——上次迁移中途失败或被取消，下次调用 `migrate()` 会从检查点继续，而不是从头重新扫描。检查点是否可复用取决于一个“迁移指纹”（entity 名、版本、主键属性名、schema 名、codec 名、迁移函数版本号集合的拼接）是否与本次调用一致，指纹不匹配视为过期检查点，从头开始。`memoryStorage`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复，每次调用都从头扫描。
+- **断点续跑**：仅 IndexedDB 提供 `metadata` 通道，可在 `` `repository:${name}:migration` `` key 下持久化检查点（`status`/`phase`/`scanned`/`migrated`/... 等全部计数器 + `lastPhysicalKey`），跨调用恢复——上次迁移中途失败或被取消，下次调用 `migrate()` 会从检查点继续，而不是从头重新扫描。检查点是否可复用取决于一个“迁移指纹”（entity 名、版本、主键属性名、schema 名、codec 名、迁移函数版本号集合的拼接）是否与本次调用一致，指纹不匹配视为过期检查点，从头开始。`memoryStorageHost`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复，每次调用都从头扫描。
 - **批量提交与冲突重试**（结构化后端）：以 `batchSize` 条记录为一批，在一个 `transaction` 内批量迁移；若该批次因 `TRANSACTION_CONFLICT` 整体失败，会退化为**逐条**在独立事务中重试——重试时会重新检查目标位置是否已被并发写入覆盖为更高版本（此时计入 `alreadyCurrent` 而非重复迁移），仍然冲突的记录计入 `conflicted`（不抛错，允许调用方后续再次调用 `migrate()` 补齐）。
 - 记录解码/迁移/校验失败时按 `onInvalid` 策略处理，逻辑与 `list`/`stream` 一致（`skip` 计入 `skipped`，`throw` 直接抛出对应错误码并中断整个 `migrate()` 调用）。
 
@@ -1010,11 +1010,11 @@ type IEntityTransactionScope<TDomain> = {
 }
 ```
 
-仅结构化后端（有真正事务）支持；`run` 收到的 `scope` 是对底层 `ITransactionScope` 的封装，内部替调用方完成 envelope 编解码与物理 key 编排。**KV-only 后端（local/session/cookie）调用 `batch` 会抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`**——这些后端没有原生事务，不做“伪事务”模拟以免给出错误的原子性假象。`scope` 内的读写共享同一份乐观并发检测（见 IndexedDB/memoryStorage 章节的事务语义），整个回调作为一个原子单元提交，冲突时抛 `TRANSACTION_CONFLICT`。
+仅结构化后端（有真正事务）支持；`run` 收到的 `scope` 是对底层 `ITransactionScope` 的封装，内部替调用方完成 envelope 编解码与物理 key 编排。**KV-only 后端（local/session/cookie）调用 `batch` 会抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`**——这些后端没有原生事务，不做“伪事务”模拟以免给出错误的原子性假象。`scope` 内的读写共享同一份乐观并发检测（见 IndexedDB/memoryStorageHost 章节的事务语义），整个回调作为一个原子单元提交，冲突时抛 `TRANSACTION_CONFLICT`。
 
 ```ts
 const orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(
-  indexedDb()
+  indexedDbHost()
 )
 
 const applyBatch = async (items: Array<{ id: string; total: number }>): Promise<void> => {
@@ -1057,7 +1057,7 @@ const users = defineEntity<IUser>()({
       select: (user) => ({ kind: 'single', key: user.email.toLowerCase() })
     }
   }
-}).connect(indexedDb({ dbName: 'app-data' }))
+}).connect(indexedDbHost({ dbName: 'app-data' }))
 
 const ada = await users.findBy('byEmail', 'ada@example.com')
 const london = await users.findManyBy('byCityAndEmail', {
@@ -1111,7 +1111,7 @@ host.backends() // mutation-incapable snapshot
 | `plugins/memory`          | `memoryBackendPlugin`         | `memory`     |
 | `plugins/local-storage`   | `localStorageBackendPlugin`   | `local`      |
 | `plugins/session-storage` | `sessionStorageBackendPlugin` | `session`    |
-| `plugins/cookies`         | `cookieBackendPlugin`         | `cookies`    |
+| `plugins/cookiesHost`         | `cookieBackendPlugin`         | `cookiesHost`    |
 | `plugins/indexed-db`      | `indexedDbBackendPlugin`      | `indexed-db` |
 
 `createStorageHost({ plugins })` 是首次安装入口且始终异步；后续才用 `await host.use(...)`。literal plugin tuple 会把 ID 精确映射到 store 类型，并在编译期拒绝重复 ID；运行时仍会对伪造 handle、重复 provider、错误 feature 拓扑和失效 store 做 fail-closed 校验。一个 batch 只有全部 create/prepare/plugin install 成功后才原子发布 registry；失败会 rollback 已接纳资源，不暴露半安装 backend。
@@ -1191,10 +1191,10 @@ await host.dispose()
 
 - memory：instance-local push。
 - local/session storage：浏览器事件或 polling 驱动的 eventual visibility，受文档/顶层上下文边界限制。
-- cookies：只能观察 JS 可见 cookie，HttpOnly 永远不可见。
+- cookiesHost：只能观察 JS 可见 cookie，HttpOnly 永远不可见。
 - IndexedDB：commit-after change feed 加同源协调；内部写入提交后才 invalidation，跨上下文为 eventual，不承诺捕获绕过本库的任意 raw writer。
 
-自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`，但必须把 adapter 绑定到同一个 opaque backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。
+自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(..., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。
 
 ---
 
@@ -1252,7 +1252,7 @@ class StorageError extends Error {
 
 | 常量                   | 值                       | 触发场景                                                                               |
 | ---------------------- | ------------------------ | -------------------------------------------------------------------------------------- |
-| `unavailable`          | `BACKEND_UNAVAILABLE`    | 存储后端不可用：隐私模式探测失败、`localStorage`/IndexedDB/`document` 被禁用或缺失     |
+| `unavailable`          | `BACKEND_UNAVAILABLE`    | 存储后端不可用：隐私模式探测失败、`localStorageHost`/IndexedDB/`document` 被禁用或缺失     |
 | `quotaExceeded`        | `QUOTA_EXCEEDED`         | 写入命中浏览器配额上限                                                                 |
 | `valueTooLarge`        | `VALUE_TOO_LARGE`        | 序列化后的 cookie 值超过单值 4KB 上限                                                  |
 | `serializeFailed`      | `SERIALIZE_FAILED`       | 序列化失败（`JSON.stringify` 抛错、codec encode 非预期输出、`structuredClone` 写失败） |
@@ -1344,7 +1344,7 @@ function isStorageContractError(value: unknown): value is StorageContractError
 import { z } from 'zod'
 import { defineEntity } from '@migaia/storage-web/entity'
 import { fromStandardSchema } from '@migaia/storage-web/schema'
-import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 
 const UserV2 = z.object({ id: z.string(), email: z.string(), verified: z.boolean() })
 
@@ -1354,7 +1354,7 @@ const users = defineEntity({
   schema: fromStandardSchema(UserV2),
   version: 2,
   migrations: { 2: async (previous) => ({ ...(previous as object), verified: false }) }
-}).connect(indexedDb({ dbName: 'app-data' }))
+}).connect(indexedDbHost({ dbName: 'app-data' }))
 
 await users.put({ id: 'ada', email: 'ada@example.com', verified: true })
 const result = await users.migrate({ batchSize: 200, onInvalid: 'skip' })
@@ -1366,10 +1366,10 @@ console.log(result.migrated, result.conflicted)
 `IOperationContext.signal`/`timeoutMs` 在所有异步方法上一致生效；同时提供两者时取先触发者。取消/超时统一以契约级 `StorageContractError(ABORTED)` 结束等待，已进入原子提交阶段的写不会被伪报回滚。
 
 ```ts
-import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 import { isStorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 
-const db = indexedDb()
+const db = indexedDbHost()
 try {
   await db.putRecord({ id: '1' }, '1', { timeoutMs: 50 })
 } catch (error) {
@@ -1383,23 +1383,23 @@ try {
 
 ```ts
 import { asRecordStore, isRecordStore } from '@migaia/storage-contract'
-import { cookies } from '@migaia/storage-web/cookies'
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { cookiesHost } from '@migaia/storage-web/cookiesHost'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 
-const primary = cookies({ scope: { path: '/', secure: true, sameSite: 'lax' } })
-const fallback = memoryStorage()
+const primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })
+const fallback = memoryStorageHost()
 const store = isRecordStore(primary) ? asRecordStore(primary) : fallback
-// cookies 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorage 分支
+// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支
 ```
 
 ### 4. 命名空间隔离 + 显式 replace 冲突策略
 
 ```ts
 import { ConflictPolicy } from '@migaia/storage-contract'
-import { localStorage } from '@migaia/storage-web/local-storage'
+import { localStorageHost } from '@migaia/storage-web/local-storage'
 
-const teamA = localStorage({ namespace: 'team-a' })
-const teamB = localStorage({ namespace: 'team-b' })
+const teamA = localStorageHost({ namespace: 'team-a' })
+const teamB = localStorageHost({ namespace: 'team-b' })
 await teamA.set('config', '{}')
 await teamB.set('config', '{}') // 不同命名空间，互不冲突
 
@@ -1412,16 +1412,16 @@ await teamA.clearValues() // 只清 team-a 命名空间下的键，team-b 不受
 
 ## 排查与构建门禁
 
-- **`localStorage()`/`sessionStorage()`/`cookies()` 抛 `BACKEND_UNAVAILABLE`**：符合预期——构造期做过真实写入探测（或读取 `document.cookie`）。Safari 隐私模式、Cookie 被完全禁用、非浏览器环境未注入 `storage`/`document` 都会命中；显式降级到 `memoryStorage()`，或提示用户开启存储权限。
-- **`cookies` 的 `get`/`set`/`keys` 抛 `COOKIE_SCOPE_AMBIGUOUS`**：说明同一物理 cookie 名同时对多个 scope 可见（例如同名 cookie 分别用 `domain: 'a.example.com'` 和不设 `domain` 写过）。让每个 scope 下的 cookie 名唯一，或在构造期固定单一 scope 后不再产生歧义；库不会随意猜测该返回哪一个值。
-- **`cookies().set()` 抛 `WRITE_FAILED`**：写入后回读发现值不可见——检查 `path`/`domain`/`sameSite`/`secure` 是否与当前页面 origin 匹配，以及浏览器隐私策略（第三方 cookie 拦截、ITP）是否拦截了这次写入。
+- **`localStorageHost()`/`sessionStorageHost()`/`cookiesHost()` 抛 `BACKEND_UNAVAILABLE`**：符合预期——构造期做过真实写入探测（或读取 `document.cookie`）。Safari 隐私模式、Cookie 被完全禁用、非浏览器环境未注入 `storage`/`document` 都会命中；显式降级到 `memoryStorageHost()`，或提示用户开启存储权限。
+- **`cookiesHost` 的 `get`/`set`/`keys` 抛 `COOKIE_SCOPE_AMBIGUOUS`**：说明同一物理 cookie 名同时对多个 scope 可见（例如同名 cookie 分别用 `domain: 'a.example.com'` 和不设 `domain` 写过）。让每个 scope 下的 cookie 名唯一，或在构造期固定单一 scope 后不再产生歧义；库不会随意猜测该返回哪一个值。
+- **`cookiesHost().set()` 抛 `WRITE_FAILED`**：写入后回读发现值不可见——检查 `path`/`domain`/`sameSite`/`secure` 是否与当前页面 origin 匹配，以及浏览器隐私策略（第三方 cookie 拦截、ITP）是否拦截了这次写入。
 - **`set(key, value)` 抛 `DUPLICATE_KEY`**：同一逻辑 key 已经在 value/bytes/record 另一通道存在。要么换 key，要么显式传 `{ conflictPolicy: ConflictPolicy.replace }` 原子替换。
-- **`asRecordStore(store)` 抛 `UNSUPPORTED_CAPABILITY`**：该 store 的 `capabilities.records`（或 `binary`/`transactions`/`iteration` 之一）为 `false`——先用 `isRecordStore(store)` 判断，或改用 `indexedDb()`/`memoryStorage()`。
-- **`repository.batch()` 抛 `UNSUPPORTED_CAPABILITY`**：底层 store 是 KV-only 后端（local/session/cookie），没有原生事务；改用 `indexedDb()`/`memoryStorage()`，或改用逐条 `get`/`put`（自行处理并发）。
+- **`asRecordStore(store)` 抛 `UNSUPPORTED_CAPABILITY`**：该 store 的 `capabilities.records`（或 `binary`/`transactions`/`iteration` 之一）为 `false`——先用 `isRecordStore(store)` 判断，或改用 `indexedDbHost()`/`memoryStorageHost()`。
+- **`repository.batch()` 抛 `UNSUPPORTED_CAPABILITY`**：底层 store 是 KV-only 后端（local/session/cookie），没有原生事务；改用 `indexedDbHost()`/`memoryStorageHost()`，或改用逐条 `get`/`put`（自行处理并发）。
 - **事务/`batch()`/`migrate()` 抛 `TRANSACTION_CONFLICT`**：这是可重试的并发写冲突，不是数据损坏——重新读取最新状态后重试整个事务回调（`migrate()` 会自动逐条重试一次，仍冲突的记录计入 `conflicted`，可再次调用 `migrate()` 补齐）。
 - **`defineEntity` 抛 `INVALID_CONFIG`（migration graph 相关）**：`version > 1` 时 `migrations` 必须完整覆盖第 2 到 `version` 的每一步，不能有缺口——这与 `runMigrations()` 独立调用时“缺失即 no-op”的宽容策略不同。
 - **`selectCodec`/`entity` 遇到 structured codec 抛 `UNSUPPORTED_CAPABILITY`**：目标后端 `capabilities.records === false`（KV-only），structured clone 能力（Blob/Map/Set/循环引用）无法用 JSON 无损表达，库不做静默降级；改用 `jsonCodec` 并自行处理不可 JSON 化的字段，或换成结构化后端。
-- **二进制值在 KV-only 后端体积膨胀 33%**：`selectCodec` 对 `binaryCodec` 在 text-only 后端上的必然行为（base64 编码），会经 `onDiagnostic` 报告一次；只有换成 IndexedDB/memoryStorage 才能避免。
+- **二进制值在 KV-only 后端体积膨胀 33%**：`selectCodec` 对 `binaryCodec` 在 text-only 后端上的必然行为（base64 编码），会经 `onDiagnostic` 报告一次；只有换成 IndexedDB/memoryStorageHost 才能避免。
 - **需要跨标签页刷新查询**：不要直接消费宿主 `storage`/`BroadcastChannel` 事件；安装对应 `*Reactive` plugin 并使用 `liveQuery`。一致性以 `query.consistency.visibility` 为准：它是 eventual requery hint，不是跨设备复制或任意 raw writer 的强一致事件流。
 
 ```bash

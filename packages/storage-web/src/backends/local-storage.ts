@@ -12,7 +12,7 @@ export type ILocalStorageOptions = IWebStorageOptions & {
   readonly storage?: IWebStorageLike
 }
 
-export const localStorage = (
+export const localStorageHost = (
   options: ILocalStorageOptions = {}
 ): ISyncCapableStore<IKeyValueStore> => {
   const optionsSnapshot = snapshotWebStorageOptions(options, StorageBackend.local)

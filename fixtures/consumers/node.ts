@@ -1,6 +1,6 @@
-// @migaia/storage-web 主入口是 web-only（localStorage/sessionStorage/document.cookie/
+// @migaia/storage-web 主入口是 web-only（localStorageHost/sessionStorageHost/document.cookie/
 // IndexedDB 全是浏览器 API），Node 主线程没有这些全局对象——见
-// docs/storage-web/web-storage-foundation.sdd.md §12.6。但 `memoryStorage` 是纯内存后端
+// docs/storage-web/web-storage-foundation.sdd.md §12.6。但 `memoryStorageHost` 是纯内存后端
 // （Map 实现、SSR/Node/testing 降级目标），经 DOM-free 子路径 `@migaia/storage-web/memory`
 // 单独引入，不把 IDB/WebStorage 的 DOM 类型带进来。
 import { MessageChannel } from 'node:worker_threads'
@@ -10,7 +10,7 @@ import { createCapabilityHost } from '@migaia/capability'
 import { jsonPlugin } from '@migaia/serialize'
 import { Signal, createRuntime } from '@migaia/reactive'
 import { Resource } from '@migaia/resource'
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { createStore } from '@migaia/store-light'
 import { ObservableArray } from '@migaia/store-indexed'
 import { atomDef, createAtomStore } from '@migaia/store-keyed'
@@ -26,7 +26,7 @@ jsonPlugin()
 const runtime = createRuntime()
 new Signal(0, runtime).dispose()
 new Resource(() => 1, runtime).dispose()
-memoryStorage().dispose()
+memoryStorageHost().dispose()
 createStore({ count: 0 }).$dispose()
 new ObservableArray([0]).dispose()
 createAtomStore(runtime).dispose()

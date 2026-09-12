@@ -12,7 +12,7 @@ export type ISessionStorageOptions = IWebStorageOptions & {
   readonly storage?: IWebStorageLike
 }
 
-export const sessionStorage = (
+export const sessionStorageHost = (
   options: ISessionStorageOptions = {}
 ): ISyncCapableStore<IKeyValueStore> => {
   const optionsSnapshot = snapshotWebStorageOptions(options, StorageBackend.session)

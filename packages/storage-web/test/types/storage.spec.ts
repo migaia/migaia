@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { asRecordStore, isKeyValueStore, isRecordStore } from '../../src/types/storage'
-import { memoryStorage } from '../../src/backends/memory'
-import { localStorage } from '../../src/backends/local-storage'
+import { memoryStorageHost } from '../../src/backends/memory'
+import { localStorageHost } from '../../src/backends/local-storage'
 import type { IStorageCapabilities } from '../../src/types/capabilities'
 import type { IKeyValueStore } from '../../src/types/storage'
 
@@ -80,7 +80,7 @@ describe('asRecordStore / isRecordStore', () => {
     expect(reads).toBe(9)
   })
   it('backend capabilities metadata 在运行时不可变', () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     expect(() => {
       ;(store.capabilities as { records: boolean }).records = false
     }).toThrow(TypeError)
@@ -125,12 +125,12 @@ describe('asRecordStore / isRecordStore', () => {
     )
     expect(isRecordStore(store)).toBe(false)
   })
-  it('memoryStorage 支持 records，可被收窄', () => {
-    expect(isRecordStore(memoryStorage())).toBe(true)
+  it('memoryStorageHost 支持 records，可被收窄', () => {
+    expect(isRecordStore(memoryStorageHost())).toBe(true)
   })
-  it('localStorage 不支持 records，收窄抛错', () => {
+  it('localStorageHost 不支持 records，收窄抛错', () => {
     const values = new Map<string, string>()
-    const store = localStorage({
+    const store = localStorageHost({
       namespace: 'test',
       storage: {
         get length() {

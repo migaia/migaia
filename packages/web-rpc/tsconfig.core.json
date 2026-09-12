@@ -32,7 +32,6 @@
     "src/error-code.ts",
     "src/error-text.ts",
     "src/transport.ts",
-    "src/typing.ts",
-    "src/internal/endpoint-modules.ts"
+    "src/typing.ts"
   ]
 }

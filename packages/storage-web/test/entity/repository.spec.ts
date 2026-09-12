@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity'
-import { memoryStorage, localStorage } from '../../src/backends'
+import { memoryStorageHost, localStorageHost } from '../../src/backends'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage'
 import { StorageError, StorageErrorCode } from '../../src/types/errors'
 import { composeFlatKey, composeRepositoryKey } from '../../src/entity/key'
@@ -12,7 +12,7 @@ type IUser = { id: string; name: string; email: string }
 const users = defineEntity<IUser>({ name: 'users', key: 'id' })
 
 it('stream limit zero performs no backend read or yield', async () => {
-  const store = memoryStorage()
+  const store = memoryStorageHost()
   const repo = users.connect(store)
   await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
   let reads = 0
@@ -28,7 +28,7 @@ it('stream limit zero performs no backend read or yield', async () => {
 })
 
 it('stream direction reverses the explicit comparator order', async () => {
-  const repo = users.connect(memoryStorage())
+  const repo = users.connect(memoryStorageHost())
   await repo.put({ id: 'a', name: 'A', email: 'a@b.c' })
   await repo.put({ id: 'b', name: 'B', email: 'b@c.d' })
   const values: IUser[] = []
@@ -69,7 +69,7 @@ it('SWV4-R05 projects explicit selectors and indexed list through the shared que
       }
     }
   })
-  const repository = entity.connect(memoryStorage())
+  const repository = entity.connect(memoryStorageHost())
   await repository.put({ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] })
   await repository.put({ id: 'u2', email: 'grace@example.com', tags: ['staff'] })
 
@@ -124,7 +124,7 @@ it('SWV4-R05 projects explicit selectors and indexed list through the shared que
 })
 
 it('SWV2-T39 routes complete indexed entity put/remove through planner', async () => {
-  const base = memoryStorage()
+  const base = memoryStorageHost()
   const calls: string[] = []
   const projections: unknown[] = []
   const indexedStore = {
@@ -176,14 +176,14 @@ it('SWV2-T39 fallback batch does not execute secondary-index selectors', async (
       }
     }
   })
-  await entity.connect(memoryStorage()).batch(async (tx) => {
+  await entity.connect(memoryStorageHost()).batch(async (tx) => {
     await tx.put({ id: 'u1', name: 'Ada', email: 'ada@example.com' })
   })
   expect(selectorCalls).toBe(0)
 })
 
 it('SWV2-T39 routes complete indexed migration through planner projections', async () => {
-  const base = memoryStorage()
+  const base = memoryStorageHost()
   const projections: unknown[] = []
   const indexedTransactions: number[] = []
   const indexedStore = {
@@ -230,7 +230,7 @@ it('SWV2-T39 routes complete indexed migration through planner projections', asy
 })
 
 it('SWV2-T39 keeps indexed migration conflict retries projected and atomic', async () => {
-  const base = memoryStorage()
+  const base = memoryStorageHost()
   const projections: unknown[] = []
   let indexedTransactions = 0
   const indexedStore = {
@@ -286,7 +286,7 @@ it('SWV2-T39 keeps indexed migration conflict retries projected and atomic', asy
 })
 
 it('SWV2-T34 exposes projection and failed-readiness persistence errors in stable order', async () => {
-  const store = memoryStorage()
+  const store = memoryStorageHost()
   const projectionFailure = new RangeError('projection failed')
   const persistenceFailure = new Error('failed readiness persistence failed')
   let reportedPrimary: unknown
@@ -343,7 +343,7 @@ it('SWV2-T16 find APIs share fallback range, ordering, direction, and limit sema
     name: 'indexed-fallback-users',
     key: 'id',
     indexes: { email: { path: 'email' } }
-  }).connect(memoryStorage())
+  }).connect(memoryStorageHost())
   await repository.put({ id: 'u2', name: 'Bob', email: 'same@example.com' })
   await repository.put({ id: 'u1', name: 'Ada', email: 'same@example.com' })
   await repository.put({ id: 'u3', name: 'Cat', email: 'z@example.com' })
@@ -374,7 +374,7 @@ it('SWV4-T43 indexed comparator ordering ties by index and id before direction a
     defaultOrderBy: () => 0,
     indexes: { email: { path: 'email' } }
   })
-  const repository = entity.connect(memoryStorage())
+  const repository = entity.connect(memoryStorageHost())
   await repository.put({ id: 'a', name: 'A', email: 'z@example.com' })
   await repository.put({ id: 'b', name: 'B', email: 'a@example.com' })
 
@@ -397,10 +397,10 @@ it('SWV4-T43 indexed comparator ordering ties by index and id before direction a
 })
 
 const backends = [
-  { label: 'memory (structured)', create: () => memoryStorage() },
+  { label: 'memory (structured)', create: () => memoryStorageHost() },
   {
-    label: 'localStorage (KV-only)',
-    create: () => localStorage({ namespace: 'entity-test', storage: fakeWebStorage() })
+    label: 'localStorageHost (KV-only)',
+    create: () => localStorageHost({ namespace: 'entity-test', storage: fakeWebStorage() })
   }
 ] as const
 
@@ -548,7 +548,7 @@ describe('KV-only scan diagnostics', () => {
       onDiagnostic: (message) => diagnosed.push(message)
     })
     const repo = diagnosedEntity.connect(
-      localStorage({ namespace: 'diag-test', storage: fakeWebStorage() })
+      localStorageHost({ namespace: 'diag-test', storage: fakeWebStorage() })
     )
     await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
     await repo.list()
@@ -563,7 +563,7 @@ describe('KV-only scan diagnostics', () => {
       key: 'id',
       onDiagnostic: (message) => diagnosed.push(message)
     })
-    const repo = diagnosedEntity.connect(memoryStorage())
+    const repo = diagnosedEntity.connect(memoryStorageHost())
     await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
     await repo.list()
     expect(diagnosed).toHaveLength(0)
@@ -578,7 +578,7 @@ describe('KV-only scan diagnostics', () => {
       }
     })
     const repo = entity.connect(
-      localStorage({ namespace: 'diag-throw-test', storage: fakeWebStorage() })
+      localStorageHost({ namespace: 'diag-throw-test', storage: fakeWebStorage() })
     )
     await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
     await expect(repo.list()).resolves.toEqual([{ id: 'u1', name: 'Ada', email: 'a@b.c' }])
@@ -588,7 +588,7 @@ describe('KV-only scan diagnostics', () => {
 describe('查询排序与无效记录策略', () => {
   it('comparator 异常统一为 EXTENSION_FAILED', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'order-error', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
@@ -609,7 +609,7 @@ describe('查询排序与无效记录策略', () => {
 
   it('comparator 返回非 number 时不静默强制转换', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'invalid-comparator', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
@@ -627,7 +627,7 @@ describe('查询排序与无效记录策略', () => {
 
   it('list/stream 不把显式 null orderBy 静默当成默认排序', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'null-order-by', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     await expect(repo.list({ orderBy: null as never })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
@@ -641,7 +641,7 @@ describe('查询排序与无效记录策略', () => {
 
   it('list/stream 拒绝 null、数组和 primitive range', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'invalid-range', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     for (const range of [null, [], 'range', 1]) {
       await expect(repo.list({ range: range as never })).rejects.toMatchObject({
@@ -657,7 +657,7 @@ describe('查询排序与无效记录策略', () => {
 
   it('list/stream 拒绝非 boolean range open flags', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'invalid-range-flags', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     for (const range of [{ lowerOpen: 'yes' }, { upperOpen: 1 }]) {
       await expect(repo.list({ range: range as never })).rejects.toMatchObject({
@@ -673,7 +673,7 @@ describe('查询排序与无效记录策略', () => {
 
   it('list/stream 拒绝 null、数组和 primitive options', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'invalid-list-options', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     for (const options of [null, [], 'options', 1]) {
       await expect(repo.list(options as never)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
@@ -687,7 +687,7 @@ describe('查询排序与无效记录策略', () => {
 
   it('list/stream/migrate 在没有坏记录时也拒绝非法 onInvalid', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'invalid-on-invalid', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     for (const onInvalid of [null, [], 'invalid', 1]) {
       await expect(repo.list({ onInvalid: onInvalid as never })).rejects.toMatchObject({
@@ -708,7 +708,7 @@ describe('查询排序与无效记录策略', () => {
       key: 'id',
       defaultOrderBy: (left, right) => right.name.localeCompare(left.name)
     })
-    const repo = entity.connect(memoryStorage())
+    const repo = entity.connect(memoryStorageHost())
     await repo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
     await repo.put({ id: 'b', name: 'Bob', email: 'b@c.d' })
     await expect(repo.list({ limit: 1 })).resolves.toEqual([
@@ -735,9 +735,9 @@ describe('查询排序与无效记录策略', () => {
         }
       }
     })
-    const repo = entity.connect(memoryStorage())
+    const repo = entity.connect(memoryStorageHost())
     await repo.put({ id: 'good', n: 1 })
-    const rawStore = memoryStorage()
+    const rawStore = memoryStorageHost()
     await rawStore.putRecord({ __v: 1, data: { id: 'bad', n: 'x' } }, ['strict-users', 'bad'])
     const strictRepo = entity.connect(rawStore)
     await expect(strictRepo.get('bad')).rejects.toMatchObject({
@@ -767,13 +767,13 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
         }
       }
     })
-    await expect(entity.connect(memoryStorage()).put({ id: 'x' })).rejects.toMatchObject({
+    await expect(entity.connect(memoryStorageHost()).put({ id: 'x' })).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.schema.validate',
       extensionStage: 'schema'
     })
 
-    const rawStore = memoryStorage()
+    const rawStore = memoryStorageHost()
     await rawStore.putRecord({ __v: 1, data: { id: 'x' } }, ['schema-extension-error', 'x'])
     const readRepo = entity.connect(rawStore)
     await expect(readRepo.get('x')).rejects.toMatchObject({
@@ -799,7 +799,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
         }
       }
     })
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ __v: 1, data: { id: 'u1' } }, ['schema-storage-error-context', 'u1'])
     await expect(entity.connect(store).get('u1')).rejects.toMatchObject({
       code: 'INVALID_CONFIG',
@@ -820,11 +820,11 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
         }
       }
     })
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ __v: 1, data: { id: 'ok' } }, ['unchecked-read', 'ok'])
     await expect(unchecked.connect(store).get('ok')).resolves.toEqual({ id: 'ok' })
 
-    const malformed = memoryStorage()
+    const malformed = memoryStorageHost()
     await malformed.putRecord({ broken: true }, ['unchecked-read', 'broken'])
     await expect(unchecked.connect(malformed).get('broken')).rejects.toMatchObject({
       code: 'DESERIALIZE_FAILED'
@@ -833,7 +833,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
 
   it('KV-only repository supports list, stream limit, put and remove', async () => {
     const repo = users.connect(
-      localStorage({ namespace: 'kv-only-extra', storage: fakeWebStorage() })
+      localStorageHost({ namespace: 'kv-only-extra', storage: fakeWebStorage() })
     )
     await repo.put({ id: 'a', name: 'Ada', email: 'a@example.com' })
     await repo.put({ id: 'b', name: 'Bob', email: 'b@example.com' })
@@ -863,14 +863,14 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   })
 
   it('put 经 normalize+encode，get 经 decode，往返值语义一致', async () => {
-    const repo = withSchema.connect(memoryStorage())
+    const repo = withSchema.connect(memoryStorageHost())
     const createdAt = new Date('2024-01-01T00:00:00.000Z')
     await repo.put({ id: 'u1', createdAt })
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', createdAt })
   })
 
   it('normalize 修改主键时以规范化后的主键写入', async () => {
-    const repo = withSchema.connect(memoryStorage())
+    const repo = withSchema.connect(memoryStorageHost())
     await expect(
       repo.put({ id: 'ABC', createdAt: new Date('2024-01-01T00:00:00.000Z') })
     ).resolves.toBe('abc')
@@ -882,7 +882,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   })
 
   it('list/stream 同样经过 schema.decode', async () => {
-    const repo = withSchema.connect(memoryStorage())
+    const repo = withSchema.connect(memoryStorageHost())
     const createdAt = new Date('2024-01-01T00:00:00.000Z')
     await repo.put({ id: 'u1', createdAt })
     const all = await repo.list()
@@ -904,7 +904,7 @@ describe('结构化后端上的自定义 repository codec', () => {
         decode: async (value) => value
       }
     })
-    await expect(entity.connect(memoryStorage()).put({ id: 'x' })).rejects.toMatchObject({
+    await expect(entity.connect(memoryStorageHost()).put({ id: 'x' })).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.codec.encode',
       extensionStage: 'codec'
@@ -937,7 +937,7 @@ describe('结构化后端上的自定义 repository codec', () => {
         }
       }
     })
-    const repo = entity.connect(memoryStorage())
+    const repo = entity.connect(memoryStorageHost())
 
     await repo.put({ id: 'u1', value: 7 })
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', value: 7 })
@@ -948,7 +948,7 @@ describe('结构化后端上的自定义 repository codec', () => {
 
 describe('list 显式 range', () => {
   it('结构化后端上 list 支持显式 range，且不会逃逸到其他 entity', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const posts = defineEntity<{ id: string; title: string }>({ name: 'posts-range', key: 'id' })
     const rangedUsers = defineEntity<IUser>({ name: 'users-range', key: 'id' })
     const userRepo = rangedUsers.connect(store)
@@ -965,7 +965,7 @@ describe('list 显式 range', () => {
 
 describe('版本迁移', () => {
   it('读取未来 envelope version 时明确失败', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ __v: 2, data: { id: 'u1', name: 'Ada' } }, ['future-users', 'u1'])
     const repo = defineEntity<{ id: string; name: string }>({
       name: 'future-users',
@@ -979,7 +979,7 @@ describe('版本迁移', () => {
   })
 
   it('拒绝超出 safe integer 的 envelope version', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ __v: 1, data: { id: 'u1' } }, ['unsafe-envelope-version', 'u1'])
     const repo = defineEntity<{ id: string }>({
       name: 'unsafe-envelope-version',
@@ -995,7 +995,7 @@ describe('版本迁移', () => {
   })
 
   it('KV-only 后端上读取旧版本记录时执行迁移但不隐式写回', async () => {
-    const store = localStorage({ namespace: 'migrate-test', storage: fakeWebStorage() })
+    const store = localStorageHost({ namespace: 'migrate-test', storage: fakeWebStorage() })
     const v1 = defineEntity<{ id: string; name: string }>({
       name: 'people',
       key: 'id',
@@ -1014,7 +1014,7 @@ describe('版本迁移', () => {
   })
 
   it('显式 migrate 才持久化新版本并返回统计', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({ name: 'explicit-migrate', key: 'id' })
     await v1.connect(store).put({ id: 'u1', name: 'Ada' })
     const v2 = defineEntity<{ id: string; displayName: string }>({
@@ -1040,7 +1040,7 @@ describe('版本迁移', () => {
 
   it('migrate 不把显式 null batchSize 静默当成默认值', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'null-batch-size', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     await expect(repo.migrate({ batchSize: null as never })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
@@ -1049,7 +1049,7 @@ describe('版本迁移', () => {
 
   it('migrate 拒绝超出 safe integer 的 batchSize', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'unsafe-batch-size', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     await expect(repo.migrate({ batchSize: Number.MAX_SAFE_INTEGER + 1 })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
@@ -1060,7 +1060,7 @@ describe('版本迁移', () => {
     const repo = defineEntity<{ id: string }>({
       name: 'migrate-options-snapshot',
       key: 'id'
-    }).connect(memoryStorage())
+    }).connect(memoryStorageHost())
     const reads = { batchSize: 0, onInvalid: 0 }
     await expect(
       repo.migrate({
@@ -1083,7 +1083,7 @@ describe('版本迁移', () => {
     const repo = defineEntity<{ id: string }>({
       name: 'invalid-migrate-options',
       key: 'id'
-    }).connect(memoryStorage())
+    }).connect(memoryStorageHost())
     for (const options of [null, [], 'options', 1])
       await expect(repo.migrate(options as never)).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -1091,7 +1091,7 @@ describe('版本迁移', () => {
   })
 
   it('KV-only migrate 按批次写回新版本', async () => {
-    const store = localStorage({ namespace: 'kv-migrate', storage: fakeWebStorage() })
+    const store = localStorageHost({ namespace: 'kv-migrate', storage: fakeWebStorage() })
     await defineEntity<{ id: string; name: string }>({ name: 'kv-people', key: 'id' })
       .connect(store)
       .put({ id: 'u1', name: 'Ada' })
@@ -1108,7 +1108,7 @@ describe('版本迁移', () => {
   })
 
   it('KV-only migrate 正确区分当前记录与坏记录', async () => {
-    const store = localStorage({ namespace: 'kv-migrate-stats', storage: fakeWebStorage() })
+    const store = localStorageHost({ namespace: 'kv-migrate-stats', storage: fakeWebStorage() })
     const current = defineEntity<{ id: string; name: string }>({
       name: 'kv-migrate-stats',
       key: 'id',
@@ -1145,7 +1145,7 @@ describe('版本迁移', () => {
   })
 
   it('migrate 统计被跳过的坏记录', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const entity = defineEntity<{ id: string; value: number }>({
       name: 'explicit-migrate-invalid',
       key: 'id',
@@ -1175,7 +1175,7 @@ describe('版本迁移', () => {
   })
 
   it('migrate 在 optimistic transaction 冲突时统计整批 conflicted', async () => {
-    const source = memoryStorage()
+    const source = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({
       name: 'explicit-migrate-conflict',
       key: 'id'
@@ -1207,7 +1207,7 @@ describe('版本迁移', () => {
   })
 
   it('migrate 归一化 backend transaction 的裸异常', async () => {
-    const source = memoryStorage()
+    const source = memoryStorageHost()
     await defineEntity<{ id: string; name: string }>({ name: 'raw-migrate-error', key: 'id' })
       .connect(source)
       .put({ id: 'u1', name: 'Ada' })
@@ -1230,7 +1230,7 @@ describe('版本迁移', () => {
   })
 
   it('migrate 批冲突后逐条重试，避免整批跳过', async () => {
-    const source = memoryStorage()
+    const source = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({ name: 'retry-migrate', key: 'id' })
     await v1.connect(source).put({ id: 'u1', name: 'Ada' })
     let calls = 0
@@ -1260,7 +1260,7 @@ describe('版本迁移', () => {
   })
 
   it('migrate 冲突重试发现并发方已迁移时不虚报 migrated', async () => {
-    const source = memoryStorage()
+    const source = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({ name: 'retry-current', key: 'id' })
     await v1.connect(source).put({ id: 'u1', name: 'Ada' })
     let first = true
@@ -1299,7 +1299,7 @@ describe('版本迁移', () => {
 
   it('迁移读取不触发隐式写回', async () => {
     const diagnosed: string[] = []
-    const inner = memoryStorage()
+    const inner = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({
       name: 'people2',
       key: 'id',
@@ -1335,7 +1335,7 @@ describe('版本迁移', () => {
 
   it('迁移读取不触发非 Error 写回异常', async () => {
     const diagnosed: string[] = []
-    const inner = memoryStorage()
+    const inner = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({
       name: 'people3',
       key: 'id',
@@ -1367,7 +1367,7 @@ describe('版本迁移', () => {
   })
 
   it('batch 作用域内 get 读到旧版本记录时触发迁移，但事务内不写回（writeBackTarget 为 undefined）', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({
       name: 'people4',
       key: 'id',
@@ -1392,7 +1392,7 @@ describe('版本迁移', () => {
 
 describe('batch', () => {
   it('batch 拒绝非函数 callback', async () => {
-    const repo = users.connect(memoryStorage())
+    const repo = users.connect(memoryStorageHost())
     for (const callback of [null, undefined, {}, 'run'])
       await expect(repo.batch(callback as never)).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -1400,7 +1400,7 @@ describe('batch', () => {
   })
 
   it('结构化后端上 batch 成功后所有写入持久化', async () => {
-    const repo = users.connect(memoryStorage())
+    const repo = users.connect(memoryStorageHost())
     await repo.batch(async (tx) => {
       await tx.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await tx.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
@@ -1419,7 +1419,7 @@ describe('batch', () => {
         normalize: async (value) => ({ ...value, id: value.id.toLowerCase() })
       }
     })
-    const repo = batchEntity.connect(memoryStorage())
+    const repo = batchEntity.connect(memoryStorageHost())
     await repo.batch(async (tx) => {
       await expect(
         tx.put({ id: 'BATCH-ABC', createdAt: new Date('2024-01-01T00:00:00.000Z') })
@@ -1430,7 +1430,7 @@ describe('batch', () => {
   })
 
   it('结构化后端上 batch 内抛错时整批回滚', async () => {
-    const repo = users.connect(memoryStorage())
+    const repo = users.connect(memoryStorageHost())
     await repo.put({ id: 'existing', name: 'Old', email: 'old@x.y' })
     await expect(
       repo.batch(async (tx) => {
@@ -1448,7 +1448,7 @@ describe('batch', () => {
   })
 
   it('batch 作用域内 get 可读取快照内已写入的值', async () => {
-    const repo = users.connect(memoryStorage())
+    const repo = users.connect(memoryStorageHost())
     await repo.batch(async (tx) => {
       await tx.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await expect(tx.get('u1')).resolves.toEqual({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -1457,7 +1457,9 @@ describe('batch', () => {
   })
 
   it('KV-only 后端上 batch 抛 UNSUPPORTED_CAPABILITY', async () => {
-    const repo = users.connect(localStorage({ namespace: 'batch-test', storage: fakeWebStorage() }))
+    const repo = users.connect(
+      localStorageHost({ namespace: 'batch-test', storage: fakeWebStorage() })
+    )
     await expect(repo.batch(async () => {})).rejects.toMatchObject({
       code: 'UNSUPPORTED_CAPABILITY'
     })
@@ -1470,7 +1472,7 @@ describe('entity key and invalid-record boundaries', () => {
       name: 'key-domains',
       key: 'id'
     })
-    const repo = entity.connect(memoryStorage())
+    const repo = entity.connect(memoryStorageHost())
     for (const id of [
       1,
       new Date('2024-01-01T00:00:00Z'),
@@ -1494,7 +1496,7 @@ describe('entity key and invalid-record boundaries', () => {
     const repo = defineEntity<{ id: IStorageKey; value: string }>({
       name: 'batch-key-guard',
       key: 'id'
-    }).connect(memoryStorage())
+    }).connect(memoryStorageHost())
     for (const id of [true, {}, 42n] as unknown[]) {
       await expect(repo.batch((tx) => tx.get(id as IStorageKey))).rejects.toMatchObject({
         code: 'INVALID_KEY'
@@ -1507,7 +1509,7 @@ describe('entity key and invalid-record boundaries', () => {
 
   it('rejects invalid list limits before reading', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'limit-guard', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     for (const limit of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
       await expect(repo.list({ limit })).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
@@ -1516,7 +1518,7 @@ describe('entity key and invalid-record boundaries', () => {
 
   it('list 与 stream 对每个 options 字段只读取一次', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'list-options-snapshot', key: 'id' }).connect(
-      memoryStorage()
+      memoryStorageHost()
     )
     await repo.put({ id: 'a' })
     const createOptions = () => {
@@ -1567,7 +1569,7 @@ describe('entity key and invalid-record boundaries', () => {
         }
       }
     })
-    const store = localStorage({ namespace: 'handler-users', storage: fakeWebStorage() })
+    const store = localStorageHost({ namespace: 'handler-users', storage: fakeWebStorage() })
     const repo = entity.connect(store)
     await repo.put({ id: 'good', n: 1 })
     await store.set(
@@ -1587,7 +1589,7 @@ describe('entity key and invalid-record boundaries', () => {
   })
 
   it('onInvalid.stage 区分 decode 与 validate', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const decodeEntity = defineEntity<{ id: string; n: number }>({
       name: 'stage-users',
       key: 'id',
@@ -1616,7 +1618,7 @@ describe('entity key and invalid-record boundaries', () => {
   })
 
   it('rejects an invalid onInvalid policy or handler result', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const entity = defineEntity<{ id: string; n: number }>({
       name: 'invalid-policy-users',
       key: 'id',
@@ -1639,7 +1641,7 @@ describe('entity key and invalid-record boundaries', () => {
   })
 
   it('onInvalid.stage 区分 migration failure', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const entity = defineEntity<{ id: string; n: number }>({
       name: 'migration-stage-users',
       key: 'id',

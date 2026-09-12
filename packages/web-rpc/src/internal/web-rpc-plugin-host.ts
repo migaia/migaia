@@ -13,11 +13,7 @@ import type { IWebRpcCleanupError } from '../errors.js'
 import type { IWebRpcConstructionControl } from './construction-install.js'
 import type { IWebRpcPluginConstraint, IWebRpcPluginCore } from './plugin-contract.js'
 import { translateEndpointDisposalError } from './disposal-translation.js'
-import {
-  preflightNativeControlClaims,
-  preflightNativeProviderClaims,
-  type IWebRpcNativeProviderClaimSource
-} from './plugin-translator.js'
+import { preflightNativeRoleClaims, type IWebRpcNativeRoleClaimSource } from './feature-policy.js'
 
 /** Pipeline values are intentionally opaque to the WebRPC domain shell. */
 export type IWebRpcPipelineValue = unknown
@@ -26,6 +22,8 @@ export type IWebRpcPipelineValue = unknown
 export class WebRpcPluginHost extends PluginHost<IWebRpcPluginCore, IWebRpcPipelineValue> {
   /** Caches the one endpoint-facing disposal Promise so repeated calls preserve identity. */
   #disposePromise: Promise<IPluginHostDisposalResult> | undefined
+  /** Stores dynamic native middleware keys for this Host transaction only. */
+  readonly #nativeMiddlewareKeys = new Map<string, readonly string[]>()
   readonly #domainCore: IWebRpcPluginCore
   readonly #readCleanupErrors: () => readonly IWebRpcCleanupError[]
 
@@ -44,8 +42,17 @@ export class WebRpcPluginHost extends PluginHost<IWebRpcPluginCore, IWebRpcPipel
       transport,
       signal: construction.signal,
       hooks,
-      construction
+      construction,
+      registerNativeMiddlewareKeys: (name, keys) => {
+        const previous = this.#nativeMiddlewareKeys.get(name) ?? []
+        this.#nativeMiddlewareKeys.set(name, Object.freeze([...previous, ...keys]))
+      }
     })
+  }
+
+  /** Returns registration-local middleware keys captured before the activation Plugin runs. */
+  readNativeMiddlewareKeys(): readonly string[] {
+    return Object.freeze([...this.#nativeMiddlewareKeys.values()].flat())
   }
 
   /** Installs the complete construction batch through PluginHost's single transaction. */
@@ -55,13 +62,6 @@ export class WebRpcPluginHost extends PluginHost<IWebRpcPluginCore, IWebRpcPipel
     const admissionFailure = createNativeAdmissionFailure(plugins)
     if (admissionFailure) return Promise.reject(admissionFailure)
     return this.use(...plugins) as unknown as Promise<IPluginHostView<WebRpcPluginHost>>
-  }
-
-  /** Installs constructor-time plugins for the synchronous shell path. */
-  installBatchSync(plugins: readonly IWebRpcPluginConstraint[]): IPluginHostView<WebRpcPluginHost> {
-    const admissionFailure = createNativeAdmissionFailure(plugins)
-    if (admissionFailure) throw admissionFailure
-    return this.useSync(plugins) as IPluginHostView<WebRpcPluginHost>
   }
 
   protected override createPluginDomainCore(): IWebRpcPluginCore {
@@ -89,14 +89,12 @@ export class WebRpcPluginHost extends PluginHost<IWebRpcPluginCore, IWebRpcPipel
   }
 }
 
-/** Creates the identical PluginHost boundary error for async and synchronous install entry points. */
+/** Creates the PluginHost boundary error for the one asynchronous install entry point. */
 function createNativeAdmissionFailure(
   plugins: readonly IWebRpcPluginConstraint[]
 ): PluginHostError | undefined {
-  const nativeDefinitions = plugins as readonly IWebRpcNativeProviderClaimSource[]
-  const admissionFailure = preflightNativeProviderClaims(nativeDefinitions)
-  const controlAdmissionFailure = preflightNativeControlClaims(nativeDefinitions)
-  const firstFailure = admissionFailure ?? controlAdmissionFailure
+  const nativeDefinitions = plugins as readonly IWebRpcNativeRoleClaimSource[]
+  const firstFailure = preflightNativeRoleClaims(nativeDefinitions)
   if (!firstFailure) return undefined
   const failureMessage =
     firstFailure.error instanceof Error ? firstFailure.error.message : String(firstFailure.error)

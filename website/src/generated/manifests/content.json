@@ -157,34 +157,6 @@
     },
     {
       "locale": "zh",
-      "library": "plugin-host",
-      "source": "src/content/zh/packages/plugin-host/advanced.mdx",
-      "slug": "advanced",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "plugin-host",
-      "source": "src/content/zh/packages/plugin-host/api.mdx",
-      "slug": "api",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "plugin-host",
-      "source": "src/content/zh/packages/plugin-host/overview.mdx",
-      "slug": "overview",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "plugin-host",
-      "source": "src/content/zh/packages/plugin-host/quickstart.mdx",
-      "slug": "quickstart",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
       "library": "reactive",
       "source": "src/content/zh/packages/reactive/advanced.mdx",
       "slug": "advanced",
@@ -376,6 +348,34 @@
       "locale": "zh",
       "library": "web-rpc",
       "source": "src/content/zh/packages/web-rpc/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "plugin-host",
+      "source": "src/content/zh/packages/plugin-host/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "plugin-host",
+      "source": "src/content/zh/packages/plugin-host/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "plugin-host",
+      "source": "src/content/zh/packages/plugin-host/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "plugin-host",
+      "source": "src/content/zh/packages/plugin-host/quickstart.mdx",
       "slug": "quickstart",
       "format": "mdx"
     }

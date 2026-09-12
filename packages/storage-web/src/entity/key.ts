@@ -2,7 +2,7 @@ import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.j
 import type { IKeyRange, IStorageKey } from '../types/context.js'
 
 /**
- * 同一个 store 实例可能被多个 entity 共用（例如同一个 indexedDb() 连接 上挂 users 和 posts）。entity 名必须编入实际存储 key，否则不同
+ * 同一个 store 实例可能被多个 entity 共用（例如同一个 indexedDbHost() 连接 上挂 users 和 posts）。entity 名必须编入实际存储 key，否则不同
  * entity 的同 id 记录会互相覆盖。
  *
  * 结构化后端：`[entityName, id]`，原生数组键，天然可用作 range 的前缀。 KV 后端：`"<entityName>:<id>"` 字符串。

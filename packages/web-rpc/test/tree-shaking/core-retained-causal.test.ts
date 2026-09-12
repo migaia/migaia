@@ -203,7 +203,6 @@ describe('WRC-C-B11f five-consumer causal graph', () => {
       })
     expect(report.consumers.core.edges).toEqual(
       expect.arrayContaining([
-        { consumer: 'core', from: 'src/core.ts', to: 'src/internal/plugin-translator.ts' },
         { consumer: 'core', from: 'src/core.ts', to: 'src/internal/plugin-inventory.ts' },
         { consumer: 'core', from: 'src/core.ts', to: 'src/internal/web-rpc-plugin-host.ts' }
       ])

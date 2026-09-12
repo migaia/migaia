@@ -10,7 +10,6 @@ import {
 import { WebRpcMessageKind } from '../semantic-constants.js'
 import { WebRpcErrorText } from '../error-text.js'
 import type {
-  IWebRpcEventListener,
   IWebRpcFanoutResult,
   IWebRpcHook,
   IWebRpcHookEvent,
@@ -77,7 +76,6 @@ export type IOutboundAttachmentHost = {
     data: unknown,
     options?: { readonly transfer?: readonly unknown[] }
   ): Promise<void>
-  on(event: string, listener: IWebRpcEventListener): () => void
   readonly hooks: { on(listener: IWebRpcHook): () => void }
   emitFailure(error: unknown, code?: string): void
   emitDiagnostic(event: Omit<IWebRpcHookEvent, 'at' | 'localId'>): void
@@ -124,8 +122,6 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #replay: ReplayWindow
   /** Hook callbacks owned by the outbound runtime. */
   readonly #hooks = new HookRegistry()
-  /** Event listeners retained for the selected public kernel surface. */
-  readonly #events = new Map<string, Set<IWebRpcEventListener>>()
   /** Shared inbound source-proof/connect/binding owner for all selected features. */
   readonly inboundIdentity: InboundIdentityCoordinator
   /** Shared variation route and admission owner for optional feature handlers. */
@@ -209,7 +205,6 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     kernel.registerOwner('inbound-identity', this.inboundIdentity)
     kernel.registerOwner('variation-coordinator', this.variations)
     kernel.resources.addSync('outbound hook registry', () => this.#hooks.clear())
-    kernel.resources.addSync('outbound event listeners', () => this.#events.clear())
     kernel.resources.addSync('outbound response bindings', () => this.#responseBindings.clear())
     for (const listener of normalizeHooks(prepared.options.hooks?.listeners))
       this.#hooks.add(listener)
@@ -625,21 +620,6 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     for (const targetId of this.targetIds) this.dispatch(targetId, method, data)
   }
 
-  /** Registers a selected event listener without publishing provider mutation APIs. */
-  on(event: string, listener: IWebRpcEventListener): () => void {
-    this.kernel.assertActive()
-    assertMethod(event)
-    if (typeof listener !== 'function')
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.eventListenerInvalid)
-    const listeners = this.#events.get(event) ?? new Set<IWebRpcEventListener>()
-    listeners.add(listener)
-    this.#events.set(event, listeners)
-    return () => {
-      listeners.delete(listener)
-      if (listeners.size === 0) this.#events.delete(event)
-    }
-  }
-
   /** Returns the public hook registration surface. */
   get hooks(): { on(listener: IWebRpcHook): () => void } {
     return { on: (listener) => this.#hooks.add(listener) }
@@ -675,7 +655,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
       activeControllers: 0,
       chunks: readSelectedFramerChunks(this.#components),
       providers: 0,
-      events: [...this.#events.values()].reduce((total, listeners) => total + listeners.size, 0),
+      events: 0,
       hooks: this.#hooks.size,
       resources: this.kernel.resources.size,
       owners: this.kernel.ownerKeys,
@@ -698,7 +678,6 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     this.#featureDisposePromise = Promise.resolve().then(() => {
       this.kernel.beginClose()
       this.#failAll(new WebRpcAbortError())
-      this.#events.clear()
       this.#responseBindings.clear()
       this.#hooks.clear()
       this.#replay.clear()

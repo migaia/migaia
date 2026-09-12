@@ -1,7 +1,7 @@
 /** Round-2 hardening regressions (H11–H14 in docs/storage-web/hardening.sdd.md). Permanent. */
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
-import { cookies, indexedDb, localStorage } from '../src/backends'
+import { cookiesHost, indexedDbHost, localStorageHost } from '../src/backends'
 import { fakeCookieDocument } from '../src/testing/fake-cookie-document'
 
 describe('#11 Web Storage 不隐式降级 memory', () => {
@@ -16,7 +16,7 @@ describe('#11 Web Storage 不隐式降级 memory', () => {
       clear: () => {},
       key: () => null
     }
-    expect(() => localStorage({ storage: broken, namespace: 'ns' })).toThrow(
+    expect(() => localStorageHost({ storage: broken, namespace: 'ns' })).toThrow(
       expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
     )
   })
@@ -32,7 +32,7 @@ describe('#11 Web Storage 不隐式降级 memory', () => {
       clear: () => {},
       key: () => null
     })
-    expect(() => localStorage({ storage: broken(), namespace: 'same' })).toThrow(
+    expect(() => localStorageHost({ storage: broken(), namespace: 'same' })).toThrow(
       expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
     )
   })
@@ -41,7 +41,7 @@ describe('#11 Web Storage 不隐式降级 memory', () => {
 describe('#12 cookie 4096 上限包含 name、value 与属性', () => {
   it('name+value 远超 4096 抛 VALUE_TOO_LARGE', async () => {
     const doc = fakeCookieDocument()
-    const store = cookies({ namespace: 'n'.repeat(2000), document: doc })
+    const store = cookiesHost({ namespace: 'n'.repeat(2000), document: doc })
     await expect(store.set('k', 'v'.repeat(4090))).rejects.toMatchObject({
       code: 'VALUE_TOO_LARGE'
     })
@@ -50,7 +50,7 @@ describe('#12 cookie 4096 上限包含 name、value 与属性', () => {
 
 describe('#13 iterate 早退后游标仍把整表读进内存', () => {
   it('只取第一条也会读完全部记录', async () => {
-    const store = indexedDb({
+    const store = indexedDbHost({
       factory: new IDBFactory(),
       keyRange: IDBKeyRange,
       dbName: `adv2-${Math.random().toString(36).slice(2)}`
@@ -71,8 +71,8 @@ describe('#13 iterate 早退后游标仍把整表读进内存', () => {
 })
 
 describe('#14 主键类型入口统一校验', () => {
-  it('boolean 主键在 indexedDb 上抛稳定 StorageError', async () => {
-    const store = indexedDb({
+  it('boolean 主键在 indexedDbHost 上抛稳定 StorageError', async () => {
+    const store = indexedDbHost({
       factory: new IDBFactory(),
       keyRange: IDBKeyRange,
       dbName: `adv2-${Math.random().toString(36).slice(2)}`

@@ -1,5 +1,5 @@
-import { cookies, type ICookiesOptions } from '../backends/cookie.js'
-import { defineStorageBackendPlugin } from '../host/contracts.js'
+import { cookiesHost, type ICookiesOptions } from '../backends/cookie.js'
+import { defineBuiltInPlugin, type IStoragePluginCore } from '../host/contracts.js'
 import {
   cookieBackendKind,
   type IBuiltInPluginId,
@@ -11,8 +11,13 @@ import type { IStorageBackendPlugin } from '../host/types.js'
 export const cookieBackendPlugin = <const TId extends string = 'cookies'>(
   options: ICookiesOptions & IBuiltInPluginId<TId> = {}
 ): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId> =>
-  defineStorageBackendPlugin({
-    backendKind: cookieBackendKind,
-    id: (options.id ?? 'cookies') as TId,
-    create: () => cookies(options)
-  })
+  defineBuiltInPlugin(
+    cookieBackendKind,
+    (options.id ?? 'cookies') as TId,
+    (core: IStoragePluginCore<ICookieBackendStore>) => ({
+      install: () => {
+        core.registerStore(cookiesHost(options))
+        return {}
+      }
+    })
+  ) as IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>

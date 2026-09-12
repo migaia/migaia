@@ -24,12 +24,20 @@ import type {
   IWebRpcUuidConfig,
   IWebRpcProtocolCapability,
   IWebRpcPlugin,
+  IWebRpcMiddleware,
   IWebRpcProvider,
   IWebRpcProviderLimits
 } from '../typing.js'
 import type { IWebRpcTransport } from '../transport.js'
 import type { IEndpointKernelTransportSnapshot } from '../endpoint-kernel.js'
 import type { IWebRpcFeature } from '../feature.js'
+import {
+  isDefinedMiddleware,
+  readDefinedMiddlewareComponents,
+  readDefinedMiddlewarePolicy,
+  type IWebRpcMiddlewareComponentPolicy
+} from '../middleware.js'
+import type { IWebRpcPluginConstraint } from './plugin-contract.js'
 import type { IWebRpcEndpointOptions, IWebRpcSelectedComponents } from './endpoint-options.js'
 import type { IWebRpcHooksPort } from './plugin-shared-keys.js'
 
@@ -43,11 +51,26 @@ export type IPreparedEndpoint<TTargetId extends string> = {
 }
 
 /** Immutable middleware metadata captured before the composed Host batch mutates state. */
-export type IEndpointMiddlewareSnapshot = {
+export type IEndpointLegacyMiddlewareSnapshot = {
+  readonly kind: 'legacy'
   readonly name: string
   readonly plugin: IWebRpcPlugin
   readonly transport?: IWebRpcTransport
 }
+/** Native middleware retains its PluginHost definition for same-order batch installation. */
+export type IEndpointNativeMiddlewareSnapshot = {
+  readonly kind: 'native'
+  readonly name: string
+  readonly plugin: IWebRpcPluginConstraint
+  /** Object-form metadata is fixed at definition time and admitted before installation. */
+  readonly metadata?: IWebRpcPlugin['metadata']
+  /** Object-form components are fixed at definition time outside PluginHost's frozen token. */
+  readonly components?: IWebRpcMiddlewareComponentPolicy
+  readonly transport?: IWebRpcTransport
+}
+export type IEndpointMiddlewareSnapshot =
+  | IEndpointLegacyMiddlewareSnapshot
+  | IEndpointNativeMiddlewareSnapshot
 
 /** Deferred bootstrap result used by the Host-owned composed path. */
 export type IDeferredPreparedEndpoint<TTargetId extends string = string> = {
@@ -202,7 +225,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
 /** Validates and snapshots config before the single PluginHost construction batch. */
 export function prepareEndpoint<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
   TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
 >(
   config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
@@ -210,7 +233,7 @@ export function prepareEndpoint<
 ): Promise<IDeferredPreparedEndpoint<TTargetId>>
 export async function prepareEndpoint<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
   TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
 >(
   config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
@@ -274,6 +297,26 @@ export async function prepareEndpoint<
   try {
     middlewareSnapshots = (factoryMiddlewares as readonly IWebRpcPlugin[]).map((middleware) => {
       const name = safeRead<unknown>(middleware, 'name')
+      if (isDefinedMiddleware(middleware)) {
+        if (typeof name !== 'string' || name.length === 0)
+          throw new WebRpcError(
+            WebRpcErrorCode.invalidConfig,
+            WebRpcErrorText.middlewareMustBePlugin
+          )
+        const componentPolicy = readDefinedMiddlewareComponents(middleware)
+        const middlewareTransport = componentPolicy?.transport
+        const metadata = readDefinedMiddlewarePolicy(middleware)
+        return Object.freeze({
+          kind: 'native' as const,
+          name,
+          plugin: middleware as unknown as IWebRpcPluginConstraint,
+          ...(middlewareTransport === undefined
+            ? {}
+            : { transport: middlewareTransport as IWebRpcTransport }),
+          ...(metadata === undefined ? {} : { metadata }),
+          ...(componentPolicy === undefined ? {} : { components: componentPolicy })
+        })
+      }
       const metadata = safeRead<unknown>(middleware, 'metadata')
       const install = safeRead<unknown>(middleware, 'install')
       const middlewareTransport = safeRead<unknown>(middleware, 'transport')
@@ -305,6 +348,7 @@ export async function prepareEndpoint<
       )
         throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.middlewareMustBePlugin)
       return {
+        kind: 'legacy' as const,
         name: name as string,
         plugin,
         transport: middlewareTransport as IWebRpcTransport | undefined
@@ -379,7 +423,9 @@ export async function prepareEndpoint<
     protocol: factoryProtocol,
     codec: factoryCodec,
     framer: factoryFramer,
-    candidates: middlewareSnapshots.map(({ plugin }) => plugin),
+    candidates: middlewareSnapshots.map((snapshot) =>
+      snapshot.kind === 'legacy' ? snapshot.plugin : (snapshot.components ?? {})
+    ),
     transportShadow:
       factoryTransport !== undefined && transportCandidates[0] !== undefined
         ? Object.freeze({ winner: transport, shadowed: transportCandidates[0] })
@@ -423,7 +469,7 @@ function selectWebRpcComponents(
     readonly protocol?: unknown
     readonly codec?: unknown
     readonly framer?: unknown
-    readonly candidates?: readonly IWebRpcPlugin[]
+    readonly candidates?: readonly Pick<IWebRpcPlugin, 'protocol' | 'codec' | 'framer'>[]
     readonly transportShadow?: Readonly<{ readonly winner: object; readonly shadowed: object }>
   }>
 ): IWebRpcSelectedComponents {

@@ -78,10 +78,10 @@ test('storage-web defineEntity imports its concrete IndexedDB backend', () => {
   for (const locale of ['zh', 'en'] as const) {
     const guide = findApiGuide('storage-web', 'entity', 'defineEntity', locale)
     assert.ok(guide?.quickStart)
-    assert.match(guide.quickStart, /import \{ indexedDb \} from '@migaia\/storage-web\/indexed-db'/)
+    assert.match(guide.quickStart, /import \{ indexedDbHost \} from '@migaia\/storage-web\/indexed-db'/)
     assert.match(guide.quickStart, /type IUser = \{ id: number; email: string \}/)
     assert.match(guide.quickStart, /defineEntity<IUser>/)
-    assert.match(guide.quickStart, /users\.connect\(indexedDb\(\{ dbName: 'app' \}\)\)/)
+    assert.match(guide.quickStart, /users\.connect\(indexedDbHost\(\{ dbName: 'app' \}\)\)/)
     assert.doesNotMatch(guide.quickStart, /\buserSchema\b|\bmigrateUserV2\b|\bUser\b/)
   }
 })
@@ -90,7 +90,7 @@ test('storage-web feature example defines every custom backend prerequisite', ()
   for (const locale of ['zh', 'en'] as const) {
     const guide = findApiGuide('storage-web', 'host', 'defineStorageBackendFeature', locale)
     assert.ok(guide?.quickStart)
-    assert.match(guide.quickStart, /import \{ memoryStorage \}/)
+    assert.match(guide.quickStart, /import \{ memoryStorageHost \}/)
     assert.match(guide.quickStart, /defineStorageBackendKind<ICacheStore>\(\)\('cache'\)/)
     assert.match(guide.quickStart, /const cacheKind =/)
     assert.match(guide.quickStart, /mode: 'polling'/)
@@ -137,8 +137,8 @@ test('plugin-host definePlugin explains core, shared, extension, Host use, and c
   assert.match(guide.quickStart, /await app\.dispose\(\)/)
   assert.doesNotMatch(guide.quickStart, /\.\.\.|\bfetchConfig\b|\brun[A-Z]\w*\(\)/)
   const shortForm = guide.examples?.find((example) => example.id === 'short-form')
-  assert.ok(shortForm, 'definePlugin must document its name + installer overload')
-  assert.match(shortForm.title, /definePlugin\(name, install\)/)
+  assert.ok(shortForm, 'definePlugin must document its name + descriptor factory form')
+  assert.match(shortForm.title, /definePlugin\(name, descriptorFactory\)/)
   assert.match(shortForm.description, /config、shared、update、metadata.*disposer/)
   assert.match(shortForm.code, /definePlugin<IAppCore, \{ greet\(name: string\): string \}>\(/)
   assert.match(shortForm.code, /'greeting',\n  \(core\) => \(\{/)
@@ -154,6 +154,16 @@ test('plugin-host definePlugin explains core, shared, extension, Host use, and c
     guide.examples?.map((example) => example.id),
     ['short-form', 'shared-collaboration']
   )
+})
+
+test('plugin-host defineFeature separates synchronous capability construction from Plugin installation', () => {
+  const guide = findApiGuide('plugin-host', 'index', 'defineFeature', 'zh')
+  assert.ok(guide?.quickStart)
+  assert.match(guide.purpose, /不会创建 Host、安装 Plugin、启动资源或发布方法/)
+  assert.match(guide.purpose, /异步工作和清理必须放在 Plugin 的 install hook 中/)
+  assert.match(guide.quickStart, /defineFeature\(\(core: IFeatureCore<\{ readCount\(\): number \}>\) =>/)
+  assert.match(guide.quickStart, /core\.features\.metrics\.read\(\)/)
+  assert.match(guide.quickStart, /definePlugin\('counter'/)
 })
 
 test('plugin-host PluginHost documents its complete runtime and composition surface', () => {

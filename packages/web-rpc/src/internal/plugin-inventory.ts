@@ -1,60 +1,28 @@
 import { EndpointKernelState, type IEndpointKernelHost } from '../endpoint-kernel.js'
-import type { IWebRpcCoreConfig } from '../core.js'
-import {
-  EndpointModuleKey,
-  activateEndpointModule,
-  getEndpointModuleOwner,
-  type IEndpointModuleClaims,
-  type IRegisteredEndpointModule
-} from './endpoint-modules.js'
-import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type {
   IDeferredPreparedEndpoint,
-  IEndpointMiddlewareSnapshot
+  IEndpointMiddlewareSnapshot,
+  IPreparedEndpoint
 } from './endpoint-bootstrap.js'
+import type { IWebRpcPluginClaims } from '../typing.js'
+import type { IWebRpcPluginDescriptor } from './plugin-descriptor.js'
 import type {
-  IWebRpcPluginDescriptor,
-  IWebRpcPluginClaims,
-  IWebRpcPluginRuntimeOutput,
-  IWebRpcPluginRuntimeOutputPhase
-} from './plugin-translator.js'
-import type { IWebRpcTranslatedPlugin } from './plugin-translator.js'
-import { toPluginDescriptor } from './plugin-descriptor.js'
+  IWebRpcPluginConstraint,
+  IWebRpcPluginCore,
+  IWebRpcPluginHostCore
+} from './plugin-contract.js'
+import { runConstructionInstall } from './construction-install.js'
+import { assertPluginInstallResult } from './plugin-descriptor.js'
 import {
   WebRpcSharedKey,
-  type IWebRpcCandidatePingPort,
-  type IWebRpcInboundIdentityPort,
-  type IWebRpcIdentityCommand,
-  type IWebRpcOutboundOperationsPort,
-  type IWebRpcOutboundCommand,
-  type IWebRpcOutboundSend,
-  type IWebRpcResponseOutboundCommand,
-  type IWebRpcSynchronousOutboundCommand,
-  type IWebRpcDiscoveryResolverPort,
-  type IWebRpcTimePort,
-  type IWebRpcVariationAdmissionRequest,
-  type IWebRpcVariationCoordinatorPort
+  type IWebRpcHooksPort,
+  type IWebRpcTimePort
 } from './plugin-shared-keys.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import type { IWebRpcCleanupError } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcHookEvent, IWebRpcPingOptions } from '../typing.js'
-import type { IOutboundAttachmentHost } from './outbound-attachment.js'
-import {
-  isNativeProviderModule,
-  registerNativeProviderClaimAuthority
-} from './provider-claim-authority.js'
-
-/** One immutable repository-owned descriptor and its preflight claims. */
-export type IWebRpcEndpointPluginInventoryEntry = {
-  readonly descriptor: IWebRpcPluginDescriptor
-  readonly claims: IWebRpcPluginClaims
-}
-
-/** Minimal owner contract used to publish the provider cancellation port. */
-type IProviderCancellationOwner = {
-  readonly abort: (id: string) => void
-}
+import type { IWebRpcHookEvent } from '../typing.js'
+import type { IWebRpcClaimAdmission } from './feature-policy.js'
 
 /** Fixed production batch positions exposed only to bounded internal failure injection tests. */
 export type IWebRpcPluginRole =
@@ -64,285 +32,53 @@ export type IWebRpcPluginRole =
   | { readonly kind: 'feature'; readonly index: number; readonly key: string }
   | { readonly kind: 'activation' }
 
-/** One production descriptor and its fixed batch position. */
-export type IWebRpcComposedPluginInventoryEntry = {
-  readonly role: IWebRpcPluginRole
-  readonly descriptor: IWebRpcPluginDescriptor
-}
-
 /** Runtime batch state observed only by bounded production parity tests. */
 export type IWebRpcComposedRuntimeState = {
   readonly routeKeys: readonly string[]
   readonly activated: boolean
 }
 
-/** Frozen result of one canonical outbound owner attempt for package-local diagnostics. */
-export type IWebRpcOutboundCommandObservation = {
-  readonly command: IWebRpcOutboundCommand
-  readonly result: void | Promise<void>
-  readonly error?: unknown
-}
+/** One direct Host definition plus only the WebRPC claims required for static parity checks. */
+export type IWebRpcNativePluginBatchEntry = Readonly<{
+  readonly role: IWebRpcPluginRole
+  readonly definition: IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
+  readonly admission: IWebRpcClaimAdmission
+}>
 
-/** Side-effect-free builder inputs; callbacks allocate or mutate only during Host installation. */
-export type IWebRpcComposedPluginBuilderOptions = {
-  readonly definitions: readonly IRegisteredEndpointModule<IWebRpcCoreConfig>[]
-  readonly config: IWebRpcCoreConfig
+/** A domain-admitted native Feature definition inserted before the single activation role. */
+export type IWebRpcNativeFeatureDefinition = Readonly<{
+  readonly key: string
+  readonly definition: IWebRpcPluginConstraint & { readonly claims?: IWebRpcPluginClaims }
+  readonly admission: IWebRpcClaimAdmission
+}>
+
+/** Native composition inputs; Host remains the only identity, topology, and lifecycle owner. */
+export type IWebRpcNativePluginBatchOptions = {
   readonly kernel: IEndpointKernelHost
   readonly deferred: IDeferredPreparedEndpoint<string>
   readonly middlewareSnapshots: readonly IEndpointMiddlewareSnapshot[]
   readonly hookEvents: IWebRpcHookEvent[]
   readonly onPrepared: (prepared: IPreparedEndpoint<string>) => void
-  readonly getPrepared: () => IPreparedEndpoint<string>
-  readonly getFeatureInstallations: () => readonly IWebRpcTranslatedPlugin[]
   readonly onActivationCommitted: () => void
-  /** Restores the observed activation commit when Host rolls the batch back. */
   readonly onActivationRolledBack?: () => void
-  readonly injectRuntimeOutput?: (
-    role: IWebRpcPluginRole,
-    phase: IWebRpcPluginRuntimeOutputPhase,
-    output: IWebRpcPluginRuntimeOutput
-  ) => IWebRpcPluginRuntimeOutput
-  readonly injectRuntimeState?: (
-    role: IWebRpcPluginRole,
-    state: IWebRpcComposedRuntimeState
-  ) => IWebRpcComposedRuntimeState | Promise<IWebRpcComposedRuntimeState>
-  /** Runs the complete activation parity gate before any feature activation callback. */
+  readonly onNativeFeatureActivate?: () => void
+  readonly onRootDisposalErrors?: (errors: readonly IWebRpcCleanupError[]) => void
   readonly onActivationPreflight?: (
     state: IWebRpcComposedRuntimeState,
     getShared: (key: PropertyKey) => unknown
-  ) => void
-  /** Reports endpoint-root cleanup identities without changing Host's own error contract. */
-  readonly onRootDisposalErrors?: (errors: readonly IWebRpcCleanupError[]) => void
-  /** Observes canonical outbound results without supplying or altering command behavior. */
-  readonly observeOutboundCommand?: (observation: IWebRpcOutboundCommandObservation) => void
-  readonly onRuntimeState?: (state: IWebRpcComposedRuntimeState) => void
-  readonly injectInstall?: (
+  ) => void | Promise<void>
+  /** Bounded test seam wraps one middleware body inside its existing construction scope. */
+  readonly transformMiddlewareInstall?: (
     role: IWebRpcPluginRole,
     install: IWebRpcPluginDescriptor['install']
   ) => IWebRpcPluginDescriptor['install']
-}
-
-/**
- * Inventories the package's admitted endpoint modules without creating a registry or lifecycle
- * owner. Shared lookup remains a narrow domain callback so the D64 translator stays stateless.
- */
-export function createEndpointPluginInventory(
-  definitions: readonly IRegisteredEndpointModule<IWebRpcCoreConfig>[],
-  config: IWebRpcCoreConfig,
-  kernel: IEndpointKernelHost,
-  getPrepared: () => IPreparedEndpoint<string>,
-  observeOutboundCommand?: (observation: IWebRpcOutboundCommandObservation) => void
-): readonly IWebRpcEndpointPluginInventoryEntry[] {
-  return definitions.map((definition) => {
-    const claims: IEndpointModuleClaims = definition.claims
-    if (isNativeProviderModule(definition.sourceToken)) registerNativeProviderClaimAuthority(claims)
-    const sharedContract = {
-      ...(claims.sharedProvides ? { sharedProvides: claims.sharedProvides } : {}),
-      ...(claims.sharedConsumes ? { sharedConsumes: claims.sharedConsumes } : {}),
-      ...(claims.sharedOptionalConsumes
-        ? { sharedOptionalConsumes: claims.sharedOptionalConsumes }
-        : {})
-    }
-    const descriptor: IWebRpcPluginDescriptor = Object.freeze({
-      name: definition.key,
-      claims,
-      ...sharedContract,
-      install: async (scope) =>
-        definition.install({
-          config,
-          kernel,
-          prepared: getPrepared(),
-          id: scope.id,
-          transport: scope.transport,
-          signal: scope.signal,
-          hooks: scope.hooks,
-          own: scope.own,
-          getShared: scope.getShared
-        }),
-      ...(definition.key === EndpointModuleKey.outbound
-        ? {
-            shared: (installation: unknown) => {
-              const owner = getEndpointModuleOwner(installation) as
-                | IOutboundAttachmentHost
-                | undefined
-              if (owner === undefined) return {}
-              const outboundOwner = owner
-              const verify: IWebRpcInboundIdentityPort['verify'] = (
-                command: IWebRpcIdentityCommand
-              ) => {
-                if (command.operation === 'admit')
-                  return owner.inboundIdentity.admit(command.request)
-                if (command.operation === 'retain')
-                  return owner.inboundIdentity.retain(command.token)
-                owner.inboundIdentity.release(command.token)
-              }
-              const inboundIdentity: IWebRpcInboundIdentityPort = { verify }
-              const admit: IWebRpcVariationCoordinatorPort['admit'] = (
-                value: IWebRpcVariationAdmissionRequest
-              ) => {
-                if (value.operation === 'register')
-                  return owner.variations.register(value.variation, value.handler)
-                if (value.operation === 'consumeAbort')
-                  return owner.variations.consumeAbort(value.key)
-                if (value.operation === 'abort')
-                  return owner.variations.abort(
-                    value.key,
-                    value.controller,
-                    value.expiresAt,
-                    value.reason
-                  )
-                return undefined
-              }
-              const variationCoordinator: IWebRpcVariationCoordinatorPort = { admit }
-              /** Dispatches one bounded provider command while preserving owner timing. */
-              function send(command: IWebRpcResponseOutboundCommand): Promise<void>
-              function send(command: IWebRpcSynchronousOutboundCommand): void
-              function send(command: IWebRpcOutboundCommand): Promise<void> | void {
-                const observe = (result: void | Promise<void>, error?: unknown): void => {
-                  if (!observeOutboundCommand) return
-                  const observation = Object.freeze({
-                    command,
-                    result,
-                    ...(error === undefined ? {} : { error })
-                  })
-                  try {
-                    observeOutboundCommand(observation)
-                  } catch (observerError) {
-                    outboundOwner.emitFailure(observerError, WebRpcErrorCode.internal)
-                  }
-                }
-                if (command.kind === 'response' || command.kind === 'frame') {
-                  try {
-                    const result = outboundOwner.sendFrame(command.message, command.transfer)
-                    observe(result)
-                    return result
-                  } catch (error) {
-                    observe(undefined, error)
-                    throw error
-                  }
-                }
-                if (command.kind === 'dispatch') {
-                  try {
-                    outboundOwner.dispatch(command.targetId, command.method, command.data)
-                    observe(undefined)
-                  } catch (error) {
-                    observe(undefined, error)
-                    throw error
-                  }
-                  return
-                }
-                if (command.kind === 'one-way') {
-                  try {
-                    const result = outboundOwner.sendOneWay(
-                      command.targetId,
-                      command.method,
-                      command.data,
-                      { transfer: command.transfer }
-                    )
-                    observe(result)
-                    return result
-                  } catch (error) {
-                    observe(undefined, error)
-                    throw error
-                  }
-                }
-                if (command.kind === 'validate') {
-                  try {
-                    outboundOwner.validate(command.method, command.side, command.data)
-                    observe(undefined)
-                  } catch (error) {
-                    observe(undefined, error)
-                    throw error
-                  }
-                  return
-                }
-                if (command.kind === 'diagnostic') {
-                  try {
-                    outboundOwner.emitDiagnostic(command.event)
-                    observe(undefined)
-                  } catch (error) {
-                    observe(undefined, error)
-                    throw error
-                  }
-                  return
-                }
-                if (command.kind === 'report') {
-                  try {
-                    outboundOwner.emitFailure(command.error, command.code)
-                    observe(undefined)
-                  } catch (error) {
-                    observe(undefined, error)
-                    throw error
-                  }
-                  return
-                }
-              }
-              const outboundOperations: IWebRpcOutboundOperationsPort = {
-                send: send as IWebRpcOutboundSend
-              }
-              return {
-                [WebRpcSharedKey.inboundIdentity]: Object.freeze(inboundIdentity),
-                [WebRpcSharedKey.variationCoordinator]: Object.freeze(variationCoordinator),
-                [WebRpcSharedKey.outboundOperations]: Object.freeze(outboundOperations)
-              }
-            }
-          }
-        : definition.key === EndpointModuleKey.control
-          ? {
-              shared: (installation: unknown) => {
-                const owner = getEndpointModuleOwner(installation) as
-                  | {
-                      readonly ping: (
-                        targetId: string,
-                        receiverId?: string,
-                        options?: IWebRpcPingOptions
-                      ) => Promise<boolean>
-                    }
-                  | undefined
-                if (!owner) return {}
-                const candidatePing: IWebRpcCandidatePingPort = Object.freeze({
-                  ping: (candidate, options) =>
-                    owner.ping(candidate.targetId, candidate.receiverId, options)
-                })
-                return { [WebRpcSharedKey.candidatePing]: candidatePing }
-              }
-            }
-          : definition.key === EndpointModuleKey.discovery
-            ? {
-                shared: (installation: unknown) => {
-                  const owner = getEndpointModuleOwner(installation) as
-                    | {
-                        readonly resolveReceiver: (targetId: string) => Promise<{
-                          readonly receiverId: string
-                          readonly verifiedPeerKey?: string
-                        }>
-                      }
-                    | undefined
-                  if (!owner) return {}
-                  const resolver: IWebRpcDiscoveryResolverPort = Object.freeze({
-                    resolve: (targetId) => owner.resolveReceiver(targetId)
-                  })
-                  return { [WebRpcSharedKey.discoveryResolver]: resolver }
-                }
-              }
-            : definition.key === EndpointModuleKey.provider
-              ? {
-                  shared: (installation: unknown) => {
-                    const owner = getEndpointModuleOwner(installation) as
-                      | IProviderCancellationOwner
-                      | undefined
-                    if (!owner) return {}
-                    return {
-                      [WebRpcSharedKey.providerCancellation]: Object.freeze({
-                        abort: (id: string) => owner.abort(id)
-                      })
-                    }
-                  }
-                }
-              : {})
-    })
-    return Object.freeze({ descriptor, claims })
-  })
+  /** Native Features are definitions in the same Host transaction, never a side graph. */
+  readonly featureDefinitions?: readonly IWebRpcNativeFeatureDefinition[]
+  /** Bounded test seam observes or replaces one direct Host definition without a descriptor path. */
+  readonly transformDefinition?: (
+    role: IWebRpcPluginRole,
+    definition: IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
+  ) => IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
 }
 
 /**
@@ -350,44 +86,44 @@ export function createEndpointPluginInventory(
  * failure matrix both consume this list; only the bounded install callback may alter role
  * behavior.
  */
-export function buildComposedPluginInventory(
-  options: IWebRpcComposedPluginBuilderOptions
-): readonly IWebRpcComposedPluginInventoryEntry[] {
-  const emptyClaims: IWebRpcPluginClaims = {
-    routes: [],
-    provides: [],
-    consumes: [],
-    publicKeys: [],
-    exposedKeys: [],
+/**
+ * Builds the production transaction as direct PluginHost definitions. This intentionally does not
+ * create endpoint descriptors, translated installations, or a second dependency graph.
+ */
+export function buildNativePluginBatch(
+  options: IWebRpcNativePluginBatchOptions
+): readonly IWebRpcNativePluginBatchEntry[] {
+  const emptyClaims: IWebRpcPluginClaims = Object.freeze({
+    routes: Object.freeze([]),
+    provides: Object.freeze([]),
+    consumes: Object.freeze([]),
+    publicKeys: Object.freeze([]),
+    exposedKeys: Object.freeze([]),
     activator: false
-  }
-  const entries: IWebRpcComposedPluginInventoryEntry[] = []
-  const add = (role: IWebRpcPluginRole, descriptor: IWebRpcPluginDescriptor): void => {
-    const install = options.injectInstall?.(role, descriptor.install) ?? descriptor.install
-    const runtimeOutput = options.injectRuntimeOutput
-      ? (phase: IWebRpcPluginRuntimeOutputPhase, output: IWebRpcPluginRuntimeOutput) =>
-          options.injectRuntimeOutput!(role, phase, output)
-      : descriptor.runtimeOutput
-    const baseDescriptor =
-      role.kind === 'middleware'
-        ? { ...descriptor, preserveRuntimeOutputForHost: true }
-        : descriptor
-    entries.push({
-      role,
-      descriptor:
-        install === baseDescriptor.install && runtimeOutput === baseDescriptor.runtimeOutput
-          ? baseDescriptor
-          : { ...baseDescriptor, install, runtimeOutput }
-    })
+  })
+  const entries: IWebRpcNativePluginBatchEntry[] = []
+  const add = (
+    role: IWebRpcPluginRole,
+    definition: IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims },
+    admission: IWebRpcClaimAdmission
+  ): void => {
+    entries.push(
+      Object.freeze({
+        role,
+        definition: options.transformDefinition?.(role, definition) ?? definition,
+        admission
+      })
+    )
   }
   add(
     { kind: 'kernel' },
-    {
-      name: 'kernel',
-      claims: emptyClaims,
-      sharedProvides: [WebRpcSharedKey.time],
-      install: async (scope) => {
-        scope.own({}, async () => {
+    nativeDefinition(
+      'kernel',
+      emptyClaims,
+      [WebRpcSharedKey.time],
+      [],
+      async (core) => {
+        core.onDispose(async () => {
           if (options.kernel.state === EndpointKernelState.disposed) return
           options.kernel.beginClose()
           try {
@@ -408,23 +144,127 @@ export function buildComposedPluginInventory(
         })
         return {}
       },
-      shared: () => ({
+      () => ({
         [WebRpcSharedKey.time]: Object.freeze({
           now: () => options.kernel.time.now(),
           setTimeout: options.kernel.time.setTimeout,
           clearTimeout: options.kernel.time.clearTimeout
         } satisfies IWebRpcTimePort)
       })
-    }
+    ),
+    { name: 'kernel', claims: emptyClaims, sharedProvides: [WebRpcSharedKey.time] }
   )
   options.middlewareSnapshots.forEach((snapshot, index) => {
+    const role = {
+      kind: 'middleware' as const,
+      index,
+      name: snapshot.name.replace(/^middleware:/, '')
+    }
+    if (snapshot.kind === 'native') {
+      const metadata = snapshot.metadata
+      add(
+        role,
+        snapshot.plugin as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims },
+        {
+          name: snapshot.plugin.name,
+          claims: metadata?.claims ?? emptyClaims,
+          sharedProvides: metadata?.sharedProvides,
+          sharedConsumes: metadata?.sharedConsumes,
+          sharedOptionalConsumes: metadata?.sharedOptionalConsumes
+        }
+      )
+      return
+    }
+    const middleware = snapshot.plugin
+    const install =
+      options.transformMiddlewareInstall?.(role, middleware.install) ?? middleware.install
+    let result: import('../typing.js').IWebRpcPluginInstallResult | undefined
     add(
-      { kind: 'middleware', index, name: snapshot.name.replace(/^middleware:/, '') },
-      toPluginDescriptor(snapshot.plugin)
+      role,
+      nativeDefinition(
+        middleware.name,
+        middleware.metadata.claims,
+        middleware.metadata.sharedProvides ?? [],
+        middleware.metadata.sharedConsumes ?? [],
+        async (core) => {
+          const hooksPort = core.getShared(WebRpcSharedKey.hooks) as IWebRpcHooksPort | undefined
+          const constructionReporter = hooksPort?.reportConstructionDiagnostic
+          const installed = await runConstructionInstall(
+            {
+              id: core.id,
+              transport: core.transport,
+              control: core.construction,
+              hooks: core.hooks,
+              getShared: (key) => core.getShared(key),
+              report: constructionReporter
+                ? (error) =>
+                    constructionReporter({
+                      name: 'failure',
+                      at: core.construction.time.now(),
+                      localId: core.id,
+                      code: WebRpcErrorCode.internal,
+                      error
+                    })
+                : (error) =>
+                    core.hooks({
+                      name: 'failure',
+                      at: core.construction.time.now(),
+                      localId: core.id,
+                      code: WebRpcErrorCode.internal,
+                      error
+                    }),
+              registerScope: (_scope, close, awaitClose) => {
+                core.onDispose(async () => {
+                  close()
+                  await awaitClose()
+                })
+              }
+            },
+            async (scope) => {
+              const installation = await install(scope)
+              const disposer =
+                installation !== null && typeof installation === 'object'
+                  ? Object.getOwnPropertyDescriptor(installation, 'dispose')?.value
+                  : undefined
+              if (typeof disposer === 'function')
+                scope.own({}, async () => {
+                  await disposer()
+                })
+              return installation
+            }
+          )
+          assertPluginInstallResult(installed)
+          result = installed
+          return copyExtensionOutput(installed.extension, middleware.metadata.claims.publicKeys)
+        },
+        () => result?.shared ?? {}
+      ),
+      {
+        name: middleware.name,
+        claims: middleware.metadata.claims,
+        sharedProvides: middleware.metadata.sharedProvides,
+        sharedConsumes: middleware.metadata.sharedConsumes,
+        sharedOptionalConsumes: middleware.metadata.sharedOptionalConsumes
+      }
     )
   })
   add(
     { kind: 'middleware-finalize' },
+    nativeDefinition(
+      'middleware-finalize',
+      emptyClaims,
+      [],
+      [WebRpcSharedKey.connect],
+      async (core) => {
+        const prepared = await options.deferred.finalize(
+          options.hookEvents,
+          (operation) => Promise.resolve(operation()),
+          core.getShared
+        )
+        options.onPrepared(prepared)
+        return {}
+      }
+    ),
     {
       name: 'middleware-finalize',
       claims: emptyClaims,
@@ -439,68 +279,80 @@ export function buildComposedPluginInventory(
         WebRpcSharedKey.hooks,
         WebRpcSharedKey.ping,
         WebRpcSharedKey.uuid
-      ],
-      install: async (scope) => {
-        const prepared = await options.deferred.finalize(
-          options.hookEvents,
-          (operation) => Promise.resolve(operation()),
-          scope.getShared
-        )
-        options.onPrepared(prepared)
-        return {}
-      }
+      ]
     }
   )
-  const featureEntries = createEndpointPluginInventory(
-    options.definitions,
-    options.config,
-    options.kernel,
-    options.getPrepared,
-    options.observeOutboundCommand
-  )
-  featureEntries.forEach((entry, index) => {
-    add({ kind: 'feature', index, key: entry.descriptor.name }, entry.descriptor)
+  options.featureDefinitions?.forEach((feature, index) => {
+    add(
+      { kind: 'feature', index, key: feature.key },
+      feature.definition as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims },
+      feature.admission
+    )
   })
   add(
     { kind: 'activation' },
-    {
-      name: 'activation',
-      claims: { ...emptyClaims, activator: true },
-      install: async (scope) => {
-        scope.own({}, () => options.onActivationRolledBack?.())
-        scope.own({}, () => {
-          options.kernel.beginClose()
-          const errors = options.kernel.resources.releaseSync()
-          if (errors.length > 0) {
-            options.onRootDisposalErrors?.(
-              errors.flatMap(({ resource, error }) =>
-                flattenReleaseErrors(error).map((child) => ({ resource, error: child }))
-              )
+    nativeDefinition('activation', { ...emptyClaims, activator: true }, [], [], async (core) => {
+      core.onDispose(() => options.onActivationRolledBack?.())
+      core.onDispose(() => {
+        options.kernel.beginClose()
+        const errors = options.kernel.resources.releaseSync()
+        if (errors.length > 0) {
+          options.onRootDisposalErrors?.(
+            errors.flatMap(({ resource, error }) =>
+              flattenReleaseErrors(error).map((child) => ({ resource, error: child }))
             )
-            throw new AggregateError(errors.map(({ error }) => error))
-          }
-        })
-        const state = await (options.injectRuntimeState?.(
-          { kind: 'activation' },
-          { routeKeys: options.kernel.routeKeys, activated: true }
-        ) ?? { routeKeys: options.kernel.routeKeys, activated: true })
-        options.onActivationPreflight?.(state, scope.getShared)
-        for (const item of options.getFeatureInstallations()) {
-          const installation = item.getInstallation()
-          if (installation === undefined)
-            throw new WebRpcError(
-              WebRpcErrorCode.invalidConfig,
-              WebRpcErrorText.endpointModuleInvalid
-            )
-          activateEndpointModule(installation)
+          )
+          throw new AggregateError(errors.map(({ error }) => error))
         }
-        options.onRuntimeState?.(state)
-        if (state.activated) options.onActivationCommitted()
-        return {}
-      }
-    }
+      })
+      const state = { routeKeys: options.kernel.routeKeys, activated: true }
+      await options.onActivationPreflight?.(state, core.getShared)
+      options.onNativeFeatureActivate?.()
+      options.onActivationCommitted()
+      return {}
+    }),
+    { name: 'activation', claims: { ...emptyClaims, activator: true } }
   )
   return Object.freeze(entries)
+}
+
+/** Creates a direct domain definition; PluginHost still owns the feature graph and instances. */
+function nativeDefinition(
+  name: string,
+  claims: IWebRpcPluginClaims,
+  sharedProvides: readonly PropertyKey[],
+  sharedConsumes: readonly PropertyKey[],
+  install: (core: IWebRpcPluginCore & IWebRpcPluginHostCore) => unknown | Promise<unknown>,
+  shared?: () => Record<PropertyKey, unknown>
+): IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims } {
+  return Object.freeze({
+    name,
+    claims,
+    sharedProvides,
+    sharedConsumes,
+    install,
+    ...(shared === undefined ? {} : { shared })
+  }) as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
+}
+
+/** Re-materializes legacy middleware output as Host-compatible configurable data properties. */
+function copyExtensionOutput(
+  source: Readonly<Record<string, unknown>>,
+  publicKeys: readonly string[]
+): Record<string, unknown> {
+  const output: Record<string, unknown> = Object.create(null)
+  for (const key of publicKeys) {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key)
+    if (!descriptor || !('value' in descriptor))
+      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+    Object.defineProperty(output, key, {
+      configurable: true,
+      enumerable: true,
+      value: descriptor.value,
+      writable: true
+    })
+  }
+  return output
 }
 
 /** Preserves raw cleanup identities while flattening lifecycle/resource diagnostic containers. */

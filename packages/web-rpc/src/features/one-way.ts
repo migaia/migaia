@@ -1,10 +1,11 @@
-import { defineEndpointModule, EndpointModuleKey } from '../internal/endpoint-modules.js'
-import {
-  WebRpcSharedKey,
-  type IWebRpcOutboundOperationsPort
-} from '../internal/plugin-shared-keys.js'
-import { outbound } from './outbound.js'
-import type { IWebRpcCoreConfig } from '../core.js'
+import type { IWebRpcFeature } from '../feature.js'
+import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
+import { defineRpcFeature } from '../internal/define-rpc-feature.js'
+import type {
+  IOneWayCapability,
+  IOneWayInstallation,
+  IOutboundCapability
+} from '../internal/feature-contract.js'
 
 /**
  * Optional transfer elements whose identity/order reach the canonical sender; that sender captures
@@ -22,46 +23,52 @@ export type IOneWaySurface = Readonly<{
   ) => Promise<void>
 }>
 
-/** Is the sole reusable module token for opt-in physical one-way delivery. */
-const oneWayModule = defineEndpointModule<IWebRpcCoreConfig, IOneWaySurface>(
-  EndpointModuleKey.oneWay,
-  async ({ getShared }) => {
-    /** Existing outbound owner port selected by the declared dependency. */
-    const outboundOperations = getShared(
-      WebRpcSharedKey.outboundOperations
-    ) as IWebRpcOutboundOperationsPort
-    return Object.freeze({
-      sendOneWay: (
-        targetId: string,
-        method: string,
-        data: unknown,
-        options?: IWebRpcOneWayOptions
-      ) => {
-        /** Snapshots the caller option once before forwarding to the canonical outbound owner. */
-        const transfer = options?.transfer
-        return outboundOperations.send({
-          kind: 'one-way',
-          targetId,
-          method,
-          data,
-          ...(transfer === undefined ? {} : { transfer })
-        })
+/** Native optional one-way Feature reuses the direct outbound capability rather than shared lookup. */
+export const createOneWayFeature = (
+  outboundCapability: IWebRpcFeature<IOutboundCapability>
+): IWebRpcFeature<
+  IOneWayCapability,
+  { readonly outbound: IWebRpcFeature<IOutboundCapability> },
+  IEndpointCapabilitiesFeatureExpose
+> =>
+  defineRpcFeature<
+    IOneWayCapability,
+    { readonly outbound: IWebRpcFeature<IOutboundCapability> },
+    IEndpointCapabilitiesFeatureExpose
+  >(
+    {
+      publicKeys: ['sendOneWay'],
+      claims: {
+        routes: [],
+        provides: [],
+        consumes: [],
+        publicKeys: ['sendOneWay'],
+        exposedKeys: [],
+        activator: false
       }
-    })
-  },
-  [outbound()],
-  [],
-  {
-    routes: [],
-    provides: [],
-    consumes: [],
-    publicKeys: ['sendOneWay'],
-    sharedConsumes: [WebRpcSharedKey.outboundOperations],
-    activator: false
-  }
-)
-
-/** Returns the opt-in first-party endpoint module for physical one-way delivery. */
-export function oneWay() {
-  return oneWayModule
-}
+    },
+    (_core, dependencies) => {
+      let installation: IOneWayInstallation | undefined
+      const prepare = (
+        scope: import('../typing.js').IWebRpcPluginInstallScope
+      ): IOneWayInstallation => {
+        if (installation) return installation
+        const outbound = dependencies.outbound.prepare(scope)
+        const publicSurface: IOneWaySurface = Object.freeze({
+          sendOneWay: (targetId, method, data, options) =>
+            outbound.outboundOperations.send({
+              kind: 'one-way',
+              targetId,
+              method,
+              data,
+              ...(options?.transfer === undefined ? {} : { transfer: options.transfer })
+            })
+        })
+        const preparedInstallation: IOneWayInstallation = Object.freeze({ public: publicSurface })
+        installation = preparedInstallation
+        return preparedInstallation
+      }
+      return Object.freeze({ prepare })
+    },
+    { outbound: outboundCapability }
+  )

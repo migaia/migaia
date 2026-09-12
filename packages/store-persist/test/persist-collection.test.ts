@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 import {
   observableMap,
   observableSet,
@@ -11,7 +11,7 @@ import { persistCollection } from '../src/indexed-index'
 describe('persistCollection（store-indexed）', () => {
   it('snapshots accessor-backed options exactly once', () => {
     const map = observableMap<string, number>()
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     let reads = 0
     const options = { storage } as { key: string; storage: typeof storage }
     Object.defineProperty(options, 'key', {
@@ -34,7 +34,7 @@ describe('persistCollection（store-indexed）', () => {
     )
   })
   it('ObservableMap：写入后 flush 落盘，hydrate 命中时整体 replace 回内存', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const map = observableMap<string, number>()
     const handle = persistCollection(map, { storage, key: 'scores' })
     map.set('u1', 10)
@@ -49,7 +49,7 @@ describe('persistCollection（store-indexed）', () => {
   })
 
   it('ObservableSet：变化触发一次防抖写回，读回后内容一致', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const set = observableSet<string>()
     const handle = persistCollection(set, { storage, key: 'tags', debounceMs: 20 })
     await handle.ready
@@ -66,7 +66,7 @@ describe('persistCollection（store-indexed）', () => {
   })
 
   it('ObservableObject：hydrate 未命中时不改动初始值', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const obj = observableObject({ theme: 'light' })
     const handle = persistCollection(obj, { storage, key: 'obj-missing' })
     await handle.ready
@@ -75,7 +75,7 @@ describe('persistCollection（store-indexed）', () => {
   })
 
   it('ObservableArray：写入并读回', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const arr = observableArray<number>([1, 2, 3])
     const handle = persistCollection(arr, { storage, key: 'arr' })
     arr.push(4)
@@ -90,7 +90,7 @@ describe('persistCollection（store-indexed）', () => {
   })
 
   it('dispose 后不再响应集合变化', async () => {
-    const storage = memoryStorage()
+    const storage = memoryStorageHost()
     const set = observableSet<string>()
     const handle = persistCollection(set, { storage, key: 'after-dispose' })
     await handle.ready

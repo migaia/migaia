@@ -1,11 +1,7 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
-import { memoryStorage } from '../../src/backends/memory.js'
-import {
-  createStorageHost,
-  defineStorageBackendKind,
-  defineStorageBackendPlugin
-} from '../../src/host/index.js'
+import { memoryStorageHost } from '../../src/backends/memory.js'
+import { createStorageHost, definePlugin } from '../../src/host/index.js'
 import type { IKeyValueStore } from '../../src/types/storage.js'
 import { indexedDbBackendPlugin } from '../../src/plugins/indexed-db.js'
 
@@ -53,7 +49,7 @@ describe('SWV4-R07 IndexedDB backend plugin', () => {
   })
 
   it('registers disposer before prepare and rolls back exactly once on prepare failure', async () => {
-    const source = memoryStorage()
+    const source = memoryStorageHost()
     const events: string[] = []
     const store = {
       ...source,
@@ -62,19 +58,14 @@ describe('SWV4-R07 IndexedDB backend plugin', () => {
         await source.dispose()
       }
     } satisfies IKeyValueStore
-    const kind = defineStorageBackendKind<IKeyValueStore>()('r07-register-prepare')
-    const plugin = defineStorageBackendPlugin({
-      backendKind: kind,
-      id: 'r07-register-prepare',
-      create: () => {
+    const plugin = definePlugin('r07-register-prepare', (core) => ({
+      install: async () => {
         events.push('create')
-        return store
-      },
-      prepare: async () => {
+        core.registerStore(store)
         events.push('prepare')
         throw new Error('prepare failed')
       }
-    })
+    }))
 
     await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'

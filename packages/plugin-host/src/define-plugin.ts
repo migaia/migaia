@@ -1,8 +1,14 @@
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { invokeCaptured } from './invocation.js'
-import { createPluginHostTypeError } from './error-text.js'
-import type { IPluginDefinition } from './registry.js'
+import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
+import { snapshotFeatureRecord } from './define-feature.js'
+import type { IPluginDefinition, IPluginDescriptor } from './registry.js'
+import type {
+  IFeatureOutputs,
+  IFeatureRecord,
+  IFeatureRecordRequiredExpose
+} from './feature-types.js'
 import type {
   IDefinedPluginConstraint,
   IPlugin,
@@ -22,6 +28,8 @@ const knownKeys = new Set<PropertyKey>([
   'update',
   'dispose',
   'shared',
+  'features',
+  'featureExpose',
   Symbol.dispose,
   Symbol.asyncDispose
 ])
@@ -45,6 +53,8 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   const update = readData(source, 'update')
   const shared = readData(source, 'shared')
   const dispose = readData(source, 'dispose')
+  const features = readData(source, 'features')
+  const featureExpose = readData(source, 'featureExpose')
   const asyncDispose = Object.getOwnPropertyDescriptor(source, Symbol.asyncDispose)
   const syncDispose = Object.getOwnPropertyDescriptor(source, Symbol.dispose)
   const asyncDisposer = asyncDispose && 'value' in asyncDispose ? asyncDispose.value : undefined
@@ -63,6 +73,13 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   ] as const)
     if (value !== undefined && typeof value !== 'function')
       throw createPluginHostTypeError(`plugin ${key} must be a function`)
+  if (
+    featureExpose !== undefined &&
+    typeof featureExpose !== 'object' &&
+    typeof featureExpose !== 'function'
+  )
+    throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_FEATURE_EXPOSE)
+  const featureRecord = snapshotFeatureRecord(features)
 
   const metadata: Record<PropertyKey, unknown> = {}
   for (const key of Reflect.ownKeys(source)) {
@@ -136,6 +153,8 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     update: plugin.update as IPluginConstraint<any>['update'],
     dispose: plugin.dispose as IPluginConstraint<any>['dispose'],
     shared: plugin.shared as IPluginConstraint<any>['shared'],
+    features: Object.freeze(featureRecord),
+    featureExpose: featureExpose as IPluginDefinition<any>['featureExpose'],
     disposer
   }
   definitions.set(plugin, definition)
@@ -146,18 +165,41 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   }
 }
 
-/** Functional short form: name plus installer callback. */
+/** Canonical function form creates one synchronous descriptor for each registration. */
 export function definePlugin<
   TCore extends object = Record<string, never>,
-  TExtension extends Record<string, unknown> = Record<string, never>,
+  TExtension extends Record<string, unknown> = Record<never, never>,
   TValue = never,
-  const TName extends string = string
+  const TName extends string = string,
+  const TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object &
+    IFeatureRecordRequiredExpose<TFeatures>,
+  TPublic extends object = Record<never, never>,
+  TShared extends object = Record<never, never>
 >(
   name: TName,
-  install: (
-    core: TCore & import('./typing.js').IPluginHostCore<TValue>
-  ) => import('./typing.js').IPluginAwaitable<TExtension>
-): IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName>
+  descriptorFactory: (
+    core: TCore &
+      import('./typing.js').IPluginHostCore<TValue> &
+      Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose }>
+  ) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> &
+    (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
+      ? unknown
+      : { readonly featureExpose: () => TExpose }) &
+    (keyof TExtension & keyof TPublic extends never
+      ? unknown
+      : { readonly duplicateHostProjectionKeys: never }),
+  featureRecord?: TFeatures
+): IDefinedPluginConstraint<
+  TCore,
+  TValue,
+  TExtension & TPublic,
+  IPluginConfig,
+  TShared,
+  TName,
+  TFeatures,
+  TExpose
+>
 
 /** Functional full descriptor form retaining config/shared and metadata shape. */
 export function definePlugin<
@@ -167,28 +209,59 @@ export function definePlugin<
   TConfig extends IPluginConfig = IPluginConfig,
   TShared extends object = Record<string, never>,
   const TName extends string = string,
+  TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object = Record<never, never>,
   TDefinition extends object = object
 >(
   definition: IPlugin<
     TCore & import('./typing.js').IPluginHostCore<TValue>,
     TExtension,
     TConfig,
-    TShared
+    TShared,
+    TFeatures,
+    TExpose
   > &
     Readonly<{ name: TName }> &
+    (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) &
     TDefinition
-): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> &
+): IDefinedPluginConstraint<
+  TCore,
+  TValue,
+  TExtension,
+  TConfig,
+  TShared,
+  TName,
+  TFeatures,
+  TExpose
+> &
   Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>
 
-export function definePlugin(...args: readonly [unknown, unknown?]): IDefinedPluginConstraint {
+export function definePlugin(
+  ...args: readonly [unknown, unknown?, unknown?]
+): IDefinedPluginConstraint {
   if (typeof args[0] === 'string') {
     if (typeof args[1] !== 'function')
-      throw createPluginHostTypeError('plugin install must be a function')
-    return createDefinition({ name: args[0], install: args[1] } as IPluginConstraint<any>)
-      .plugin as IDefinedPluginConstraint
+      throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_DESCRIPTOR_HOOK_DATA)
+    const definition = createDefinition({
+      name: args[0],
+      install: () => ({})
+    } as IPluginConstraint<any>)
+    const featureRecord = snapshotFeatureRecord(args[2])
+    const stored = definitions.get(definition.plugin)!
+    Object.assign(
+      stored as {
+        descriptorFactory?: (core: object) => IPluginDescriptor
+        features: Readonly<Record<string, object>>
+      },
+      {
+        descriptorFactory: args[1] as (core: object) => IPluginDescriptor,
+        features: Object.freeze(featureRecord)
+      }
+    )
+    return definition.plugin as IDefinedPluginConstraint
   }
   if (!args[0] || typeof args[0] !== 'object')
-    throw createPluginHostTypeError('plugin definition must be an object')
+    throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_DEFINITION)
   return createDefinition(args[0] as IPluginConstraint<any>).plugin as IDefinedPluginConstraint
 }
 

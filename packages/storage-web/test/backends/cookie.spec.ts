@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { cookies } from '../../src/backends/cookie'
+import { cookiesHost } from '../../src/backends/cookie'
 import { fakeCookieDocument } from '../../src/testing/fake-cookie-document'
 
-describe('cookies backend', () => {
+describe('cookiesHost backend', () => {
   it('构造期拒绝 null、数组和 primitive options', () => {
     for (const options of [null, [], 'options', 1])
-      expect(() => cookies(options as never)).toThrowError(
+      expect(() => cookiesHost(options as never)).toThrowError(
         expect.objectContaining({ code: 'INVALID_CONFIG' })
       )
   })
 
   it('拒绝数组 cookie scope 配置', () => {
     expect(() =>
-      cookies({ scope: [] as never, namespace: 'array-scope', document: fakeCookieDocument() })
+      cookiesHost({ scope: [] as never, namespace: 'array-scope', document: fakeCookieDocument() })
     ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
   })
 
@@ -20,7 +20,7 @@ describe('cookies backend', () => {
     const document = fakeCookieDocument()
     let optionReads = 0
     let scopeReads = 0
-    const store = cookies({
+    const store = cookiesHost({
       get namespace() {
         optionReads += 1
         return 'constructor-snapshot'
@@ -67,7 +67,7 @@ describe('cookies backend', () => {
 
   it('拒绝数组 namespace codec 配置', () => {
     expect(() =>
-      cookies({
+      cookiesHost({
         namespace: 'array-codec',
         namespaceCodec: [] as never,
         document: fakeCookieDocument()
@@ -90,7 +90,7 @@ describe('cookies backend', () => {
             : undefined
       }
     }
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'cookie-codec',
       namespaceCodec: codec,
       document: fakeCookieDocument()
@@ -102,7 +102,7 @@ describe('cookies backend', () => {
 
   it('namespace codec getter 异常统一返回 INVALID_CONFIG', () => {
     expect(() =>
-      cookies({
+      cookiesHost({
         namespaceCodec: {
           encode: (namespace: string, key: string) => `${namespace}:${key}`,
           get decode(): never {
@@ -115,7 +115,7 @@ describe('cookies backend', () => {
   })
 
   it('拒绝非法 expires 写入上下文', async () => {
-    const store = cookies({ namespace: 'expires-guard', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'expires-guard', document: fakeCookieDocument() })
     for (const expires of [
       null,
       'date',
@@ -136,7 +136,7 @@ describe('cookies backend', () => {
 
   it('只读取一次 Date-like expires 并使用快照序列化', async () => {
     const document = fakeCookieDocument()
-    const store = cookies({ namespace: 'expires-snapshot', document })
+    const store = cookiesHost({ namespace: 'expires-snapshot', document })
     let reads = 0
     const expires = {
       getTime: () => {
@@ -152,7 +152,10 @@ describe('cookies backend', () => {
   })
 
   it('write context 字段只读取一次且 getter 异常统一返回 INVALID_CONFIG', async () => {
-    const store = cookies({ namespace: 'write-context-snapshot', document: fakeCookieDocument() })
+    const store = cookiesHost({
+      namespace: 'write-context-snapshot',
+      document: fakeCookieDocument()
+    })
     let reads = 0
     await store.set('key', 'value', {
       get signal() {
@@ -184,7 +187,7 @@ describe('cookies backend', () => {
 
   it('write lifecycle getter 异常穿透为 contract INVALID_ARGUMENT', async () => {
     const cause = new Error('hostile signal getter')
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'write-lifecycle-metadata',
       document: fakeCookieDocument()
     })
@@ -201,7 +204,7 @@ describe('cookies backend', () => {
   })
 
   it('所有 Cookie async 方法的 lifecycle 错误穿透为 contract INVALID_ARGUMENT', async () => {
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'async-lifecycle-metadata',
       document: fakeCookieDocument()
     })
@@ -229,20 +232,20 @@ describe('cookies backend', () => {
   })
 
   it('拒绝超出 safe integer 的 maxAge', async () => {
-    const store = cookies({ namespace: 'max-age-guard', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'max-age-guard', document: fakeCookieDocument() })
     await expect(
       store.set('key', 'value', { maxAge: Number.MAX_SAFE_INTEGER + 1 })
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   })
 
   it('拒绝非法 document 注入容器', () => {
-    expect(() => cookies({ document: null as never })).toThrowError(
+    expect(() => cookiesHost({ document: null as never })).toThrowError(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
-    expect(() => cookies({ document: [] as never })).toThrowError(
+    expect(() => cookiesHost({ document: [] as never })).toThrowError(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
-    expect(() => cookies({ document: {} as never })).toThrowError(
+    expect(() => cookiesHost({ document: {} as never })).toThrowError(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
   })
@@ -250,7 +253,7 @@ describe('cookies backend', () => {
   it('构造期 document.cookie getter 异常统一返回 INVALID_CONFIG', () => {
     const cause = new Error('constructor cookie getter')
     expect(() =>
-      cookies({
+      cookiesHost({
         document: {
           get cookie(): string {
             throw cause
@@ -264,7 +267,7 @@ describe('cookies backend', () => {
   it('运行期 document.cookie getter 异常统一返回 BACKEND_UNAVAILABLE', async () => {
     const cause = new Error('runtime cookie getter')
     let reads = 0
-    const store = cookies({
+    const store = cookiesHost({
       document: {
         get cookie() {
           reads += 1
@@ -290,7 +293,7 @@ describe('cookies backend', () => {
       },
       set cookie(_value: string) {}
     }
-    const store = cookies({ document: causeDocument })
+    const store = cookiesHost({ document: causeDocument })
     await expect(store.get('key')).rejects.toMatchObject({
       code: 'BACKEND_UNAVAILABLE',
       backend: 'cookie',
@@ -302,7 +305,7 @@ describe('cookies backend', () => {
 
   it('运行期 document.cookie setter 异常统一返回 WRITE_FAILED', async () => {
     const cause = new Error('runtime cookie setter')
-    const store = cookies({
+    const store = cookiesHost({
       document: {
         get cookie() {
           return ''
@@ -325,19 +328,19 @@ describe('cookies backend', () => {
   })
 
   it('backend 与 capabilities 正确声明', () => {
-    const store = cookies({ namespace: 'ns', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'ns', document: fakeCookieDocument() })
     expect(store.backend).toBe('cookie')
     expect(store.capabilities.maxValueBytes).toBe(4096)
     expect(store.capabilities.opaqueEntries).toBe(true)
     expect(store.capabilities.syncRead).toBe(true)
   })
   it('set 后 get 返回同值，值经过编解码往返', async () => {
-    const store = cookies({ namespace: 'ns', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'ns', document: fakeCookieDocument() })
     await store.set('token', 'a b; c,d')
     await expect(store.get('token')).resolves.toBe('a b; c,d')
   })
   it('拒绝运行时非字符串 key，不把它隐式编码为 cookie 名', async () => {
-    const store = cookies({ namespace: 'ns', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'ns', document: fakeCookieDocument() })
     await expect(store.set(42 as unknown as string, 'value')).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
@@ -355,7 +358,7 @@ describe('cookies backend', () => {
       },
       decode: () => undefined
     }
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'ns',
       document: fakeCookieDocument(),
       namespaceCodec: codec
@@ -373,7 +376,7 @@ describe('cookies backend', () => {
         throw new Error('decode failure')
       }
     }
-    const store = cookies({ namespace: 'ns', document: doc, namespaceCodec: codec })
+    const store = cookiesHost({ namespace: 'ns', document: doc, namespaceCodec: codec })
     await store.set('key', 'value')
     await expect(store.keys()).rejects.toMatchObject({ code: 'EXTENSION_FAILED' })
   })
@@ -388,7 +391,7 @@ describe('cookies backend', () => {
           : undefined
       }
     }
-    const store = cookies({ namespace: 'codec-clear', document, namespaceCodec: codec })
+    const store = cookiesHost({ namespace: 'codec-clear', document, namespaceCodec: codec })
     await store.set('mixed', 'value')
     await expect(store.keys()).resolves.toEqual(['MIXED'])
     await store.clearValues()
@@ -409,7 +412,7 @@ describe('cookies backend', () => {
         document.cookie = value
       }
     }
-    const store = cookies({ namespace: 'partial-clear', document: hostileDocument })
+    const store = cookiesHost({ namespace: 'partial-clear', document: hostileDocument })
     await store.set('first', 'one')
     await store.set('second', 'two')
     await expect(store.clearAll()).rejects.toMatchObject({
@@ -424,7 +427,7 @@ describe('cookies backend', () => {
   it('clearAll 快照读取失败归属公开 operation，不降级为 cookie.keys', async () => {
     const cause = new Error('hostile cookie clear snapshot')
     let reads = 0
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'snapshot-failure',
       document: {
         get cookie(): string {
@@ -443,15 +446,15 @@ describe('cookies backend', () => {
     })
   })
   it.each([
-    ['cookie.get', (store: ReturnType<typeof cookies>) => store.get('key')],
-    ['cookie.has', (store: ReturnType<typeof cookies>) => store.has('key')],
-    ['cookie.remove', (store: ReturnType<typeof cookies>) => store.remove('key')],
-    ['cookie.keys', (store: ReturnType<typeof cookies>) => store.keys()],
-    ['cookie.clearValues', (store: ReturnType<typeof cookies>) => store.clearValues()],
-    ['cookie.clearAll', (store: ReturnType<typeof cookies>) => store.clearAll()],
-    ['cookie.set', (store: ReturnType<typeof cookies>) => store.set('key', 'new')]
+    ['cookie.get', (store: ReturnType<typeof cookiesHost>) => store.get('key')],
+    ['cookie.has', (store: ReturnType<typeof cookiesHost>) => store.has('key')],
+    ['cookie.remove', (store: ReturnType<typeof cookiesHost>) => store.remove('key')],
+    ['cookie.keys', (store: ReturnType<typeof cookiesHost>) => store.keys()],
+    ['cookie.clearValues', (store: ReturnType<typeof cookiesHost>) => store.clearValues()],
+    ['cookie.clearAll', (store: ReturnType<typeof cookiesHost>) => store.clearAll()],
+    ['cookie.set', (store: ReturnType<typeof cookiesHost>) => store.set('key', 'new')]
   ] as const)('%s 拒绝同一物理名的多个可见 scope', async (operation, invoke) => {
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'duplicate-scope',
       namespaceCodec: {
         encode: (namespace: string, key: string) => `${namespace}:${key}`,
@@ -479,7 +482,7 @@ describe('cookies backend', () => {
     const controller = new AbortController()
     const reason = new Error('stop after first cookie removal')
     let armed = false
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'reentrant-abort',
       document: {
         get cookie(): string {
@@ -502,7 +505,7 @@ describe('cookies backend', () => {
     await expect(store.get('second')).resolves.toBe('two')
   })
   it('拒绝 namespace codec 的非法输出类型', async () => {
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'ns',
       document: fakeCookieDocument(),
       namespaceCodec: { encode: () => 42, decode: () => undefined } as never
@@ -519,7 +522,7 @@ describe('cookies backend', () => {
         lastAssignment = value
       }
     }
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'ns',
       document: doc,
       scope: { path: '/app', domain: 'example.com', sameSite: 'strict', secure: true }
@@ -532,7 +535,7 @@ describe('cookies backend', () => {
     expect(lastAssignment).toContain('secure')
   })
   it('remove 后 get 返回 null', async () => {
-    const store = cookies({ namespace: 'ns', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'ns', document: fakeCookieDocument() })
     await store.set('k', 'v')
     await store.remove('k')
     await expect(store.get('k')).resolves.toBeNull()
@@ -547,7 +550,7 @@ describe('cookies backend', () => {
         invocations.push(value)
       }
     }
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'ns',
       document: doc,
       scope: { path: '/app', domain: 'example.com' }
@@ -559,7 +562,7 @@ describe('cookies backend', () => {
 
   it('sync remove 忽略运行时 scope override，不读取额外对象', async () => {
     const document = fakeCookieDocument()
-    const store = cookies({
+    const store = cookiesHost({
       namespace: 'sync-remove-fixed-scope',
       document,
       scope: { path: '/fixed', sameSite: 'lax' }
@@ -578,7 +581,7 @@ describe('cookies backend', () => {
   })
 
   it('async remove 的 lifecycle context 字段只读取一次', async () => {
-    const store = cookies({ namespace: 'remove-context', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'remove-context', document: fakeCookieDocument() })
     await store.set('k', 'v')
     const controller = new AbortController()
     let reads = 0
@@ -598,7 +601,7 @@ describe('cookies backend', () => {
 
   it('过期写按删除处理，不把不可见写误报为 WRITE_FAILED', async () => {
     const doc = fakeCookieDocument()
-    const store = cookies({ namespace: 'expiry', document: doc })
+    const store = cookiesHost({ namespace: 'expiry', document: doc })
     await store.set('k', 'v')
     await expect(store.set('k', 'new', { maxAge: 0 })).resolves.toBeUndefined()
     await expect(store.get('k')).resolves.toBeNull()
@@ -606,36 +609,36 @@ describe('cookies backend', () => {
 
   it('构造时拒绝不安全的 SameSite=None 与 Partitioned scope', () => {
     const document = fakeCookieDocument()
-    expect(() => cookies({ document, scope: { sameSite: 'none' } })).toThrow(
+    expect(() => cookiesHost({ document, scope: { sameSite: 'none' } })).toThrow(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
-    expect(() => cookies({ document, scope: { partitioned: true } })).toThrow(
+    expect(() => cookiesHost({ document, scope: { partitioned: true } })).toThrow(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
-    expect(() => cookies({ document, scope: null as never })).toThrow(
+    expect(() => cookiesHost({ document, scope: null as never })).toThrow(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
-    expect(() => cookies({ document, scope: { path: 42 } as never })).toThrow(
+    expect(() => cookiesHost({ document, scope: { path: 42 } as never })).toThrow(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
-    expect(() => cookies({ document, namespace: '' })).toThrow(
+    expect(() => cookiesHost({ document, namespace: '' })).toThrow(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
-    expect(() => cookies({ document, namespaceCodec: {} as never })).toThrow(
+    expect(() => cookiesHost({ document, namespaceCodec: {} as never })).toThrow(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
   })
   it('clearAll 删除本实例 scope 下写入的 cookie', async () => {
     const doc = fakeCookieDocument()
-    const store = cookies({ namespace: 'path', document: doc, scope: { path: '/app' } })
+    const store = cookiesHost({ namespace: 'path', document: doc, scope: { path: '/app' } })
     await store.set('k', 'v')
     await store.clearAll()
     await expect(store.get('k')).resolves.toBeNull()
   })
   it('keys/clear 只作用于本命名空间', async () => {
     const doc = fakeCookieDocument()
-    const nsA = cookies({ namespace: 'a', document: doc })
-    const nsB = cookies({ namespace: 'b', document: doc })
+    const nsA = cookiesHost({ namespace: 'a', document: doc })
+    const nsB = cookiesHost({ namespace: 'b', document: doc })
     await nsA.set('k1', 'v1')
     await nsB.set('k1', 'v1')
     await expect(nsA.keys()).resolves.toEqual(['k1'])
@@ -644,7 +647,7 @@ describe('cookies backend', () => {
     await expect(nsB.keys()).resolves.toEqual(['k1'])
   })
   it('sync 通道全方法与异步一致', () => {
-    const store = cookies({ namespace: 'ns', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'ns', document: fakeCookieDocument() })
     expect(store.sync).toBeDefined()
     store.sync!.set('k', 'v')
     expect(store.sync!.get('k')).toBe('v')
@@ -654,18 +657,18 @@ describe('cookies backend', () => {
     expect(store.sync!.get('k')).toBeNull()
   })
   it('dispose 后任何操作抛 STORE_DISPOSED', async () => {
-    const store = cookies({ namespace: 'ns', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'ns', document: fakeCookieDocument() })
     await store.dispose()
     await expect(store.get('k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
   })
   it('超过 4096 字节的值 set 抛 VALUE_TOO_LARGE', async () => {
-    const store = cookies({ namespace: 'ns', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'ns', document: fakeCookieDocument() })
     await expect(store.set('k', 'x'.repeat(4097))).rejects.toMatchObject({
       code: 'VALUE_TOO_LARGE'
     })
   })
   it('未传 document 时使用 globalThis.document（jsdom 环境）', async () => {
-    const store = cookies({ namespace: 'global-check' })
+    const store = cookiesHost({ namespace: 'global-check' })
     await store.set('k', 'v')
     await expect(store.get('k')).resolves.toBe('v')
     await store.remove('k')

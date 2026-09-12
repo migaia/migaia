@@ -10,6 +10,8 @@
 declare global {
   interface AbortSignal {
     readonly aborted: boolean
+    /** Preserves the first close cause for core-only shutdown consumers. */
+    readonly reason: unknown
     addEventListener(
       type: 'abort',
       listener: () => void,

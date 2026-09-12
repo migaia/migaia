@@ -21,6 +21,175 @@ const PACKAGES = [
   'storage-web'
 ]
 
+/** Validates optional direct-entry arguments before any generator path can write projections. */
+export function parseSelectedLibrary(args: readonly string[]): string | null {
+  if (args.length === 0) return null
+  if (args.length !== 2 || args[0] !== '--library' || !PACKAGES.includes(args[1])) {
+    throw new Error('Expected --library followed by one known library slug')
+  }
+  return args[1]
+}
+
+/** Optional library owner selected for a bounded direct regeneration. */
+const selectedLibrary = import.meta.main ? parseSelectedLibrary(process.argv.slice(2)) : null
+
+/** Tests whether a generated route or source path contains one exact library path segment. */
+function hasLibraryPathSegment(value: unknown, library: string) {
+  return typeof value === 'string' && new RegExp(`(?:^|/)${library}(?:/|$)`, 'u').test(value)
+}
+
+/** Reads an existing aggregate projection before replacing only its selected library-owned portion. */
+function readGeneratedJson(path: string) {
+  if (!existsSync(path)) throw new Error(`Missing generated projection ${path}`)
+  return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+}
+
+/** Replaces selected owner records in place so untouched aggregate ordering remains byte-stable. */
+export function replaceOwnedEntries(
+  previous: unknown[],
+  next: unknown[],
+  owns: (entry: unknown) => boolean,
+  label: string
+) {
+  const replacements = next.filter(owns)
+  if (replacements.length === 0) throw new Error(`Missing ${label}`)
+  let index = 0
+  const merged: unknown[] = []
+  for (const entry of previous) {
+    if (!owns(entry)) {
+      merged.push(entry)
+      continue
+    }
+    const replacement = replacements[index++]
+    if (replacement !== undefined) merged.push(replacement)
+  }
+  return [...merged, ...replacements.slice(index)]
+}
+
+/** Merges a selected library projection while preserving nonselected aggregate data and order. */
+function mergeLibraryProjection(name: string, next: Record<string, unknown>, library: string) {
+  const path = resolve('src/generated/manifests', `${name}.json`)
+  const previous = readGeneratedJson(path)
+  if (name === 'content') {
+    const entries = next.entries
+    const priorEntries = previous.entries
+    if (!Array.isArray(entries) || !Array.isArray(priorEntries))
+      throw new Error(`Invalid ${name} entries`)
+    if (!entries.some((entry) => (entry as { library?: unknown }).library === library)) {
+      throw new Error(`Missing ${library} ${name} entries`)
+    }
+    return {
+      ...previous,
+      entries: replaceOwnedEntries(
+        priorEntries,
+        entries,
+        (entry) => (entry as { library?: unknown }).library === library,
+        `${library} ${name} entries`
+      )
+    }
+  }
+  if (name === 'libraries' || name === 'library-index') {
+    const libraries = next.libraries
+    const priorLibraries = previous.libraries
+    if (!Array.isArray(libraries) || !Array.isArray(priorLibraries))
+      throw new Error(`Invalid ${name} libraries`)
+    if (!libraries.some((entry) => (entry as { slug?: unknown }).slug === library)) {
+      throw new Error(`Missing ${library} ${name} entry`)
+    }
+    return {
+      ...previous,
+      libraries: replaceOwnedEntries(
+        priorLibraries,
+        libraries,
+        (entry) => (entry as { slug?: unknown }).slug === library,
+        `${library} ${name} entry`
+      )
+    }
+  }
+  if (name === 'apis') {
+    const apis = next.apis
+    const priorApis = previous.apis
+    if (!Array.isArray(apis) || !Array.isArray(priorApis)) throw new Error('Invalid apis entries')
+    if (!apis.some((entry) => (entry as { library?: unknown }).library === library)) {
+      throw new Error(`Missing ${library} apis entries`)
+    }
+    return {
+      ...previous,
+      apis: replaceOwnedEntries(
+        priorApis,
+        apis,
+        (entry) => (entry as { library?: unknown }).library === library,
+        `${library} apis entries`
+      )
+    }
+  }
+  if (name === 'routes') {
+    const entries = next.entries
+    const priorEntries = previous.entries
+    if (!Array.isArray(entries) || !Array.isArray(priorEntries))
+      throw new Error('Invalid routes entries')
+    if (!entries.some((entry) => (entry as { library?: unknown }).library === library)) {
+      throw new Error(`Missing ${library} routes entries`)
+    }
+    return {
+      ...previous,
+      entries: replaceOwnedEntries(
+        priorEntries,
+        entries,
+        (entry) => (entry as { library?: unknown }).library === library,
+        `${library} routes entries`
+      )
+    }
+  }
+  if (name === 'example-imports') {
+    const packageName = `@migaia/${library}`
+    const packages = next.packages
+    const priorPackages = previous.packages
+    if (
+      !packages ||
+      typeof packages !== 'object' ||
+      !priorPackages ||
+      typeof priorPackages !== 'object' ||
+      !(packageName in packages)
+    )
+      throw new Error('Invalid example-imports packages')
+    return {
+      ...previous,
+      packages: {
+        ...priorPackages,
+        [packageName]: (packages as Record<string, unknown>)[packageName]
+      }
+    }
+  }
+  if (name === 'relationships') {
+    const edges = next.edges
+    const priorEdges = previous.edges
+    if (!Array.isArray(edges) || !Array.isArray(priorEdges))
+      throw new Error('Invalid relationships edges')
+    const ownsEdge = (edge: unknown) => {
+      const record = edge as { from?: unknown; to?: unknown }
+      return (
+        hasLibraryPathSegment(record.from, library) || hasLibraryPathSegment(record.to, library)
+      )
+    }
+    if (!edges.some(ownsEdge)) throw new Error(`Missing ${library} relationships edges`)
+    return {
+      ...previous,
+      edges: replaceOwnedEntries(priorEdges, edges, ownsEdge, `${library} relationships edges`)
+    }
+  }
+  throw new Error(`Unknown generated projection ${name}`)
+}
+
+/** Writes a full projection or a validated library-owned merge for scoped regeneration. */
+function writeGeneratedProjection(name: string, value: Record<string, unknown>) {
+  const output = selectedLibrary ? mergeLibraryProjection(name, value, selectedLibrary) : value
+  writeFileSync(
+    resolve('src/generated/manifests', `${name}.json`),
+    `${JSON.stringify(output, null, 2)}\n`
+  )
+}
+
 /** Stable route families owned by the React Router route module. */
 const ROUTE_FAMILIES = [
   { domain: 'docs', path: '/:lang/docs/*' },
@@ -1823,6 +1992,7 @@ async function generateManifests() {
   const libraryShardDirectory = resolve(manifestDirectory, 'libraries')
   mkdirSync(libraryShardDirectory, { recursive: true })
   for (const library of libraryManifest.libraries) {
+    if (selectedLibrary && library.slug !== selectedLibrary) continue
     const shard = {
       version: 1,
       library,
@@ -1876,18 +2046,20 @@ async function generateManifests() {
     routes,
     relationships
   })) {
-    writeFileSync(resolve(manifestDirectory, `${name}.json`), `${JSON.stringify(value, null, 2)}\n`)
+    writeGeneratedProjection(name, value)
   }
 }
 
 /** Runs the repository formatter over generated JSON so repeat runs share one byte form. */
 function formatGeneratedJson() {
   /** Current per-library shards emitted by the canonical generator. */
-  const libraryShards = readdirSync(resolve('src/generated/manifests/libraries')).map((name) =>
-    resolve('src/generated/manifests/libraries', name)
-  )
+  const libraryShards = readdirSync(resolve('src/generated/manifests/libraries'))
+    .filter((name) => !selectedLibrary || name === `${selectedLibrary}.json`)
+    .map((name) => resolve('src/generated/manifests/libraries', name))
   const files = [
-    ...PACKAGES.map((pkg) => resolve('src/generated/signatures', `${pkg}.json`)),
+    ...(selectedLibrary ? [selectedLibrary] : PACKAGES).map((pkg) =>
+      resolve('src/generated/signatures', `${pkg}.json`)
+    ),
     ...[
       'content',
       'libraries',
@@ -1910,7 +2082,7 @@ async function generateSignatures() {
   const dir = resolve('src/generated/signatures')
   mkdirSync(dir, { recursive: true })
 
-  for (const pkg of PACKAGES) {
+  for (const pkg of selectedLibrary ? [selectedLibrary] : PACKAGES) {
     const output = { package: pkg, exports: [] }
     writeFileSync(resolve(dir, `${pkg}.json`), `${JSON.stringify(output, null, 2)}\n`)
     console.log(`✓ ${pkg}`)
@@ -1919,7 +2091,8 @@ async function generateSignatures() {
   formatGeneratedJson()
 }
 
-generateSignatures().catch((e) => {
-  console.error(e)
-  process.exit(1)
-})
+if (import.meta.main)
+  generateSignatures().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })

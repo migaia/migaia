@@ -1,34 +1,40 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { localStorage, sessionStorage, memoryStorage, cookies, indexedDb } from '../../src/backends'
+import {
+  localStorageHost,
+  sessionStorageHost,
+  memoryStorageHost,
+  cookiesHost,
+  indexedDbHost
+} from '../../src/backends'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage'
 import { fakeCookieDocument } from '../../src/testing/fake-cookie-document'
 import { kvConformance } from './suite'
 
-kvConformance('localStorage', async () =>
-  localStorage({
+kvConformance('localStorageHost', async () =>
+  localStorageHost({
     namespace: `test-${Math.random().toString(36).slice(2)}`,
     storage: fakeWebStorage()
   })
 )
 
-kvConformance('sessionStorage', async () =>
-  sessionStorage({
+kvConformance('sessionStorageHost', async () =>
+  sessionStorageHost({
     namespace: `test-${Math.random().toString(36).slice(2)}`,
     storage: fakeWebStorage()
   })
 )
 
-kvConformance('memory', async () => memoryStorage())
+kvConformance('memory', async () => memoryStorageHost())
 
-kvConformance('cookies', async () =>
-  cookies({
+kvConformance('cookiesHost', async () =>
+  cookiesHost({
     namespace: `test-${Math.random().toString(36).slice(2)}`,
     document: fakeCookieDocument()
   })
 )
 
-kvConformance('indexedDb', async () =>
-  indexedDb({
+kvConformance('indexedDbHost', async () =>
+  indexedDbHost({
     factory: new IDBFactory(),
     keyRange: IDBKeyRange,
     dbName: `test-${Math.random().toString(36).slice(2)}`

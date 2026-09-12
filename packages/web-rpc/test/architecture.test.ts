@@ -95,12 +95,6 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
     expect(manifest.dependencies?.['@migaia/plugin-host']).toBe('workspace:^')
     expect(manifest.dependencies?.['@migaia/capability']).toBe('workspace:^')
 
-    const moduleSource = SOURCES['../src/internal/endpoint-modules.ts']
-    expect(moduleSource).toContain('@migaia/capability/graph/topology')
-    expect(moduleSource).not.toContain('@migaia/capability/src/')
-    expect(moduleSource).not.toMatch(/while\s*\(definitions\.length\)/)
-    expect(moduleSource).not.toMatch(/findIndex\s*\(/)
-
     const pipelineImports = Object.entries(SOURCES)
       .filter(([path]) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'))
       .filter(([, source]) => source.includes('@migaia/middleware-pipeline'))

@@ -104,11 +104,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>(\n  'upper',\n  (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n)\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
+                "code": "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, descriptorFactory) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>('upper', (core) => ({\n  install: () => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}))\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
               },
               {
                 "type": "paragraph",
-                "text": "`definePlugin()` 有两种写法。上面是短写法 `definePlugin(name, install)`，适合只有名称和安装函数的插件；需要 `config`、`shared`、`update` 或 `dispose` 时使用完整对象写法：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 `install()`；真正的安装发生在 `host.use(plugin)`。"
+                "text": "`definePlugin()` 有两种写法。上面是函数形 `definePlugin(name, descriptorFactory)`：每次安装先同步创建一个 descriptor，再由其 `install`、`expose`、`featureExpose`、`shared` hooks 提供这次安装的能力。需要 `config`、`update`、`dispose` 等长期定义字段时使用保留对象形：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 descriptor 或 `install()`；真正的安装发生在 `host.use(plugin)`。"
               },
               {
                 "type": "paragraph",
@@ -941,11 +941,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  check: () => ({ ok: true as const })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})"
+                "code": "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  install: () => ({ check: () => ({ ok: true as const }) })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})"
               },
               {
                 "type": "paragraph",
-                "text": "第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
+                "text": "第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
               },
               {
                 "type": "paragraph",
@@ -1872,10 +1872,115 @@
           "fragment": "plugin-host-index--createRegistrationView"
         },
         {
+          "name": "defineFeature",
+          "kind": "function",
+          "signature": "export declare function defineFeature<TExpose extends object = Record<never, never>, const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: IFeatureFactory<TExpose, TDependencies, TOutput>, dependencies?: TDependencies): IFeature<TExpose, TOutput, TDependencies>;\nexport declare function defineFeature<TExpose extends object = Record<never, never>, const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(descriptor: IFeatureDescriptor<TExpose, TDependencies, TOutput>): IFeature<TExpose, TOutput, TDependencies>;",
+          "declarationLine": 15,
+          "source": "packages/plugin-host/dist/define-feature.d.ts",
+          "purpose": "Defines a synchronous, opaque Feature without evaluating user factory code.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineFeature.",
+          "advanced": "No additional advanced behavior is declared for defineFeature.",
+          "parameters": [
+            "factory: IFeatureFactory<TExpose, TDependencies, TOutput>",
+            "dependencies: TDependencies (optional)",
+            "descriptor: IFeatureDescriptor<TExpose, TDependencies, TOutput>"
+          ],
+          "parameterDetails": [
+            {
+              "name": "factory",
+              "type": "IFeatureFactory<TExpose, TDependencies, TOutput>",
+              "optional": false
+            },
+            {
+              "name": "dependencies",
+              "type": "TDependencies",
+              "optional": true
+            },
+            {
+              "name": "descriptor",
+              "type": "IFeatureDescriptor<TExpose, TDependencies, TOutput>",
+              "optional": false
+            }
+          ],
+          "returns": "IFeature<TExpose, TOutput, TDependencies>",
+          "errors": ["No documented errors are declared for defineFeature."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineFeature.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "defineFeature",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function defineFeature<TExpose extends object = Record<never, never>, const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: IFeatureFactory<TExpose, TDependencies, TOutput>, dependencies?: TDependencies): IFeature<TExpose, TOutput, TDependencies>;",
+            "export declare function defineFeature<TExpose extends object = Record<never, never>, const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(descriptor: IFeatureDescriptor<TExpose, TDependencies, TOutput>): IFeature<TExpose, TOutput, TDependencies>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "factory",
+                "type": "IFeatureFactory<TExpose, TDependencies, TOutput>",
+                "optional": false
+              },
+              {
+                "name": "dependencies",
+                "type": "TDependencies",
+                "optional": true
+              }
+            ],
+            [
+              {
+                "name": "descriptor",
+                "type": "IFeatureDescriptor<TExpose, TDependencies, TOutput>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IFeature<TExpose, TOutput, TDependencies>"],
+          "whenToUse": "Use defineFeature when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when defineFeature does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Defines a synchronous, opaque Feature without evaluating user factory code."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import defineFeature from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use defineFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when defineFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineFeature."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for defineFeature."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/define-feature.d.ts:defineFeature:export declare function defineFeature<TExpose extends object = Record<never, never>, const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: IFeatureFactory<TExpose, TDependencies, TOutput>, dependencies?: TDependencies): IFeature<TExpose, TOutput, TDependencies>;\nexport declare function defineFeature<TExpose extends object = Record<never, never>, const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(descriptor: IFeatureDescriptor<TExpose, TDependencies, TOutput>): IFeature<TExpose, TOutput, TDependencies>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--defineFeature"
+        },
+        {
           "name": "IAsyncGeneratorPipelineStage",
           "kind": "type",
           "signature": "export type IAsyncGeneratorPipelineStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;",
-          "declarationLine": 81,
+          "declarationLine": 82,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Async-generator stage：串行 drain 每个 stage，中间 yield 不会提前进入下一 stage。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncGeneratorPipelineStage.",
@@ -1939,7 +2044,7 @@
           "name": "IAsyncPipelineStage",
           "kind": "type",
           "signature": "export type IAsyncPipelineStage<TValue> = (value: TValue, next: (value: TValue) => Promise<void>, context?: IMiddlewarePipelineContext) => void | Promise<void>;",
-          "declarationLine": 77,
+          "declarationLine": 78,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IAsyncPipelineStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncPipelineStage.",
@@ -2003,7 +2108,7 @@
           "name": "IExtractPluginConfig",
           "kind": "type",
           "signature": "export type IExtractPluginConfig<TPlugin> = TPlugin extends { readonly config?: infer TConfig; } ? TConfig extends IPluginConfig ? TConfig : IPluginConfig : IPluginConfig;",
-          "declarationLine": 152,
+          "declarationLine": 201,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IExtractPluginConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IExtractPluginConfig.",
@@ -2067,7 +2172,7 @@
           "name": "IExtractPluginExt",
           "kind": "type",
           "signature": "export type IExtractPluginExt<TPlugin> = TPlugin extends IPlugin<infer _TCore, infer TExt, infer _TConfig, infer _TShared> ? TExt : Record<string, never>;",
-          "declarationLine": 151,
+          "declarationLine": 200,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IExtractPluginExt is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IExtractPluginExt.",
@@ -2131,7 +2236,7 @@
           "name": "IExtractPluginShared",
           "kind": "type",
           "signature": "export type IExtractPluginShared<TPlugin> = TPlugin extends IPlugin<infer _TCore, infer _TExt, infer _TConfig, infer TShared> ? TShared : Record<string, never>;",
-          "declarationLine": 168,
+          "declarationLine": 217,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IExtractPluginShared is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IExtractPluginShared.",
@@ -2192,10 +2297,586 @@
           "fragment": "plugin-host-index--IExtractPluginShared"
         },
         {
+          "name": "IFeature",
+          "kind": "type",
+          "signature": "export type IFeature<TExpose extends object, TOutput extends object, TDependencies extends IFeatureRecord = Record<never, never>> = Readonly<{ readonly [featureBrand]: { readonly expose: TExpose; readonly output: TOutput; readonly dependencies: TDependencies; }; }>;",
+          "declarationLine": 14,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "A trusted synchronous Feature definition with its expose requirement and direct dependencies.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeature.",
+          "advanced": "No additional advanced behavior is declared for IFeature.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeature."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeature.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeature",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeature<TExpose extends object, TOutput extends object, TDependencies extends IFeatureRecord = Record<never, never>> = Readonly<{ readonly [featureBrand]: { readonly expose: TExpose; readonly output: TOutput; readonly dependencies: TDependencies; }; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeature when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeature does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A trusted synchronous Feature definition with its expose requirement and direct dependencies."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeature from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeature when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeature."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeature."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeature:export type IFeature<TExpose extends object, TOutput extends object, TDependencies extends IFeatureRecord = Record<never, never>> = Readonly<{ readonly [featureBrand]: { readonly expose: TExpose; readonly output: TOutput; readonly dependencies: TDependencies; }; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeature"
+        },
+        {
+          "name": "IFeatureCore",
+          "kind": "type",
+          "signature": "export type IFeatureCore<TExpose extends object> = Readonly<{ readonly featureExpose: TExpose; }>;",
+          "declarationLine": 6,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "Read-only capability surface available to one synchronous Feature factory.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureCore.",
+          "advanced": "No additional advanced behavior is declared for IFeatureCore.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeatureCore."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureCore.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeatureCore",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeatureCore<TExpose extends object> = Readonly<{ readonly featureExpose: TExpose; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeatureCore when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeatureCore does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Read-only capability surface available to one synchronous Feature factory."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeatureCore from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeatureCore when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeatureCore does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureCore."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeatureCore."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeatureCore:export type IFeatureCore<TExpose extends object> = Readonly<{ readonly featureExpose: TExpose; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeatureCore"
+        },
+        {
+          "name": "IFeatureFactory",
+          "kind": "type",
+          "signature": "export type IFeatureFactory<TExpose extends object, TDependencies extends IFeatureRecord, TOutput extends object> = (core: IFeatureCore<TExpose>, dependencies: IFeatureOutputs<TDependencies>) => TOutput & (TOutput extends PromiseLike<unknown> ? never : unknown);",
+          "declarationLine": 32,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "Factory contract: construction is synchronous while returned methods may remain asynchronous.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureFactory.",
+          "advanced": "No additional advanced behavior is declared for IFeatureFactory.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeatureFactory."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureFactory.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeatureFactory",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeatureFactory<TExpose extends object, TDependencies extends IFeatureRecord, TOutput extends object> = (core: IFeatureCore<TExpose>, dependencies: IFeatureOutputs<TDependencies>) => TOutput & (TOutput extends PromiseLike<unknown> ? never : unknown);"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeatureFactory when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeatureFactory does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Factory contract: construction is synchronous while returned methods may remain asynchronous."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeatureFactory from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeatureFactory when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeatureFactory does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureFactory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeatureFactory."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeatureFactory:export type IFeatureFactory<TExpose extends object, TDependencies extends IFeatureRecord, TOutput extends object> = (core: IFeatureCore<TExpose>, dependencies: IFeatureOutputs<TDependencies>) => TOutput & (TOutput extends PromiseLike<unknown> ? never : unknown);",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeatureFactory"
+        },
+        {
+          "name": "IFeatureInspection",
+          "kind": "type",
+          "signature": "export type IFeatureInspection<TFeatures extends IFeatureRecord> = Readonly<{ readonly roots: TFeatures; readonly ordered: readonly IFeature<any, any, any>[]; }>;",
+          "declarationLine": 34,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "Read-only trusted topology projection; factories and dependency metadata remain private.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureInspection.",
+          "advanced": "No additional advanced behavior is declared for IFeatureInspection.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeatureInspection."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureInspection.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeatureInspection",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeatureInspection<TFeatures extends IFeatureRecord> = Readonly<{ readonly roots: TFeatures; readonly ordered: readonly IFeature<any, any, any>[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeatureInspection when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeatureInspection does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Read-only trusted topology projection; factories and dependency metadata remain private."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeatureInspection from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeatureInspection when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeatureInspection does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureInspection."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeatureInspection."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeatureInspection:export type IFeatureInspection<TFeatures extends IFeatureRecord> = Readonly<{ readonly roots: TFeatures; readonly ordered: readonly IFeature<any, any, any>[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeatureInspection"
+        },
+        {
+          "name": "IFeatureOutput",
+          "kind": "type",
+          "signature": "export type IFeatureOutput<TFeature> = TFeature extends IFeature<any, infer TOutput, any> ? TOutput : never;",
+          "declarationLine": 22,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "Extracts one Feature's exact factory output.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureOutput.",
+          "advanced": "No additional advanced behavior is declared for IFeatureOutput.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeatureOutput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureOutput.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeatureOutput",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeatureOutput<TFeature> = TFeature extends IFeature<any, infer TOutput, any> ? TOutput : never;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeatureOutput when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeatureOutput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Extracts one Feature's exact factory output."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeatureOutput from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeatureOutput when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeatureOutput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureOutput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeatureOutput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeatureOutput:export type IFeatureOutput<TFeature> = TFeature extends IFeature<any, infer TOutput, any> ? TOutput : never;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeatureOutput"
+        },
+        {
+          "name": "IFeatureOutputs",
+          "kind": "type",
+          "signature": "export type IFeatureOutputs<TDependencies extends IFeatureRecord> = Readonly<{ readonly [K in keyof TDependencies]: IFeatureOutput<TDependencies[K]>; }>;",
+          "declarationLine": 10,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "Exact outputs for declared direct dependency aliases.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureOutputs.",
+          "advanced": "No additional advanced behavior is declared for IFeatureOutputs.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeatureOutputs."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureOutputs.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeatureOutputs",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeatureOutputs<TDependencies extends IFeatureRecord> = Readonly<{ readonly [K in keyof TDependencies]: IFeatureOutput<TDependencies[K]>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeatureOutputs when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeatureOutputs does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exact outputs for declared direct dependency aliases."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeatureOutputs from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeatureOutputs when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeatureOutputs does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureOutputs."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeatureOutputs."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeatureOutputs:export type IFeatureOutputs<TDependencies extends IFeatureRecord> = Readonly<{ readonly [K in keyof TDependencies]: IFeatureOutput<TDependencies[K]>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeatureOutputs"
+        },
+        {
+          "name": "IFeatureRecord",
+          "kind": "type",
+          "signature": "export type IFeatureRecord = Readonly<Record<string, IFeature<any, any, any>>>;",
+          "declarationLine": 4,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "A named root/dependency map of trusted Feature definitions.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureRecord.",
+          "advanced": "No additional advanced behavior is declared for IFeatureRecord.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeatureRecord."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureRecord.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeatureRecord",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeatureRecord = Readonly<Record<string, IFeature<any, any, any>>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeatureRecord when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeatureRecord does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A named root/dependency map of trusted Feature definitions."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeatureRecord from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeatureRecord when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeatureRecord does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureRecord."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeatureRecord."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeatureRecord:export type IFeatureRecord = Readonly<Record<string, IFeature<any, any, any>>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeatureRecord"
+        },
+        {
+          "name": "IFeatureRecordRequiredExpose",
+          "kind": "type",
+          "signature": "export type IFeatureRecordRequiredExpose<TFeatures extends IFeatureRecord> = keyof TFeatures extends never ? Record<never, never> : IUnionToIntersection<IFeatureRequiredExpose<TFeatures[keyof TFeatures]>>;",
+          "declarationLine": 30,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "Intersects every selected root's required expose contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureRecordRequiredExpose.",
+          "advanced": "No additional advanced behavior is declared for IFeatureRecordRequiredExpose.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeatureRecordRequiredExpose."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureRecordRequiredExpose.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeatureRecordRequiredExpose",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeatureRecordRequiredExpose<TFeatures extends IFeatureRecord> = keyof TFeatures extends never ? Record<never, never> : IUnionToIntersection<IFeatureRequiredExpose<TFeatures[keyof TFeatures]>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeatureRecordRequiredExpose when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeatureRecordRequiredExpose does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Intersects every selected root's required expose contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeatureRecordRequiredExpose from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeatureRecordRequiredExpose when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeatureRecordRequiredExpose does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureRecordRequiredExpose."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeatureRecordRequiredExpose."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeatureRecordRequiredExpose:export type IFeatureRecordRequiredExpose<TFeatures extends IFeatureRecord> = keyof TFeatures extends never ? Record<never, never> : IUnionToIntersection<IFeatureRequiredExpose<TFeatures[keyof TFeatures]>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeatureRecordRequiredExpose"
+        },
+        {
+          "name": "IFeatureRequiredExpose",
+          "kind": "type",
+          "signature": "export type IFeatureRequiredExpose<TFeature> = TFeature extends IFeature<infer TExpose, any, infer TDependencies> ? IIsAny<TDependencies> extends true ? TExpose : TExpose & IFeatureRecordRequiredExpose<TDependencies> : never;",
+          "declarationLine": 28,
+          "source": "packages/plugin-host/dist/feature-types.d.ts",
+          "purpose": "Expose contract required by one Feature and its direct dependency closure.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureRequiredExpose.",
+          "advanced": "No additional advanced behavior is declared for IFeatureRequiredExpose.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFeatureRequiredExpose."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureRequiredExpose.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFeatureRequiredExpose",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFeatureRequiredExpose<TFeature> = TFeature extends IFeature<infer TExpose, any, infer TDependencies> ? IIsAny<TDependencies> extends true ? TExpose : TExpose & IFeatureRecordRequiredExpose<TDependencies> : never;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFeatureRequiredExpose when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFeatureRequiredExpose does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Expose contract required by one Feature and its direct dependency closure."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFeatureRequiredExpose from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFeatureRequiredExpose when its type contract and declared inputs match the result you need. Choose a different public symbol when IFeatureRequiredExpose does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFeatureRequiredExpose."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFeatureRequiredExpose."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-types.d.ts:IFeatureRequiredExpose:export type IFeatureRequiredExpose<TFeature> = TFeature extends IFeature<infer TExpose, any, infer TDependencies> ? IIsAny<TDependencies> extends true ? TExpose : TExpose & IFeatureRecordRequiredExpose<TDependencies> : never;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IFeatureRequiredExpose"
+        },
+        {
           "name": "IGeneratorPipelineStage",
           "kind": "type",
           "signature": "export type IGeneratorPipelineStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;",
-          "declarationLine": 79,
+          "declarationLine": 80,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Generator stage yields zero or more intermediate values; last yielded value continues.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGeneratorPipelineStage.",
@@ -2351,7 +3032,7 @@
           "name": "IMergePluginExts",
           "kind": "type",
           "signature": "export type IMergePluginExts<TPlugins extends readonly unknown[]> = IUnionToIntersection<IExtractPluginExt<TPlugins[number]>>;",
-          "declarationLine": 167,
+          "declarationLine": 216,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "把一组插件提供的实例扩展合并成交叉类型。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMergePluginExts.",
@@ -2415,7 +3096,7 @@
           "name": "IMergePluginShared",
           "kind": "type",
           "signature": "export type IMergePluginShared<TPlugins extends readonly unknown[]> = IUnionToIntersection<IExtractPluginShared<TPlugins[number]>> & object;",
-          "declarationLine": 170,
+          "declarationLine": 219,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "把一组插件声明的 shared 对象合并成交叉类型。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMergePluginShared.",
@@ -2545,7 +3226,7 @@
           "name": "IPipelineConfig",
           "kind": "type",
           "signature": "export type IPipelineConfig = { mode?: IPipelineMode; };",
-          "declarationLine": 65,
+          "declarationLine": 66,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPipelineConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPipelineConfig.",
@@ -2607,7 +3288,7 @@
           "name": "IPipelineMode",
           "kind": "type",
           "signature": "export type IPipelineMode = (typeof PluginHostPipelineMode)[keyof typeof PluginHostPipelineMode];",
-          "declarationLine": 64,
+          "declarationLine": 65,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPipelineMode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPipelineMode.",
@@ -2670,8 +3351,8 @@
         {
           "name": "IPlugin",
           "kind": "type",
-          "signature": "export type IPlugin<TCore, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>> = { readonly name: string; readonly config?: TConfig; /** 声明跨插件共享能力。共享函数优先使用箭头函数，确保它被提取、缓存或传递后 仍绑定当前插件实例；只有明确不访问插件实例状态时才使用普通函数。 */ shared?: (core: TCore & IPluginLifecycleCore<TConfig>) => TShared; install: (core: TCore & IPluginLifecycleCore<TConfig>) => IPluginAwaitable<TExt>; update?: (next: IReadonlyConfig<TConfig>, core: TCore & IPluginLifecycleCore<TConfig>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
-          "declarationLine": 83,
+          "signature": "export type IPlugin<TCore, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: TConfig; readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose); /** 声明跨插件共享能力。共享函数优先使用箭头函数，确保它被提取、缓存或传递后 仍绑定当前插件实例；只有明确不访问插件实例状态时才使用普通函数。 */ shared?: (core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => TShared; install: (core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<TExt>; update?: (next: IReadonlyConfig<TConfig>, core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
+          "declarationLine": 84,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "通用插件契约；具体应用通过 TCore 暴露自己的领域能力。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPlugin.",
@@ -2694,7 +3375,7 @@
           "aliasOf": "IPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPlugin<TCore, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>> = { readonly name: string; readonly config?: TConfig; /** 声明跨插件共享能力。共享函数优先使用箭头函数，确保它被提取、缓存或传递后 仍绑定当前插件实例；只有明确不访问插件实例状态时才使用普通函数。 */ shared?: (core: TCore & IPluginLifecycleCore<TConfig>) => TShared; install: (core: TCore & IPluginLifecycleCore<TConfig>) => IPluginAwaitable<TExt>; update?: (next: IReadonlyConfig<TConfig>, core: TCore & IPluginLifecycleCore<TConfig>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };"
+            "export type IPlugin<TCore, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: TConfig; readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose); /** 声明跨插件共享能力。共享函数优先使用箭头函数，确保它被提取、缓存或传递后 仍绑定当前插件实例；只有明确不访问插件实例状态时才使用普通函数。 */ shared?: (core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => TShared; install: (core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<TExt>; update?: (next: IReadonlyConfig<TConfig>, core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2733,7 +3414,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPlugin:export type IPlugin<TCore, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>> = { readonly name: string; readonly config?: TConfig; /** 声明跨插件共享能力。共享函数优先使用箭头函数，确保它被提取、缓存或传递后 仍绑定当前插件实例；只有明确不访问插件实例状态时才使用普通函数。 */ shared?: (core: TCore & IPluginLifecycleCore<TConfig>) => TShared; install: (core: TCore & IPluginLifecycleCore<TConfig>) => IPluginAwaitable<TExt>; update?: (next: IReadonlyConfig<TConfig>, core: TCore & IPluginLifecycleCore<TConfig>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPlugin:export type IPlugin<TCore, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: TConfig; readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose); /** 声明跨插件共享能力。共享函数优先使用箭头函数，确保它被提取、缓存或传递后 仍绑定当前插件实例；只有明确不访问插件实例状态时才使用普通函数。 */ shared?: (core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => TShared; install: (core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<TExt>; update?: (next: IReadonlyConfig<TConfig>, core: TCore & IPluginLifecycleCore<TConfig> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
           "guidance": [
             {
               "id": "9-错误码完整参考",
@@ -3026,7 +3707,7 @@
           "name": "IPluginAdmission",
           "kind": "type",
           "signature": "export type IPluginAdmission<TPlugin extends IPluginConstraint<any>> = Readonly<{ readonly [pluginAdmissionBrand]?: TPlugin; }>;",
-          "declarationLine": 272,
+          "declarationLine": 321,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginAdmission is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginAdmission.",
@@ -3090,7 +3771,7 @@
           "name": "IPluginAdmissionRequest",
           "kind": "type",
           "signature": "export type IPluginAdmissionRequest = Readonly<{ readonly admission: IPluginAdmission<IPluginConstraint<any>>; readonly slot: IPluginDataOrderSlot; }>;",
-          "declarationLine": 276,
+          "declarationLine": 325,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "One admission request for the composition integration boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginAdmissionRequest.",
@@ -3154,7 +3835,7 @@
           "name": "IPluginAwaitable",
           "kind": "type",
           "signature": "export type IPluginAwaitable<T> = T | PromiseLike<T>;",
-          "declarationLine": 5,
+          "declarationLine": 6,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Values accepted at every asynchronous plugin lifecycle boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginAwaitable.",
@@ -3216,7 +3897,7 @@
           "name": "IPluginBatchRemovalLeaf",
           "kind": "type",
           "signature": "export type IPluginBatchRemovalLeaf = Readonly<{ readonly receipt: IPluginRegistrationReceipt; readonly name: string; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 299,
+          "declarationLine": 348,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Result of one prepared batch removal, preserving the Host dynamic-view contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalLeaf.",
@@ -3280,7 +3961,7 @@
           "name": "IPluginBatchRemovalOptions",
           "kind": "type",
           "signature": "export type IPluginBatchRemovalOptions = Readonly<{ readonly beforeCleanup?: PromiseLike<void>; }>;",
-          "declarationLine": 295,
+          "declarationLine": 344,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Canonical fence supplied by Graph before Host physical cleanup begins.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalOptions.",
@@ -3344,7 +4025,7 @@
           "name": "IPluginBatchRemovalResult",
           "kind": "type",
           "signature": "export type IPluginBatchRemovalResult<TView> = Readonly<{ readonly ok: boolean; readonly committed: true; readonly view: TView; readonly leaves: readonly IPluginBatchRemovalLeaf[]; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 307,
+          "declarationLine": 356,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Aggregate result for one all-or-nothing prepared removal commit.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalResult.",
@@ -3408,7 +4089,7 @@
           "name": "IPluginConfig",
           "kind": "type",
           "signature": "export type IPluginConfig = Record<string, unknown>;",
-          "declarationLine": 25,
+          "declarationLine": 26,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginConfig.",
@@ -3473,7 +4154,7 @@
           "name": "IPluginDataOrderSlot",
           "kind": "type",
           "signature": "export type IPluginDataOrderSlot = Readonly<{ readonly __pluginDataOrderSlot: unique symbol; }>;",
-          "declarationLine": 267,
+          "declarationLine": 316,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Opaque Host-owned ordering slot; callers may retain it but cannot inspect its ordinal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDataOrderSlot.",
@@ -3537,7 +4218,7 @@
           "name": "IPluginDisposalContext",
           "kind": "type",
           "signature": "export type IPluginDisposalContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; }>;",
-          "declarationLine": 45,
+          "declarationLine": 46,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Disposal context passed to a V2 plugin dispose hook.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDisposalContext.",
@@ -3601,7 +4282,7 @@
           "name": "IPluginDisposer",
           "kind": "type",
           "signature": "export type IPluginDisposer = () => IPluginAwaitable<void>;",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Plugin resource cleanup callback; a thenable is assimilated by the owning lifecycle scope.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDisposer.",
@@ -3662,10 +4343,138 @@
           "fragment": "plugin-host-index--IPluginDisposer"
         },
         {
+          "name": "IPluginFeatureCore",
+          "kind": "type",
+          "signature": "export type IPluginFeatureCore<TFeatures extends IFeatureRecord, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>> = Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>;",
+          "declarationLine": 145,
+          "source": "packages/plugin-host/dist/typing.d.ts",
+          "purpose": "Feature fields injected into Plugin hooks from selected roots and one registration expose.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginFeatureCore.",
+          "advanced": "No additional advanced behavior is declared for IPluginFeatureCore.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IPluginFeatureCore."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginFeatureCore.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IPluginFeatureCore",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPluginFeatureCore<TFeatures extends IFeatureRecord, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>> = Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IPluginFeatureCore when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IPluginFeatureCore does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Feature fields injected into Plugin hooks from selected roots and one registration expose."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPluginFeatureCore from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPluginFeatureCore when its type contract and declared inputs match the result you need. Choose a different public symbol when IPluginFeatureCore does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginFeatureCore."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IPluginFeatureCore."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginFeatureCore:export type IPluginFeatureCore<TFeatures extends IFeatureRecord, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>> = Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IPluginFeatureCore"
+        },
+        {
+          "name": "IPluginFeatureOptions",
+          "kind": "type",
+          "signature": "export type IPluginFeatureOptions<TCore extends object, TConfig extends IPluginConfig, TFeatures extends IFeatureRecord, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>> = Readonly<{ readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose); }>;",
+          "declarationLine": 150,
+          "source": "packages/plugin-host/dist/typing.d.ts",
+          "purpose": "Definition-time Feature options shared by functional and object Plugin declarations.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginFeatureOptions.",
+          "advanced": "No additional advanced behavior is declared for IPluginFeatureOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IPluginFeatureOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginFeatureOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IPluginFeatureOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPluginFeatureOptions<TCore extends object, TConfig extends IPluginConfig, TFeatures extends IFeatureRecord, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>> = Readonly<{ readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose); }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IPluginFeatureOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IPluginFeatureOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Definition-time Feature options shared by functional and object Plugin declarations."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPluginFeatureOptions from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPluginFeatureOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPluginFeatureOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginFeatureOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IPluginFeatureOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginFeatureOptions:export type IPluginFeatureOptions<TCore extends object, TConfig extends IPluginConfig, TFeatures extends IFeatureRecord, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>> = Readonly<{ readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose); }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--IPluginFeatureOptions"
+        },
+        {
           "name": "IPluginHostCompositionIntegration",
           "kind": "type",
           "signature": "export type IPluginHostCompositionIntegration<THost> = Readonly<{ readonly revision: number; getCurrentView(): IPluginHostDynamicView<THost>; createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): IPluginAdmission<TPlugin>; createDataOrderSlot(name: string): IPluginDataOrderSlot; prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; retireDataOrderSlot(slot: IPluginDataOrderSlot): void; prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; }>;",
-          "declarationLine": 317,
+          "declarationLine": 366,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Host-owned integration used by a composition owner to perform total batch publication.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostCompositionIntegration.",
@@ -3729,7 +4538,7 @@
           "name": "IPluginHostConfigFor",
           "kind": "type",
           "signature": "export type IPluginHostConfigFor<TPlugins extends readonly unknown[]> = { get(path: string): unknown | undefined; update<TName extends Extract<TPlugins[number], { readonly name: string; }>['name']>(name: TName, recipe: (previous: IReadonlyConfig<IExtractPluginConfig<IPluginByName<TPlugins, TName>>>) => Partial<IExtractPluginConfig<IPluginByName<TPlugins, TName>>>): Promise<void>; update(name: string, recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>): Promise<void>; };",
-          "declarationLine": 158,
+          "declarationLine": 207,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginHostConfigFor is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostConfigFor.",
@@ -3793,7 +4602,7 @@
           "name": "IPluginHostDisposalResult",
           "kind": "type",
           "signature": "export type IPluginHostDisposalResult = Readonly<{ readonly logicalTerminal: true; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 260,
+          "declarationLine": 309,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Structured logical terminal result; cleanup failures never reopen or reject the Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostDisposalResult.",
@@ -3856,8 +4665,8 @@
         {
           "name": "IPluginHostDynamicView",
           "kind": "type",
-          "signature": "export type IPluginHostDynamicView<THost> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: { get(path: string): unknown; update(name: string, recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>): Promise<void>; }; getShared(key: PropertyKey): unknown; use(...plugins: readonly IPluginConstraint<any>[]): Promise<IPluginHostDynamicView<THost>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>; }>;",
-          "declarationLine": 227,
+          "signature": "export type IPluginHostDynamicView<THost, TCore extends object = object, TValue = never> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: { get(path: string): unknown; update(name: string, recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>): Promise<void>; }; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>): Promise<IPluginHostDynamicView<THost, TCore, TValue>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost, TCore, TValue>>>; }>;",
+          "declarationLine": 276,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Runtime-unknown view returned when a dynamic plugin name cannot be narrowed statically.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostDynamicView.",
@@ -3872,7 +4681,7 @@
           "aliasOf": "IPluginHostDynamicView",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPluginHostDynamicView<THost> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: { get(path: string): unknown; update(name: string, recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>): Promise<void>; }; getShared(key: PropertyKey): unknown; use(...plugins: readonly IPluginConstraint<any>[]): Promise<IPluginHostDynamicView<THost>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>; }>;"
+            "export type IPluginHostDynamicView<THost, TCore extends object = object, TValue = never> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: { get(path: string): unknown; update(name: string, recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>): Promise<void>; }; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>): Promise<IPluginHostDynamicView<THost, TCore, TValue>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost, TCore, TValue>>>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3911,7 +4720,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginHostDynamicView:export type IPluginHostDynamicView<THost> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: { get(path: string): unknown; update(name: string, recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>): Promise<void>; }; getShared(key: PropertyKey): unknown; use(...plugins: readonly IPluginConstraint<any>[]): Promise<IPluginHostDynamicView<THost>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginHostDynamicView:export type IPluginHostDynamicView<THost, TCore extends object = object, TValue = never> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: { get(path: string): unknown; update(name: string, recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>): Promise<void>; }; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>): Promise<IPluginHostDynamicView<THost, TCore, TValue>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost, TCore, TValue>>>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4251,7 +5060,7 @@
           "name": "IPluginHostErrorDetail",
           "kind": "type",
           "signature": "export type IPluginHostErrorDetail = Readonly<Record<string, unknown>>;",
-          "declarationLine": 14,
+          "declarationLine": 15,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Generic structured detail carried by a PluginHost boundary error.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostErrorDetail.",
@@ -4379,7 +5188,7 @@
           "name": "IPluginHostPhysicalCleanupResult",
           "kind": "type",
           "signature": "export type IPluginHostPhysicalCleanupResult = Readonly<{ readonly cleanupErrors: readonly unknown[]; }>;",
-          "declarationLine": 256,
+          "declarationLine": 305,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Physical completion detail for work that outlives bounded logical disposal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostPhysicalCleanupResult.",
@@ -4698,8 +5507,8 @@
         {
           "name": "IPluginHostView",
           "kind": "type",
-          "signature": "export type IPluginHostView<THost, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<IMergePluginExts<TInstalled>>; readonly config: IPluginHostConfigFor<TInstalled>; getShared<TKey extends keyof IMergePluginShared<TInstalled>>(key: TKey): IMergePluginShared<TInstalled>[TKey] | undefined; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins]>>; unUse<const TName extends IInstalledPluginName<TInstalled>>(name: TName): Promise<IPluginRemovalResult<IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>>>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>; }>;",
-          "declarationLine": 216,
+          "signature": "export type IPluginHostView<THost, TInstalled extends readonly IPluginConstraint<any>[] = readonly [], TCore extends object = object, TValue = never> = Readonly<{ readonly host: THost; readonly extensions: Readonly<IMergePluginExts<TInstalled>>; readonly config: IPluginHostConfigFor<TInstalled>; getShared<TKey extends keyof IMergePluginShared<TInstalled>>(key: TKey): IMergePluginShared<TInstalled>[TKey] | undefined; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>, TPlugins>): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins], TCore, TValue>>; unUse<const TName extends IInstalledPluginName<TInstalled>>(name: TName): Promise<IPluginRemovalResult<IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>, TCore, TValue>>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost, TCore, TValue>>>; }>;",
+          "declarationLine": 265,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Immutable publication view returned by V2 composition and removal operations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostView.",
@@ -4714,7 +5523,7 @@
           "aliasOf": "IPluginHostView",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPluginHostView<THost, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<IMergePluginExts<TInstalled>>; readonly config: IPluginHostConfigFor<TInstalled>; getShared<TKey extends keyof IMergePluginShared<TInstalled>>(key: TKey): IMergePluginShared<TInstalled>[TKey] | undefined; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins]>>; unUse<const TName extends IInstalledPluginName<TInstalled>>(name: TName): Promise<IPluginRemovalResult<IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>>>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>; }>;"
+            "export type IPluginHostView<THost, TInstalled extends readonly IPluginConstraint<any>[] = readonly [], TCore extends object = object, TValue = never> = Readonly<{ readonly host: THost; readonly extensions: Readonly<IMergePluginExts<TInstalled>>; readonly config: IPluginHostConfigFor<TInstalled>; getShared<TKey extends keyof IMergePluginShared<TInstalled>>(key: TKey): IMergePluginShared<TInstalled>[TKey] | undefined; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>, TPlugins>): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins], TCore, TValue>>; unUse<const TName extends IInstalledPluginName<TInstalled>>(name: TName): Promise<IPluginRemovalResult<IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>, TCore, TValue>>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost, TCore, TValue>>>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4753,7 +5562,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginHostView:export type IPluginHostView<THost, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<IMergePluginExts<TInstalled>>; readonly config: IPluginHostConfigFor<TInstalled>; getShared<TKey extends keyof IMergePluginShared<TInstalled>>(key: TKey): IMergePluginShared<TInstalled>[TKey] | undefined; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins]>>; unUse<const TName extends IInstalledPluginName<TInstalled>>(name: TName): Promise<IPluginRemovalResult<IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>>>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginHostView:export type IPluginHostView<THost, TInstalled extends readonly IPluginConstraint<any>[] = readonly [], TCore extends object = object, TValue = never> = Readonly<{ readonly host: THost; readonly extensions: Readonly<IMergePluginExts<TInstalled>>; readonly config: IPluginHostConfigFor<TInstalled>; getShared<TKey extends keyof IMergePluginShared<TInstalled>>(key: TKey): IMergePluginShared<TInstalled>[TKey] | undefined; getShared(key: PropertyKey): unknown; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>, TPlugins>): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins], TCore, TValue>>; unUse<const TName extends IInstalledPluginName<TInstalled>>(name: TName): Promise<IPluginRemovalResult<IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>, TCore, TValue>>>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost, TCore, TValue>>>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4763,7 +5572,7 @@
           "name": "IPluginInstaller",
           "kind": "type",
           "signature": "export type IPluginInstaller<TCore extends object, TExtension extends Record<string, unknown>, TValue = never, TConfig extends IPluginConfig = IPluginConfig> = (core: TCore & IPluginHostCore<TValue, Record<PropertyKey, unknown>, TConfig>) => IPluginAwaitable<TExtension>;",
-          "declarationLine": 27,
+          "declarationLine": 28,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Functional installer signature carrying the Host pipeline payload axis.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginInstaller.",
@@ -4827,7 +5636,7 @@
           "name": "IPluginInstallFailureDetail",
           "kind": "type",
           "signature": "export type IPluginInstallFailureDetail = { readonly failedName: string; readonly rollbackErrors: readonly unknown[]; readonly completion?: Promise<IPluginInstallFailureDetail>; };",
-          "declarationLine": 20,
+          "declarationLine": 21,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Structured install-failure detail. Synchronous installation publishes an immutable snapshot; its completion resolves to the final immutable rollback detail without mutating the published error, so a translator can await cleanup deterministically.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginInstallFailureDetail.",
@@ -4891,7 +5700,7 @@
           "name": "IPluginLifecycleConfig",
           "kind": "type",
           "signature": "export type IPluginLifecycleConfig<TConfig extends IPluginConfig = IPluginConfig> = { get(): IReadonlyConfig<TConfig>; };",
-          "declarationLine": 32,
+          "declarationLine": 33,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginLifecycleConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginLifecycleConfig.",
@@ -4955,7 +5764,7 @@
           "name": "IPluginLifecycleCore",
           "kind": "type",
           "signature": "export type IPluginLifecycleCore<TConfig extends IPluginConfig = IPluginConfig> = { readonly config: IPluginLifecycleConfig<TConfig>; readonly operation: IPluginOperationContext; readonly lifecycle: IPluginRegistrationContext; };",
-          "declarationLine": 50,
+          "declarationLine": 51,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Plugin-facing config capability; TConfig is fixed by the plugin declaration.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginLifecycleCore.",
@@ -5019,7 +5828,7 @@
           "name": "IPluginOperationContext",
           "kind": "type",
           "signature": "export type IPluginOperationContext = { readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; };",
-          "declarationLine": 36,
+          "declarationLine": 37,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Operation-scoped cancellation and deadline exposed to one plugin hook invocation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginOperationContext.",
@@ -5083,7 +5892,7 @@
           "name": "IPluginPreparedAdmissions",
           "kind": "type",
           "signature": "export type IPluginPreparedAdmissions = object;",
-          "declarationLine": 281,
+          "declarationLine": 330,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Opaque prepared candidate admission owned by one concrete PluginHost.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginPreparedAdmissions.",
@@ -5145,7 +5954,7 @@
           "name": "IPluginPreparedRemovalBatch",
           "kind": "type",
           "signature": "export type IPluginPreparedRemovalBatch = object;",
-          "declarationLine": 293,
+          "declarationLine": 342,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Opaque exact registration batch prepared for logical removal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginPreparedRemovalBatch.",
@@ -5207,7 +6016,7 @@
           "name": "IPluginRegistrationContext",
           "kind": "type",
           "signature": "export type IPluginRegistrationContext = { readonly signal: IAbortSignal; };",
-          "declarationLine": 41,
+          "declarationLine": 42,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Registration-scoped lifetime signal that remains valid until logical revocation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginRegistrationContext.",
@@ -5271,7 +6080,7 @@
           "name": "IPluginRegistrationReceipt",
           "kind": "type",
           "signature": "export type IPluginRegistrationReceipt<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = IRegistrationToken<TPlugin>;",
-          "declarationLine": 287,
+          "declarationLine": 336,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "@deprecated Use IRegistrationToken from `@migaia/plugin-host/composition`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginRegistrationReceipt.",
@@ -5335,7 +6144,7 @@
           "name": "IPluginRemovalResult",
           "kind": "type",
           "signature": "export type IPluginRemovalResult<TView> = Readonly<{ ok: true; removed: boolean; view: TView; cleanupComplete: boolean; cleanupErrors: readonly unknown[]; physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }> | Readonly<{ ok: false; removed: boolean; view: TView; error: PluginHostError; cleanupComplete: boolean; cleanupErrors: readonly unknown[]; physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 239,
+          "declarationLine": 288,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Structured result for logical removal and any cleanup errors.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginRemovalResult.",
@@ -5399,7 +6208,7 @@
           "name": "IPluginResource",
           "kind": "type",
           "signature": "export type IPluginResource = IPluginDisposer | { [asyncDisposeKey](): IPluginAwaitable<void>; } | { [disposeKey](): void; };",
-          "declarationLine": 8,
+          "declarationLine": 9,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginResource is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginResource.",
@@ -5465,7 +6274,7 @@
           "name": "ISyncPipelineStage",
           "kind": "type",
           "signature": "export type ISyncPipelineStage<TValue> = (value: TValue, next: (value: TValue) => void, context?: IMiddlewarePipelineContext) => void;",
-          "declarationLine": 76,
+          "declarationLine": 77,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "同步 stage。next() 必须在 stage 返回前调用；延迟调用会被忽略并告警。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncPipelineStage.",
@@ -6426,9 +7235,9 @@
           "ownerFragment": "plugin-host-defined--asyncDisposeKey"
         },
         {
-          "identity": "packages/plugin-host/dist/define-plugin.d.ts:definePlugin:export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, const TName extends string = string>(name: TName, install: (core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>): IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
+          "identity": "packages/plugin-host/dist/define-plugin.d.ts:definePlugin:export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<never, never>, TValue = never, const TName extends string = string, const TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object & IFeatureRecordRequiredExpose<TFeatures>, TPublic extends object = Record<never, never>, TShared extends object = Record<never, never>>(name: TName, descriptorFactory: (core: TCore & import('./typing.js').IPluginHostCore<TValue> & Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TExpose; }) & (keyof TExtension & keyof TPublic extends never ? unknown : { readonly duplicateHostProjectionKeys: never; }), featureRecord?: TFeatures): IDefinedPluginConstraint<TCore, TValue, TExtension & TPublic, IPluginConfig, TShared, TName, TFeatures, TExpose>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ name: TName; }> & (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName, TFeatures, TExpose> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
           "name": "definePlugin",
-          "signature": "export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, const TName extends string = string>(name: TName, install: (core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>): IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
+          "signature": "export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<never, never>, TValue = never, const TName extends string = string, const TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object & IFeatureRecordRequiredExpose<TFeatures>, TPublic extends object = Record<never, never>, TShared extends object = Record<never, never>>(name: TName, descriptorFactory: (core: TCore & import('./typing.js').IPluginHostCore<TValue> & Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TExpose; }) & (keyof TExtension & keyof TPublic extends never ? unknown : { readonly duplicateHostProjectionKeys: never; }), featureRecord?: TFeatures): IDefinedPluginConstraint<TCore, TValue, TExtension & TPublic, IPluginConfig, TShared, TName, TFeatures, TExpose>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ name: TName; }> & (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName, TFeatures, TExpose> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
           "source": "packages/plugin-host/dist/define-plugin.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./defined",
@@ -6446,9 +7255,9 @@
           "ownerFragment": "plugin-host-defined--disposeKey"
         },
         {
-          "identity": "packages/plugin-host/dist/typing.d.ts:IDefinedPluginConstraint:export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string> = IPlugin<any, TExtension, TConfig, TShared> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IDefinedPluginConstraint:export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
           "name": "IDefinedPluginConstraint",
-          "signature": "export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string> = IPlugin<any, TExtension, TConfig, TShared> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
+          "signature": "export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
           "source": "packages/plugin-host/dist/typing.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./defined",
@@ -6466,9 +7275,9 @@
           "ownerFragment": "plugin-host-defined--IHostSetupContext"
         },
         {
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginConstraint:export type IPluginConstraint<TCore> = { readonly name: string; readonly config?: unknown; shared?: (core: TCore & IPluginLifecycleCore<any>) => object; install: (core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginConstraint:export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>) => TExpose); shared?: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => object; install: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
           "name": "IPluginConstraint",
-          "signature": "export type IPluginConstraint<TCore> = { readonly name: string; readonly config?: unknown; shared?: (core: TCore & IPluginLifecycleCore<any>) => object; install: (core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
+          "signature": "export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>) => TExpose); shared?: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => object; install: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
           "source": "packages/plugin-host/dist/typing.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./structural",
@@ -6536,9 +7345,9 @@
           "ownerFragment": "plugin-host-composition--IRegistrationView"
         },
         {
-          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostOptions:export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostOptions:export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins & IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>; }>;",
           "name": "ISetupHostOptions",
-          "signature": "export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins; }>;",
+          "signature": "export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins & IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>; }>;",
           "source": "packages/plugin-host/dist/typing.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./defined",
@@ -6546,9 +7355,9 @@
           "ownerFragment": "plugin-host-defined--ISetupHostOptions"
         },
         {
-          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostView:export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly any[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins & readonly IPluginConstraint<any>[]>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostView:export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly IPluginConstraint<any>[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins, _TCore, _TValue>;",
           "name": "ISetupHostView",
-          "signature": "export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly any[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins & readonly IPluginConstraint<any>[]>;",
+          "signature": "export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly IPluginConstraint<any>[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins, _TCore, _TValue>;",
           "source": "packages/plugin-host/dist/typing.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./defined",
@@ -6556,9 +7365,9 @@
           "ownerFragment": "plugin-host-defined--ISetupHostView"
         },
         {
-          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupPluginHost:export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupPluginHost:export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>, TCore, TValue>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins, TCore, TValue>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;",
           "name": "ISetupPluginHost",
-          "signature": "export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;",
+          "signature": "export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>, TCore, TValue>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins, TCore, TValue>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;",
           "source": "packages/plugin-host/dist/typing.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./defined",
@@ -6637,7 +7446,7 @@
           "name": "createView",
           "kind": "const",
           "signature": "export declare const createView: <TPlugin extends IPluginConstraint<any>>(token: IRegistrationToken<TPlugin>) => IRegistrationView<TPlugin>;",
-          "declarationLine": 3,
+          "declarationLine": 4,
           "source": "packages/plugin-host/dist/composition-entry.d.ts",
           "purpose": "Publishes only the exact live registration extensions carried by `token`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createView.",
@@ -6699,10 +7508,74 @@
           "fragment": "plugin-host-composition--createView"
         },
         {
+          "name": "inspectFeatures",
+          "kind": "const",
+          "signature": "export declare const inspectFeatures: <TFeatures extends IFeatureRecord>(roots: TFeatures) => IFeatureInspection<TFeatures>;",
+          "declarationLine": 10,
+          "source": "packages/plugin-host/dist/feature-runtime.d.ts",
+          "purpose": "Inspects trusted Feature topology without invoking factories or creating registration state.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for inspectFeatures.",
+          "advanced": "No additional advanced behavior is declared for inspectFeatures.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for inspectFeatures."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for inspectFeatures.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "inspectFeatures",
+          "exportPath": "./composition",
+          "overloadSignatures": [
+            "export declare const inspectFeatures: <TFeatures extends IFeatureRecord>(roots: TFeatures) => IFeatureInspection<TFeatures>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use inspectFeatures when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when inspectFeatures does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Inspects trusted Feature topology without invoking factories or creating registration state."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import inspectFeatures from @migaia/plugin-host/composition, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use inspectFeatures when its const contract and declared inputs match the result you need. Choose a different public symbol when inspectFeatures does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for inspectFeatures."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for inspectFeatures."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/feature-runtime.d.ts:inspectFeatures:export declare const inspectFeatures: <TFeatures extends IFeatureRecord>(roots: TFeatures) => IFeatureInspection<TFeatures>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-composition--inspectFeatures"
+        },
+        {
           "name": "IRegistrationToken",
           "kind": "type",
           "signature": "export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = object & Readonly<{ readonly __plugin?: TPlugin; }>;",
-          "declarationLine": 283,
+          "declarationLine": 332,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Canonical name for the opaque token accepted by composition publication.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRegistrationToken.",
@@ -6768,7 +7641,7 @@
           "name": "IRegistrationView",
           "kind": "type",
           "signature": "export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>>; }>;",
-          "declarationLine": 289,
+          "declarationLine": 338,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Narrow extension-only view for one live registration token.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRegistrationView.",
@@ -7028,16 +7901,16 @@
         {
           "name": "definePlugin",
           "kind": "function",
-          "signature": "export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, const TName extends string = string>(name: TName, install: (core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>): IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
-          "declarationLine": 5,
+          "signature": "export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<never, never>, TValue = never, const TName extends string = string, const TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object & IFeatureRecordRequiredExpose<TFeatures>, TPublic extends object = Record<never, never>, TShared extends object = Record<never, never>>(name: TName, descriptorFactory: (core: TCore & import('./typing.js').IPluginHostCore<TValue> & Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TExpose; }) & (keyof TExtension & keyof TPublic extends never ? unknown : { readonly duplicateHostProjectionKeys: never; }), featureRecord?: TFeatures): IDefinedPluginConstraint<TCore, TValue, TExtension & TPublic, IPluginConfig, TShared, TName, TFeatures, TExpose>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ name: TName; }> & (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName, TFeatures, TExpose> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
+          "declarationLine": 6,
           "source": "packages/plugin-host/dist/define-plugin.d.ts",
-          "purpose": "Functional short form: name plus installer callback. Functional full descriptor form retaining config/shared and metadata shape.",
+          "purpose": "Canonical function form creates one synchronous descriptor for each registration. Functional full descriptor form retaining config/shared and metadata shape.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for definePlugin.",
           "advanced": "No additional advanced behavior is declared for definePlugin.",
           "parameters": [
             "name: TName",
-            "install: (core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>",
-            "definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition"
+            "descriptorFactory: (core: TCore & import('./typing.js').IPluginHostCore<TValue> & Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TExpose; }) & (keyof TExtension & keyof TPublic extends never ? unknown : { readonly duplicateHostProjectionKeys: never; }), featureRecord?: TFeatures",
+            "definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ name: TName; }> & (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) & TDefinition"
           ],
           "parameterDetails": [
             {
@@ -7046,29 +7919,29 @@
               "optional": false
             },
             {
-              "name": "install",
-              "type": "(core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>",
+              "name": "descriptorFactory",
+              "type": "(core: TCore & import('./typing.js').IPluginHostCore<TValue> & Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TExpose; }) & (keyof TExtension & keyof TPublic extends never ? unknown : { readonly duplicateHostProjectionKeys: never; }), featureRecord?: TFeatures",
               "optional": false
             },
             {
               "name": "definition",
-              "type": "IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition",
+              "type": "IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ name: TName; }> & (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) & TDefinition",
               "optional": false
             }
           ],
-          "returns": "IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName> | IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>",
+          "returns": "IDefinedPluginConstraint<TCore, TValue, TExtension & TPublic, IPluginConfig, TShared, TName, TFeatures, TExpose> | IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName, TFeatures, TExpose> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>",
           "errors": ["No documented errors are declared for definePlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for definePlugin.",
           "examples": [
-            "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  check: () => ({ ok: true as const })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})",
-            "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>(\n  'upper',\n  (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n)\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
+            "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  install: () => ({ check: () => ({ ok: true as const }) })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})",
+            "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, descriptorFactory) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>('upper', (core) => ({\n  install: () => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}))\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
           ],
           "members": [],
           "aliasOf": "definePlugin",
           "exportPath": "./defined",
           "overloadSignatures": [
-            "export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, const TName extends string = string>(name: TName, install: (core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>): IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName>;",
-            "export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;"
+            "export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<never, never>, TValue = never, const TName extends string = string, const TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object & IFeatureRecordRequiredExpose<TFeatures>, TPublic extends object = Record<never, never>, TShared extends object = Record<never, never>>(name: TName, descriptorFactory: (core: TCore & import('./typing.js').IPluginHostCore<TValue> & Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TExpose; }) & (keyof TExtension & keyof TPublic extends never ? unknown : { readonly duplicateHostProjectionKeys: never; }), featureRecord?: TFeatures): IDefinedPluginConstraint<TCore, TValue, TExtension & TPublic, IPluginConfig, TShared, TName, TFeatures, TExpose>;",
+            "export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ name: TName; }> & (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName, TFeatures, TExpose> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;"
           ],
           "overloadParameterDetails": [
             [
@@ -7078,22 +7951,22 @@
                 "optional": false
               },
               {
-                "name": "install",
-                "type": "(core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>",
+                "name": "descriptorFactory",
+                "type": "(core: TCore & import('./typing.js').IPluginHostCore<TValue> & Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TExpose; }) & (keyof TExtension & keyof TPublic extends never ? unknown : { readonly duplicateHostProjectionKeys: never; }), featureRecord?: TFeatures",
                 "optional": false
               }
             ],
             [
               {
                 "name": "definition",
-                "type": "IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition",
+                "type": "IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ name: TName; }> & (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) & TDefinition",
                 "optional": false
               }
             ]
           ],
           "overloadReturns": [
-            "IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName>",
-            "IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>"
+            "IDefinedPluginConstraint<TCore, TValue, TExtension & TPublic, IPluginConfig, TShared, TName, TFeatures, TExpose>",
+            "IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName, TFeatures, TExpose> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>"
           ],
           "whenToUse": "Use definePlugin when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when definePlugin does not match the required inputs or return contract.",
@@ -7101,7 +7974,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Functional short form: name plus installer callback. Functional full descriptor form retaining config/shared and metadata shape."
+              "content": "Canonical function form creates one synchronous descriptor for each registration. Functional full descriptor form retaining config/shared and metadata shape."
             },
             {
               "id": "getting-started",
@@ -7130,7 +8003,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/define-plugin.d.ts:definePlugin:export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, const TName extends string = string>(name: TName, install: (core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>): IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
+          "identity": "packages/plugin-host/dist/define-plugin.d.ts:definePlugin:export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<never, never>, TValue = never, const TName extends string = string, const TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object & IFeatureRecordRequiredExpose<TFeatures>, TPublic extends object = Record<never, never>, TShared extends object = Record<never, never>>(name: TName, descriptorFactory: (core: TCore & import('./typing.js').IPluginHostCore<TValue> & Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TExpose; }) & (keyof TExtension & keyof TPublic extends never ? unknown : { readonly duplicateHostProjectionKeys: never; }), featureRecord?: TFeatures): IDefinedPluginConstraint<TCore, TValue, TExtension & TPublic, IPluginConfig, TShared, TName, TFeatures, TExpose>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ name: TName; }> & (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName, TFeatures, TExpose> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
           "guidance": [],
           "usageScore": 50,
           "configuration": [],
@@ -7313,8 +8186,8 @@
         {
           "name": "IDefinedPluginConstraint",
           "kind": "type",
-          "signature": "export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string> = IPlugin<any, TExtension, TConfig, TShared> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
-          "declarationLine": 107,
+          "signature": "export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
+          "declarationLine": 156,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IDefinedPluginConstraint is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDefinedPluginConstraint.",
@@ -7329,7 +8202,7 @@
           "aliasOf": "IDefinedPluginConstraint",
           "exportPath": "./defined",
           "overloadSignatures": [
-            "export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string> = IPlugin<any, TExtension, TConfig, TShared> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;"
+            "export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7368,7 +8241,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IDefinedPluginConstraint:export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string> = IPlugin<any, TExtension, TConfig, TShared> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IDefinedPluginConstraint:export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose> & Readonly<{ readonly name: TName; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7378,7 +8251,7 @@
           "name": "IHostSetupContext",
           "kind": "type",
           "signature": "export type IHostSetupContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; onDispose(resource: IPluginResource): void; }>;",
-          "declarationLine": 116,
+          "declarationLine": 165,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Functional setup context supplied only while Core construction is current.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IHostSetupContext.",
@@ -7441,8 +8314,8 @@
         {
           "name": "ISetupHostOptions",
           "kind": "type",
-          "signature": "export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins; }>;",
-          "declarationLine": 122,
+          "signature": "export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins & IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>; }>;",
+          "declarationLine": 171,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Public structural view returned by asynchronous setup.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISetupHostOptions.",
@@ -7457,7 +8330,7 @@
           "aliasOf": "ISetupHostOptions",
           "exportPath": "./defined",
           "overloadSignatures": [
-            "export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins; }>;"
+            "export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins & IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7496,7 +8369,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostOptions:export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostOptions:export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins & IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7505,8 +8378,8 @@
         {
           "name": "ISetupHostView",
           "kind": "type",
-          "signature": "export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly any[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins & readonly IPluginConstraint<any>[]>;",
-          "declarationLine": 143,
+          "signature": "export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly IPluginConstraint<any>[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins, _TCore, _TValue>;",
+          "declarationLine": 192,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Fully active immutable setup publication with explicit and ERM disposal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISetupHostView.",
@@ -7521,7 +8394,7 @@
           "aliasOf": "ISetupHostView",
           "exportPath": "./defined",
           "overloadSignatures": [
-            "export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly any[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins & readonly IPluginConstraint<any>[]>;"
+            "export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly IPluginConstraint<any>[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins, _TCore, _TValue>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7560,7 +8433,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostView:export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly any[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins & readonly IPluginConstraint<any>[]>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostView:export type ISetupHostView<THost, _TCore extends object = object, _TValue = never, TPlugins extends readonly IPluginConstraint<any>[] = readonly []> = Readonly<{ readonly host: THost; readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<TPlugins>; getShared(key: PropertyKey): unknown; dispose(): Promise<IPluginHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }> & IPluginHostView<THost, TPlugins, _TCore, _TValue>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7569,8 +8442,8 @@
         {
           "name": "ISetupPluginHost",
           "kind": "type",
-          "signature": "export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;",
-          "declarationLine": 130,
+          "signature": "export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>, TCore, TValue>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins, TCore, TValue>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;",
+          "declarationLine": 179,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Structural Host surface exposed by setupHost; concrete runtime class stays private.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISetupPluginHost.",
@@ -7585,7 +8458,7 @@
           "aliasOf": "ISetupPluginHost",
           "exportPath": "./defined",
           "overloadSignatures": [
-            "export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;"
+            "export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>, TCore, TValue>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins, TCore, TValue>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7624,7 +8497,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupPluginHost:export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:ISetupPluginHost:export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{ readonly pipelineMode: IPipelineMode; readonly revision: number; getShared(key: PropertyKey): unknown; getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>, TCore, TValue>; use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins, TCore, TValue>>; usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>; dispose(): Promise<IPluginHostDisposalResult>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8481,7 +9354,7 @@
             },
             {
               "name": "plugins",
-              "type": "TPlugins",
+              "type": "TPlugins & IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>",
               "optional": true,
               "description": ""
             },
@@ -8554,9 +9427,9 @@
               "name": "host",
               "type": "IPluginHostOptions",
               "optional": false,
-              "description": "第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。",
+              "description": "第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。",
               "descriptionEn": "",
-              "descriptionZh": "第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
+              "descriptionZh": "第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
             },
             {
               "name": "setupTimeoutMs",
@@ -8584,7 +9457,7 @@
             },
             {
               "name": "plugins",
-              "type": "TPlugins",
+              "type": "TPlugins & IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>",
               "optional": true,
               "description": "Initial plugin definitions installed together before the returned view becomes visible.",
               "descriptionEn": "Initial plugin definitions installed together before the returned view becomes visible.",
@@ -8695,8 +9568,8 @@
         {
           "name": "IPluginConstraint",
           "kind": "type",
-          "signature": "export type IPluginConstraint<TCore> = { readonly name: string; readonly config?: unknown; shared?: (core: TCore & IPluginLifecycleCore<any>) => object; install: (core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
-          "declarationLine": 95,
+          "signature": "export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>) => TExpose); shared?: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => object; install: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
+          "declarationLine": 107,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "用于约束插件元组，同时保留每个插件自身的精确泛型。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginConstraint.",
@@ -8711,7 +9584,7 @@
           "aliasOf": "IPluginConstraint",
           "exportPath": "./structural",
           "overloadSignatures": [
-            "export type IPluginConstraint<TCore> = { readonly name: string; readonly config?: unknown; shared?: (core: TCore & IPluginLifecycleCore<any>) => object; install: (core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };"
+            "export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>) => TExpose); shared?: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => object; install: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8750,7 +9623,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginConstraint:export type IPluginConstraint<TCore> = { readonly name: string; readonly config?: unknown; shared?: (core: TCore & IPluginLifecycleCore<any>) => object; install: (core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginConstraint:export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>) => TExpose); shared?: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => object; install: (core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<Record<string, unknown>>; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8760,7 +9633,7 @@
           "name": "IPluginHostCore",
           "kind": "interface",
           "signature": "export interface IPluginHostCore<TValue = never, TShared extends object = Record<PropertyKey, unknown>, TConfig extends IPluginConfig = IPluginConfig> { readonly config: IPluginLifecycleConfig<TConfig>; readonly operation: IPluginOperationContext; readonly lifecycle: IPluginRegistrationContext; getShared<TKey extends keyof TShared>(key: TKey): TShared[TKey] | undefined; getShared(key: PropertyKey): unknown; onDispose(resource: IPluginResource): void; usePipeline(stage: ISyncPipelineStage<TValue>): this; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this; }",
-          "declarationLine": 178,
+          "declarationLine": 227,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Interface required so fluent capabilities can use polymorphic `this` returns. PluginHost 向插件和业务宿主提供的通用能力。 业务侧只需将自己的领域字段与此类型做交叉，避免重复声明 shared 读取、资源清理、配置和 pipeline 等宿主约定。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostCore.",
@@ -8952,7 +9825,7 @@
           "name": "IPluginHostOptions",
           "kind": "type",
           "signature": "export type IPluginHostOptions = { /** Explicit operation and pipeline drain budgets; `false` opts into unbounded waiting. */ readonly execution: { /** * Maximum time for one admitted install, update, or removal hook; `false` waits without a * deadline. */ readonly mutationTimeoutMs: number | false; /** * Maximum time to drain active pipeline leases before logical removal continues; `false` waits * until zero. */ readonly pipelineDrainTimeoutMs: number | false; }; pipeline?: IPipelineConfig; diagnostic?: (message: string, code?: IPluginHostErrorCode) => void; /** 时间域与排程来源（默认 lifecycle `systemScheduler`）；queue watchdog / dispose timeout 共用。 */ scheduler?: ILifecycleScheduler; /** 队列 admission 阈值。`undefined`：只诊断不拒绝；`false`：不建 timer、不诊断、不拒绝；`number`：超时出队并 reject。 */ queueAdmissionTimeoutMs?: number | false; /** `queueAdmissionTimeoutMs` 未配置时的诊断阈值；`false` 关闭诊断 timer。 */ queueAdmissionDiagnosticMs?: number | false; /** 单个 disposer 步的最大等待时间；`false` 表示永久等待（不触发 force）。 */ disposeStepTimeoutMs?: number | false; };",
-          "declarationLine": 190,
+          "declarationLine": 239,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginHostOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostOptions.",
@@ -9143,7 +10016,7 @@
         {
           "name": "PluginHost",
           "kind": "class",
-          "signature": "export declare abstract class PluginHost<TDomainCore extends object, TValue = never, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> { #private; /** Type-only baseline tuple marker; no runtime property is emitted. */ readonly [installedPluginsBrand]: TInstalled; constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader); get pipelineMode(): IPipelineMode; /** Current committed Host mutation receipt; it changes only at publication boundaries. */ get revision(): number; /** Returns a fresh dynamic view over the currently committed registrations. */ getCurrentView(): IPluginHostDynamicView<this>; protected createPluginDomainCore(): TDomainCore; /** * Transforms the final Host disposal error inside the sole disposal Promise. The base Host * returns its PluginHostError unchanged; subclasses may translate the boundary error without * creating a second lifecycle Promise. */ protected translateDisposalError(error: PluginHostError): Error; protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>; /** Host-side pipeline registration for application composition. */ usePipeline(stage: ISyncPipelineStage<TValue>): this; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this; getShared<T = unknown>(key: PropertyKey): T | undefined; use<const TPlugins extends readonly IPluginConstraint<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>>[]>(...plugins: TPlugins): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins]>>; /** Creates one immutable admission snapshot through the canonical Host validator. */ createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): import('./typing.js').IPluginAdmission<TPlugin>; /** Reserves a Host-owned opaque ordering slot for one composition definition name. */ createDataOrderSlot(name: string): import('./typing.js').IPluginDataOrderSlot; /** Permanently retires the exact definition ordering lane after definition deletion. */ retireDataOrderSlot(slot: import('./typing.js').IPluginDataOrderSlot): void; /** Prepares an admission batch for a composition owner without publishing candidate state. */ prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; /** Commits a prepared admission in one synchronous publication point. */ commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; /** Discards a prepared candidate and resolves with exact rollback observations. */ discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; /** Validates exact live receipts before a composition removal critical section. */ prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; /** Revokes a prepared receipt batch synchronously, then drains its cleanup fence. */ commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; /** Installs constructor-time plugins synchronously or throws before the host escapes. */ protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(plugins: readonly IPluginConstraint<any>[]): IPluginHostView<this, TViewPlugins>; get config(): IPluginHostConfigFor<TInstalled>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>>; /** Completes logical host disposal; concrete consumer facades may narrow the observed result. */ dispose(): Promise<import('./typing.js').IPluginHostDisposalResult>; }",
+          "signature": "export declare abstract class PluginHost<TDomainCore extends object, TValue = never, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> { #private; /** Type-only baseline tuple marker; no runtime property is emitted. */ readonly [installedPluginsBrand]: TInstalled; constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader); get pipelineMode(): IPipelineMode; /** Current committed Host mutation receipt; it changes only at publication boundaries. */ get revision(): number; /** Returns a fresh dynamic view over the currently committed registrations. */ getCurrentView(): IPluginHostDynamicView<this, TDomainCore, TValue>; protected createPluginDomainCore(): TDomainCore; /** * Transforms the final Host disposal error inside the sole disposal Promise. The base Host * returns its PluginHostError unchanged; subclasses may translate the boundary error without * creating a second lifecycle Promise. */ protected translateDisposalError(error: PluginHostError): Error; protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>; /** Host-side pipeline registration for application composition. */ usePipeline(stage: ISyncPipelineStage<TValue>): this; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this; getShared<T = unknown>(key: PropertyKey): T | undefined; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>, TPlugins>): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins], TDomainCore, TValue>>; /** Creates one immutable admission snapshot through the canonical Host validator. */ createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): import('./typing.js').IPluginAdmission<TPlugin>; /** Reserves a Host-owned opaque ordering slot for one composition definition name. */ createDataOrderSlot(name: string): import('./typing.js').IPluginDataOrderSlot; /** Permanently retires the exact definition ordering lane after definition deletion. */ retireDataOrderSlot(slot: import('./typing.js').IPluginDataOrderSlot): void; /** Prepares an admission batch for a composition owner without publishing candidate state. */ prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; /** Commits a prepared admission in one synchronous publication point. */ commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; /** Discards a prepared candidate and resolves with exact rollback observations. */ discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; /** Validates exact live receipts before a composition removal critical section. */ prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; /** Revokes a prepared receipt batch synchronously, then drains its cleanup fence. */ commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; /** Installs constructor-time plugins synchronously or throws before the host escapes. */ protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(plugins: readonly IPluginConstraint<any>[]): IPluginHostView<this, TViewPlugins, TDomainCore, TValue>; get config(): IPluginHostConfigFor<TInstalled>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>>; /** Completes logical host disposal; concrete consumer facades may narrow the observed result. */ dispose(): Promise<import('./typing.js').IPluginHostDisposalResult>; }",
           "declarationLine": 13,
           "source": "packages/plugin-host/dist/host-runtime.d.ts",
           "purpose": "Runtime-neutral plugin host. All external mutation enters one Promise queue.",
@@ -9189,10 +10062,10 @@
             {
               "name": "getCurrentView",
               "kind": "method",
-              "signature": "getCurrentView(): IPluginHostDynamicView<this>;",
+              "signature": "getCurrentView(): IPluginHostDynamicView<this, TDomainCore, TValue>;",
               "description": "Returns a fresh dynamic view over the currently committed registrations.",
               "parameterDetails": [],
-              "returns": "IPluginHostDynamicView<this>"
+              "returns": "IPluginHostDynamicView<this, TDomainCore, TValue>"
             },
             {
               "name": "usePipeline",
@@ -9267,16 +10140,16 @@
             {
               "name": "use",
               "kind": "method",
-              "signature": "use<const TPlugins extends readonly IPluginConstraint<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>>[]>(...plugins: TPlugins): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins]>>;",
+              "signature": "use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>, TPlugins>): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins], TDomainCore, TValue>>;",
               "description": null,
               "parameterDetails": [
                 {
-                  "name": "...plugins: TPlugins",
+                  "name": "...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>, TPlugins>",
                   "type": "unknown",
                   "optional": false
                 }
               ],
-              "returns": "Promise<IPluginHostView<this, [...TInstalled, ...TPlugins]>>"
+              "returns": "Promise<IPluginHostView<this, [...TInstalled, ...TPlugins], TDomainCore, TValue>>"
             },
             {
               "name": "createPluginAdmission",
@@ -9429,7 +10302,7 @@
           "aliasOf": "PluginHost",
           "exportPath": "./structural",
           "overloadSignatures": [
-            "export declare abstract class PluginHost<TDomainCore extends object, TValue = never, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> { #private; /** Type-only baseline tuple marker; no runtime property is emitted. */ readonly [installedPluginsBrand]: TInstalled; constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader); get pipelineMode(): IPipelineMode; /** Current committed Host mutation receipt; it changes only at publication boundaries. */ get revision(): number; /** Returns a fresh dynamic view over the currently committed registrations. */ getCurrentView(): IPluginHostDynamicView<this>; protected createPluginDomainCore(): TDomainCore; /** * Transforms the final Host disposal error inside the sole disposal Promise. The base Host * returns its PluginHostError unchanged; subclasses may translate the boundary error without * creating a second lifecycle Promise. */ protected translateDisposalError(error: PluginHostError): Error; protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>; /** Host-side pipeline registration for application composition. */ usePipeline(stage: ISyncPipelineStage<TValue>): this; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this; getShared<T = unknown>(key: PropertyKey): T | undefined; use<const TPlugins extends readonly IPluginConstraint<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>>[]>(...plugins: TPlugins): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins]>>; /** Creates one immutable admission snapshot through the canonical Host validator. */ createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): import('./typing.js').IPluginAdmission<TPlugin>; /** Reserves a Host-owned opaque ordering slot for one composition definition name. */ createDataOrderSlot(name: string): import('./typing.js').IPluginDataOrderSlot; /** Permanently retires the exact definition ordering lane after definition deletion. */ retireDataOrderSlot(slot: import('./typing.js').IPluginDataOrderSlot): void; /** Prepares an admission batch for a composition owner without publishing candidate state. */ prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; /** Commits a prepared admission in one synchronous publication point. */ commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; /** Discards a prepared candidate and resolves with exact rollback observations. */ discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; /** Validates exact live receipts before a composition removal critical section. */ prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; /** Revokes a prepared receipt batch synchronously, then drains its cleanup fence. */ commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; /** Installs constructor-time plugins synchronously or throws before the host escapes. */ protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(plugins: readonly IPluginConstraint<any>[]): IPluginHostView<this, TViewPlugins>; get config(): IPluginHostConfigFor<TInstalled>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>>; /** Completes logical host disposal; concrete consumer facades may narrow the observed result. */ dispose(): Promise<import('./typing.js').IPluginHostDisposalResult>; }"
+            "export declare abstract class PluginHost<TDomainCore extends object, TValue = never, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> { #private; /** Type-only baseline tuple marker; no runtime property is emitted. */ readonly [installedPluginsBrand]: TInstalled; constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader); get pipelineMode(): IPipelineMode; /** Current committed Host mutation receipt; it changes only at publication boundaries. */ get revision(): number; /** Returns a fresh dynamic view over the currently committed registrations. */ getCurrentView(): IPluginHostDynamicView<this, TDomainCore, TValue>; protected createPluginDomainCore(): TDomainCore; /** * Transforms the final Host disposal error inside the sole disposal Promise. The base Host * returns its PluginHostError unchanged; subclasses may translate the boundary error without * creating a second lifecycle Promise. */ protected translateDisposalError(error: PluginHostError): Error; protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>; /** Host-side pipeline registration for application composition. */ usePipeline(stage: ISyncPipelineStage<TValue>): this; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this; getShared<T = unknown>(key: PropertyKey): T | undefined; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>, TPlugins>): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins], TDomainCore, TValue>>; /** Creates one immutable admission snapshot through the canonical Host validator. */ createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): import('./typing.js').IPluginAdmission<TPlugin>; /** Reserves a Host-owned opaque ordering slot for one composition definition name. */ createDataOrderSlot(name: string): import('./typing.js').IPluginDataOrderSlot; /** Permanently retires the exact definition ordering lane after definition deletion. */ retireDataOrderSlot(slot: import('./typing.js').IPluginDataOrderSlot): void; /** Prepares an admission batch for a composition owner without publishing candidate state. */ prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; /** Commits a prepared admission in one synchronous publication point. */ commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; /** Discards a prepared candidate and resolves with exact rollback observations. */ discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; /** Validates exact live receipts before a composition removal critical section. */ prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; /** Revokes a prepared receipt batch synchronously, then drains its cleanup fence. */ commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; /** Installs constructor-time plugins synchronously or throws before the host escapes. */ protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(plugins: readonly IPluginConstraint<any>[]): IPluginHostView<this, TViewPlugins, TDomainCore, TValue>; get config(): IPluginHostConfigFor<TInstalled>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>>; /** Completes logical host disposal; concrete consumer facades may narrow the observed result. */ dispose(): Promise<import('./typing.js').IPluginHostDisposalResult>; }"
           ],
           "overloadParameterDetails": [
             [
@@ -9542,7 +10415,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/plugin-host/dist/host-runtime.d.ts:PluginHost:export declare abstract class PluginHost<TDomainCore extends object, TValue = never, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> { #private; /** Type-only baseline tuple marker; no runtime property is emitted. */ readonly [installedPluginsBrand]: TInstalled; constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader); get pipelineMode(): IPipelineMode; /** Current committed Host mutation receipt; it changes only at publication boundaries. */ get revision(): number; /** Returns a fresh dynamic view over the currently committed registrations. */ getCurrentView(): IPluginHostDynamicView<this>; protected createPluginDomainCore(): TDomainCore; /** * Transforms the final Host disposal error inside the sole disposal Promise. The base Host * returns its PluginHostError unchanged; subclasses may translate the boundary error without * creating a second lifecycle Promise. */ protected translateDisposalError(error: PluginHostError): Error; protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>; /** Host-side pipeline registration for application composition. */ usePipeline(stage: ISyncPipelineStage<TValue>): this; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this; getShared<T = unknown>(key: PropertyKey): T | undefined; use<const TPlugins extends readonly IPluginConstraint<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>>[]>(...plugins: TPlugins): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins]>>; /** Creates one immutable admission snapshot through the canonical Host validator. */ createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): import('./typing.js').IPluginAdmission<TPlugin>; /** Reserves a Host-owned opaque ordering slot for one composition definition name. */ createDataOrderSlot(name: string): import('./typing.js').IPluginDataOrderSlot; /** Permanently retires the exact definition ordering lane after definition deletion. */ retireDataOrderSlot(slot: import('./typing.js').IPluginDataOrderSlot): void; /** Prepares an admission batch for a composition owner without publishing candidate state. */ prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; /** Commits a prepared admission in one synchronous publication point. */ commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; /** Discards a prepared candidate and resolves with exact rollback observations. */ discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; /** Validates exact live receipts before a composition removal critical section. */ prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; /** Revokes a prepared receipt batch synchronously, then drains its cleanup fence. */ commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; /** Installs constructor-time plugins synchronously or throws before the host escapes. */ protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(plugins: readonly IPluginConstraint<any>[]): IPluginHostView<this, TViewPlugins>; get config(): IPluginHostConfigFor<TInstalled>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>>; /** Completes logical host disposal; concrete consumer facades may narrow the observed result. */ dispose(): Promise<import('./typing.js').IPluginHostDisposalResult>; }",
+          "identity": "packages/plugin-host/dist/host-runtime.d.ts:PluginHost:export declare abstract class PluginHost<TDomainCore extends object, TValue = never, TInstalled extends readonly IPluginConstraint<any>[] = readonly []> { #private; /** Type-only baseline tuple marker; no runtime property is emitted. */ readonly [installedPluginsBrand]: TInstalled; constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader); get pipelineMode(): IPipelineMode; /** Current committed Host mutation receipt; it changes only at publication boundaries. */ get revision(): number; /** Returns a fresh dynamic view over the currently committed registrations. */ getCurrentView(): IPluginHostDynamicView<this, TDomainCore, TValue>; protected createPluginDomainCore(): TDomainCore; /** * Transforms the final Host disposal error inside the sole disposal Promise. The base Host * returns its PluginHostError unchanged; subclasses may translate the boundary error without * creating a second lifecycle Promise. */ protected translateDisposalError(error: PluginHostError): Error; protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>; /** Host-side pipeline registration for application composition. */ usePipeline(stage: ISyncPipelineStage<TValue>): this; useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this; useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this; useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this; getShared<T = unknown>(key: PropertyKey): T | undefined; use<const TPlugins extends readonly IPluginConstraint<any>[]>(...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>, TPlugins>): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins], TDomainCore, TValue>>; /** Creates one immutable admission snapshot through the canonical Host validator. */ createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): import('./typing.js').IPluginAdmission<TPlugin>; /** Reserves a Host-owned opaque ordering slot for one composition definition name. */ createDataOrderSlot(name: string): import('./typing.js').IPluginDataOrderSlot; /** Permanently retires the exact definition ordering lane after definition deletion. */ retireDataOrderSlot(slot: import('./typing.js').IPluginDataOrderSlot): void; /** Prepares an admission batch for a composition owner without publishing candidate state. */ prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; /** Commits a prepared admission in one synchronous publication point. */ commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; /** Discards a prepared candidate and resolves with exact rollback observations. */ discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; /** Validates exact live receipts before a composition removal critical section. */ prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; /** Revokes a prepared receipt batch synchronously, then drains its cleanup fence. */ commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; /** Installs constructor-time plugins synchronously or throws before the host escapes. */ protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(plugins: readonly IPluginConstraint<any>[]): IPluginHostView<this, TViewPlugins, TDomainCore, TValue>; get config(): IPluginHostConfigFor<TInstalled>; unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>>; /** Completes logical host disposal; concrete consumer facades may narrow the observed result. */ dispose(): Promise<import('./typing.js').IPluginHostDisposalResult>; }",
           "guidance": [
             {
               "id": "8-生命周期与错误",

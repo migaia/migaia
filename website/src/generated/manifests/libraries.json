@@ -6946,11 +6946,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>(\n  'upper',\n  (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n)\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
+                  "code": "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, descriptorFactory) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>('upper', (core) => ({\n  install: () => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}))\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`definePlugin()` 有两种写法。上面是短写法 `definePlugin(name, install)`，适合只有名称和安装函数的插件；需要 `config`、`shared`、`update` 或 `dispose` 时使用完整对象写法：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 `install()`；真正的安装发生在 `host.use(plugin)`。"
+                  "text": "`definePlugin()` 有两种写法。上面是函数形 `definePlugin(name, descriptorFactory)`：每次安装先同步创建一个 descriptor，再由其 `install`、`expose`、`featureExpose`、`shared` hooks 提供这次安装的能力。需要 `config`、`update`、`dispose` 等长期定义字段时使用保留对象形：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 descriptor 或 `install()`；真正的安装发生在 `host.use(plugin)`。"
                 },
                 {
                   "type": "paragraph",
@@ -7783,11 +7783,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  check: () => ({ ok: true as const })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})"
+                  "code": "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  install: () => ({ check: () => ({ ok: true as const }) })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})"
                 },
                 {
                   "type": "paragraph",
-                  "text": "第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
+                  "text": "第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
                 },
                 {
                   "type": "paragraph",
@@ -12775,7 +12775,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "浏览器端本地存储的统一契约实现：命名空间化的 `localStorage`/`sessionStorage`、`document.cookie`、IndexedDB，以及纯内存实现，叠加可选的实体（entity）、schema 校验、序列化（codec）扩展层。"
+                  "text": "浏览器端本地存储的统一契约实现：命名空间化的 `localStorageHost`/`sessionStorageHost`、`document.cookie`、IndexedDB，以及纯内存实现，叠加可选的实体（entity）、schema 校验、序列化（codec）扩展层。"
                 }
               ]
             },
@@ -12815,10 +12815,10 @@
                 {
                   "type": "list",
                   "items": [
-                    "`localStorage` / `sessionStorage`：命名空间化的同步 Web Storage 封装",
-                    "`cookies`：`document.cookie` 封装，带 scope 与可见性歧义处理",
-                    "`indexedDb`：唯一支持记录/字节/事务的浏览器后端",
-                    "`memoryStorage`：纯内存 L0+L1 实现，测试/SSR/降级用",
+                    "`localStorageHost` / `sessionStorageHost`：命名空间化的同步 Web Storage 封装",
+                    "`cookiesHost`：`document.cookie` 封装，带 scope 与可见性歧义处理",
+                    "`indexedDbHost`：唯一支持记录/字节/事务的浏览器后端",
+                    "`memoryStorageHost`：纯内存 L0+L1 实现，测试/SSR/降级用",
                     "契约与能力模块：`IKeyValueStore`/`IRecordStore`/`isRecordStore`/`asRecordStore`/命名空间编码",
                     "序列化（codec）模块：`jsonCodec`/`structuredCodec`/`binaryCodec`/`selectCodec`",
                     "Schema 模块：`passthrough`/`fromStandardSchema`/`runMigrations`",
@@ -12837,26 +12837,26 @@
               ]
             },
             {
-              "id": "localstorage-sessionstorage-模块",
-              "heading": "localStorage / sessionStorage 模块",
+              "id": "localstoragehost-sessionstoragehost-模块",
+              "heading": "localStorageHost / sessionStorageHost 模块",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { localStorage } from '@migaia/storage-web/local-storage'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'"
+                  "code": "import { localStorageHost } from '@migaia/storage-web/local-storage'\nimport { sessionStorageHost } from '@migaia/storage-web/session-storage'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`localStorage`｜5 秒上手："
+                  "text": "`localStorageHost`｜5 秒上手："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = localStorage({ namespace: 'settings' })\nawait store.set('theme', 'dark')\nawait store.get('theme') // 'dark'\nstore.sync.set('theme', 'light') // 同步 API，Web Storage 天然同步"
+                  "code": "const store = localStorageHost({ namespace: 'settings' })\nawait store.set('theme', 'dark')\nawait store.get('theme') // 'dark'\nstore.sync.set('theme', 'light') // 同步 API，Web Storage 天然同步"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`sessionStorage(options)` 用法完全一致，仅默认注入 `globalThis.sessionStorage`。"
+                  "text": "`sessionStorageHost(options)` 用法完全一致，仅默认注入 `globalThis.sessionStorage`。"
                 },
                 {
                   "type": "paragraph",
@@ -12867,12 +12867,12 @@
                   "items": [
                     "`namespace?: string` —— 默认 `'default'`；必须非空字符串，否则抛 `INVALID_CONFIG`。同命名空间内的 `keys()`/`clearValues()`/`clearAll()` 互相隔离。",
                     "`namespaceCodec?: INamespaceCodec` —— 默认 `lengthPrefixedNamespaceCodec`；决定命名空间如何编码进物理 key。",
-                    "`storage?: IWebStorageLike` —— 注入点，测试/非浏览器环境用；默认 `globalThis.localStorage`（或 `sessionStorage`）。"
+                    "`storage?: IWebStorageLike` —— 注入点，测试/非浏览器环境用；默认 `globalThis.localStorage`（或 `sessionStorageHost`）。"
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "构造期会真实写一次探测 key 再删除（`localStorage()`/`sessionStorage()` 都会），Safari 隐私模式下 `setItem` 抛错也能被探测到，失败时立即抛 `BACKEND_UNAVAILABLE`，而不是等到第一次业务写入才发现。"
+                  "text": "构造期会真实写一次探测 key 再删除（`localStorageHost()`/`sessionStorageHost()` 都会），Safari 隐私模式下 `setItem` 抛错也能被探测到，失败时立即抛 `BACKEND_UNAVAILABLE`，而不是等到第一次业务写入才发现。"
                 },
                 {
                   "type": "paragraph",
@@ -12881,27 +12881,27 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = localStorage({ storage: myFakeStorage }) // 测试环境注入"
+                  "code": "const store = localStorageHost({ storage: myFakeStorage }) // 测试环境注入"
                 }
               ]
             },
             {
-              "id": "cookies-模块",
-              "heading": "cookies 模块",
+              "id": "cookieshost-模块",
+              "heading": "cookiesHost 模块",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { cookies } from '@migaia/storage-web/cookies'"
+                  "code": "import { cookiesHost } from '@migaia/storage-web/cookiesHost'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`cookies`｜10 秒上手："
+                  "text": "`cookiesHost`｜10 秒上手："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const jar = cookies({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nawait jar.get('session') // 'abc123'\nawait jar.remove('session')"
+                  "code": "const jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nawait jar.get('session') // 'abc123'\nawait jar.remove('session')"
                 },
                 {
                   "type": "paragraph",
@@ -12932,22 +12932,22 @@
               ]
             },
             {
-              "id": "indexeddb-模块",
-              "heading": "indexedDb 模块",
+              "id": "indexeddbhost-模块",
+              "heading": "indexedDbHost 模块",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { indexedDb } from '@migaia/storage-web/indexed-db'"
+                  "code": "import { indexedDbHost } from '@migaia/storage-web/indexed-db'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`indexedDb`｜10 秒上手 —— 唯一原生支持字节/记录/事务/游标迭代的浏览器后端："
+                  "text": "`indexedDbHost`｜10 秒上手 —— 唯一原生支持字节/记录/事务/游标迭代的浏览器后端："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' })\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\nawait db.getRecord('ada') // { id: 'ada', name: 'Ada' }\nfor await (const [key, value] of db.iterateRecords()) console.log(key, value)"
+                  "code": "const db = indexedDbHost<{ id: string; name: string }>({ dbName: 'app-data' })\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\nawait db.getRecord('ada') // { id: 'ada', name: 'Ada' }\nfor await (const [key, value] of db.iterateRecords()) console.log(key, value)"
                 },
                 {
                   "type": "paragraph",
@@ -12976,22 +12976,22 @@
               ]
             },
             {
-              "id": "memorystorage-模块",
-              "heading": "memoryStorage 模块",
+              "id": "memorystoragehost-模块",
+              "heading": "memoryStorageHost 模块",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { memoryStorage } from '@migaia/storage-web/memory'"
+                  "code": "import { memoryStorageHost } from '@migaia/storage-web/memory'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`memoryStorage`｜3 秒上手："
+                  "text": "`memoryStorageHost`｜3 秒上手："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = memoryStorage<{ id: string }>()\nawait store.putRecord({ id: '1' }, '1')"
+                  "code": "const store = memoryStorageHost<{ id: string }>()\nawait store.putRecord({ id: '1' }, '1')"
                 },
                 {
                   "type": "paragraph",
@@ -13015,7 +13015,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = indexedDb()\nif (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')\nconst records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)"
+                  "code": "const store = indexedDbHost()\nif (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')\nconst records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)"
                 },
                 {
                   "type": "paragraph",
@@ -13036,7 +13036,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`lengthPrefixedNamespaceCodec`｜3 秒上手 —— 默认物理 key 编码器，`localStorage`/`sessionStorage`/`cookies` 的 `namespaceCodec` 默认值："
+                  "text": "`lengthPrefixedNamespaceCodec`｜3 秒上手 —— 默认物理 key 编码器，`localStorageHost`/`sessionStorageHost`/`cookiesHost` 的 `namespaceCodec` 默认值："
                 },
                 {
                   "type": "code",
@@ -13120,7 +13120,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]]),\n  bytes: new Uint8Array([1, 2, 3])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot) // === snapshot：codec 不复制\nawait db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留\n\nawait db.dispose()"
+                  "code": "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDbHost({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]]),\n  bytes: new Uint8Array([1, 2, 3])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot) // === snapshot：codec 不复制\nawait db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留\n\nawait db.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -13220,7 +13220,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IPreference = { id: string; theme: 'light' | 'dark' }\n\nconst definition = defineEntity<IPreference>({\n  name: 'preferences',\n  key: 'id',\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }\n})\n\nconst preferences = definition.connect(indexedDb({ dbName: 'app-data' }))\nawait preferences.put({ id: 'appearance', theme: 'dark' })\nawait preferences.get('appearance') // { id: 'appearance', theme: 'dark' }"
+                  "code": "type IPreference = { id: string; theme: 'light' | 'dark' }\n\nconst definition = defineEntity<IPreference>({\n  name: 'preferences',\n  key: 'id',\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }\n})\n\nconst preferences = definition.connect(indexedDbHost({ dbName: 'app-data' }))\nawait preferences.put({ id: 'appearance', theme: 'dark' })\nawait preferences.get('appearance') // { id: 'appearance', theme: 'dark' }"
                 },
                 {
                   "type": "paragraph",
@@ -13253,7 +13253,7 @@
                     "`remove(id, ctx?)`：删除主键对应记录（同时清理历史存储形态遗留的键）。",
                     "`list(options?, ctx?)` / `stream(options?, ctx?)`：`options: IListOptions<TDomain>` 为 `{ range?, limit?, orderBy?, onInvalid? }`；`onInvalid` 取 `'skip'`（默认）、`'throw'`，或 `(issue) => 'skip' | 'throw'` 处理器，`issue.stage` 取 `'decode' | 'migrate' | 'validate'`。KV-only 后端会全表扫描并触发一次诊断；结构化后端按实体前缀 range 扫描。",
                     "`findBy(index, key, ctx?)` / `findManyBy(index, range?, options?, ctx?)` / `streamBy(...)`：按声明的二级索引查询；IndexedDB 使用原生 sidecar，其他后端走语义等价 fallback。unique、compound、multi-entry 和 selector projection 都由同一 entity 定义约束。",
-                    "`migrate(options?, ctx?)`：`options: IMigrateOptions<TDomain>` 为 `{ batchSize?(默认 100，正安全整数), onInvalid? }`；返回 `{ scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }`。IndexedDB 可用 `metadata` 通道持久化检查点、跨调用断点续跑；`memoryStorage`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复。",
+                    "`migrate(options?, ctx?)`：`options: IMigrateOptions<TDomain>` 为 `{ batchSize?(默认 100，正安全整数), onInvalid? }`；返回 `{ scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }`。IndexedDB 可用 `metadata` 通道持久化检查点、跨调用断点续跑；`memoryStorageHost`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复。",
                     "`batch(run, ctx?)`：仅结构化后端（有真正事务）支持；`run` 收到 `IEntityTransactionScope<TDomain>`（`get`/`put`/`remove`），KV-only 后端调用会抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`。"
                   ]
                 }
@@ -13336,7 +13336,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { z } from 'zod'\nimport { defineEntity } from '@migaia/storage-web/entity'\nimport { fromStandardSchema } from '@migaia/storage-web/schema'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst UserV2 = z.object({ id: z.string(), email: z.string(), verified: z.boolean() })\n\nconst users = defineEntity({\n  name: 'users',\n  key: 'id',\n  schema: fromStandardSchema(UserV2),\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as object), verified: false }) }\n}).connect(indexedDb({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', email: 'ada@example.com', verified: true })\nconst result = await users.migrate({ batchSize: 200, onInvalid: 'skip' })\nconsole.log(result.migrated, result.conflicted)"
+                  "code": "import { z } from 'zod'\nimport { defineEntity } from '@migaia/storage-web/entity'\nimport { fromStandardSchema } from '@migaia/storage-web/schema'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst UserV2 = z.object({ id: z.string(), email: z.string(), verified: z.boolean() })\n\nconst users = defineEntity({\n  name: 'users',\n  key: 'id',\n  schema: fromStandardSchema(UserV2),\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as object), verified: false }) }\n}).connect(indexedDbHost({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', email: 'ada@example.com', verified: true })\nconst result = await users.migrate({ batchSize: 200, onInvalid: 'skip' })\nconsole.log(result.migrated, result.conflicted)"
                 }
               ]
             },
@@ -13347,7 +13347,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookies } from '@migaia/storage-web/cookies'\nimport { memoryStorage } from '@migaia/storage-web/memory'\n\nconst primary = cookies({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorage()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookies 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorage 分支"
+                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookiesHost'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
                 }
               ]
             },
@@ -13358,7 +13358,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineEntity } from '@migaia/storage-web/entity'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { StorageError, StorageErrorCode } from '@migaia/storage-web'\n\nconst orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(\n  indexedDb()\n)\n\nconst applyBatch = async (items: Array<{ id: string; total: number }>) => {\n  try {\n    await orders.batch(async (tx) => {\n      for (const item of items) await tx.put(item)\n    })\n  } catch (error) {\n    if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {\n      await applyBatch(items) // 并发冲突：重读后重试整个回调\n    } else {\n      throw error\n    }\n  }\n}"
+                  "code": "import { defineEntity } from '@migaia/storage-web/entity'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { StorageError, StorageErrorCode } from '@migaia/storage-web'\n\nconst orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(\n  indexedDbHost()\n)\n\nconst applyBatch = async (items: Array<{ id: string; total: number }>) => {\n  try {\n    await orders.batch(async (tx) => {\n      for (const item of items) await tx.put(item)\n    })\n  } catch (error) {\n    if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {\n      await applyBatch(items) // 并发冲突：重读后重试整个回调\n    } else {\n      throw error\n    }\n  }\n}"
                 }
               ]
             },
@@ -13369,7 +13369,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { memoryStorage } from '@migaia/storage-web/memory'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst textOnly = sessionStorage()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>\n  console.warn('[codec fallback]', message)\n)\nconst encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorage()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
+                  "code": "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst textOnly = sessionStorageHost()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>\n  console.warn('[codec fallback]', message)\n)\nconst encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorageHost()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
                 }
               ]
             },
@@ -13380,7 +13380,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ConflictPolicy } from '@migaia/storage-contract'\nimport { localStorage } from '@migaia/storage-web/local-storage'\n\nconst teamA = localStorage({ namespace: 'team-a' })\nconst teamB = localStorage({ namespace: 'team-b' })\nawait teamA.set('config', '{}')\nawait teamB.set('config', '{}') // 不同命名空间，互不冲突\n\nawait teamA.clearValues() // 只清 team-a 命名空间下的键，team-b 不受影响"
+                  "code": "import { ConflictPolicy } from '@migaia/storage-contract'\nimport { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst teamA = localStorageHost({ namespace: 'team-a' })\nconst teamB = localStorageHost({ namespace: 'team-b' })\nawait teamA.set('config', '{}')\nawait teamB.set('config', '{}') // 不同命名空间，互不冲突\n\nawait teamA.clearValues() // 只清 team-a 命名空间下的键，team-b 不受影响"
                 }
               ]
             },
@@ -13420,10 +13420,10 @@
                 {
                   "type": "list",
                   "items": [
-                    "`localStorage` / `sessionStorage` 模块",
-                    "`cookies` 模块",
-                    "`indexedDb` 模块",
-                    "`memoryStorage` 模块",
+                    "`localStorageHost` / `sessionStorageHost` 模块",
+                    "`cookiesHost` 模块",
+                    "`indexedDbHost` 模块",
+                    "`memoryStorageHost` 模块",
                     "契约与能力模块",
                     "序列化（codec）模块",
                     "Schema 模块",
@@ -13442,7 +13442,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// 按后端与扩展点分别导入，避免把 DOM/IDB 类型拉入无关消费者\nimport { localStorage } from '@migaia/storage-web/local-storage'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { memoryStorage } from '@migaia/storage-web/memory'\nimport { defineEntity } from '@migaia/storage-web/entity'"
+                  "code": "// 按后端与扩展点分别导入，避免把 DOM/IDB 类型拉入无关消费者\nimport { localStorageHost } from '@migaia/storage-web/local-storage'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { defineEntity } from '@migaia/storage-web/entity'"
                 },
                 {
                   "type": "paragraph",
@@ -13466,8 +13466,8 @@
               ]
             },
             {
-              "id": "localstorage-sessionstorage-模块",
-              "heading": "localStorage / sessionStorage 模块",
+              "id": "localstoragehost-sessionstoragehost-模块",
+              "heading": "localStorageHost / sessionStorageHost 模块",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -13476,13 +13476,13 @@
               ]
             },
             {
-              "id": "localstorage",
-              "heading": "localStorage",
+              "id": "localstoragehost",
+              "heading": "localStorageHost",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function localStorage(options?: ILocalStorageOptions): ISyncCapableStore<IKeyValueStore>\n\ntype ILocalStorageOptions = IWebStorageOptions & {\n  readonly storage?: IWebStorageLike\n}\ntype IWebStorageOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n}"
+                  "code": "function localStorageHost(options?: ILocalStorageOptions): ISyncCapableStore<IKeyValueStore>\n\ntype ILocalStorageOptions = IWebStorageOptions & {\n  readonly storage?: IWebStorageLike\n}\ntype IWebStorageOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n}"
                 },
                 {
                   "type": "list",
@@ -13503,7 +13503,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "构造期探测：`createWebStorageBackend` 在返回 store 前，会用 `probeWebStorage` 真实写一次探测 key（`namespacedKey(namespace, 'probe', .)`）再删除/还原。Safari 隐私模式下 `localStorage` 对象存在但 `setItem` 抛异常（旧版本 `SecurityError`，新版本 quota=0 的 `QuotaExceededError`），只有真实写入才能可靠探测到这种情况；探测失败立即抛 `StorageError(BACKEND_UNAVAILABLE)`，而不是等到第一次业务写入才发现。若探测 key 原本已存在非空值，探测会退避到一个带时间戳/随机数后缀的临时 key，避免覆盖调用方数据。"
+                  "text": "构造期探测：`createWebStorageBackend` 在返回 store 前，会用 `probeWebStorage` 真实写一次探测 key（`namespacedKey(namespace, 'probe', .)`）再删除/还原。Safari 隐私模式下 `localStorageHost` 对象存在但 `setItem` 抛异常（旧版本 `SecurityError`，新版本 quota=0 的 `QuotaExceededError`），只有真实写入才能可靠探测到这种情况；探测失败立即抛 `StorageError(BACKEND_UNAVAILABLE)`，而不是等到第一次业务写入才发现。若探测 key 原本已存在非空值，探测会退避到一个带时间戳/随机数后缀的临时 key，避免覆盖调用方数据。"
                 },
                 {
                   "type": "paragraph",
@@ -13556,42 +13556,42 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { localStorage } from '@migaia/storage-web/local-storage'\n\nconst store = localStorage({ namespace: 'settings' })\nawait store.set('theme', 'dark')\nconsole.log(await store.get('theme')) // 'dark'\nstore.sync.set('theme', 'light') // 同步 API，Web Storage 天然同步\nconsole.log(store.sync.get('theme')) // 'light'\nawait store.remove('theme')\nconsole.log(await store.has('theme')) // false\nawait store.dispose()"
+                  "code": "import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst store = localStorageHost({ namespace: 'settings' })\nawait store.set('theme', 'dark')\nconsole.log(await store.get('theme')) // 'dark'\nstore.sync.set('theme', 'light') // 同步 API，Web Storage 天然同步\nconsole.log(store.sync.get('theme')) // 'light'\nawait store.remove('theme')\nconsole.log(await store.has('theme')) // false\nawait store.dispose()"
                 }
               ]
             },
             {
-              "id": "sessionstorage",
-              "heading": "sessionStorage",
+              "id": "sessionstoragehost",
+              "heading": "sessionStorageHost",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function sessionStorage(options?: ISessionStorageOptions): ISyncCapableStore<IKeyValueStore>\n\ntype ISessionStorageOptions = IWebStorageOptions & {\n  readonly storage?: IWebStorageLike\n}"
+                  "code": "function sessionStorageHost(options?: ISessionStorageOptions): ISyncCapableStore<IKeyValueStore>\n\ntype ISessionStorageOptions = IWebStorageOptions & {\n  readonly storage?: IWebStorageLike\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "选项与行为与 `localStorage` 完全一致，唯一区别是默认注入 `globalThis.sessionStorage` 而非 `globalThis.localStorage`；`backend` 字段为 `'session'`。"
+                  "text": "选项与行为与 `localStorageHost` 完全一致，唯一区别是默认注入 `globalThis.sessionStorage` 而非 `globalThis.localStorage`；`backend` 字段为 `'session'`。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst store = sessionStorage({ storage: myFakeStorage }) // 测试环境注入\nawait store.set('draft', JSON.stringify({ step: 1 }))"
+                  "code": "import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst store = sessionStorageHost({ storage: myFakeStorage }) // 测试环境注入\nawait store.set('draft', JSON.stringify({ step: 1 }))"
                 }
               ]
             },
             {
-              "id": "cookies-模块",
-              "heading": "cookies 模块",
+              "id": "cookieshost-模块",
+              "heading": "cookiesHost 模块",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorage`）。"
+                  "text": "源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorageHost`）。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function cookies(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>\n\ntype ICookiesOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n  readonly scope?: ICookieScope\n  readonly document?: ICookieDocument // { cookie: string }\n}\n\ntype ICookieScope = {\n  readonly path?: string\n  readonly domain?: string\n  readonly sameSite?: 'strict' | 'lax' | 'none'\n  readonly secure?: boolean\n  readonly partitioned?: boolean\n}"
+                  "code": "function cookiesHost(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>\n\ntype ICookiesOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n  readonly scope?: ICookieScope\n  readonly document?: ICookieDocument // { cookie: string }\n}\n\ntype ICookieScope = {\n  readonly path?: string\n  readonly domain?: string\n  readonly sameSite?: 'strict' | 'lax' | 'none'\n  readonly secure?: boolean\n  readonly partitioned?: boolean\n}"
                 }
               ]
             },
@@ -13670,13 +13670,13 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { cookies } from '@migaia/storage-web/cookies'\n\nconst jar = cookies({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nconsole.log(await jar.get('session')) // 'abc123'\nawait jar.remove('session')\nconsole.log(await jar.get('session')) // null"
+                  "code": "import { cookiesHost } from '@migaia/storage-web/cookiesHost'\n\nconst jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nconsole.log(await jar.get('session')) // 'abc123'\nawait jar.remove('session')\nconsole.log(await jar.get('session')) // null"
                 }
               ]
             },
             {
-              "id": "indexeddb-模块",
-              "heading": "indexedDb 模块",
+              "id": "indexeddbhost-模块",
+              "heading": "indexedDbHost 模块",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -13685,7 +13685,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function indexedDb<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue>\n\ntype IIndexedDbOptions = {\n  readonly dbName?: string\n  readonly kvStoreName?: string\n  readonly bytesStoreName?: string\n  readonly recordsStoreName?: string\n  readonly cleanupLegacyRecords?: boolean\n  readonly factory?: IDBFactory\n  readonly keyRange?: typeof IDBKeyRange\n}"
+                  "code": "function indexedDbHost<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue>\n\ntype IIndexedDbOptions = {\n  readonly dbName?: string\n  readonly kvStoreName?: string\n  readonly bytesStoreName?: string\n  readonly recordsStoreName?: string\n  readonly cleanupLegacyRecords?: boolean\n  readonly factory?: IDBFactory\n  readonly keyRange?: typeof IDBKeyRange\n}"
                 }
               ]
             },
@@ -13817,7 +13817,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' })\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\nconsole.log(await db.getRecord('ada')) // { id: 'ada', name: 'Ada' }\nfor await (const [key, value] of db.iterateRecords()) console.log(key, value)\nawait db.dispose()"
+                  "code": "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<{ id: string; name: string }>({ dbName: 'app-data' })\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\nconsole.log(await db.getRecord('ada')) // { id: 'ada', name: 'Ada' }\nfor await (const [key, value] of db.iterateRecords()) console.log(key, value)\nawait db.dispose()"
                 }
               ]
             },
@@ -13871,13 +13871,13 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只有 `indexedDb` 后端提供（`IRecordStore.metadata` 是可选字段）。读写 `meta` object store，供 `repository.migrate()` 持久化可恢复的迁移检查点使用（见Entity 模块）。`memoryStorage`/KV-only 后端没有这个通道，因此其 `migrate()` 无法跨调用恢复，只能在单次调用内完整扫描。"
+                  "text": "只有 `indexedDbHost` 后端提供（`IRecordStore.metadata` 是可选字段）。读写 `meta` object store，供 `repository.migrate()` 持久化可恢复的迁移检查点使用（见Entity 模块）。`memoryStorageHost`/KV-only 后端没有这个通道，因此其 `migrate()` 无法跨调用恢复，只能在单次调用内完整扫描。"
                 }
               ]
             },
             {
-              "id": "memorystorage-模块",
-              "heading": "memoryStorage 模块",
+              "id": "memorystoragehost-模块",
+              "heading": "memoryStorageHost 模块",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -13886,7 +13886,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function memoryStorage<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>>"
+                  "code": "function memoryStorageHost<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>>"
                 },
                 {
                   "type": "paragraph",
@@ -13913,7 +13913,7 @@
                   "type": "list",
                   "items": [
                     "`sync` 通道只暴露 L0（`get`/`set`/`remove`/`has`/`keys`/`clearValues`）；异步 L0/L1/事务方法是完整实现，不是对 `sync` 的包装。",
-                    "跨通道冲突检测（value/bytes/record 共享同一逻辑 key）与 `indexedDb` 遵循相同的 `planChannelWrite` 规则（见契约与能力模块）。",
+                    "跨通道冲突检测（value/bytes/record 共享同一逻辑 key）与 `indexedDbHost` 遵循相同的 `planChannelWrite` 规则（见契约与能力模块）。",
                     "`transaction(run, ctx?)`：与 IndexedDB 相同的乐观并发模型——草稿隔离、提交前比对 `recordEpoch`（对应 `clearAll`）与每个访问过的 key 的 revision；不一致抛 `TRANSACTION_CONFLICT`。与旧实现的关键差异：草稿在提交前完全不触碰真实的 `documents` Map；早期实现直接在真实 Map 上写入、失败时用开头拍的快照整体覆盖回去——如果事务执行期间（`run(scope)` 内任意一次 `await` 之间）有其他并发的 `putRecord` 或另一个事务成功提交，那次快照恢复会把那次无关的成功写入一起抹掉。当前实现下失败只需丢弃草稿，真实数据从未被动过；成功时的合并循环是纯同步的（没有 `await`），不会被其他调用交错。",
                     "`iterateRecords(range?, ctx?)`：对当前全部记录按 `compareStorageKeys` 排序后再按 range 过滤 yield；不分页（内存数据集通常不需要）。",
                     "`dispose()`：置位 `disposed` 并清空全部内部 Map（`kv`/`bytes`/`documents`）。",
@@ -13927,7 +13927,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { memoryStorage } from '@migaia/storage-web/memory'\n\nconst store = memoryStorage<{ id: string }>()\nawait store.putRecord({ id: '1' }, '1')\nconsole.log(await store.getRecord('1')) // { id: '1' }\nawait store.transaction(async (tx) => {\n  await tx.put({ id: '2' }, '2')\n})"
+                  "code": "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost<{ id: string }>()\nawait store.putRecord({ id: '1' }, '1')\nconsole.log(await store.getRecord('1')) // { id: '1' }\nawait store.transaction(async (tx) => {\n  await tx.put({ id: '2' }, '2')\n})"
                 }
               ]
             },
@@ -13959,7 +13959,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst store = indexedDb()\nif (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')\nconst records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)"
+                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst store = indexedDbHost()\nif (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')\nconst records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)"
                 }
               ]
             },
@@ -13999,7 +13999,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "默认物理 key 编码器（`localStorage`/`sessionStorage`/`cookies` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。"
+                  "text": "默认物理 key 编码器（`localStorageHost`/`sessionStorageHost`/`cookiesHost` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。"
                 },
                 {
                   "type": "code",
@@ -14031,7 +14031,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ITransactionScope<TValue>`（`indexedDb`/`memoryStorage` 的 `transaction()` 回调参数类型，详见各自章节）："
+                  "text": "`ITransactionScope<TValue>`（`indexedDbHost`/`memoryStorageHost` 的 `transaction()` 回调参数类型，详见各自章节）："
                 },
                 {
                   "type": "code",
@@ -14150,7 +14150,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'\nimport { memoryStorage } from '@migaia/storage-web/memory'\n\nconst textOnly = sessionStorage()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (msg) => console.warn(msg))\nawait selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorage()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
+                  "code": "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { sessionStorageHost } from '@migaia/storage-web/session-storage'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst textOnly = sessionStorageHost()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (msg) => console.warn(msg))\nawait selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorageHost()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
                 }
               ]
             },
@@ -14290,7 +14290,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IPreference = { id: string; theme: 'light' | 'dark' }\n\nconst definition = defineEntity<IPreference>({\n  name: 'preferences',\n  key: 'id',\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }\n})\n\nconst preferences = definition.connect(indexedDb({ dbName: 'app-data' }))\nawait preferences.put({ id: 'appearance', theme: 'dark' })\nconsole.log(await preferences.get('appearance')) // { id: 'appearance', theme: 'dark' }"
+                  "code": "type IPreference = { id: string; theme: 'light' | 'dark' }\n\nconst definition = defineEntity<IPreference>({\n  name: 'preferences',\n  key: 'id',\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }\n})\n\nconst preferences = definition.connect(indexedDbHost({ dbName: 'app-data' }))\nawait preferences.put({ id: 'appearance', theme: 'dark' })\nconsole.log(await preferences.get('appearance')) // { id: 'appearance', theme: 'dark' }"
                 }
               ]
             },
@@ -14381,7 +14381,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "断点续跑：仅 IndexedDB 提供 `metadata` 通道，可在 `` `repository:${name}:migration` `` key 下持久化检查点（`status`/`phase`/`scanned`/`migrated`/... 等全部计数器 + `lastPhysicalKey`），跨调用恢复——上次迁移中途失败或被取消，下次调用 `migrate()` 会从检查点继续，而不是从头重新扫描。检查点是否可复用取决于一个“迁移指纹”（entity 名、版本、主键属性名、schema 名、codec 名、迁移函数版本号集合的拼接）是否与本次调用一致，指纹不匹配视为过期检查点，从头开始。`memoryStorage`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复，每次调用都从头扫描。",
+                    "断点续跑：仅 IndexedDB 提供 `metadata` 通道，可在 `` `repository:${name}:migration` `` key 下持久化检查点（`status`/`phase`/`scanned`/`migrated`/... 等全部计数器 + `lastPhysicalKey`），跨调用恢复——上次迁移中途失败或被取消，下次调用 `migrate()` 会从检查点继续，而不是从头重新扫描。检查点是否可复用取决于一个“迁移指纹”（entity 名、版本、主键属性名、schema 名、codec 名、迁移函数版本号集合的拼接）是否与本次调用一致，指纹不匹配视为过期检查点，从头开始。`memoryStorageHost`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复，每次调用都从头扫描。",
                     "批量提交与冲突重试（结构化后端）：以 `batchSize` 条记录为一批，在一个 `transaction` 内批量迁移；若该批次因 `TRANSACTION_CONFLICT` 整体失败，会退化为逐条在独立事务中重试——重试时会重新检查目标位置是否已被并发写入覆盖为更高版本（此时计入 `alreadyCurrent` 而非重复迁移），仍然冲突的记录计入 `conflicted`（不抛错，允许调用方后续再次调用 `migrate()` 补齐）。",
                     "记录解码/迁移/校验失败时按 `onInvalid` 策略处理，逻辑与 `list`/`stream` 一致（`skip` 计入 `skipped`，`throw` 直接抛出对应错误码并中断整个 `migrate()` 调用）。"
                   ]
@@ -14404,12 +14404,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "仅结构化后端（有真正事务）支持；`run` 收到的 `scope` 是对底层 `ITransactionScope` 的封装，内部替调用方完成 envelope 编解码与物理 key 编排。KV-only 后端（local/session/cookie）调用 `batch` 会抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`——这些后端没有原生事务，不做“伪事务”模拟以免给出错误的原子性假象。`scope` 内的读写共享同一份乐观并发检测（见 IndexedDB/memoryStorage 章节的事务语义），整个回调作为一个原子单元提交，冲突时抛 `TRANSACTION_CONFLICT`。"
+                  "text": "仅结构化后端（有真正事务）支持；`run` 收到的 `scope` 是对底层 `ITransactionScope` 的封装，内部替调用方完成 envelope 编解码与物理 key 编排。KV-only 后端（local/session/cookie）调用 `batch` 会抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`——这些后端没有原生事务，不做“伪事务”模拟以免给出错误的原子性假象。`scope` 内的读写共享同一份乐观并发检测（见 IndexedDB/memoryStorageHost 章节的事务语义），整个回调作为一个原子单元提交，冲突时抛 `TRANSACTION_CONFLICT`。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(\n  indexedDb()\n)\n\nconst applyBatch = async (items: Array<{ id: string; total: number }>): Promise<void> => {\n  try {\n    await orders.batch(async (tx) => {\n      for (const item of items) await tx.put(item)\n    })\n  } catch (error) {\n    if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {\n      await applyBatch(items) // 并发冲突：重读后重试整个回调\n    } else {\n      throw error\n    }\n  }\n}"
+                  "code": "const orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(\n  indexedDbHost()\n)\n\nconst applyBatch = async (items: Array<{ id: string; total: number }>): Promise<void> => {\n  try {\n    await orders.batch(async (tx) => {\n      for (const item of items) await tx.put(item)\n    })\n  } catch (error) {\n    if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {\n      await applyBatch(items) // 并发冲突：重读后重试整个回调\n    } else {\n      throw error\n    }\n  }\n}"
                 }
               ]
             },
@@ -14424,7 +14424,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IUser = {\n  id: string\n  email: string\n  profile: { city: string }\n  tags: readonly string[]\n}\n\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: {\n    byEmail: { path: 'email', unique: true },\n    byCityAndEmail: { paths: ['profile.city', 'email'] },\n    byTag: { path: 'tags', multiEntry: true },\n    byNormalizedEmail: {\n      revision: 1,\n      unique: true,\n      select: (user) => ({ kind: 'single', key: user.email.toLowerCase() })\n    }\n  }\n}).connect(indexedDb({ dbName: 'app-data' }))\n\nconst ada = await users.findBy('byEmail', 'ada@example.com')\nconst london = await users.findManyBy('byCityAndEmail', {\n  lower: ['London', ''],\n  upper: ['London', '\\uffff']\n})\nfor await (const user of users.streamBy('byTag', { lower: 'compiler', upper: 'compiler' })) {\n  console.log(user.id)\n}"
+                  "code": "type IUser = {\n  id: string\n  email: string\n  profile: { city: string }\n  tags: readonly string[]\n}\n\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: {\n    byEmail: { path: 'email', unique: true },\n    byCityAndEmail: { paths: ['profile.city', 'email'] },\n    byTag: { path: 'tags', multiEntry: true },\n    byNormalizedEmail: {\n      revision: 1,\n      unique: true,\n      select: (user) => ({ kind: 'single', key: user.email.toLowerCase() })\n    }\n  }\n}).connect(indexedDbHost({ dbName: 'app-data' }))\n\nconst ada = await users.findBy('byEmail', 'ada@example.com')\nconst london = await users.findManyBy('byCityAndEmail', {\n  lower: ['London', ''],\n  upper: ['London', '\\uffff']\n})\nfor await (const user of users.streamBy('byTag', { lower: 'compiler', upper: 'compiler' })) {\n  console.log(user.id)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -14464,7 +14464,7 @@
                     ["`plugins/memory`", "`memoryBackendPlugin`", "`memory`"],
                     ["`plugins/local-storage`", "`localStorageBackendPlugin`", "`local`"],
                     ["`plugins/session-storage`", "`sessionStorageBackendPlugin`", "`session`"],
-                    ["`plugins/cookies`", "`cookieBackendPlugin`", "`cookies`"],
+                    ["`plugins/cookiesHost`", "`cookieBackendPlugin`", "`cookiesHost`"],
                     ["`plugins/indexed-db`", "`indexedDbBackendPlugin`", "`indexed-db`"]
                   ]
                 },
@@ -14546,13 +14546,13 @@
                   "items": [
                     "memory：instance-local push。",
                     "local/session storage：浏览器事件或 polling 驱动的 eventual visibility，受文档/顶层上下文边界限制。",
-                    "cookies：只能观察 JS 可见 cookie，HttpOnly 永远不可见。",
+                    "cookiesHost：只能观察 JS 可见 cookie，HttpOnly 永远不可见。",
                     "IndexedDB：commit-after change feed 加同源协调；内部写入提交后才 invalidation，跨上下文为 eventual，不承诺捕获绕过本库的任意 raw writer。"
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`，但必须把 adapter 绑定到同一个 opaque backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。"
+                  "text": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。"
                 }
               ]
             },
@@ -14595,7 +14595,7 @@
                     [
                       "`unavailable`",
                       "`BACKEND_UNAVAILABLE`",
-                      "存储后端不可用：隐私模式探测失败、`localStorage`/IndexedDB/`document` 被禁用或缺失"
+                      "存储后端不可用：隐私模式探测失败、`localStorageHost`/IndexedDB/`document` 被禁用或缺失"
                     ],
                     ["`quotaExceeded`", "`QUOTA_EXCEEDED`", "写入命中浏览器配额上限"],
                     [
@@ -14816,7 +14816,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { z } from 'zod'\nimport { defineEntity } from '@migaia/storage-web/entity'\nimport { fromStandardSchema } from '@migaia/storage-web/schema'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst UserV2 = z.object({ id: z.string(), email: z.string(), verified: z.boolean() })\n\nconst users = defineEntity({\n  name: 'users',\n  key: 'id',\n  schema: fromStandardSchema(UserV2),\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as object), verified: false }) }\n}).connect(indexedDb({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', email: 'ada@example.com', verified: true })\nconst result = await users.migrate({ batchSize: 200, onInvalid: 'skip' })\nconsole.log(result.migrated, result.conflicted)"
+                  "code": "import { z } from 'zod'\nimport { defineEntity } from '@migaia/storage-web/entity'\nimport { fromStandardSchema } from '@migaia/storage-web/schema'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst UserV2 = z.object({ id: z.string(), email: z.string(), verified: z.boolean() })\n\nconst users = defineEntity({\n  name: 'users',\n  key: 'id',\n  schema: fromStandardSchema(UserV2),\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as object), verified: false }) }\n}).connect(indexedDbHost({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', email: 'ada@example.com', verified: true })\nconst result = await users.migrate({ batchSize: 200, onInvalid: 'skip' })\nconsole.log(result.migrated, result.conflicted)"
                 }
               ]
             },
@@ -14831,7 +14831,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { isStorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'\n\nconst db = indexedDb()\ntry {\n  await db.putRecord({ id: '1' }, '1', { timeoutMs: 50 })\n} catch (error) {\n  if (isStorageContractError(error) && error.code === StorageContractErrorCode.aborted) {\n    // 50ms 内未完成\n  }\n}"
+                  "code": "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { isStorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'\n\nconst db = indexedDbHost()\ntry {\n  await db.putRecord({ id: '1' }, '1', { timeoutMs: 50 })\n} catch (error) {\n  if (isStorageContractError(error) && error.code === StorageContractErrorCode.aborted) {\n    // 50ms 内未完成\n  }\n}"
                 }
               ]
             },
@@ -14842,7 +14842,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookies } from '@migaia/storage-web/cookies'\nimport { memoryStorage } from '@migaia/storage-web/memory'\n\nconst primary = cookies({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorage()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookies 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorage 分支"
+                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookiesHost'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
                 }
               ]
             },
@@ -14853,7 +14853,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ConflictPolicy } from '@migaia/storage-contract'\nimport { localStorage } from '@migaia/storage-web/local-storage'\n\nconst teamA = localStorage({ namespace: 'team-a' })\nconst teamB = localStorage({ namespace: 'team-b' })\nawait teamA.set('config', '{}')\nawait teamB.set('config', '{}') // 不同命名空间，互不冲突\n\nawait teamA.clearValues() // 只清 team-a 命名空间下的键，team-b 不受影响"
+                  "code": "import { ConflictPolicy } from '@migaia/storage-contract'\nimport { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst teamA = localStorageHost({ namespace: 'team-a' })\nconst teamB = localStorageHost({ namespace: 'team-b' })\nawait teamA.set('config', '{}')\nawait teamB.set('config', '{}') // 不同命名空间，互不冲突\n\nawait teamA.clearValues() // 只清 team-a 命名空间下的键，team-b 不受影响"
                 }
               ]
             },
@@ -14864,16 +14864,16 @@
                 {
                   "type": "list",
                   "items": [
-                    "`localStorage()`/`sessionStorage()`/`cookies()` 抛 `BACKEND_UNAVAILABLE`：符合预期——构造期做过真实写入探测（或读取 `document.cookie`）。Safari 隐私模式、Cookie 被完全禁用、非浏览器环境未注入 `storage`/`document` 都会命中；显式降级到 `memoryStorage()`，或提示用户开启存储权限。",
-                    "`cookies` 的 `get`/`set`/`keys` 抛 `COOKIE_SCOPE_AMBIGUOUS`：说明同一物理 cookie 名同时对多个 scope 可见（例如同名 cookie 分别用 `domain: 'a.example.com'` 和不设 `domain` 写过）。让每个 scope 下的 cookie 名唯一，或在构造期固定单一 scope 后不再产生歧义；库不会随意猜测该返回哪一个值。",
-                    "`cookies().set()` 抛 `WRITE_FAILED`：写入后回读发现值不可见——检查 `path`/`domain`/`sameSite`/`secure` 是否与当前页面 origin 匹配，以及浏览器隐私策略（第三方 cookie 拦截、ITP）是否拦截了这次写入。",
+                    "`localStorageHost()`/`sessionStorageHost()`/`cookiesHost()` 抛 `BACKEND_UNAVAILABLE`：符合预期——构造期做过真实写入探测（或读取 `document.cookie`）。Safari 隐私模式、Cookie 被完全禁用、非浏览器环境未注入 `storage`/`document` 都会命中；显式降级到 `memoryStorageHost()`，或提示用户开启存储权限。",
+                    "`cookiesHost` 的 `get`/`set`/`keys` 抛 `COOKIE_SCOPE_AMBIGUOUS`：说明同一物理 cookie 名同时对多个 scope 可见（例如同名 cookie 分别用 `domain: 'a.example.com'` 和不设 `domain` 写过）。让每个 scope 下的 cookie 名唯一，或在构造期固定单一 scope 后不再产生歧义；库不会随意猜测该返回哪一个值。",
+                    "`cookiesHost().set()` 抛 `WRITE_FAILED`：写入后回读发现值不可见——检查 `path`/`domain`/`sameSite`/`secure` 是否与当前页面 origin 匹配，以及浏览器隐私策略（第三方 cookie 拦截、ITP）是否拦截了这次写入。",
                     "`set(key, value)` 抛 `DUPLICATE_KEY`：同一逻辑 key 已经在 value/bytes/record 另一通道存在。要么换 key，要么显式传 `{ conflictPolicy: ConflictPolicy.replace }` 原子替换。",
-                    "`asRecordStore(store)` 抛 `UNSUPPORTED_CAPABILITY`：该 store 的 `capabilities.records`（或 `binary`/`transactions`/`iteration` 之一）为 `false`——先用 `isRecordStore(store)` 判断，或改用 `indexedDb()`/`memoryStorage()`。",
-                    "`repository.batch()` 抛 `UNSUPPORTED_CAPABILITY`：底层 store 是 KV-only 后端（local/session/cookie），没有原生事务；改用 `indexedDb()`/`memoryStorage()`，或改用逐条 `get`/`put`（自行处理并发）。",
+                    "`asRecordStore(store)` 抛 `UNSUPPORTED_CAPABILITY`：该 store 的 `capabilities.records`（或 `binary`/`transactions`/`iteration` 之一）为 `false`——先用 `isRecordStore(store)` 判断，或改用 `indexedDbHost()`/`memoryStorageHost()`。",
+                    "`repository.batch()` 抛 `UNSUPPORTED_CAPABILITY`：底层 store 是 KV-only 后端（local/session/cookie），没有原生事务；改用 `indexedDbHost()`/`memoryStorageHost()`，或改用逐条 `get`/`put`（自行处理并发）。",
                     "事务/`batch()`/`migrate()` 抛 `TRANSACTION_CONFLICT`：这是可重试的并发写冲突，不是数据损坏——重新读取最新状态后重试整个事务回调（`migrate()` 会自动逐条重试一次，仍冲突的记录计入 `conflicted`，可再次调用 `migrate()` 补齐）。",
                     "`defineEntity` 抛 `INVALID_CONFIG`（migration graph 相关）：`version > 1` 时 `migrations` 必须完整覆盖第 2 到 `version` 的每一步，不能有缺口——这与 `runMigrations()` 独立调用时“缺失即 no-op”的宽容策略不同。",
                     "`selectCodec`/`entity` 遇到 structured codec 抛 `UNSUPPORTED_CAPABILITY`：目标后端 `capabilities.records === false`（KV-only），structured clone 能力（Blob/Map/Set/循环引用）无法用 JSON 无损表达，库不做静默降级；改用 `jsonCodec` 并自行处理不可 JSON 化的字段，或换成结构化后端。",
-                    "二进制值在 KV-only 后端体积膨胀 33%：`selectCodec` 对 `binaryCodec` 在 text-only 后端上的必然行为（base64 编码），会经 `onDiagnostic` 报告一次；只有换成 IndexedDB/memoryStorage 才能避免。",
+                    "二进制值在 KV-only 后端体积膨胀 33%：`selectCodec` 对 `binaryCodec` 在 text-only 后端上的必然行为（base64 编码），会经 `onDiagnostic` 报告一次；只有换成 IndexedDB/memoryStorageHost 才能避免。",
                     "需要跨标签页刷新查询：不要直接消费宿主 `storage`/`BroadcastChannel` 事件；安装对应 `*Reactive` plugin 并使用 `liveQuery`。一致性以 `query.consistency.visibility` 为准：它是 eventual requery hint，不是跨设备复制或任意 raw writer 的强一致事件流。"
                   ]
                 },
@@ -30479,10 +30479,10 @@
         "./adapters/web-worker",
         "./adapters/window",
         "./client",
-        "./contract-endpoint",
         "./core",
         "./features/control",
         "./features/discovery",
+        "./features/one-way",
         "./features/outbound",
         "./features/provider",
         "./full",
@@ -30699,15 +30699,15 @@
                       "kernel 能力 + 所选 Feature 的根投影"
                     ],
                     [
-                      "自定义组合的 Feature token",
-                      "`@migaia/web-rpc/features/{outbound,provider,...}`",
-                      "由 token tuple 静态推导"
+                      "自定义原生 Feature/Middleware",
+                      "`defineFeature` / `defineMiddleware` from `@migaia/web-rpc`",
+                      "定义显式返回的 surface 决定 endpoint 投影"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "这些子路径不是兼容别名。它们是 tree-shaking 边界：例如 client 入口不会把 provider、discovery、control、chunk 的实现带入 retained graph；provider 只私下安装它必须依赖的 outbound 安全闭包。Feature 的依赖会自动安装，但依赖不会偷偷扩大根对象：只选择 `discovery()` 时，不会因为它内部依赖 outbound 就额外得到 `send()`。"
+                  "text": "这些子路径不是兼容别名。它们是 tree-shaking 边界：例如 client 入口不会把 provider、discovery、control、chunk 的实现带入 retained graph。原生 Feature 的依赖可以自动安装，但依赖不会偷偷扩大根对象：只有定义显式返回的 surface 会投影到 endpoint。"
                 }
               ]
             },
@@ -30767,40 +30767,26 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`middlewares` 现在只接受原生 `IWebRpcPlugin` 描述符（包含 `metadata` 与 Host install scope）。0.x 的 `IWebRpcMiddlewareContext`/`install(context)` 形状已移除；继续传入旧形状会在任何传输副作用前以 `INVALID_CONFIG` 拒绝。自定义插件应通过 `scope.getShared` 读取依赖，并通过 `scope.own` 注册清理。"
+                  "text": "`middlewares` 接受由 `defineMiddleware` 或首方 middleware 工厂创建的原生定义；它们与 Feature 一起作为同一个 PluginHost 批次安装，资源清理由 `core.own()` 归属。0.x 的 `IWebRpcMiddlewareContext`/`install(context)` 形状已移除；继续传入旧形状会在任何传输副作用前以 `INVALID_CONFIG` 拒绝。"
                 }
               ]
             },
             {
-              "id": "7-4-自定义-feature-组合",
-              "heading": "7.4 自定义 Feature 组合",
+              "id": "7-4-自定义原生-feature-与-middleware",
+              "heading": "7.4 自定义原生 Feature 与 Middleware",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Feature 从独立子路径导入；`createComposedEndpoint` 会解析依赖、在任何 transport 订阅前检查冲突，再通过一个 PluginHost batch 原子安装。安装失败会回滚已经取得的资源，原始错误保留在 `cause`/`AggregateError.errors` 链上。"
+                  "text": "用 `defineFeature` 和 `defineMiddleware` 定义扩展。二者会和首方能力一起进入同一个 PluginHost 原子安装批次：依赖检查发生在 transport 订阅前；失败会回滚已经取得的资源，原始错误保留在 `cause`/`AggregateError.errors` 链上。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\nimport { control } from '@migaia/web-rpc/features/control'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'probe',\n    transport,\n    middlewares: [connect({ transport }), ping()] as const\n  },\n  [outbound(), discovery(), control()] as const\n)\n\nawait endpoint.send('service', 'health', undefined)\nconst alive = await endpoint.ping('service')"
+                  "code": "import {\n  connect,\n  createFullEndpoint,\n  defineFeature,\n  defineMiddleware\n} from '@migaia/web-rpc'\n\nconst observed = defineFeature(() => ({ observe: () => 'ready' }))\nconst metrics = defineMiddleware('metrics', (core) => ({\n  install: () => {\n    core.own({}, () => console.log('metrics disposed'))\n    return {}\n  },\n  expose: () => ({ metricEndpointId: () => core.id })\n}))\n\nconst endpoint = await createFullEndpoint({\n  id: 'probe',\n  transport,\n  middlewares: [connect({ transport }), metrics] as const,\n  features: [observed] as const\n})\n\nendpoint.observe()\nendpoint.metricEndpointId()"
                 },
                 {
                   "type": "paragraph",
-                  "text": "官方 token："
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`outbound()`：`send` / `sendAll` / `dispatch` / `dispatchAll`。",
-                    "`provider()`：`provide`，并把 inseparable outbound closure 投影到根对象。",
-                    "`discovery()`：`connect` / `discovery`；内部依赖 outbound，但单独选择时不暴露发送方法。",
-                    "`control()`：ping/pong 控制面；公开 `ping` / `pingAll` 还要求 middleware tuple 包含 `ping()`。",
-                    "`framer()`：分片 framing，没有独立公开方法；具体限制来自 framing descriptor 配置。"
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`Feature` 和 layer descriptor 不是重复实现：前者决定运行时模块与公开 surface，后者只提供配置/capability。分片能力由 framing layer 负责，策略由 framer descriptor 决定。"
+                  "text": "`Feature` 选择业务根投影；`Middleware` 提供配置、协议或横切能力。不要恢复 endpoint token tuple、转换器或独立安装缓存来组合它们。"
                 }
               ]
             },
@@ -31438,11 +31424,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Feature 决定 endpoint 运行时安装哪些领域能力、根对象公开哪些方法。当前可组合 Feature 为 `outbound()`、`provider()`、`discovery()`、`control()`，分片由 framing layer 负责。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Feature 会自动安装其私有依赖，但依赖不会自动扩大根对象的公开 API。例如 `discovery()` 内部依赖 outbound，却只公开 `connect` 和 `discovery`；要在同一个 endpoint 上调用 `send()`，仍需显式选择 `outbound()`。"
+                  "text": "Feature 由 `defineFeature((core) => surface)` 定义，决定 endpoint 运行时安装哪些领域能力和根对象公开哪些方法。Feature 的私有依赖不会自动扩大根对象的公开 API；只有 Feature 明确返回的 surface 才会投影到 endpoint。"
                 }
               ]
             },
@@ -31452,11 +31434,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Middleware 是 PluginHost 管理的配置、协议和策略插件，例如 `connect()`、`contract()`、`timeout()`、`ping()`。它不负责选择 endpoint 根对象的业务表面。"
+                  "text": "Middleware 由 `defineMiddleware(name, (core) => descriptor)` 定义，是 PluginHost 管理的配置、协议和策略插件；首方 `connect()`、`contract()`、`timeout()`、`ping()`也使用同一安装归属。它不负责选择 endpoint 根对象的业务表面。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Feature 与 Middleware 必须分开理解：framing layer 选择分片帧处理能力，根入口导出的 `framer({.})` descriptor 配置分片策略；`features/control` 选择控制帧能力，middleware `ping()` 才让 `ping` / `pingAll` 出现在精确推导出的类型上。完整参考见 §3。"
+                  "text": "Feature 与 Middleware 必须分开理解：Feature 返回的 surface 才会投影为 endpoint 方法；Middleware 通过 `core.own()` 归属资源，并可通过 `expose()` 提供明确的横切方法。二者随同一个原生 PluginHost batch 安装和回滚，完整参考见 §3。"
                 }
               ]
             },
@@ -31504,7 +31486,7 @@
               "blocks": [
                 {
                   "type": "table",
-                  "headers": ["入口", "工厂/Token", "endpoint 根对象的公开能力", "适用场景"],
+                  "headers": ["入口", "工厂/定义", "endpoint 根对象的公开能力", "适用场景"],
                   "rows": [
                     [
                       "`@migaia/web-rpc`",
@@ -31533,14 +31515,14 @@
                     [
                       "`@migaia/web-rpc/core`",
                       "`createComposedEndpoint`",
-                      "kernel + 显式 Feature 的根投影",
+                      "kernel + 显式原生 Feature 的根投影",
                       "自定义最小能力集合"
                     ],
                     [
-                      "`@migaia/web-rpc/features/*`",
-                      "Feature token",
-                      "由所选 token 决定",
-                      "与 `/core` 配合"
+                      "`@migaia/web-rpc`",
+                      "`defineFeature` / `defineMiddleware`",
+                      "定义返回的 surface 决定",
+                      "原生扩展"
                     ],
                     [
                       "`@migaia/web-rpc/adapters/<transport>`",
@@ -31585,27 +31567,20 @@
               ]
             },
             {
-              "id": "2-3-自定义-feature-组合",
-              "heading": "2.3 自定义 Feature 组合",
+              "id": "2-3-自定义原生-feature-与-middleware",
+              "heading": "2.3 自定义原生 Feature 与 Middleware",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { connect, ping } from '@migaia/web-rpc'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'dashboard',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 2_000 })] as const\n  },\n  [outbound(), discovery(), control()] as const\n)\n\nawait endpoint.send('worker', 'refresh', undefined)\nconst alive = await endpoint.ping('worker')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "组合器遵守以下规则："
+                  "code": "import { connect, createFullEndpoint, defineFeature, defineMiddleware } from '@migaia/web-rpc'\n\nconst status = defineFeature(() => ({ status: () => 'ready' }))\nconst metrics = defineMiddleware('metrics', (core) => ({\n  install: () => {\n    core.own({}, () => console.log('metrics disposed'))\n    return {}\n  },\n  expose: () => ({ endpointId: () => core.id })\n}))\n\nconst endpoint = await createFullEndpoint({\n  id: 'dashboard',\n  transport,\n  middlewares: [connect({ transport }), metrics] as const,\n  features: [status] as const\n})\n\nendpoint.status()\nendpoint.endpointId()"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "Feature tuple 不能为空，重复 token 会以 `CAPABILITY_CONFLICT` 拒绝。",
-                    "Feature 的运行时依赖由组合器安装并去重；依赖是私有安装关系，不等于公开根投影。",
-                    "`provider()` 的公开闭包特意包含 outbound，因此选择 provider 后可以 `send()`；framing layer 的私有 outbound 依赖不会公开 `send()`。",
-                    "framing layer 不增加独立方法，只安装分片帧所有者；它与 `framer({...})` descriptor 一起使用。",
-                    "middleware tuple 使用 `as const`，TypeScript 才能精确推断手动发现模式和 `ping()` 带来的条件方法。",
-                    "构造是异步、原子的：任何 Feature 或 middleware 安装失败时，已安装项会逆序清理，原始失败保留在 `cause` / `AggregateError.errors` 链中。"
+                    "Feature 返回的 surface 决定公开根投影；私有依赖不扩大公开 API。",
+                    "Middleware 通过 `core.own()` 交给 Host 清理，并可通过 `expose()` 明确投影横切方法。",
+                    "构造是异步、原子的：任何 Feature 或 Middleware 安装失败时，已安装项会逆序清理，原始失败保留在 `cause` / `AggregateError.errors` 链中。"
                   ]
                 }
               ]
@@ -31625,7 +31600,7 @@
                     "`id`：整个通信拓扑里必须唯一。它出现在每一条消息的 `senderId` 字段里，但不是身份凭证——见 §11。",
                     "`targetIds`：只是\"我已知这些 id\"的预声明，不是必需的。自动发现模式下，第一次对未知 `targetId` 调用 `send`/`dispatch`/`ping` 会触发一次懒查询并缓存结果；`endpoint.discovery` 暴露的远端快照永远不包含 endpoint 自己。",
                     "`transport`：可以在工厂配置或 `connect({ transport })` 中提供；两处都提供时必须是同一个对象。没有可解析出的 transport、或出现冲突，会在订阅消息前以 `INVALID_CONFIG` 失败。",
-                    "中间件迁移：`middlewares` 只接受原生 `IWebRpcPlugin`（`metadata` + Host install scope）。旧版 `IWebRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义插件请使用 `scope.getShared` 与 `scope.own`。",
+                    "中间件迁移：`middlewares` 接受 `defineMiddleware` 或首方工厂返回的原生定义，并在同一个 PluginHost 批次中安装。旧版 `IWebRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义定义通过 `core.getShared()` 读取依赖，并用 `core.own()` 归属清理。",
                     "`provider`：等价于在 `createEndpoint` 返回前，对每一项调用一次 `endpoint.provide(method, fn)`；纯粹是\"少写几行\"的便利写法。",
                     "`replay`：出站请求/消息 id 会在一个有界窗口内保留，防止重放攻击复用同一个 id 让已完成的请求再跑一次 provider。普通请求的 id 在整个 TTL 内都不释放（哪怕响应已经收到）——这是有意为之，防止晚到的重复响应复活一个\"看起来还在等\"的旧请求；dispatch-only（单向通知）的 id 在发送结算后立即释放，因为它天生不会有响应需要防重放。默认容量 4096、TTL 310 秒；高频单向通知场景一般不需要调大，持续的双向请求量很大时可以按需调整。",
                     "`construction.signal` / `construction.timeoutMs`：构造 `createEndpoint()` 本身也是异步的（要跑完全部中间件的 `install()`），可以用这两个字段取消或限时。取消会 reject 构造过程，并且仍然会清理已经安装成功的中间件（不会留下半初始化的资源）。中间件的 `install(context)` 会收到同一个 `signal`，如果中间件自己的初始化工作是可取消的，应该监听它。"
@@ -32550,7 +32525,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：TypeScript 提示 `endpoint.ping` 不存在。 `ping` / `pingAll` 同时要求 full/control Feature 与 `ping()` middleware。`endpoint.connect` / `endpoint.discovery` 要求 discovery Feature；其中手动方法（`query` / `register` / .）还要求 middleware tuple 把 `discoveryMode: 'manual'` 保留为字面量。自定义组合与 middleware 数组建议写 `as const`，否则宽化后的联合类型只能给出保守表面。"
+                  "text": "Q：TypeScript 提示 `endpoint.ping` 不存在。 `ping` / `pingAll` 同时要求 full/control Feature 与 `ping()` middleware。`endpoint.connect` / `endpoint.discovery` 要求 discovery Feature；其中手动方法（`query` / `register` / .）还要求 `discoveryMode: 'manual'` 的原生 middleware 定义。自定义组合与 middleware 数组建议写 `as const`，否则宽化后的联合类型只能给出保守表面。"
                 },
                 {
                   "type": "paragraph",

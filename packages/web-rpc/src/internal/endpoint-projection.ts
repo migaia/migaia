@@ -7,8 +7,8 @@ export type IEndpointProjectionOptions = {
   readonly host: object
   readonly publicKeys: readonly string[]
   readonly exposedKeys: readonly string[]
-  readonly on: (...args: readonly unknown[]) => unknown
-  readonly hooks: unknown
+  readonly on?: (...args: readonly unknown[]) => unknown
+  readonly hooks?: unknown
   readonly hostDispose: () => Promise<void>
   readonly beforeDispose?: (endpoint: object) => void
 }
@@ -78,8 +78,8 @@ export function createEndpointProjection(
     }
     return hostPromise
   }
-  defineValue(target, 'on', (...args: readonly unknown[]) => options.on(...args))
-  defineValue(target, 'hooks', options.hooks)
+  if (options.on) defineValue(target, 'on', (...args: readonly unknown[]) => options.on!(...args))
+  if (options.hooks !== undefined) defineValue(target, 'hooks', options.hooks)
   defineValue(target, 'dispose', dispose)
   for (const key of exposedKeys) {
     const value = values.get(key)

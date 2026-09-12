@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createMemoryTransportPair } from '../../src/adapters/memory.js'
-import {
-  createComposedEndpoint,
-  type IWebRpcCoreConfig,
-  type IWebRpcKernelSurface
-} from '../../src/core.js'
-import { defineEndpointModule } from '../../src/internal/endpoint-modules.js'
+import { createFullEndpoint } from '../../src/full.js'
+import { defineFeature } from '../../src/feature.js'
+import { createComposedEndpoint, type IWebRpcCoreConfig } from '../../src/core.js'
 import { WebRpcErrorCode } from '../../src/errors.js'
 import { connect } from '../../src/middleware/connect.js'
 
@@ -27,88 +24,51 @@ function createConfig(onSubscribe: () => void): IWebRpcCoreConfig {
   }
 }
 
-/** Defines a test module with a recorded installer and optional object-reference dependency. */
-function moduleWith(
-  key: string,
-  install: () => Promise<{ readonly dispose: () => void }>,
-  requires: readonly (string | ReturnType<typeof defineEndpointModule>)[] = []
-) {
-  return defineEndpointModule<IWebRpcCoreConfig, IWebRpcKernelSurface>(
-    key,
-    async () => install(),
-    requires
-  )
-}
-
 describe('capability topology adapter', () => {
   it('WRC-C-T71 preserves transitive order while keeping one installer path', async () => {
     const installs: string[] = []
-    const provider = moduleWith('provider', async () => {
+    const provider = defineFeature(() => {
       installs.push('provider')
-      return { dispose: () => undefined }
+      return {}
     })
-    const dependent = moduleWith(
-      'dependent',
-      async () => {
+    const dependent = defineFeature(
+      (_core, dependencies) => {
+        void dependencies.provider
         installs.push('dependent')
-        return { dispose: () => undefined }
+        return {}
       },
-      [provider]
+      { provider }
     )
 
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => undefined),
-      [dependent]
-    )
+    const endpoint = await createFullEndpoint({
+      ...createConfig(() => undefined),
+      features: [dependent] as const
+    })
     expect(installs).toEqual(['provider', 'dependent'])
     await endpoint.dispose()
   })
 
-  it('WRC-C-T71 fails missing and cyclic topology before subscription or installation', async () => {
+  it('WRC-C-T71 rejects undefined native dependencies and retired arrays before installation', async () => {
     let subscriptions = 0
     let installs = 0
-    const missing = moduleWith(
-      'missing-dependent',
-      async () => {
-        installs += 1
-        return { dispose: () => undefined }
-      },
-      ['absent']
-    )
+    expect(() =>
+      defineFeature(
+        (_core, dependencies) => {
+          void dependencies.absent
+          installs += 1
+          return {}
+        },
+        { absent: undefined as never }
+      )
+    ).toThrow(TypeError)
+    /** Retired token arrays must reject before graph inspection, subscription, or installation. */
     await expect(
       createComposedEndpoint(
         createConfig(() => subscriptions++),
-        [missing]
+        [] as never
       )
     ).rejects.toMatchObject({
-      code: WebRpcErrorCode.invalidConfig,
-      cause: expect.any(TypeError)
-    })
-
-    const cycleA = moduleWith(
-      'cycle-a',
-      async () => {
-        installs += 1
-        return { dispose: () => undefined }
-      },
-      ['cycle-b']
-    )
-    const cycleB = moduleWith(
-      'cycle-b',
-      async () => {
-        installs += 1
-        return { dispose: () => undefined }
-      },
-      ['cycle-a']
-    )
-    await expect(
-      createComposedEndpoint(
-        createConfig(() => subscriptions++),
-        [cycleA, cycleB]
-      )
-    ).rejects.toMatchObject({
-      code: WebRpcErrorCode.invalidConfig,
-      cause: expect.any(TypeError)
+      code: WebRpcErrorCode.invalidConfig
     })
     expect(subscriptions).toBe(0)
     expect(installs).toBe(0)

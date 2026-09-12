@@ -342,10 +342,9 @@ describe('functional setupHost', () => {
           resolveCore = resolve
         }),
       plugins: [
-        definePlugin<{ readonly value: number }, Record<string, never>>(
-          'batch-pending',
-          () => new Promise<Record<string, never>>(() => {})
-        )
+        definePlugin<{ readonly value: number }, Record<string, never>>('batch-pending', () => ({
+          install: () => new Promise<Record<string, never>>(() => {})
+        }))
       ]
     })
     await Promise.resolve()
@@ -362,15 +361,19 @@ describe('functional setupHost', () => {
     let resolvePending!: (value: Record<string, never> | PromiseLike<Record<string, never>>) => void
     const pending = definePlugin<{ readonly value: number }, Record<string, never>>(
       'pending-install',
-      () =>
-        new Promise<Record<string, never>>((resolve) => {
-          resolvePending = resolve
-        })
+      () => ({
+        install: () =>
+          new Promise<Record<string, never>>((resolve) => {
+            resolvePending = resolve
+          })
+      })
     )
-    const later = definePlugin<{ readonly value: number }>('later-install', () => {
-      laterInstallCount += 1
-      return {}
-    })
+    const later = definePlugin<{ readonly value: number }>('later-install', () => ({
+      install: () => {
+        laterInstallCount += 1
+        return {}
+      }
+    }))
     const scheduler = createManualScheduler()
     const setup = setupHost<{ readonly value: number }, readonly [typeof pending, typeof later]>({
       host: {

@@ -64,6 +64,7 @@ import type {
   IAsyncPipelineStage,
   IGeneratorPipelineStage,
   IPluginConstraint,
+  IPluginConstraintTuple,
   IPluginHostCore,
   IPluginHostConfigFor,
   IPluginHostErrorCode,
@@ -459,7 +460,7 @@ export abstract class PluginHost<
   }
 
   /** Returns a fresh dynamic view over the currently committed registrations. */
-  getCurrentView(): IPluginHostDynamicView<this> {
+  getCurrentView(): IPluginHostDynamicView<this, TDomainCore, TValue> {
     this.#assertActive()
     return this.#createView() as IPluginHostDynamicView<this>
   }
@@ -715,11 +716,13 @@ export abstract class PluginHost<
     return this.#shared.get(key)?.value as T | undefined
   }
 
-  use<
-    const TPlugins extends readonly IPluginConstraint<
-      TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>
-    >[]
-  >(...plugins: TPlugins): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins]>> {
+  use<const TPlugins extends readonly IPluginConstraint<any>[]>(
+    ...plugins: TPlugins &
+      IPluginConstraintTuple<
+        TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>,
+        TPlugins
+      >
+  ): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins], TDomainCore, TValue>> {
     this.#assertActive()
     this.#assertMutationAllowed()
     const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
@@ -791,7 +794,7 @@ export abstract class PluginHost<
   /** Installs constructor-time plugins synchronously or throws before the host escapes. */
   protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(
     plugins: readonly IPluginConstraint<any>[]
-  ): IPluginHostView<this, TViewPlugins> {
+  ): IPluginHostView<this, TViewPlugins, TDomainCore, TValue> {
     this.#assertActive()
     this.#assertMutationAllowed()
     const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
@@ -838,7 +841,7 @@ export abstract class PluginHost<
     if (this.#registrations.get(registration.name) === registration)
       this.#registrations.delete(registration.name)
     registration.scope?.close()
-    registration.lifecycle = PluginHostRegistrationLifecycle.idle
+    registration.lifecycle = PluginHostRegistrationLifecycle.dispose
   }
 
   /** Rejects access through a stale view after any captured registration is revoked. */
@@ -851,7 +854,7 @@ export abstract class PluginHost<
   /** Materializes a null-prototype, frozen view over the current committed registrations. */
   #createView<TViewPlugins extends readonly IPluginConstraint<any>[]>(
     registrations: readonly IRegistration<TDomainCore, TValue>[] = [...this.#registrations.values()]
-  ): IPluginHostView<this, TViewPlugins> {
+  ): IPluginHostView<this, TViewPlugins, TDomainCore, TValue> {
     return createPluginHostPublication<this, TDomainCore, TValue, TViewPlugins>(registrations, {
       host: this,
       assertLive: (captured) => this.#assertViewLive(captured),

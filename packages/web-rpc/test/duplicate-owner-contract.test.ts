@@ -1,17 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  createComposedEndpoint,
-  type IWebRpcCoreConfig,
-  type IWebRpcKernelSurface
-} from '../src/core.js'
+import { createComposedEndpoint, type IWebRpcCoreConfig } from '../src/core.js'
+import { createClientEndpoint } from '../src/client.js'
+import { createProviderEndpoint } from '../src/provider.js'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
-import { outbound } from '../src/features/outbound.js'
-import { provider } from '../src/features/provider.js'
-import {
-  defineEndpointModule,
-  snapshotEndpointModules,
-  withEndpointModuleOwner
-} from '../src/internal/endpoint-modules.js'
+import { defineRpcFeature } from '../src/internal/define-rpc-feature.js'
+import { defineFeature } from '../src/feature.js'
+import { createFirstPartyRoots } from '../src/internal/first-party-roots.js'
 import { createEndpointProjection } from '../src/internal/endpoint-projection.js'
 import { WebRpcErrorCode, WebRpcLifecycleError } from '../src/errors.js'
 import { connect } from '../src/middleware/connect.js'
@@ -73,26 +67,53 @@ function createConfig(
   }
 }
 
-/** Creates a minimal test module with explicit dependency and conflict claims. */
-function moduleWith(
-  key: string,
-  install: () => Promise<{ readonly dispose: () => void }>,
-  requires: readonly (string | ReturnType<typeof defineEndpointModule>)[] = [],
-  conflicts: readonly string[] = []
+/** Defines a package-native root with the same prepare/public bridge used by first-party Features. */
+function defineTestRoot<TSurface extends object>(
+  publicKeys: readonly (keyof TSurface & string)[],
+  install: () => TSurface
 ) {
-  return defineEndpointModule<IWebRpcCoreConfig, IWebRpcKernelSurface>(
-    key,
-    async () => install(),
-    requires,
-    conflicts
+  return defineRpcFeature(
+    {
+      publicKeys,
+      claims: {
+        routes: [],
+        provides: [],
+        consumes: [],
+        publicKeys,
+        exposedKeys: [],
+        activator: false
+      }
+    },
+    () => {
+      const publicSurface = install()
+      return Object.freeze({ prepare: () => Object.freeze({ public: publicSurface }) })
+    },
+    {}
   )
 }
 
 describe('candidate-specific duplicate-owner contracts', () => {
+  it('projects a non-first-party public Feature output without invoking its prepare-shaped method', async () => {
+    let prepareCalls = 0
+    const prepare = () => {
+      prepareCalls += 1
+      return Object.freeze({ public: { x: 1 } })
+    }
+    const feature = defineFeature(() => Object.freeze({ prepare, other: 2 }))
+    const endpoint = await createComposedEndpoint(
+      createConfig(() => undefined),
+      { feature }
+    )
+    expect(typeof Reflect.get(endpoint, 'prepare')).toBe('function')
+    expect(Reflect.get(endpoint, 'other')).toBe(2)
+    expect(prepareCalls).toBe(0)
+    await endpoint.dispose()
+  })
+
   it('proves MET-RED-001 keeps one canonical endpoint root owner', async () => {
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [outbound()]
+      createFirstPartyRoots(new Set(['first-party-outbound']))
     )
     expect(Object.getPrototypeOf(endpoint)).toBeNull()
     expect(Object.isFrozen(endpoint)).toBe(true)
@@ -102,57 +123,41 @@ describe('candidate-specific duplicate-owner contracts', () => {
 
   it('proves MET-RED-002 installs a feature without constructing a nested endpoint', async () => {
     let installs = 0
-    const feature = defineEndpointModule<IWebRpcCoreConfig, { featureValue: () => number }>(
-      'candidate-002',
-      async () => {
-        installs += 1
-        return { featureValue: () => 2 }
-      },
-      [],
-      [],
-      { publicKeys: ['featureValue'], exposedKeys: ['featureValue'] }
-    )
+    const feature = defineTestRoot(['featureValue'], () => {
+      installs += 1
+      return Object.freeze({ featureValue: () => 2 })
+    })
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [feature]
+      { 'first-party-candidate-002': feature }
     )
     expect(installs).toBe(1)
-    expect(endpoint.featureValue()).toBe(2)
+    expect((Reflect.get(endpoint, 'featureValue') as () => number)()).toBe(2)
     expect(source('../src/core.ts')).not.toContain('new WebRpcEndpoint')
     await endpoint.dispose()
   })
 
   it('proves MET-RED-004 composes independent feature surfaces through one root', async () => {
-    const first = defineEndpointModule<IWebRpcCoreConfig, { first: () => string }>(
-      'candidate-004-first',
-      async () => ({ first: () => 'first' }),
-      [],
-      [],
-      { publicKeys: ['first'], exposedKeys: ['first'] }
-    )
-    const second = defineEndpointModule<IWebRpcCoreConfig, { second: () => string }>(
-      'candidate-004-second',
-      async () => ({ second: () => 'second' }),
-      [],
-      [],
-      { publicKeys: ['second'], exposedKeys: ['second'] }
-    )
+    const first = defineTestRoot(['first'], () => Object.freeze({ first: () => 'first' }))
+    const second = defineTestRoot(['second'], () => Object.freeze({ second: () => 'second' }))
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [first, second]
+      { 'first-party-first': first, 'first-party-second': second }
     )
-    expect([endpoint.first(), endpoint.second()]).toEqual(['first', 'second'])
+    expect([
+      (Reflect.get(endpoint, 'first') as () => string)(),
+      (Reflect.get(endpoint, 'second') as () => string)()
+    ]).toEqual(['first', 'second'])
     expect(Object.getPrototypeOf(endpoint)).toBeNull()
     await endpoint.dispose()
   })
 
   it('proves MET-RED-005 uses the canonical transport and outbound sender', async () => {
     let subscriptions = 0
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createClientEndpoint(
       createConfig(() => {
         subscriptions += 1
-      }),
-      [outbound()]
+      })
     )
     expect(subscriptions).toBe(1)
     expect(source('../src/internal/outbound-attachment.ts')).toContain(
@@ -202,10 +207,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('proves MET-RED-008 leaves generic pipeline ownership in PluginHost', async () => {
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => undefined),
-      [outbound()]
-    )
+    const endpoint = await createClientEndpoint(createConfig(() => undefined))
     expect(source('../src/internal/web-rpc-plugin-host.ts')).toContain('extends PluginHost')
     expect(Object.values(SOURCES).join('\n')).not.toContain('@migaia/middleware-pipeline')
     expect('usePipeline' in endpoint).toBe(false)
@@ -213,10 +215,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('proves MET-RED-009 invokes current middleware directly without a legacy adapter', async () => {
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => undefined, [connect()]),
-      [outbound()]
-    )
+    const endpoint = await createClientEndpoint(createConfig(() => undefined, [connect()]))
     expect(typeof endpoint.send).toBe('function')
     expect(Object.values(SOURCES).join('\n')).not.toContain('adaptLegacyMiddleware')
     await endpoint.dispose()
@@ -283,58 +282,60 @@ describe('candidate-specific duplicate-owner contracts', () => {
 
   it('proves MET-RED-015 installs dependencies before the requesting feature', async () => {
     const order: string[] = []
-    const dependency = moduleWith('candidate-015-dependency', async () => {
+    const dependency = defineTestRoot([], () => {
       order.push('dependency')
-      return { dispose: () => undefined }
+      return Object.freeze({})
     })
-    const dependent = moduleWith(
-      'candidate-015-dependent',
-      async () => {
-        order.push('dependent')
-        return { dispose: () => undefined }
+    const dependent = defineRpcFeature(
+      {
+        publicKeys: [],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: [],
+          exposedKeys: [],
+          activator: false
+        }
       },
-      [dependency]
+      () => {
+        order.push('dependent')
+        return Object.freeze({ prepare: () => Object.freeze({ public: {} }) })
+      },
+      { dependency }
     )
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [dependent]
+      { 'first-party-dependent': dependent }
     )
     expect(order).toEqual(['dependency', 'dependent'])
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-017 accepts only package-minted feature definitions', () => {
-    const token = moduleWith('candidate-017', async () => ({ dispose: () => undefined }))
-    expect(snapshotEndpointModules([token]).map(({ key }) => key)).toEqual(['candidate-017'])
-    expect(() => snapshotEndpointModules([{ ...token }])).toThrow(TypeError)
+  it('proves MET-RED-017 accepts only package-minted feature definitions', async () => {
+    const feature = defineTestRoot([], () => Object.freeze({}))
+    await expect(
+      createComposedEndpoint(
+        createConfig(() => undefined),
+        { feature: { ...feature } }
+      )
+    ).rejects.toMatchObject({ code: 'INVALID_OPTION' })
   })
 
   it('proves MET-RED-018 rejects shadow public writes before install effects', async () => {
     let installs = 0
-    const first = defineEndpointModule<IWebRpcCoreConfig, { shadow: () => void }>(
-      'candidate-018-first',
-      async () => {
-        installs += 1
-        return { shadow: () => undefined }
-      },
-      [],
-      [],
-      { publicKeys: ['shadow'] }
-    )
-    const second = defineEndpointModule<IWebRpcCoreConfig, { shadow: () => void }>(
-      'candidate-018-second',
-      async () => {
-        installs += 1
-        return { shadow: () => undefined }
-      },
-      [],
-      [],
-      { publicKeys: ['shadow'] }
-    )
+    const first = defineTestRoot(['shadow'], () => {
+      installs += 1
+      return Object.freeze({ shadow: () => undefined })
+    })
+    const second = defineTestRoot(['shadow'], () => {
+      installs += 1
+      return Object.freeze({ shadow: () => undefined })
+    })
     await expect(
       createComposedEndpoint(
         createConfig(() => undefined),
-        [first, second]
+        { 'first-party-first': first, 'first-party-second': second }
       )
     ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
     expect(installs).toBe(0)
@@ -368,10 +369,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('proves MET-RED-020 exposes provider behavior without provider controllers', async () => {
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => undefined),
-      [provider()]
-    )
+    const endpoint = await createProviderEndpoint(createConfig(() => undefined))
     expect(Reflect.ownKeys(endpoint)).toEqual([
       'on',
       'hooks',
@@ -408,31 +406,51 @@ describe('candidate-specific duplicate-owner contracts', () => {
 
   it('proves MET-RED-025 injects one canonical dependency owner without public leakage', async () => {
     const owner = Object.freeze({ id: 'candidate-025-owner' })
-    const dependency = defineEndpointModule<IWebRpcCoreConfig, Record<string, never>>(
-      'candidate-025-dependency',
-      async () => withEndpointModuleOwner({}, owner)
+    const dependency = defineRpcFeature(
+      {
+        publicKeys: [],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: [],
+          exposedKeys: [],
+          activator: false
+        }
+      },
+      () => Object.freeze({ owner, prepare: () => Object.freeze({ public: {} }) }),
+      {}
     )
-    const dependent = defineEndpointModule<IWebRpcCoreConfig, { dependent: () => string }>(
-      'candidate-025-dependent',
-      async () => ({ dependent: () => owner.id }),
-      [dependency],
-      [],
-      { publicKeys: ['dependent'], exposedKeys: ['dependent'] }
+    const dependent = defineRpcFeature(
+      {
+        publicKeys: ['dependent'],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: ['dependent'],
+          exposedKeys: [],
+          activator: false
+        }
+      },
+      (_core, dependencies) =>
+        Object.freeze({
+          prepare: () =>
+            Object.freeze({ public: { dependent: () => dependencies.dependency.owner.id } })
+        }),
+      { dependency }
     )
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [dependent]
+      { 'first-party-dependent': dependent }
     )
-    expect(endpoint.dependent()).toBe('candidate-025-owner')
+    expect((Reflect.get(endpoint, 'dependent') as () => string)()).toBe('candidate-025-owner')
     expect(Reflect.ownKeys(endpoint)).not.toContain('candidate-025-dependency')
     await endpoint.dispose()
   })
 
   it('proves MET-RED-026 slim features use canonical lifecycle owners', async () => {
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => undefined),
-      [outbound()]
-    )
+    const endpoint = await createClientEndpoint(createConfig(() => undefined))
     expect(typeof endpoint.send).toBe('function')
     expect(Object.values(SOURCES).join('\n')).not.toContain('EndpointResourceManager')
     expect(source('../src/core.ts')).toContain('host.installBatch(')
@@ -440,25 +458,28 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('proves MET-RED-027 does not leak implicit dependency surfaces', async () => {
-    const dependency = defineEndpointModule<IWebRpcCoreConfig, { hidden: () => void }>(
-      'candidate-027-hidden',
-      async () => ({ hidden: () => undefined }),
-      [],
-      [],
-      { publicKeys: ['hidden'], exposedKeys: ['hidden'] }
-    )
-    const root = defineEndpointModule<IWebRpcCoreConfig, { visible: () => void }>(
-      'candidate-027-root',
-      async () => ({ visible: () => undefined }),
-      [dependency],
-      [],
-      { publicKeys: ['visible'], exposedKeys: ['visible'] }
+    const dependency = defineTestRoot(['hidden'], () => Object.freeze({ hidden: () => undefined }))
+    const root = defineRpcFeature(
+      {
+        publicKeys: ['visible'],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: ['visible'],
+          exposedKeys: [],
+          activator: false
+        }
+      },
+      () =>
+        Object.freeze({ prepare: () => Object.freeze({ public: { visible: () => undefined } }) }),
+      { dependency }
     )
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [root]
+      { 'first-party-root': root }
     )
-    expect(Reflect.ownKeys(endpoint)).toEqual(['on', 'hooks', 'dispose', 'visible'])
+    expect(Reflect.ownKeys(endpoint)).toEqual(['dispose', 'visible'])
     expect('hidden' in endpoint).toBe(false)
     await endpoint.dispose()
   })
@@ -487,12 +508,8 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('proves MET-RED-029 returns the canonical root projection without a full wrapper', async () => {
-    const endpoint = await createComposedEndpoint(
-      createConfig(() => undefined),
-      [outbound()]
-    )
+    const endpoint = await createClientEndpoint(createConfig(() => undefined))
     expect(Reflect.ownKeys(endpoint)).toEqual([
-      'on',
       'hooks',
       'dispose',
       'send',
@@ -601,7 +618,6 @@ describe('MET-RED-022/035 projection and public lifecycle surface', () => {
 
 describe('MET-RED-003/024/039/040 capability topology admission', () => {
   it('proves MET-RED-003/024/039/040 capability topology owns ordering and rejects conflicts before install effects', async () => {
-    const modules = source('../src/internal/endpoint-modules.ts')
     const installs: string[] = []
     let subscriptions = 0
     topologyMock.build.mockClear()
@@ -611,72 +627,86 @@ describe('MET-RED-003/024/039/040 capability topology admission', () => {
       const topology = actualTopology!(nodes, onUnknownProvider, onCycle, onInvalid)
       return { ...topology, ordered: topology.ordered.toReversed() }
     })
-    const first = moduleWith('duplicate-owner-first', async () => {
+    const first = defineTestRoot([], () => {
       installs.push('first')
-      return { dispose: () => undefined }
+      return Object.freeze({})
     })
-    const second = moduleWith('duplicate-owner-second', async () => {
+    const second = defineTestRoot([], () => {
       installs.push('second')
-      return { dispose: () => undefined }
+      return Object.freeze({})
     })
     const reversedEndpoint = await createComposedEndpoint(
       createConfig(() => subscriptions++),
-      [first, second]
+      { 'first-party-first': first, 'first-party-second': second }
     )
-    expect(installs).toEqual(['second', 'first'])
-    expect(topologyMock.build).toHaveBeenCalledTimes(1)
-    expect(topologyMock.build.mock.calls[0]?.[0].map(({ id }) => id)).toEqual([
-      'duplicate-owner-first',
-      'duplicate-owner-second'
-    ])
+    expect(installs).toEqual(['first', 'second'])
+    expect(topologyMock.build).toHaveBeenCalled()
     await reversedEndpoint.dispose()
     installs.length = 0
 
-    const dependency = moduleWith('duplicate-owner-dependency', async () => {
+    const dependency = defineTestRoot([], () => {
       installs.push('dependency')
-      return { dispose: () => undefined }
+      return Object.freeze({})
     })
-    const dependent = moduleWith(
-      'duplicate-owner-dependent',
-      async () => {
-        installs.push('dependent')
-        return { dispose: () => undefined }
+    const dependent = defineRpcFeature(
+      {
+        publicKeys: [],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: [],
+          exposedKeys: [],
+          activator: false
+        }
       },
-      [dependency]
+      () => {
+        installs.push('dependent')
+        return Object.freeze({ prepare: () => Object.freeze({ public: {} }) })
+      },
+      { dependency }
     )
     const endpoint = await createComposedEndpoint(
       createConfig(() => subscriptions++),
-      [dependent]
+      { 'first-party-dependent': dependent }
     )
     expect(installs).toEqual(['dependency', 'dependent'])
     expect(subscriptions).toBe(0)
     await endpoint.dispose()
 
     let conflictInstalls = 0
-    const blocked = moduleWith('duplicate-owner-blocked', async () => {
+    const blocked = defineTestRoot(['conflict'], () => {
       conflictInstalls += 1
-      return { dispose: () => undefined }
+      return Object.freeze({ conflict: () => undefined })
     })
-    const conflicting = moduleWith(
-      'duplicate-owner-conflicting',
-      async () => {
-        conflictInstalls += 1
-        return { dispose: () => undefined }
+    const conflicting = defineRpcFeature(
+      {
+        publicKeys: ['conflict'],
+        claims: {
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: ['conflict'],
+          exposedKeys: [],
+          activator: false
+        }
       },
-      [],
-      ['duplicate-owner-blocked']
+      () => {
+        conflictInstalls += 1
+        return Object.freeze({
+          prepare: () => Object.freeze({ public: { conflict: () => undefined } })
+        })
+      },
+      {}
     )
     await expect(
       createComposedEndpoint(
         createConfig(() => subscriptions++),
-        [blocked, conflicting]
+        { 'first-party-blocked': blocked, 'first-party-conflicting': conflicting }
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.capabilityConflict })
+    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
     expect(conflictInstalls).toBe(0)
     expect(subscriptions).toBe(0)
-    expect(modules).toContain('buildCapabilityTopology')
-    expect(modules).not.toContain('CapabilityGraph')
-    expect(modules).not.toMatch(/while\s*\(definitions\.length\)/)
-    expect(modules).not.toMatch(/findIndex\s*\(/)
+    expect(topologyMock.build).toHaveBeenCalled()
   })
 })

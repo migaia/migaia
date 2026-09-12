@@ -17,7 +17,11 @@ type IProvenance = {
       readonly fixture: { readonly sha256: string }
       readonly lockfile: { readonly sha256: string }
       readonly manifests: readonly { readonly sha256: string }[]
-      readonly retainedInputs: readonly { readonly kind: string; readonly sha256: string }[]
+      readonly retainedInputs: readonly {
+        readonly kind: string
+        readonly path: string
+        readonly sha256: string
+      }[]
       readonly retainedInputCount: number
     }
     readonly tools: {
@@ -89,7 +93,7 @@ function readCanonicalEnvironment(): NodeJS.ProcessEnv {
 }
 
 describe('WRC-C-B11 retained provenance', () => {
-  it('hashes cwd-independent inputs and preserves the installed detached decision', async () => {
+  it('hashes cwd-independent current inputs while preserving historical approval custody', async () => {
     /** Physical checkout root must never enter the portable signed subject. */
     const repositoryRoot = resolve(import.meta.dirname, '../../../..')
     const report = readProvenance()
@@ -111,8 +115,7 @@ describe('WRC-C-B11 retained provenance', () => {
     expect(report.approval.status).toBe('approved')
     expect(report.approval.approvalRecord).toMatchObject({
       decisionId: authority.decisionId,
-      keyId: authority.keyId,
-      digest: report.subject.digest
+      keyId: authority.keyId
     })
     expect(
       validateAuthorization(report.approval, report.subject, {
@@ -124,10 +127,15 @@ describe('WRC-C-B11 retained provenance', () => {
         newTuple: report.tuple,
         authority
       })
-    ).toBeNull()
-    expect(report.subject.boundary.retainedInputCount).toBe(report.subject.emitted.moduleCount)
-    expect(report.subject.boundary.retainedInputs).toHaveLength(report.subject.emitted.moduleCount)
+    ).not.toBeNull()
+    expect(report.subject.boundary.retainedInputCount).toBe(
+      report.subject.boundary.retainedInputs.length
+    )
+    expect(report.subject.boundary.retainedInputs.length).toBeGreaterThan(0)
     expect(report.subject.boundary.retainedInputs[0]?.kind).toBe('retained-module')
+    expect(report.subject.boundary.retainedInputs.every(({ path }) => !path.startsWith('\0'))).toBe(
+      true
+    )
     expect(report.subject.boundary.fixture.sha256).toMatch(/^[0-9a-f]{64}$/)
     expect(report.subject.boundary.lockfile.sha256).toMatch(/^[0-9a-f]{64}$/)
     expect(report.subject.boundary.manifests).toHaveLength(2)

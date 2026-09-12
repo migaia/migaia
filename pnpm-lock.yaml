@@ -111,6 +111,9 @@ importers:
 
   packages/plugin-host:
     dependencies:
+      '@migaia/capability':
+        specifier: workspace:^
+        version: link:../capability
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle

@@ -98,13 +98,13 @@ type IPersistOptions = {
 
 ```ts
 import { createStore } from '@migaia/store-light';
-import { indexedDb } from '@migaia/storage-web/indexed-db';
+import { indexedDbHost } from '@migaia/storage-web/indexed-db';
 import { persist } from '@migaia/store-persist/light';
 
 const store = createStore({ theme: 'light', fontSize: 14 });
 const handle = persist(store, {
   key: 'settings:v1',
-  storage: indexedDb({ dbName: 'app' }),
+  storage: indexedDbHost({ dbName: 'app' }),
   version: 1,
   partialize: (state) => ({ theme: state.theme }) // 只存 theme，fontSize 只留内存
 });
@@ -146,13 +146,13 @@ type IPersistCollectionOptions<TState> = {
 
 ```ts
 import { observableMap } from '@migaia/store-indexed';
-import { localStorage } from '@migaia/storage-web/local-storage';
+import { localStorageHost } from '@migaia/storage-web/local-storage';
 import { persistCollection } from '@migaia/store-persist/indexed';
 
 const cart = observableMap<string, number>(); // sku -> 数量
 const handle = persistCollection(cart, {
   key: 'cart:v1',
-  storage: localStorage()
+  storage: localStorageHost()
 });
 
 cart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）
@@ -196,12 +196,12 @@ type IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };
 
 ```ts
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
-import { indexedDb } from '@migaia/storage-web/indexed-db';
+import { indexedDbHost } from '@migaia/storage-web/indexed-db';
 import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
 
 type Session = { accessToken: string; refreshToken: string };
 const session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));
-const storage = indexedDb({ dbName: 'app' });
+const storage = indexedDbHost({ dbName: 'app' });
 const atomStore = createAtomStore(runtime);
 
 // 每个 session id 首次使用时调用一次
@@ -271,7 +271,7 @@ async function logout(userId: string) {
 ## 7. 与 storage-web 的 codec 集成
 
 `storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可：
-`memoryStorage()`、`localStorage()` 或 `indexedDb()` 的返回值即可。binary codec 另需
+`memoryStorageHost()`、`localStorageHost()` 或 `indexedDbHost()` 的返回值即可。binary codec 另需
 `getBytes`/`setBytes`。
 
 `codec` 默认是本包自带的 `defaultJsonCodec`（`name: 'migaia-collections-json-v1'`、`output: 'text'`，遵循 `@migaia/storage-contract` 的 `ICodec` 契约；本包不运行时依赖 storage-web 的具体 codec 值）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
@@ -288,7 +288,7 @@ import { binaryCodec } from '@migaia/storage-web/serialize';
 
 const handle = persistCollection(bigDataset, {
   key: 'big',
-  storage: indexedDb({ dbName: 'app' }),
+  storage: indexedDbHost({ dbName: 'app' }),
   codec: binaryCodec
 });
 ```
@@ -335,14 +335,14 @@ const handle = persistCollection(bigDataset, {
 import { createStore } from '@migaia/store-light';
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
 import { observableSet } from '@migaia/store-indexed';
-import { indexedDb } from '@migaia/storage-web/indexed-db';
+import { indexedDbHost } from '@migaia/storage-web/indexed-db';
 import { persist } from '@migaia/store-persist/light';
 import { persistCollection } from '@migaia/store-persist/indexed';
 import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
 import { createRuntime } from '@migaia/reactive';
 
 const runtime = createRuntime();
-const storage = indexedDb({ dbName: 'app' });
+const storage = indexedDbHost({ dbName: 'app' });
 
 // 1. 扁平设置
 const settings = createStore({ theme: 'light' });

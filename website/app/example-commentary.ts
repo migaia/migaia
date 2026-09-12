@@ -209,7 +209,11 @@ function describeSegment(segment: string, locale: ILocale): string | undefined {
     return locale === 'zh'
       ? '这个查询会先读取一次结果；匹配的数据发生变化时自动重跑。ready 等首次结果，refresh 手动刷新，dispose 停止监听。'
       : 'This query reads once, then reruns when matching data changes. ready waits for the first result, refresh reruns manually, and dispose stops listening.'
-  if (/\b(?:localStorage|createManualScheduler)\s*\(/.test(executable))
+  if (
+    /\b(?:createManualScheduler|cookiesHost|indexedDbHost|localStorageHost|localStorage|memoryStorageHost|sessionStorageHost)\s*\(/.test(
+      executable
+    )
+  )
     return describeConstruction(executable, locale)
   return undefined
 }
@@ -225,10 +229,14 @@ function describeConstruction(executable: string, locale: ILocale): string | und
   return undefined
 }
 
-/** Explains the concrete namespace and owner visible in a Local Storage example. */
+/** Explains the concrete namespace and owner visible in a storage-host example. */
 function describeLocalStorageConstruction(executable: string, locale: ILocale): string | undefined {
   /** Variable name identifies which object owns the generated backend resources. */
-  const owner = executable.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*localStorage/)?.[1]
+  const owner =
+    executable.match(
+      /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:localStorageHost|sessionStorageHost|cookiesHost|memoryStorageHost|indexedDbHost|localStorage)\(/
+    )?.[1] ??
+    executable.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*createStorageHost\(/)?.[1]
   /** Namespace literal identifies the exact key partition used by the example. */
   const namespace = executable.match(/\bnamespace\s*:\s*['"]([^'"]+)['"]/)?.[1]
   if (!owner || !namespace) return undefined

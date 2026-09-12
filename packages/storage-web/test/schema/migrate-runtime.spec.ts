@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations, runMigrationsWithRuntime } from '../../src/schema/migrate.js'
 import { defineEntity } from '../../src/entity/index.js'
-import { memoryStorage } from '../../src/backends/memory.js'
+import { memoryStorageHost } from '../../src/backends/memory.js'
 
 /**
  * T-14(6)/(7) 运行时归属门禁：公开 `runMigrations()` 内部创建「恰好一个」runtime/reporter； 内部
@@ -44,7 +44,7 @@ describe('migration runtime ownership (§4.4 T-14(6)/(7))', () => {
   })
 
   it('T-14(7): repository 读取旧版本触发迁移时不额外创建 reporter', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({
       name: 'rt-people',
       key: 'id',

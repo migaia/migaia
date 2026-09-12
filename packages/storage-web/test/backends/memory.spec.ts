@@ -1,11 +1,11 @@
 import { isChangeFeedStore, type IStorageChange } from '@migaia/storage-contract'
 import { describe, expect, it, vi } from 'vitest'
-import { memoryStorage } from '../../src/backends/memory'
+import { memoryStorageHost } from '../../src/backends/memory'
 import { composeRepositoryKey } from '../../src/entity/key.js'
 
-describe('memoryStorage', () => {
+describe('memoryStorageHost', () => {
   it('absent record deletes are true no-ops for revisions and change feed', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     const stop = store.subscribeChanges((change) => changes.push(change))
     await store.deleteRecord('missing')
@@ -21,7 +21,7 @@ describe('memoryStorage', () => {
       value: { randomUUID: () => 'fixed-auto-key' }
     })
     try {
-      const store = memoryStorage()
+      const store = memoryStorageHost()
       const first = await store.putRecord({ value: 1 })
       const second = await store.putRecord({ value: 2 })
       expect(second).not.toEqual(first)
@@ -32,7 +32,7 @@ describe('memoryStorage', () => {
     }
   })
   it('在无冲突写入路径也拒绝非法 conflictPolicy', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await expect(
       store.set('key', 'value', { conflictPolicy: 'invalid' as never })
     ).rejects.toMatchObject({
@@ -41,7 +41,7 @@ describe('memoryStorage', () => {
   })
 
   it('拒绝运行时非字符串 value', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     expect(() => store.sync!.set('key', 42 as unknown as string)).toThrowError(
       expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
@@ -50,7 +50,7 @@ describe('memoryStorage', () => {
     })
   })
   it('L0 与 bytes 通道拒绝运行时非字符串 key', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const invalidKey = 42 as unknown as string
     for (const invoke of [
       () => store.get(invalidKey),
@@ -73,7 +73,7 @@ describe('memoryStorage', () => {
       expect(invoke).toThrow(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
   })
   it('拒绝非 Uint8Array 的 bytes value', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await expect(
       store.setBytes('key', new DataView(new ArrayBuffer(1)) as unknown as Uint8Array)
     ).rejects.toMatchObject({
@@ -81,7 +81,7 @@ describe('memoryStorage', () => {
     })
   })
   it('record replace 在 clone 失败时保留原 value 通道', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.set('shared', 'original')
     await expect(
       store.putRecord({ uncloneable: () => {} }, 'shared', { conflictPolicy: 'replace' })
@@ -90,7 +90,7 @@ describe('memoryStorage', () => {
     await expect(store.getRecord('shared')).resolves.toBeUndefined()
   })
   it('bytes replace 在 detached buffer 复制失败时保留原 value 通道', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.set('shared', 'original')
     const buffer = new ArrayBuffer(4)
     const detached = new Uint8Array(buffer)
@@ -103,7 +103,7 @@ describe('memoryStorage', () => {
   })
 
   it('optimistic transaction detects revision changed during await', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ value: 0 }, 'revision-key')
     let release: (() => void) | undefined
     const paused = new Promise<void>((resolve) => {
@@ -124,7 +124,7 @@ describe('memoryStorage', () => {
     await expect(store.getRecord('revision-key')).resolves.toEqual({ value: 2 })
   })
   it('transaction reads a repeatable snapshot even when an external write commits', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ value: 0 }, 'snapshot-key')
     let release: (() => void) | undefined
     const paused = new Promise<void>((resolve) => {
@@ -141,7 +141,7 @@ describe('memoryStorage', () => {
     await expect(transaction).rejects.toMatchObject({ code: 'TRANSACTION_CONFLICT' })
   })
   it('clear and recreate cannot pass an old transaction revision check', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ value: 0 }, 'aba-key')
     let release: (() => void) | undefined
     const paused = new Promise<void>((resolve) => {
@@ -160,7 +160,7 @@ describe('memoryStorage', () => {
     await expect(store.getRecord('aba-key')).resolves.toEqual({ value: 1 })
   })
   it('transaction 进入同步 commit point 后不因 hostile signal 漂移留下半提交', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     let abortedReads = 0
     const signal = {
       get aborted(): boolean {
@@ -185,13 +185,13 @@ describe('memoryStorage', () => {
     expect(abortedReads).toBe(6)
   })
   it('backend 与 capabilities 正确声明', () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     expect(store.backend).toBe('memory')
     expect(store.capabilities.records).toBe(true)
     expect(store.capabilities.syncRead).toBe(true)
   })
   it('sync 通道全方法可用', () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     store.sync!.set('k', 'v')
     expect(store.sync!.get('k')).toBe('v')
     expect(store.sync!.has('k')).toBe(true)
@@ -200,18 +200,18 @@ describe('memoryStorage', () => {
     expect(store.sync!.get('k')).toBeNull()
   })
   it('每个实例独立隔离', () => {
-    const a = memoryStorage()
-    const b = memoryStorage()
+    const a = memoryStorageHost()
+    const b = memoryStorageHost()
     a.sync!.set('k', 'a-value')
     expect(b.sync!.get('k')).toBeNull()
   })
   it('dispose 后 sync 方法也拒绝', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.dispose()
     expect(() => store.sync!.get('k')).toThrow(expect.objectContaining({ code: 'STORE_DISPOSED' }))
   })
   it('iterate 按 range 的 lower/upper 边界过滤', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ v: 1 }, 1)
     await store.putRecord({ v: 2 }, 2)
     await store.putRecord({ v: 3 }, 3)
@@ -226,7 +226,7 @@ describe('memoryStorage', () => {
     expect(await collect({ upper: 2, upperOpen: false })).toEqual([{ v: 1 }, { v: 2 }])
   })
   it('iterate 首次 yield 后修改复合 range 不影响剩余结果', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ value: 1 }, ['tenant', 1])
     await store.putRecord({ value: 2 }, ['tenant', 2])
     await store.putRecord({ value: 3 }, ['tenant', 3])
@@ -242,7 +242,7 @@ describe('memoryStorage', () => {
     const original = crypto.randomUUID
     Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true })
     try {
-      const store = memoryStorage()
+      const store = memoryStorageHost()
       const key = await store.putRecord({ a: 1 })
       expect(typeof key).toBe('string')
       await expect(store.getRecord(key)).resolves.toEqual({ a: 1 })
@@ -251,7 +251,7 @@ describe('memoryStorage', () => {
     }
   })
   it('transaction 作用域内 put 不传 key 时自动生成，get 可读取快照内的值', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     let generatedKey: unknown
     await store.transaction(async (tx) => {
       generatedKey = await tx.put({ v: 'auto' })
@@ -260,7 +260,7 @@ describe('memoryStorage', () => {
     await expect(store.getRecord(generatedKey as never)).resolves.toEqual({ v: 'auto' })
   })
   it('iterate 在 signal 已 abort 时抛 ABORTED', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ v: 1 }, 'a')
     const controller = new AbortController()
     controller.abort()
@@ -269,7 +269,7 @@ describe('memoryStorage', () => {
     ).rejects.toMatchObject({ code: 'ABORTED' })
   })
   it('dispose 后 getBytes/getRecord/iterate/transaction 均拒绝', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.dispose()
     await expect(store.putRecord({ a: 1 })).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
     await expect(store.setBytes('k', new Uint8Array())).rejects.toMatchObject({
@@ -280,7 +280,7 @@ describe('memoryStorage', () => {
     })
   })
   it('复合主键编码无碰撞且事务边界结构化克隆', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ value: 'comma' }, ['a,b'])
     await store.putRecord({ value: 'split' }, ['a', 'b'])
     await expect(store.getRecord(['a,b'])).resolves.toEqual({ value: 'comma' })
@@ -295,7 +295,7 @@ describe('memoryStorage', () => {
     await expect(store.getRecord('tx-clone')).resolves.toEqual({ nested: { value: 1 } })
   })
   it('direct/transaction/iterate 均不泄漏复合 key 的可变引用', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const directKey: (string | number)[] = ['direct', 1]
     await store.putRecord({ source: 'direct' }, directKey)
     directKey[1] = 9
@@ -335,15 +335,15 @@ describe('memoryStorage', () => {
   })
 })
 
-describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
+describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
   it('SWV2-R05 declares changeFeed:true and is recognized by the storage-contract guard', () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     expect(store.capabilities.changeFeed).toBe(true)
     expect(isChangeFeedStore(store)).toBe(true)
   })
 
   it('SWV2-I05 fires one put event per channel with the correct kind/channel/keys, and one remove event', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
@@ -366,7 +366,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SOL-SWV2-045 a record-channel event derives scope from a canonical entity key; value/bytes events never carry one', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
@@ -387,7 +387,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SOL-SWV2-045 a batch touching two scopes has no single scope to report', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
@@ -401,9 +401,9 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SOL-SWV2-045 omits keys above 128 (consumer must fall back to scope) but keeps them at exactly 128', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
 
-    const atCap = memoryStorage()
+    const atCap = memoryStorageHost()
     const capChanges: IStorageChange[] = []
     atCap.subscribeChanges((change) => capChanges.push(change))
     await atCap.transaction(async (tx) => {
@@ -428,7 +428,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SOL-SWV2-046 a listener that subscribes during fanout does not receive the event already in flight', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const lateListenerEvents: IStorageChange[] = []
     store.subscribeChanges(() => {
       store.subscribeChanges((change) => lateListenerEvents.push(change))
@@ -442,7 +442,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SOL-SWV2-046 a listener unsubscribing during fanout does not affect delivery to the rest of that same event', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const order: string[] = []
     let unsubscribeSelf: (() => void) | undefined
     unsubscribeSelf = store.subscribeChanges(() => {
@@ -460,7 +460,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SOL-SWV2-046 a listener that mutates the store during delivery is queued, not dispatched recursively: every listener sees event N before anyone sees event N+1', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const order: string[] = []
     let reentered = false
     store.subscribeChanges((change) => {
@@ -479,7 +479,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SOL-SWV2-046 a listener that always mutates on every event terminates via a bounded loop, not unbounded recursion', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     let calls = 0
     const limit = 50
     store.subscribeChanges(() => {
@@ -492,7 +492,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SWV2-B05 clearValues/clearBytes/clearRecords/clearAll each fire exactly one clear event on the right channel, when there is something to clear', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     // Each channel must hold something before its clear, or the clear is a no-op per
     // SOL-SWV2-047 and must not publish (covered separately below).
     await store.set('k', 'v')
@@ -520,7 +520,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SOL-SWV2-047: clearing an already-empty channel, removing an absent value key, and deleting an absent record all publish nothing', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
@@ -535,7 +535,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SWV2-E04/rollback-no-event: a write that fails (cross-channel conflict) must not publish a change', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.set('shared', 'value')
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -547,7 +547,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('a conflictPolicy:"replace" write that silently evicts another channel also publishes that channel\'s own remove event', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.set('shared', 'value')
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -565,7 +565,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('a transaction put that evicts another channel via replace still counts as one batch event, not an extra standalone remove', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.set('shared', 'value')
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -581,7 +581,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SWV2-B05 batch one-event: a transaction publishes exactly one batch event for all its writes, and a rolled-back transaction publishes none', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
@@ -614,7 +614,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('SWV2-E08 one listener throwing does not stop delivery to other listeners or break the write', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const originalConsoleError = console.error
     const reported: unknown[] = []
     console.error = (...args: unknown[]) => reported.push(args)
@@ -635,7 +635,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('unsubscribe stops delivery, and calling the returned unsubscribe twice is a no-op', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     const unsubscribe = store.subscribeChanges((change) => changes.push(change))
     await store.set('k', 'v1')
@@ -646,7 +646,7 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
   })
 
   it('dispose clears listeners and further mutation is impossible (STORE_DISPOSED), so no late events can fire', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const listener = vi.fn()
     store.subscribeChanges(listener)
     await store.dispose()

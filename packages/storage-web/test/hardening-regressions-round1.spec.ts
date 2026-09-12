@@ -5,13 +5,13 @@
  */
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
-import { indexedDb, localStorage, memoryStorage } from '../src/backends'
+import { indexedDbHost, localStorageHost, memoryStorageHost } from '../src/backends'
 import { defineEntity } from '../src/entity'
 import { fakeWebStorage } from '../src/testing/fake-web-storage'
 import type { IRecordStore } from '../src/types'
 
 const freshIdb = (): IRecordStore =>
-  indexedDb({
+  indexedDbHost({
     factory: new IDBFactory(),
     keyRange: IDBKeyRange,
     dbName: `adv-${Math.random().toString(36).slice(2)}`
@@ -19,13 +19,13 @@ const freshIdb = (): IRecordStore =>
 
 describe('#1 clearAll() 清理全部 record 通道', () => {
   it('memory: clearAll() 连 records 一起清', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ v: 1 }, 'doc')
     await store.clearAll()
     expect(await store.getRecord('doc')).toBeUndefined()
   })
 
-  it('indexedDb: clearAll() 连 records 一起清', async () => {
+  it('indexedDbHost: clearAll() 连 records 一起清', async () => {
     const store = freshIdb()
     await store.putRecord({ v: 1 }, 'doc')
     await store.clearAll()
@@ -35,13 +35,13 @@ describe('#1 clearAll() 清理全部 record 通道', () => {
 
 describe('#2 getBytes/setBytes 与 get/set 通道隔离且跨通道不可静默覆盖', () => {
   it('memory: bytes 与 kv 互不可见', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.setBytes('k', new Uint8Array([1, 2]))
     expect(await store.has('k')).toBe(false)
     expect(await store.keys()).toEqual([])
   })
 
-  it('indexedDb: bytes 键不泄漏进 keys()/has()', async () => {
+  it('indexedDbHost: bytes 键不泄漏进 keys()/has()', async () => {
     const store = freshIdb()
     await store.setBytes('k', new Uint8Array([1, 2]))
     expect(await store.has('k')).toBe(false)
@@ -54,30 +54,30 @@ describe('#2 getBytes/setBytes 与 get/set 通道隔离且跨通道不可静默�
 
 describe('#3 dispose 后 L1 方法统一抛 STORE_DISPOSED', () => {
   it('memory: getRecord/getBytes 抛 STORE_DISPOSED', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ v: 1 }, 'doc')
     await store.dispose()
     await expect(store.getRecord('doc')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
     await expect(store.getBytes('doc')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
   })
 
-  it('indexedDb: getRecord 抛 STORE_DISPOSED', async () => {
+  it('indexedDbHost: getRecord 抛 STORE_DISPOSED', async () => {
     const store = freshIdb()
     await store.dispose()
     await expect(store.getRecord('doc')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
   })
 })
 
-describe('#4 memory 存活引用，indexedDb 结构化克隆', () => {
+describe('#4 memory 存活引用，indexedDbHost 结构化克隆', () => {
   it('memory: 写入后修改原对象不污染已存数据', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const value = { n: 1 }
     await store.putRecord(value, 'k')
     value.n = 999
     expect(await store.getRecord('k')).toEqual({ n: 1 })
   })
 
-  it('indexedDb: 同样操作不受影响', async () => {
+  it('indexedDbHost: 同样操作不受影响', async () => {
     const store = freshIdb()
     const value = { n: 1 }
     await store.putRecord(value, 'k')
@@ -86,7 +86,7 @@ describe('#4 memory 存活引用，indexedDb 结构化克隆', () => {
   })
 })
 
-describe('#5 iterate 顺序：memory 与 indexedDb 都是键序', () => {
+describe('#5 iterate 顺序：memory 与 indexedDbHost 都是键序', () => {
   const insert = async (store: IRecordStore): Promise<string[]> => {
     await store.putRecord({}, 'c')
     await store.putRecord({}, 'a')
@@ -97,10 +97,10 @@ describe('#5 iterate 顺序：memory 与 indexedDb 都是键序', () => {
   }
 
   it('memory', async () => {
-    expect(await insert(memoryStorage())).toEqual(['a', 'b', 'c'])
+    expect(await insert(memoryStorageHost())).toEqual(['a', 'b', 'c'])
   })
 
-  it('indexedDb', async () => {
+  it('indexedDbHost', async () => {
     expect(await insert(freshIdb())).toEqual(['a', 'b', 'c'])
   })
 })
@@ -108,8 +108,8 @@ describe('#5 iterate 顺序：memory 与 indexedDb 都是键序', () => {
 describe('#6 命名空间前缀是可穿透的', () => {
   it("namespace 'app' 能看见并清掉 namespace 'app:cache' 的数据", async () => {
     const shared = fakeWebStorage()
-    const app = localStorage({ namespace: 'app', storage: shared })
-    const cache = localStorage({ namespace: 'app:cache', storage: shared })
+    const app = localStorageHost({ namespace: 'app', storage: shared })
+    const cache = localStorageHost({ namespace: 'app:cache', storage: shared })
 
     await cache.set('token', 'secret')
     expect(await app.keys()).toEqual([])
@@ -133,7 +133,7 @@ describe('#7 数组主键：get/list 可见性一致', () => {
 
 describe('#8 单条脏数据不阻断 list()', () => {
   it('一条校验失败的记录被跳过并保留好记录', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     type IRow = { readonly id: string; readonly n: number }
     const schema = {
       name: 'strict',
@@ -154,7 +154,7 @@ describe('#8 单条脏数据不阻断 list()', () => {
 
 describe('#9 memory.iterate 尊重 timeoutMs', () => {
   it('零超时不会产出记录', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     await store.putRecord({ v: 1 }, 'k')
     await expect(store.iterateRecords(undefined, { timeoutMs: 0 }).next()).rejects.toMatchObject({
       code: 'ABORTED'
@@ -163,7 +163,7 @@ describe('#9 memory.iterate 尊重 timeoutMs', () => {
 })
 
 describe('#10 飞行中 abort 的错误类型不是 StorageError', () => {
-  it('indexedDb.get 在请求发出后 abort，拒绝值没有 code', async () => {
+  it('indexedDbHost.get 在请求发出后 abort，拒绝值没有 code', async () => {
     const store = freshIdb()
     await store.set('k', 'v')
     const controller = new AbortController()

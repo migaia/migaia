@@ -63,6 +63,8 @@ export type IWebRpcDiscoveryCleanupFaults = {
   readonly route?: readonly unknown[]
   readonly replay?: readonly unknown[]
   readonly registry?: readonly unknown[]
+  /** Passive package-test observation of the exact discovery attachment disposal entry. */
+  readonly onDispose?: () => void
 }
 
 /** Returns a registered package-test reader for transfer across a composed surface. */
@@ -115,7 +117,8 @@ export function registerDiscoveryCleanupFaults(
   const snapshot = Object.freeze({
     ...(faults.route === undefined ? {} : { route: Object.freeze([...faults.route]) }),
     ...(faults.replay === undefined ? {} : { replay: Object.freeze([...faults.replay]) }),
-    ...(faults.registry === undefined ? {} : { registry: Object.freeze([...faults.registry]) })
+    ...(faults.registry === undefined ? {} : { registry: Object.freeze([...faults.registry]) }),
+    ...(faults.onDispose === undefined ? {} : { onDispose: faults.onDispose })
   })
   discoveryCleanupFaults.set(endpoint, snapshot)
   return () => {

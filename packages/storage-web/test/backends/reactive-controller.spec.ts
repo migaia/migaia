@@ -1,11 +1,11 @@
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
-import { cookies } from '../../src/backends/cookie.js'
-import { indexedDb } from '../../src/backends/indexed-db.js'
-import { localStorage } from '../../src/backends/local-storage.js'
-import { memoryStorage } from '../../src/backends/memory.js'
-import { sessionStorage } from '../../src/backends/session-storage.js'
+import { cookiesHost } from '../../src/backends/cookie.js'
+import { indexedDbHost } from '../../src/backends/indexed-db.js'
+import { localStorageHost } from '../../src/backends/local-storage.js'
+import { memoryStorageHost } from '../../src/backends/memory.js'
+import { sessionStorageHost } from '../../src/backends/session-storage.js'
 import {
   createBackendReactiveController,
   getBackendReactiveController
@@ -24,23 +24,23 @@ type IObservedBackend = {
 /** Build the five canonical stores without changing their public capability declarations. */
 const createObservedBackends = (): IObservedBackend[] => [
   (() => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     return { name: 'memory', store, write: () => store.set('key', 'value') }
   })(),
   (() => {
-    const store = localStorage({ namespace: 'controller-local', storage: fakeWebStorage() })
+    const store = localStorageHost({ namespace: 'controller-local', storage: fakeWebStorage() })
     return { name: 'local', store, write: () => store.set('key', 'value') }
   })(),
   (() => {
-    const store = sessionStorage({ namespace: 'controller-session', storage: fakeWebStorage() })
+    const store = sessionStorageHost({ namespace: 'controller-session', storage: fakeWebStorage() })
     return { name: 'session', store, write: () => store.set('key', 'value') }
   })(),
   (() => {
-    const store = cookies({ namespace: 'controller-cookie', document: fakeCookieDocument() })
+    const store = cookiesHost({ namespace: 'controller-cookie', document: fakeCookieDocument() })
     return { name: 'cookie', store, write: () => store.set('key', 'value') }
   })(),
   (() => {
-    const store = indexedDb({
+    const store = indexedDbHost({
       dbName: `controller-${Math.random().toString(36).slice(2)}`,
       factory: new IDBFactory(),
       keyRange: IDBKeyRange
@@ -70,7 +70,7 @@ describe('B04 R08 private backend reactive controller', () => {
   })
 
   it('keeps failed writes silent and contains listener failure without reversing the write', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!
     const events: unknown[] = []
     const unsubscribeFailure = controller.subscribe(() => {
@@ -132,7 +132,7 @@ describe('B04 R08 private backend reactive controller', () => {
   })
 
   it('admits memory transactions before sealing and drains them before disposal', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!
     const events: unknown[] = []
     const unsubscribe = controller.subscribe((event) => events.push(event))
@@ -166,7 +166,7 @@ describe('B04 R08 private backend reactive controller', () => {
   })
 
   it('publishes a completed memory transaction before a later disposal', async () => {
-    const store = memoryStorage()
+    const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!
     const events: unknown[] = []
     const unsubscribe = controller.subscribe((event) => events.push(event))

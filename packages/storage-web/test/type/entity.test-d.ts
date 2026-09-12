@@ -1,6 +1,6 @@
 import { expectTypeOf } from 'vitest'
 import { defineEntity } from '../../src/entity'
-import { memoryStorage } from '../../src/backends'
+import { memoryStorageHost } from '../../src/backends'
 import type { IMigrateOptions, IMigrateResult, IRepository } from '../../src/entity/types.js'
 
 type IUser = {
@@ -12,7 +12,7 @@ type IUser = {
 }
 
 const users = defineEntity<IUser>({ name: 'users', key: 'id' })
-const repo = users.connect(memoryStorage())
+const repo = users.connect(memoryStorageHost())
 
 // connect() 的返回类型正确推导出 IRepository<IUser>，get/put/stream
 // 的值类型都是 IUser，不需要调用方手写类型断言。
@@ -42,7 +42,7 @@ const indexedUsers = defineEntity<IUser>()({
     }
   }
 })
-const indexedRepo = indexedUsers.connect(memoryStorage())
+const indexedRepo = indexedUsers.connect(memoryStorageHost())
 type IUserIndexMap = {
   readonly name: string
   readonly id: string

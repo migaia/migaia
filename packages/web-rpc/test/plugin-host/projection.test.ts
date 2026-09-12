@@ -1,34 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createComposedEndpoint } from '../../src/core.js'
-import { outbound } from '../../src/features/outbound.js'
+import { defineFeature } from '../../src/feature.js'
+import { createClientFirstPartyRoots } from '../../src/internal/client-first-party-roots.js'
 import { WebRpcErrorCode, WebRpcLifecycleError } from '../../src/errors.js'
 import { WebRpcErrorText } from '../../src/error-text.js'
 import { connect } from '../../src/middleware/connect.js'
 import { createMemoryTransportPair } from '../../src/adapters/memory.js'
 import { createConstructionControl } from '../../src/internal/construction-install.js'
-import { defineEndpointModule } from '../../src/internal/endpoint-modules.js'
 import { createEndpointProjection } from '../../src/internal/endpoint-projection.js'
 import type { IWebRpcPluginConstraint } from '../../src/internal/plugin-contract.js'
 import { WebRpcPluginHost } from '../../src/internal/web-rpc-plugin-host.js'
-import type { IWebRpcCoreConfig } from '../../src/core.js'
 import type { IWebRpcAbortSignal } from '../../src/typing.js'
 
-const hostileProjectionModule = defineEndpointModule<IWebRpcCoreConfig, Record<string, unknown>>(
-  'round14-projection-hostile',
-  async () => {
-    const surface = Object.create(null) as Record<string, unknown>
-    Object.defineProperty(surface, 'forged', {
-      configurable: false,
-      enumerable: true,
-      value: undefined,
-      writable: false
-    })
-    return Object.freeze(surface)
-  },
-  [],
-  [],
-  { publicKeys: ['forged'], exposedKeys: ['forged'] }
-)
+/** Native output with an undefined public value must fail closed at the projection boundary. */
+const hostileProjectionFeature = defineFeature(() => Object.freeze({ forged: undefined }))
 
 /** Builds the narrow owner callbacks required by the frozen projection helper. */
 const options = (host: object) => ({
@@ -157,9 +142,10 @@ describe('canonical endpoint projection', () => {
         {
           id: 'round14-projection-hostile',
           transport,
-          middlewares: [connect({ transport })]
+          middlewares: [connect({ transport })],
+          features: [hostileProjectionFeature] as const
         },
-        [outbound(), hostileProjectionModule] as const
+        createClientFirstPartyRoots()
       )
       await expect(construction).rejects.toMatchObject({
         code: WebRpcErrorCode.invalidConfig,

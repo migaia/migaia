@@ -1,7 +1,7 @@
-import { cookies } from '../src/cookies.js'
-import { indexedDb } from '../src/indexed-db.js'
-import { localStorage } from '../src/local-storage.js'
-import { memoryStorage } from '../src/memory.js'
+import { cookiesHost } from '../src/cookies.js'
+import { indexedDbHost } from '../src/indexed-db.js'
+import { localStorageHost } from '../src/local-storage.js'
+import { memoryStorageHost } from '../src/memory.js'
 import { defineEntity } from '../src/entity.js'
 import { fromStandardSchema, runMigrations } from '../src/schema.js'
 import { jsonCodec, selectCodec } from '../src/serialize.js'
@@ -52,12 +52,12 @@ const browserBackfillLeaseContenders = new Map<
 const browserCoordinationReceivers = new Map<
   string,
   {
-    store: ReturnType<typeof indexedDb>
+    store: ReturnType<typeof indexedDbHost>
     hint: Promise<IStorageChange>
   }
 >()
 /** Keeps cross-page R09 writer stores alive until the receiver performs its authoritative read. */
-const browserCoordinationWriters = new Map<string, ReturnType<typeof indexedDb>>()
+const browserCoordinationWriters = new Map<string, ReturnType<typeof indexedDbHost>>()
 
 declare global {
   interface Window {
@@ -392,9 +392,9 @@ declare global {
   }
 }
 
-/** 真实浏览器下的 localStorage 配额：一直写到抛 QuotaExceededError 为止。 */
+/** 真实浏览器下的 localStorageHost 配额：一直写到抛 QuotaExceededError 为止。 */
 window.runLocalStorageQuotaScenario = async () => {
-  const store = localStorage({ namespace: `quota-${Math.random().toString(36).slice(2)}` })
+  const store = localStorageHost({ namespace: `quota-${Math.random().toString(36).slice(2)}` })
   const chunk = 'x'.repeat(1024 * 64) // 64KB/条，加速填满 ~5-10MB 配额
   let wroteCount = 0
   let quotaErrorCode: string | undefined
@@ -409,7 +409,7 @@ window.runLocalStorageQuotaScenario = async () => {
   await store.clearValues()
   let optionsCode: string | undefined
   try {
-    localStorage(null as never)
+    localStorageHost(null as never)
   } catch (error) {
     optionsCode = (error as { code?: string }).code
   }
@@ -419,7 +419,7 @@ window.runLocalStorageQuotaScenario = async () => {
 /** 真实浏览器页面内注入异常 Storage，验证公开入口仍归一化为 StorageError。 */
 window.runStorageFailureScenario = async () => {
   let constructorOptionReads = 0
-  const getterStore = localStorage({
+  const getterStore = localStorageHost({
     get namespace() {
       constructorOptionReads += 1
       return `getter-storage-${Math.random().toString(36).slice(2)}`
@@ -437,7 +437,7 @@ window.runStorageFailureScenario = async () => {
   await getterStore.clearValues()
   let optionGetterCode: string | undefined
   try {
-    localStorage({
+    localStorageHost({
       get namespace(): string {
         throw new Error('hostile browser namespace')
       }
@@ -457,14 +457,14 @@ window.runStorageFailureScenario = async () => {
     key: (index: number) => window.localStorage.key(index),
     clear: () => window.localStorage.clear()
   }
-  const lengthObservedStore = localStorage({
+  const lengthObservedStore = localStorageHost({
     namespace: `length-observed-${Math.random().toString(36).slice(2)}`,
     storage: lengthObservedStorage
   })
   await lengthObservedStore.dispose()
   let storageGetterCode: string | undefined
   try {
-    localStorage({
+    localStorageHost({
       storage: Object.defineProperty(lengthObservedStorage, 'getItem', {
         configurable: true,
         get: () => {
@@ -476,7 +476,7 @@ window.runStorageFailureScenario = async () => {
     storageGetterCode = (error as { code?: string }).code
   }
   let namespaceCodecReads = 0
-  const codecStore = localStorage({
+  const codecStore = localStorageHost({
     namespace: `codec-observed-${Math.random().toString(36).slice(2)}`,
     get namespaceCodec() {
       return {
@@ -509,7 +509,7 @@ window.runStorageFailureScenario = async () => {
     key: (index: number) => window.localStorage.key(index),
     clear: () => window.localStorage.clear()
   }
-  const boundedStore = localStorage({
+  const boundedStore = localStorageHost({
     namespace: `bounded-iteration-${Math.random().toString(36).slice(2)}`,
     storage: boundedStorage
   })
@@ -517,7 +517,7 @@ window.runStorageFailureScenario = async () => {
   if (!(await boundedStore.keys()).includes('key')) throw new Error('bounded scan missed key')
   await boundedStore.remove('key')
   const physicalClearNamespace = `physical-clear-${Math.random().toString(36).slice(2)}`
-  const physicalClearStore = localStorage({
+  const physicalClearStore = localStorageHost({
     namespace: physicalClearNamespace,
     namespaceCodec: {
       encode: (namespace: string, key: string) => `${namespace}:wire:${key.toLowerCase()}`,
@@ -553,7 +553,7 @@ window.runStorageFailureScenario = async () => {
         .sort()[index] ?? null,
     clear: () => window.localStorage.clear()
   }
-  const partialClearStore = localStorage({
+  const partialClearStore = localStorageHost({
     namespace: `partial-clear-${Math.random().toString(36).slice(2)}`,
     storage: partialStorage
   })
@@ -572,7 +572,7 @@ window.runStorageFailureScenario = async () => {
     partialClearKey = typed.key
   }
   let snapshotLengthReads = 0
-  const snapshotFailureStore = localStorage({
+  const snapshotFailureStore = localStorageHost({
     namespace: `snapshot-failure-${Math.random().toString(36).slice(2)}`,
     storage: {
       get length(): number {
@@ -616,7 +616,7 @@ window.runStorageFailureScenario = async () => {
         .sort()[index] ?? null,
     clear: () => window.localStorage.clear()
   }
-  const reentrantStore = localStorage({
+  const reentrantStore = localStorageHost({
     namespace: `reentrant-clear-${Math.random().toString(36).slice(2)}`,
     storage: reentrantStorage
   })
@@ -638,7 +638,7 @@ window.runStorageFailureScenario = async () => {
   const reentrantAbortKeyMatchesRemaining =
     reentrantRemainingKeys.length === 1 && reentrantRemainingKeys[0] === reentrantAbortKey
   const incoherentNamespace = `incoherent-clear-${Math.random().toString(36).slice(2)}`
-  const incoherentStore = localStorage({
+  const incoherentStore = localStorageHost({
     namespace: incoherentNamespace,
     storage: {
       get length() {
@@ -678,13 +678,13 @@ window.runStorageFailureScenario = async () => {
   }
   let invalidStorageCode: string | undefined
   try {
-    localStorage({ namespace: 'invalid-storage', storage: {} as never })
+    localStorageHost({ namespace: 'invalid-storage', storage: {} as never })
   } catch (error) {
     invalidStorageCode = (error as { code?: string }).code
   }
   let invalidLengthCode: string | undefined
   try {
-    localStorage({
+    localStorageHost({
       namespace: 'invalid-length',
       storage: {
         length: NaN,
@@ -699,7 +699,7 @@ window.runStorageFailureScenario = async () => {
     invalidLengthCode = (error as { code?: string }).code
   }
   try {
-    localStorage({ namespace: `failure-${Math.random().toString(36).slice(2)}`, storage })
+    localStorageHost({ namespace: `failure-${Math.random().toString(36).slice(2)}`, storage })
     return {
       code: undefined,
       hasCause: false,
@@ -759,11 +759,11 @@ window.runStorageFailureScenario = async () => {
  */
 window.runCookieSecureScenario = async () => {
   const namespace = `secure-${Math.random().toString(36).slice(2)}`
-  const insecureStore = cookies({ namespace })
+  const insecureStore = cookiesHost({ namespace })
   await insecureStore.set('insecure-cookie', 'v1')
   const insecureVisible = (await insecureStore.get('insecure-cookie')) === 'v1'
 
-  const secureStore = cookies({ namespace, scope: { path: '/', secure: true } })
+  const secureStore = cookiesHost({ namespace, scope: { path: '/', secure: true } })
   let secureVisible = false
   try {
     await secureStore.set('secure-cookie', 'v2')
@@ -779,7 +779,7 @@ window.runCookieSecureScenario = async () => {
 
 /** 真实浏览器对单条 cookie ~4KB 的硬限制；超过后浏览器直接不写入或截断。 */
 window.runCookieSizeLimitScenario = async () => {
-  const store = cookies({ namespace: `size-${Math.random().toString(36).slice(2)}` })
+  const store = cookiesHost({ namespace: `size-${Math.random().toString(36).slice(2)}` })
   try {
     await store.set('big', 'x'.repeat(5000))
     return { code: undefined }
@@ -802,7 +802,7 @@ window.runCookieDuplicateScopeScenario = async () => {
       .split(';')
       .map((pair) => decodeURIComponent(pair.slice(0, pair.indexOf('=')).trim()))
       .filter((name) => name === physicalKey).length === 2
-  const store = cookies({
+  const store = cookiesHost({
     namespace,
     scope: { path: '/nested' },
     namespaceCodec: {
@@ -843,7 +843,7 @@ window.runCookieDuplicateScopeScenario = async () => {
 window.runCookieScopeGuardScenario = async () => {
   let constructorOptionReads = 0
   let scopeReads = 0
-  const constructorStore = cookies({
+  const constructorStore = cookiesHost({
     get namespace() {
       constructorOptionReads += 1
       return `constructor-${Math.random().toString(36).slice(2)}`
@@ -897,13 +897,13 @@ window.runCookieScopeGuardScenario = async () => {
   })
   let scopeCode: string | undefined
   try {
-    cookies({ namespace: `scope-${Math.random().toString(36).slice(2)}`, scope: [] as never })
+    cookiesHost({ namespace: `scope-${Math.random().toString(36).slice(2)}`, scope: [] as never })
   } catch (error) {
     scopeCode = (error as { code?: string }).code
   }
   let codecCode: string | undefined
   try {
-    cookies({
+    cookiesHost({
       namespace: `codec-${Math.random().toString(36).slice(2)}`,
       namespaceCodec: [] as never
     })
@@ -912,7 +912,7 @@ window.runCookieScopeGuardScenario = async () => {
   }
   let documentCode: string | undefined
   try {
-    cookies({
+    cookiesHost({
       namespace: `document-${Math.random().toString(36).slice(2)}`,
       document: [] as never
     })
@@ -921,13 +921,13 @@ window.runCookieScopeGuardScenario = async () => {
   }
   let optionsCode: string | undefined
   try {
-    cookies(null as never)
+    cookiesHost(null as never)
   } catch (error) {
     optionsCode = (error as { code?: string }).code
   }
   let expiresCode: string | undefined
   try {
-    await cookies({ namespace: `expires-${Math.random().toString(36).slice(2)}` }).set(
+    await cookiesHost({ namespace: `expires-${Math.random().toString(36).slice(2)}` }).set(
       'key',
       'value',
       { expires: 'date' as never }
@@ -936,7 +936,7 @@ window.runCookieScopeGuardScenario = async () => {
     expiresCode = (error as { code?: string }).code
   }
   try {
-    await cookies({ namespace: `expires-number-${Math.random().toString(36).slice(2)}` }).set(
+    await cookiesHost({ namespace: `expires-number-${Math.random().toString(36).slice(2)}` }).set(
       'key',
       'value',
       { expires: { getTime: () => Infinity } as never }
@@ -946,7 +946,7 @@ window.runCookieScopeGuardScenario = async () => {
   }
   let maxAgeCode: string | undefined
   try {
-    await cookies({ namespace: `max-age-${Math.random().toString(36).slice(2)}` }).set(
+    await cookiesHost({ namespace: `max-age-${Math.random().toString(36).slice(2)}` }).set(
       'key',
       'value',
       { maxAge: Number.MAX_SAFE_INTEGER + 1 }
@@ -955,7 +955,7 @@ window.runCookieScopeGuardScenario = async () => {
     maxAgeCode = (error as { code?: string }).code
   }
   let expiresReads = 0
-  const snapshotStore = cookies({
+  const snapshotStore = cookiesHost({
     namespace: `expires-snapshot-${Math.random().toString(36).slice(2)}`
   })
   await snapshotStore.set('key', 'value', {
@@ -969,7 +969,7 @@ window.runCookieScopeGuardScenario = async () => {
   })
   let documentReadCode: string | undefined
   let hostileDocumentReads = 0
-  const readFailureStore = cookies({
+  const readFailureStore = cookiesHost({
     namespace: 'document-read-failure',
     document: {
       get cookie() {
@@ -987,7 +987,7 @@ window.runCookieScopeGuardScenario = async () => {
   }
   let documentTypeDriftCode: string | undefined
   let driftingDocumentReads = 0
-  const typeDriftStore = cookies({
+  const typeDriftStore = cookiesHost({
     namespace: 'document-type-drift',
     document: {
       get cookie(): string {
@@ -1003,7 +1003,7 @@ window.runCookieScopeGuardScenario = async () => {
     documentTypeDriftCode = (error as { code?: string }).code
   }
   let documentWriteCode: string | undefined
-  const writeFailureStore = cookies({
+  const writeFailureStore = cookiesHost({
     namespace: 'document-write-failure',
     document: {
       get cookie() {
@@ -1032,7 +1032,7 @@ window.runCookieScopeGuardScenario = async () => {
       document.cookie = value
     }
   }
-  const partialCookieStore = cookies({
+  const partialCookieStore = cookiesHost({
     namespace: `partial-cookie-${Math.random().toString(36).slice(2)}`,
     document: partialCookieDocument
   })
@@ -1050,7 +1050,7 @@ window.runCookieScopeGuardScenario = async () => {
     partialClearKey = typed.key
   }
   let snapshotCookieReads = 0
-  const snapshotFailureStore = cookies({
+  const snapshotFailureStore = cookiesHost({
     namespace: `snapshot-cookie-${Math.random().toString(36).slice(2)}`,
     document: {
       get cookie(): string {
@@ -1072,7 +1072,7 @@ window.runCookieScopeGuardScenario = async () => {
   }
   const reentrantController = new AbortController()
   let reentrantArmed = false
-  const reentrantStore = cookies({
+  const reentrantStore = cookiesHost({
     namespace: `reentrant-cookie-${Math.random().toString(36).slice(2)}`,
     document: {
       get cookie(): string {
@@ -1103,7 +1103,7 @@ window.runCookieScopeGuardScenario = async () => {
   const reentrantAbortKeyMatchesRemaining =
     reentrantRemainingKeys.length === 1 && reentrantRemainingKeys[0] === reentrantAbortKey
   let syncRemoveOverrideReads = 0
-  const syncRemoveStore = cookies({
+  const syncRemoveStore = cookiesHost({
     namespace: `sync-remove-${Math.random().toString(36).slice(2)}`,
     scope: { path: '/' }
   })
@@ -1117,7 +1117,7 @@ window.runCookieScopeGuardScenario = async () => {
   if ((await syncRemoveStore.get('key')) !== null)
     throw new Error('sync remove did not use fixed scope')
   let writeContextReads = 0
-  const writeContextStore = cookies({
+  const writeContextStore = cookiesHost({
     namespace: `write-context-${Math.random().toString(36).slice(2)}`
   })
   await writeContextStore.set('key', 'value', {
@@ -1241,7 +1241,7 @@ window.runIndexedDbBlockedScenario = async () => {
   })
 
   let blockedErrorCode: string | undefined
-  const store = indexedDb({ factory, dbName })
+  const store = indexedDbHost({ factory, dbName })
   const openAttempt = store.get('k').catch((error: { code?: string }) => {
     blockedErrorCode = error.code
   })
@@ -1260,12 +1260,12 @@ window.runIndexedDbBlockedScenario = async () => {
   } catch {
     sameStoreRetrySucceeded = false
   }
-  const retryStore = indexedDb({ factory, dbName })
+  const retryStore = indexedDbHost({ factory, dbName })
   await retryStore.set('k', 'v')
   const secondOpenSucceededAfterClose = (await retryStore.get('k')) === 'v'
 
   const hostileDbName = `${dbName}-hostile-close`
-  const hostileStore = indexedDb({ factory, dbName: hostileDbName })
+  const hostileStore = indexedDbHost({ factory, dbName: hostileDbName })
   await hostileStore.set('before', 'value')
   const currentDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
     const request = factory.open(hostileDbName)
@@ -1317,7 +1317,7 @@ window.runIndexedDbBlockedScenario = async () => {
     transaction.onerror = () => reject(transaction.error)
   })
   transitionLegacy.close()
-  const transitionStore = indexedDb({ factory, dbName: transitionDbName })
+  const transitionStore = indexedDbHost({ factory, dbName: transitionDbName })
   let transitionCloseCode: string | undefined
   let transitionCloseRetrySucceeded = false
   IDBDatabase.prototype.close = () => {
@@ -1387,7 +1387,7 @@ window.runIndexedDbBlockedScenario = async () => {
         } as unknown as IDBOpenDBRequest
       }
     } as unknown as IDBFactory
-    const schemaStore = indexedDb({ factory: hostileFactory, dbName: schemaDbName })
+    const schemaStore = indexedDbHost({ factory: hostileFactory, dbName: schemaDbName })
     let code: string | undefined
     try {
       await schemaStore.get('key')
@@ -1414,7 +1414,7 @@ window.runIndexedDbBlockedScenario = async () => {
     property: 'onversionchange' | 'onclose'
   ): Promise<{ code: string | undefined; recovered: boolean }> => {
     const connectionDbName = `${dbName}-connection-${property}`
-    const seedStore = indexedDb({ factory, dbName: connectionDbName })
+    const seedStore = indexedDbHost({ factory, dbName: connectionDbName })
     await seedStore.set('seed', 'value')
     await seedStore.dispose()
     let intercepted = false
@@ -1459,7 +1459,7 @@ window.runIndexedDbBlockedScenario = async () => {
         } as unknown as IDBOpenDBRequest
       }
     } as unknown as IDBFactory
-    const connectionStore = indexedDb({ factory: hostileFactory, dbName: connectionDbName })
+    const connectionStore = indexedDbHost({ factory: hostileFactory, dbName: connectionDbName })
     let code: string | undefined
     try {
       await connectionStore.get('seed')
@@ -1500,8 +1500,8 @@ window.runIndexedDbBlockedScenario = async () => {
 
 window.runIndexedDbTransactionConflictScenario = async () => {
   const dbName = `conflict-${Math.random().toString(36).slice(2)}`
-  const first = indexedDb({ dbName })
-  const second = indexedDb({ dbName })
+  const first = indexedDbHost({ dbName })
+  const second = indexedDbHost({ dbName })
   await first.putRecord({ value: 0 }, 'revision-key')
   let code: string | undefined
   try {
@@ -1522,7 +1522,7 @@ window.runIndexedDbTransactionConflictScenario = async () => {
 /** 真实浏览器验证 transaction scope 在 callback 结束后不会静默读写。 */
 window.runIndexedDbEscapedTransactionScopeScenario = async () => {
   const dbName = `escaped-scope-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   let escaped:
     | {
         get(key: string): Promise<unknown>
@@ -1555,7 +1555,7 @@ window.runIndexedDbEscapedTransactionScopeScenario = async () => {
 /** 真实浏览器验证 destructive clear 在取消后不提交部分清理。 */
 window.runIndexedDbClearAbortScenario = async () => {
   const dbName = `clear-abort-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   await store.set('all-value', 'keep')
   await store.putRecord({ keep: true }, 'all-record')
 
@@ -1587,7 +1587,7 @@ window.runIndexedDbClearAbortScenario = async () => {
 /** 真实浏览器验证 deleteRecord 在 revision request 期间取消不会落盘删除。 */
 window.runIndexedDbDeleteAbortScenario = async () => {
   const dbName = `delete-abort-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   await store.putRecord({ keep: true }, 'delete-me')
   const controller = new AbortController()
   const pending = store.deleteRecord('delete-me', { signal: controller.signal })
@@ -1608,7 +1608,7 @@ window.runIndexedDbDeleteAbortScenario = async () => {
 /** 真实浏览器验证 putRecord 的 request 失败/取消不会提交部分写入。 */
 window.runIndexedDbPutAbortScenario = async () => {
   const dbName = `put-abort-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   await store.putRecord({ warm: true }, 'warm')
   const controller = new AbortController()
   const pending = store.putRecord({ keep: true }, 'put-me', {
@@ -1631,7 +1631,7 @@ window.runIndexedDbPutAbortScenario = async () => {
 /** 真实浏览器验证 entity migrate 的分批 transaction 与 legacy 清理语义。 */
 window.runIndexedDbEntityMigrationScenario = async () => {
   const dbName = `entity-migrate-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   const entity = defineEntity<{ id: string; displayName: string }>({
     name: 'browser-migrate',
     key: 'id',
@@ -1698,7 +1698,7 @@ window.runIndexedDbEntityMigrationScenario = async () => {
 /** 真实浏览器验证两个连接并发执行 entity migrate 后不会留下重复 legacy 数据。 */
 window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
   const dbName = `entity-migrate-concurrent-${Math.random().toString(36).slice(2)}`
-  const seed = indexedDb({ dbName })
+  const seed = indexedDbHost({ dbName })
   await seed.putRecord({ __v: 1, data: { id: 'a', name: 'Ada' } }, [
     'browser-concurrent-migrate',
     'a'
@@ -1707,8 +1707,8 @@ window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
     'browser-concurrent-migrate',
     'b'
   ])
-  const first = indexedDb({ dbName })
-  const second = indexedDb({ dbName })
+  const first = indexedDbHost({ dbName })
+  const second = indexedDbHost({ dbName })
   const createEntity = () =>
     defineEntity<{ id: string; displayName: string }>({
       name: 'browser-concurrent-migrate',
@@ -1751,7 +1751,7 @@ window.runIndexedDbCrossRealmKeyScenario = async () => {
     Uint8Array: typeof Uint8Array
   }
   const dbName = `cross-realm-key-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   const dateKey = new realm.Date('2025-01-02T03:04:05.000Z')
   const bytesKey = new realm.ArrayBuffer(3)
   new realm.Uint8Array(bytesKey).set([7, 8, 9])
@@ -1822,7 +1822,7 @@ window.runByteBrandScenario = async () => {
 /** 真实浏览器验证 SWV2-D27 对每个非 canonical key 域的原子 generation rotation。 */
 window.runIndexedDbRawIndexFirewallScenario = async () => {
   const dbName = `raw-index-firewall-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   const capability = asIndexedDbBackfillStore(store)!
   const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
   const rawKeys: ReadonlyArray<readonly [string, IStorageKey]> = [
@@ -1921,8 +1921,8 @@ window.runIndexedDbRawIndexFirewallScenario = async () => {
 /** 真实浏览器验证跨 connection lease 只由 monotonic heartbeat 观察窗口推进。 */
 window.runIndexedDbBackfillLeaseScenario = async () => {
   const dbName = `backfill-lease-${Math.random().toString(36).slice(2)}`
-  const ownerStore = indexedDb({ dbName })
-  const contenderStore = indexedDb({ dbName })
+  const ownerStore = indexedDbHost({ dbName })
+  const contenderStore = indexedDbHost({ dbName })
   const ownerCapability = asIndexedDbBackfillStore(ownerStore)!
   const contenderCapability = asIndexedDbBackfillStore(contenderStore)!
   const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
@@ -1992,7 +1992,7 @@ window.runIndexedDbBackfillLeaseScenario = async () => {
 
 /** Start a lease in this page so another page can contend without sharing local observations. */
 window.startIndexedDbBackfillLeaseOwner = async (dbName) => {
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   const capability = asIndexedDbBackfillStore(store)!
   const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
   await store.putRecord({ value: 1 }, composeRepositoryKey('lease-pages', 'id-0'))
@@ -2009,7 +2009,7 @@ window.startIndexedDbBackfillLeaseOwner = async (dbName) => {
 window.contendIndexedDbBackfillLease = async (dbName) => {
   let contender = browserBackfillLeaseContenders.get(dbName)
   if (contender === undefined) {
-    const store = indexedDb({ dbName })
+    const store = indexedDbHost({ dbName })
     const capability = asIndexedDbBackfillStore(store)!
     const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
     const handle = await capability.ensureRecordIndexes('lease-pages', definitions)
@@ -2051,7 +2051,7 @@ window.finishIndexedDbBackfillLeaseOwner = async (dbName) => {
 
 /** 真实浏览器验证 Memory 对复合 record key 的输入与输出所有权隔离。 */
 window.runMemoryCompositeKeyOwnershipScenario = async () => {
-  const store = memoryStorage<{ source: string }>()
+  const store = memoryStorageHost<{ source: string }>()
   const directKey: Array<string | number> = ['direct', 1]
   const transactionKey: Array<string | number> = ['transaction', 1]
   await store.putRecord({ source: 'direct' }, directKey)
@@ -2082,7 +2082,7 @@ window.runMemoryCompositeKeyOwnershipScenario = async () => {
       ])
   await store.dispose()
 
-  const rangeStore = memoryStorage<{ value: number }>()
+  const rangeStore = memoryStorageHost<{ value: number }>()
   await rangeStore.putRecord({ value: 1 }, ['range', 1])
   await rangeStore.putRecord({ value: 2 }, ['range', 2])
   await rangeStore.putRecord({ value: 3 }, ['range', 3])
@@ -2100,7 +2100,7 @@ window.runMemoryCompositeKeyOwnershipScenario = async () => {
 /** 真实浏览器验证 timeoutMs=0 与 dispose 的统一 operation lifecycle。 */
 window.runOperationLifecycleScenario = async () => {
   const operationRuntime = createStorageOperationRuntime()
-  const memory = (await import('../src/memory.js')).memoryStorage()
+  const memory = (await import('../src/memory.js')).memoryStorageHost()
   let contextSnapshotReads = 0
   const contextController = new AbortController()
   await memory.set('context-snapshot', 'value', {
@@ -2357,8 +2357,8 @@ window.runOperationLifecycleScenario = async () => {
   const syncOptionCodes: Array<string | undefined> = []
   const syncStores = [
     memory,
-    localStorage({ namespace: `sync-options-${Math.random().toString(36).slice(2)}` }),
-    cookies({ namespace: `sync-options-${Math.random().toString(36).slice(2)}` })
+    localStorageHost({ namespace: `sync-options-${Math.random().toString(36).slice(2)}` }),
+    cookiesHost({ namespace: `sync-options-${Math.random().toString(36).slice(2)}` })
   ]
   for (const store of syncStores)
     for (const options of [{ conflictPolicy: 'invalid' }, { timeoutMs: 1 }]) {
@@ -2370,7 +2370,7 @@ window.runOperationLifecycleScenario = async () => {
     }
   const memoryValue = await memory.get('timeout')
   const dbName = `operation-lifecycle-${Math.random().toString(36).slice(2)}`
-  const database = indexedDb({ dbName })
+  const database = indexedDbHost({ dbName })
   await database.putRecord({ keep: true }, 'keep')
   let indexedTimeoutCode: string | undefined
   try {
@@ -2578,7 +2578,7 @@ window.runOperationLifecycleScenario = async () => {
       operationRuntime
     )) === undefined
   const destructiveDbName = `idb-destructive-setter-${Math.random().toString(36).slice(2)}`
-  const destructiveStore = indexedDb({ dbName: destructiveDbName })
+  const destructiveStore = indexedDbHost({ dbName: destructiveDbName })
   const idbDestructiveSetterCodes: Array<string | undefined> = []
   let idbDestructiveSetterRolledBack = true
   for (const operation of ['clearAll', 'deleteRecord', 'clearRecords'] as const) {
@@ -2664,7 +2664,7 @@ window.runOperationLifecycleScenario = async () => {
 /** 真实浏览器验证 entity codec 异常不会提交半条 IndexedDB record。 */
 window.runIndexedDbExtensionFailureScenario = async () => {
   const dbName = `extension-failure-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   const entity = defineEntity<{ id: string; value: string }>({
     name: 'browser-extension-failure',
     key: 'id',
@@ -2693,7 +2693,7 @@ window.runIndexedDbExtensionFailureScenario = async () => {
 /** 真实浏览器验证旧 entity 客户端不会读取或覆盖未来版本 envelope。 */
 window.runIndexedDbFutureVersionScenario = async () => {
   const dbName = `future-version-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   await store.putRecord({ __v: 2, data: { id: 'future', name: 'New' } }, [
     'browser-future-version',
     'future'
@@ -2731,7 +2731,7 @@ window.runIndexedDbFutureVersionScenario = async () => {
 /** 真实浏览器验证 custom codec 永不 settle 时外部 abort 仍能结束等待。 */
 window.runIndexedDbHangingExtensionAbortScenario = async () => {
   const dbName = `hanging-extension-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   const entity = defineEntity<{ id: string; name: string }>({
     name: 'browser-hanging-extension',
     key: 'id',
@@ -2763,7 +2763,7 @@ window.runIndexedDbHangingExtensionAbortScenario = async () => {
 /** 真实浏览器验证 hanging migration 在 abort 后结束等待且不改写 legacy envelope。 */
 window.runIndexedDbHangingMigrationAbortScenario = async () => {
   const dbName = `hanging-migration-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   await store.putRecord({ __v: 1, data: { id: 'hanging', name: 'Ada' } }, [
     'browser-hanging-migration',
     'hanging'
@@ -2801,7 +2801,7 @@ window.runIndexedDbHangingMigrationAbortScenario = async () => {
 /** 真实浏览器验证 pre-abort 不会调用 custom codec。 */
 window.runIndexedDbPreAbortExtensionScenario = async () => {
   const dbName = `pre-abort-extension-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   let calls = 0
   const entity = defineEntity<{ id: string; name: string }>({
     name: 'browser-pre-abort-extension',
@@ -2832,7 +2832,7 @@ window.runIndexedDbPreAbortExtensionScenario = async () => {
 /** 真实浏览器验证 pre-abort migration 即使无需步骤也不会成功返回。 */
 window.runIndexedDbPreAbortMigrationScenario = async () => {
   const dbName = `pre-abort-migration-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   const entity = defineEntity<{ id: string; name: string }>({
     name: 'browser-pre-abort-migration',
     key: 'id',
@@ -2854,7 +2854,7 @@ window.runIndexedDbPreAbortMigrationScenario = async () => {
 /** 真实浏览器验证 schema validation failure 不会留下 raw entity record。 */
 window.runIndexedDbSchemaFailureScenario = async () => {
   const dbName = `schema-failure-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   const entity = defineEntity<{ id: string; name: string }>({
     name: 'browser-schema-failure',
     key: 'id',
@@ -2880,7 +2880,7 @@ window.runIndexedDbSchemaFailureScenario = async () => {
 /** 真实浏览器中用小页扫描较大结果集，验证分页不会丢项、乱序或在提前停止后继续消费。 */
 window.runIndexedDbPagedScanScenario = async () => {
   const dbName = `paged-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   for (let index = 0; index < 257; index += 1)
     await store.putRecord({ index }, `record-${String(index).padStart(3, '0')}`)
 
@@ -3026,9 +3026,9 @@ window.runIndexedDbPagedScanScenario = async () => {
 /** 三个连接同时参与同一 revision 的竞争，验证 optimistic transaction 只允许一个提交。 */
 window.runIndexedDbDualTransactionScenario = async () => {
   const dbName = `dual-conflict-${Math.random().toString(36).slice(2)}`
-  const seed = indexedDb({ dbName })
-  const first = indexedDb({ dbName })
-  const second = indexedDb({ dbName })
+  const seed = indexedDbHost({ dbName })
+  const first = indexedDbHost({ dbName })
+  const second = indexedDbHost({ dbName })
   await seed.putRecord({ value: 0 }, 'dual-key')
   let releaseFirst: (() => void) | undefined
   let releaseSecond: (() => void) | undefined
@@ -3084,7 +3084,7 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
     transaction.onerror = () => reject(transaction.error)
   })
   database.close()
-  const store = indexedDb({ dbName, cleanupLegacyRecords: true })
+  const store = indexedDbHost({ dbName, cleanupLegacyRecords: true })
   const value = await store.getRecord('legacy')
   const checkpoint = await store.metadata!.get('migration:records-v1-to-v2')
   await store.dispose()
@@ -3121,7 +3121,7 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
       },
       set onerror(_handler: unknown) {}
     }) as unknown as IDBRequest) as typeof originalOpenCursor
-  const hostileStore = indexedDb({ dbName: hostileDbName })
+  const hostileStore = indexedDbHost({ dbName: hostileDbName })
   let hostileCursorCode: string | undefined
   try {
     await hostileStore.getRecord('hostile')
@@ -3155,7 +3155,7 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
     }) as unknown as IDBFactory
   /** Run one hostile open lifecycle and return its normalized storage error code. */
   const readHostileOpenCode = async (event: 'success' | 'upgrade'): Promise<string | undefined> => {
-    const hostileOpenStore = indexedDb({
+    const hostileOpenStore = indexedDbHost({
       factory: createHostileFactory(event),
       dbName: `hostile-${event}`
     })
@@ -3172,7 +3172,7 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
   const hostileUpgradeCode = await readHostileOpenCode('upgrade')
   const openSetterCodes: Array<string | undefined> = []
   for (const property of ['onupgradeneeded', 'onblocked', 'onsuccess', 'onerror'] as const) {
-    const hostileSetterStore = indexedDb({
+    const hostileSetterStore = indexedDbHost({
       factory: {
         open: () =>
           ({
@@ -3216,8 +3216,8 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
 
 window.runIndexedDbFourWayTransactionScenario = async () => {
   const dbName = `four-way-${Math.random().toString(36).slice(2)}`
-  const seed = indexedDb({ dbName })
-  const stores = [1, 2, 3, 4].map(() => indexedDb({ dbName }))
+  const seed = indexedDbHost({ dbName })
+  const stores = [1, 2, 3, 4].map(() => indexedDbHost({ dbName }))
   await seed.putRecord({ value: 0 }, 'four-way-key')
   const releases: Array<() => void> = []
   const runs = stores.map((store, index) => {
@@ -3251,7 +3251,7 @@ window.runIndexedDbFourWayTransactionScenario = async () => {
 
 window.runIndexedDbFailureScenario = async () => {
   const dbName = `failure-${Math.random().toString(36).slice(2)}`
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   let transactionCode: string | undefined
   try {
     await store.transaction(async (tx) => {
@@ -3316,7 +3316,7 @@ window.runIndexedDbFailureScenario = async () => {
 /** 真实浏览器验证 IndexedDB commit 后 listener/report failure 不反转 write result。 */
 window.runIndexedDbPostCommitFailureScenario = async () => {
   const makeStore = () =>
-    indexedDb({ dbName: `post-commit-failure-${Math.random().toString(36).slice(2)}` })
+    indexedDbHost({ dbName: `post-commit-failure-${Math.random().toString(36).slice(2)}` })
   const syncStore = makeStore()
   const syncTrace: string[] = []
   let syncResolved = false
@@ -3410,7 +3410,7 @@ window.runIndexedDbPostCommitFailureScenario = async () => {
 }
 
 window.runIndexedDbSmokeScenario = async () => {
-  const store = indexedDb({ dbName: `smoke-${Math.random().toString(36).slice(2)}` })
+  const store = indexedDbHost({ dbName: `smoke-${Math.random().toString(36).slice(2)}` })
   await store.putRecord({ a: 1 }, 'k')
   await store.metadata!.set('smoke', { ready: true })
   const value = await store.getRecord('k')
@@ -3423,7 +3423,7 @@ window.runIndexedDbSmokeScenario = async () => {
 window.startIndexedDbCoordinationReceiver = async (dbName) => {
   const existing = browserCoordinationReceivers.get(dbName)
   if (existing !== undefined) await existing.store.dispose()
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   let resolveHint!: (change: IStorageChange) => void
   const hint = new Promise<IStorageChange>((resolve) => {
     resolveHint = resolve
@@ -3453,7 +3453,7 @@ window.awaitIndexedDbCoordinationHint = async (dbName) => {
 
 /** Commit one value from a separate browser page while retaining the transport until observation. */
 window.startIndexedDbCoordinationWriter = async (dbName) => {
-  const store = indexedDb({ dbName })
+  const store = indexedDbHost({ dbName })
   await store.set('r09-cross-page-key', 'committed-by-writer')
   browserCoordinationWriters.set(dbName, store)
   return { changeFeed: store.capabilities.changeFeed }
@@ -3472,18 +3472,18 @@ window.runIndexedDbOptionsGuardScenario = async () => {
   const codes: Array<string | undefined> = []
   for (const options of [null, [], 'options', 1]) {
     try {
-      indexedDb(options as never)
+      indexedDbHost(options as never)
     } catch (error) {
       codes.push((error as { code?: string }).code)
     }
   }
   try {
-    indexedDb({ cleanupLegacyRecords: 'yes' as never })
+    indexedDbHost({ cleanupLegacyRecords: 'yes' as never })
   } catch (error) {
     codes.push((error as { code?: string }).code)
   }
   try {
-    indexedDb({
+    indexedDbHost({
       get dbName(): string {
         throw new Error('hostile browser dbName')
       }
@@ -3491,7 +3491,7 @@ window.runIndexedDbOptionsGuardScenario = async () => {
   } catch (error) {
     codes.push((error as { code?: string }).code)
   }
-  const store = indexedDb({ dbName: `invalid-string-key-${crypto.randomUUID()}` })
+  const store = indexedDbHost({ dbName: `invalid-string-key-${crypto.randomUUID()}` })
   const invalidKey = 42 as unknown as string
   for (const operation of [
     () => store.get(invalidKey),
@@ -3572,7 +3572,7 @@ window.runEntityDefinitionGuardScenario = async () => {
       return undefined
     }
   })
-  await getterDefinition.connect(memoryStorage()).put({ id: 'stable' })
+  await getterDefinition.connect(memoryStorageHost()).put({ id: 'stable' })
   const hostileStore = {
     get backend(): 'memory' {
       throw new Error('hostile browser backend')
@@ -3599,7 +3599,7 @@ window.runEntityDefinitionGuardScenario = async () => {
       storeCodes.push((error as { code?: string }).code)
     }
   }
-  entity.connect(memoryStorage())
+  entity.connect(memoryStorageHost())
   const codecCodes: Array<string | undefined> = []
   for (const codec of [null, [], {}, { name: 'codec' }, { name: 'codec', output: 'unknown' }]) {
     try {
@@ -3901,7 +3901,7 @@ window.runEntityDefinitionGuardScenario = async () => {
 /** 真实浏览器验证 orderBy comparator 的返回类型不会被 Array.sort 静默转换。 */
 window.runEntityComparatorGuardScenario = async () => {
   const entity = defineEntity<{ id: string }>({ name: 'browser-comparator-guard', key: 'id' })
-  const repo = entity.connect(memoryStorage())
+  const repo = entity.connect(memoryStorageHost())
   await repo.put({ id: 'a' })
   await repo.put({ id: 'b' })
   const codes: Array<string | undefined> = []
@@ -3956,7 +3956,7 @@ window.runEntityComparatorGuardScenario = async () => {
   }
   let invalidPolicyCode: string | undefined
   try {
-    await memoryStorage().set('policy', 'value', { conflictPolicy: 'invalid' as never })
+    await memoryStorageHost().set('policy', 'value', { conflictPolicy: 'invalid' as never })
   } catch (error) {
     invalidPolicyCode = (error as { code?: string }).code
   }

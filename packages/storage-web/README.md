@@ -1,6 +1,6 @@
 # `@migaia/storage-web`
 
-浏览器端本地存储的统一契约实现：命名空间化的 `localStorage`/`sessionStorage`、`document.cookie`、IndexedDB，以及纯内存实现，叠加可选的实体（entity）、schema 校验、序列化（codec）扩展层。
+浏览器端本地存储的统一契约实现：命名空间化的 `localStorageHost`/`sessionStorageHost`、`document.cookie`、IndexedDB，以及纯内存实现，叠加可选的实体（entity）、schema 校验、序列化（codec）扩展层。
 
 ## 适用与不适用场景
 
@@ -18,10 +18,10 @@ Monorepo 内部依赖 `@migaia/storage-web@workspace:^`。
 
 ## 目录
 
-- [`localStorage` / `sessionStorage`](#web-storage-模块)：命名空间化的同步 Web Storage 封装
-- [`cookies`](#cookies-模块)：`document.cookie` 封装，带 scope 与可见性歧义处理
-- [`indexedDb`](#indexeddb-模块)：唯一支持记录/字节/事务的浏览器后端
-- [`memoryStorage`](#memorystorage-模块)：纯内存 L0+L1 实现，测试/SSR/降级用
+- [`localStorageHost` / `sessionStorageHost`](#web-storage-模块)：命名空间化的同步 Web Storage 封装
+- [`cookiesHost`](#cookiesHost-模块)：`document.cookie` 封装，带 scope 与可见性歧义处理
+- [`indexedDbHost`](#indexeddb-模块)：唯一支持记录/字节/事务的浏览器后端
+- [`memoryStorageHost`](#memorystorage-模块)：纯内存 L0+L1 实现，测试/SSR/降级用
 - [契约与能力模块](#契约与能力模块)：`IKeyValueStore`/`IRecordStore`/`isRecordStore`/`asRecordStore`/命名空间编码
 - [序列化（codec）模块](#序列化-codec-模块)：`jsonCodec`/`structuredCodec`/`binaryCodec`/`selectCodec`
 - [Schema 模块](#schema-模块)：`passthrough`/`fromStandardSchema`/`runMigrations`
@@ -38,52 +38,52 @@ Monorepo 内部依赖 `@migaia/storage-web@workspace:^`。
 
 <a id="web-storage-模块"></a>
 
-## `localStorage` / `sessionStorage` 模块
+## `localStorageHost` / `sessionStorageHost` 模块
 
 ```ts
-import { localStorage } from '@migaia/storage-web/local-storage'
-import { sessionStorage } from '@migaia/storage-web/session-storage'
+import { localStorageHost } from '@migaia/storage-web/local-storage'
+import { sessionStorageHost } from '@migaia/storage-web/session-storage'
 ```
 
-**`localStorage`｜5 秒上手**：
+**`localStorageHost`｜5 秒上手**：
 
 ```ts
-const store = localStorage({ namespace: 'settings' })
+const store = localStorageHost({ namespace: 'settings' })
 await store.set('theme', 'dark')
 await store.get('theme') // 'dark'
 store.sync.set('theme', 'light') // 同步 API，Web Storage 天然同步
 ```
 
-`sessionStorage(options)` 用法完全一致，仅默认注入 `globalThis.sessionStorage`。
+`sessionStorageHost(options)` 用法完全一致，仅默认注入 `globalThis.sessionStorage`。
 
 全部选项（`ILocalStorageOptions` / `ISessionStorageOptions`，均继承 `IWebStorageOptions`）：
 
 - `namespace?: string` —— 默认 `'default'`；必须非空字符串，否则抛 `INVALID_CONFIG`。同命名空间内的 `keys()`/`clearValues()`/`clearAll()` 互相隔离。
 - `namespaceCodec?: INamespaceCodec` —— 默认 `lengthPrefixedNamespaceCodec`；决定命名空间如何编码进物理 key。
-- `storage?: IWebStorageLike` —— 注入点，测试/非浏览器环境用；默认 `globalThis.localStorage`（或 `sessionStorage`）。
+- `storage?: IWebStorageLike` —— 注入点，测试/非浏览器环境用；默认 `globalThis.localStorage`（或 `sessionStorageHost`）。
 
-构造期会真实写一次探测 key 再删除（`localStorage()`/`sessionStorage()` 都会），Safari 隐私模式下 `setItem` 抛错也能被探测到，失败时立即抛 `BACKEND_UNAVAILABLE`，而不是等到第一次业务写入才发现。
+构造期会真实写一次探测 key 再删除（`localStorageHost()`/`sessionStorageHost()` 都会），Safari 隐私模式下 `setItem` 抛错也能被探测到，失败时立即抛 `BACKEND_UNAVAILABLE`，而不是等到第一次业务写入才发现。
 
 能力（`store.capabilities`）包含 `syncRead: true`，但 `binary`/`records`/`transactions`/`iteration`/`secondaryIndexes`/`changeFeed` 均为 `false`；`maxValueBytes` 约为 5 MiB，`opaqueEntries: false`。该上限是近似值，不是浏览器配额保证。
 
 ```ts
-const store = localStorage({ storage: myFakeStorage }) // 测试环境注入
+const store = localStorageHost({ storage: myFakeStorage }) // 测试环境注入
 ```
 
 ---
 
-<a id="cookies-模块"></a>
+<a id="cookiesHost-模块"></a>
 
-## `cookies` 模块
+## `cookiesHost` 模块
 
 ```ts
-import { cookies } from '@migaia/storage-web/cookies'
+import { cookiesHost } from '@migaia/storage-web/cookiesHost'
 ```
 
-**`cookies`｜10 秒上手**：
+**`cookiesHost`｜10 秒上手**：
 
 ```ts
-const jar = cookies({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })
+const jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })
 await jar.set('session', 'abc123', { maxAge: 3600 })
 await jar.get('session') // 'abc123'
 await jar.remove('session')
@@ -109,16 +109,16 @@ await jar.remove('session')
 
 <a id="indexeddb-模块"></a>
 
-## `indexedDb` 模块
+## `indexedDbHost` 模块
 
 ```ts
-import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 ```
 
-**`indexedDb`｜10 秒上手** —— 唯一原生支持字节/记录/事务/游标迭代的浏览器后端：
+**`indexedDbHost`｜10 秒上手** —— 唯一原生支持字节/记录/事务/游标迭代的浏览器后端：
 
 ```ts
-const db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' })
+const db = indexedDbHost<{ id: string; name: string }>({ dbName: 'app-data' })
 await db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')
 await db.getRecord('ada') // { id: 'ada', name: 'Ada' }
 for await (const [key, value] of db.iterateRecords()) console.log(key, value)
@@ -142,16 +142,16 @@ for await (const [key, value] of db.iterateRecords()) console.log(key, value)
 
 <a id="memorystorage-模块"></a>
 
-## `memoryStorage` 模块
+## `memoryStorageHost` 模块
 
 ```ts
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 ```
 
-**`memoryStorage`｜3 秒上手**：
+**`memoryStorageHost`｜3 秒上手**：
 
 ```ts
-const store = memoryStorage<{ id: string }>()
+const store = memoryStorageHost<{ id: string }>()
 await store.putRecord({ id: '1' }, '1')
 ```
 
@@ -171,7 +171,7 @@ import { lengthPrefixedNamespaceCodec } from '@migaia/storage-web'
 **`isRecordStore` / `asRecordStore`｜5 秒上手** —— 从 `IKeyValueStore`（L0）安全收窄到 `IRecordStore`（L1）：
 
 ```ts
-const store = indexedDb()
+const store = indexedDbHost()
 if (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')
 const records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)
 ```
@@ -186,7 +186,7 @@ await store.set('k', 'v', { conflictPolicy: ConflictPolicy.replace })
 
 取值 `{ conflict: 'conflict', replace: 'replace' }`。默认 `'conflict'`：一个逻辑 key 同时占用 value/bytes/record 三个通道之一时，另一通道写入会抛 `DUPLICATE_KEY`；显式传 `'replace'` 才会原子删除其他通道的同名值。
 
-**`lengthPrefixedNamespaceCodec`｜3 秒上手** —— 默认物理 key 编码器，`localStorage`/`sessionStorage`/`cookies` 的 `namespaceCodec` 默认值：
+**`lengthPrefixedNamespaceCodec`｜3 秒上手** —— 默认物理 key 编码器，`localStorageHost`/`sessionStorageHost`/`cookiesHost` 的 `namespaceCodec` 默认值：
 
 ```ts
 lengthPrefixedNamespaceCodec.encode('app', 'theme') // 'sw1:3:app:theme'
@@ -228,10 +228,10 @@ await jsonCodec.decode('{"a":1}') // { a: 1 }
 **`structuredCodec`｜10 秒上手** —— codec 本身原样传值，真正的复制发生在 IndexedDB/Memory 的 structured clone 写入与读取边界：
 
 ```ts
-import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 import { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'
 
-const db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })
+const db = indexedDbHost({ dbName: 'app-data', recordsStoreName: 'snapshots' })
 const codec = selectCodec(structuredCodec, db.capabilities)
 
 const snapshot: Record<string, unknown> = {
@@ -329,7 +329,7 @@ const definition = defineEntity<IPreference>({
   migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }
 })
 
-const preferences = definition.connect(indexedDb({ dbName: 'app-data' }))
+const preferences = definition.connect(indexedDbHost({ dbName: 'app-data' }))
 await preferences.put({ id: 'appearance', theme: 'dark' })
 await preferences.get('appearance') // { id: 'appearance', theme: 'dark' }
 ```
@@ -354,7 +354,7 @@ await preferences.get('appearance') // { id: 'appearance', theme: 'dark' }
 - `remove(id, ctx?)`：删除主键对应记录（同时清理历史存储形态遗留的键）。
 - `list(options?, ctx?)` / `stream(options?, ctx?)`：`options: IListOptions<TDomain>` 为 `{ range?, limit?, orderBy?, onInvalid? }`；`onInvalid` 取 `'skip'`（默认）、`'throw'`，或 `(issue) => 'skip' | 'throw'` 处理器，`issue.stage` 取 `'decode' | 'migrate' | 'validate'`。KV-only 后端会全表扫描并触发一次诊断；结构化后端按实体前缀 range 扫描。
 - `findBy(index, key, ctx?)` / `findManyBy(index, range?, options?, ctx?)` / `streamBy(...)`：按声明的二级索引查询；IndexedDB 使用原生 sidecar，其他后端走语义等价 fallback。unique、compound、multi-entry 和 selector projection 都由同一 entity 定义约束。
-- `migrate(options?, ctx?)`：`options: IMigrateOptions<TDomain>` 为 `{ batchSize?(默认 100，正安全整数), onInvalid? }`；返回 `{ scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }`。IndexedDB 可用 `metadata` 通道持久化检查点、跨调用断点续跑；`memoryStorage`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复。
+- `migrate(options?, ctx?)`：`options: IMigrateOptions<TDomain>` 为 `{ batchSize?(默认 100，正安全整数), onInvalid? }`；返回 `{ scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }`。IndexedDB 可用 `metadata` 通道持久化检查点、跨调用断点续跑；`memoryStorageHost`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复。
 - `batch(run, ctx?)`：仅结构化后端（有真正事务）支持；`run` 收到 `IEntityTransactionScope<TDomain>`（`get`/`put`/`remove`），KV-only 后端调用会抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`。
 
 ---
@@ -455,7 +455,7 @@ await host.dispose()
 import { z } from 'zod'
 import { defineEntity } from '@migaia/storage-web/entity'
 import { fromStandardSchema } from '@migaia/storage-web/schema'
-import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 
 const UserV2 = z.object({ id: z.string(), email: z.string(), verified: z.boolean() })
 
@@ -465,7 +465,7 @@ const users = defineEntity({
   schema: fromStandardSchema(UserV2),
   version: 2,
   migrations: { 2: async (previous) => ({ ...(previous as object), verified: false }) }
-}).connect(indexedDb({ dbName: 'app-data' }))
+}).connect(indexedDbHost({ dbName: 'app-data' }))
 
 await users.put({ id: 'ada', email: 'ada@example.com', verified: true })
 const result = await users.migrate({ batchSize: 200, onInvalid: 'skip' })
@@ -476,24 +476,24 @@ console.log(result.migrated, result.conflicted)
 
 ```ts
 import { asRecordStore, isRecordStore } from '@migaia/storage-contract'
-import { cookies } from '@migaia/storage-web/cookies'
-import { memoryStorage } from '@migaia/storage-web/memory'
+import { cookiesHost } from '@migaia/storage-web/cookiesHost'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 
-const primary = cookies({ scope: { path: '/', secure: true, sameSite: 'lax' } })
-const fallback = memoryStorage()
+const primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })
+const fallback = memoryStorageHost()
 const store = isRecordStore(primary) ? asRecordStore(primary) : fallback
-// cookies 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorage 分支
+// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支
 ```
 
 ### 3. 批量事务写入 + 冲突重试（结构化后端）
 
 ```ts
 import { defineEntity } from '@migaia/storage-web/entity'
-import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 import { StorageError, StorageErrorCode } from '@migaia/storage-web'
 
 const orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(
-  indexedDb()
+  indexedDbHost()
 )
 
 const applyBatch = async (items: Array<{ id: string; total: number }>) => {
@@ -515,16 +515,16 @@ const applyBatch = async (items: Array<{ id: string; total: number }>) => {
 
 ```ts
 import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'
-import { memoryStorage } from '@migaia/storage-web/memory'
-import { sessionStorage } from '@migaia/storage-web/session-storage'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { sessionStorageHost } from '@migaia/storage-web/session-storage'
 
-const textOnly = sessionStorage()
+const textOnly = sessionStorageHost()
 const selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>
   console.warn('[codec fallback]', message)
 )
 const encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断
 
-const recordBackend = memoryStorage()
+const recordBackend = memoryStorageHost()
 const direct = selectCodec(binaryCodec, recordBackend.capabilities)
 await direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级
 ```
@@ -533,10 +533,10 @@ await direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级
 
 ```ts
 import { ConflictPolicy } from '@migaia/storage-contract'
-import { localStorage } from '@migaia/storage-web/local-storage'
+import { localStorageHost } from '@migaia/storage-web/local-storage'
 
-const teamA = localStorage({ namespace: 'team-a' })
-const teamB = localStorage({ namespace: 'team-b' })
+const teamA = localStorageHost({ namespace: 'team-a' })
+const teamB = localStorageHost({ namespace: 'team-b' })
 await teamA.set('config', '{}')
 await teamB.set('config', '{}') // 不同命名空间，互不冲突
 

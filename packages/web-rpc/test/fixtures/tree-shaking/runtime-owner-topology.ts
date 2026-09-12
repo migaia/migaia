@@ -66,11 +66,11 @@ import { createComposedEndpoint } from '../../../src/core.js'
 import { createClientEndpoint } from '../../../src/client.js'
 import { createFullEndpoint } from '../../../src/full.js'
 import { createProviderEndpoint } from '../../../src/provider.js'
-import { outbound } from '../../../src/features/outbound.js'
-import { provider } from '../../../src/features/provider.js'
-import { discovery } from '../../../src/features/discovery.js'
-import { control } from '../../../src/features/control.js'
-import { canonicalChunk } from '../../../src/features/canonical-chunk.js'
+import { createClientFirstPartyRoots } from '../../../src/internal/client-first-party-roots.js'
+import {
+  createFirstPartyRoots,
+  type IWebRpcFirstPartyRootName
+} from '../../../src/internal/first-party-roots.js'
 import { readEndpointDebugSnapshot } from '../../../src/internal/test-observer.js'
 import { connect } from '../../../src/middleware/connect.js'
 
@@ -93,17 +93,22 @@ export async function observeRuntimeOwnerAllocation(): Promise<IRuntimeOwnerAllo
     const [transport] = createMemoryTransportPair()
     /** Binds the endpoint identity, transport, and physical connect middleware for this probe. */
     const config = { id: `runtime-owner-${kind}`, transport, middlewares: [connect({ transport })] }
-    if (kind === 'core') return createComposedEndpoint(config, [outbound()])
+    if (kind === 'core') return createComposedEndpoint(config, createClientFirstPartyRoots())
     if (kind === 'client') return createClientEndpoint(config)
     if (kind === 'provider') return createProviderEndpoint(config)
     if (kind === 'full') return createFullEndpoint(config)
-    return createComposedEndpoint(config, [
-      outbound(),
-      provider(),
-      discovery(),
-      control(),
-      canonicalChunk()
-    ])
+    return createComposedEndpoint(
+      config,
+      createFirstPartyRoots(
+        new Set<IWebRpcFirstPartyRootName>([
+          'first-party-chunk',
+          'first-party-outbound',
+          'first-party-provider',
+          'first-party-discovery',
+          'first-party-control'
+        ])
+      )
+    )
   }
   /** Retains each endpoint created before a later construction failure. */
   const endpoints: IObservedEndpoint[] = []

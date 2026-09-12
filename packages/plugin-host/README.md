@@ -65,17 +65,16 @@ class Host extends PluginHost<ICore, string> {
   }
 }
 
-// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装
-const upper = definePlugin<ICore, { upper(value: string): string }>(
-  'upper',
-  (core) => ({
+// 第二步：definePlugin(name, descriptorFactory) 定义插件；这里只定义，不会立刻安装
+const upper = definePlugin<ICore, { upper(value: string): string }>('upper', (core) => ({
+  install: () => ({
     upper: (value: string) => {
       const result = value.toUpperCase()
       core.emit(result) // 插件可以调用领域能力
       return result
     }
   })
-)
+}))
 
 // 第三步：安装、使用、卸载
 const host = new Host({
@@ -87,7 +86,7 @@ await view.unUse('upper')
 await host.dispose()
 ```
 
-`definePlugin()` 有两种写法。上面是短写法 `definePlugin(name, install)`，适合只有名称和安装函数的插件；需要 `config`、`shared`、`update` 或 `dispose` 时使用完整对象写法：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 `install()`；真正的安装发生在 `host.use(plugin)`。
+`definePlugin()` 有两种写法。上面是函数形 `definePlugin(name, descriptorFactory)`：每次安装先同步创建一个 descriptor，再由其 `install`、`expose`、`featureExpose`、`shared` hooks 提供这次安装的能力。需要 `config`、`update`、`dispose` 等长期定义字段时使用保留对象形：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 descriptor 或 `install()`；真正的安装发生在 `host.use(plugin)`。
 
 `PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后返回不可变 view，业务代码从 `view.extensions` 调用这些方法；`view.unUse()` 卸载插件，`host.dispose()` 关闭整个宿主。
 

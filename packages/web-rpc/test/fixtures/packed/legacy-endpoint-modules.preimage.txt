@@ -1,0 +1,206 @@
+import { buildCapabilityTopology } from '@migaia/capability/graph/topology';
+import { WebRpcErrorText } from '../error-text.js';
+/** Private marker used to defer ingress activation until composition commit. */
+export const endpointModuleActivator = Symbol('endpoint-module-activator');
+/** Private owner marker used to inject one canonical dependency instance. */
+export const endpointModuleOwner = Symbol('endpoint-module-owner');
+/** Registers a private activation callback without expanding the public module surface. */
+export function withEndpointModuleActivator(surface, activate) {
+    Object.defineProperty(surface, endpointModuleActivator, {
+        configurable: false,
+        enumerable: false,
+        value: activate,
+        writable: false
+    });
+    return surface;
+}
+/** Associates an installed public surface with its canonical private owner. */
+export function withEndpointModuleOwner(surface, owner) {
+    Object.defineProperty(surface, endpointModuleOwner, {
+        configurable: false,
+        enumerable: false,
+        value: owner,
+        writable: false
+    });
+    return surface;
+}
+/** Reads one dependency owner without exposing attachment state publicly. */
+export function getEndpointModuleOwner(value) {
+    if (typeof value !== 'object' || value === null)
+        return undefined;
+    return value[endpointModuleOwner];
+}
+/** Commits one installed feature after all selected installers have succeeded. */
+export function activateEndpointModule(value) {
+    if (typeof value !== 'object' || value === null)
+        return;
+    const activate = value[endpointModuleActivator];
+    activate?.();
+}
+const endpointModuleDefinitions = new WeakMap();
+const endpointModuleSourceTokens = new WeakMap();
+const endpointModuleRootProjections = new WeakMap();
+/** Returns the immutable root exposure contract for one package-owned module token. */
+export function getEndpointModuleExposedKeys(value) {
+    if (typeof value !== 'object' || value === null)
+        return [];
+    return endpointModuleDefinitions.get(value)?.claims.exposedKeys ?? [];
+}
+/** Reads package-owned root projection metadata without exposing transitive definitions. */
+export function getEndpointModuleRootProjection(value) {
+    if (typeof value !== 'object' || value === null)
+        return [];
+    return endpointModuleRootProjections.get(value) ?? getEndpointModuleExposedKeys(value);
+}
+/** Stable first-party topology keys shared by immutable feature definitions. */
+export const EndpointModuleKey = {
+    outbound: 'outbound',
+    provider: 'provider',
+    discovery: 'discovery',
+    control: 'control',
+    chunk: 'chunk'
+};
+/** Sentinel separating deliberate duplicate detection from hostile user failures. */
+export const endpointModuleDuplicate = Symbol('endpoint-module-duplicate');
+/** Admits WebRPC module dependency edges through the pure capability topology owner. */
+export function admitEndpointModuleTopology(definitions) {
+    const definitionsByKey = new Map(definitions.map((definition) => [definition.key, definition]));
+    const nodes = definitions.map((definition, ordinal) => ({
+        id: definition.key,
+        dependencies: definition.requires.map((requirement) => ({
+            provider: typeof requirement === 'string' ? requirement : requirement.key,
+            required: true
+        })),
+        ordinal
+    }));
+    return buildCapabilityTopology(nodes, () => {
+        throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+    }, () => {
+        throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+    }, () => {
+        throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+    }).ordered.map((node) => definitionsByKey.get(node.id));
+}
+/** Creates one immutable first-party definition at module initialization. */
+export function defineEndpointModule(key, install, requires = [], conflicts = [], claims = {}, rootProjection) {
+    const definition = Object.freeze({
+        key,
+        requires: Object.freeze([...requires]),
+        conflicts: Object.freeze([...conflicts]),
+        claims: Object.freeze({
+            routes: Object.freeze([...(claims.routes ?? [])]),
+            provides: Object.freeze([...(claims.provides ?? [])]),
+            consumes: Object.freeze([...(claims.consumes ?? [])]),
+            publicKeys: Object.freeze([...(claims.publicKeys ?? [])]),
+            exposedKeys: Object.freeze([...(claims.exposedKeys ?? claims.publicKeys ?? [])]),
+            activator: claims.activator ?? false,
+            sharedProvides: Object.freeze([...(claims.sharedProvides ?? [])]),
+            sharedConsumes: Object.freeze([...(claims.sharedConsumes ?? [])]),
+            ...(claims.sharedOptionalConsumes === undefined
+                ? {}
+                : {
+                    sharedOptionalConsumes: Object.freeze([...claims.sharedOptionalConsumes])
+                })
+        }),
+        install
+    });
+    const token = Object.freeze({ key });
+    endpointModuleDefinitions.set(token, definition);
+    endpointModuleSourceTokens.set(definition, token);
+    endpointModuleRootProjections.set(token, Object.freeze([...(rootProjection ?? definition.claims.exposedKeys)]));
+    return token;
+}
+/** Snapshots and validates package-owned module tokens before endpoint side effects. */
+export function snapshotEndpointModules(input) {
+    let snapshot;
+    try {
+        snapshot = Array.from(input);
+    }
+    catch (error) {
+        throw new TypeError(WebRpcErrorText.endpointModuleInvalid, { cause: error });
+    }
+    const seen = new Set();
+    let definitions;
+    try {
+        definitions = snapshot.map((candidate) => {
+            try {
+                const module = typeof candidate === 'object' && candidate !== null
+                    ? endpointModuleDefinitions.get(candidate)
+                    : undefined;
+                if (!module)
+                    throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+                if (seen.has(module.key))
+                    throw endpointModuleDuplicate;
+                if (module.conflicts.some((key) => snapshot.some((item) => item !== candidate && endpointModuleDefinitions.get(item)?.key === key)))
+                    throw endpointModuleDuplicate;
+                seen.add(module.key);
+                return module;
+            }
+            catch (error) {
+                if (error === endpointModuleDuplicate)
+                    throw error;
+                throw new TypeError(WebRpcErrorText.endpointModuleInvalid, { cause: error });
+            }
+        });
+    }
+    catch (error) {
+        if (error === endpointModuleDuplicate)
+            throw error;
+        throw error instanceof TypeError
+            ? error
+            : new TypeError(WebRpcErrorText.endpointModuleInvalid, { cause: error });
+    }
+    const byKey = new Map(definitions.map((definition) => [definition.key, definition]));
+    const closure = new Map(byKey);
+    const visit = (definition) => {
+        for (const requirement of definition.requires) {
+            const key = typeof requirement === 'string' ? requirement : requirement.key;
+            if (typeof requirement === 'string')
+                continue;
+            const dependency = endpointModuleDefinitions.get(requirement);
+            if (!dependency)
+                throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+            if (!byKey.has(key))
+                closure.set(key, dependency);
+            const resolved = closure.get(key);
+            if (resolved && !byKey.has(key))
+                visit(resolved);
+        }
+    };
+    for (const definition of definitions)
+        visit(definition);
+    definitions = [...closure.values()];
+    const routeOwners = new Set();
+    const portProviders = new Set();
+    const publicOwners = new Set();
+    for (const definition of definitions) {
+        for (const publicKey of definition.claims.publicKeys) {
+            if (publicOwners.has(publicKey))
+                throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+            publicOwners.add(publicKey);
+        }
+    }
+    for (const definition of definitions) {
+        for (const route of definition.claims.routes) {
+            if (routeOwners.has(route))
+                throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+            routeOwners.add(route);
+        }
+        for (const provided of definition.claims.provides) {
+            if (portProviders.has(provided))
+                throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+            portProviders.add(provided);
+        }
+        for (const exposedKey of definition.claims.exposedKeys)
+            if (!publicOwners.has(exposedKey))
+                throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+        for (const consumed of definition.claims.consumes)
+            if (!portProviders.has(consumed) &&
+                !definitions.some((item) => item.claims.provides.includes(consumed)))
+                throw new TypeError(WebRpcErrorText.endpointModuleInvalid);
+    }
+    return admitEndpointModuleTopology(definitions).map((definition) => Object.freeze({
+        ...definition,
+        sourceToken: endpointModuleSourceTokens.get(definition)
+    }));
+}

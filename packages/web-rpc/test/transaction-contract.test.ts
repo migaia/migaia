@@ -1,14 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createComposedEndpoint, type IWebRpcCoreConfig } from '../src/core.js'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
-import { outbound } from '../src/features/outbound.js'
-import { provider } from '../src/features/provider.js'
+import { createClientFirstPartyRoots } from '../src/internal/client-first-party-roots.js'
+import { createProviderFirstPartyRoots } from '../src/internal/provider-first-party-roots.js'
 import { connect } from '../src/middleware/connect.js'
-import {
-  defineEndpointModule,
-  type IEndpointModuleInstallContext
-} from '../src/internal/endpoint-modules.js'
-import type { IWebRpcPlugin, IWebRpcPluginInstallResult } from '../src/typing.js'
+import { defineMiddleware } from '../src/middleware.js'
+import { defineFeature } from '@migaia/plugin-host'
+import type { IWebRpcMiddleware, IWebRpcPlugin, IWebRpcPluginInstallResult } from '../src/typing.js'
 import type { IWebRpcHookEvent } from '../src/typing.js'
 import type { IWebRpcPluginConstraint } from '../src/internal/plugin-contract.js'
 import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
@@ -116,7 +114,7 @@ let configSequence = 0
 /** Creates a transport whose physical subscription remains observable during composition. */
 function createConfig(
   onSubscribe: () => void,
-  middlewares: readonly IWebRpcPlugin[] = [connect()]
+  middlewares: readonly IWebRpcMiddleware[] = [connect()]
 ): IWebRpcCoreConfig {
   const [transport] = createMemoryTransportPair()
   return {
@@ -132,15 +130,21 @@ function createConfig(
   }
 }
 
-/** Creates a package-owned feature token with explicit runtime claims for the projection tests. */
+/** Creates native middleware whose async resource work remains in the Host construction scope. */
 function createFeatureModule(
   key: string,
-  install: (context: IEndpointModuleInstallContext<IWebRpcCoreConfig>) => Promise<object>,
-  publicKeys: readonly string[] = []
+  install: () => Promise<
+    Record<string, unknown> & { readonly dispose?: () => void | Promise<void> }
+  >
 ) {
-  return defineEndpointModule<IWebRpcCoreConfig, Record<string, unknown>>(key, install, [], [], {
-    publicKeys,
-    exposedKeys: publicKeys
+  return defineMiddleware(key, (core) => {
+    return {
+      install: async () => {
+        const { dispose, ...extension } = await install()
+        if (typeof dispose === 'function') core.own(dispose, () => dispose())
+        return extension
+      }
+    }
   })
 }
 
@@ -180,7 +184,7 @@ describe('MET-RED-006 PluginHost batch completeness', () => {
   it('proves one Host receives the complete kernel, middleware, feature, and activation batch', async () => {
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [outbound(), provider()]
+      createProviderFirstPartyRoots()
     )
     try {
       expect(observed.hosts).toHaveLength(1)
@@ -189,9 +193,7 @@ describe('MET-RED-006 PluginHost batch completeness', () => {
         'kernel',
         'connect',
         'middleware-finalize',
-        'chunk',
-        'outbound',
-        'provider',
+        'endpoint-capabilities',
         'activation'
       ])
     } finally {
@@ -212,16 +214,12 @@ describe('MET-RED-007 Host rollback ownership', () => {
     const first = createSharedMiddleware('transaction-first', sharedKey, firstValue, () => {
       resourceDisposals += 1
     })
-    const installedFeature = createFeatureModule(
-      'transaction-installed-feature',
-      async () => ({
-        transactionExtension: extensionValue,
-        dispose: () => {
-          featureDisposals += 1
-        }
-      }),
-      ['transactionExtension']
-    )
+    const installedFeature = createFeatureModule('transaction-installed-feature', async () => ({
+      transactionExtension: extensionValue,
+      dispose: () => {
+        featureDisposals += 1
+      }
+    }))
     const primaryFailure = new Error('later batch member failed')
     const failingFeature = createFeatureModule('transaction-failing-feature', async () => {
       const host = observed.hosts[0]
@@ -230,8 +228,8 @@ describe('MET-RED-007 Host rollback ownership', () => {
       throw primaryFailure
     })
     const failure = await createComposedEndpoint(
-      createConfig(() => undefined, [connect(), first]),
-      [installedFeature, failingFeature]
+      createConfig(() => undefined, [connect(), first, installedFeature, failingFeature]),
+      createClientFirstPartyRoots()
     ).catch((error: unknown) => error)
 
     expect(failure).toBe(primaryFailure)
@@ -269,7 +267,7 @@ describe('MET-RED-016 activation boundary', () => {
       createConfig(() => {
         subscriptions += 1
       }, [connect(), observer]),
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     try {
       expect(installSubscriptionCount).toBe(0)
@@ -298,8 +296,8 @@ describe('MET-RED-016 activation boundary', () => {
     const construction = createComposedEndpoint(
       createConfig(() => {
         subscriptions += 1
-      }, [connect(), observer]),
-      [failingFeature]
+      }, [connect(), observer, failingFeature]),
+      Object.create(null)
     )
 
     await expect(construction).rejects.toBe(primaryFailure)
@@ -315,19 +313,18 @@ describe('MET-RED-021 feature disposer and public surface ownership', () => {
     const featureDisposer = (): void => {
       disposerCalls += 1
     }
-    const feature = createFeatureModule(
-      'transaction-feature',
-      async () => ({
-        feature: () => undefined,
-        dispose: featureDisposer
-      }),
-      ['feature']
-    )
+    const cleanupFeature = createFeatureModule('transaction-feature', async () => ({
+      dispose: featureDisposer
+    }))
+    const feature = defineFeature(() => Object.freeze({ feature: () => undefined }))
     const endpoint = await createComposedEndpoint(
-      createConfig(() => undefined),
-      [feature]
+      {
+        ...createConfig(() => undefined, [connect(), cleanupFeature]),
+        features: [feature] as const
+      },
+      Object.create(null)
     )
-    expect(Reflect.ownKeys(endpoint)).toEqual(['on', 'hooks', 'dispose', 'feature'])
+    expect(Reflect.ownKeys(endpoint)).toEqual(['dispose', 'feature'])
     expect(endpoint).not.toBe(observed.hosts[0])
     expect(typeof endpoint.feature).toBe('function')
     expect(endpoint.dispose).not.toBe(featureDisposer)
@@ -353,31 +350,27 @@ describe('MET-RED-024 preflight conflict ownership', () => {
       let installs = 0
       let subscriptions = 0
       const publicKeys = 'publicKeys' in claims ? claims.publicKeys : []
-      const first = defineEndpointModule<IWebRpcCoreConfig, Record<string, unknown>>(
-        `transaction-${label}-first`,
-        async () => {
+      const first = defineMiddleware({
+        name: `transaction-${label}-first`,
+        metadata: { claims: { ...emptyClaims, ...claims } },
+        install: async () => {
           installs += 1
-          return {}
-        },
-        [],
-        [],
-        claims
-      )
-      const second = defineEndpointModule<IWebRpcCoreConfig, Record<string, unknown>>(
-        `transaction-${label}-second`,
-        async () => {
+          return { extension: {}, shared: {} }
+        }
+      })
+      const second = defineMiddleware({
+        name: `transaction-${label}-second`,
+        metadata: { claims: { ...emptyClaims, ...claims, publicKeys } },
+        install: async () => {
           installs += 1
-          return {}
-        },
-        [],
-        [],
-        { ...claims, publicKeys }
-      )
+          return { extension: {}, shared: {} }
+        }
+      })
       const failure = await createComposedEndpoint(
         createConfig(() => {
           subscriptions += 1
-        }),
-        [first, second]
+        }, [connect(), first, second]),
+        Object.create(null)
       ).catch((error: unknown) => error)
 
       expect(failure, label).toMatchObject({ code: 'INVALID_CONFIG' })
@@ -419,7 +412,7 @@ describe('MET-RED-031 construction and disposal race', () => {
         ...createConfig(() => undefined, [connect(), delayed]),
         construction: { signal: controller.signal }
       },
-      [outbound()]
+      createClientFirstPartyRoots()
     )
 
     await vi.waitFor(() => expect(installStarted).toBe(true))
@@ -473,8 +466,8 @@ describe('MET-RED-031 construction and disposal race', () => {
 
     await expect(
       createComposedEndpoint(
-        createConfig(() => undefined),
-        [failingFeature]
+        createConfig(() => undefined, [connect(), failingFeature]),
+        Object.create(null)
       )
     ).rejects.toBe(primaryFailure)
     expect(observed.hookEvents.filter((event) => event.error === primaryFailure)).toHaveLength(0)
@@ -507,7 +500,7 @@ describe('MET-RED-031 construction and disposal race', () => {
         ...createConfig(() => undefined, [connect(), delayed]),
         construction: { signal: controller.signal }
       },
-      [outbound()]
+      createClientFirstPartyRoots()
     )
 
     await vi.waitFor(() => expect(installStarted).toBe(true))
@@ -526,7 +519,7 @@ describe('MET-RED-033 public endpoint boundary', () => {
   it('proves the endpoint is a projection and never the PluginHost object', async () => {
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [outbound(), provider()]
+      createProviderFirstPartyRoots()
     )
     const host = observed.hosts[0]
     expect(host).toBeDefined()
@@ -552,7 +545,7 @@ describe('MET-RED-034 per-endpoint batch cardinality', () => {
   it('proves one endpoint invokes exactly one Host install batch', async () => {
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
-      [outbound()]
+      createClientFirstPartyRoots()
     )
     try {
       expect(observed.hosts).toHaveLength(1)

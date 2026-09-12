@@ -2647,24 +2647,17 @@ function groupStorageWebApiLinks(
       label: locale === 'zh' ? 'Feature 定义与拓扑' : 'Feature authoring and topology',
       matches: (link: IGuideApiLink) =>
         link.module === 'reactive-adapter' ||
-        (link.module === 'host' &&
-          [
-            'compileStorageFeatureTopology',
-            'defineStorageBackendFeature',
-            'readStorageBackendFeatureMetadata'
-          ].includes(link.name))
+        (link.module === 'host' && ['defineFeature'].includes(link.name))
     },
     {
       key: 'plugin-authoring',
-      label: locale === 'zh' ? '插件与 Backend Kind 定义' : 'Plugin and backend-kind authoring',
+      label: locale === 'zh' ? '插件定义与命名' : 'Plugin authoring and naming',
       matches: (link: IGuideApiLink) =>
         link.module === 'host' &&
         [
-          'defineStorageBackendKind',
-          'defineStorageBackendPlugin',
+          'definePlugin',
           'pluginNameFromBackendId',
-          'reactiveAdapterNameFromBackendId',
-          'readStorageBackendPluginMetadata'
+          'reactiveAdapterNameFromBackendId'
         ].includes(link.name)
     },
     {

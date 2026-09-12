@@ -8,7 +8,7 @@ test('Secure cookie 遵循真实浏览器的 loopback 语义，普通 cookie 也
   const result = await page.evaluate(() => window.runCookieSecureScenario())
   expect(result.insecureVisible).toBe(true)
   // Chromium treats loopback HTTP as trustworthy here; WebKit rejects Secure
-  // cookies on the same HTTP origin. Both are valid browser-level outcomes.
+  // cookiesHost on the same HTTP origin. Both are valid browser-level outcomes.
   expect(result.secureVisible).toBe(browserName === 'chromium')
 })
 

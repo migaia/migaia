@@ -1,4 +1,5 @@
 import { createRegistrationView } from './composition.js'
+export { inspectFeatures } from './feature-runtime.js'
 import type { IRegistrationToken, IRegistrationView, IPluginConstraint } from './typing.js'
 
 /** Publishes only the exact live registration extensions carried by `token`. */

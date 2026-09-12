@@ -30,6 +30,8 @@ export type IWebRpcPluginCore = {
   readonly signal: IWebRpcAbortSignal
   readonly hooks: (event: IWebRpcHookEvent) => void
   readonly construction: IWebRpcConstructionControl
+  /** Records one registration-local native middleware projection before endpoint activation. */
+  readonly registerNativeMiddlewareKeys: (name: string, keys: readonly string[]) => void
 }
 
 /** Narrow resource ownership passed to a WebRPC plugin install body. */

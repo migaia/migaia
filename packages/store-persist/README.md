@@ -6,7 +6,7 @@
 
 **适用**：用户设置/草稿/UI 偏好需要跨会话保留（`persist()`）；标签列表/购物车条目/按 id 索引的缓存表需要整体持久化（`persistCollection()`）；按 key 动态生成的状态（每用户/每会话各自的资料）只想持久化其中一部分（`persistKeyed()` + `partialize`/`merge`）；需要批量清空某一类 keyed 持久化记录（`clearFamily()`）；存储里可能是旧版本数据，需要 `version` + `migrate()`。
 
-**不适用**：只是想把一次性数据存进 storage-web、不需要跟内存状态双向同步/不需要迁移，直接用 `@migaia/storage-contract` 的 `IKeyValueStore` 搭配所需 backend 子路径更直接。本包不提供加密——敏感数据不要无加密直接写 `localStorage`，需要的话自己实现一个 `ICodec` 传给 `codec` 选项。
+**不适用**：只是想把一次性数据存进 storage-web、不需要跟内存状态双向同步/不需要迁移，直接用 `@migaia/storage-contract` 的 `IKeyValueStore` 搭配所需 backend 子路径更直接。本包不提供加密——敏感数据不要无加密直接写 `localStorageHost`，需要的话自己实现一个 `ICodec` 传给 `codec` 选项。
 
 依赖关系：
 
@@ -46,12 +46,12 @@ import { persist } from '@migaia/store-persist/light';
 
 ```ts
 import { createStore } from '@migaia/store-light';
-import { memoryStorage } from '@migaia/storage-web/memory';
+import { memoryStorageHost } from '@migaia/storage-web/memory';
 
 const store = createStore({ theme: 'light', fontSize: 14 });
 const handle = persist(store, {
   key: 'settings',
-  storage: memoryStorage(), // 生产环境换成 localStorage()/indexedDb()
+  storage: memoryStorageHost(), // 生产环境换成 localStorageHost()/indexedDbHost()
   version: 1,
   debounceMs: 250
 });
@@ -90,10 +90,10 @@ import { persistCollection } from '@migaia/store-persist/indexed';
 
 ```ts
 import { observableMap } from '@migaia/store-indexed';
-import { localStorage } from '@migaia/storage-web/local-storage';
+import { localStorageHost } from '@migaia/storage-web/local-storage';
 
 const cart = observableMap<string, number>(); // sku -> 数量
-const handle = persistCollection(cart, { key: 'cart:v1', storage: localStorage() });
+const handle = persistCollection(cart, { key: 'cart:v1', storage: localStorageHost() });
 cart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写
 ```
 
@@ -120,11 +120,11 @@ import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
 
 ```ts
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
-import { indexedDb } from '@migaia/storage-web/indexed-db';
+import { indexedDbHost } from '@migaia/storage-web/indexed-db';
 
 const session = familyDef(() => ({ accessToken: '', refreshToken: '' }));
 const atomStore = createAtomStore(runtime);
-const storage = indexedDb({ dbName: 'app' });
+const storage = indexedDbHost({ dbName: 'app' });
 
 const { value, dispose } = persistKeyed(atomStore, session('u1'), 'u1', {
   namespace: 'sessions',
@@ -190,14 +190,14 @@ await handle.clear(); // 排队删除存档，不重置内存状态
 import { createStore } from '@migaia/store-light';
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
 import { observableSet } from '@migaia/store-indexed';
-import { indexedDb } from '@migaia/storage-web/indexed-db';
+import { indexedDbHost } from '@migaia/storage-web/indexed-db';
 import { persist } from '@migaia/store-persist/light';
 import { persistCollection } from '@migaia/store-persist/indexed';
 import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
 import { createRuntime } from '@migaia/reactive';
 
 const runtime = createRuntime();
-const storage = indexedDb({ dbName: 'app' });
+const storage = indexedDbHost({ dbName: 'app' });
 
 const settings = createStore({ theme: 'light' });
 const settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });

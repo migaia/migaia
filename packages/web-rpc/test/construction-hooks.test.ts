@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createComposedEndpoint, type IWebRpcCoreConfig } from '../src/core.js'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
-import { outbound } from '../src/features/outbound.js'
+import { createClientFirstPartyRoots } from '../src/internal/client-first-party-roots.js'
 import { connect } from '../src/middleware/connect.js'
 import { hooks } from '../src/middleware/hooks.js'
 import type { IWebRpcHookEvent, IWebRpcPlugin } from '../src/typing.js'
@@ -82,7 +82,7 @@ describe('real construction diagnostic reporter', () => {
         undefined,
         pendingMiddleware
       ),
-      [outbound()]
+      createClientFirstPartyRoots()
     )
 
     await started
@@ -142,7 +142,7 @@ describe('real construction diagnostic reporter', () => {
         },
         pendingMiddleware
       ),
-      [outbound()]
+      createClientFirstPartyRoots()
     )
 
     await started
@@ -184,7 +184,7 @@ describe('real construction diagnostic reporter', () => {
           failing
         ]
       },
-      [outbound()]
+      createClientFirstPartyRoots()
     )
 
     await expect(construction).rejects.toBe(primaryFailure)
