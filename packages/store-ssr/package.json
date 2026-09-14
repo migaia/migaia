@@ -1,6 +1,6 @@
 {
   "name": "@migaia/store-ssr",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Request-scoped Store SSR dehydration and hydration.",
   "license": "MIT",
