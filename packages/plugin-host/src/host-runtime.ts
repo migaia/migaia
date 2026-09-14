@@ -718,7 +718,9 @@ export abstract class PluginHost<
 
   use<
     const TPlugins extends readonly IPluginConstraint<
-      TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>
+      TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>,
+      any,
+      any
     >[]
   >(
     ...plugins: TPlugins &
