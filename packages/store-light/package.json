@@ -1,6 +1,6 @@
 {
   "name": "@migaia/store-light",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Minimal object-state Store facade.",
   "license": "MIT",
