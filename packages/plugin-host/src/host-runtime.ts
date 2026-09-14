@@ -716,7 +716,11 @@ export abstract class PluginHost<
     return this.#shared.get(key)?.value as T | undefined
   }
 
-  use<const TPlugins extends readonly IPluginConstraint<any>[]>(
+  use<
+    const TPlugins extends readonly IPluginConstraint<
+      TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>
+    >[]
+  >(
     ...plugins: TPlugins &
       IPluginConstraintTuple<
         TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>,
