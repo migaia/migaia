@@ -78,7 +78,10 @@ test('storage-web defineEntity imports its concrete IndexedDB backend', () => {
   for (const locale of ['zh', 'en'] as const) {
     const guide = findApiGuide('storage-web', 'entity', 'defineEntity', locale)
     assert.ok(guide?.quickStart)
-    assert.match(guide.quickStart, /import \{ indexedDbHost \} from '@migaia\/storage-web\/indexed-db'/)
+    assert.match(
+      guide.quickStart,
+      /import \{ indexedDbHost \} from '@migaia\/storage-web\/indexed-db'/
+    )
     assert.match(guide.quickStart, /type IUser = \{ id: number; email: string \}/)
     assert.match(guide.quickStart, /defineEntity<IUser>/)
     assert.match(guide.quickStart, /users\.connect\(indexedDbHost\(\{ dbName: 'app' \}\)\)/)
@@ -161,7 +164,10 @@ test('plugin-host defineFeature separates synchronous capability construction fr
   assert.ok(guide?.quickStart)
   assert.match(guide.purpose, /不会创建 Host、安装 Plugin、启动资源或发布方法/)
   assert.match(guide.purpose, /异步工作和清理必须放在 Plugin 的 install hook 中/)
-  assert.match(guide.quickStart, /defineFeature\(\(core: IFeatureCore<\{ readCount\(\): number \}>\) =>/)
+  assert.match(
+    guide.quickStart,
+    /defineFeature\(\(core: IFeatureCore<\{ readCount\(\): number \}>\) =>/
+  )
   assert.match(guide.quickStart, /core\.features\.metrics\.read\(\)/)
   assert.match(guide.quickStart, /definePlugin\('counter'/)
 })

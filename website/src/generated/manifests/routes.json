@@ -2579,6 +2579,84 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/defined/disposeKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/defined/setupHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/invokeCaptured",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural/IPluginConstraint",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural/IPluginHostCore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural/IPluginHostDisposalNodeKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural/IPluginHostDisposalProvenance",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural/IPluginHostOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural/PluginHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural/PluginHostDisposalNodeKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/structural/readPluginHostDisposalProvenance",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/reactive",
       "locale": "en",
       "domain": "docs",
@@ -3245,19 +3323,7 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/IRpcDiscoveryEnvelope",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
       "path": "/en/docs/rpc-contract/IRpcEncodedType",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/en/docs/rpc-contract/IRpcEnvelope",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -3293,24 +3359,6 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/IRpcRequestEnvelope",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/en/docs/rpc-contract/IRpcResponseFailure",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/en/docs/rpc-contract/IRpcResponseSuccess",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
       "path": "/en/docs/rpc-contract/IRpcSerializedError",
       "locale": "en",
       "domain": "docs",
@@ -3318,12 +3366,6 @@
     },
     {
       "path": "/en/docs/rpc-contract/IRpcStringFrame",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/en/docs/rpc-contract/IRpcVariationEnvelope",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -3353,6 +3395,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/framing/IRpcBoundFrameIngress",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/framing/IRpcFrameAcceptResult",
       "locale": "en",
       "domain": "docs",
@@ -3371,7 +3419,19 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/framing/IRpcNativeFrameOutputDomain",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/framing/IRpcReassembler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/bindRpcFrameIngress",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -3401,13 +3461,19 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/normalizePortable",
+      "path": "/en/docs/rpc-contract/framing/v1",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/normalizeRpcEnvelope",
+      "path": "/en/docs/rpc-contract/framing/v1/messageFramer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/normalizePortable",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -3419,13 +3485,49 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/rpcProtocolV1",
+      "path": "/en/docs/rpc-contract/serializeRpcError",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/serializeRpcError",
+      "path": "/en/docs/rpc-contract/v1",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/v1/IRpcDiscoveryEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/v1/IRpcEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/v1/IRpcRequestEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/v1/IRpcResponseFailure",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/v1/IRpcResponseSuccess",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/v1/IRpcVariationEnvelope",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -3593,7 +3695,19 @@
       "library": "serialize"
     },
     {
+      "path": "/en/docs/serialize/codecs/identity/identityCodec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
       "path": "/en/docs/serialize/codecs/identity/identityCodecV1",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/identity/v1",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -3636,12 +3750,6 @@
     },
     {
       "path": "/en/docs/serialize/codecs/protobuf",
-      "locale": "en",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/en/docs/serialize/codecs/protobuf/IProtobufBinding",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -5048,54 +5156,6 @@
       "path": "/en/docs/storage-web/session-storage/sessionStorageHost",
       "locale": "en",
       "domain": "docs",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/guides/storage-web",
-      "locale": "en",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/guides/storage-web/cancellation-errors-and-shutdown",
-      "locale": "en",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/guides/storage-web/cookies-and-security",
-      "locale": "en",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/guides/storage-web/entity-schema-and-codecs",
-      "locale": "en",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/guides/storage-web/getting-started",
-      "locale": "en",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/guides/storage-web/host-and-plugins",
-      "locale": "en",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/guides/storage-web/indexeddb-and-transactions",
-      "locale": "en",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/guides/storage-web/reactive-live-queries",
-      "locale": "en",
-      "domain": "guides",
       "library": "storage-web"
     },
     {
@@ -9659,18 +9719,6 @@
       "library": "web-rpc"
     },
     {
-      "path": "/en/guides/web-rpc",
-      "locale": "en",
-      "domain": "guides",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/guides/web-rpc/calls-and-cancellation",
-      "locale": "en",
-      "domain": "guides",
-      "library": "web-rpc"
-    },
-    {
       "path": "/en/guides",
       "locale": "en",
       "domain": "guides",
@@ -9863,39 +9911,39 @@
       "library": "middleware-pipeline"
     },
     {
-      "path": "/en/docs/plugin-host/defined/disposeKey",
+      "path": "/en/guides/plugin-host",
       "locale": "en",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/defined/setupHost",
+      "path": "/en/guides/plugin-host/configuration-and-shared",
       "locale": "en",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/invokeCaptured",
+      "path": "/en/guides/plugin-host/getting-started",
       "locale": "en",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/overview",
+      "path": "/en/guides/plugin-host/install-and-compose",
       "locale": "en",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/structural",
+      "path": "/en/guides/plugin-host/pipelines",
       "locale": "en",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/structural/IPluginConstraint",
+      "path": "/en/guides/plugin-host/removal-and-rollback",
       "locale": "en",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
@@ -9964,6 +10012,16 @@
       "domain": "guides",
       "library": "rpc-contract"
     },
+    {
+      "path": "/en/guides/rpc-contract/real-world-bindings",
+      "locale": "en",
+      "domain": "guides",
+      "library": "rpc-contract"
+    },
+    { "path": "/en/guides/rpc-contract/fetch", "locale": "en", "domain": "guides", "library": "rpc-contract" },
+    { "path": "/en/guides/rpc-contract/websocket", "locale": "en", "domain": "guides", "library": "rpc-contract" },
+    { "path": "/en/guides/rpc-contract/sse", "locale": "en", "domain": "guides", "library": "rpc-contract" },
+    { "path": "/en/guides/rpc-contract/process", "locale": "en", "domain": "guides", "library": "rpc-contract" },
     {
       "path": "/en/guides/serialize",
       "locale": "en",
@@ -10043,51 +10101,51 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/architecture/storage-web",
-      "locale": "zh",
-      "domain": "architecture",
+      "path": "/en/guides/storage-web",
+      "locale": "en",
+      "domain": "guides",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web",
-      "locale": "zh",
-      "domain": "docs",
+      "path": "/en/guides/storage-web/cancellation-errors-and-shutdown",
+      "locale": "en",
+      "domain": "guides",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/IExtensionStage",
-      "locale": "zh",
-      "domain": "docs",
+      "path": "/en/guides/storage-web/cookies-and-security",
+      "locale": "en",
+      "domain": "guides",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/INamespaceCodec",
-      "locale": "zh",
-      "domain": "docs",
+      "path": "/en/guides/storage-web/entity-schema-and-codecs",
+      "locale": "en",
+      "domain": "guides",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/IStorageChannel",
-      "locale": "zh",
-      "domain": "docs",
+      "path": "/en/guides/storage-web/getting-started",
+      "locale": "en",
+      "domain": "guides",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/IStorageErrorDetails",
-      "locale": "zh",
-      "domain": "docs",
+      "path": "/en/guides/storage-web/host-and-plugins",
+      "locale": "en",
+      "domain": "guides",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/STORAGE_WEB_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
+      "path": "/en/guides/storage-web/indexeddb-and-transactions",
+      "locale": "en",
+      "domain": "guides",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/StorageError",
-      "locale": "zh",
-      "domain": "docs",
+      "path": "/en/guides/storage-web/reactive-live-queries",
+      "locale": "en",
+      "domain": "guides",
       "library": "storage-web"
     },
     {
@@ -10847,6 +10905,18 @@
       "library": "wasm"
     },
     {
+      "path": "/en/guides/web-rpc",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/calls-and-cancellation",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
       "path": "/en/guides/web-rpc/chunking-and-backpressure",
       "locale": "en",
       "domain": "guides",
@@ -10895,18 +10965,6 @@
       "library": "web-rpc"
     },
     {
-      "path": "/zh/architecture/web-rpc",
-      "locale": "zh",
-      "domain": "architecture",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
       "path": "/zh/architecture",
       "locale": "zh",
       "domain": "architecture",
@@ -10943,9 +11001,9 @@
       "library": "middleware-pipeline"
     },
     {
-      "path": "/en/docs/plugin-host/structural/IPluginHostCore",
-      "locale": "en",
-      "domain": "docs",
+      "path": "/zh/architecture/plugin-host",
+      "locale": "zh",
+      "domain": "architecture",
       "library": "plugin-host"
     },
     {
@@ -10979,9 +11037,9 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-web/StorageErrorText",
+      "path": "/zh/architecture/storage-web",
       "locale": "zh",
-      "domain": "docs",
+      "domain": "architecture",
       "library": "storage-web"
     },
     {
@@ -11069,9 +11127,9 @@
       "library": "wasm"
     },
     {
-      "path": "/zh/docs/web-rpc/IFactoryDiscoveryMode",
+      "path": "/zh/architecture/web-rpc",
       "locale": "zh",
-      "domain": "docs",
+      "domain": "architecture",
       "library": "web-rpc"
     },
     {
@@ -13031,84 +13089,6 @@
       "library": "middleware-pipeline"
     },
     {
-      "path": "/en/docs/plugin-host/structural/IPluginHostDisposalNodeKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/IPluginHostDisposalProvenance",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/IPluginHostOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/PluginHost",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/PluginHostDisposalNodeKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/readPluginHostDisposalProvenance",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/guides/plugin-host",
-      "locale": "en",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/guides/plugin-host/configuration-and-shared",
-      "locale": "en",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/guides/plugin-host/getting-started",
-      "locale": "en",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/guides/plugin-host/install-and-compose",
-      "locale": "en",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/guides/plugin-host/pipelines",
-      "locale": "en",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/guides/plugin-host/removal-and-rollback",
-      "locale": "en",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/architecture/plugin-host",
-      "locale": "zh",
-      "domain": "architecture",
-      "library": "plugin-host"
-    },
-    {
       "path": "/zh/docs/plugin-host",
       "locale": "zh",
       "domain": "docs",
@@ -13554,6 +13534,162 @@
     },
     {
       "path": "/zh/docs/plugin-host/composition/inspectFeatures",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/createRegistrationView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defineFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/IDefinedPluginConstraint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/IHostSetupContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/ISetupHostOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/ISetupHostView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/ISetupPluginHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/PluginHostError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/PluginHostErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/asyncDisposeKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/definePlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/disposeKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/defined/setupHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/invokeCaptured",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural/IPluginConstraint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural/IPluginHostCore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural/IPluginHostDisposalNodeKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural/IPluginHostDisposalProvenance",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural/IPluginHostOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural/PluginHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural/PluginHostDisposalNodeKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/structural/readPluginHostDisposalProvenance",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -14261,19 +14397,7 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/IRpcDiscoveryEnvelope",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
       "path": "/zh/docs/rpc-contract/IRpcEncodedType",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/zh/docs/rpc-contract/IRpcEnvelope",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -14309,24 +14433,6 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/IRpcRequestEnvelope",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/zh/docs/rpc-contract/IRpcResponseFailure",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/zh/docs/rpc-contract/IRpcResponseSuccess",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
       "path": "/zh/docs/rpc-contract/IRpcSerializedError",
       "locale": "zh",
       "domain": "docs",
@@ -14334,12 +14440,6 @@
     },
     {
       "path": "/zh/docs/rpc-contract/IRpcStringFrame",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/zh/docs/rpc-contract/IRpcVariationEnvelope",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -14369,6 +14469,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/framing/IRpcBoundFrameIngress",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/framing/IRpcFrameAcceptResult",
       "locale": "zh",
       "domain": "docs",
@@ -14387,7 +14493,19 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/framing/IRpcNativeFrameOutputDomain",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/framing/IRpcReassembler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/bindRpcFrameIngress",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -14417,13 +14535,19 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/normalizePortable",
+      "path": "/zh/docs/rpc-contract/framing/v1",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/normalizeRpcEnvelope",
+      "path": "/zh/docs/rpc-contract/framing/v1/messageFramer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/normalizePortable",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -14435,13 +14559,49 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/rpcProtocolV1",
+      "path": "/zh/docs/rpc-contract/serializeRpcError",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/serializeRpcError",
+      "path": "/zh/docs/rpc-contract/v1",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/v1/IRpcDiscoveryEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/v1/IRpcEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/v1/IRpcRequestEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/v1/IRpcResponseFailure",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/v1/IRpcResponseSuccess",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/v1/IRpcVariationEnvelope",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -14621,7 +14781,19 @@
       "library": "serialize"
     },
     {
+      "path": "/zh/docs/serialize/codecs/identity/identityCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
       "path": "/zh/docs/serialize/codecs/identity/identityCodecV1",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/identity/v1",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -14664,12 +14836,6 @@
     },
     {
       "path": "/zh/docs/serialize/codecs/protobuf",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/zh/docs/serialize/codecs/protobuf/IProtobufBinding",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -15395,6 +15561,54 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-web",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/IExtensionStage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/INamespaceCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/IStorageChannel",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/IStorageErrorDetails",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/STORAGE_WEB_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/StorageError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/StorageErrorText",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
       "path": "/zh/docs/storage-web/advanced",
       "locale": "zh",
       "domain": "docs",
@@ -16070,54 +16284,6 @@
       "path": "/zh/docs/storage-web/session-storage/sessionStorageHost",
       "locale": "zh",
       "domain": "docs",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/guides/storage-web",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/guides/storage-web/cancellation-errors-and-shutdown",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/guides/storage-web/cookies-and-security",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/guides/storage-web/entity-schema-and-codecs",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/guides/storage-web/getting-started",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/guides/storage-web/host-and-plugins",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/guides/storage-web/indexeddb-and-transactions",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/guides/storage-web/reactive-live-queries",
-      "locale": "zh",
-      "domain": "guides",
       "library": "storage-web"
     },
     {
@@ -19613,6 +19779,18 @@
       "library": "wasm"
     },
     {
+      "path": "/zh/docs/web-rpc",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/IFactoryDiscoveryMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/zh/docs/web-rpc/IFactoryPingCapability",
       "locale": "zh",
       "domain": "docs",
@@ -20705,30 +20883,6 @@
       "library": "web-rpc"
     },
     {
-      "path": "/zh/guides/web-rpc",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/guides/web-rpc/calls-and-cancellation",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/guides/web-rpc/chunking-and-backpressure",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/guides/web-rpc/discovery-and-control",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "web-rpc"
-    },
-    {
       "path": "/zh/guides",
       "locale": "zh",
       "domain": "guides",
@@ -20921,39 +21075,39 @@
       "library": "middleware-pipeline"
     },
     {
-      "path": "/zh/docs/plugin-host/createRegistrationView",
+      "path": "/zh/guides/plugin-host",
       "locale": "zh",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/defineFeature",
+      "path": "/zh/guides/plugin-host/configuration-and-shared",
       "locale": "zh",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/defined",
+      "path": "/zh/guides/plugin-host/getting-started",
       "locale": "zh",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/defined/IDefinedPluginConstraint",
+      "path": "/zh/guides/plugin-host/install-and-compose",
       "locale": "zh",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/defined/IHostSetupContext",
+      "path": "/zh/guides/plugin-host/pipelines",
       "locale": "zh",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/defined/ISetupHostOptions",
+      "path": "/zh/guides/plugin-host/removal-and-rollback",
       "locale": "zh",
-      "domain": "docs",
+      "domain": "guides",
       "library": "plugin-host"
     },
     {
@@ -21022,6 +21176,16 @@
       "domain": "guides",
       "library": "rpc-contract"
     },
+    {
+      "path": "/zh/guides/rpc-contract/real-world-bindings",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "rpc-contract"
+    },
+    { "path": "/zh/guides/rpc-contract/fetch", "locale": "zh", "domain": "guides", "library": "rpc-contract" },
+    { "path": "/zh/guides/rpc-contract/websocket", "locale": "zh", "domain": "guides", "library": "rpc-contract" },
+    { "path": "/zh/guides/rpc-contract/sse", "locale": "zh", "domain": "guides", "library": "rpc-contract" },
+    { "path": "/zh/guides/rpc-contract/process", "locale": "zh", "domain": "guides", "library": "rpc-contract" },
     {
       "path": "/zh/guides/serialize",
       "locale": "zh",
@@ -21099,6 +21263,54 @@
       "locale": "zh",
       "domain": "guides",
       "library": "storage-contract"
+    },
+    {
+      "path": "/zh/guides/storage-web",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/cancellation-errors-and-shutdown",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/cookies-and-security",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/entity-schema-and-codecs",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/host-and-plugins",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/indexeddb-and-transactions",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/reactive-live-queries",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
     },
     {
       "path": "/zh/guides/store-devtools",
@@ -21857,6 +22069,30 @@
       "library": "wasm"
     },
     {
+      "path": "/zh/guides/web-rpc",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/calls-and-cancellation",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/chunking-and-backpressure",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/discovery-and-control",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
       "path": "/zh/guides/web-rpc/endpoint-composition",
       "locale": "zh",
       "domain": "guides",
@@ -21891,162 +22127,6 @@
       "locale": "zh",
       "domain": "guides",
       "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/ISetupHostView",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/ISetupPluginHost",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/PluginHostError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/PluginHostErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/asyncDisposeKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/definePlugin",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/disposeKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/setupHost",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/invokeCaptured",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/overview",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/quickstart",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginConstraint",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginHostCore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginHostDisposalNodeKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginHostDisposalProvenance",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginHostOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/PluginHost",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/PluginHostDisposalNodeKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/readPluginHostDisposalProvenance",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/guides/plugin-host",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/guides/plugin-host/configuration-and-shared",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/guides/plugin-host/getting-started",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/guides/plugin-host/install-and-compose",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/guides/plugin-host/pipelines",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/guides/plugin-host/removal-and-rollback",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "plugin-host"
     }
   ]
 }

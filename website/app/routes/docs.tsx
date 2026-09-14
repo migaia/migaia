@@ -716,6 +716,16 @@ function LibraryModuleLinks({
   /** Storage Web spans backends, schema, Host composition, and plugins; public-path buckets hide those decisions. */
   const storageWebGroups =
     librarySlug === 'storage-web' ? groupStorageWebApiLinks(apiLinks, locale) : []
+  /** Real-world bindings keep transport-specific examples discoverable beside the contract APIs. */
+  const rpcContractScenarioLinks =
+    librarySlug === 'rpc-contract'
+      ? [
+          ['进程 IPC', 'Process IPC', 'bindings-process'],
+          ['WebSocket', 'WebSocket', 'bindings-websocket'],
+          ['SSE 服务端推送', 'SSE server push', 'bindings-sse'],
+          ['fetch 请求响应', 'fetch request/response', 'bindings-fetch']
+        ]
+      : []
   return (
     <>
       {storageWebGroups.map((group) => (
@@ -734,6 +744,24 @@ function LibraryModuleLinks({
           </div>
         </div>
       ))}
+      {rpcContractScenarioLinks.length > 0 ? (
+        <div className="left-rail-group left-rail-primary">
+          <span>{locale === 'zh' ? '场景应用' : 'Real-world scenarios'}</span>
+          <div className="left-rail-children">
+            <Link to={`/${locale}/guides/rpc-contract/real-world-bindings`}>
+              {locale === 'zh' ? '同一 Contract 的完整数据流' : 'One Contract, complete data flow'}
+            </Link>
+            {rpcContractScenarioLinks.map(([labelZh, labelEn, anchor]) => (
+              <Link
+                key={labelEn}
+                to={`/${locale}/guides/rpc-contract/${anchor.replace('bindings-', '')}`}
+              >
+                {locale === 'zh' ? labelZh : labelEn}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {primaryEntries.length > 0 ? (
         <div className="left-rail-group left-rail-primary">
           <span>{locale === 'zh' ? '常用 Endpoint' : 'Primary endpoints'}</span>
@@ -1442,7 +1470,7 @@ function SingleApiReference({
   const relatedTypes = collectRelatedTypes(symbol, typingSymbols)
   const coreUsage = symbol.sections.find((section) => section.id === 'core-usage')
   const rawQuickExample =
-    guide?.quickStart ??
+    (guide?.quickStart && isObservableExample(guide.quickStart) ? guide.quickStart : undefined) ??
     diagnosticSourceExample(symbol, api.library) ??
     runnableExample(symbol.examples)
   const quickExample = rawQuickExample
@@ -1736,10 +1764,19 @@ function isErrorContract(symbol: IApiSymbol): boolean {
   )
 }
 
-/** Rejects import-only snippets that cannot demonstrate observable behavior by themselves. */
+/** Rejects snippets that only declare names and never demonstrate an observable API step. */
 function runnableExample(examples: readonly string[]): string | undefined {
-  return examples.find(
-    (example) => !/^\s*import\s+[\s\S]+?\s+from\s+['"][^'"]+['"];?\s*$/.test(example)
+  return examples.find(isObservableExample)
+}
+
+/** Detects whether a maintained snippet reaches an API, result, branch, or lifecycle action. */
+function isObservableExample(example: string): boolean {
+  const body = example
+    .replace(/^\s*import[\s\S]*?from\s+['"][^'"]+['"];?\s*/gmu, '')
+    .replace(/^\s*(?:type|interface)\s+[\s\S]*?(?:\n|$)/gmu, '')
+    .replace(/^\s*\/\/.*$/gmu, '')
+  return /\b(?:await|throw|return|if|for|while)\b|\bconsole\.|\.[A-Za-z_$][\w$]*\s*\(/u.test(
+    body
   )
 }
 
@@ -2239,7 +2276,17 @@ function MaintainedDocument({
               {index > 0 && isApiBoundaryBlock(block) ? (
                 <Separator className="contract-separator" />
               ) : null}
-              <MaintainedBlock block={block} domain={domain} library={library} locale={locale} />
+              <div
+                id={
+                  section.id === 'bindings'
+                    ? ['bindings-fetch', 'bindings-websocket', 'bindings-sse', 'bindings-process'][
+                        index - 1
+                      ]
+                    : undefined
+                }
+              >
+                <MaintainedBlock block={block} domain={domain} library={library} locale={locale} />
+              </div>
             </Fragment>
           ))}
         </section>
@@ -2898,7 +2945,7 @@ function DomainLibrary({
                 <span>{locale === 'zh' ? '任务指南' : 'Task guides'}</span>
                 {guideTopics.map((entry) => (
                   <Link
-                    className={entry.topic === topic ? 'active' : ''}
+                    className={`guide-topic-link${entry.topic === topic ? ' active' : ''}`}
                     key={entry.topic}
                     to={
                       entry.topic === 'index'
@@ -2924,7 +2971,7 @@ function DomainLibrary({
               <nav className="mobile-guide-links" aria-label={copyFor(locale).taskGuides}>
                 {guideTopics.map((entry) => (
                   <Link
-                    className={entry.topic === topic ? 'active' : ''}
+                    className={`guide-topic-link${entry.topic === topic ? ' active' : ''}`}
                     key={entry.topic}
                     to={
                       entry.topic === 'index'
@@ -3076,11 +3123,11 @@ function RelatedTypes({
       <h2>
         {standalone
           ? locale === 'zh'
-            ? `类型参考（${symbols.length}）`
-            : `Type reference (${symbols.length})`
+            ? '类型参考'
+            : 'Type reference'
           : locale === 'zh'
-            ? `相关类型（${symbols.length}）`
-            : `Related types (${symbols.length})`}
+            ? '相关类型'
+            : 'Related types'}
       </h2>
       <div className="type-reference-body">
         {symbols.map((symbol) => {
@@ -3269,6 +3316,23 @@ function SymbolPurpose({
   return purpose ? <InlineText library={library} locale={locale} text={purpose} /> : null
 }
 
+/**
+ * Adds a short result explanation to console examples that otherwise leave
+ * readers guessing what the output is meant to prove.
+ */
+function ensureConsoleOutputComment(code: string, locale: ILocale): string {
+  const explanation = locale === 'zh'
+    ? '输出用于确认上一操作的结果。'
+    : 'Logs the result of the preceding operation.'
+  return code
+    .split('\n')
+    .map((line) => {
+      if (!/\bconsole\.log\(/u.test(line) || /\s\/\/\s/u.test(line)) return line
+      return `${line} // ${explanation}`
+    })
+    .join('\n')
+}
+
 /** Presents source text as a labelled, horizontally scrollable Dracula code surface. */
 function CodeBlock({
   code,
@@ -3289,10 +3353,12 @@ function CodeBlock({
   const isTypeScript = ['ts', 'tsx', 'typescript'].includes(normalizedLanguage)
   /** Reader-facing source with each public symbol imported from its narrowest owner. */
   const normalizedCode = isTypeScript ? normalizeExampleImports(code) : code
+  /** Source passed to highlighting after enforcing the site-wide console explanation rule. */
+  const documentedCode = ensureConsoleOutputComment(normalizedCode, locale)
   /** Examples include inline intent plus a walkthrough; signatures stay byte-focused. */
   const commentary = explain
-    ? commentExample(normalizedCode, language, locale, commentaryContext)
-    : { code: normalizedCode, notes: [] }
+    ? commentExample(documentedCode, language, locale, commentaryContext)
+    : { code: documentedCode, notes: [] }
   return (
     <div
       className={explain ? 'explained-code annotated' : 'explained-code'}
@@ -3326,12 +3392,15 @@ function CodeBlock({
 /** Tokenizes formatted TypeScript into safe React spans using the Dracula palette. */
 function highlightTypeScript(code: string) {
   const keywords = new Set([
+    'async',
     'as',
+    'await',
     'const',
     'declare',
     'export',
     'extends',
     'false',
+    'for',
     'from',
     'function',
     'import',
@@ -3340,6 +3409,8 @@ function highlightTypeScript(code: string) {
     'never',
     'new',
     'null',
+    'of',
+    'in',
     'readonly',
     'return',
     'true',

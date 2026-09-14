@@ -31,7 +31,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\n\n\n// 1. 创建一对已经互联的 transport。\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\n// 2. Provider 拥有服务 id，并注册可调用的方法。\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\n// 3. Client 声明允许调用的目标，然后像调用异步函数一样发送请求。\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport })\n  ]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\n// 4. 测试结束时释放两端，避免监听器泄漏到下一个用例。\nawait Promise.all([app.dispose(), calculator.dispose()])"
+          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\n// 1. 创建一对已经互联的 transport。\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\n// 2. Provider 拥有服务 id，并注册可调用的方法。\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\n// 3. Client 声明允许调用的目标，然后像调用异步函数一样发送请求。\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport })\n  ]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\n// 4. 测试结束时释放两端，避免监听器泄漏到下一个用例。\nawait Promise.all([app.dispose(), calculator.dispose()])"
         },
         {
           type: 'list',
@@ -108,7 +108,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// search.worker.ts：接收被转移的 port2，并在同一专用链路提供方法\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker',\n    transport,\n    middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
+          code: "// search.worker.ts：接收被转移的 port2，并在同一专用链路提供方法\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\nconst index = ['migaia', 'storage', 'rpc']\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker',\n    transport,\n    middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
         },
         {
           type: 'list',
@@ -187,12 +187,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// main.ts：主线程调用 Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page',\n  targetIds: ['image-worker'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\n\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file, width: 320 })\n\nawait images.dispose()\nworker.terminate()"
+          code: "// main.ts：主线程调用 Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page',\n  targetIds: ['image-worker'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\n\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file: new Blob(['demo']), width: 320 })\n\nawait images.dispose()\nworker.terminate()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// image.worker.ts：Worker 接收调用并返回结果\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  const result = await resizeImage(file, width)\n  return context.success(result)\n})"
+          code: "// image.worker.ts：Worker 接收调用并返回结果\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst resizeImage = async (file: Blob, width: number): Promise<Blob> => {\n  const bitmap = await createImageBitmap(file)\n  const canvas = new OffscreenCanvas(width, Math.round(bitmap.height * width / bitmap.width))\n  const context = canvas.getContext('2d')\n  if (!context) throw new Error('2D canvas is unavailable')\n  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)\n  bitmap.close()\n  return canvas.convertToBlob({ type: 'image/webp' })\n}\n\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  const result = await resizeImage(file, width)\n  return context.success(result)\n})"
         },
         {
           type: 'list',
@@ -237,7 +237,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// page.ts：每个标签页创建自己的 endpoint\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createSharedWorkerTransport } from '@migaia/web-rpc/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./counter.worker.ts', import.meta.url), { type: 'module' })\nworker.port.start()\nconst transport = createSharedWorkerTransport(worker.port)\nconst counter = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['shared-counter'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst value = await counter.send<number>('shared-counter', 'increment', undefined)\nwindow.addEventListener('pagehide', () => void counter.dispose(), { once: true })"
+          code: "// page.ts：每个标签页创建自己的 endpoint\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createSharedWorkerTransport } from '@migaia/web-rpc/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./counter.worker.ts', import.meta.url), { type: 'module' })\nworker.port.start()\nconst transport = createSharedWorkerTransport(worker.port)\nconst counter = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['shared-counter'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst value = await counter.send<number>('shared-counter', 'increment', undefined)\nconsole.log(`shared counter value: ${value}`) // 响应来自 SharedWorker 中所有页面共享的计数状态。\nwindow.addEventListener('pagehide', () => void counter.dispose(), { once: true })"
         },
         {
           type: 'code',
@@ -289,7 +289,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// page.ts：受控页面先把自己的 client id 告诉 ServiceWorker\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createServiceWorkerTransport } from '@migaia/web-rpc/adapters/service-worker'\n\nawait navigator.serviceWorker.ready\nconst controller = navigator.serviceWorker.controller\nif (!controller) throw new Error('Reload once so the ServiceWorker controls this page')\nconst clientId = crypto.randomUUID()\ncontroller.postMessage({ type: 'rpc-connect', clientId })\n\nconst transport = createServiceWorkerTransport({\n  target: controller, receiver: navigator.serviceWorker, peerId: 'service-worker'\n})\nconst cache = await createEndpoint({\n  id: clientId, targetIds: ['service-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog.json')\nwindow.addEventListener('pagehide', () => void cache.dispose(), { once: true })"
+          code: "// page.ts：受控页面先把自己的 client id 告诉 ServiceWorker\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createServiceWorkerTransport } from '@migaia/web-rpc/adapters/service-worker'\n\nawait navigator.serviceWorker.ready\nconst controller = navigator.serviceWorker.controller\nif (!controller) throw new Error('Reload once so the ServiceWorker controls this page')\nconst clientId = crypto.randomUUID()\ncontroller.postMessage({ type: 'rpc-connect', clientId })\n\nconst transport = createServiceWorkerTransport({\n  target: controller, receiver: navigator.serviceWorker, peerId: 'service-worker'\n})\nconst cache = await createEndpoint({\n  id: clientId, targetIds: ['service-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog.json')\nconsole.log(cached ? 'offline catalog is available' : 'offline catalog is missing') // provider 在 ServiceWorker 端查询 CacheStorage 后返回结果。\nwindow.addEventListener('pagehide', () => void cache.dispose(), { once: true })"
         },
         {
           type: 'code',
@@ -406,7 +406,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// receiver.ts：另一端从 datachannel 事件取得同一条逻辑链路\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
+          code: "// receiver.ts：另一端从 datachannel 事件取得同一条逻辑链路\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst loadProfile = async (userId: string) => ({ userId, displayName: 'Ada' })\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
         },
         {
           type: 'list',
@@ -454,12 +454,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// browser.ts：调用 HTTP/3 服务端公开的指标方法\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nrenderMetrics(snapshot)\n\nawait metrics.dispose()\nsession.close()"
+          code: "// browser.ts：调用 HTTP/3 服务端公开的指标方法\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nconsole.log('metrics snapshot:', snapshot)\n\nawait metrics.dispose()\nsession.close()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// metrics-session.ts：由 HTTP/3 框架在认证并接受 session 后调用\nimport { connect, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: readCpuUsage(), at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
+          code: "// metrics-session.ts：由 HTTP/3 框架在认证并接受 session 后调用\nimport { connect, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: 0.42, at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
         },
         {
           type: 'list',
@@ -497,7 +497,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\n\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: providerTransport })]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: clientTransport })]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\nawait Promise.all([app.dispose(), calculator.dispose()])"
+          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: providerTransport })]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: clientTransport })]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\nawait Promise.all([app.dispose(), calculator.dispose()])"
         },
         {
           type: 'list',
@@ -578,7 +578,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// search.worker.ts: receive port2 and expose a method on that link\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker', transport, middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
+          code: "// search.worker.ts: receive port2 and expose a method on that link\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\nconst index = ['migaia', 'storage', 'rpc']\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker', transport, middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
         },
         {
           type: 'list',
@@ -661,12 +661,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// main.ts: call the Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page', targetIds: ['image-worker'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file, width: 320 })\nawait images.dispose()\nworker.terminate()"
+          code: "// main.ts: call the Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page', targetIds: ['image-worker'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file: new Blob(['demo']), width: 320 })\nawait images.dispose()\nworker.terminate()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// image.worker.ts: handle the call and return a result\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  return context.success(await resizeImage(file, width))\n})"
+          code: "// image.worker.ts: handle the call and return a result\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst resizeImage = async (file: Blob, width: number): Promise<Blob> => {\n  const bitmap = await createImageBitmap(file)\n  const canvas = new OffscreenCanvas(width, Math.round(bitmap.height * width / bitmap.width))\n  const context = canvas.getContext('2d')\n  if (!context) throw new Error('2D canvas is unavailable')\n  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)\n  bitmap.close()\n  return canvas.convertToBlob({ type: 'image/webp' })\n}\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  return context.success(await resizeImage(file, width))\n})"
         },
         {
           type: 'list',
@@ -930,7 +930,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// receiver.ts: obtain the paired channel from the datachannel event\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
+          code: "// receiver.ts: obtain the paired channel from the datachannel event\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst loadProfile = async (userId: string) => ({ userId, displayName: 'Ada' })\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
         },
         {
           type: 'list',
@@ -994,12 +994,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// browser.ts: call the metric method exposed by the HTTP/3 server\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nrenderMetrics(snapshot)\n\nawait metrics.dispose()\nsession.close()"
+          code: "// browser.ts: call the metric method exposed by the HTTP/3 server\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nconsole.log('metrics snapshot:', snapshot)\n\nawait metrics.dispose()\nsession.close()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// metrics-session.ts: called after the HTTP/3 framework authenticates and accepts a session\nimport { connect, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: readCpuUsage(), at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
+          code: "// metrics-session.ts: called after the HTTP/3 framework authenticates and accepts a session\nimport { connect, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: 0.42, at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
         },
         {
           type: 'list',
@@ -1128,7 +1128,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'tsx',
-                code: "const sessionToken = createStoreToken<typeof sessionStore>('session')\nconst runtime = createRuntime()\nconst registry = createStoreRegistry(runtime)\nregistry.register(sessionToken, sessionStore, { owned: true })\n\nfunction UserName() {\n  const name = useProvidedStore(sessionToken, (store) => store.name)\n  return <span>{name}</span>\n}\n\nroot.render(\n  <StoreProvider registry={registry} disposeOnUnmount>\n    <UserName />\n  </StoreProvider>\n)"
+                code: "import { createRoot } from 'react-dom/client'\nimport { createStore } from '@migaia/store-light'\nimport { createRuntime } from '@migaia/reactive'\nimport { createStoreRegistry, createStoreToken, StoreProvider, useProvidedStore } from '@migaia/store-react'\n\nconst sessionStore = createStore({ name: 'Ada' })\nconst sessionToken = createStoreToken<typeof sessionStore>('session')\nconst runtime = createRuntime()\nconst registry = createStoreRegistry(runtime)\nregistry.register(sessionToken, sessionStore, { owned: true })\n\nfunction UserName() {\n  const name = useProvidedStore(sessionToken, (store) => store.name)\n  return <span>{name}</span>\n}\n\nconst root = createRoot(document.getElementById('root')!)\nroot.render(\n  <StoreProvider registry={registry} disposeOnUnmount>\n    <UserName />\n  </StoreProvider>\n)"
               },
               {
                 type: 'list',
@@ -1160,7 +1160,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'tsx',
-                code: "const sessionToken = createStoreToken<typeof sessionStore>('session')\nconst runtime = createRuntime()\nconst registry = createStoreRegistry(runtime)\nregistry.register(sessionToken, sessionStore, { owned: true })\n\nfunction UserName() {\n  const name = useProvidedStore(sessionToken, (store) => store.name)\n  return <span>{name}</span>\n}\n\nroot.render(\n  <StoreProvider registry={registry} disposeOnUnmount>\n    <UserName />\n  </StoreProvider>\n)"
+                code: "import { createRoot } from 'react-dom/client'\nimport { createStore } from '@migaia/store-light'\nimport { createRuntime } from '@migaia/reactive'\nimport { createStoreRegistry, createStoreToken, StoreProvider, useProvidedStore } from '@migaia/store-react'\n\nconst sessionStore = createStore({ name: 'Ada' })\nconst sessionToken = createStoreToken<typeof sessionStore>('session')\nconst runtime = createRuntime()\nconst registry = createStoreRegistry(runtime)\nregistry.register(sessionToken, sessionStore, { owned: true })\n\nfunction UserName() {\n  const name = useProvidedStore(sessionToken, (store) => store.name)\n  return <span>{name}</span>\n}\n\nconst root = createRoot(document.getElementById('root')!)\nroot.render(\n  <StoreProvider registry={registry} disposeOnUnmount>\n    <UserName />\n  </StoreProvider>\n)"
               },
               {
                 type: 'list',
@@ -1210,7 +1210,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'tsx',
-                code: 'const ready = useMemo(() => [() => ensureWasm(), session.ready], [session.ready])\nconst config = useMemo(() => ({ ready, fallback: <Loading /> }), [ready])\n\nreturn <StoreProvider config={config}>{children}</StoreProvider>'
+                code: "import { useMemo, type ReactNode } from 'react'\nimport { StoreProvider } from '@migaia/store-react'\n\nconst session = { ready: Promise.resolve() }\nconst ensureWasm = async () => {}\nconst Loading = () => <span>Loading...</span>\n\nexport function App({ children }: { children: ReactNode }) {\n  const ready = useMemo(() => [ensureWasm(), session.ready], [session.ready])\n  const config = useMemo(() => ({ ready, fallback: <Loading /> }), [ready])\n  return <StoreProvider config={config}>{children}</StoreProvider>\n}"
               },
               {
                 type: 'list',
@@ -1258,7 +1258,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'tsx',
-                code: 'const ready = useMemo(() => [() => ensureWasm(), session.ready], [session.ready])\nconst config = useMemo(() => ({ ready, fallback: <Loading /> }), [ready])\n\nreturn <StoreProvider config={config}>{children}</StoreProvider>'
+                code: "import { useMemo, type ReactNode } from 'react'\nimport { StoreProvider } from '@migaia/store-react'\n\nconst session = { ready: Promise.resolve() }\nconst ensureWasm = async () => {}\nconst Loading = () => <span>Loading...</span>\n\nexport function App({ children }: { children: ReactNode }) {\n  const ready = useMemo(() => [ensureWasm(), session.ready], [session.ready])\n  const config = useMemo(() => ({ ready, fallback: <Loading /> }), [ready])\n  return <StoreProvider config={config}>{children}</StoreProvider>\n}"
               },
               {
                 type: 'list',
@@ -1403,7 +1403,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'tsx',
-                code: "const countDef = atomDef(0, 'count')\n\nfunction Counter() {\n  const count = useAtomDefinition(countDef)\n  const setCount = useSetAtomDefinition(countDef)\n  return <button onClick={() => setCount((n) => n + 1)}>{count}</button>\n}"
+                code: "import { createRoot } from 'react-dom/client'\nimport { atomDef } from '@migaia/store-keyed'\nimport { StoreProvider, useAtomDefinition } from '@migaia/store-react'\n\n// Definition 只是稳定的状态描述；每个 Provider 会为它创建自己的值。\nconst countDef = atomDef(0, 'count')\n\nfunction Counter({ label }: { label: string }) {\n  const count = useAtomDefinition(countDef)\n  return <p>{label}: {count}</p>\n}\n\ncreateRoot(document.getElementById('root')!).render(\n  <>\n    <StoreProvider><Counter label='left' /></StoreProvider>\n    <StoreProvider><Counter label='right' /></StoreProvider>\n  </>\n)"
               },
               {
                 type: 'list',
@@ -1462,7 +1462,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'tsx',
-                code: "const countDef = atomDef(0, 'count')\n\nfunction Counter() {\n  const count = useAtomDefinition(countDef)\n  const setCount = useSetAtomDefinition(countDef)\n  return <button onClick={() => setCount((n) => n + 1)}>{count}</button>\n}"
+                code: "import { createRoot } from 'react-dom/client'\nimport { atomDef } from '@migaia/store-keyed'\nimport { StoreProvider, useAtomDefinition } from '@migaia/store-react'\n\n// Definition 只是稳定的状态描述；每个 Provider 会为它创建自己的值。\nconst countDef = atomDef(0, 'count')\n\nfunction Counter({ label }: { label: string }) {\n  const count = useAtomDefinition(countDef)\n  return <p>{label}: {count}</p>\n}\n\ncreateRoot(document.getElementById('root')!).render(\n  <>\n    <StoreProvider><Counter label='left' /></StoreProvider>\n    <StoreProvider><Counter label='right' /></StoreProvider>\n  </>\n)"
               },
               {
                 type: 'list',
@@ -1972,7 +1972,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 1000)\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = new Effect(() => {\n  draw(positions.get(0), positions.get(1))\n}, runtime)"
+                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 2, { initialValues: [0, 0] })\nconst draw = (x: number, y: number) => console.log({ x, y })\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = new Effect(() => {\n  draw(positions.get(0), positions.get(1))\n}, runtime)\n\npositions.update(0, (x) => x + 1)\nstopWatch()\nrender.dispose()\npositions.dispose()\nworker.terminate()"
               }
             ]
           },
@@ -1983,7 +1983,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'self.onmessage = ({ data }) => {\n  const runtime = createRuntime()\n  const positions = sharedInt32Array(runtime, 1000, { buffer: data.buffer })\n  positions.update(0, (x) => x + 1)\n}'
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nself.onmessage = ({ data }) => {\n  const runtime = createRuntime()\n  const positions = sharedInt32Array(runtime, 2, { buffer: data.buffer })\n  positions.update(0, (x) => x + 1)\n  self.postMessage({ x: positions.get(0), y: positions.get(1) })\n  positions.dispose()\n}"
               },
               {
                 type: 'list',
@@ -2014,7 +2014,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 1000)\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = new Effect(() => {\n  draw(positions.get(0), positions.get(1))\n}, runtime)"
+                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 2, { initialValues: [0, 0] })\nconst draw = (x: number, y: number) => console.log({ x, y })\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = new Effect(() => {\n  draw(positions.get(0), positions.get(1))\n}, runtime)\n\npositions.update(0, (x) => x + 1)\nstopWatch()\nrender.dispose()\npositions.dispose()\nworker.terminate()"
               }
             ]
           },
@@ -2025,7 +2025,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'self.onmessage = ({ data }) => {\n  const runtime = createRuntime()\n  const positions = sharedInt32Array(runtime, 1000, { buffer: data.buffer })\n  positions.update(0, (x) => x + 1)\n}'
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nself.onmessage = ({ data }) => {\n  const runtime = createRuntime()\n  const positions = sharedInt32Array(runtime, 2, { buffer: data.buffer })\n  positions.update(0, (x) => x + 1)\n  self.postMessage({ x: positions.get(0), y: positions.get(1) })\n  positions.dispose()\n}"
               },
               {
                 type: 'list',
@@ -2491,7 +2491,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'let stop: () => void\ntry {\n  stop = positions.watch()\n} catch (error) {\n  if (error.code !== StoreSharedErrorCode.envUnsupported) throw error\n  const timer = setInterval(() => positions.sync(), 100)\n  stop = () => clearInterval(timer)\n}'
+                code: "import { StoreSharedErrorCode } from '@migaia/store-shared'\n\ntype ISyncSource = { watch: () => () => void; sync: () => void }\n\nexport function startSyncWithFallback(positions: ISyncSource) {\n  try {\n    return positions.watch()\n  } catch (error) {\n    const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined\n    if (code !== StoreSharedErrorCode.envUnsupported) throw error\n    const timer = setInterval(() => positions.sync(), 100)\n    return () => clearInterval(timer)\n  }\n}"
               },
               {
                 type: 'paragraph',
@@ -2533,7 +2533,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'let stop: () => void\ntry {\n  stop = positions.watch()\n} catch (error) {\n  if (error.code !== StoreSharedErrorCode.envUnsupported) throw error\n  const timer = setInterval(() => positions.sync(), 100)\n  stop = () => clearInterval(timer)\n}'
+                code: "import { StoreSharedErrorCode } from '@migaia/store-shared'\n\ntype ISyncSource = { watch: () => () => void; sync: () => void }\n\nexport function startSyncWithFallback(positions: ISyncSource) {\n  try {\n    return positions.watch()\n  } catch (error) {\n    const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined\n    if (code !== StoreSharedErrorCode.envUnsupported) throw error\n    const timer = setInterval(() => positions.sync(), 100)\n    return () => clearInterval(timer)\n  }\n}"
               },
               {
                 type: 'paragraph',
@@ -2924,7 +2924,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'await ensureWasm()\n\nconst telemetry = createStore({\n  temperature: number(),\n  connected: boolean(),\n  label: string(64),\n  samples: array(number(), 1024, 32),\n  position: record({ x: number(), y: number() })\n})\n\ntelemetry.temperature.value = 21.5\ntelemetry.samples.setRange(0, 3, [1, 2, 3])\ntelemetry.position.x = 10\n\ntelemetry.$dispose()'
+                code: `import { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait ensureWasm()\n\nconst telemetry = createStore({\n  temperature: number(),\n  connected: boolean(),\n  label: string(64),\n  samples: array(number(), 1024, 32),\n  position: record({ x: number(), y: number() })\n})\n\ntelemetry.temperature.value = 21.5\ntelemetry.samples.setRange(0, 3, [1, 2, 3])\ntelemetry.position.x = 10\n\ntelemetry.$dispose()`
               },
               {
                 type: 'list',
@@ -2956,7 +2956,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'await ensureWasm()\n\nconst telemetry = createStore({\n  temperature: number(),\n  connected: boolean(),\n  label: string(64),\n  samples: array(number(), 1024, 32),\n  position: record({ x: number(), y: number() })\n})\n\ntelemetry.temperature.value = 21.5\ntelemetry.samples.setRange(0, 3, [1, 2, 3])\ntelemetry.position.x = 10\n\ntelemetry.$dispose()'
+                code: `import { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait ensureWasm()\n\nconst telemetry = createStore({\n  temperature: number(),\n  connected: boolean(),\n  label: string(64),\n  samples: array(number(), 1024, 32),\n  position: record({ x: number(), y: number() })\n})\n\ntelemetry.temperature.value = 21.5\ntelemetry.samples.setRange(0, 3, [1, 2, 3])\ntelemetry.position.x = 10\n\ntelemetry.$dispose()`
               },
               {
                 type: 'list',
@@ -3174,7 +3174,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const label = string(12)\nlabel.value = 'hello'\n\n// 多字节字符按 TextEncoder 结果计数\nconst bytes = new TextEncoder().encode(nextLabel).byteLength\nif (bytes <= 12) label.value = nextLabel"
+                code: "import { string } from '@migaia/store-wasm'\n\nconst label = string(12)\nlabel.value = 'hello'\nconst nextLabel = '你好'\n\n// 多字节字符按 TextEncoder 结果计数。\nconst bytes = new TextEncoder().encode(nextLabel).byteLength\nif (bytes <= 12) label.value = nextLabel"
               },
               {
                 type: 'list',
@@ -3220,7 +3220,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const label = string(12)\nlabel.value = 'hello'\n\n// Multi-byte characters count by TextEncoder output\nconst bytes = new TextEncoder().encode(nextLabel).byteLength\nif (bytes <= 12) label.value = nextLabel"
+                code: "import { string } from '@migaia/store-wasm'\n\nconst label = string(12)\nlabel.value = 'hello'\nconst nextLabel = 'hello world'\n\n// Multi-byte characters count by TextEncoder output.\nconst bytes = new TextEncoder().encode(nextLabel).byteLength\nif (bytes <= 12) label.value = nextLabel"
               },
               {
                 type: 'list',
@@ -3351,7 +3351,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const position = record({\n  x: number(),\n  y: number(),\n  z: number()\n})\n\nposition.x = 1\nposition.y = 2'
+                code: "import { number, record } from '@migaia/store-wasm'\n\nconst position = record({\n  x: number(),\n  y: number(),\n  z: number()\n})\n\nposition.x = 1\nposition.y = 2\nconsole.log(position.x, position.y)"
               },
               {
                 type: 'list',
@@ -3393,7 +3393,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const position = record({\n  x: number(),\n  y: number(),\n  z: number()\n})\n\nposition.x = 1\nposition.y = 2'
+                code: "import { number, record } from '@migaia/store-wasm'\n\nconst position = record({\n  x: number(),\n  y: number(),\n  z: number()\n})\n\nposition.x = 1\nposition.y = 2\nconsole.log(position.x, position.y)"
               },
               {
                 type: 'list',
@@ -3831,7 +3831,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const handler = createWorkerHandler<number[], number>(\n  (values, { signal }) => {\n    signal.throwIfAborted?.()\n    return values.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => {\n  void handler(event.data)\n}'
+                code: "import { createWorkerHandler } from '@migaia/store-worker'\n\n// Worker 收到主线程数组后计算总和，再把结果回传给 Adapter。\nconst handler = createWorkerHandler<number[], number>(\n  (values, { signal }) => {\n    signal.throwIfAborted?.()\n    return values.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => {\n  void handler(event.data)\n}"
               }
             ]
           },
@@ -3842,7 +3842,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const worker = new Worker(new URL('./sum.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5000 })\n\ntry {\n  const sum = await adapter.request<number[], number>([1, 2, 3])\n  console.log(sum)\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}"
+                code: "import { WorkerAdapter } from '@migaia/store-worker'\n\nconst worker = new Worker(new URL('./sum.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5000 })\n\ntry {\n  const sum = await adapter.request<number[], number>([1, 2, 3])\n  console.log(sum) // 6：输入数组经 Worker 计算后回到主线程。\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}"
               },
               {
                 type: 'list',
@@ -3873,7 +3873,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const handler = createWorkerHandler<number[], number>(\n  (values, { signal }) => {\n    signal.throwIfAborted?.()\n    return values.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => {\n  void handler(event.data)\n}'
+                code: "import { createWorkerHandler } from '@migaia/store-worker'\n\n// Worker 收到主线程数组后计算总和，再把结果回传给 Adapter。\nconst handler = createWorkerHandler<number[], number>(\n  (values, { signal }) => {\n    signal.throwIfAborted?.()\n    return values.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => {\n  void handler(event.data)\n}"
               }
             ]
           },
@@ -3884,7 +3884,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const worker = new Worker(new URL('./sum.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5000 })\n\ntry {\n  const sum = await adapter.request<number[], number>([1, 2, 3])\n  console.log(sum)\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}"
+                code: "import { WorkerAdapter } from '@migaia/store-worker'\n\nconst worker = new Worker(new URL('./sum.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5000 })\n\ntry {\n  const sum = await adapter.request<number[], number>([1, 2, 3])\n  console.log(sum) // 6：输入数组经 Worker 计算后回到主线程。\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}"
               },
               {
                 type: 'list',
@@ -4215,7 +4215,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const totals = workerComputed(adapter, () => rows.value, {\n  runtime,\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  retry: 2,\n  transfer: (input) => input instanceof Uint8Array ? [input.buffer] : []\n})'
+                code: "import { workerComputed, WorkerAdapter } from '@migaia/store-worker'\nimport type { IRuntime } from '@migaia/reactive'\n\nexport function createTotals(adapter: WorkerAdapter, rows: { value: readonly number[] }, runtime: IRuntime) {\n  return workerComputed(adapter, () => rows.value, {\n    runtime,\n    ttl: 30_000,\n    staleWhileRevalidate: true,\n    retry: 2,\n    transfer: (input) => input instanceof Uint8Array ? [input.buffer] : []\n  })\n}"
               },
               {
                 type: 'list',
@@ -4257,7 +4257,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const totals = workerComputed(adapter, () => rows.value, {\n  runtime,\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  retry: 2,\n  transfer: (input) => input instanceof Uint8Array ? [input.buffer] : []\n})'
+                code: "import { workerComputed, WorkerAdapter } from '@migaia/store-worker'\nimport type { IRuntime } from '@migaia/reactive'\n\nexport function createTotals(adapter: WorkerAdapter, rows: { value: readonly number[] }, runtime: IRuntime) {\n  return workerComputed(adapter, () => rows.value, {\n    runtime,\n    ttl: 30_000,\n    staleWhileRevalidate: true,\n    retry: 2,\n    transfer: (input) => input instanceof Uint8Array ? [input.buffer] : []\n  })\n}"
               },
               {
                 type: 'list',
@@ -4310,7 +4310,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const registry = createSerializeRegistry([\n  workerPlugin({\n    worker,\n    type: 'gzip',\n    ownership: WorkerByteOwnership.transfer\n  })\n])"
+                code: "import { createSerializeRegistry } from '@migaia/serialize'\nimport { WorkerByteOwnership, workerPlugin } from '@migaia/store-worker'\n\nconst worker = new Worker(new URL('./codec.worker.ts', import.meta.url), { type: 'module' })\nconst registry = createSerializeRegistry([\n  workerPlugin({\n    worker,\n    type: 'gzip',\n    ownership: WorkerByteOwnership.transfer\n  })\n])\n\nconst encoded = await registry.encode('gzip', { id: 42, payload: 'report' })\nconsole.log(encoded)\nworker.terminate()"
               }
             ]
           },
@@ -4357,7 +4357,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const registry = createSerializeRegistry([\n  workerPlugin({\n    worker,\n    type: 'gzip',\n    ownership: WorkerByteOwnership.transfer\n  })\n])"
+                code: "import { createSerializeRegistry } from '@migaia/serialize'\nimport { WorkerByteOwnership, workerPlugin } from '@migaia/store-worker'\n\nconst worker = new Worker(new URL('./codec.worker.ts', import.meta.url), { type: 'module' })\nconst registry = createSerializeRegistry([\n  workerPlugin({\n    worker,\n    type: 'gzip',\n    ownership: WorkerByteOwnership.transfer\n  })\n])\n\nconst encoded = await registry.encode('gzip', { id: 42, payload: 'report' })\nconsole.log(encoded)\nworker.terminate()"
               }
             ]
           },
@@ -4771,7 +4771,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const tools = import.meta.env.DEV\n  ? createStoreDevTools(counterStore, {\n      maxHistory: 100,\n      maxTrace: 500\n    })\n  : undefined\n\nconst checkpoint = tools?.record('before-submit')\ncounterStore.increment()\n\nconsole.table(tools?.actions)\nif (submitFailed && checkpoint) tools?.jumpTo(checkpoint.id)\n\ntools?.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools } from '@migaia/store-devtools'\n\nconst counterStore = createStore({ count: 0, increment() { this.count += 1 } })\nconst submitFailed = false\nconst tools = import.meta.env.DEV\n  ? createStoreDevTools(counterStore, { maxHistory: 100, maxTrace: 500 })\n  : undefined\n\nconst checkpoint = tools?.record('before-submit')\ncounterStore.increment()\nconsole.table(tools?.actions)\nif (submitFailed && checkpoint) tools?.jumpTo(checkpoint.id)\ntools?.dispose()\nawait counterStore.dispose()"
               },
               {
                 type: 'list',
@@ -4803,7 +4803,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const tools = import.meta.env.DEV\n  ? createStoreDevTools(counterStore, {\n      maxHistory: 100,\n      maxTrace: 500\n    })\n  : undefined\n\nconst checkpoint = tools?.record('before-submit')\ncounterStore.increment()\n\nconsole.table(tools?.actions)\nif (submitFailed && checkpoint) tools?.jumpTo(checkpoint.id)\n\ntools?.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools } from '@migaia/store-devtools'\n\nconst counterStore = createStore({ count: 0, increment() { this.count += 1 } })\nconst submitFailed = false\nconst tools = import.meta.env.DEV\n  ? createStoreDevTools(counterStore, { maxHistory: 100, maxTrace: 500 })\n  : undefined\n\nconst checkpoint = tools?.record('before-submit')\ncounterStore.increment()\nconsole.table(tools?.actions)\nif (submitFailed && checkpoint) tools?.jumpTo(checkpoint.id)\ntools?.dispose()\nawait counterStore.dispose()"
               },
               {
                 type: 'list',
@@ -5105,7 +5105,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\n\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))'
+                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { getDependencyTree, getObserverTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst priceSignal = runtime.signal(10)\nconst totalEffect = new Effect(() => {\n  console.log('total', priceSignal.value * 2)\n}, runtime)\n\nconst upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))\ntotalEffect.dispose()"
               },
               {
                 type: 'table',
@@ -5151,7 +5151,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\n\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))'
+                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { getDependencyTree, getObserverTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst priceSignal = runtime.signal(10)\nconst totalEffect = new Effect(() => {\n  console.log('total', priceSignal.value * 2)\n}, runtime)\n\nconst upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))\ntotalEffect.dispose()"
               },
               {
                 type: 'table',
@@ -5210,7 +5210,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const tools = createStoreDevTools(authStore, {\n  clone(state) {\n    const copy = ClonePolicy.diagnostic(state)\n    if ('token' in copy) copy.token = '[redacted]'\n    return copy\n  }\n})"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools } from '@migaia/store-devtools'\nimport { ClonePolicy } from '@migaia/store-middleware/tolerant-clone'\n\nconst authStore = createStore({ token: 'secret', loggedIn: true })\nconst tools = createStoreDevTools(authStore, {\n  clone(state) {\n    const copy = ClonePolicy.diagnostic(state)\n    if ('token' in copy) copy.token = '[redacted]'\n    return copy\n  }\n})\nconsole.log(tools.record('login'))\ntools.dispose()\nawait authStore.dispose()"
               },
               {
                 type: 'list',
@@ -5252,7 +5252,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const tools = createStoreDevTools(authStore, {\n  clone(state) {\n    const copy = ClonePolicy.diagnostic(state)\n    if ('token' in copy) copy.token = '[redacted]'\n    return copy\n  }\n})"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools } from '@migaia/store-devtools'\nimport { ClonePolicy } from '@migaia/store-middleware/tolerant-clone'\n\nconst authStore = createStore({ token: 'secret', loggedIn: true })\nconst tools = createStoreDevTools(authStore, {\n  clone(state) {\n    const copy = ClonePolicy.diagnostic(state)\n    if ('token' in copy) copy.token = '[redacted]'\n    return copy\n  }\n})\nconsole.log(tools.record('login'))\ntools.dispose()\nawait authStore.dispose()"
               },
               {
                 type: 'list',
@@ -5572,7 +5572,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const scope = createSSRRequestScope()\nconst app = createStore({ user: null }, { runtime: scope.runtime })\nscope.register('app', app)\n\ntry {\n  await loadSession(app, request)\n  const stateScript = createSSRStateScript(scope.dehydrate())\n  return renderHtml({ app, stateScript })\n} finally {\n  await scope.disposeAsync()\n}"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr'\n\nasync function loadSession(app: { user: unknown }, request: Request) {\n  app.user = { id: request.headers.get('x-user-id') ?? 'guest' }\n}\n\nexport async function renderRequest(request: Request) {\n  const scope = createSSRRequestScope()\n  const app = createStore({ user: null as unknown }, { runtime: scope.runtime })\n  scope.register('app', app)\n  try {\n    await loadSession(app, request)\n    const stateScript = createSSRStateScript(scope.dehydrate())\n    return { app, stateScript }\n  } finally {\n    await scope.disposeAsync()\n  }\n}"
               },
               {
                 type: 'paragraph',
@@ -5587,7 +5587,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const state = readSSRStateFromDocument('__STORE_STATE__', document)\nconst scope = createSSRRequestScope()\nif (state) scope.hydrate(state)\n\nconst app = createStore({ user: null }, { runtime: scope.runtime })\nscope.register('app', app) // 自动消费待处理快照"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createSSRRequestScope, readSSRStateFromDocument } from '@migaia/store-ssr'\n\nconst state = readSSRStateFromDocument('__STORE_STATE__', document)\nconst scope = createSSRRequestScope()\nif (state) scope.hydrate(state)\n\nconst app = createStore({ user: null as unknown }, { runtime: scope.runtime })\nscope.register('app', app)\n\nwindow.addEventListener('beforeunload', () => {\n  void scope.disposeAsync()\n}, { once: true })"
               },
               {
                 type: 'list',
@@ -5618,7 +5618,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const scope = createSSRRequestScope()\nconst app = createStore({ user: null }, { runtime: scope.runtime })\nscope.register('app', app)\n\ntry {\n  await loadSession(app, request)\n  const stateScript = createSSRStateScript(scope.dehydrate())\n  return renderHtml({ app, stateScript })\n} finally {\n  await scope.disposeAsync()\n}"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr'\n\nasync function loadSession(app: { user: unknown }, request: Request) {\n  app.user = { id: request.headers.get('x-user-id') ?? 'guest' }\n}\n\nexport async function renderRequest(request: Request) {\n  const scope = createSSRRequestScope()\n  const app = createStore({ user: null as unknown }, { runtime: scope.runtime })\n  scope.register('app', app)\n  try {\n    await loadSession(app, request)\n    const stateScript = createSSRStateScript(scope.dehydrate())\n    return { app, stateScript }\n  } finally {\n    await scope.disposeAsync()\n  }\n}"
               },
               {
                 type: 'paragraph',
@@ -5633,7 +5633,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const state = readSSRStateFromDocument('__STORE_STATE__', document)\nconst scope = createSSRRequestScope()\nif (state) scope.hydrate(state)\n\nconst app = createStore({ user: null }, { runtime: scope.runtime })\nscope.register('app', app) // consumes deferred hydration"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createSSRRequestScope, readSSRStateFromDocument } from '@migaia/store-ssr'\n\nconst state = readSSRStateFromDocument('__STORE_STATE__', document)\nconst scope = createSSRRequestScope()\nif (state) scope.hydrate(state)\n\nconst app = createStore({ user: null as unknown }, { runtime: scope.runtime })\nscope.register('app', app)\n\nwindow.addEventListener('beforeunload', () => {\n  void scope.disposeAsync()\n}, { once: true })"
               },
               {
                 type: 'list',
@@ -5942,7 +5942,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const state = await scope.dehydrateAsync({\n  timeoutMs: 3000,\n  onResourceError(failure) {\n    logger.warn({ key: failure.key, error: failure.error })\n  }\n})'
+                code: "type IResourceFailure = { key: string; error: unknown }\n\ntype IDehydrationScope = { dehydrateAsync(options: { timeoutMs: number; onResourceError(failure: IResourceFailure): void }): Promise<unknown> }\ntype ILogger = { warn(value: unknown): void }\n\nexport async function dehydrateRequest(scope: IDehydrationScope, logger: ILogger) {\n  return scope.dehydrateAsync({\n    timeoutMs: 3000,\n    onResourceError(failure) {\n      logger.warn({ key: failure.key, error: failure.error })\n    }\n  })\n}"
               },
               {
                 type: 'list',
@@ -5984,7 +5984,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const state = await scope.dehydrateAsync({\n  timeoutMs: 3000,\n  onResourceError(failure) {\n    logger.warn({ key: failure.key, error: failure.error })\n  }\n})'
+                code: "type IResourceFailure = { key: string; error: unknown }\n\ntype IDehydrationScope = { dehydrateAsync(options: { timeoutMs: number; onResourceError(failure: IResourceFailure): void }): Promise<unknown> }\ntype ILogger = { warn(value: unknown): void }\n\nexport async function dehydrateRequest(scope: IDehydrationScope, logger: ILogger) {\n  return scope.dehydrateAsync({\n    timeoutMs: 3000,\n    onResourceError(failure) {\n      logger.warn({ key: failure.key, error: failure.error })\n    }\n  })\n}"
               },
               {
                 type: 'list',
@@ -6147,7 +6147,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const codecs = createSerializeRegistry([jsonPlugin()])\nconst html = await createSSRStateScriptWith(state, {\n  codecs,\n  signal: request.signal\n})\n\nconst restored = await readSSRStateFromDocumentWith({\n  codecs,\n  document,\n  signal: hydrateSignal\n})'
+                code: "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr'\n\nexport async function roundTripState(state: unknown, document: Document, request: Request) {\n  const codecs = createSerializeRegistry([jsonPlugin()])\n  const html = await createSSRStateScriptWith(state, { codecs, signal: request.signal })\n  document.body.insertAdjacentHTML('beforeend', html)\n  return readSSRStateFromDocumentWith({\n    codecs,\n    document,\n    signal: request.signal\n  })\n}"
               },
               {
                 type: 'list',
@@ -6197,7 +6197,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const codecs = createSerializeRegistry([jsonPlugin()])\nconst html = await createSSRStateScriptWith(state, {\n  codecs,\n  signal: request.signal\n})\n\nconst restored = await readSSRStateFromDocumentWith({\n  codecs,\n  document,\n  signal: hydrateSignal\n})'
+                code: "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr'\n\nexport async function roundTripState(state: unknown, document: Document, request: Request) {\n  const codecs = createSerializeRegistry([jsonPlugin()])\n  const html = await createSSRStateScriptWith(state, { codecs, signal: request.signal })\n  document.body.insertAdjacentHTML('beforeend', html)\n  return readSSRStateFromDocumentWith({\n    codecs,\n    document,\n    signal: request.signal\n  })\n}"
               },
               {
                 type: 'list',
@@ -6791,7 +6791,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "persistCollection(sessionCache, {\n  key: 'sessions',\n  storage,\n  version: 2,\n  partialize: (value) => ({ refreshToken: value.refreshToken }),\n  migrate: (old, from) => from === 1 ? migrateSessionV1(old) : old,\n  merge: (persisted, current) => ({ ...current, ...persisted })\n})"
+                code: "import { persistCollection } from '@migaia/store-persist'\n\ntype ISession = { refreshToken: string; userId: string }\nconst migrateSessionV1 = (old: Partial<ISession>) => ({ ...old, userId: old.userId ?? 'unknown' })\n\nexport function persistSessions(\n  sessionCache: Parameters<typeof persistCollection>[0],\n  storage: Parameters<typeof persistCollection>[1]['storage']\n) {\n  return persistCollection(sessionCache, {\n    key: 'sessions',\n    storage,\n    version: 2,\n    partialize: (value: ISession) => ({ refreshToken: value.refreshToken }),\n    migrate: (old: Partial<ISession>, from: number) => from === 1 ? migrateSessionV1(old) : old,\n    merge: (persisted: Partial<ISession>, current: ISession) => ({ ...current, ...persisted })\n  })\n}"
               },
               {
                 type: 'list',
@@ -6846,7 +6846,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "persistCollection(sessionCache, {\n  key: 'sessions',\n  storage,\n  version: 2,\n  partialize: (value) => ({ refreshToken: value.refreshToken }),\n  migrate: (old, from) => from === 1 ? migrateSessionV1(old) : old,\n  merge: (persisted, current) => ({ ...current, ...persisted })\n})"
+                code: "import { persistCollection } from '@migaia/store-persist'\n\ntype ISession = { refreshToken: string; userId: string }\nconst migrateSessionV1 = (old: Partial<ISession>) => ({ ...old, userId: old.userId ?? 'unknown' })\n\nexport function persistSessions(\n  sessionCache: Parameters<typeof persistCollection>[0],\n  storage: Parameters<typeof persistCollection>[1]['storage']\n) {\n  return persistCollection(sessionCache, {\n    key: 'sessions',\n    storage,\n    version: 2,\n    partialize: (value: ISession) => ({ refreshToken: value.refreshToken }),\n    migrate: (old: Partial<ISession>, from: number) => from === 1 ? migrateSessionV1(old) : old,\n    merge: (persisted: Partial<ISession>, current: ISession) => ({ ...current, ...persisted })\n  })\n}"
               },
               {
                 type: 'list',
@@ -7056,7 +7056,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const sessionDef = session(userId)\nconst handle = persistKeyed(atomStore, sessionDef, userId, {\n  namespace: 'sessions',\n  storage,\n  partialize: ({ refreshToken }) => ({ refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n})\n\nawait handle.ready\nconst restoredSession = atomStore.get(sessionDef)\nawait handle.flush()\n\n// leaving this user scope\nhandle.dispose()"
+                code: "import { persistKeyed } from '@migaia/store-persist'\nexport async function persistUserSession(\n  atomStore: Parameters<typeof persistKeyed>[0],\n  sessionDef: Parameters<typeof persistKeyed>[1],\n  storage: Parameters<typeof persistKeyed>[3]['storage'],\n  userId: string\n) {\n  const handle = persistKeyed(atomStore, sessionDef, userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (value) => value,\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  })\n\n  await handle.ready\n  const restoredSession = atomStore.get(sessionDef)\n  await handle.flush()\n  console.log(restoredSession)\n  handle.dispose()\n}"
               },
               {
                 type: 'paragraph',
@@ -7098,7 +7098,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const sessionDef = session(userId)\nconst handle = persistKeyed(atomStore, sessionDef, userId, {\n  namespace: 'sessions',\n  storage,\n  partialize: ({ refreshToken }) => ({ refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n})\n\nawait handle.ready\nconst restoredSession = atomStore.get(sessionDef)\nawait handle.flush()\n\n// leaving this user scope\nhandle.dispose()"
+                code: "import { persistKeyed } from '@migaia/store-persist'\nexport async function persistUserSession(\n  atomStore: Parameters<typeof persistKeyed>[0],\n  sessionDef: Parameters<typeof persistKeyed>[1],\n  storage: Parameters<typeof persistKeyed>[3]['storage'],\n  userId: string\n) {\n  const handle = persistKeyed(atomStore, sessionDef, userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (value) => value,\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  })\n\n  await handle.ready\n  const restoredSession = atomStore.get(sessionDef)\n  await handle.flush()\n  console.log(restoredSession)\n  handle.dispose()\n}"
               },
               {
                 type: 'paragraph',
@@ -7588,7 +7588,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const auditPlugin = {\n  name: 'audit',\n  install(core) {\n    core.usePipeline((event, next) => {\n      next(event)\n      if (event.type === 'action' && event.phase === 'end') {\n        audit({ event, state: core.getState() })\n      }\n    })\n    core.onDispose(() => audit.flush())\n    return {}\n  }\n}\n\nawait host.use(auditPlugin)"
+                code: "import type { IPluginHostCore } from '@migaia/plugin-host'\n\ntype IAuditSink = {\n  record(entry: unknown): void\n  flush(): void\n}\n\nexport async function installAuditPlugin(host: { use(plugin: unknown): Promise<unknown> }, audit: IAuditSink) {\n  const auditPlugin = {\n    name: 'audit',\n    install(core: IPluginHostCore) {\n      core.usePipeline((event, next) => {\n        next(event)\n        if (event.type === 'action' && event.phase === 'end') {\n          audit.record({ event, state: core.getShared('state') })\n        }\n      })\n      core.onDispose(() => audit.flush())\n      return {}\n    }\n  }\n\n  await host.use(auditPlugin)\n}"
               },
               {
                 type: 'paragraph',
@@ -7634,7 +7634,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const auditPlugin = {\n  name: 'audit',\n  install(core) {\n    core.usePipeline((event, next) => {\n      next(event)\n      if (event.type === 'action' && event.phase === 'end') {\n        audit({ event, state: core.getState() })\n      }\n    })\n    core.onDispose(() => audit.flush())\n    return {}\n  }\n}\n\nawait host.use(auditPlugin)"
+                code: "import type { IPluginHostCore } from '@migaia/plugin-host'\n\ntype IAuditSink = {\n  record(entry: unknown): void\n  flush(): void\n}\n\nexport async function installAuditPlugin(host: { use(plugin: unknown): Promise<unknown> }, audit: IAuditSink) {\n  const auditPlugin = {\n    name: 'audit',\n    install(core: IPluginHostCore) {\n      core.usePipeline((event, next) => {\n        next(event)\n        if (event.type === 'action' && event.phase === 'end') {\n          audit.record({ event, state: core.getShared('state') })\n        }\n      })\n      core.onDispose(() => audit.flush())\n      return {}\n    }\n  }\n\n  await host.use(auditPlugin)\n}"
               },
               {
                 type: 'paragraph',
@@ -7663,7 +7663,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "host.runAction('preferences:apply', () => {\n  store.$set(nextPreferences)\n  indexedRows.replace(nextRows)\n}, { source: 'settings-form' })"
+                code: "type IStore = { $set(value: Record<string, unknown>): void }\ntype IRows = { replace(value: readonly unknown[]): void }\ntype IActionHost = { runAction(name: string, action: () => void, options: { source: string }): void }\n\nexport function applyPreferences(\n  host: IActionHost,\n  store: IStore,\n  indexedRows: IRows,\n  nextPreferences: Record<string, unknown>,\n  nextRows: readonly unknown[]\n) {\n  host.runAction('preferences:apply', () => {\n    store.$set(nextPreferences)\n    indexedRows.replace(nextRows)\n  }, { source: 'settings-form' })\n}"
               },
               {
                 type: 'list',
@@ -7708,7 +7708,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "host.runAction('preferences:apply', () => {\n  store.$set(nextPreferences)\n  indexedRows.replace(nextRows)\n}, { source: 'settings-form' })"
+                code: "type IStore = { $set(value: Record<string, unknown>): void }\ntype IRows = { replace(value: readonly unknown[]): void }\ntype IActionHost = { runAction(name: string, action: () => void, options: { source: string }): void }\n\nexport function applyPreferences(\n  host: IActionHost,\n  store: IStore,\n  indexedRows: IRows,\n  nextPreferences: Record<string, unknown>,\n  nextRows: readonly unknown[]\n) {\n  host.runAction('preferences:apply', () => {\n    store.$set(nextPreferences)\n    indexedRows.replace(nextRows)\n  }, { source: 'settings-form' })\n}"
               },
               {
                 type: 'list',
@@ -7853,7 +7853,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const adapter = createReduxDevToolsAdapter(connection)\nawait host.connectDevTools(adapter)\n\n// bindStoreMiddleware 已把 applyState 桥接到 store.$hydrate()\n// 卸载时同时释放 adapter subscription\nawait host.unUse('store-devtools')"
+                code: "import { createReduxDevToolsAdapter } from '@migaia/store-middleware'\nimport type { IReduxDevToolsConnection, IDevToolsAdapter } from '@migaia/store-middleware'\n\ntype IDevToolsHost = {\n  connectDevTools(adapter: IDevToolsAdapter<unknown>): Promise<void>\n  unUse(name: string): Promise<void>\n}\n\nexport async function connectDevTools(host: IDevToolsHost, connection: IReduxDevToolsConnection<unknown>) {\n  const adapter = createReduxDevToolsAdapter(connection)\n  await host.connectDevTools(adapter)\n\n  // 卸载时撤销 adapter subscription，Host 负责剩余资源的逆序清理。\n  await host.unUse('store-devtools')\n}"
               },
               {
                 type: 'list',
@@ -7898,7 +7898,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const adapter = createReduxDevToolsAdapter(connection)\nawait host.connectDevTools(adapter)\n\n// bindStoreMiddleware already bridges applyState to store.$hydrate()\n// uninstallation also releases the adapter subscription\nawait host.unUse('store-devtools')"
+                code: "import { createReduxDevToolsAdapter } from '@migaia/store-middleware'\nimport type { IReduxDevToolsConnection, IDevToolsAdapter } from '@migaia/store-middleware'\n\ntype IDevToolsHost = {\n  connectDevTools(adapter: IDevToolsAdapter<unknown>): Promise<void>\n  unUse(name: string): Promise<void>\n}\n\nexport async function connectDevTools(host: IDevToolsHost, connection: IReduxDevToolsConnection<unknown>) {\n  const adapter = createReduxDevToolsAdapter(connection)\n  await host.connectDevTools(adapter)\n\n  // 卸载时撤销 adapter subscription，Host 负责剩余资源的逆序清理。\n  await host.unUse('store-devtools')\n}"
               },
               {
                 type: 'list',
@@ -8024,7 +8024,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const hostResult = await host.dispose()\n// binding subscriptions and plugins are now closed\nawait store.$dispose()\n// dispose runtime only if this scope owns it'
+                code: "type IHost = { dispose(): Promise<unknown> }\ntype IStore = { dispose(): Promise<void> }\n\nexport async function closeOwnedStore(host: IHost, store: IStore) {\n  const hostResult = await host.dispose()\n  console.log(hostResult)\n  // binding subscriptions and plugins are now closed; the caller owns the Store.\n  await store.dispose()\n}"
               },
               {
                 type: 'list',
@@ -8059,7 +8059,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const hostResult = await host.dispose()\n// binding subscriptions and plugins are now closed\nawait store.$dispose()\n// dispose runtime only if this scope owns it'
+                code: "type IHost = { dispose(): Promise<unknown> }\ntype IStore = { dispose(): Promise<void> }\n\nexport async function closeOwnedStore(host: IHost, store: IStore) {\n  const hostResult = await host.dispose()\n  console.log(hostResult)\n  // binding subscriptions and plugins are now closed; the caller owns the Store.\n  await store.dispose()\n}"
               },
               {
                 type: 'list',
@@ -8286,7 +8286,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const byClass = new ObservableArray(items, runtime, { debugName: 'rows' })\nconst byFactory = observableArray(items, { debugName: 'rows' }, runtime)"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray, observableArray } from '@migaia/store-light'\n\nconst runtime = createRuntime()\nconst items = ['Ada', 'Grace']\nconst byClass = new ObservableArray(items, runtime, { debugName: 'rows' })\nconst byFactory = observableArray(items, { debugName: 'rows' }, runtime)\nconsole.log(byClass.length, byFactory.length)\nbyClass.dispose()\nbyFactory.dispose()"
               },
               {
                 type: 'paragraph',
@@ -8363,7 +8363,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const byClass = new ObservableArray(items, runtime, { debugName: 'rows' })\nconst byFactory = observableArray(items, { debugName: 'rows' }, runtime)"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray, observableArray } from '@migaia/store-light'\n\nconst runtime = createRuntime()\nconst items = ['Ada', 'Grace']\nconst byClass = new ObservableArray(items, runtime, { debugName: 'rows' })\nconst byFactory = observableArray(items, { debugName: 'rows' }, runtime)\nconsole.log(byClass.length, byFactory.length)\nbyClass.dispose()\nbyFactory.dispose()"
               },
               {
                 type: 'paragraph',
@@ -8700,7 +8700,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const rows = new ObservableArray([], runtime, {\n  debugName: 'rows',\n  mutationGuard\n})\n\nmutationGuard.runInAction(() => {\n  rows.push(nextRow)\n  rows.set(0, patchedRow)\n})"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-light'\n\ntype IRow = { id: number; label: string }\nconst runtime = createRuntime()\nconst mutationGuard = { runInAction(action: () => void) { action() } }\nconst nextRow: IRow = { id: 1, label: 'new' }\nconst patchedRow: IRow = { id: 1, label: 'patched' }\nconst rows = new ObservableArray<IRow>([], runtime, { debugName: 'rows', mutationGuard })\n\nmutationGuard.runInAction(() => {\n  rows.push(nextRow)\n  rows.set(0, patchedRow)\n})\nconsole.log(rows.at(0))\nrows.dispose()"
               },
               {
                 type: 'list',
@@ -8742,7 +8742,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const rows = new ObservableArray([], runtime, {\n  debugName: 'rows',\n  mutationGuard\n})\n\nmutationGuard.runInAction(() => {\n  rows.push(nextRow)\n  rows.set(0, patchedRow)\n})"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-light'\n\ntype IRow = { id: number; label: string }\nconst runtime = createRuntime()\nconst mutationGuard = { runInAction(action: () => void) { action() } }\nconst nextRow: IRow = { id: 1, label: 'new' }\nconst patchedRow: IRow = { id: 1, label: 'patched' }\nconst rows = new ObservableArray<IRow>([], runtime, { debugName: 'rows', mutationGuard })\n\nmutationGuard.runInAction(() => {\n  rows.push(nextRow)\n  rows.set(0, patchedRow)\n})\nconsole.log(rows.at(0))\nrows.dispose()"
               },
               {
                 type: 'list',
@@ -9174,7 +9174,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const profileDef = atomDef({ first: 'Ada', last: 'Lovelace' })\nconst fullNameDef = derivedDef(\n  (get) => `${get(profileDef).first} ${get(profileDef).last}`\n)\nconst renameDef = writableDef(\n  (get) => get(fullNameDef),\n  (get, set, first: string, last: string) => {\n    if (get(fullNameDef) === `${first} ${last}`) return false\n    set(profileDef, { first, last })\n    return true\n  }\n)\n\nstore.set(renameDef, 'Grace', 'Hopper')"
+                code: "import { atomDef, createAtomStore, derivedDef, writableDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst profileDef = atomDef({ first: 'Ada', last: 'Lovelace' })\nconst fullNameDef = derivedDef((get) => get(profileDef).first + ' ' + get(profileDef).last)\nconst renameDef = writableDef(\n  (get) => get(fullNameDef),\n  (get, set, first: string, last: string) => {\n    if (get(fullNameDef) === first + ' ' + last) return false\n    set(profileDef, { first, last })\n    return true\n  }\n)\n\nstore.set(renameDef, 'Grace', 'Hopper')\nconsole.log(store.get(fullNameDef))\nstore.dispose()"
               },
               {
                 type: 'list',
@@ -9206,7 +9206,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const profileDef = atomDef({ first: 'Ada', last: 'Lovelace' })\nconst fullNameDef = derivedDef(\n  (get) => `${get(profileDef).first} ${get(profileDef).last}`\n)\nconst renameDef = writableDef(\n  (get) => get(fullNameDef),\n  (get, set, first: string, last: string) => {\n    if (get(fullNameDef) === `${first} ${last}`) return false\n    set(profileDef, { first, last })\n    return true\n  }\n)\n\nstore.set(renameDef, 'Grace', 'Hopper')"
+                code: "import { atomDef, createAtomStore, derivedDef, writableDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst profileDef = atomDef({ first: 'Ada', last: 'Lovelace' })\nconst fullNameDef = derivedDef((get) => get(profileDef).first + ' ' + get(profileDef).last)\nconst renameDef = writableDef(\n  (get) => get(fullNameDef),\n  (get, set, first: string, last: string) => {\n    if (get(fullNameDef) === first + ' ' + last) return false\n    set(profileDef, { first, last })\n    return true\n  }\n)\n\nstore.set(renameDef, 'Grace', 'Hopper')\nconsole.log(store.get(fullNameDef))\nstore.dispose()"
               },
               {
                 type: 'list',
@@ -9260,7 +9260,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const todosDef = atomDef<readonly Todo[]>([])\nconst todos = splitDef(todosDef, (todo) => todo.id)\n\nconst todo42Def = todos.of('42')\ntodos.insert(store, { id: '42', title: 'Ship docs' })\nstore.set(todo42Def, (todo) => ({ ...todo, done: true }))\n\ntodos.remove(store, '42')\nstore.release(todo42Def)\ntodos.prune(store)"
+                code: "import { atomDef, createAtomStore, splitDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\ntype ITodo = { id: string; title: string; done?: boolean }\nconst store = createAtomStore(createRuntime())\nconst todosDef = atomDef<readonly ITodo[]>([])\nconst todos = splitDef(todosDef, (todo) => todo.id)\nconst todo42Def = todos.of('42')\ntodos.insert(store, { id: '42', title: 'Ship docs' })\nstore.set(todo42Def, (todo) => ({ ...todo, done: true }))\nconsole.log(store.get(todo42Def))\ntodos.remove(store, '42')\nstore.release(todo42Def)\ntodos.prune(store)\nstore.dispose()"
               },
               {
                 type: 'list',
@@ -9324,7 +9324,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const todosDef = atomDef<readonly Todo[]>([])\nconst todos = splitDef(todosDef, (todo) => todo.id)\n\nconst todo42Def = todos.of('42')\ntodos.insert(store, { id: '42', title: 'Ship docs' })\nstore.set(todo42Def, (todo) => ({ ...todo, done: true }))\n\ntodos.remove(store, '42')\nstore.release(todo42Def)\ntodos.prune(store)"
+                code: "import { atomDef, createAtomStore, splitDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\ntype ITodo = { id: string; title: string; done?: boolean }\nconst store = createAtomStore(createRuntime())\nconst todosDef = atomDef<readonly ITodo[]>([])\nconst todos = splitDef(todosDef, (todo) => todo.id)\nconst todo42Def = todos.of('42')\ntodos.insert(store, { id: '42', title: 'Ship docs' })\nstore.set(todo42Def, (todo) => ({ ...todo, done: true }))\nconsole.log(store.get(todo42Def))\ntodos.remove(store, '42')\nstore.release(todo42Def)\ntodos.prune(store)\nstore.dispose()"
               },
               {
                 type: 'list',
@@ -9358,7 +9358,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const draftByConversation = familyDef(\n  (conversationId: string) => ({ conversationId, text: '' }),\n  { maxSize: 512, debugLabel: 'draft' }\n)\nconst lengthByConversation = derivedFamilyDef(\n  (conversationId: string) => (get) => get(draftByConversation(conversationId)).text.length,\n  { maxSize: 512, debugLabel: 'draft-length' }\n)\n\nconst draftDef = draftByConversation('conv-42')\nstore.set(draftDef, (draft) => ({ ...draft, text: 'hello' }))"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, derivedFamilyDef, familyDef } from '@migaia/store-keyed'\n\nconst store = createAtomStore(createRuntime())\nconst draftByConversation = familyDef(\n  (conversationId: string) => ({ conversationId, text: '' }),\n  { maxSize: 512, debugLabel: 'draft' }\n)\nconst lengthByConversation = derivedFamilyDef(\n  (conversationId: string) => (get) => get(draftByConversation(conversationId)).text.length,\n  { maxSize: 512, debugLabel: 'draft-length' }\n)\n\nconst draftDef = draftByConversation('conv-42')\nstore.set(draftDef, (draft) => ({ ...draft, text: 'hello' }))\nconsole.log(store.get(lengthByConversation('conv-42')))\nstore.dispose()"
               },
               {
                 type: 'list',
@@ -9420,7 +9420,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const draftByConversation = familyDef(\n  (conversationId: string) => ({ conversationId, text: '' }),\n  { maxSize: 512, debugLabel: 'draft' }\n)\nconst lengthByConversation = derivedFamilyDef(\n  (conversationId: string) => (get) => get(draftByConversation(conversationId)).text.length,\n  { maxSize: 512, debugLabel: 'draft-length' }\n)\n\nconst draftDef = draftByConversation('conv-42')\nstore.set(draftDef, (draft) => ({ ...draft, text: 'hello' }))"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, derivedFamilyDef, familyDef } from '@migaia/store-keyed'\n\nconst store = createAtomStore(createRuntime())\nconst draftByConversation = familyDef(\n  (conversationId: string) => ({ conversationId, text: '' }),\n  { maxSize: 512, debugLabel: 'draft' }\n)\nconst lengthByConversation = derivedFamilyDef(\n  (conversationId: string) => (get) => get(draftByConversation(conversationId)).text.length,\n  { maxSize: 512, debugLabel: 'draft-length' }\n)\n\nconst draftDef = draftByConversation('conv-42')\nstore.set(draftDef, (draft) => ({ ...draft, text: 'hello' }))\nconsole.log(store.get(lengthByConversation('conv-42')))\nstore.dispose()"
               },
               {
                 type: 'list',
@@ -9499,7 +9499,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const undo = store.override(\n  remoteUserDef,\n  atomDef({ id: 'test-user', role: 'admin' })\n)\n\ntry {\n  runScenario(store)\n} finally {\n  undo()\n}"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore } from '@migaia/store-keyed'\n\nconst store = createAtomStore(createRuntime())\nconst remoteUserDef = atomDef({ id: 'remote-user', role: 'viewer' })\nconst testUserDef = atomDef({ id: 'test-user', role: 'admin' })\nconst undo = store.override(remoteUserDef, testUserDef)\n\ntry {\n  console.log(store.get(remoteUserDef))\n} finally {\n  undo()\n  store.dispose()\n}"
               },
               {
                 type: 'list',
@@ -9549,7 +9549,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const undo = store.override(\n  remoteUserDef,\n  atomDef({ id: 'test-user', role: 'admin' })\n)\n\ntry {\n  runScenario(store)\n} finally {\n  undo()\n}"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore } from '@migaia/store-keyed'\n\nconst store = createAtomStore(createRuntime())\nconst remoteUserDef = atomDef({ id: 'remote-user', role: 'viewer' })\nconst testUserDef = atomDef({ id: 'test-user', role: 'admin' })\nconst undo = store.override(remoteUserDef, testUserDef)\n\ntry {\n  console.log(store.get(remoteUserDef))\n} finally {\n  undo()\n  store.dispose()\n}"
               },
               {
                 type: 'list',
@@ -9889,7 +9889,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.$batch((draft) => {\n        draft.status = next\n      })\n    }\n  },\n  { warnAsyncActions: true }\n)"
+                code: "import { createStore } from '@migaia/store-light'\n\nconst loadStatus = async () => 'ready' as const\nconst store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.status = next\n    }\n  },\n  { warnAsyncActions: true }\n)\n\nawait store.refresh()\nconsole.log(store.status)\nawait store.dispose()"
               },
               {
                 type: 'paragraph',
@@ -9973,7 +9973,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.$batch((draft) => {\n        draft.status = next\n      })\n    }\n  },\n  { warnAsyncActions: true }\n)"
+                code: "import { createStore } from '@migaia/store-light'\n\nconst loadStatus = async () => 'ready' as const\nconst store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.status = next\n    }\n  },\n  { warnAsyncActions: true }\n)\n\nawait store.refresh()\nconsole.log(store.status)\nawait store.dispose()"
               },
               {
                 type: 'paragraph',
@@ -10158,7 +10158,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const persisted = JSON.parse(saved)\n\nstore.$hydrate(persisted, {\n  unknown: 'report',\n  onUnknown: (key) => reportMigrationField(key)\n})\n\nconst nextSaved = JSON.stringify(store.$plain())"
+                code: "import { createStore } from '@migaia/store-light'\n\nconst saved = '{\"theme\":\"dark\",\"legacyFlag\":true}'\nconst store = createStore({ theme: 'light' })\nconst reportMigrationField = (key: string) => console.warn('unknown persisted field:', key)\nconst persisted = JSON.parse(saved)\n\nstore.$hydrate(persisted, {\n  unknown: 'report',\n  onUnknown: (key) => reportMigrationField(key)\n})\n\nconst nextSaved = JSON.stringify(store.$snapshot()\nconsole.log(nextSaved)"
               },
               {
                 type: 'list',
@@ -10226,7 +10226,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const persisted = JSON.parse(saved)\n\nstore.$hydrate(persisted, {\n  unknown: 'report',\n  onUnknown: (key) => reportMigrationField(key)\n})\n\nconst nextSaved = JSON.stringify(store.$plain())"
+                code: "import { createStore } from '@migaia/store-light'\n\nconst saved = '{\"theme\":\"dark\",\"legacyFlag\":true}'\nconst store = createStore({ theme: 'light' })\nconst reportMigrationField = (key: string) => console.warn('unknown persisted field:', key)\nconst persisted = JSON.parse(saved)\n\nstore.$hydrate(persisted, {\n  unknown: 'report',\n  onUnknown: (key) => reportMigrationField(key)\n})\n\nconst nextSaved = JSON.stringify(store.$snapshot()\nconsole.log(nextSaved)"
               },
               {
                 type: 'list',
@@ -10280,7 +10280,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}'
+                code: "import { createFieldSource } from '@migaia/reactive/source'\nimport { FIELD_BUILDER, StoreFieldMode } from '@migaia/store-light'\n\nconst customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context: { runtime: Parameters<typeof createFieldSource>[0]; own(resource: unknown): void }) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}"
               },
               {
                 type: 'list',
@@ -10322,7 +10322,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}'
+                code: "import { createFieldSource } from '@migaia/reactive/source'\nimport { FIELD_BUILDER, StoreFieldMode } from '@migaia/store-light'\n\nconst customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context: { runtime: Parameters<typeof createFieldSource>[0]; own(resource: unknown): void }) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}"
               },
               {
                 type: 'list',
@@ -10366,7 +10366,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const user = createStoreResource(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal })\n    return response.json()\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => report(error, phase),\n    onTerminal: () => reportTerminal()\n  }\n)\n\nuser.preload()\nconst value = user.read()"
+                code: "import { createStoreResource } from '@migaia/store-light'\n\nconst report = (error: unknown, phase: string) => console.error(phase, error)\nconst reportTerminal = () => console.log('user resource terminal')\nconst user = createStoreResource(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal })\n    if (!response.ok) throw new Error('user request failed')\n    return response.json()\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => report(error, phase),\n    onTerminal: reportTerminal\n  }\n)\n\nuser.preload()\nconst value = user.read()\nconsole.log(value)\nuser.dispose()"
               },
               {
                 type: 'list',
@@ -10430,7 +10430,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const user = createStoreResource(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal })\n    return response.json()\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => report(error, phase),\n    onTerminal: () => reportTerminal()\n  }\n)\n\nuser.preload()\nconst value = user.read()"
+                code: "import { createStoreResource } from '@migaia/store-light'\n\nconst report = (error: unknown, phase: string) => console.error(phase, error)\nconst reportTerminal = () => console.log('user resource terminal')\nconst user = createStoreResource(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal })\n    if (!response.ok) throw new Error('user request failed')\n    return response.json()\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => report(error, phase),\n    onTerminal: reportTerminal\n  }\n)\n\nuser.preload()\nconst value = user.read()\nconsole.log(value)\nuser.dispose()"
               },
               {
                 type: 'list',
@@ -10896,7 +10896,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const id = alloc_bytes(byteLength)\nconst capacity = byte_len_of(id)\n\nconst writeView = new Uint8Array(memory.buffer, ptr_of(id), capacity)\nwriteView.set(source)\n\nallocateMoreMemory()\n\nconst readView = new Uint8Array(memory.buffer, ptr_of(id), source.length)'
+                code: "import init, { alloc_bytes, byte_len_of, dealloc_bytes, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\nconst source = new Uint8Array([1, 2, 3, 4])\nconst byteLength = source.length\nconst id = alloc_bytes(byteLength)\nconst capacity = byte_len_of(id)\nconst writeView = new Uint8Array(wasm.memory.buffer, ptr_of(id), capacity)\nwriteView.set(source)\n\n// 任意后续分配都可能增长 memory；因此重新读取 buffer 与 ptr。\nconst extraId = alloc_bytes(16)\nconst readView = new Uint8Array(wasm.memory.buffer, ptr_of(id), source.length)\nconsole.log(readView[0], readView.length)\ndealloc_bytes(extraId)\ndealloc_bytes(id)"
               },
               {
                 type: 'paragraph',
@@ -10943,7 +10943,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const id = alloc_bytes(byteLength)\nconst capacity = byte_len_of(id)\n\nconst writeView = new Uint8Array(memory.buffer, ptr_of(id), capacity)\nwriteView.set(source)\n\nallocateMoreMemory()\n\nconst readView = new Uint8Array(memory.buffer, ptr_of(id), source.length)'
+                code: "import init, { alloc_bytes, byte_len_of, dealloc_bytes, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\nconst source = new Uint8Array([1, 2, 3, 4])\nconst byteLength = source.length\nconst id = alloc_bytes(byteLength)\nconst capacity = byte_len_of(id)\nconst writeView = new Uint8Array(wasm.memory.buffer, ptr_of(id), capacity)\nwriteView.set(source)\n\n// 任意后续分配都可能增长 memory；因此重新读取 buffer 与 ptr。\nconst extraId = alloc_bytes(16)\nconst readView = new Uint8Array(wasm.memory.buffer, ptr_of(id), source.length)\nconsole.log(readView[0], readView.length)\ndealloc_bytes(extraId)\ndealloc_bytes(id)"
               },
               {
                 type: 'paragraph',
@@ -11292,7 +11292,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
+                code: "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\ntype IApiClient = { load(): Promise<unknown> }\nconst createClient = (baseUrl: string): IApiClient => ({ load: async () => fetch(`${baseUrl}/items`).then((response) => response.json()) })\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 type: 'list',
@@ -11323,7 +11323,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
+                code: "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\ntype IApiClient = { load(): Promise<unknown> }\nconst createClient = (baseUrl: string): IApiClient => ({ load: async () => fetch(`${baseUrl}/items`).then((response) => response.json()) })\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 type: 'list',
@@ -11660,7 +11660,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const stop = host.on('mutationFailed', ({ value }) => {\n  report(value.error)\n})\n\ntry {\n  console.log(host.plugins, host.readyPlugins)\n  console.log(host.pluginState('analytics'))\n  const telemetry = host.getShared(telemetryKey)\n  await host.config.update('analytics', (previous) => ({\n    ...previous,\n    sampleRate: 0.25\n  }))\n} finally {\n  stop()\n}"
+                code: "type IMutationFailure = { value: { error: unknown } }\ntype IHostEvents = { on(event: 'mutationFailed', listener: (failure: IMutationFailure) => void): () => void }\n\nexport function observeMutationFailures(host: IHostEvents, report: (error: unknown) => void) {\n  const stop = host.on('mutationFailed', ({ value }) => {\n    report(value.error)\n  })\n\n  // on() 返回同步 unsubscribe；调用方在离开当前 Host scope 时执行它。\n  return stop\n}"
               },
               {
                 type: 'list',
@@ -11748,7 +11748,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const stop = host.on('mutationFailed', ({ value }) => {\n  report(value.error)\n})\n\ntry {\n  console.log(host.plugins, host.readyPlugins)\n  console.log(host.pluginState('analytics'))\n  const telemetry = host.getShared(telemetryKey)\n  await host.config.update('analytics', (previous) => ({\n    ...previous,\n    sampleRate: 0.25\n  }))\n} finally {\n  stop()\n}"
+                code: "type IMutationFailure = { value: { error: unknown } }\ntype IHostEvents = { on(event: 'mutationFailed', listener: (failure: IMutationFailure) => void): () => void }\n\nexport function observeMutationFailures(host: IHostEvents, report: (error: unknown) => void) {\n  const stop = host.on('mutationFailed', ({ value }) => {\n    report(value.error)\n  })\n\n  // on() 返回同步 unsubscribe；调用方在离开当前 Host scope 时执行它。\n  return stop\n}"
               },
               {
                 type: 'list',
@@ -11782,7 +11782,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const added = await host.use(plugin)\nif (!added.ok) {\n  if (added.committed) observeDynamicView(added.view)\n  else report(added.error)\n}\n\nconst removed = await host.unUse('provider')\nif (removed.removed) {\n  console.log(removed.affected)\n}"
+                code: "type IMutationResult = { ok: boolean; committed?: boolean; view?: unknown; error?: unknown; removed?: boolean; affected?: readonly string[] }\ntype IMutationHost = { use(plugin: unknown): Promise<IMutationResult>; unUse(name: string): Promise<IMutationResult> }\n\nexport async function applyPluginChange(\n  host: IMutationHost,\n  plugin: unknown,\n  observeDynamicView: (view: unknown) => void,\n  report: (error: unknown) => void\n) {\n  const added = await host.use(plugin)\n  if (!added.ok) {\n    if (added.committed) observeDynamicView(added.view)\n    else report(added.error)\n  }\n\n  const removed = await host.unUse('provider')\n  if (removed.removed) console.log(removed.affected)\n}"
               },
               {
                 type: 'list',
@@ -11846,7 +11846,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const added = await host.use(plugin)\nif (!added.ok) {\n  if (added.committed) observeDynamicView(added.view)\n  else report(added.error)\n}\n\nconst removed = await host.unUse('provider')\nif (removed.removed) {\n  console.log(removed.affected)\n}"
+                code: "type IMutationResult = { ok: boolean; committed?: boolean; view?: unknown; error?: unknown; removed?: boolean; affected?: readonly string[] }\ntype IMutationHost = { use(plugin: unknown): Promise<IMutationResult>; unUse(name: string): Promise<IMutationResult> }\n\nexport async function applyPluginChange(\n  host: IMutationHost,\n  plugin: unknown,\n  observeDynamicView: (view: unknown) => void,\n  report: (error: unknown) => void\n) {\n  const added = await host.use(plugin)\n  if (!added.ok) {\n    if (added.committed) observeDynamicView(added.view)\n    else report(added.error)\n  }\n\n  const removed = await host.unUse('provider')\n  if (removed.removed) console.log(removed.affected)\n}"
               },
               {
                 type: 'list',
@@ -11916,7 +11916,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const result = await host.unUse('analytics')\n\nif (!result.cleanupComplete && result.physicalCompletion) {\n  const physical = await result.physicalCompletion\n  for (const error of physical.cleanupErrors) report(error)\n}"
+                code: "type ICleanupResult = {\n  cleanupComplete: boolean\n  physicalCompletion?: Promise<{ cleanupErrors: unknown[] }>\n}\n\nexport async function removeAnalytics(\n  host: { unUse(name: string): Promise<ICleanupResult> },\n  report: (error: unknown) => void\n) {\n  const result = await host.unUse('analytics')\n\n  if (!result.cleanupComplete && result.physicalCompletion) {\n    const physical = await result.physicalCompletion\n    for (const error of physical.cleanupErrors) report(error)\n  }\n}"
               },
               {
                 type: 'list',
@@ -11958,7 +11958,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const result = await host.unUse('analytics')\n\nif (!result.cleanupComplete && result.physicalCompletion) {\n  const physical = await result.physicalCompletion\n  for (const error of physical.cleanupErrors) report(error)\n}"
+                code: "type ICleanupResult = {\n  cleanupComplete: boolean\n  physicalCompletion?: Promise<{ cleanupErrors: unknown[] }>\n}\n\nexport async function removeAnalytics(\n  host: { unUse(name: string): Promise<ICleanupResult> },\n  report: (error: unknown) => void\n) {\n  const result = await host.unUse('analytics')\n\n  if (!result.cleanupComplete && result.physicalCompletion) {\n    const physical = await result.physicalCompletion\n    for (const error of physical.cleanupErrors) report(error)\n  }\n}"
               },
               {
                 type: 'list',
@@ -12173,7 +12173,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const first = collect(users).take(2).where(isActive).result\nconst second = collect(users).where(isActive).take(2).result\n// first 与 second 语义不同：take 所在位置不同。\n\nconst query = collect(users).where(isActive)\nconst a = query.result\nconst b = query.result\nconsole.assert(a === b) // 同一 revision 复用缓存引用\n\nquery.take(10)\nconst c = query.result\nconsole.assert(c !== a) // 新动作形成新 revision；旧快照不变'
+                code: "import { collect } from '@migaia/utils'\n\ntype IUser = { id: number; active: boolean }\nconst users: readonly IUser[] = [\n  { id: 1, active: true },\n  { id: 2, active: false },\n  { id: 3, active: true }\n]\nconst isActive = (user: IUser) => user.active\n\nconst first = collect(users).take(2).where(isActive).result\nconst second = collect(users).where(isActive).take(2).result\nconsole.log(first, second)\n\nconst query = collect(users).where(isActive)\nconst a = query.result\nconst b = query.result\nconsole.assert(a === b)\nquery.take(1)\nconst c = query.result\nconsole.assert(c !== a)"
               },
               {
                 type: 'list',
@@ -12282,7 +12282,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const first = collect(users).take(2).where(isActive).result\nconst second = collect(users).where(isActive).take(2).result\n// first and second differ because take runs at another position.\n\nconst query = collect(users).where(isActive)\nconst a = query.result\nconst b = query.result\nconsole.assert(a === b) // one revision reuses its cached reference\n\nquery.take(10)\nconst c = query.result\nconsole.assert(c !== a) // a new revision leaves the old snapshot unchanged'
+                code: "import { collect } from '@migaia/utils'\n\ntype IUser = { id: number; active: boolean }\nconst users: readonly IUser[] = [\n  { id: 1, active: true },\n  { id: 2, active: false },\n  { id: 3, active: true }\n]\nconst isActive = (user: IUser) => user.active\n\nconst first = collect(users).take(2).where(isActive).result\nconst second = collect(users).where(isActive).take(2).result\nconsole.log(first, second)\n\nconst query = collect(users).where(isActive)\nconst a = query.result\nconst b = query.result\nconsole.assert(a === b)\nquery.take(1)\nconst c = query.result\nconsole.assert(c !== a)"
               },
               {
                 type: 'list',
@@ -12447,7 +12447,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const result = await withTimeout(\n  async ({ signal }) => {\n    const response = await fetch(url, { signal })\n    return response.json()\n  },\n  {\n    timeoutMs: 2_000,\n    zeroTimeoutBehavior: 'skip',\n    report: reportLateFailure\n  }\n)"
+                code: "import { withTimeout } from '@migaia/utils'\n\nconst reportLateFailure = (error: unknown) => console.warn('late failure', error)\nexport async function fetchWithDeadline(url: string) {\n  return withTimeout(\n    async ({ signal }) => {\n      const response = await fetch(url, { signal })\n      if (!response.ok) throw new Error('request failed')\n      return response.json()\n    },\n    { timeoutMs: 2_000, zeroTimeoutBehavior: 'skip', report: reportLateFailure }\n  )\n}"
               },
               {
                 type: 'list',
@@ -12507,7 +12507,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const result = await withTimeout(\n  async ({ signal }) => {\n    const response = await fetch(url, { signal })\n    return response.json()\n  },\n  {\n    timeoutMs: 2_000,\n    zeroTimeoutBehavior: 'skip',\n    report: reportLateFailure\n  }\n)"
+                code: "import { withTimeout } from '@migaia/utils'\n\nconst reportLateFailure = (error: unknown) => console.warn('late failure', error)\nexport async function fetchWithDeadline(url: string) {\n  return withTimeout(\n    async ({ signal }) => {\n      const response = await fetch(url, { signal })\n      if (!response.ok) throw new Error('request failed')\n      return response.json()\n    },\n    { timeoutMs: 2_000, zeroTimeoutBehavior: 'skip', report: reportLateFailure }\n  )\n}"
               },
               {
                 type: 'list',
@@ -12541,7 +12541,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const value = await retry(\n  ({ signal }) => loadRecord({ signal }),\n  {\n    maxAttempts: 4,\n    attemptTimeoutMs: 1_000,\n    totalTimeoutMs: 3_500,\n    delay: (_, { attempt }) => attempt * 100,\n    shouldRetry: (error) => isTransient(error)\n  }\n)'
+                code: "import { retry } from '@migaia/utils'\n\nconst loadRecord = async ({ signal }: { signal: AbortSignal }) => ({ id: 'record-1', value: 42 })\nconst isTransient = (error: unknown) => error instanceof TypeError\n\nexport async function loadWithRetry() {\n  return retry(\n    ({ signal }) => loadRecord({ signal }),\n    {\n      maxAttempts: 4,\n      attemptTimeoutMs: 1_000,\n      totalTimeoutMs: 3_500,\n      delay: (_, { attempt }) => attempt * 100,\n      shouldRetry: (error) => isTransient(error)\n    }\n  )\n}"
               },
               {
                 type: 'list',
@@ -12583,7 +12583,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const value = await retry(\n  ({ signal }) => loadRecord({ signal }),\n  {\n    maxAttempts: 4,\n    attemptTimeoutMs: 1_000,\n    totalTimeoutMs: 3_500,\n    delay: (_, { attempt }) => attempt * 100,\n    shouldRetry: (error) => isTransient(error)\n  }\n)'
+                code: "import { retry } from '@migaia/utils'\n\nconst loadRecord = async ({ signal }: { signal: AbortSignal }) => ({ id: 'record-1', value: 42 })\nconst isTransient = (error: unknown) => error instanceof TypeError\n\nexport async function loadWithRetry() {\n  return retry(\n    ({ signal }) => loadRecord({ signal }),\n    {\n      maxAttempts: 4,\n      attemptTimeoutMs: 1_000,\n      totalTimeoutMs: 3_500,\n      delay: (_, { attempt }) => attempt * 100,\n      shouldRetry: (error) => isTransient(error)\n    }\n  )\n}"
               },
               {
                 type: 'list',
@@ -12642,7 +12642,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const causes = walkErrorCauses(error, { maxDepth: 32 })\nconst cleanupFailure = combineErrors(cleanupErrors, 'cleanup failed')"
+                code: "import { combineErrors, walkErrorCauses } from '@migaia/utils'\n\nconst originalError = new Error('load failed')\nconst cleanupErrors: Error[] = [new Error('flush failed')]\nconst error = new AggregateError([originalError], 'request failed')\nconst causes = walkErrorCauses(error, { maxDepth: 32 })\nconst cleanupFailure = combineErrors(cleanupErrors, 'cleanup failed')\nconsole.log(causes.length, cleanupFailure?.message)"
               },
               {
                 type: 'list',
@@ -12688,7 +12688,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const causes = walkErrorCauses(error, { maxDepth: 32 })\nconst cleanupFailure = combineErrors(cleanupErrors, 'cleanup failed')"
+                code: "import { combineErrors, walkErrorCauses } from '@migaia/utils'\n\nconst originalError = new Error('load failed')\nconst cleanupErrors: Error[] = [new Error('flush failed')]\nconst error = new AggregateError([originalError], 'request failed')\nconst causes = walkErrorCauses(error, { maxDepth: 32 })\nconst cleanupFailure = combineErrors(cleanupErrors, 'cleanup failed')\nconsole.log(causes.length, cleanupFailure?.message)"
               },
               {
                 type: 'list',
@@ -12721,7 +12721,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const encoded = bytesToBase64(new Uint8Array([1, 2, 3]))\nconst decoded = base64ToBytes(encoded)\n\nfor (const chunk of streamBase64Chunks(largePayload, 32_763)) {\n  send(chunk)\n}'
+                code: "import { base64ToBytes, bytesToBase64, streamBase64Chunks } from '@migaia/serialize'\n\nconst largePayload = new Uint8Array(100_000).fill(7)\nconst send = (chunk: string) => console.log('sending chunk', chunk.length)\nconst encoded = bytesToBase64(new Uint8Array([1, 2, 3]))\nconst decoded = base64ToBytes(encoded)\nconsole.log(decoded.length)\n\nfor (const chunk of streamBase64Chunks(largePayload, 32_763)) {\n  send(chunk)\n}"
               },
               {
                 type: 'list',
@@ -12740,7 +12740,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const size = utf8ByteLength(text)\nconst chunks = splitUtf8(text, 4_096)\nconst strict = decodeUtf8(encodeUtf8(text), { fatal: true })'
+                code: "import { decodeUtf8, encodeUtf8, splitUtf8, utf8ByteLength } from '@migaia/serialize'\n\nconst text = '你好，WebRPC'\nconst size = utf8ByteLength(text)\nconst chunks = splitUtf8(text, 4_096)\nconst strict = decodeUtf8(encodeUtf8(text), { fatal: true })\nconsole.log(size, chunks.length, strict)"
               },
               {
                 type: 'paragraph',
@@ -12767,7 +12767,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const encoded = bytesToBase64(new Uint8Array([1, 2, 3]))\nconst decoded = base64ToBytes(encoded)\n\nfor (const chunk of streamBase64Chunks(largePayload, 32_763)) {\n  send(chunk)\n}'
+                code: "import { base64ToBytes, bytesToBase64, streamBase64Chunks } from '@migaia/serialize'\n\nconst largePayload = new Uint8Array(100_000).fill(7)\nconst send = (chunk: string) => console.log('sending chunk', chunk.length)\nconst encoded = bytesToBase64(new Uint8Array([1, 2, 3]))\nconst decoded = base64ToBytes(encoded)\nconsole.log(decoded.length)\n\nfor (const chunk of streamBase64Chunks(largePayload, 32_763)) {\n  send(chunk)\n}"
               },
               {
                 type: 'list',
@@ -12786,7 +12786,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const size = utf8ByteLength(text)\nconst chunks = splitUtf8(text, 4_096)\nconst strict = decodeUtf8(encodeUtf8(text), { fatal: true })'
+                code: "import { decodeUtf8, encodeUtf8, splitUtf8, utf8ByteLength } from '@migaia/serialize'\n\nconst text = '你好，WebRPC'\nconst size = utf8ByteLength(text)\nconst chunks = splitUtf8(text, 4_096)\nconst strict = decodeUtf8(encodeUtf8(text), { fatal: true })\nconsole.log(size, chunks.length, strict)"
               },
               {
                 type: 'paragraph',
@@ -12834,7 +12834,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const probe = probeObjectPath(state, 'user.profile.name')\nconst next = set(state, 'user.profile.name', 'Grace')\n\nconst accessor = createPathAccessor(next, {\n  ifBlocked: (result) => report(result),\n  onSet: (event) => audit(event)\n})"
+                code: "import { createPathAccessor, probeObjectPath, set } from '@migaia/utils'\n\nconst state = { user: { profile: { name: 'Ada' } } }\nconst report = (result: unknown) => console.warn('blocked path', result)\nconst audit = (event: unknown) => console.log('path update', event)\nconst probe = probeObjectPath(state, 'user.profile.name')\nconst next = set(state, 'user.profile.name', 'Grace')\n\nconst accessor = createPathAccessor(next, {\n  ifBlocked: report,\n  onSet: audit\n})\nconsole.log(probe.value, accessor.get('user.profile.name'))"
               },
               {
                 type: 'list',
@@ -12893,7 +12893,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const probe = probeObjectPath(state, 'user.profile.name')\nconst next = set(state, 'user.profile.name', 'Grace')\n\nconst accessor = createPathAccessor(next, {\n  ifBlocked: (result) => report(result),\n  onSet: (event) => audit(event)\n})"
+                code: "import { createPathAccessor, probeObjectPath, set } from '@migaia/utils'\n\nconst state = { user: { profile: { name: 'Ada' } } }\nconst report = (result: unknown) => console.warn('blocked path', result)\nconst audit = (event: unknown) => console.log('path update', event)\nconst probe = probeObjectPath(state, 'user.profile.name')\nconst next = set(state, 'user.profile.name', 'Grace')\n\nconst accessor = createPathAccessor(next, {\n  ifBlocked: report,\n  onSet: audit\n})\nconsole.log(probe.value, accessor.get('user.profile.name'))"
               },
               {
                 type: 'list',
@@ -12927,7 +12927,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const owned = ownConfig(input, {\n  profile: ConfigProfile.data,\n  limits: { maxDepth: 32, maxNodes: 10_000 }\n})\n\nconst publicConfig = readonlyConfig(owned)'
+                code: "import { ConfigProfile, ownConfig, readonlyConfig } from '@migaia/utils'\n\nconst input = { retries: 1, features: { cache: true } }\nconst owned = ownConfig(input, {\n  profile: ConfigProfile.data,\n  limits: { maxDepth: 32, maxNodes: 10_000 }\n})\n\nconst publicConfig = readonlyConfig(owned)\nconsole.log(publicConfig.features.cache)"
               },
               {
                 type: 'list',
@@ -12946,7 +12946,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const patched = patchConfig(owned, {\n  retries: 3,\n  debug: CONFIG_DELETE\n})\n\nconst merged = combineConfig([defaults, environment, patched], {\n  strategies: { array: 'replace', record: 'merge' },\n  pathRules: [\n    { prefix: ['features'], strategies: { array: 'concat' } }\n  ]\n})"
+                code: "import { CONFIG_DELETE, combineConfig, patchConfig } from '@migaia/utils'\n\nconst defaults = { retries: 1, features: { cache: false } }\nconst environment = { retries: 2 }\nconst owned = { retries: 1, features: { cache: true } }\nconst patched = patchConfig(owned, { retries: 3, debug: CONFIG_DELETE })\nconst merged = combineConfig([defaults, environment, patched], {\n  strategies: { array: 'replace', record: 'merge' },\n  pathRules: [{ prefix: ['features'], strategies: { array: 'concat' } }]\n})\nconsole.log(merged.retries)"
               },
               {
                 type: 'list',
@@ -12978,7 +12978,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const owned = ownConfig(input, {\n  profile: ConfigProfile.data,\n  limits: { maxDepth: 32, maxNodes: 10_000 }\n})\n\nconst publicConfig = readonlyConfig(owned)'
+                code: "import { ConfigProfile, ownConfig, readonlyConfig } from '@migaia/utils'\n\nconst input = { retries: 1, features: { cache: true } }\nconst owned = ownConfig(input, {\n  profile: ConfigProfile.data,\n  limits: { maxDepth: 32, maxNodes: 10_000 }\n})\n\nconst publicConfig = readonlyConfig(owned)\nconsole.log(publicConfig.features.cache)"
               },
               {
                 type: 'list',
@@ -12997,7 +12997,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const patched = patchConfig(owned, {\n  retries: 3,\n  debug: CONFIG_DELETE\n})\n\nconst merged = combineConfig([defaults, environment, patched], {\n  strategies: { array: 'replace', record: 'merge' },\n  pathRules: [\n    { prefix: ['features'], strategies: { array: 'concat' } }\n  ]\n})"
+                code: "import { CONFIG_DELETE, combineConfig, patchConfig } from '@migaia/utils'\n\nconst defaults = { retries: 1, features: { cache: false } }\nconst environment = { retries: 2 }\nconst owned = { retries: 1, features: { cache: true } }\nconst patched = patchConfig(owned, { retries: 3, debug: CONFIG_DELETE })\nconst merged = combineConfig([defaults, environment, patched], {\n  strategies: { array: 'replace', record: 'merge' },\n  pathRules: [{ prefix: ['features'], strategies: { array: 'concat' } }]\n})\nconsole.log(merged.retries)"
               },
               {
                 type: 'list',
@@ -13076,7 +13076,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const probe = probeThenable(value)\n\nif (probe.kind === ThenableProbeKind.failed) report(probe.error)\nif (probe.kind === ThenableProbeKind.thenable) {\n  await assimilateCapturedThen(probe.thenFn, value)\n}'
+                code: "import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils'\n\nconst value: unknown = { then(resolve: (result: string) => void) { resolve('ready') } }\nconst report = (error: unknown) => console.error(error)\nconst probe = probeThenable(value)\n\nif (probe.kind === ThenableProbeKind.failed) report(probe.error)\nif (probe.kind === ThenableProbeKind.thenable) {\n  await assimilateCapturedThen(value, probe.thenFn)\n}"
               },
               {
                 type: 'paragraph',
@@ -13152,7 +13152,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const probe = probeThenable(value)\n\nif (probe.kind === ThenableProbeKind.failed) report(probe.error)\nif (probe.kind === ThenableProbeKind.thenable) {\n  await assimilateCapturedThen(probe.thenFn, value)\n}'
+                code: "import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils'\n\nconst value: unknown = { then(resolve: (result: string) => void) { resolve('ready') } }\nconst report = (error: unknown) => console.error(error)\nconst probe = probeThenable(value)\n\nif (probe.kind === ThenableProbeKind.failed) report(probe.error)\nif (probe.kind === ThenableProbeKind.thenable) {\n  await assimilateCapturedThen(value, probe.thenFn)\n}"
               },
               {
                 type: 'paragraph',
@@ -13493,7 +13493,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\n\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+                code: "import { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
               },
               {
                 type: 'list',
@@ -13556,7 +13556,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'await Promise.all([client.dispose(), provider.dispose()])'
+                code: "type IDisposableEndpoint = { dispose(): Promise<void> }\n\nexport async function disposeEndpointTree(\n  client: IDisposableEndpoint,\n  provider: IDisposableEndpoint\n) {\n  // 两个 endpoint 互不依赖，允许并行结算 pending 请求并释放各自所有资源。\n  await Promise.all([client.dispose(), provider.dispose()])\n}"
               },
               {
                 type: 'paragraph',
@@ -13584,7 +13584,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\n\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+                code: "import { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
               },
               {
                 type: 'list',
@@ -13675,7 +13675,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'await Promise.all([client.dispose(), provider.dispose()])'
+                code: "type IDisposableEndpoint = { dispose(): Promise<void> }\n\nexport async function disposeEndpointTree(\n  client: IDisposableEndpoint,\n  provider: IDisposableEndpoint\n) {\n  // 两个 endpoint 互不依赖，允许并行结算 pending 请求并释放各自所有资源。\n  await Promise.all([client.dispose(), provider.dispose()])\n}"
               },
               {
                 type: 'paragraph',
@@ -13830,7 +13830,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createFullEndpoint } from '@migaia/web-rpc/full'\n\n// 只调用库存服务：根对象没有 provide。\nconst storefront = await createClientEndpoint({\n  id: 'storefront',\n  targetIds: ['inventory'],\n  transport: storefrontTransport,\n  middlewares: [connect({ transport: storefrontTransport })] as const\n})\nconst stock = await storefront.send<number>('inventory', 'getStock', 'sku-42')\n\n// 提供库存方法：同时保留主动调用其他宿主的能力。\nconst inventory = await createProviderEndpoint({\n  id: 'inventory',\n  transport: inventoryTransport,\n  middlewares: [connect({ transport: inventoryTransport })] as const\n})\ninventory.provide('getStock', ({ success }) => success(12))\n\n// 运维宿主明确需要完整的发现与控制表面。\nconst operations = await createFullEndpoint({\n  id: 'operations',\n  transport: operationsTransport,\n  middlewares: [connect({ transport: operationsTransport })] as const\n})\nconst peers = operations.discovery.getServerList()"
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createFullEndpoint } from '@migaia/web-rpc/full'\n\ntype ITransport = Parameters<typeof createClientEndpoint>[0]['transport']\n\nexport async function runHostRoles(\n  storefrontTransport: ITransport,\n  inventoryTransport: ITransport,\n  operationsTransport: ITransport\n) {\n  // 只调用库存服务：根对象没有 provide。\n  const storefront = await createClientEndpoint({\n    id: 'storefront',\n    targetIds: ['inventory'],\n    transport: storefrontTransport,\n    middlewares: [connect({ transport: storefrontTransport })] as const\n  })\n  const stock = await storefront.send<number>('inventory', 'getStock', 'sku-42')\n\n  // 提供库存方法：同时保留主动调用其他宿主的能力。\n  const inventory = await createProviderEndpoint({\n    id: 'inventory',\n    transport: inventoryTransport,\n    middlewares: [connect({ transport: inventoryTransport })] as const\n  })\n  inventory.provide('getStock', ({ success }) => success(12))\n\n  // 运维宿主明确需要完整的发现与控制表面。\n  const operations = await createFullEndpoint({\n    id: 'operations',\n    transport: operationsTransport,\n    middlewares: [connect({ transport: operationsTransport })] as const\n  })\n  const peers = operations.discovery.getServerList()\n  console.log(stock, peers)\n  await Promise.all([storefront.dispose(), inventory.dispose(), operations.dispose()])\n}"
               },
               {
                 type: 'paragraph',
@@ -13845,7 +13845,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'dashboard',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 2_000 })] as const\n  },\n  [outbound(), discovery(), control()] as const\n)\n\nawait endpoint.send('worker', 'refresh', undefined)\nconst alive = await endpoint.ping('worker')"
+                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst [, transport] = createMemoryTransportPair()\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'dashboard',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 2_000 })] as const\n  },\n  [outbound(), discovery(), control()] as const\n)\n\nawait endpoint.send('worker', 'refresh', undefined)\nconst alive = await endpoint.ping('worker')"
               },
               {
                 type: 'list',
@@ -14033,7 +14033,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createFullEndpoint } from '@migaia/web-rpc/full'\n\nconst storefront = await createClientEndpoint({\n  id: 'storefront', targetIds: ['inventory'], transport: storefrontTransport,\n  middlewares: [connect({ transport: storefrontTransport })] as const\n})\nconst stock = await storefront.send<number>('inventory', 'getStock', 'sku-42')\n\nconst inventory = await createProviderEndpoint({\n  id: 'inventory', transport: inventoryTransport,\n  middlewares: [connect({ transport: inventoryTransport })] as const\n})\ninventory.provide('getStock', ({ success }) => success(12))\n\nconst operations = await createFullEndpoint({\n  id: 'operations', transport: operationsTransport,\n  middlewares: [connect({ transport: operationsTransport })] as const\n})\nconst peers = operations.discovery.getServerList()"
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createFullEndpoint } from '@migaia/web-rpc/full'\n\ntype ITransport = Parameters<typeof createClientEndpoint>[0]['transport']\n\nexport async function runHostRoles(\n  storefrontTransport: ITransport,\n  inventoryTransport: ITransport,\n  operationsTransport: ITransport\n) {\n  const storefront = await createClientEndpoint({\n    id: 'storefront', targetIds: ['inventory'], transport: storefrontTransport,\n    middlewares: [connect({ transport: storefrontTransport })] as const\n  })\n  const stock = await storefront.send<number>('inventory', 'getStock', 'sku-42')\n\n  const inventory = await createProviderEndpoint({\n    id: 'inventory', transport: inventoryTransport,\n    middlewares: [connect({ transport: inventoryTransport })] as const\n  })\n  inventory.provide('getStock', ({ success }) => success(12))\n\n  const operations = await createFullEndpoint({\n    id: 'operations', transport: operationsTransport,\n    middlewares: [connect({ transport: operationsTransport })] as const\n  })\n  const peers = operations.discovery.getServerList()\n  console.log(stock, peers)\n  await Promise.all([storefront.dispose(), inventory.dispose(), operations.dispose()])\n}"
               },
               {
                 type: 'paragraph',
@@ -14048,7 +14048,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'dashboard',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 2_000 })] as const\n  },\n  [outbound(), discovery(), control()] as const\n)\n\nawait endpoint.send('worker', 'refresh', undefined)\nconst alive = await endpoint.ping('worker')"
+                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst [, transport] = createMemoryTransportPair()\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'dashboard',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 2_000 })] as const\n  },\n  [outbound(), discovery(), control()] as const\n)\n\nawait endpoint.send('worker', 'refresh', undefined)\nconst alive = await endpoint.ping('worker')"
               },
               {
                 type: 'list',
@@ -14160,7 +14160,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\nconst client = await createClientEndpoint({\n  id: 'storefront',\n  targetIds: ['catalog'],\n  transport,\n  middlewares: [\n    connect({ transport }),\n    reportTransportErrors((error) => diagnostics.capture(error))\n  ] as const\n})\n\ntry {\n  await client.send('catalog', 'findProduct', { id: 'sku-42' })\n} finally {\n  await client.dispose() // 同时解除 transport error 订阅\n}"
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\ntype IDiagnostics = { capture(error: unknown): void }\n\nexport async function callCatalog(\n  transport: Parameters<typeof createClientEndpoint>[0]['transport'],\n  diagnostics: IDiagnostics\n) {\n  const client = await createClientEndpoint({\n    id: 'storefront',\n    targetIds: ['catalog'],\n    transport,\n    middlewares: [\n      connect({ transport }),\n      reportTransportErrors((error) => diagnostics.capture(error))\n    ] as const\n  })\n\n  try {\n    const product = await client.send<{ id: string; name: string }>(\n      'catalog',\n      'findProduct',\n      { id: 'sku-42' }\n    )\n    console.log(product)\n    return product\n  } finally {\n    await client.dispose() // 同时解除 transport error 订阅\n  }\n}"
               },
               {
                 type: 'paragraph',
@@ -14254,7 +14254,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\nconst client = await createClientEndpoint({\n  id: 'storefront',\n  targetIds: ['catalog'],\n  transport,\n  middlewares: [\n    connect({ transport }),\n    reportTransportErrors((error) => diagnostics.capture(error))\n  ] as const\n})\n\ntry {\n  await client.send('catalog', 'findProduct', { id: 'sku-42' })\n} finally {\n  await client.dispose() // also removes the transport-error subscription\n}"
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\ntype IDiagnostics = { capture(error: unknown): void }\n\nexport async function callCatalog(\n  transport: Parameters<typeof createClientEndpoint>[0]['transport'],\n  diagnostics: IDiagnostics\n) {\n  const client = await createClientEndpoint({\n    id: 'storefront',\n    targetIds: ['catalog'],\n    transport,\n    middlewares: [\n      connect({ transport }),\n      reportTransportErrors((error) => diagnostics.capture(error))\n    ] as const\n  })\n\n  try {\n    const product = await client.send<{ id: string; name: string }>(\n      'catalog',\n      'findProduct',\n      { id: 'sku-42' }\n    )\n    console.log(product)\n    return product\n  } finally {\n    await client.dispose() // also removes the transport-error subscription\n  }\n}"
               },
               {
                 type: 'paragraph',
@@ -14318,7 +14318,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const controller = new AbortController()\n\nconst pending = client.send<User>('provider', 'findUser', { id: 'u-1' }, {\n  signal: controller.signal,\n  timeoutMs: 3_000\n})\n\ncontroller.abort(new Error('route changed'))\nawait pending"
+                code: "import type { IWebRpcEndpoint } from '@migaia/web-rpc'\n\ntype IUser = { id: string; name: string }\n\nexport async function findUserBeforeRouteChange(client: IWebRpcEndpoint) {\n  const controller = new AbortController()\n  const pending = client.send<IUser>('provider', 'findUser', { id: 'u-1' }, {\n    signal: controller.signal,\n    timeoutMs: 3_000\n  })\n\n  // 页面跳转或组件卸载时调用，避免继续等待已经无用的请求。\n  controller.abort(new Error('route changed'))\n\n  try {\n    return await pending\n  } catch (error) {\n    if (controller.signal.aborted) return undefined\n    throw error\n  }\n}"
               },
               {
                 type: 'list',
@@ -14388,7 +14388,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const controller = new AbortController()\n\nconst pending = client.send<User>('provider', 'findUser', { id: 'u-1' }, {\n  signal: controller.signal,\n  timeoutMs: 3_000\n})\n\ncontroller.abort(new Error('route changed'))\nawait pending"
+                code: "import type { IWebRpcEndpoint } from '@migaia/web-rpc'\n\ntype IUser = { id: string; name: string }\n\nexport async function findUserBeforeRouteChange(client: IWebRpcEndpoint) {\n  const controller = new AbortController()\n  const pending = client.send<IUser>('provider', 'findUser', { id: 'u-1' }, {\n    signal: controller.signal,\n    timeoutMs: 3_000\n  })\n\n  // 页面跳转或组件卸载时调用，避免继续等待已经无用的请求。\n  controller.abort(new Error('route changed'))\n\n  try {\n    return await pending\n  } catch (error) {\n    if (controller.signal.aborted) return undefined\n    throw error\n  }\n}"
               },
               {
                 type: 'list',
@@ -14535,6 +14535,121 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
+  'rpc-contract:real-world-bindings': {
+    zh: {
+      title: '把同一份 RPC Contract 接到进程、WebSocket、SSE 和 fetch',
+      lede: 'rpc-contract 只定义稳定的 descriptor、请求/响应 envelope 和 framing；真正的通信载体由宿主选择。下面四个例子使用同一个 read-orders contract，展示数据如何离开调用方、到达服务端，再回到业务代码。',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: '先分清 Contract 与 Transport 的边界',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '先创建一份所有参与方共享的 descriptor。它只回答“调用哪个稳定 ID、使用哪个版本”；serialize/normalize 负责把数据变成可跨边界传输的记录。process IPC、WebSocket、SSE 和 fetch 负责搬运记录，不应该各自重新发明一套 method 名称和版本规则。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createDescriptor } from '@migaia/rpc-contract'\n\ntype IReadOrdersInput = { customerId: string }\ntype IReadOrdersResult = { id: string; total: number }\n\nexport const readOrders = createDescriptor('read-orders', 1)\nexport type IReadOrdersRequest = {\n  requestId: string\n  descriptor: typeof readOrders\n  input: IReadOrdersInput\n}\nexport type IReadOrdersResponse = {\n  requestId: string\n  descriptor: typeof readOrders\n  output: IReadOrdersResult[]\n}\n\n// 四种 transport 都只传这两个业务边界对象；版本检查仍由共享 descriptor 约束。"
+              }
+            ]
+          },
+          {
+            id: 'bindings',
+            heading: '四种通信载体如何承载同一份数据',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['载体', '调用方发送', '服务端返回/推送', '适合场景'],
+                rows: [
+                  ['Node process IPC', 'process.send(request)', 'message({ output })', '同一台机器上的父子进程或 Worker'],
+                  ['WebSocket', 'socket.send(JSON.stringify(request))', 'message(JSON response)', '双向、长连接、需要服务端主动通知'],
+                  ['SSE', 'fetch POST 发送 request', 'EventSource 接收 response/update', '服务端持续推送，客户端上行请求较少'],
+                  ['fetch', 'POST JSON request', 'HTTP JSON response', '一次请求一次响应、缓存和网关友好']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "// fetch-client.ts：一次请求一次响应，Contract 仍是唯一的消息形状\nimport { readOrders, type IReadOrdersRequest, type IReadOrdersResponse } from './contract.js'\n\nexport async function fetchOrders(customerId: string): Promise<IReadOrdersResponse['output']> {\n  const request: IReadOrdersRequest = { requestId: crypto.randomUUID(), descriptor: readOrders, input: { customerId } }\n  const response = await fetch('/rpc/read-orders', {\n    method: 'POST',\n    headers: { 'content-type': 'application/json' },\n    body: JSON.stringify(request)\n  })\n  if (!response.ok) throw new Error(`RPC HTTP ${response.status}`)\n  const message = await response.json() as IReadOrdersResponse\n  if (message.descriptor.id !== readOrders.id || message.descriptor.version !== readOrders.version) {\n    throw new Error('RPC contract version mismatch')\n  }\n  return message.output\n}\n\nconsole.log(await fetchOrders('customer-42'))"
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "// websocket-client.ts：同一 request 通过长连接发送，响应按 requestId 配对\nimport { readOrders, type IReadOrdersRequest, type IReadOrdersResponse } from './contract.js'\n\nconst socket = new WebSocket('wss://api.example/rpc')\nawait new Promise<void>((resolve, reject) => {\n  socket.addEventListener('open', () => resolve(), { once: true })\n  socket.addEventListener('error', () => reject(new Error('WebSocket connection failed')), { once: true })\n})\nconst request: IReadOrdersRequest = { requestId: crypto.randomUUID(), descriptor: readOrders, input: { customerId: 'customer-42' } }\nsocket.addEventListener('message', (event) => {\n  const response = JSON.parse(String(event.data)) as IReadOrdersResponse\n  if (response.requestId === request.requestId) console.log('orders received:', response.output)\n}, { once: true })\nsocket.send(JSON.stringify(request))\n\n// 生产代码还要加 requestId、超时、重连和 socket.close()；Contract 不替代这些 transport 策略。"
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "// sse-client.ts：上行仍用 fetch，下行由 SSE 持续推送同一 Contract 的事件\nimport { readOrders, type IReadOrdersRequest, type IReadOrdersResponse } from './contract.js'\n\nconst request: IReadOrdersRequest = { requestId: crypto.randomUUID(), descriptor: readOrders, input: { customerId: 'customer-42' } }\nconst start = await fetch('/rpc/read-orders/start', {\n  method: 'POST',\n  headers: { 'content-type': 'application/json' },\n  body: JSON.stringify(request)\n})\nif (!start.ok) throw new Error(`SSE start failed: ${start.status}`)\nconst events = new EventSource('/rpc/read-orders/events?requestId=${encodeURIComponent(request.requestId)}\&customerId=customer-42')\nevents.addEventListener('orders', (event) => {\n  const response = JSON.parse(event.data) as IReadOrdersResponse\n  if (response.requestId !== request.requestId || response.descriptor.id !== readOrders.id || response.descriptor.version !== readOrders.version) {\n    events.close()\n    throw new Error('SSE response does not match the RPC contract')\n  }\n  console.log('orders update:', response.output)\n})\nwindow.addEventListener('pagehide', () => events.close(), { once: true })\n\n// 页面卸载或任务完成时关闭 EventSource，避免服务端继续保留连接。"
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "// orders-child.ts：子进程校验同一 descriptor 后执行本地业务\nimport { readOrders, type IReadOrdersRequest, type IReadOrdersResponse } from './contract.js'\n\nprocess.once('message', (message: IReadOrdersRequest) => {\n  if (message.descriptor.id !== readOrders.id || message.descriptor.version !== readOrders.version) {\n    throw new Error('RPC contract version mismatch')\n  }\n  const response: IReadOrdersResponse = {\n    requestId: message.requestId,\n    descriptor: readOrders,\n    output: [{ id: 'order-1', total: 42 }]\n  }\n  process.send?.(response)\n  process.disconnect()\n})"
+              },
+              {
+                type: 'paragraph',
+                text: '服务端收到 envelope 后先解析 JSON，再验证 descriptor.id、descriptor.version 和 input；校验通过后调用真正的业务函数，并在 response 中原样带回 requestId 与 descriptor。SSE 服务端从查询参数读取 requestId，并只向对应订阅推送事件。Contract 不负责数据库查询。返回 response 后，HTTP 请求自然结束，WebSocket 连接继续复用，SSE 则在任务完成或客户端断开时关闭。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'WebRPC Transport 与安全', path: 'web-rpc/transports-and-security' },
+        { label: 'createDescriptor API', path: 'docs/rpc-contract/createDescriptor' }
+      ]
+    },
+    en: {
+      title: 'Bind one RPC Contract to processes, WebSocket, SSE, and fetch',
+      lede: 'rpc-contract defines stable descriptors, request/response envelopes, and framing; the host chooses the communication carrier. These four examples reuse one read-orders contract and show data leaving the caller, reaching the service, and returning to business code.',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: 'Separate Contract from Transport',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Create one descriptor shared by every participant. It answers which stable ID and version are being called; serialize/normalize produces a portable record. Process IPC, WebSocket, SSE, and fetch carry that record and should not invent separate method and version rules.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createDescriptor } from '@migaia/rpc-contract'\n\ntype IReadOrdersInput = { customerId: string }\ntype IReadOrdersResult = { id: string; total: number }\n\nexport const readOrders = createDescriptor('read-orders', 1)\nexport type IReadOrdersRequest = { requestId: string; descriptor: typeof readOrders; input: IReadOrdersInput }\nexport type IReadOrdersResponse = { requestId: string; descriptor: typeof readOrders; output: IReadOrdersResult[] }\n\n// Every transport below carries these same two business-boundary records."
+              }
+            ]
+          },
+          {
+            id: 'bindings',
+            heading: 'How the four carriers move the same data',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Use fetch for one request/one response, WebSocket for bidirectional long-lived traffic, SSE for server-to-client updates after an HTTP start request, and process IPC for a Node parent/child boundary. The snippets below are separate runtime examples, not one file: browser code uses fetch/WebSocket/EventSource, while process.send belongs in the Node parent or child. Add request IDs, timeout, authentication, retry, and shutdown policy at the transport or application layer; the Contract keeps the payload shape and version stable.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "// fetch-client.ts: one request and one response\nimport { readOrders, type IReadOrdersRequest, type IReadOrdersResponse } from './contract.js'\n\nconst request: IReadOrdersRequest = { requestId: crypto.randomUUID(), descriptor: readOrders, input: { customerId: 'customer-42' } }\nconst response = await fetch('/rpc/read-orders', {\n  method: 'POST',\n  headers: { 'content-type': 'application/json' },\n  body: JSON.stringify(request)\n})\nif (!response.ok) throw new Error(`RPC HTTP ${response.status}`)\nconst message = await response.json() as IReadOrdersResponse\nconsole.log(message.output)\n\n// WebSocket: register the response listener before sending the same request.\nconst socket = new WebSocket('wss://api.example/rpc')\nawait new Promise<void>((resolve, reject) => {\n  socket.addEventListener('open', () => resolve(), { once: true })\n  socket.addEventListener('error', () => reject(new Error('WebSocket connection failed')), { once: true })\n})\nsocket.addEventListener('message', (event) => console.log(JSON.parse(String(event.data)) as IReadOrdersResponse), { once: true })\nsocket.send(JSON.stringify(request))\n\n// SSE: start upstream work with fetch, then close the event stream with the page.\nconst start = await fetch('/rpc/read-orders/start', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) })\nif (!start.ok) throw new Error(`SSE start failed: ${start.status}`)\nconst events = new EventSource('/rpc/read-orders/events?requestId=${encodeURIComponent(request.requestId)}')\nevents.addEventListener('orders', (event) => console.log(JSON.parse(event.data) as IReadOrdersResponse))\nwindow.addEventListener('pagehide', () => events.close(), { once: true })\n\n// Process IPC: the child validates the descriptor before returning the response.\nprocess.send?.(request)\nprocess.once('message', (message: IReadOrdersResponse) => console.log(message.output))\n\n// WebSocket, SSE, and process IPC carry the same request/response records;\n// their connection, timeout, requestId, retry, and shutdown policies stay outside Contract."
+              },
+              {
+                type: 'paragraph',
+                text: 'The server parses the envelope, validates descriptor.id, descriptor.version, and input, then calls the real business function and returns the same requestId and descriptor in the response. For SSE, it reads requestId from the query and publishes events only to the matching subscription. Contract does not query the database. HTTP ends after the response, WebSocket remains reusable, and SSE closes when the job finishes or the client disconnects.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'WebRPC transport and security', path: 'web-rpc/transports-and-security' },
+        { label: 'createDescriptor API', path: 'docs/rpc-contract/createDescriptor' }
+      ]
+    }
+  },
   'web-rpc:transports-and-security': {
     zh: {
       title: '按拓扑选择 Transport，并建立真实安全边界',
@@ -14669,7 +14784,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  [discovery(), control()] as const\n)\n\nconst alive = await endpoint.ping('worker')"
+                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\n\nconst [, transport] = createMemoryTransportPair()\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  [discovery(), control()] as const\n)\n\nconst alive = await endpoint.ping('worker')"
               },
               {
                 type: 'paragraph',
@@ -14721,7 +14836,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  [discovery(), control()] as const\n)\n\nconst alive = await endpoint.ping('worker')"
+                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\n\nconst [, transport] = createMemoryTransportPair()\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  [discovery(), control()] as const\n)\n\nconst alive = await endpoint.ping('worker')"
               },
               {
                 type: 'paragraph',
@@ -14760,7 +14875,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { chunk, connect } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      chunk({\n        chunkSize: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      })\n    ] as const\n  },\n  [outbound(), chunkFeature()] as const\n)"
+                code: "import { chunk, connect } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst [, transport] = createMemoryTransportPair()\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      chunk({\n        chunkSize: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      })\n    ] as const\n  },\n  [outbound(), chunkFeature()] as const\n)"
               },
               {
                 type: 'paragraph',
@@ -14818,7 +14933,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { chunk, connect } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      chunk({\n        chunkSize: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      })\n    ] as const\n  },\n  [outbound(), chunkFeature()] as const\n)"
+                code: "import { chunk, connect } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst [, transport] = createMemoryTransportPair()\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      chunk({\n        chunkSize: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      })\n    ] as const\n  },\n  [outbound(), chunkFeature()] as const\n)"
               },
               {
                 type: 'paragraph',
@@ -15859,7 +15974,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const controller = new AbortController()\nconst range = { lower: 'order:0000', upper: 'order:9999' } as const\n\ntry {\n  for await (const [key, order] of db.iterateRecords(range, {\n    signal: controller.signal,\n    timeoutMs: 10_000,\n    pageSize: 64\n  })) {\n    renderRow(key, order)\n    if (shouldStop()) controller.abort('list closed')\n  }\n} catch (error) {\n  if (!(error instanceof DOMException && error.name === 'AbortError')) throw error\n}"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<{ id: string; total: number }>({ dbName: 'orders' })\nconst controller = new AbortController()\nconst renderRow = (key: string, order: { id: string; total: number }) => console.log(key, order)\nconst shouldStop = () => controller.signal.aborted\nconst range = { lower: 'order:0000', upper: 'order:9999' } as const\n\ntry {\n  for await (const [key, order] of db.iterateRecords(range, {\n    signal: controller.signal,\n    timeoutMs: 10_000,\n    pageSize: 64\n  })) {\n    renderRow(key, order)\n    if (shouldStop()) controller.abort('list closed')\n  }\n} catch (error) {\n  if (!(error instanceof DOMException && error.name === 'AbortError')) throw error\n} finally {\n  await db.dispose()\n}"
               },
               {
                 type: 'list',
@@ -16057,7 +16172,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const controller = new AbortController()\nconst range = { lower: 'order:0000', upper: 'order:9999' } as const\n\ntry {\n  for await (const [key, order] of db.iterateRecords(range, {\n    signal: controller.signal,\n    timeoutMs: 10_000,\n    pageSize: 64\n  })) {\n    renderRow(key, order)\n    if (shouldStop()) controller.abort('list closed')\n  }\n} catch (error) {\n  if (!(error instanceof DOMException && error.name === 'AbortError')) throw error\n}"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<{ id: string; total: number }>({ dbName: 'orders' })\nconst controller = new AbortController()\nconst renderRow = (key: string, order: { id: string; total: number }) => console.log(key, order)\nconst shouldStop = () => controller.signal.aborted\nconst range = { lower: 'order:0000', upper: 'order:9999' } as const\n\ntry {\n  for await (const [key, order] of db.iterateRecords(range, {\n    signal: controller.signal,\n    timeoutMs: 10_000,\n    pageSize: 64\n  })) {\n    renderRow(key, order)\n    if (shouldStop()) controller.abort('list closed')\n  }\n} catch (error) {\n  if (!(error instanceof DOMException && error.name === 'AbortError')) throw error\n} finally {\n  await db.dispose()\n}"
               },
               {
                 type: 'list',
@@ -16158,7 +16273,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "type IUser = { id: string; name: string }\n\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(indexedDbHost({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', name: 'Ada' })\nconst ada = await users.get('ada')"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { defineEntity } from '@migaia/storage-web/schema'\n\ntype IUser = { id: string; name: string }\nconst db = indexedDbHost({ dbName: 'app-data' })\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(db)\n\ntry {\n  await users.put({ id: 'ada', name: 'Ada' })\n  const ada = await users.get('ada')\n  console.log(ada)\n} finally {\n  await db.dispose()\n}"
               },
               {
                 type: 'list',
@@ -16284,7 +16399,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "type IUser = { id: string; name: string }\n\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(indexedDbHost({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', name: 'Ada' })\nconst ada = await users.get('ada')"
+                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\nimport { defineEntity } from '@migaia/storage-web/schema'\n\ntype IUser = { id: string; name: string }\nconst db = indexedDbHost({ dbName: 'app-data' })\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(db)\n\ntry {\n  await users.put({ id: 'ada', name: 'Ada' })\n  const ada = await users.get('ada')\n  console.log(ada)\n} finally {\n  await db.dispose()\n}"
               },
               {
                 type: 'list',
@@ -16897,7 +17012,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const disposePage = async () => {\n  await user.dispose() // 先停止变化订阅，并取消 IndexedDB 示例的当前 generation\n  await host.dispose() // 再等待 Host 已接纳的工作收敛，并释放 adapter 与 backend\n}\n\nwindow.addEventListener('pagehide', () => void disposePage(), { once: true })"
+                code: "type IDisposable = { dispose(): Promise<void> }\n\n// 在组件创建阶段取得的 query 和 Host，在页面销毁时按此顺序传入。\nconst disposePage = async (user: IDisposable, host: IDisposable) => {\n  await user.dispose() // 先停止变化订阅，并取消 IndexedDB 示例的当前 generation\n  await host.dispose() // 再等待 Host 已接纳的工作收敛，并释放 adapter 与 backend\n}\n\n// 页面框架的销毁钩子中调用：void disposePage(user, host)"
               },
               {
                 type: 'list',
@@ -17121,7 +17236,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const disposePage = async () => {\n  await user.dispose() // stop subscriptions and cancel the IndexedDB example's current generation first\n  await host.dispose() // then drain admitted work and release adapters and backends\n}\n\nwindow.addEventListener('pagehide', () => void disposePage(), { once: true })"
+                code: "type IDisposable = { dispose(): Promise<void> }\n\n// Pass the query and Host created by the page into this cleanup hook.\nconst disposePage = async (user: IDisposable, host: IDisposable) => {\n  await user.dispose() // stop subscriptions and cancel the IndexedDB example's current generation first\n  await host.dispose() // then drain admitted work and release adapters and backends\n}\n\n// Call from the page framework's destroy hook: void disposePage(user, host)"
               },
               {
                 type: 'list',
@@ -17157,7 +17272,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const jar = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nawait jar.remove('session')"
+                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst jar = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nconst session = await jar.get('session')\nconsole.log(session)\nawait jar.remove('session')\nawait jar.dispose()"
               },
               {
                 type: 'list',
@@ -17281,7 +17396,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const jar = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nawait jar.remove('session')"
+                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst jar = cookiesHost({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nconst session = await jar.get('session')\nconsole.log(session)\nawait jar.remove('session')\nawait jar.dispose()"
               },
               {
                 type: 'list',
@@ -17884,7 +17999,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "await log.flush()\nawait log.shutdown('manual')"
+                code: "type ILogger = {\n  flush(): Promise<void>\n  shutdown(reason: 'manual'): Promise<void>\n}\n\n// 应用退出钩子接收已创建的 Logger，先确保缓冲日志落盘，再结束运行时。\nconst closeLogger = async (log: ILogger) => {\n  await log.flush()\n  await log.shutdown('manual')\n}"
               },
               {
                 type: 'paragraph',
@@ -17978,7 +18093,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "await log.flush()\nawait log.shutdown('manual')"
+                code: "type ILogger = {\n  flush(): Promise<void>\n  shutdown(reason: 'manual'): Promise<void>\n}\n\n// Pass the created Logger from the application shutdown hook.\nconst closeLogger = async (log: ILogger) => {\n  await log.flush()\n  await log.shutdown('manual')\n}"
               },
               {
                 type: 'paragraph',
@@ -18091,7 +18206,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const log = new Logger({\n  execution,\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: '/logs', retries: 2 })\n  ]\n})"
+                code: "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level } from '@migaia/logger/plugins'\n\nconst execution = { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 }\nconst log = new Logger({\n  execution,\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: '/logs', retries: 2 })\n  ]\n})"
               },
               {
                 type: 'list',
@@ -18141,7 +18256,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const log = new Logger({\n  execution,\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: '/logs', retries: 2 })\n  ]\n})"
+                code: "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level } from '@migaia/logger/plugins'\n\nconst execution = { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 }\nconst log = new Logger({\n  execution,\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: '/logs', retries: 2 })\n  ]\n})"
               },
               {
                 type: 'list',
@@ -18417,7 +18532,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const off = log.usePipeline((entry, next) => {\n  const authorization = entry.meta?.authorization\n  if (typeof authorization === 'string') {\n    entry.meta = { ...entry.meta, authorization: '[redacted]' }\n  }\n  next(entry)\n})\n\nlog.info('request accepted', { requestId })\noff()"
+                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 } })\nconst requestId = 'req-42'\nconst off = log.usePipeline((entry, next) => {\n  const authorization = entry.meta?.authorization\n  if (typeof authorization === 'string') {\n    entry.meta = { ...entry.meta, authorization: '[redacted]' }\n  }\n  next(entry)\n})\n\nlog.info('request accepted', { requestId })\noff()"
               },
               {
                 type: 'paragraph',
@@ -18472,7 +18587,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const off = log.usePipeline((entry, next) => {\n  const authorization = entry.meta?.authorization\n  if (typeof authorization === 'string') {\n    entry.meta = { ...entry.meta, authorization: '[redacted]' }\n  }\n  next(entry)\n})\n\nlog.info('request accepted', { requestId })\noff()"
+                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 } })\nconst requestId = 'req-42'\nconst off = log.usePipeline((entry, next) => {\n  const authorization = entry.meta?.authorization\n  if (typeof authorization === 'string') {\n    entry.meta = { ...entry.meta, authorization: '[redacted]' }\n  }\n  next(entry)\n})\n\nlog.info('request accepted', { requestId })\noff()"
               },
               {
                 type: 'paragraph',
@@ -18593,7 +18708,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  ...previous,\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => embeddedConsole.write(text)\n})\n\ntry {\n  const embeddedLog = new Logger({ execution })\n  embeddedLog.info('ready')\n  await embeddedLog.shutdown('manual')\n} finally {\n  restore()\n}"
+                code: "import { Logger, getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst embeddedConsole = { write: (text: string) => console.log(text) }\nconst execution = { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 }\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  ...previous,\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => embeddedConsole.write(text)\n})\n\ntry {\n  const embeddedLog = new Logger({ execution })\n  embeddedLog.info('ready')\n  await embeddedLog.shutdown('manual')\n} finally {\n  restore()\n}"
               },
               {
                 type: 'paragraph',
@@ -18639,7 +18754,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  ...previous,\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => embeddedConsole.write(text)\n})\n\ntry {\n  const embeddedLog = new Logger({ execution })\n  embeddedLog.info('ready')\n  await embeddedLog.shutdown('manual')\n} finally {\n  restore()\n}"
+                code: "import { Logger, getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst embeddedConsole = { write: (text: string) => console.log(text) }\nconst execution = { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 }\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  ...previous,\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => embeddedConsole.write(text)\n})\n\ntry {\n  const embeddedLog = new Logger({ execution })\n  embeddedLog.info('ready')\n  await embeddedLog.shutdown('manual')\n} finally {\n  restore()\n}"
               },
               {
                 type: 'paragraph',
@@ -18814,7 +18929,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) {\n  await removal.physicalCompletion\n}\n\nawait host.dispose()"
+                code: "type IGreetingPlugin = { name: 'greeting' }\ntype IInstalledView = {\n  extensions: { greet(name: string): void }\n  unUse(name: string): Promise<{ physicalCompletion?: Promise<void> }>\n}\ntype IGreetingHost = {\n  use(plugin: IGreetingPlugin): Promise<IInstalledView>\n  dispose(): Promise<void>\n}\n\nexport async function runGreeting(host: IGreetingHost, greetingPlugin: IGreetingPlugin) {\n  const view = await host.use(greetingPlugin)\n  view.extensions.greet('Migaia')\n\n  const removal = await view.unUse('greeting')\n  if (removal.physicalCompletion) await removal.physicalCompletion\n  await host.dispose()\n}\n\n// 调用方把上一节创建的 host 和 greetingPlugin 传入，形成安装、使用、卸载闭环。"
               },
               {
                 type: 'list',
@@ -18932,7 +19047,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) {\n  await removal.physicalCompletion\n}\n\nawait host.dispose()"
+                code: "type IGreetingPlugin = { name: 'greeting' }\ntype IInstalledView = {\n  extensions: { greet(name: string): void }\n  unUse(name: string): Promise<{ physicalCompletion?: Promise<void> }>\n}\ntype IGreetingHost = {\n  use(plugin: IGreetingPlugin): Promise<IInstalledView>\n  dispose(): Promise<void>\n}\n\nexport async function runGreeting(host: IGreetingHost, greetingPlugin: IGreetingPlugin) {\n  const view = await host.use(greetingPlugin)\n  view.extensions.greet('Migaia')\n\n  const removal = await view.unUse('greeting')\n  if (removal.physicalCompletion) await removal.physicalCompletion\n  await host.dispose()\n}\n\n// Pass the host and greetingPlugin created in the previous section to close the install-use-remove loop."
               },
               {
                 type: 'list',
@@ -19041,7 +19156,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const ordered = [databasePlugin, repositoryPlugin, featurePlugin]\nconst view = await host.use(ordered)\nview.extensions.feature.run()'
+                code: "type IPlugin = { name: string }\ntype IOrderedView = { extensions: { feature: { run(): void } } }\ntype IPluginHost = { use(plugins: IPlugin[]): Promise<IOrderedView> }\n\nexport async function installFeature(\n  host: IPluginHost,\n  databasePlugin: IPlugin,\n  repositoryPlugin: IPlugin,\n  featurePlugin: IPlugin\n) {\n  // 依赖顺序由调用方明确给出：database → repository → feature。\n  const ordered = [databasePlugin, repositoryPlugin, featurePlugin]\n  const view = await host.use(ordered)\n  view.extensions.feature.run()\n}"
               },
               {
                 type: 'list',
@@ -19082,7 +19197,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const ordered = [databasePlugin, repositoryPlugin, featurePlugin]\nconst view = await host.use(ordered)\nview.extensions.feature.run()'
+                code: "type IPlugin = { name: string }\ntype IOrderedView = { extensions: { feature: { run(): void } } }\ntype IPluginHost = { use(plugins: IPlugin[]): Promise<IOrderedView> }\n\nexport async function installFeature(\n  host: IPluginHost,\n  databasePlugin: IPlugin,\n  repositoryPlugin: IPlugin,\n  featurePlugin: IPlugin\n) {\n  // The caller supplies the dependency order explicitly: database → repository → feature.\n  const ordered = [databasePlugin, repositoryPlugin, featurePlugin]\n  const view = await host.use(ordered)\n  view.extensions.feature.run()\n}"
               },
               {
                 type: 'list',
@@ -19125,7 +19240,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const installed = await host.use(greetingPlugin)\n\nawait installed.config.update('greeting', (previous) => ({\n  prefix: previous.prefix === 'Hello' ? '你好' : 'Hello'\n}))\n\nconst current = host.getCurrentView()\nconst prefix = current.config.get('greeting.prefix')"
+                code: "type IConfigView = {\n  config: {\n    update(name: 'greeting', change: (previous: { prefix: string }) => { prefix: string }): Promise<void>\n    get(path: 'greeting.prefix'): string\n  }\n}\ntype IConfigHost = {\n  use(plugin: { name: 'greeting' }): Promise<IConfigView>\n  getCurrentView(): IConfigView\n}\n\nexport async function switchGreetingLanguage(host: IConfigHost, greetingPlugin: { name: 'greeting' }) {\n  const installed = await host.use(greetingPlugin)\n  await installed.config.update('greeting', (previous) => ({\n    prefix: previous.prefix === 'Hello' ? '你好' : 'Hello'\n  }))\n\n  // update 成功后重新读取当前 view，拿到已经提交的新配置。\n  const current = host.getCurrentView()\n  return current.config.get('greeting.prefix')\n}"
               },
               {
                 type: 'list',
@@ -19149,7 +19264,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const view = await host.use([databasePlugin, repositoryPlugin])\nconst repository = view.shared.get('repository')\nawait repository.findById('42')"
+                code: "type IRepository = { findById(id: string): Promise<unknown> }\ntype ISharedView = {\n  shared: { get(name: 'repository'): IRepository }\n}\ntype ISharedHost = {\n  use(plugins: Array<{ name: string }>): Promise<ISharedView>\n}\n\nexport async function loadOrder(host: ISharedHost, databasePlugin: { name: string }, repositoryPlugin: { name: string }) {\n  // 先安装 provider，再由 consumer 暴露 repository shared capability。\n  const view = await host.use([databasePlugin, repositoryPlugin])\n  const repository = view.shared.get('repository')\n  return repository.findById('42')\n}"
               }
             ]
           }
@@ -19172,7 +19287,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const installed = await host.use(greetingPlugin)\n\nawait installed.config.update('greeting', (previous) => ({\n  prefix: previous.prefix === 'Hello' ? '你好' : 'Hello'\n}))\n\nconst current = host.getCurrentView()\nconst prefix = current.config.get('greeting.prefix')"
+                code: "type IConfigView = {\n  config: {\n    update(name: 'greeting', change: (previous: { prefix: string }) => { prefix: string }): Promise<void>\n    get(path: 'greeting.prefix'): string\n  }\n}\ntype IConfigHost = {\n  use(plugin: { name: 'greeting' }): Promise<IConfigView>\n  getCurrentView(): IConfigView\n}\n\nexport async function switchGreetingLanguage(host: IConfigHost, greetingPlugin: { name: 'greeting' }) {\n  const installed = await host.use(greetingPlugin)\n  await installed.config.update('greeting', (previous) => ({\n    prefix: previous.prefix === 'Hello' ? '你好' : 'Hello'\n  }))\n\n  // Re-read the current view after commit so the caller observes the new snapshot.\n  const current = host.getCurrentView()\n  return current.config.get('greeting.prefix')\n}"
               },
               {
                 type: 'list',
@@ -19196,7 +19311,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const view = await host.use([databasePlugin, repositoryPlugin])\nconst repository = view.shared.get('repository')\nawait repository.findById('42')"
+                code: "type IRepository = { findById(id: string): Promise<unknown> }\ntype ISharedView = {\n  shared: { get(name: 'repository'): IRepository }\n}\ntype ISharedHost = {\n  use(plugins: Array<{ name: string }>): Promise<ISharedView>\n}\n\nexport async function loadOrder(host: ISharedHost, databasePlugin: { name: string }, repositoryPlugin: { name: string }) {\n  // Install the provider before the consumer; the view then exposes its shared repository capability.\n  const view = await host.use([databasePlugin, repositoryPlugin])\n  const repository = view.shared.get('repository')\n  return repository.findById('42')\n}"
               }
             ]
           }
@@ -19356,7 +19471,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "await view.unUse('feature') // consumer first\nconst result = await host.view().unUse('database') // provider last\n\nif (!result.cleanupComplete && result.physicalCompletion) {\n  await result.physicalCompletion\n}\nfor (const error of result.cleanupErrors) diagnostics.report(error)"
+                code: "type ICleanupView = { unUse(name: string): Promise<{ cleanupComplete: boolean; cleanupErrors: unknown[]; physicalCompletion?: Promise<void> }> }\nconst diagnostics = { report: (error: unknown) => console.error(error) }\n\nexport async function removeInDependencyOrder(view: ICleanupView, host: { view(): ICleanupView }) {\n  await view.unUse('feature') // consumer first\n  const result = await host.view().unUse('database') // provider last\n\n  if (!result.cleanupComplete && result.physicalCompletion) {\n    await result.physicalCompletion\n  }\n  for (const error of result.cleanupErrors) diagnostics.report(error)\n}"
               },
               {
                 type: 'list',
@@ -19397,7 +19512,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "await view.unUse('feature') // consumer first\nconst result = await host.view().unUse('database') // provider last\n\nif (!result.cleanupComplete && result.physicalCompletion) {\n  await result.physicalCompletion\n}\nfor (const error of result.cleanupErrors) diagnostics.report(error)"
+                code: "type ICleanupView = { unUse(name: string): Promise<{ cleanupComplete: boolean; cleanupErrors: unknown[]; physicalCompletion?: Promise<void> }> }\nconst diagnostics = { report: (error: unknown) => console.error(error) }\n\nexport async function removeInDependencyOrder(view: ICleanupView, host: { view(): ICleanupView }) {\n  await view.unUse('feature') // consumer first\n  const result = await host.view().unUse('database') // provider last\n\n  if (!result.cleanupComplete && result.physicalCompletion) {\n    await result.physicalCompletion\n  }\n  for (const error of result.cleanupErrors) diagnostics.report(error)\n}"
               },
               {
                 type: 'list',
@@ -20166,7 +20281,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nawait runAsyncMiddleware(\n  [\n    async (request, next) => {\n      const startedAt = performance.now()\n      try {\n        await next({ ...request, authenticated: true })\n      } finally {\n        metrics.observe(performance.now() - startedAt)\n      }\n    },\n    async (request, next) => {\n      if (!request.authenticated) return\n      await next(request)\n    }\n  ],\n  incomingRequest,\n  async (request) => sendResponse(await handleRequest(request)),\n  { onViolation: (violation) => diagnostics.report(violation) }\n)"
+                code: "import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\ntype IRequest = { path: string; authenticated?: boolean }\nconst incomingRequest: IRequest = { path: '/orders' }\nconst metrics = { observe: (milliseconds: number) => console.log('stage ms:', milliseconds) }\nconst diagnostics = { report: (violation: unknown) => console.error('middleware violation:', violation) }\nconst handleRequest = async (request: IRequest) => ({ status: 200, body: request.path })\nconst sendResponse = async (response: { status: number; body: string }) => console.log(response)\n\nawait runAsyncMiddleware(\n  [\n    async (request: IRequest, next) => {\n      const startedAt = performance.now()\n      try {\n        await next({ ...request, authenticated: true })\n      } finally {\n        metrics.observe(performance.now() - startedAt)\n      }\n    },\n    async (request: IRequest, next) => {\n      if (!request.authenticated) return\n      await next(request)\n    }\n  ],\n  incomingRequest,\n  async (request: IRequest) => sendResponse(await handleRequest(request)),\n  { onViolation: (violation) => diagnostics.report(violation) }\n)"
               },
               {
                 type: 'list',
@@ -20202,7 +20317,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nawait runAsyncMiddleware(\n  [\n    async (request, next) => {\n      const startedAt = performance.now()\n      try {\n        await next({ ...request, authenticated: true })\n      } finally {\n        metrics.observe(performance.now() - startedAt)\n      }\n    },\n    async (request, next) => {\n      if (!request.authenticated) return\n      await next(request)\n    }\n  ],\n  incomingRequest,\n  async (request) => sendResponse(await handleRequest(request)),\n  { onViolation: (violation) => diagnostics.report(violation) }\n)"
+                code: "import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\ntype IRequest = { path: string; authenticated?: boolean }\nconst incomingRequest: IRequest = { path: '/orders' }\nconst metrics = { observe: (milliseconds: number) => console.log('stage ms:', milliseconds) }\nconst diagnostics = { report: (violation: unknown) => console.error('middleware violation:', violation) }\nconst handleRequest = async (request: IRequest) => ({ status: 200, body: request.path })\nconst sendResponse = async (response: { status: number; body: string }) => console.log(response)\n\nawait runAsyncMiddleware(\n  [\n    async (request: IRequest, next) => {\n      const startedAt = performance.now()\n      try {\n        await next({ ...request, authenticated: true })\n      } finally {\n        metrics.observe(performance.now() - startedAt)\n      }\n    },\n    async (request: IRequest, next) => {\n      if (!request.authenticated) return\n      await next(request)\n    }\n  ],\n  incomingRequest,\n  async (request: IRequest) => sendResponse(await handleRequest(request)),\n  { onViolation: (violation) => diagnostics.report(violation) }\n)"
               },
               {
                 type: 'list',
@@ -20296,7 +20411,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const normalized = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report(violation)\n)\n\nawait runAsyncMiddleware([normalized], input, save, {\n  onViolation: (violation) => diagnostics.report(violation)\n})'
+                code: "import { adaptSyncStageToAsync, runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (violation: unknown) => console.error(violation) }\nconst input = '  customer-42  '\nconst save = async (value: string) => console.log('saved:', value)\nconst normalized = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report(violation)\n)\n\nawait runAsyncMiddleware([normalized], input, save, {\n  onViolation: (violation) => diagnostics.report(violation)\n})"
               }
             ]
           }
@@ -20383,7 +20498,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const normalized = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report(violation)\n)\n\nawait runAsyncMiddleware([normalized], input, save, {\n  onViolation: (violation) => diagnostics.report(violation)\n})'
+                code: "import { adaptSyncStageToAsync, runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (violation: unknown) => console.error(violation) }\nconst input = '  customer-42  '\nconst save = async (value: string) => console.log('saved:', value)\nconst normalized = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report(violation)\n)\n\nawait runAsyncMiddleware([normalized], input, save, {\n  onViolation: (violation) => diagnostics.report(violation)\n})"
               }
             ]
           }
@@ -20850,7 +20965,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const products = new Resource(fetchProducts, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true,\n  keepAlive: false\n})\n\nconst state = products.state\nif (state.status === 'success') {\n  renderProducts(state.data, { refreshing: products.refreshing })\n}\n\nawait products.invalidate() // mutation 后立即重新验证"
+                code: "import { Resource } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IProduct = { id: string; name: string }\nconst runtime = createRuntime()\nconst fetchProducts = async (): Promise<IProduct[]> => {\n  const response = await fetch('/api/products')\n  return response.json() as Promise<IProduct[]>\n}\nconst renderProducts = (items: IProduct[], options: { refreshing: boolean }) =>\n  console.log(items, options.refreshing)\n\nconst products = new Resource(fetchProducts, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true,\n  keepAlive: false\n})\n\nconst state = products.state\nif (state.status === 'success') {\n  renderProducts(state.data, { refreshing: products.refreshing })\n}\n\nawait products.invalidate() // mutation 后立即重新验证"
               }
             ]
           },
@@ -20899,7 +21014,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const products = new Resource(fetchProducts, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true,\n  keepAlive: false\n})\n\nconst state = products.state\nif (state.status === 'success') {\n  renderProducts(state.data, { refreshing: products.refreshing })\n}\n\nawait products.invalidate() // revalidate after a mutation"
+                code: "import { Resource } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IProduct = { id: string; name: string }\nconst runtime = createRuntime()\nconst fetchProducts = async (): Promise<IProduct[]> => {\n  const response = await fetch('/api/products')\n  return response.json() as Promise<IProduct[]>\n}\nconst renderProducts = (items: IProduct[], options: { refreshing: boolean }) =>\n  console.log(items, options.refreshing)\n\nconst products = new Resource(fetchProducts, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true,\n  keepAlive: false\n})\n\nconst state = products.state\nif (state.status === 'success') {\n  renderProducts(state.data, { refreshing: products.refreshing })\n}\n\nawait products.invalidate() // revalidate after a mutation"
               }
             ]
           },
@@ -20955,7 +21070,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: '// 服务端：等待成功后只传 JSON-safe snapshot\nawait serverResource.promise\nconst snapshot = serverResource.dehydrate()\nconst payload = JSON.stringify(snapshot)\n\n// 客户端：用 snapshot 构造，fresh 时不会重复请求\nconst initialSnapshot = JSON.parse(payload) as IResourceCacheSnapshot<IUser>\nconst clientResource = new Resource(fetchUser, runtime, {\n  initialSnapshot,\n  ttl: 30_000\n})'
+                code: "import { Resource, type IResourceCacheSnapshot } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IUser = { id: string; name: string }\nconst runtime = createRuntime()\nconst fetchUser = async (): Promise<IUser> => {\n  const response = await fetch('/api/user/current')\n  return response.json() as Promise<IUser>\n}\n\n// 服务端：请求成功后只传 JSON-safe snapshot。\nconst serverResource = new Resource(fetchUser, runtime, { ttl: 30_000 })\nawait serverResource.promise\nconst snapshot = serverResource.dehydrate()\nconst payload = JSON.stringify(snapshot)\n\n// 客户端：用 snapshot 构造，fresh 时不会重复请求。\nconst initialSnapshot = JSON.parse(payload) as IResourceCacheSnapshot<IUser>\nconst clientResource = new Resource(fetchUser, runtime, {\n  initialSnapshot,\n  ttl: 30_000\n})\nconsole.log(await clientResource.promise)"
               },
               {
                 type: 'list',
@@ -21008,7 +21123,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: '// Server: wait for success and transfer only a JSON-safe snapshot\nawait serverResource.promise\nconst snapshot = serverResource.dehydrate()\nconst payload = JSON.stringify(snapshot)\n\n// Client: construct from the snapshot; a fresh value avoids a duplicate request\nconst initialSnapshot = JSON.parse(payload) as IResourceCacheSnapshot<IUser>\nconst clientResource = new Resource(fetchUser, runtime, {\n  initialSnapshot,\n  ttl: 30_000\n})'
+                code: "import { Resource, type IResourceCacheSnapshot } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IUser = { id: string; name: string }\nconst runtime = createRuntime()\nconst fetchUser = async (): Promise<IUser> => {\n  const response = await fetch('/api/user/current')\n  return response.json() as Promise<IUser>\n}\n\n// Server: wait for success and transfer only a JSON-safe snapshot.\nconst serverResource = new Resource(fetchUser, runtime, { ttl: 30_000 })\nawait serverResource.promise\nconst snapshot = serverResource.dehydrate()\nconst payload = JSON.stringify(snapshot)\n\n// Client: construct from the snapshot; a fresh value avoids a duplicate request.\nconst initialSnapshot = JSON.parse(payload) as IResourceCacheSnapshot<IUser>\nconst clientResource = new Resource(fetchUser, runtime, {\n  initialSnapshot,\n  ttl: 30_000\n})\nconsole.log(await clientResource.promise)"
               },
               {
                 type: 'list',
@@ -21043,7 +21158,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const resource = new Resource(fetchReport, runtime, {\n  retry: (failureCount, error) =>\n    failureCount < 4 && isTransientNetworkFailure(error),\n  retryDelay: (failureCount) => Math.min(250 * 2 ** (failureCount - 1), 5_000),\n  scheduler\n})\n\nconst pending = resource.refetch()\nresource.cancel()\nawait pending.catch((error) => {\n  if (error instanceof DOMException && error.name === 'AbortError') return\n  throw error\n})"
+                code: "import { Resource } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IReport = { id: string; total: number }\nconst runtime = createRuntime()\nconst fetchReport = async (): Promise<IReport> => {\n  const response = await fetch('/api/report')\n  return response.json() as Promise<IReport>\n}\nconst isTransientNetworkFailure = (error: unknown) => error instanceof TypeError\n\nconst resource = new Resource(fetchReport, runtime, {\n  retry: (failureCount, error) =>\n    failureCount < 4 && isTransientNetworkFailure(error),\n  retryDelay: (failureCount) => Math.min(250 * 2 ** (failureCount - 1), 5_000)\n})\n\nconst pending = resource.refetch()\nresource.cancel()\nawait pending.catch((error) => {\n  if (error instanceof DOMException && error.name === 'AbortError') return\n  throw error\n})\nresource.dispose()"
               },
               {
                 type: 'list',
@@ -21086,7 +21201,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const resource = new Resource(fetchReport, runtime, {\n  retry: (failureCount, error) =>\n    failureCount < 4 && isTransientNetworkFailure(error),\n  retryDelay: (failureCount) => Math.min(250 * 2 ** (failureCount - 1), 5_000),\n  scheduler\n})\n\nconst pending = resource.refetch()\nresource.cancel()\nawait pending.catch((error) => {\n  if (error instanceof DOMException && error.name === 'AbortError') return\n  throw error\n})"
+                code: "import { Resource } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IReport = { id: string; total: number }\nconst runtime = createRuntime()\nconst fetchReport = async (): Promise<IReport> => {\n  const response = await fetch('/api/report')\n  return response.json() as Promise<IReport>\n}\nconst isTransientNetworkFailure = (error: unknown) => error instanceof TypeError\n\nconst resource = new Resource(fetchReport, runtime, {\n  retry: (failureCount, error) =>\n    failureCount < 4 && isTransientNetworkFailure(error),\n  retryDelay: (failureCount) => Math.min(250 * 2 ** (failureCount - 1), 5_000)\n})\n\nconst pending = resource.refetch()\nresource.cancel()\nawait pending.catch((error) => {\n  if (error instanceof DOMException && error.name === 'AbortError') return\n  throw error\n})\nresource.dispose()"
               },
               {
                 type: 'list',
@@ -21708,7 +21823,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const saved = createEventChannel<IUserSaved>({ style: 'on-emit' })\nconst subscription = saved.on(({ value }) => audit(value))\n\nsaved.emit({ id: 'user-42', revision: 3 })\nsubscription.off()\n\n// Canonical methods remain available on the same Channel.\nconst second = saved.subscribe(({ value }) => audit(value))\nsaved.publish({ id: 'user-43', revision: 1 })\nsecond.unsubscribe()"
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IUserSaved = { id: string; revision: number }\nconst audit = (event: IUserSaved) => console.log(event.id, event.revision)\nconst saved = createEventChannel<IUserSaved>({ style: 'on-emit' })\nconst subscription = saved.on(({ value }) => audit(value))\n\nsaved.emit({ id: 'user-42', revision: 3 })\nsubscription.off()\n\n// Canonical methods remain available on the same Channel.\nconst second = saved.subscribe(({ value }) => audit(value))\nsaved.publish({ id: 'user-43', revision: 1 })\nsecond.unsubscribe()"
               },
               {
                 type: 'paragraph',
@@ -21789,7 +21904,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "const saved = createEventChannel<IUserSaved>({ style: 'on-emit' })\nconst subscription = saved.on(({ value }) => audit(value))\n\nsaved.emit({ id: 'user-42', revision: 3 })\nsubscription.off()\n\n// Canonical methods remain available on the same Channel.\nconst second = saved.subscribe(({ value }) => audit(value))\nsaved.publish({ id: 'user-43', revision: 1 })\nsecond.unsubscribe()"
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IUserSaved = { id: string; revision: number }\nconst audit = (event: IUserSaved) => console.log(event.id, event.revision)\nconst saved = createEventChannel<IUserSaved>({ style: 'on-emit' })\nconst subscription = saved.on(({ value }) => audit(value))\n\nsaved.emit({ id: 'user-42', revision: 3 })\nsubscription.off()\n\n// Canonical methods remain available on the same Channel.\nconst second = saved.subscribe(({ value }) => audit(value))\nsaved.publish({ id: 'user-43', revision: 1 })\nsecond.unsubscribe()"
               },
               {
                 type: 'paragraph',
@@ -22956,7 +23071,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createErrorCollector } from '@migaia/lifecycle/errors'\n\nconst errors = createErrorCollector('collect', undefined)\n\nfor (const item of resources) {\n  try {\n    await item.dispose()\n  } catch (error) {\n    errors.add(item.id, error)\n  }\n}\n\nconst failures = errors.finalize('resource disposal failed')"
+                code: "import { createErrorCollector } from '@migaia/lifecycle/errors'\n\ntype IResource = { id: string; dispose(): Promise<void> }\nconst resources: IResource[] = [\n  { id: 'cache', dispose: async () => {} },\n  { id: 'transport', dispose: async () => {} }\n]\nconst errors = createErrorCollector('collect', undefined)\n\nfor (const item of resources) {\n  try {\n    await item.dispose()\n  } catch (error) {\n    errors.add(item.id, error)\n  }\n}\n\nconst failures = errors.finalize('resource disposal failed')\nconsole.log(failures)"
               }
             ]
           },
@@ -23021,7 +23136,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createErrorCollector } from '@migaia/lifecycle/errors'\n\nconst errors = createErrorCollector('collect', undefined)\n\nfor (const item of resources) {\n  try {\n    await item.dispose()\n  } catch (error) {\n    errors.add(item.id, error)\n  }\n}\n\nconst failures = errors.finalize('resource disposal failed')"
+                code: "import { createErrorCollector } from '@migaia/lifecycle/errors'\n\ntype IResource = { id: string; dispose(): Promise<void> }\nconst resources: IResource[] = [\n  { id: 'cache', dispose: async () => {} },\n  { id: 'transport', dispose: async () => {} }\n]\nconst errors = createErrorCollector('collect', undefined)\n\nfor (const item of resources) {\n  try {\n    await item.dispose()\n  } catch (error) {\n    errors.add(item.id, error)\n  }\n}\n\nconst failures = errors.finalize('resource disposal failed')\nconsole.log(failures)"
               }
             ]
           },
@@ -23688,7 +23803,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const deadlineAt = scheduler.now() + 500\n\nawait registry.dispose({ deadlineAt }).catch((error) => {\n  reportShutdownFailure(error)\n  throw error\n})'
+                code: "type IDeadlineScheduler = { now(): number }\ntype IRegistry = { dispose(options: { deadlineAt: number }): Promise<void> }\n\nconst reportShutdownFailure = (error: unknown) => console.error('shutdown failed', error)\nexport async function disposeWithinDeadline(scheduler: IDeadlineScheduler, registry: IRegistry) {\n  const deadlineAt = scheduler.now() + 500\n\n  await registry.dispose({ deadlineAt }).catch((error) => {\n    reportShutdownFailure(error)\n    throw error\n  })\n}"
               }
             ]
           },
@@ -23753,7 +23868,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'const deadlineAt = scheduler.now() + 500\n\nawait registry.dispose({ deadlineAt }).catch((error) => {\n  reportShutdownFailure(error)\n  throw error\n})'
+                code: "type IDeadlineScheduler = { now(): number }\ntype IRegistry = { dispose(options: { deadlineAt: number }): Promise<void> }\n\nconst reportShutdownFailure = (error: unknown) => console.error('shutdown failed', error)\nexport async function disposeWithinDeadline(scheduler: IDeadlineScheduler, registry: IRegistry) {\n  const deadlineAt = scheduler.now() + 500\n\n  await registry.dispose({ deadlineAt }).catch((error) => {\n    reportShutdownFailure(error)\n    throw error\n  })\n}"
               }
             ]
           },
@@ -24613,6 +24728,89 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   }
 }
 
+/** Builds one independent real-world page from the shared Contract transport examples. */
+function findRpcScenarioJourney(topic: string, locale: ILocale): IGuideJourney | undefined {
+  const scenarios: Readonly<Record<string, { readonly blockIndex: number; readonly heading: [string, string]; readonly intro: [string, string]; readonly title: [string, string] }>> = {
+    fetch: {
+      blockIndex: 1,
+      heading: ['fetch：一次请求与一次响应', 'fetch: one request and one response'],
+      intro: ['这里不是说 HTTP 接口普遍必须返回 descriptor。descriptor 是本案例自定义的 RPC envelope 元数据：请求带上它，服务端校验后在 response 中回传同一个 descriptor，调用方才能确认响应属于哪个契约和版本；普通 REST 接口可以只返回业务数据。这种 RPC 形态仍然容易接入网关、缓存和日志系统。', 'This does not mean every HTTP API must return a descriptor. The descriptor is RPC envelope metadata defined by this example: the request carries it, the server echoes it in the response, and the caller can confirm which contract and version produced the response. Ordinary REST APIs can return business data only. This RPC shape remains friendly to gateways, caching, and request logs.'],
+      title: ['用 fetch 把 Contract 接到 HTTP 请求', 'Bind the Contract to an HTTP request with fetch']
+    },
+    websocket: {
+      blockIndex: 2,
+      heading: ['WebSocket：长连接上的双向 RPC', 'WebSocket: bidirectional RPC over a long-lived connection'],
+      intro: ['客户端先建立长连接，再发送带 requestId 的 Contract 请求。服务端可以复用连接返回响应，也可以主动推送事件；客户端必须按 requestId 匹配响应，并在断线、超时和关闭时清理 pending 请求。', 'The client opens a long-lived connection and sends a Contract request with a requestId. The server can reuse it for responses and server-initiated events; the client must match responses by requestId and clean up pending requests on disconnect, timeout, and close.'],
+      title: ['用 WebSocket 承载双向 RPC', 'Carry bidirectional RPC over WebSocket']
+    },
+    sse: {
+      blockIndex: 3,
+      heading: ['SSE：HTTP 启动、服务端持续推送', 'SSE: start over HTTP, then stream server updates'],
+      intro: ['SSE 只负责服务端到客户端的持续推送，不能替代上行请求。先用 fetch 提交任务，再用 requestId 建立 EventSource；每个事件都要验证 requestId、descriptor 和 version，页面卸载或任务完成时关闭连接。', 'SSE only streams server-to-client updates; it does not replace the upstream request. Start the work with fetch, open EventSource with the requestId, validate requestId, descriptor, and version for every event, and close the stream on page unload or completion.'],
+      title: ['用 SSE 推送 RPC 结果更新', 'Stream RPC result updates with SSE']
+    },
+    process: {
+      blockIndex: 4,
+      heading: ['Node 进程 IPC：父子进程共享 Contract', 'Node process IPC: share the Contract across parent and child'],
+      intro: ['父进程和子进程分别加载同一份 contract.ts。父进程通过 process.send 发送请求，子进程先校验 descriptor、version 和 input，再调用本地业务并回传 response；Contract 统一消息形状，但不负责启动进程、鉴权或重启策略。', 'The parent and child load the same contract.ts. The parent sends with process.send; the child validates descriptor, version, and input before running local business code and returning a response. The Contract stabilizes the message shape but does not own process startup, authentication, or restart policy.'],
+      title: ['用 Node 进程 IPC 隔离业务执行', 'Isolate business execution with Node process IPC']
+    }
+  }
+  const scenario = scenarios[topic]
+  const base = guideJourneys['rpc-contract:real-world-bindings']?.[locale]
+  const bindings = base?.document.sections.find((section) => section.id === 'bindings')
+  const code = bindings?.blocks[scenario?.blockIndex]
+  if (!scenario || !base || !bindings || !code || code.type !== 'code') return undefined
+  /** Makes each scenario page runnable on its own instead of hiding business setup in another file. */
+  const standaloneCode = {
+    ...code,
+    code: code.code.replace(
+      /import \{ readOrders, type IReadOrdersRequest, type IReadOrdersResponse \} from '\.\/contract\.js'/g,
+      "import { createDescriptor } from '@migaia/rpc-contract'\n\ntype IReadOrdersRequest = { requestId: string; descriptor: typeof readOrders; input: { customerId: string } }\ntype IReadOrdersResponse = { requestId: string; descriptor: typeof readOrders; output: { id: string; total: number }[] }\nconst readOrders = createDescriptor('read-orders', 1)"
+    )
+  }
+  /** Plain HTTP example makes the contrast with the RPC envelope explicit. */
+  const ordinaryHttpExample = {
+    type: 'code' as const,
+    language: 'ts',
+    code:
+      locale === 'zh'
+        ? "// 普通 REST：服务端查询业务数据，客户端拿到 JSON 后渲染页面\n// server.ts\napp.get('/api/orders', async (request, reply) => {\n  const customerId = String(request.query.customerId)\n  const orders = await orderRepository.findByCustomer(customerId)\n  return reply.send(orders) // response body 是 [{ id, total }]\n})\n\n// browser.ts\nexport async function loadOrders(customerId: string) {\n  const url = `/api/orders?customerId=${encodeURIComponent(customerId)}`\n  const response = await fetch(url)\n  if (!response.ok) throw new Error(`HTTP ${response.status}`)\n  const orders = await response.json() as { id: string; total: number }[]\n  renderOrderList(orders)\n  return orders\n}\n\nawait loadOrders('customer-42') // GET -> 查询 -> JSON -> 页面渲染"
+        : "// Ordinary REST: the server queries business data; the client renders the JSON\n// server.ts\napp.get('/api/orders', async (request, reply) => {\n  const customerId = String(request.query.customerId)\n  const orders = await orderRepository.findByCustomer(customerId)\n  return reply.send(orders) // response body is [{ id, total }]\n})\n\n// browser.ts\nexport async function loadOrders(customerId: string) {\n  const url = `/api/orders?customerId=${encodeURIComponent(customerId)}`\n  const response = await fetch(url)\n  if (!response.ok) throw new Error(`HTTP ${response.status}`)\n  const orders = await response.json() as { id: string; total: number }[]\n  renderOrderList(orders)\n  return orders\n}\n\nawait loadOrders('customer-42') // GET -> query -> JSON -> render"
+  }
+  return {
+    ...base,
+    title: scenario.title[locale === 'zh' ? 0 : 1],
+    lede: scenario.intro[locale === 'zh' ? 0 : 1],
+    document: {
+      sections: [
+        {
+          id: topic,
+          heading: scenario.heading[locale === 'zh' ? 0 : 1],
+          blocks: [
+            { type: 'paragraph', text: scenario.intro[locale === 'zh' ? 0 : 1] },
+            { type: 'paragraph', text: locale === 'zh' ? '注意：@migaia/rpc-contract 提供 createDescriptor、normalizeRpcEnvelope 等通用契约工具；readOrders 是本案例定义的业务 descriptor。为了让本页可以独立运行，下面直接在示例中创建它，不依赖隐藏文件。' : 'Note: @migaia/rpc-contract provides generic contract tools such as createDescriptor and normalizeRpcEnvelope. readOrders is the business descriptor defined by this example; it is created inline so this page runs independently without a hidden file.' },
+            ...(topic === 'fetch'
+              ? [
+                  {
+                    type: 'paragraph' as const,
+                    text:
+                      locale === 'zh'
+                        ? '先看普通接口：如果调用方和服务端已经约定好 URL、HTTP 状态码和 JSON 结构，直接返回业务数据就够了。只有当多个调用方需要共享稳定的 RPC 方法名、版本和 envelope 校验时，才引入下面带 descriptor 的 Contract 方案。'
+                        : 'Start with the ordinary API: when the caller and server already agree on the URL, status code, and JSON shape, returning business data is enough. Introduce the descriptor-based Contract only when several callers need a stable RPC method, version, and envelope validation.',
+                  },
+                  ordinaryHttpExample,
+                ]
+              : []),
+            standaloneCode,
+            { type: 'paragraph', text: locale === 'zh' ? '从普通 REST 演进到 Contract 时，业务查询和页面渲染都可以保留；变化只发生在消息外层：客户端用 @migaia/rpc-contract 的 createDescriptor 标记 read-orders，服务端校验 descriptor 和 version，再把 output 放回响应 envelope。这样同一套业务方法既能接 fetch，也能复用到 WebSocket、SSE 或进程 IPC，而不会让每种通信方式各自维护一套接口约定。' : 'When evolving from ordinary REST to a Contract, the business query and page rendering can stay the same. Only the message boundary changes: the client uses createDescriptor from @migaia/rpc-contract to identify read-orders, the server validates the descriptor and version, and places output back into the response envelope. The same business method can then be reused over fetch, WebSocket, SSE, or process IPC without maintaining separate contracts.' }
+          ]
+        }
+      ]
+    }
+  }
+}
+
 /** Returns an exact task page without silently substituting another topic or language. */
 export function findGuideJourney(
   library: string,
@@ -24620,6 +24818,8 @@ export function findGuideJourney(
   locale: ILocale
 ): IGuideJourney | undefined {
   const normalizedTopic = topic === 'overview' ? 'index' : topic
+  if (library === 'rpc-contract' && ['fetch', 'websocket', 'sse', 'process'].includes(normalizedTopic))
+    return findRpcScenarioJourney(normalizedTopic, locale)
   return guideJourneys[`${library}:${normalizedTopic}`]?.[locale]
 }
 
@@ -24629,10 +24829,17 @@ export function listGuideJourneys(
   locale: ILocale
 ): readonly { readonly title: string; readonly topic: string }[] {
   const prefix = `${library}:`
-  return Object.entries(guideJourneys)
+  const topics = Object.entries(guideJourneys)
     .filter(([key, localized]) => key.startsWith(prefix) && localized[locale])
     .map(([key, localized]) => ({
       title: localized[locale]?.title ?? key.slice(prefix.length),
       topic: key.slice(prefix.length)
     }))
+  if (library === 'rpc-contract') {
+    for (const topic of ['fetch', 'websocket', 'sse', 'process']) {
+      const journey = findRpcScenarioJourney(topic, locale)
+      if (journey) topics.push({ title: journey.title, topic })
+    }
+  }
+  return topics
 }

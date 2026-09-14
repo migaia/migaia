@@ -145,14 +145,19 @@ export const completionApiGuides: Readonly<
 import type { IFeatureCore } from '@migaia/plugin-host'
 import { definePlugin, setupHost } from '@migaia/plugin-host/defined'
 
+const values = [10, 20, 30]
 const metrics = defineFeature((core: IFeatureCore<{ readCount(): number }>) => ({
-  read: () => core.featureExpose.readCount()
+  read: () => core.featureExpose.readCount(),
+  sum: () => values.reduce((total, value) => total + value, 0)
 }))
 
 const counter = definePlugin('counter', (core) => ({
-  featureExpose: () => ({ readCount: () => 1 }),
+  featureExpose: () => ({ readCount: () => values.length }),
   install() {
-    return { readMetric: () => core.features.metrics.read() }
+    return {
+      readMetric: () => core.features.metrics.read(),
+      sumMetric: () => core.features.metrics.sum()
+    }
   }
 }), { metrics })
 
@@ -162,7 +167,7 @@ const host = await setupHost({
   core: () => ({}),
   plugins: [counter] as const
 })
-host.extensions.readMetric()
+console.log(host.extensions.readMetric(), host.extensions.sumMetric())
 await host.dispose()`,
     scenariosEn: [
       'Define a reusable synchronous capability with explicitly declared direct dependencies.',
@@ -180,9 +185,9 @@ await host.dispose()`,
   }),
   'plugin-host:composition:inspectFeatures': guide({
     purposeEn:
-      'Inspects trusted static Feature roots without invoking factories or creating registration state. Use ordered for dependency order and roots for the declared aliases before Plugin installation.',
+      'Inspects trusted static Feature roots without invoking factories or creating registration state. A Feature root is a top-level named entry in the input Feature graph; roots preserves those aliases, while ordered expands the same graph into dependency order before Plugin installation.',
     purposeZh:
-      '检查可信的静态 Feature roots，不调用 factory，也不创建 registration 状态。Plugin 安装前可用 ordered 取得依赖顺序，用 roots 读取声明的别名。',
+      '检查可信的静态 Feature roots，不调用 factory，也不安装 Plugin、启动资源或创建运行中的实例。Feature root 指传入 Feature 依赖图中的顶层命名入口；roots 保留这些入口别名，ordered 则在 Plugin 安装前把同一张图展开为依赖顺序。',
     quickStart: `import { defineFeature } from '@migaia/plugin-host'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 
@@ -193,8 +198,8 @@ const metrics = defineFeature(() => {
 })
 
 const inspection = inspectFeatures({ metrics })
-console.log(inspection.roots.metrics === metrics)
-console.log(inspection.ordered[0] === metrics)
+console.log(inspection.roots.metrics === metrics) // true: roots 保留声明的 metrics 别名
+console.log(inspection.ordered[0] === metrics) // true: ordered 按依赖顺序返回同一个 Feature
 console.log(factoryCalls) // 0: inspection never invokes factories`,
     scenariosEn: [
       'Check a trusted static Feature dependency order before installation.',
@@ -501,7 +506,7 @@ await app.dispose()`
     purposeZh:
       '用稳定的 source 与 code 表示可处理的 Plugin Host 状态或协议失败。原始失败通过 cause 保持可达，不可变结构化诊断放入 detail；输入形状错误仍保持原生 TypeError，因此调用方能区分错误输入与 Host 生命周期失败。',
     quickStart:
-      "import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host/defined'\n\ntry {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed) {\n    reportInstallFailure(error.cause)\n  }\n}",
+      "import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host/defined'\n\nconst reportInstallFailure = (cause: unknown) => console.error('plugin install failed', cause)\nconst host = { use: async (_plugin: unknown) => { throw new PluginHostError(PluginHostErrorCode.pluginInstallFailed, 'plugin install failed', { cause: new Error('backend unavailable') }) } }\nconst plugin = { name: 'analytics' }\n\ntry {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed) {\n    reportInstallFailure(error.cause)\n  }\n}",
     scenariosEn: [
       'A caller can recover, report, or retry based on a stable Plugin Host error code.',
       'Structured detail is needed without parsing the human-readable message.'
@@ -897,7 +902,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       guide({
         purposeEn: `Adapts an existing Plugin Host pipeline stage to the execution shape named by ${name}, while preserving value flow, terminal signals, next-call violations, and thrown error identity.`,
         purposeZh: `把现有${sourceZh}转换为${targetZh}，同时保留 value 流、终止信号、next 调用违规和抛出错误的身份。`,
-        quickStart: `import { ${name} } from '@migaia/plugin-host'\n\nconst adaptedStage = ${name}(stage${needsViolationHandler ? ', (violation) => console.warn(violation)' : ''})\nhost.${installMethod}(adaptedStage)`,
+        quickStart: `import { ${name}, setupHost } from '@migaia/plugin-host'\n\nconst stage = (value: number, next: (value: number) => number) => next(value + 1)\nconst adaptedStage = ${name}(stage${needsViolationHandler ? ', (violation) => console.warn(violation)' : ''})\nconst host = await setupHost({ plugins: [] })\nconst installedHost = host.${installMethod}(adaptedStage)\nconsole.log(installedHost === host) // true\nawait host.dispose()`,
         scenariosEn: [
           'A host selected one pipeline execution mode but an existing stage uses another supported shape.',
           'Migration must preserve the canonical middleware violation policy.'
@@ -923,7 +928,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '使用此前捕获的 receiver 与参数列表调用已准入函数，并保持 receiver 行为、参数顺序、返回值身份和原始抛出错误不变。',
     quickStart:
-      "import { invokeCaptured } from '@migaia/plugin-host'\n\nconst counter = { value: 1, add(step: number) { this.value += step; return this.value } }\nconst result = invokeCaptured<number>(counter.add, counter, [2])",
+      "import { invokeCaptured } from '@migaia/plugin-host'\n\nconst counter = { value: 1, add(step: number) { this.value += step; return this.value } }\nconst result = invokeCaptured<number>(counter.add, counter, [2])\nconsole.log(result, counter.value) // 3 3：receiver 和参数都被保留，调用结果可直接用于后续业务判断。",
     scenariosEn: [
       'A plugin callback was validated and captured before queued execution.',
       'The JavaScript receiver must remain identical without rebinding the public function.'
@@ -944,7 +949,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '根据注册回执，只公开对应且仍然存活的插件扩展，并返回冻结视图。回执未知、已撤销、尚未安装或正在释放时会直接拒绝；调用方拿不到 Host 内部状态，也不会误读其他插件代次。',
     quickStart:
-      "import { createRegistrationView, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\ntry {\n  const view = createRegistrationView(receipt)\n  await view.extensions.search('migaia')\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === PluginHostErrorCode.viewRevoked) {\n    refreshRegistration()\n  }\n}",
+      "import { createRegistrationView, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nexport async function searchRegisteredPlugin(\n  receipt: Parameters<typeof createRegistrationView>[0],\n  refreshRegistration: () => void\n) {\n  try {\n    const view = createRegistrationView(receipt)\n    return await view.extensions.search('migaia')\n  } catch (error) {\n    if (error instanceof PluginHostError && error.code === PluginHostErrorCode.viewRevoked) {\n      refreshRegistration()\n    }\n    throw error\n  }\n}",
     scenariosEn: [
       'A composition layer holds a registration receipt and must expose only that plugin generation’s extensions.',
       'A consumer must fail closed after logical removal instead of retaining stale extension access.'
@@ -968,7 +973,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '把带类型的注册 token 转成该插件精确代次的冻结扩展视图。它是 createRegistrationView 的公开类型安全入口；注册被撤销后会失败，不会继续返回过期扩展。',
     quickStart:
-      "import { createView } from '@migaia/plugin-host/composition'\n\nconst view = createView(searchRegistration)\nconst results = await view.extensions.search('migaia')",
+      "import { createView } from '@migaia/plugin-host/composition'\n\nexport async function searchRegistration(searchRegistration: Parameters<typeof createView>[0]) {\n  const view = createView(searchRegistration)\n  return view.extensions.search('migaia')\n}",
     scenariosEn: [
       'Typed composition code receives a registration token and needs only that plugin’s published extensions.',
       'The view must become unusable as soon as its exact registration is revoked.'
@@ -992,7 +997,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '读取由当前 Plugin Host 模块实例附加的 dispose 来源信息。普通值和其他模块副本创建的值返回 undefined，不会信任仅结构相似的对象。',
     quickStart:
-      "import { readPluginHostDisposalProvenance } from '@migaia/plugin-host/structural'\n\nconst provenance = readPluginHostDisposalProvenance(resource)\nif (provenance) console.log(provenance.kind)",
+      "import { readPluginHostDisposalProvenance } from '@migaia/plugin-host/structural'\n\nexport function describeResourceOwnership(resource: unknown) {\n  const provenance = readPluginHostDisposalProvenance(resource)\n  if (provenance) console.log(provenance.kind)\n  return provenance\n}",
     scenariosEn: [
       'Cleanup diagnostics need to identify which Host node owns a resource.',
       'A test verifies physical cleanup without exposing mutable disposal state.'

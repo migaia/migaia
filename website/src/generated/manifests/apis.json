@@ -53476,7 +53476,7 @@
           "name": "IRpcBinaryFrame",
           "kind": "type",
           "signature": "export type IRpcBinaryFrame = Readonly<{\n  kind: 'rpc.frame.v1';\n  messageId: string;\n  index: number;\n  count: number;\n  length: number;\n  data: Uint8Array;\n}>;",
-          "declarationLine": 99,
+          "declarationLine": 62,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "Stable binary fragment wire shape used by binary transports.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBinaryFrame.",
@@ -53540,7 +53540,7 @@
           "name": "IRpcContractError",
           "kind": "type",
           "signature": "export type IRpcContractError = Error &\n  Readonly<{ source: '@migaia/rpc-contract'; code: IRpcContractErrorCode }>;",
-          "declarationLine": 120,
+          "declarationLine": 83,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "Error shape used by callers that need a module code without replacing native Error.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcContractError.",
@@ -53729,74 +53729,10 @@
           "fragment": "rpc-contract-index--IRpcDescriptor"
         },
         {
-          "name": "IRpcDiscoveryEnvelope",
-          "kind": "type",
-          "signature": "export type IRpcDiscoveryEnvelope = IRpcPortableRecord &\n  Readonly<{\n    kind: 'discovery';\n    id: string;\n    version: string;\n    acceptVersions: readonly string[];\n    data?: IRpcPortableValue;\n  }>;",
-          "declarationLine": 50,
-          "source": "packages/rpc-contract/dist/types.d.ts",
-          "purpose": "IRpcDiscoveryEnvelope is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDiscoveryEnvelope.",
-          "advanced": "No additional advanced behavior is declared for IRpcDiscoveryEnvelope.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRpcDiscoveryEnvelope."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDiscoveryEnvelope.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRpcDiscoveryEnvelope",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRpcDiscoveryEnvelope when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRpcDiscoveryEnvelope does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IRpcDiscoveryEnvelope is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRpcDiscoveryEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRpcDiscoveryEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDiscoveryEnvelope does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDiscoveryEnvelope."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRpcDiscoveryEnvelope."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcDiscoveryEnvelope:export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-contract-index--IRpcDiscoveryEnvelope"
-        },
-        {
           "name": "IRpcEncodedType",
           "kind": "type",
           "signature": "export type IRpcEncodedType = 'unknown' | 'string' | 'uint8array';",
-          "declarationLine": 67,
+          "declarationLine": 30,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "IRpcEncodedType is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEncodedType.",
@@ -53857,74 +53793,10 @@
           "fragment": "rpc-contract-index--IRpcEncodedType"
         },
         {
-          "name": "IRpcEnvelope",
-          "kind": "type",
-          "signature": "export type IRpcEnvelope =\n  | IRpcRequestEnvelope\n  | IRpcResponseSuccess\n  | IRpcResponseFailure<IRpcPortableValue>\n  | IRpcDiscoveryEnvelope\n  | IRpcVariationEnvelope;",
-          "declarationLine": 62,
-          "source": "packages/rpc-contract/dist/types.d.ts",
-          "purpose": "IRpcEnvelope is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEnvelope.",
-          "advanced": "No additional advanced behavior is declared for IRpcEnvelope.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRpcEnvelope."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcEnvelope.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRpcEnvelope",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRpcEnvelope when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRpcEnvelope does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IRpcEnvelope is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRpcEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRpcEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcEnvelope does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEnvelope."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRpcEnvelope."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcEnvelope:export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-contract-index--IRpcEnvelope"
-        },
-        {
           "name": "IRpcFramerOptions",
           "kind": "type",
           "signature": "export type IRpcFramerOptions = Readonly<{\n  chunkBytes?: number;\n  maxMessageBytes?: number;\n  maxChunks?: number;\n  maxBufferedBytes?: number;\n  maxConcurrentMessages?: number;\n  assemblyTimeoutMs?: number;\n  now?: () => number;\n  schedule?: (callback: () => void, delayMs: number) => unknown;\n  cancel?: (handle: unknown) => void;\n}>;",
-          "declarationLine": 108,
+          "declarationLine": 71,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "Resource limits applied before a framer allocates or retains fragment state.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFramerOptions.",
@@ -54180,7 +54052,7 @@
           "name": "IRpcProtocol",
           "kind": "type",
           "signature": "export type IRpcProtocol<\n  TEnvelope extends IRpcPortableValue,\n  TId extends string,\n  TVersion extends number,\n> = IRpcDescriptor<TId, TVersion> &\n  Readonly<{ normalize: (value: unknown) => TEnvelope }>;",
-          "declarationLine": 64,
+          "declarationLine": 27,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "Runtime protocol descriptor that normalizes untrusted semantic input.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcProtocol.",
@@ -54239,198 +54111,6 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-contract-index--IRpcProtocol"
-        },
-        {
-          "name": "IRpcRequestEnvelope",
-          "kind": "type",
-          "signature": "export type IRpcRequestEnvelope = IRpcPortableRecord &\n  Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue }>;",
-          "declarationLine": 26,
-          "source": "packages/rpc-contract/dist/types.d.ts",
-          "purpose": "IRpcRequestEnvelope is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcRequestEnvelope.",
-          "advanced": "No additional advanced behavior is declared for IRpcRequestEnvelope.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRpcRequestEnvelope."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcRequestEnvelope.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRpcRequestEnvelope",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRpcRequestEnvelope when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRpcRequestEnvelope does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IRpcRequestEnvelope is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRpcRequestEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRpcRequestEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcRequestEnvelope does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcRequestEnvelope."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRpcRequestEnvelope."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcRequestEnvelope:export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-contract-index--IRpcRequestEnvelope"
-        },
-        {
-          "name": "IRpcResponseFailure",
-          "kind": "type",
-          "signature": "export type IRpcResponseFailure<TData extends IRpcPortableValue = never> =\n  IRpcPortableRecord &\n    Readonly<{\n      kind: 'response';\n      ok: false;\n      id: string;\n      code: string;\n      message: string;\n      data?: TData;\n      error?: IRpcSerializedError;\n    }>;",
-          "declarationLine": 41,
-          "source": "packages/rpc-contract/dist/types.d.ts",
-          "purpose": "IRpcResponseFailure is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseFailure.",
-          "advanced": "No additional advanced behavior is declared for IRpcResponseFailure.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRpcResponseFailure."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcResponseFailure.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRpcResponseFailure",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRpcResponseFailure when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRpcResponseFailure does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IRpcResponseFailure is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRpcResponseFailure from @migaia/rpc-contract, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRpcResponseFailure when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcResponseFailure does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseFailure."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRpcResponseFailure."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcResponseFailure:export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-contract-index--IRpcResponseFailure"
-        },
-        {
-          "name": "IRpcResponseSuccess",
-          "kind": "type",
-          "signature": "export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> =\n  IRpcPortableRecord &\n    Readonly<{\n      kind: 'response';\n      ok: true;\n      id: string;\n      data: TData;\n      code?: never;\n      message?: never;\n      error?: never;\n    }>;",
-          "declarationLine": 32,
-          "source": "packages/rpc-contract/dist/types.d.ts",
-          "purpose": "IRpcResponseSuccess is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseSuccess.",
-          "advanced": "No additional advanced behavior is declared for IRpcResponseSuccess.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRpcResponseSuccess."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcResponseSuccess.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRpcResponseSuccess",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRpcResponseSuccess when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRpcResponseSuccess does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IRpcResponseSuccess is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRpcResponseSuccess from @migaia/rpc-contract, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRpcResponseSuccess when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcResponseSuccess does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseSuccess."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRpcResponseSuccess."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcResponseSuccess:export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-contract-index--IRpcResponseSuccess"
         },
         {
           "name": "IRpcSerializedError",
@@ -54500,7 +54180,7 @@
           "name": "IRpcStringFrame",
           "kind": "type",
           "signature": "export type IRpcStringFrame = Readonly<{\n  kind: 'rpc.frame.v1';\n  messageId: string;\n  index: number;\n  count: number;\n  length: number;\n  data: string;\n}>;",
-          "declarationLine": 90,
+          "declarationLine": 53,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "Stable string fragment wire shape; `source` is supplied by the transport boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcStringFrame.",
@@ -54561,74 +54241,10 @@
           "fragment": "rpc-contract-index--IRpcStringFrame"
         },
         {
-          "name": "IRpcVariationEnvelope",
-          "kind": "type",
-          "signature": "export type IRpcVariationEnvelope = IRpcPortableRecord &\n  Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue }>;",
-          "declarationLine": 57,
-          "source": "packages/rpc-contract/dist/types.d.ts",
-          "purpose": "IRpcVariationEnvelope is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcVariationEnvelope.",
-          "advanced": "No additional advanced behavior is declared for IRpcVariationEnvelope.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRpcVariationEnvelope."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcVariationEnvelope.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRpcVariationEnvelope",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRpcVariationEnvelope when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRpcVariationEnvelope does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IRpcVariationEnvelope is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRpcVariationEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRpcVariationEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcVariationEnvelope does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcVariationEnvelope."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRpcVariationEnvelope."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcVariationEnvelope:export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-contract-index--IRpcVariationEnvelope"
-        },
-        {
           "name": "normalizePortable",
           "kind": "function",
           "signature": "export declare function normalizePortable(\n  value: unknown,\n  depth?: number,\n  active?: Set<object>,\n): IRpcPortableValue;",
-          "declarationLine": 3,
+          "declarationLine": 6,
           "source": "packages/rpc-contract/dist/normalize.d.ts",
           "purpose": "Validate and snapshot a portable value, reading each ordinary object field once.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizePortable.",
@@ -54727,84 +54343,6 @@
           "fragment": "rpc-contract-index--normalizePortable"
         },
         {
-          "name": "normalizeRpcEnvelope",
-          "kind": "function",
-          "signature": "export declare function normalizeRpcEnvelope(value: unknown): IRpcEnvelope;",
-          "declarationLine": 5,
-          "source": "packages/rpc-contract/dist/normalize.d.ts",
-          "purpose": "Normalize an untrusted semantic envelope with exact discriminator checks.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRpcEnvelope.",
-          "advanced": "No additional advanced behavior is declared for normalizeRpcEnvelope.",
-          "parameters": ["value: unknown"],
-          "parameterDetails": [
-            {
-              "name": "value",
-              "type": "unknown",
-              "optional": false
-            }
-          ],
-          "returns": "IRpcEnvelope",
-          "errors": ["No documented errors are declared for normalizeRpcEnvelope."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizeRpcEnvelope.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "normalizeRpcEnvelope",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function normalizeRpcEnvelope(value: unknown): IRpcEnvelope;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "value",
-                "type": "unknown",
-                "optional": false
-              }
-            ]
-          ],
-          "overloadReturns": ["IRpcEnvelope"],
-          "whenToUse": "Use normalizeRpcEnvelope when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when normalizeRpcEnvelope does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Normalize an untrusted semantic envelope with exact discriminator checks."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import normalizeRpcEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use normalizeRpcEnvelope when its function contract and declared inputs match the result you need. Choose a different public symbol when normalizeRpcEnvelope does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRpcEnvelope."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for normalizeRpcEnvelope."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/normalize.d.ts:normalizeRpcEnvelope:export declare function normalizeRpcEnvelope(value: unknown): IRpcEnvelope;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-contract-index--normalizeRpcEnvelope"
-        },
-        {
           "name": "RpcContractErrorCode",
           "kind": "const",
           "signature": "export declare const RpcContractErrorCode: {\n  /** Invalid descriptor identity or shape; caller must correct the component configuration. */ readonly invalidDescriptor: 'INVALID_DESCRIPTOR';\n  /** Invalid semantic envelope; caller must reject the untrusted message. */ readonly invalidEnvelope: 'INVALID_ENVELOPE';\n  /** Invalid frame grammar; caller must discard the frame sequence. */ readonly invalidFrame: 'INVALID_FRAME';\n  /** Reassembly exceeded a declared message/source/global budget. */ readonly frameLimitExceeded: 'FRAME_LIMIT_EXCEEDED';\n  /** Reassembly expired before all fragments arrived. */ readonly frameAssemblyExpired: 'FRAME_ASSEMBLY_EXPIRED';\n};",
@@ -54867,72 +54405,6 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-contract-index--RpcContractErrorCode"
-        },
-        {
-          "name": "rpcProtocolV1",
-          "kind": "const",
-          "signature": "export declare const rpcProtocolV1: IRpcProtocol<IRpcEnvelope, 'migaia.rpc', 1>;",
-          "declarationLine": 5,
-          "source": "packages/rpc-contract/dist/protocol.d.ts",
-          "purpose": "Canonical V1 semantic protocol descriptor and hostile-safe normalizer.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for rpcProtocolV1.",
-          "advanced": "No additional advanced behavior is declared for rpcProtocolV1.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for rpcProtocolV1."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for rpcProtocolV1.",
-          "examples": [
-            "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'"
-          ],
-          "members": [],
-          "aliasOf": "rpcProtocolV1",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const rpcProtocolV1: IRpcProtocol<IRpcEnvelope, 'migaia.rpc', 1>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use rpcProtocolV1 when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when rpcProtocolV1 does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Canonical V1 semantic protocol descriptor and hostile-safe normalizer."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import rpcProtocolV1 from @migaia/rpc-contract, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use rpcProtocolV1 when its const contract and declared inputs match the result you need. Choose a different public symbol when rpcProtocolV1 does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for rpcProtocolV1."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for rpcProtocolV1."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/protocol.d.ts:rpcProtocolV1:export declare const rpcProtocolV1: IRpcProtocol<IRpcEnvelope, 'migaia.rpc', 1>;",
-          "guidance": [],
-          "usageScore": 14,
-          "configuration": [],
-          "fragment": "rpc-contract-index--rpcProtocolV1"
         },
         {
           "name": "serializeRpcError",
@@ -55039,6 +54511,26 @@
       ],
       "aliases": [
         {
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcDiscoveryEnvelope:export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;",
+          "name": "IRpcDiscoveryEnvelope",
+          "signature": "export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;",
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./v1",
+          "ownerModule": "v1",
+          "ownerFragment": "rpc-contract-v1--IRpcDiscoveryEnvelope"
+        },
+        {
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcEnvelope:export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;",
+          "name": "IRpcEnvelope",
+          "signature": "export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;",
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./v1",
+          "ownerModule": "v1",
+          "ownerFragment": "rpc-contract-v1--IRpcEnvelope"
+        },
+        {
           "identity": "packages/rpc-contract/dist/types.d.ts:IRpcFrameAcceptResult:export type IRpcFrameAcceptResult<TEncoded> = Readonly<{ status: 'pending'; }> | Readonly<{ status: 'complete'; value: TEncoded; }> | Readonly<{ status: 'rejected'; error: Error; }>;",
           "name": "IRpcFrameAcceptResult",
           "signature": "export type IRpcFrameAcceptResult<TEncoded> = Readonly<{ status: 'pending'; }> | Readonly<{ status: 'complete'; value: TEncoded; }> | Readonly<{ status: 'rejected'; error: Error; }>;",
@@ -55067,6 +54559,46 @@
           "ownerExportPath": "./framing",
           "ownerModule": "framing",
           "ownerFragment": "rpc-contract-framing--IRpcFramer"
+        },
+        {
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcRequestEnvelope:export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;",
+          "name": "IRpcRequestEnvelope",
+          "signature": "export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;",
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./v1",
+          "ownerModule": "v1",
+          "ownerFragment": "rpc-contract-v1--IRpcRequestEnvelope"
+        },
+        {
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcResponseFailure:export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;",
+          "name": "IRpcResponseFailure",
+          "signature": "export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;",
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./v1",
+          "ownerModule": "v1",
+          "ownerFragment": "rpc-contract-v1--IRpcResponseFailure"
+        },
+        {
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcResponseSuccess:export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;",
+          "name": "IRpcResponseSuccess",
+          "signature": "export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;",
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./v1",
+          "ownerModule": "v1",
+          "ownerFragment": "rpc-contract-v1--IRpcResponseSuccess"
+        },
+        {
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcVariationEnvelope:export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;",
+          "name": "IRpcVariationEnvelope",
+          "signature": "export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;",
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./v1",
+          "ownerModule": "v1",
+          "ownerFragment": "rpc-contract-v1--IRpcVariationEnvelope"
         }
       ]
     },
@@ -55087,10 +54619,101 @@
       "architecturePath": "/en/architecture/rpc-contract",
       "symbols": [
         {
+          "name": "bindRpcFrameIngress",
+          "kind": "function",
+          "signature": "export declare function bindRpcFrameIngress<TFrame, TEncoded>(\n  accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>,\n  frame?: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[],\n): IRpcBoundFrameIngress<TFrame>;",
+          "declarationLine": 36,
+          "source": "packages/rpc-contract/dist/framing/reassembler.d.ts",
+          "purpose": "Returns preparation only for a module-native accept callable. Custom callables deliberately remain opaque and receive their original frame unchanged.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for bindRpcFrameIngress.",
+          "advanced": "No additional advanced behavior is declared for bindRpcFrameIngress.",
+          "parameters": [
+            "accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>",
+            "frame: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[] (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "accept",
+              "type": "(frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>",
+              "optional": false
+            },
+            {
+              "name": "frame",
+              "type": "(value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcBoundFrameIngress<TFrame>",
+          "errors": ["No documented errors are declared for bindRpcFrameIngress."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for bindRpcFrameIngress.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "bindRpcFrameIngress",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export declare function bindRpcFrameIngress<TFrame, TEncoded>(accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>, frame?: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]): IRpcBoundFrameIngress<TFrame>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "accept",
+                "type": "(frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>",
+                "optional": false
+              },
+              {
+                "name": "frame",
+                "type": "(value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcBoundFrameIngress<TFrame>"],
+          "whenToUse": "Use bindRpcFrameIngress when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when bindRpcFrameIngress does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Returns preparation only for a module-native accept callable. Custom callables deliberately remain opaque and receive their original frame unchanged."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import bindRpcFrameIngress from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use bindRpcFrameIngress when its function contract and declared inputs match the result you need. Choose a different public symbol when bindRpcFrameIngress does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for bindRpcFrameIngress."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for bindRpcFrameIngress."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/reassembler.d.ts:bindRpcFrameIngress:export declare function bindRpcFrameIngress<TFrame, TEncoded>(accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>, frame?: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]): IRpcBoundFrameIngress<TFrame>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--bindRpcFrameIngress"
+        },
+        {
           "name": "createBinaryFramer",
           "kind": "function",
-          "signature": "export declare function createBinaryFramer<\n  const TOptions extends IRpcFramerOptions = IRpcFramerOptions,\n>(\n  options?: TOptions,\n): IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>;",
-          "declarationLine": 5,
+          "signature": "export declare function createBinaryFramer<\n  const TOptions extends IRpcFramerOptions = IRpcFramerOptions,\n>(options?: TOptions): IValidatedFramer<Uint8Array, Uint8Array | IRpcBinaryFrame>;",
+          "declarationLine": 12,
           "source": "packages/rpc-contract/dist/framing/message-framer.d.ts",
           "purpose": "Creates a codec-independent binary framer with strict ordered bounded reassembly.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBinaryFramer.",
@@ -55103,7 +54726,7 @@
               "optional": true
             }
           ],
-          "returns": "IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>",
+          "returns": "IValidatedFramer<Uint8Array, Uint8Array | IRpcBinaryFrame>",
           "errors": ["No documented errors are declared for createBinaryFramer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBinaryFramer.",
           "examples": [],
@@ -55111,7 +54734,7 @@
           "aliasOf": "createBinaryFramer",
           "exportPath": "./framing",
           "overloadSignatures": [
-            "export declare function createBinaryFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>;"
+            "export declare function createBinaryFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IValidatedFramer<Uint8Array, Uint8Array | IRpcBinaryFrame>;"
           ],
           "overloadParameterDetails": [
             [
@@ -55122,7 +54745,7 @@
               }
             ]
           ],
-          "overloadReturns": ["IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>"],
+          "overloadReturns": ["IValidatedFramer<Uint8Array, Uint8Array | IRpcBinaryFrame>"],
           "whenToUse": "Use createBinaryFramer when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createBinaryFramer does not match the required inputs or return contract.",
           "sections": [
@@ -55158,9 +54781,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:createBinaryFramer:export declare function createBinaryFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>;",
+          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:createBinaryFramer:export declare function createBinaryFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IValidatedFramer<Uint8Array, Uint8Array | IRpcBinaryFrame>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-contract-framing--createBinaryFramer"
         },
@@ -55168,7 +54791,7 @@
           "name": "createReassembler",
           "kind": "function",
           "signature": "export declare function createReassembler<\n  TEncoded,\n  TFrame,\n  TId extends string,\n  TVersion extends number,\n>(\n  framer: IRpcFramer<TEncoded, TFrame, TId, TVersion>,\n): IRpcReassembler<TFrame, TEncoded>;",
-          "declarationLine": 8,
+          "declarationLine": 38,
           "source": "packages/rpc-contract/dist/framing/reassembler.d.ts",
           "purpose": "Projects the reassembly methods of a framer without introducing a second state owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createReassembler.",
@@ -55245,8 +54868,8 @@
         {
           "name": "createStringFramer",
           "kind": "function",
-          "signature": "export declare function createStringFramer<\n  const TOptions extends IRpcFramerOptions = IRpcFramerOptions,\n>(options?: TOptions): IRpcFramer<string, string | IRpcStringFrame, 'message', 1>;",
-          "declarationLine": 3,
+          "signature": "export declare function createStringFramer<\n  const TOptions extends IRpcFramerOptions = IRpcFramerOptions,\n>(options?: TOptions): IValidatedFramer<string, string | IRpcStringFrame>;",
+          "declarationLine": 10,
           "source": "packages/rpc-contract/dist/framing/message-framer.d.ts",
           "purpose": "Creates a codec-independent string framer with strict ordered bounded reassembly.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStringFramer.",
@@ -55259,7 +54882,7 @@
               "optional": true
             }
           ],
-          "returns": "IRpcFramer<string, string | IRpcStringFrame, 'message', 1>",
+          "returns": "IValidatedFramer<string, string | IRpcStringFrame>",
           "errors": ["No documented errors are declared for createStringFramer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStringFramer.",
           "examples": [],
@@ -55267,7 +54890,7 @@
           "aliasOf": "createStringFramer",
           "exportPath": "./framing",
           "overloadSignatures": [
-            "export declare function createStringFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<string, string | IRpcStringFrame, 'message', 1>;"
+            "export declare function createStringFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IValidatedFramer<string, string | IRpcStringFrame>;"
           ],
           "overloadParameterDetails": [
             [
@@ -55278,7 +54901,7 @@
               }
             ]
           ],
-          "overloadReturns": ["IRpcFramer<string, string | IRpcStringFrame, 'message', 1>"],
+          "overloadReturns": ["IValidatedFramer<string, string | IRpcStringFrame>"],
           "whenToUse": "Use createStringFramer when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createStringFramer does not match the required inputs or return contract.",
           "sections": [
@@ -55314,17 +54937,81 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:createStringFramer:export declare function createStringFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<string, string | IRpcStringFrame, 'message', 1>;",
+          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:createStringFramer:export declare function createStringFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IValidatedFramer<string, string | IRpcStringFrame>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--createStringFramer"
+        },
+        {
+          "name": "IRpcBoundFrameIngress",
+          "kind": "type",
+          "signature": "export type IRpcBoundFrameIngress<TFrame> = ((\n  frame: TFrame,\n  context: IRpcFrameContext,\n) => IRpcPreparedFrame<TFrame>) & {\n  readonly nativeOutputDomain?: IRpcNativeFrameOutputDomain;\n};",
+          "declarationLine": 27,
+          "source": "packages/rpc-contract/dist/framing/reassembler.d.ts",
+          "purpose": "Preserves ingress preparation while exposing an optional immutable native output fact for the exact registered frame callable. The callable itself remains extensible for existing clients.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBoundFrameIngress.",
+          "advanced": "No additional advanced behavior is declared for IRpcBoundFrameIngress.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcBoundFrameIngress."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcBoundFrameIngress.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcBoundFrameIngress",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export type IRpcBoundFrameIngress<TFrame> = ((frame: TFrame, context: IRpcFrameContext) => IRpcPreparedFrame<TFrame>) & { readonly nativeOutputDomain?: IRpcNativeFrameOutputDomain; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcBoundFrameIngress when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcBoundFrameIngress does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Preserves ingress preparation while exposing an optional immutable native output fact for the exact registered frame callable. The callable itself remains extensible for existing clients."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcBoundFrameIngress from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcBoundFrameIngress when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcBoundFrameIngress does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBoundFrameIngress."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcBoundFrameIngress."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/reassembler.d.ts:IRpcBoundFrameIngress:export type IRpcBoundFrameIngress<TFrame> = ((frame: TFrame, context: IRpcFrameContext) => IRpcPreparedFrame<TFrame>) & { readonly nativeOutputDomain?: IRpcNativeFrameOutputDomain; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "rpc-contract-framing--createStringFramer"
+          "fragment": "rpc-contract-framing--IRpcBoundFrameIngress"
         },
         {
           "name": "IRpcFrameAcceptResult",
           "kind": "type",
           "signature": "export type IRpcFrameAcceptResult<TEncoded> =\n  | Readonly<{ status: 'pending' }>\n  | Readonly<{ status: 'complete'; value: TEncoded }>\n  | Readonly<{ status: 'rejected'; error: Error }>;",
-          "declarationLine": 80,
+          "declarationLine": 43,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "IRpcFrameAcceptResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFrameAcceptResult.",
@@ -55388,7 +55075,7 @@
           "name": "IRpcFrameContext",
           "kind": "type",
           "signature": "export type IRpcFrameContext = Readonly<{ source: string; messageId: string }>;",
-          "declarationLine": 76,
+          "declarationLine": 39,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "IRpcFrameContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFrameContext.",
@@ -55452,7 +55139,7 @@
           "name": "IRpcFramer",
           "kind": "type",
           "signature": "export type IRpcFramer<\n  TEncoded,\n  TFrame,\n  TId extends string,\n  TVersion extends number,\n> = IRpcDescriptor<TId, TVersion> &\n  Readonly<{\n    inputEncodedType: IRpcEncodedType;\n    outputEncodedType: IRpcEncodedType;\n    frame: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[];\n    accept: (\n      frame: TFrame,\n      context: IRpcFrameContext,\n    ) => IRpcFrameAcceptResult<TEncoded>;\n    close: (reason?: unknown) => void;\n  }>;",
-          "declarationLine": 69,
+          "declarationLine": 32,
           "source": "packages/rpc-contract/dist/types.d.ts",
           "purpose": "Generic framing boundary; semantic contracts do not depend on a transport.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFramer.",
@@ -55511,6 +55198,70 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-contract-framing--IRpcFramer"
+        },
+        {
+          "name": "IRpcNativeFrameOutputDomain",
+          "kind": "type",
+          "signature": "export type IRpcNativeFrameOutputDomain = Readonly<{\n  readonly kind: 'carrier-or-fragment';\n  readonly carrierEncodedType: 'string' | 'uint8array';\n}>;",
+          "declarationLine": 19,
+          "source": "packages/rpc-contract/dist/framing/reassembler.d.ts",
+          "purpose": "Describes a module-native framer whose output can be either a legal carrier or a fragment object. Component admission uses this owner-provided fact without invoking framing callables.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcNativeFrameOutputDomain.",
+          "advanced": "No additional advanced behavior is declared for IRpcNativeFrameOutputDomain.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcNativeFrameOutputDomain."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcNativeFrameOutputDomain.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcNativeFrameOutputDomain",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export type IRpcNativeFrameOutputDomain = Readonly<{ readonly kind: 'carrier-or-fragment'; readonly carrierEncodedType: 'string' | 'uint8array'; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcNativeFrameOutputDomain when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcNativeFrameOutputDomain does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Describes a module-native framer whose output can be either a legal carrier or a fragment object. Component admission uses this owner-provided fact without invoking framing callables."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcNativeFrameOutputDomain from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcNativeFrameOutputDomain when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcNativeFrameOutputDomain does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcNativeFrameOutputDomain."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcNativeFrameOutputDomain."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/reassembler.d.ts:IRpcNativeFrameOutputDomain:export type IRpcNativeFrameOutputDomain = Readonly<{ readonly kind: 'carrier-or-fragment'; readonly carrierEncodedType: 'string' | 'uint8array'; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--IRpcNativeFrameOutputDomain"
         },
         {
           "name": "IRpcReassembler",
@@ -55579,8 +55330,8 @@
         {
           "name": "messageFramerV1",
           "kind": "const",
-          "signature": "export declare const messageFramerV1: IRpcFramer<\n  string | Uint8Array,\n  string | Uint8Array,\n  'message',\n  1\n>;",
-          "declarationLine": 7,
+          "signature": "export declare const messageFramerV1: Readonly<{\n  inputEncodedType: 'unknown';\n  outputEncodedType: 'unknown';\n  frame: <T>(value: T, _context: IRpcFrameContext) => readonly T[];\n  accept: <T>(value: T, _context?: IRpcFrameContext) => IRpcFrameAcceptResult<T>;\n  close: (_reason?: unknown) => void;\n  id: 'message';\n  version: 1;\n}>;",
+          "declarationLine": 14,
           "source": "packages/rpc-contract/dist/framing/message-framer.d.ts",
           "purpose": "Canonical V1 whole-frame identity framer; it never fragments or allocates buffers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for messageFramerV1.",
@@ -55591,13 +55342,14 @@
           "errors": ["No documented errors are declared for messageFramerV1."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for messageFramerV1.",
           "examples": [
-            "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'"
+            "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport rpcV1, { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramer } from '@migaia/rpc-contract/framing/v1'",
+            "import rpcV1, { normalizeRpcEnvelope, rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramer } from '@migaia/rpc-contract/framing/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\n\nconst envelope = rpcProtocol.normalize({ kind: 'request', id: '1', method: 'ping', data: null })\nconst sameProtocol = rpcV1.rpcProtocol === rpcProtocol\nconst sameFramer = messageFramer === messageFramerV1\nconst normalized = normalizeRpcEnvelope(envelope)"
           ],
           "members": [],
           "aliasOf": "messageFramerV1",
           "exportPath": "./framing",
           "overloadSignatures": [
-            "export declare const messageFramerV1: IRpcFramer<string | Uint8Array, string | Uint8Array, 'message', 1>;"
+            "export declare const messageFramerV1: Readonly<{ inputEncodedType: \"unknown\"; outputEncodedType: \"unknown\"; frame: <T>(value: T, _context: IRpcFrameContext) => readonly T[]; accept: <T>(value: T, _context?: IRpcFrameContext) => IRpcFrameAcceptResult<T>; close: (_reason?: unknown) => void; id: \"message\"; version: 1; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -55636,11 +55388,500 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:messageFramerV1:export declare const messageFramerV1: IRpcFramer<string | Uint8Array, string | Uint8Array, 'message', 1>;",
+          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:messageFramerV1:export declare const messageFramerV1: Readonly<{ inputEncodedType: \"unknown\"; outputEncodedType: \"unknown\"; frame: <T>(value: T, _context: IRpcFrameContext) => readonly T[]; accept: <T>(value: T, _context?: IRpcFrameContext) => IRpcFrameAcceptResult<T>; close: (_reason?: unknown) => void; id: \"message\"; version: 1; }>;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "rpc-contract-framing--messageFramerV1"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-contract:framing/v1",
+      "library": "rpc-contract",
+      "module": "framing/v1",
+      "exportPath": "./framing/v1",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-contract/getting-started",
+      "architecturePath": "/en/architecture/rpc-contract",
+      "symbols": [
+        {
+          "name": "messageFramer",
+          "kind": "const",
+          "signature": "export declare const messageFramer: Readonly<{\n  inputEncodedType: 'unknown';\n  outputEncodedType: 'unknown';\n  frame: <T>(value: T, _context: IRpcFrameContext) => readonly T[];\n  accept: <T>(value: T, _context?: IRpcFrameContext) => IRpcFrameAcceptResult<T>;\n  close: (_reason?: unknown) => void;\n  id: 'message';\n  version: 1;\n}>;",
+          "declarationLine": 14,
+          "source": "packages/rpc-contract/dist/framing/message-framer.d.ts",
+          "purpose": "Canonical V1 whole-frame identity framer; it never fragments or allocates buffers.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for messageFramer.",
+          "advanced": "No additional advanced behavior is declared for messageFramer.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for messageFramer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for messageFramer.",
+          "examples": [
+            "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport rpcV1, { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramer } from '@migaia/rpc-contract/framing/v1'",
+            "import rpcV1, { normalizeRpcEnvelope, rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramer } from '@migaia/rpc-contract/framing/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\n\nconst envelope = rpcProtocol.normalize({ kind: 'request', id: '1', method: 'ping', data: null })\nconst sameProtocol = rpcV1.rpcProtocol === rpcProtocol\nconst sameFramer = messageFramer === messageFramerV1\nconst normalized = normalizeRpcEnvelope(envelope)"
+          ],
+          "members": [],
+          "aliasOf": "messageFramerV1",
+          "exportPath": "./framing/v1",
+          "overloadSignatures": [
+            "export declare const messageFramer: Readonly<{ inputEncodedType: \"unknown\"; outputEncodedType: \"unknown\"; frame: <T>(value: T, _context: IRpcFrameContext) => readonly T[]; accept: <T>(value: T, _context?: IRpcFrameContext) => IRpcFrameAcceptResult<T>; close: (_reason?: unknown) => void; id: \"message\"; version: 1; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use messageFramer when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when messageFramer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Canonical V1 whole-frame identity framer; it never fragments or allocates buffers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import messageFramer from @migaia/rpc-contract/framing/v1, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use messageFramer when its const contract and declared inputs match the result you need. Choose a different public symbol when messageFramer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for messageFramer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for messageFramer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:messageFramer:export declare const messageFramer: Readonly<{ inputEncodedType: \"unknown\"; outputEncodedType: \"unknown\"; frame: <T>(value: T, _context: IRpcFrameContext) => readonly T[]; accept: <T>(value: T, _context?: IRpcFrameContext) => IRpcFrameAcceptResult<T>; close: (_reason?: unknown) => void; id: \"message\"; version: 1; }>;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "rpc-contract-framing/v1--messageFramer"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-contract:v1",
+      "library": "rpc-contract",
+      "module": "v1",
+      "exportPath": "./v1",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-contract/getting-started",
+      "architecturePath": "/en/architecture/rpc-contract",
+      "symbols": [
+        {
+          "name": "IRpcDiscoveryEnvelope",
+          "kind": "type",
+          "signature": "export type IRpcDiscoveryEnvelope = IRpcPortableRecord &\n  Readonly<{\n    kind: 'discovery';\n    id: string;\n    version: string;\n    acceptVersions: readonly string[];\n    data?: IRpcPortableValue;\n  }>;",
+          "declarationLine": 30,
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "purpose": "Concrete V1 discovery envelope.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDiscoveryEnvelope.",
+          "advanced": "No additional advanced behavior is declared for IRpcDiscoveryEnvelope.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDiscoveryEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDiscoveryEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcDiscoveryEnvelope",
+          "exportPath": "./v1",
+          "overloadSignatures": [
+            "export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDiscoveryEnvelope when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDiscoveryEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Concrete V1 discovery envelope."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDiscoveryEnvelope from @migaia/rpc-contract/v1, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDiscoveryEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDiscoveryEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDiscoveryEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDiscoveryEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcDiscoveryEnvelope:export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-v1--IRpcDiscoveryEnvelope"
+        },
+        {
+          "name": "IRpcEnvelope",
+          "kind": "type",
+          "signature": "export type IRpcEnvelope =\n  | IRpcRequestEnvelope\n  | IRpcResponseSuccess\n  | IRpcResponseFailure<IRpcPortableValue>\n  | IRpcDiscoveryEnvelope\n  | IRpcVariationEnvelope;",
+          "declarationLine": 44,
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "purpose": "Closed V1 semantic-envelope union.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEnvelope.",
+          "advanced": "No additional advanced behavior is declared for IRpcEnvelope.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcEnvelope",
+          "exportPath": "./v1",
+          "overloadSignatures": [
+            "export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcEnvelope when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Closed V1 semantic-envelope union."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcEnvelope from @migaia/rpc-contract/v1, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcEnvelope:export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-v1--IRpcEnvelope"
+        },
+        {
+          "name": "IRpcRequestEnvelope",
+          "kind": "type",
+          "signature": "export type IRpcRequestEnvelope = IRpcPortableRecord &\n  Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue }>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "purpose": "Concrete V1 request envelope owned by the V1 semantic module.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcRequestEnvelope.",
+          "advanced": "No additional advanced behavior is declared for IRpcRequestEnvelope.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcRequestEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcRequestEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcRequestEnvelope",
+          "exportPath": "./v1",
+          "overloadSignatures": [
+            "export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcRequestEnvelope when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcRequestEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Concrete V1 request envelope owned by the V1 semantic module."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcRequestEnvelope from @migaia/rpc-contract/v1, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcRequestEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcRequestEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcRequestEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcRequestEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcRequestEnvelope:export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-v1--IRpcRequestEnvelope"
+        },
+        {
+          "name": "IRpcResponseFailure",
+          "kind": "type",
+          "signature": "export type IRpcResponseFailure<TData extends IRpcPortableValue = never> =\n  IRpcPortableRecord &\n    Readonly<{\n      kind: 'response';\n      ok: false;\n      id: string;\n      code: string;\n      message: string;\n      data?: TData;\n      error?: IRpcSerializedError;\n    }>;",
+          "declarationLine": 20,
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "purpose": "Concrete V1 failed response envelope.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseFailure.",
+          "advanced": "No additional advanced behavior is declared for IRpcResponseFailure.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcResponseFailure."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcResponseFailure.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcResponseFailure",
+          "exportPath": "./v1",
+          "overloadSignatures": [
+            "export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcResponseFailure when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcResponseFailure does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Concrete V1 failed response envelope."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcResponseFailure from @migaia/rpc-contract/v1, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcResponseFailure when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcResponseFailure does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseFailure."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcResponseFailure."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcResponseFailure:export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-v1--IRpcResponseFailure"
+        },
+        {
+          "name": "IRpcResponseSuccess",
+          "kind": "type",
+          "signature": "export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> =\n  IRpcPortableRecord &\n    Readonly<{\n      kind: 'response';\n      ok: true;\n      id: string;\n      data: TData;\n      code?: never;\n      message?: never;\n      error?: never;\n    }>;",
+          "declarationLine": 10,
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "purpose": "Concrete V1 successful response envelope.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseSuccess.",
+          "advanced": "No additional advanced behavior is declared for IRpcResponseSuccess.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcResponseSuccess."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcResponseSuccess.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcResponseSuccess",
+          "exportPath": "./v1",
+          "overloadSignatures": [
+            "export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcResponseSuccess when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcResponseSuccess does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Concrete V1 successful response envelope."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcResponseSuccess from @migaia/rpc-contract/v1, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcResponseSuccess when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcResponseSuccess does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseSuccess."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcResponseSuccess."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcResponseSuccess:export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-v1--IRpcResponseSuccess"
+        },
+        {
+          "name": "IRpcVariationEnvelope",
+          "kind": "type",
+          "signature": "export type IRpcVariationEnvelope = IRpcPortableRecord &\n  Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue }>;",
+          "declarationLine": 38,
+          "source": "packages/rpc-contract/dist/v1/types.d.ts",
+          "purpose": "Concrete V1 variation envelope.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcVariationEnvelope.",
+          "advanced": "No additional advanced behavior is declared for IRpcVariationEnvelope.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcVariationEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcVariationEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcVariationEnvelope",
+          "exportPath": "./v1",
+          "overloadSignatures": [
+            "export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcVariationEnvelope when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcVariationEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Concrete V1 variation envelope."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcVariationEnvelope from @migaia/rpc-contract/v1, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcVariationEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcVariationEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcVariationEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcVariationEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/v1/types.d.ts:IRpcVariationEnvelope:export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-v1--IRpcVariationEnvelope"
         }
       ],
       "aliases": []
@@ -56124,7 +56365,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/format-constants.d.ts:SerializeChunkKind:export declare const SerializeChunkKind: { readonly value: \"value\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };",
           "guidance": [],
-          "usageScore": 62,
+          "usageScore": 68,
           "configuration": [],
           "fragment": "serialize-index--SerializeChunkKind"
         },
@@ -57665,9 +57906,9 @@
       ],
       "aliases": [
         {
-          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
           "name": "identityCodecV1",
-          "signature": "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "signature": "export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
           "source": "packages/serialize/dist/codecs/identity.d.ts",
           "exportPath": "./codec",
           "ownerExportPath": "./codecs/identity",
@@ -57852,12 +58093,77 @@
       "architecturePath": "/en/architecture/serialize",
       "symbols": [
         {
-          "name": "identityCodecV1",
+          "name": "identityCodec",
           "kind": "const",
-          "signature": "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
-          "declarationLine": 3,
+          "signature": "export declare const identityCodec: Readonly<{\n  id: 'identity';\n  version: 1;\n  encodedType: 'unknown';\n  encode: <T>(value: T) => T;\n  decode: <T>(value: T) => T;\n}>;",
+          "declarationLine": 2,
           "source": "packages/serialize/dist/codecs/identity.d.ts",
           "purpose": "Identity codec used by whole-frame transports; it never imports a format runtime.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identityCodec.",
+          "advanced": "No additional advanced behavior is declared for identityCodec.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for identityCodec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for identityCodec.",
+          "examples": [
+            "import { identityCodec } from '@migaia/serialize/codecs/identity/v1';\nimport { identityCodecV1 } from '@migaia/serialize/codec';\n\n// The versioned entry is the modern name; the retained alias is the same object.\nconst sameCodec = identityCodec === identityCodecV1;\nconst literal: { readonly ok: true } = identityCodec.encode({ ok: true } as const);"
+          ],
+          "members": [],
+          "exportPath": "./codecs/identity",
+          "overloadSignatures": [
+            "export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use identityCodec when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when identityCodec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Identity codec used by whole-frame transports; it never imports a format runtime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import identityCodec from @migaia/serialize/codecs/identity, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use identityCodec when its const contract and declared inputs match the result you need. Choose a different public symbol when identityCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identityCodec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for identityCodec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodec:export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
+          "guidance": [],
+          "usageScore": 18,
+          "configuration": [],
+          "fragment": "serialize-codecs/identity--identityCodec"
+        },
+        {
+          "name": "identityCodecV1",
+          "kind": "const",
+          "signature": "export declare const identityCodecV1: Readonly<{\n  id: 'identity';\n  version: 1;\n  encodedType: 'unknown';\n  encode: <T>(value: T) => T;\n  decode: <T>(value: T) => T;\n}>;",
+          "declarationLine": 10,
+          "source": "packages/serialize/dist/codecs/identity.d.ts",
+          "purpose": "Legacy entry retains the exact V1 codec object identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identityCodecV1.",
           "advanced": "No additional advanced behavior is declared for identityCodecV1.",
           "parameters": ["This const declaration has no parameters."],
@@ -57865,11 +58171,13 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for identityCodecV1."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for identityCodecV1.",
-          "examples": [],
+          "examples": [
+            "import { identityCodec } from '@migaia/serialize/codecs/identity/v1';\nimport { identityCodecV1 } from '@migaia/serialize/codec';\n\n// The versioned entry is the modern name; the retained alias is the same object.\nconst sameCodec = identityCodec === identityCodecV1;\nconst literal: { readonly ok: true } = identityCodec.encode({ ok: true } as const);"
+          ],
           "members": [],
           "exportPath": "./codecs/identity",
           "overloadSignatures": [
-            "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;"
+            "export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -57879,7 +58187,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Identity codec used by whole-frame transports; it never imports a format runtime."
+              "content": "Legacy entry retains the exact V1 codec object identity."
             },
             {
               "id": "getting-started",
@@ -57908,14 +58216,43 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "serialize-codecs/identity--identityCodecV1"
         }
       ],
       "aliases": []
+    },
+    {
+      "id": "serialize:codecs/identity/v1",
+      "library": "serialize",
+      "module": "codecs/identity/v1",
+      "exportPath": "./codecs/identity/v1",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/serialize/getting-started",
+      "architecturePath": "/en/architecture/serialize",
+      "symbols": [],
+      "aliases": [
+        {
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodec:export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
+          "name": "identityCodec",
+          "signature": "export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
+          "source": "packages/serialize/dist/codecs/identity.d.ts",
+          "exportPath": "./codecs/identity/v1",
+          "ownerExportPath": "./codecs/identity",
+          "ownerModule": "codecs/identity",
+          "ownerFragment": "serialize-codecs/identity--identityCodec"
+        }
+      ]
     },
     {
       "id": "serialize:codecs/json",
@@ -58254,42 +58591,42 @@
         {
           "name": "defineProtobufCodec",
           "kind": "function",
-          "signature": "export declare function defineProtobufCodec<\n  const TVersion extends number,\n  const TSchemaId extends string,\n  const TSchemaVersion extends number,\n  TValue,\n>(\n  options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>,\n): ICodec<TValue, Uint8Array, 'protobuf', TVersion> &\n  Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion> }>;",
-          "declarationLine": 17,
+          "signature": "export declare function defineProtobufCodec<\n  const TVersion extends number,\n  const TSchemaId extends string,\n  const TSchemaVersion extends number,\n  const TBinding extends DescMessage,\n>(\n  options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>,\n): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> &\n  Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion> }>;",
+          "declarationLine": 15,
           "source": "packages/serialize/dist/codecs/protobuf.d.ts",
           "purpose": "Create a protobuf codec that keeps codec and schema identities independent.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineProtobufCodec.",
           "advanced": "No additional advanced behavior is declared for defineProtobufCodec.",
           "parameters": [
-            "options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>"
+            "options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>"
           ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>",
+              "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>",
               "optional": false
             }
           ],
-          "returns": "ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>",
+          "returns": "ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>",
           "errors": ["No documented errors are declared for defineProtobufCodec."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineProtobufCodec.",
           "examples": [],
           "members": [],
           "exportPath": "./codecs/protobuf",
           "overloadSignatures": [
-            "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, TValue>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>): ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;"
+            "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>",
+                "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>",
                 "optional": false
               }
             ]
           ],
           "overloadReturns": [
-            "ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>"
+            "ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>"
           ],
           "whenToUse": "Use defineProtobufCodec when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when defineProtobufCodec does not match the required inputs or return contract.",
@@ -58326,82 +58663,19 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:defineProtobufCodec:export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, TValue>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>): ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:defineProtobufCodec:export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
           "fragment": "serialize-codecs/protobuf--defineProtobufCodec"
         },
         {
-          "name": "IProtobufBinding",
-          "kind": "type",
-          "signature": "export type IProtobufBinding<TValue> = Readonly<{\n  encode: (value: TValue) => Uint8Array;\n  decode: (value: Uint8Array) => TValue;\n}>;",
-          "declarationLine": 3,
-          "source": "packages/serialize/dist/codecs/protobuf.d.ts",
-          "purpose": "Minimal generated-binding boundary accepted by the Protobuf codec.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufBinding.",
-          "advanced": "No additional advanced behavior is declared for IProtobufBinding.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IProtobufBinding."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProtobufBinding.",
-          "examples": [],
-          "members": [],
-          "exportPath": "./codecs/protobuf",
-          "overloadSignatures": [
-            "export type IProtobufBinding<TValue> = Readonly<{ encode: (value: TValue) => Uint8Array; decode: (value: Uint8Array) => TValue; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IProtobufBinding when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IProtobufBinding does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Minimal generated-binding boundary accepted by the Protobuf codec."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IProtobufBinding from @migaia/serialize/codecs/protobuf, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IProtobufBinding when its type contract and declared inputs match the result you need. Choose a different public symbol when IProtobufBinding does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufBinding."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IProtobufBinding."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufBinding:export type IProtobufBinding<TValue> = Readonly<{ encode: (value: TValue) => Uint8Array; decode: (value: Uint8Array) => TValue; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "serialize-codecs/protobuf--IProtobufBinding"
-        },
-        {
           "name": "IProtobufCodecOptions",
           "kind": "type",
-          "signature": "export type IProtobufCodecOptions<\n  TVersion extends number,\n  TSchemaId extends string,\n  TSchemaVersion extends number,\n  TValue,\n> = Readonly<{\n  version: TVersion;\n  schema: IProtobufSchema<TSchemaId, TSchemaVersion>;\n  binding: IProtobufBinding<TValue>;\n}>;",
-          "declarationLine": 11,
+          "signature": "export type IProtobufCodecOptions<\n  TVersion extends number,\n  TSchemaId extends string,\n  TSchemaVersion extends number,\n  TBinding extends DescMessage,\n> = Readonly<{\n  version: TVersion;\n  schema: IProtobufSchema<TSchemaId, TSchemaVersion>;\n  binding: TBinding;\n}>;",
+          "declarationLine": 9,
           "source": "packages/serialize/dist/codecs/protobuf.d.ts",
-          "purpose": "IProtobufCodecOptions is part of this module's public type contract.",
+          "purpose": "A generated Buf descriptor is the only executable binding accepted by a Protobuf codec.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufCodecOptions.",
           "advanced": "No additional advanced behavior is declared for IProtobufCodecOptions.",
           "parameters": ["This type declaration has no parameters."],
@@ -58413,7 +58687,7 @@
           "members": [],
           "exportPath": "./codecs/protobuf",
           "overloadSignatures": [
-            "export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TValue> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: IProtobufBinding<TValue>; }>;"
+            "export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TBinding extends DescMessage> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: TBinding; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -58423,7 +58697,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IProtobufCodecOptions is part of this module's public type contract."
+              "content": "A generated Buf descriptor is the only executable binding accepted by a Protobuf codec."
             },
             {
               "id": "getting-started",
@@ -58452,7 +58726,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufCodecOptions:export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TValue> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: IProtobufBinding<TValue>; }>;",
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufCodecOptions:export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TBinding extends DescMessage> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: TBinding; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -58462,9 +58736,9 @@
           "name": "IProtobufSchema",
           "kind": "type",
           "signature": "export type IProtobufSchema<TId extends string, TVersion extends number> = Readonly<{\n  id: TId;\n  version: TVersion;\n}>;",
-          "declarationLine": 7,
+          "declarationLine": 4,
           "source": "packages/serialize/dist/codecs/protobuf.d.ts",
-          "purpose": "IProtobufSchema is part of this module's public type contract.",
+          "purpose": "Stable public schema identity remains independent from codec and binding versions.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufSchema.",
           "advanced": "No additional advanced behavior is declared for IProtobufSchema.",
           "parameters": ["This type declaration has no parameters."],
@@ -58486,7 +58760,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IProtobufSchema is part of this module's public type contract."
+              "content": "Stable public schema identity remains independent from codec and binding versions."
             },
             {
               "id": "getting-started",
@@ -58618,7 +58892,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/types.d.ts:assertSerializeType:export declare function assertSerializeType(type: string): void;",
           "guidance": [],
-          "usageScore": 76,
+          "usageScore": 82,
           "configuration": [],
           "fragment": "serialize-core--assertSerializeType"
         },
@@ -58933,7 +59207,7 @@
               ]
             }
           ],
-          "usageScore": 84,
+          "usageScore": 90,
           "configuration": [],
           "fragment": "serialize-core--base64ToBytes"
         },
@@ -59014,7 +59288,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/base64.d.ts:bytesToBase64:export declare function bytesToBase64(bytes: Uint8Array): string;",
           "guidance": [],
-          "usageScore": 80,
+          "usageScore": 86,
           "configuration": [],
           "fragment": "serialize-core--bytesToBase64"
         },
@@ -59319,7 +59593,7 @@
               ]
             }
           ],
-          "usageScore": 90,
+          "usageScore": 96,
           "configuration": [
             {
               "name": "signal",
@@ -60347,7 +60621,7 @@
               ]
             }
           ],
-          "usageScore": 132,
+          "usageScore": 138,
           "configuration": [
             {
               "name": "type",
@@ -62727,7 +63001,7 @@
               ]
             }
           ],
-          "usageScore": 64,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "serialize-core--SERIALIZE_TYPE_PATTERN"
         },
@@ -63149,7 +63423,7 @@
               ]
             }
           ],
-          "usageScore": 266,
+          "usageScore": 272,
           "configuration": [],
           "fragment": "serialize-core--SerializeCodecError"
         },
@@ -63537,7 +63811,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/base64.d.ts:streamBase64Chunks:export declare function streamBase64Chunks(bytes: Uint8Array): Generator<string, void, void>;",
           "guidance": [],
-          "usageScore": 64,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "serialize-core--streamBase64Chunks"
         },
@@ -64030,7 +64304,7 @@
               ]
             }
           ],
-          "usageScore": 148,
+          "usageScore": 154,
           "configuration": [
             {
               "name": "replacer",
@@ -64353,7 +64627,7 @@
               ]
             }
           ],
-          "usageScore": 100,
+          "usageScore": 106,
           "configuration": [],
           "fragment": "serialize-registry--chunkToBytes"
         },
@@ -64624,7 +64898,7 @@
               ]
             }
           ],
-          "usageScore": 96,
+          "usageScore": 102,
           "configuration": [],
           "fragment": "serialize-registry--chunkToText"
         },
@@ -64975,7 +65249,7 @@
               ]
             }
           ],
-          "usageScore": 190,
+          "usageScore": 196,
           "configuration": [
             {
               "name": "scheduler",
@@ -105578,11 +105852,11 @@
           "errors": ["No documented errors are declared for persistCollection."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for persistCollection.",
           "examples": [
-            "import { observableMap } from '@migaia/store-indexed';\nimport { localStorage } from '@migaia/storage-web/local-storage';\nimport { persistCollection } from '@migaia/store-persist/indexed';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, {\n  key: 'cart:v1',\n  storage: localStorage()\n});\n\ncart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）",
-            "import { binaryCodec } from '@migaia/storage-web/serialize';\n\nconst handle = persistCollection(bigDataset, {\n  key: 'big',\n  storage: indexedDb({ dbName: 'app' }),\n  codec: binaryCodec\n});",
-            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
-            "import { observableMap } from '@migaia/store-indexed';\nimport { localStorage } from '@migaia/storage-web/local-storage';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, { key: 'cart:v1', storage: localStorage() });\ncart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写",
-            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
+            "import { observableMap } from '@migaia/store-indexed';\nimport { localStorageHost } from '@migaia/storage-web/local-storage';\nimport { persistCollection } from '@migaia/store-persist/indexed';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, {\n  key: 'cart:v1',\n  storage: localStorageHost()\n});\n\ncart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）",
+            "import { binaryCodec } from '@migaia/storage-web/serialize';\n\nconst handle = persistCollection(bigDataset, {\n  key: 'big',\n  storage: indexedDbHost({ dbName: 'app' }),\n  codec: binaryCodec\n});",
+            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
+            "import { observableMap } from '@migaia/store-indexed';\nimport { localStorageHost } from '@migaia/storage-web/local-storage';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, { key: 'cart:v1', storage: localStorageHost() });\ncart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写",
+            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
           "members": [],
           "aliasOf": "persistCollection",
@@ -105757,9 +106031,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for clearFamily.",
           "examples": [
             "async function logout(userId: string) {\n  await clearFamily(storage, 'sessions'); // 清空全部用户的持久化 session\n  currentSessionHandle?.dispose(); // 清理当前用户还留在内存里的 handle\n}",
-            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
+            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
             "const deletedCount = await clearFamily(storage, 'sessions');",
-            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
+            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
           "members": [],
           "aliasOf": "clearFamily",
@@ -105996,10 +106270,10 @@
           "errors": ["No documented errors are declared for persistKeyed."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for persistKeyed.",
           "examples": [
-            "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\n\ntype Session = { accessToken: string; refreshToken: string };\nconst session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));\nconst storage = indexedDb({ dbName: 'app' });\nconst atomStore = createAtomStore(runtime);\n\n// 每个 session id 首次使用时调用一次\nfunction getSession(id: string) {\n  return persistKeyed(atomStore, session(id), id, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }), // 只存 refreshToken\n    merge: (persisted, current) => ({ ...current, ...persisted }) // 其余字段保留内存值\n  });\n}\n\nconst { value, dispose } = getSession('u1');\n// ... 使用完毕\ndispose();",
-            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
-            "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\n\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nconst atomStore = createAtomStore(runtime);\nconst storage = indexedDb({ dbName: 'app' });\n\nconst { value, dispose } = persistKeyed(atomStore, session('u1'), 'u1', {\n  namespace: 'sessions',\n  storage,\n  partialize: (v) => ({ refreshToken: v.refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n});",
-            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
+            "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\n\ntype Session = { accessToken: string; refreshToken: string };\nconst session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));\nconst storage = indexedDbHost({ dbName: 'app' });\nconst atomStore = createAtomStore(runtime);\n\n// 每个 session id 首次使用时调用一次\nfunction getSession(id: string) {\n  return persistKeyed(atomStore, session(id), id, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }), // 只存 refreshToken\n    merge: (persisted, current) => ({ ...current, ...persisted }) // 其余字段保留内存值\n  });\n}\n\nconst { value, dispose } = getSession('u1');\n// ... 使用完毕\ndispose();",
+            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
+            "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\n\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nconst atomStore = createAtomStore(runtime);\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst { value, dispose } = persistKeyed(atomStore, session('u1'), 'u1', {\n  namespace: 'sessions',\n  storage,\n  partialize: (v) => ({ refreshToken: v.refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n});",
+            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
           "members": [],
           "aliasOf": "persistKeyed",
@@ -106406,10 +106680,10 @@
           "errors": ["No documented errors are declared for persist."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for persist.",
           "examples": [
-            "import { createStore } from '@migaia/store-light';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\n\nconst store = createStore({ theme: 'light', fontSize: 14 });\nconst handle = persist(store, {\n  key: 'settings:v1',\n  storage: indexedDb({ dbName: 'app' }),\n  version: 1,\n  partialize: (state) => ({ theme: state.theme }) // 只存 theme，fontSize 只留内存\n});",
-            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
-            "import { createStore } from '@migaia/store-light';\nimport { memoryStorage } from '@migaia/storage-web/memory';\n\nconst store = createStore({ theme: 'light', fontSize: 14 });\nconst handle = persist(store, {\n  key: 'settings',\n  storage: memoryStorage(), // 生产环境换成 localStorage()/indexedDb()\n  version: 1,\n  debounceMs: 250\n});\n\nawait handle.ready; // 首次 hydrate 完成（失败会 reject）\nstore.theme = 'dark'; // 250ms 后自动防抖写回\nawait handle.flush(); // 需要立即落盘时手动调用\nhandle.dispose(); // 停止订阅、清计时器、abort 在途 I/O",
-            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}",
+            "import { createStore } from '@migaia/store-light';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\n\nconst store = createStore({ theme: 'light', fontSize: 14 });\nconst handle = persist(store, {\n  key: 'settings:v1',\n  storage: indexedDbHost({ dbName: 'app' }),\n  version: 1,\n  partialize: (state) => ({ theme: state.theme }) // 只存 theme，fontSize 只留内存\n});",
+            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
+            "import { createStore } from '@migaia/store-light';\nimport { memoryStorageHost } from '@migaia/storage-web/memory';\n\nconst store = createStore({ theme: 'light', fontSize: 14 });\nconst handle = persist(store, {\n  key: 'settings',\n  storage: memoryStorageHost(), // 生产环境换成 localStorageHost()/indexedDbHost()\n  version: 1,\n  debounceMs: 250\n});\n\nawait handle.ready; // 首次 hydrate 完成（失败会 reject）\nstore.theme = 'dark'; // 250ms 后自动防抖写回\nawait handle.flush(); // 需要立即落盘时手动调用\nhandle.dispose(); // 停止订阅、清计时器、abort 在途 I/O",
+            "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}",
             "const handle = persist(store, {\n  key: 'settings',\n  storage,\n  version: 2,\n  migrate: (persisted, fromVersion) => {\n    if (fromVersion === 1)\n      return { ...persisted, fontSize: (persisted as { size?: number }).size ?? 14 };\n    return persisted;\n  }\n});"
           ],
           "members": [],
