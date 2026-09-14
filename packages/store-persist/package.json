@@ -1,6 +1,6 @@
 {
   "name": "@migaia/store-persist",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Store snapshot persistence and storage adapter protocol.",
   "license": "MIT",
@@ -49,10 +49,10 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/storage-web": "workspace:^",
     "@migaia/store-indexed": "workspace:^",
     "@migaia/store-keyed": "workspace:^",
     "@migaia/store-light": "workspace:^",
-    "@migaia/storage-web": "workspace:^",
     "typescript": "~6.0.2",
     "vitest": "4.1.10"
   },
