@@ -1,6 +1,6 @@
 {
   "name": "@migaia/store-wasm",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Optional WASM-backed fields for Store light.",
   "license": "MIT",
