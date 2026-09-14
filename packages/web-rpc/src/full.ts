@@ -7,6 +7,7 @@ import type { IOutboundSurface } from './features/outbound.js'
 import type { IProviderRegistrationSurface } from './features/provider.js'
 import type { IDiscoverySurface } from './features/discovery.js'
 import type { IControlSurface } from './features/control.js'
+import type { IOneWaySurface } from './features/one-way.js'
 import {
   createFirstPartyRoots,
   type IWebRpcFirstPartyRootName
@@ -86,15 +87,48 @@ function createFullEndpointRuntime<
   >
 >
 function createFullEndpointRuntime(config: IWebRpcFactoryConfig): Promise<object> {
+  return createFullEndpointWithRoots(config, false)
+}
+
+/** Creates the full endpoint preset with the explicit one-way root included. */
+function createFullOneWayEndpointRuntime<
+  TTargetId extends string = string,
+  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
+  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+>(
+  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+    readonly features?: import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>
+  }
+): Promise<
+  IRecursiveProvideSurface<
+    IFullEndpointSurface<
+      TTargetId,
+      IFactoryDiscoveryMode<TMiddlewares>,
+      IFactoryPingCapability<TMiddlewares>,
+      TMiddlewares,
+      TFeatures
+    > &
+      IOneWaySurface
+  >
+>
+function createFullOneWayEndpointRuntime(config: IWebRpcFactoryConfig): Promise<object> {
+  return createFullEndpointWithRoots(config, true)
+}
+
+/** Selects the package-owned roots for the full endpoint presets. */
+function createFullEndpointWithRoots(
+  config: IWebRpcFactoryConfig,
+  includeOneWay: boolean
+): Promise<object> {
+  const roots: IWebRpcFirstPartyRootName[] = [
+    'first-party-provider',
+    'first-party-discovery',
+    'first-party-control'
+  ]
+  if (includeOneWay) roots.push('first-party-one-way')
   return createComposedEndpoint(
     config as unknown as IWebRpcFactoryConfig<string, readonly IWebRpcMiddleware[], readonly []>,
-    createFirstPartyRoots(
-      new Set<IWebRpcFirstPartyRootName>([
-        'first-party-provider',
-        'first-party-discovery',
-        'first-party-control'
-      ])
-    )
+    createFirstPartyRoots(new Set(roots))
   ) as Promise<object>
 }
 
@@ -108,7 +142,7 @@ import type {
 } from './pipeline-contract.js'
 
 /** Public full-endpoint callable preserves checked inferred and legacy-default forms. */
-type IPublicCallable = {
+type IPublicCallable<TAdditionalSurface extends object = Record<never, never>> = {
   <const TConfig extends ICheckedInput>(
     config: TConfig & IChecked<TConfig>
   ): Promise<
@@ -119,7 +153,8 @@ type IPublicCallable = {
         IFactoryPingCapability<IMiddlewares<TConfig>>,
         IMiddlewares<TConfig>,
         IFeatures<TConfig>
-      >
+      > &
+        TAdditionalSurface
     >
   >
   <
@@ -136,10 +171,15 @@ type IPublicCallable = {
         IFactoryPingCapability<TMiddlewares>,
         TMiddlewares,
         TFeatures
-      >
+      > &
+        TAdditionalSurface
     >
   >
 }
 
 /** Checked public boundary delegates to the original runtime without a second lifecycle path. */
 export const createFullEndpoint = createFullEndpointRuntime as unknown as IPublicCallable
+
+/** Creates the full endpoint preset with physical one-way delivery. */
+export const createFullOneWayEndpoint =
+  createFullOneWayEndpointRuntime as unknown as IPublicCallable<IOneWaySurface>

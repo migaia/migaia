@@ -1,8 +1,6 @@
 import type { IWebRpcFeature } from '../feature.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from '../internal/define-rpc-feature.js'
-import { createCanonicalChunkFeature } from './canonical-chunk.js'
-import { createOutboundFeature } from './outbound.js'
 import type {
   IOneWayCapability,
   IOneWayInstallation,
@@ -15,7 +13,7 @@ import type {
  */
 export type IWebRpcOneWayOptions = Readonly<{ transfer?: readonly unknown[] }>
 
-/** Public surface added only when callers explicitly select {@link createOneWayFeature}. */
+/** Public surface added only when callers select the one-way endpoint preset. */
 export type IOneWaySurface = Readonly<{
   sendOneWay: (
     targetId: string,
@@ -27,9 +25,7 @@ export type IOneWaySurface = Readonly<{
 
 /** Native optional one-way Feature reuses the direct outbound capability rather than shared lookup. */
 export const createOneWayFeature = (
-  outboundCapability: IWebRpcFeature<IOutboundCapability> = createOutboundFeature(
-    createCanonicalChunkFeature()
-  )
+  outboundCapability: IWebRpcFeature<IOutboundCapability>
 ): IWebRpcFeature<
   IOneWayCapability,
   { readonly outbound: IWebRpcFeature<IOutboundCapability> },
