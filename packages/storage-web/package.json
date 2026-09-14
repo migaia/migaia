@@ -1,6 +1,6 @@
 {
   "name": "@migaia/storage-web",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
   "repository": {
