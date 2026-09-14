@@ -1,6 +1,6 @@
 import { normalizePortable, type IRpcPortableValue } from '@migaia/rpc-contract'
 import { abort, connect, createEndpoint, timeout } from '@migaia/web-rpc'
-import { oneWay } from '@migaia/web-rpc/features/one-way'
+import { createOneWayFeature } from '@migaia/web-rpc/features/one-way'
 import {
   createWebWorkerTransport,
   type IWebWorkerLikePort
@@ -39,7 +39,7 @@ export function createWorkerContractEndpoint(
     targetIds: [defaultTargetId],
     transport,
     middlewares: [connect({ transport }), abort(), timeout()],
-    features: [oneWay()] as const
+    features: [createOneWayFeature()] as const
   }).then((endpoint) => {
     const handlers = new Map<string, Set<IWorkerHandler>>()
     const installed = new Set<string>()
