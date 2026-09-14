@@ -1,6 +1,6 @@
 {
   "name": "@migaia/store-worker",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Worker adapters and worker-backed Resource/serialization integrations.",
   "license": "MIT",
@@ -38,8 +38,8 @@
   },
   "dependencies": {
     "@migaia/reactive": "workspace:^",
-    "@migaia/rpc-contract": "workspace:^",
     "@migaia/resource": "workspace:^",
+    "@migaia/rpc-contract": "workspace:^",
     "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^",
     "@migaia/web-rpc": "workspace:^"
