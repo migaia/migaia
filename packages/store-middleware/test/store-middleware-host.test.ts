@@ -8,7 +8,8 @@ import {
   loggerMiddleware,
   middlewarePlugin,
   type IDevToolsCommand,
-  type IMiddlewareEvent
+  type IMiddlewareEvent,
+  type IStoreMiddlewarePlugin
 } from '../src/index'
 import { ClonePolicy } from '../src/tolerant-clone'
 
@@ -90,7 +91,7 @@ describe('StoreMiddlewareHost construction', () => {
           })
           return {}
         }
-      })
+      } satisfies IStoreMiddlewarePlugin<IState>)
     ).rejects.toThrow()
     await host.dispose()
   })

@@ -5,7 +5,8 @@ import {
   bindStoreMiddleware,
   createMutationPolicy,
   StoreMiddlewareHost,
-  type IMiddlewareEvent
+  type IMiddlewareEvent,
+  type IStoreMiddlewarePlugin
 } from '../src/index'
 
 /** Explicit unbounded policy used by legacy Store behavior tests. */
@@ -88,7 +89,7 @@ describe('bindStoreMiddleware', () => {
           })
           return {}
         }
-      })
+      } satisfies IStoreMiddlewarePlugin<Record<string, unknown>>)
       .then(async () => {
         store.value = 2
         await Promise.resolve()
@@ -134,7 +135,7 @@ describe('bindStoreMiddleware', () => {
         })
         return {}
       }
-    })
+    } satisfies IStoreMiddlewarePlugin<Record<string, unknown>>)
     store.value = 6
     await Promise.resolve()
     expect(seen).toHaveLength(1)
@@ -164,7 +165,7 @@ describe('bindStoreMiddleware', () => {
         })
         return {}
       }
-    })
+    } satisfies IStoreMiddlewarePlugin<Record<string, unknown>>)
     store.increment()
     const actionEvents = events.filter((e) => e.type === 'action')
     expect(actionEvents.map((e) => (e as { phase: string }).phase)).toEqual(['start', 'end'])
@@ -195,7 +196,7 @@ describe('bindStoreMiddleware', () => {
         })
         return {}
       }
-    })
+    } satisfies IStoreMiddlewarePlugin<Record<string, unknown>>)
     expect(() => store.blowUp()).toThrow('kaboom')
     const actionEvents = events.filter((e) => e.type === 'action')
     expect(actionEvents.map((e) => (e as { phase: string }).phase)).toEqual(['start', 'error'])
@@ -226,7 +227,7 @@ describe('bindStoreMiddleware', () => {
         })
         return {}
       }
-    })
+    } satisfies IStoreMiddlewarePlugin<Record<string, unknown>>)
     store.otherAction()
     expect(events.filter((e) => e.type === 'action')).toHaveLength(0)
     store.allowedAction()
@@ -248,7 +249,7 @@ describe('bindStoreMiddleware', () => {
         })
         return {}
       }
-    })
+    } satisfies IStoreMiddlewarePlugin<Record<string, unknown>>)
     store.value = 2
     await Promise.resolve()
     expect(events.length).toBeGreaterThan(0)
