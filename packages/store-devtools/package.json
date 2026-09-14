@@ -1,6 +1,6 @@
 {
   "name": "@migaia/store-devtools",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Store dependency tracing, snapshots, and time travel diagnostics.",
   "license": "MIT",
