@@ -1,6 +1,6 @@
 {
   "name": "@migaia/lifecycle",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
   "license": "MIT",
