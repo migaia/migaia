@@ -6,7 +6,7 @@ export PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN := false
 
 # Publish foundations before every consumer. scripts/release-plan.mjs verifies
 # that this remains a closed, dependency-topological release set.
-RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host tray web-rpc logger storage-web
+RELEASE_PACKAGES := utils rpc-contract event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host tray web-rpc logger storage-web
 # Store packages release independently from the foundation ship. `wasm` is the
 # package-owned prerequisite for store-wasm and therefore leads this plan.
 STORE_RELEASE_PACKAGES := wasm store-light store-keyed store-shared store-ssr store-worker store-indexed store-middleware store-react store-persist store-devtools store-wasm
