@@ -1,6 +1,6 @@
 {
   "name": "@migaia/serialize",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "description": "Store-neutral chunked serialization and codec registry.",
   "license": "MIT",
