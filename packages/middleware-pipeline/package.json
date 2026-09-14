@@ -1,6 +1,6 @@
 {
   "name": "@migaia/middleware-pipeline",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "description": "Runtime-neutral sync, async middleware and generator chain executors.",
   "license": "MIT",
