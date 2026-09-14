@@ -9972,7 +9972,7 @@
       "slug": "rpc-contract",
       "description": "Runtime-neutral RPC semantic and framing contracts.",
       "version": "0.0.1",
-      "exports": [".", "./framing"],
+      "exports": [".", "./framing", "./framing/v1", "./v1"],
       "documentation": {
         "readme": {
           "sections": [
@@ -9989,6 +9989,21 @@
                   "text": "The module has no dependency on transports, runtimes, codecs, workers, or Store. Format codecs live in `@migaia/serialize`."
                 }
               ]
+            },
+            {
+              "id": "v1-semantic-contract",
+              "heading": "V1 semantic contract",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import rpcV1, { normalizeRpcEnvelope, rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramer } from '@migaia/rpc-contract/framing/v1'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\n\nconst envelope = rpcProtocol.normalize({ kind: 'request', id: '1', method: 'ping', data: null })\nconst sameProtocol = rpcV1.rpcProtocol === rpcProtocol\nconst sameFramer = messageFramer === messageFramerV1\nconst normalized = normalizeRpcEnvelope(envelope)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The frozen default `rpcV1` aggregates the named V1 exports. Root `rpcProtocolV1` and `normalizeRpcEnvelope`, plus `messageFramerV1`, remain the same runtime identities for existing callers."
+                }
+              ]
             }
           ]
         },
@@ -10001,11 +10016,30 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'"
+                  "code": "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'\nimport rpcV1, { rpcProtocol } from '@migaia/rpc-contract/v1'\nimport { messageFramer } from '@migaia/rpc-contract/framing/v1'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`rpcProtocolV1.normalize()` validates untrusted semantic envelopes. `messageFramerV1` accepts whole string or binary frames and does not place chunk metadata in semantic messages."
+                  "text": "`rpcProtocolV1.normalize()` validates untrusted semantic envelopes. The versioned `rpcV1` default is a frozen aggregate of `rpcProtocol` and `normalizeRpcEnvelope`; its named `rpcProtocol` is the same V1 identity. `messageFramer` is the modern V1 whole-message identity framer, while retained `messageFramerV1` is the same object."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Fixed `createStringFramer` and `createBinaryFramer` entries validate their selected carriers and do not place chunk metadata in semantic messages."
+                }
+              ]
+            },
+            {
+              "id": "v1-semantic-contract",
+              "heading": "V1 semantic contract",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import rpcV1, { rpcProtocol } from '@migaia/rpc-contract/v1'\n\nconst protocol = rpcProtocol\nconst sameProtocol = rpcV1.rpcProtocol === protocol"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Root exports remain available with their existing V1 identities."
                 }
               ]
             }
@@ -10022,6 +10056,7 @@
         "./codec",
         "./codecs/cbor",
         "./codecs/identity",
+        "./codecs/identity/v1",
         "./codecs/json",
         "./codecs/message-pack",
         "./codecs/protobuf",
@@ -10104,6 +10139,21 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  jsonPlugin,\n  jsonParser,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  SerializeCodecError,\n  SerializeErrorCode,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  tagSerializeError,\n  isChunkShape,\n  SerializeChunkKind\n} from '@migaia/serialize';"
+                }
+              ]
+            },
+            {
+              "id": "versioned-identity-codec",
+              "heading": "Versioned identity codec",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { identityCodec } from '@migaia/serialize/codecs/identity/v1';\nimport { identityCodecV1 } from '@migaia/serialize/codec';\n\n// The versioned entry is the modern name; the retained alias is the same object.\nconst sameCodec = identityCodec === identityCodecV1;\nconst literal: { readonly ok: true } = identityCodec.encode({ ok: true } as const);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`identityCodec` preserves the runtime value and its actual TypeScript type in both directions. The legacy `identityCodecV1` export remains available for existing callers."
                 },
                 {
                   "type": "paragraph",
@@ -11507,7 +11557,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/serialize/codec` defines the generic `ICodec<TValue, TEncoded, TId, TVersion>` shape and its identity implementation. Format implementations are intentionally split: `codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the generic or identity path does not load binary format runtimes."
+                  "text": "`@migaia/serialize/codec` defines the generic `ICodec<TValue, TEncoded, TId, TVersion>` shape and retains the `identityCodecV1` compatibility alias. New version-specific callers import `identityCodec` from `@migaia/serialize/codecs/identity/v1`; it is the same runtime object and preserves the input value's concrete type through `encode` and `decode`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Format implementations are intentionally split: `codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the generic or identity path does not load binary format runtimes."
                 }
               ]
             }
@@ -20960,7 +21014,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "不适用：只是想把一次性数据存进 storage-web、不需要跟内存状态双向同步/不需要迁移，直接用 `@migaia/storage-contract` 的 `IKeyValueStore` 搭配所需 backend 子路径更直接。本包不提供加密——敏感数据不要无加密直接写 `localStorage`，需要的话自己实现一个 `ICodec` 传给 `codec` 选项。"
+                  "text": "不适用：只是想把一次性数据存进 storage-web、不需要跟内存状态双向同步/不需要迁移，直接用 `@migaia/storage-contract` 的 `IKeyValueStore` 搭配所需 backend 子路径更直接。本包不提供加密——敏感数据不要无加密直接写 `localStorageHost`，需要的话自己实现一个 `ICodec` 传给 `codec` 选项。"
                 },
                 {
                   "type": "paragraph",
@@ -21024,7 +21078,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStore } from '@migaia/store-light';\nimport { memoryStorage } from '@migaia/storage-web/memory';\n\nconst store = createStore({ theme: 'light', fontSize: 14 });\nconst handle = persist(store, {\n  key: 'settings',\n  storage: memoryStorage(), // 生产环境换成 localStorage()/indexedDb()\n  version: 1,\n  debounceMs: 250\n});\n\nawait handle.ready; // 首次 hydrate 完成（失败会 reject）\nstore.theme = 'dark'; // 250ms 后自动防抖写回\nawait handle.flush(); // 需要立即落盘时手动调用\nhandle.dispose(); // 停止订阅、清计时器、abort 在途 I/O"
+                  "code": "import { createStore } from '@migaia/store-light';\nimport { memoryStorageHost } from '@migaia/storage-web/memory';\n\nconst store = createStore({ theme: 'light', fontSize: 14 });\nconst handle = persist(store, {\n  key: 'settings',\n  storage: memoryStorageHost(), // 生产环境换成 localStorageHost()/indexedDbHost()\n  version: 1,\n  debounceMs: 250\n});\n\nawait handle.ready; // 首次 hydrate 完成（失败会 reject）\nstore.theme = 'dark'; // 250ms 后自动防抖写回\nawait handle.flush(); // 需要立即落盘时手动调用\nhandle.dispose(); // 停止订阅、清计时器、abort 在途 I/O"
                 },
                 {
                   "type": "paragraph",
@@ -21068,7 +21122,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { observableMap } from '@migaia/store-indexed';\nimport { localStorage } from '@migaia/storage-web/local-storage';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, { key: 'cart:v1', storage: localStorage() });\ncart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写"
+                  "code": "import { observableMap } from '@migaia/store-indexed';\nimport { localStorageHost } from '@migaia/storage-web/local-storage';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, { key: 'cart:v1', storage: localStorageHost() });\ncart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写"
                 },
                 {
                   "type": "paragraph",
@@ -21105,7 +21159,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\n\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nconst atomStore = createAtomStore(runtime);\nconst storage = indexedDb({ dbName: 'app' });\n\nconst { value, dispose } = persistKeyed(atomStore, session('u1'), 'u1', {\n  namespace: 'sessions',\n  storage,\n  partialize: (v) => ({ refreshToken: v.refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n});"
+                  "code": "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\n\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nconst atomStore = createAtomStore(runtime);\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst { value, dispose } = persistKeyed(atomStore, session('u1'), 'u1', {\n  namespace: 'sessions',\n  storage,\n  partialize: (v) => ({ refreshToken: v.refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n});"
                 },
                 {
                   "type": "paragraph",
@@ -21183,7 +21237,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
+                  "code": "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
                 }
               ]
             },
@@ -21357,7 +21411,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStore } from '@migaia/store-light';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\n\nconst store = createStore({ theme: 'light', fontSize: 14 });\nconst handle = persist(store, {\n  key: 'settings:v1',\n  storage: indexedDb({ dbName: 'app' }),\n  version: 1,\n  partialize: (state) => ({ theme: state.theme }) // 只存 theme，fontSize 只留内存\n});"
+                  "code": "import { createStore } from '@migaia/store-light';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\n\nconst store = createStore({ theme: 'light', fontSize: 14 });\nconst handle = persist(store, {\n  key: 'settings:v1',\n  storage: indexedDbHost({ dbName: 'app' }),\n  version: 1,\n  partialize: (state) => ({ theme: state.theme }) // 只存 theme，fontSize 只留内存\n});"
                 }
               ]
             },
@@ -21381,7 +21435,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { observableMap } from '@migaia/store-indexed';\nimport { localStorage } from '@migaia/storage-web/local-storage';\nimport { persistCollection } from '@migaia/store-persist/indexed';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, {\n  key: 'cart:v1',\n  storage: localStorage()\n});\n\ncart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）"
+                  "code": "import { observableMap } from '@migaia/store-indexed';\nimport { localStorageHost } from '@migaia/storage-web/local-storage';\nimport { persistCollection } from '@migaia/store-persist/indexed';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, {\n  key: 'cart:v1',\n  storage: localStorageHost()\n});\n\ncart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）"
                 }
               ]
             },
@@ -21417,7 +21471,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\n\ntype Session = { accessToken: string; refreshToken: string };\nconst session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));\nconst storage = indexedDb({ dbName: 'app' });\nconst atomStore = createAtomStore(runtime);\n\n// 每个 session id 首次使用时调用一次\nfunction getSession(id: string) {\n  return persistKeyed(atomStore, session(id), id, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }), // 只存 refreshToken\n    merge: (persisted, current) => ({ ...current, ...persisted }) // 其余字段保留内存值\n  });\n}\n\nconst { value, dispose } = getSession('u1');\n// ... 使用完毕\ndispose();"
+                  "code": "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\n\ntype Session = { accessToken: string; refreshToken: string };\nconst session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));\nconst storage = indexedDbHost({ dbName: 'app' });\nconst atomStore = createAtomStore(runtime);\n\n// 每个 session id 首次使用时调用一次\nfunction getSession(id: string) {\n  return persistKeyed(atomStore, session(id), id, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }), // 只存 refreshToken\n    merge: (persisted, current) => ({ ...current, ...persisted }) // 其余字段保留内存值\n  });\n}\n\nconst { value, dispose } = getSession('u1');\n// ... 使用完毕\ndispose();"
                 }
               ]
             },
@@ -21538,7 +21592,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可： `memoryStorage()`、`localStorage()` 或 `indexedDb()` 的返回值即可。binary codec 另需 `getBytes`/`setBytes`。"
+                  "text": "`storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可： `memoryStorageHost()`、`localStorageHost()` 或 `indexedDbHost()` 的返回值即可。binary codec 另需 `getBytes`/`setBytes`。"
                 },
                 {
                   "type": "paragraph",
@@ -21562,7 +21616,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { binaryCodec } from '@migaia/storage-web/serialize';\n\nconst handle = persistCollection(bigDataset, {\n  key: 'big',\n  storage: indexedDb({ dbName: 'app' }),\n  codec: binaryCodec\n});"
+                  "code": "import { binaryCodec } from '@migaia/storage-web/serialize';\n\nconst handle = persistCollection(bigDataset, {\n  key: 'big',\n  storage: indexedDbHost({ dbName: 'app' }),\n  codec: binaryCodec\n});"
                 },
                 {
                   "type": "paragraph",
@@ -21668,7 +21722,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}"
+                  "code": "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}"
                 }
               ]
             },

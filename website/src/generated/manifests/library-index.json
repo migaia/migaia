@@ -72,7 +72,7 @@
       "slug": "rpc-contract",
       "description": "Runtime-neutral RPC semantic and framing contracts.",
       "version": "0.0.1",
-      "exports": [".", "./framing"]
+      "exports": [".", "./framing", "./framing/v1", "./v1"]
     },
     {
       "slug": "serialize",
@@ -83,6 +83,7 @@
         "./codec",
         "./codecs/cbor",
         "./codecs/identity",
+        "./codecs/identity/v1",
         "./codecs/json",
         "./codecs/message-pack",
         "./codecs/protobuf",

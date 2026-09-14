@@ -9,6 +9,7 @@
       "./codec",
       "./codecs/cbor",
       "./codecs/identity",
+      "./codecs/identity/v1",
       "./codecs/json",
       "./codecs/message-pack",
       "./codecs/protobuf",
@@ -91,6 +92,21 @@
                 "type": "code",
                 "language": "ts",
                 "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  jsonPlugin,\n  jsonParser,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  SerializeCodecError,\n  SerializeErrorCode,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  tagSerializeError,\n  isChunkShape,\n  SerializeChunkKind\n} from '@migaia/serialize';"
+              }
+            ]
+          },
+          {
+            "id": "versioned-identity-codec",
+            "heading": "Versioned identity codec",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { identityCodec } from '@migaia/serialize/codecs/identity/v1';\nimport { identityCodecV1 } from '@migaia/serialize/codec';\n\n// The versioned entry is the modern name; the retained alias is the same object.\nconst sameCodec = identityCodec === identityCodecV1;\nconst literal: { readonly ok: true } = identityCodec.encode({ ok: true } as const);"
+              },
+              {
+                "type": "paragraph",
+                "text": "`identityCodec` preserves the runtime value and its actual TypeScript type in both directions. The legacy `identityCodecV1` export remains available for existing callers."
               },
               {
                 "type": "paragraph",
@@ -1494,7 +1510,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`@migaia/serialize/codec` defines the generic `ICodec<TValue, TEncoded, TId, TVersion>` shape and its identity implementation. Format implementations are intentionally split: `codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the generic or identity path does not load binary format runtimes."
+                "text": "`@migaia/serialize/codec` defines the generic `ICodec<TValue, TEncoded, TId, TVersion>` shape and retains the `identityCodecV1` compatibility alias. New version-specific callers import `identityCodec` from `@migaia/serialize/codecs/identity/v1`; it is the same runtime object and preserves the input value's concrete type through `encode` and `decode`."
+              },
+              {
+                "type": "paragraph",
+                "text": "Format implementations are intentionally split: `codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the generic or identity path does not load binary format runtimes."
               }
             ]
           }
@@ -1982,7 +2002,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/format-constants.d.ts:SerializeChunkKind:export declare const SerializeChunkKind: { readonly value: \"value\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };",
           "guidance": [],
-          "usageScore": 62,
+          "usageScore": 68,
           "configuration": [],
           "fragment": "serialize-index--SerializeChunkKind"
         },
@@ -3523,9 +3543,9 @@
       ],
       "aliases": [
         {
-          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
           "name": "identityCodecV1",
-          "signature": "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "signature": "export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
           "source": "packages/serialize/dist/codecs/identity.d.ts",
           "exportPath": "./codec",
           "ownerExportPath": "./codecs/identity",
@@ -3710,12 +3730,77 @@
       "architecturePath": "/en/architecture/serialize",
       "symbols": [
         {
-          "name": "identityCodecV1",
+          "name": "identityCodec",
           "kind": "const",
-          "signature": "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
-          "declarationLine": 3,
+          "signature": "export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
+          "declarationLine": 2,
           "source": "packages/serialize/dist/codecs/identity.d.ts",
           "purpose": "Identity codec used by whole-frame transports; it never imports a format runtime.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identityCodec.",
+          "advanced": "No additional advanced behavior is declared for identityCodec.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for identityCodec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for identityCodec.",
+          "examples": [
+            "import { identityCodec } from '@migaia/serialize/codecs/identity/v1';\nimport { identityCodecV1 } from '@migaia/serialize/codec';\n\n// The versioned entry is the modern name; the retained alias is the same object.\nconst sameCodec = identityCodec === identityCodecV1;\nconst literal: { readonly ok: true } = identityCodec.encode({ ok: true } as const);"
+          ],
+          "members": [],
+          "exportPath": "./codecs/identity",
+          "overloadSignatures": [
+            "export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use identityCodec when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when identityCodec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Identity codec used by whole-frame transports; it never imports a format runtime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import identityCodec from @migaia/serialize/codecs/identity, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use identityCodec when its const contract and declared inputs match the result you need. Choose a different public symbol when identityCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identityCodec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for identityCodec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodec:export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
+          "guidance": [],
+          "usageScore": 18,
+          "configuration": [],
+          "fragment": "serialize-codecs/identity--identityCodec"
+        },
+        {
+          "name": "identityCodecV1",
+          "kind": "const",
+          "signature": "export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
+          "declarationLine": 10,
+          "source": "packages/serialize/dist/codecs/identity.d.ts",
+          "purpose": "Legacy entry retains the exact V1 codec object identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identityCodecV1.",
           "advanced": "No additional advanced behavior is declared for identityCodecV1.",
           "parameters": ["This const declaration has no parameters."],
@@ -3723,11 +3808,13 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for identityCodecV1."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for identityCodecV1.",
-          "examples": [],
+          "examples": [
+            "import { identityCodec } from '@migaia/serialize/codecs/identity/v1';\nimport { identityCodecV1 } from '@migaia/serialize/codec';\n\n// The versioned entry is the modern name; the retained alias is the same object.\nconst sameCodec = identityCodec === identityCodecV1;\nconst literal: { readonly ok: true } = identityCodec.encode({ ok: true } as const);"
+          ],
           "members": [],
           "exportPath": "./codecs/identity",
           "overloadSignatures": [
-            "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;"
+            "export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3737,7 +3824,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Identity codec used by whole-frame transports; it never imports a format runtime."
+              "content": "Legacy entry retains the exact V1 codec object identity."
             },
             {
               "id": "getting-started",
@@ -3766,14 +3853,43 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "serialize-codecs/identity--identityCodecV1"
         }
       ],
       "aliases": []
+    },
+    {
+      "id": "serialize:codecs/identity/v1",
+      "library": "serialize",
+      "module": "codecs/identity/v1",
+      "exportPath": "./codecs/identity/v1",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/serialize/getting-started",
+      "architecturePath": "/en/architecture/serialize",
+      "symbols": [],
+      "aliases": [
+        {
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodec:export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
+          "name": "identityCodec",
+          "signature": "export declare const identityCodec: Readonly<{ id: \"identity\"; version: 1; encodedType: \"unknown\"; encode: <T>(value: T) => T; decode: <T>(value: T) => T; }>;",
+          "source": "packages/serialize/dist/codecs/identity.d.ts",
+          "exportPath": "./codecs/identity/v1",
+          "ownerExportPath": "./codecs/identity",
+          "ownerModule": "codecs/identity",
+          "ownerFragment": "serialize-codecs/identity--identityCodec"
+        }
+      ]
     },
     {
       "id": "serialize:codecs/json",
@@ -4112,42 +4228,42 @@
         {
           "name": "defineProtobufCodec",
           "kind": "function",
-          "signature": "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, TValue>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>): ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
-          "declarationLine": 17,
+          "signature": "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
+          "declarationLine": 15,
           "source": "packages/serialize/dist/codecs/protobuf.d.ts",
           "purpose": "Create a protobuf codec that keeps codec and schema identities independent.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineProtobufCodec.",
           "advanced": "No additional advanced behavior is declared for defineProtobufCodec.",
           "parameters": [
-            "options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>"
+            "options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>"
           ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>",
+              "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>",
               "optional": false
             }
           ],
-          "returns": "ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>",
+          "returns": "ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>",
           "errors": ["No documented errors are declared for defineProtobufCodec."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineProtobufCodec.",
           "examples": [],
           "members": [],
           "exportPath": "./codecs/protobuf",
           "overloadSignatures": [
-            "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, TValue>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>): ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;"
+            "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>",
+                "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>",
                 "optional": false
               }
             ]
           ],
           "overloadReturns": [
-            "ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>"
+            "ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>"
           ],
           "whenToUse": "Use defineProtobufCodec when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when defineProtobufCodec does not match the required inputs or return contract.",
@@ -4184,82 +4300,19 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:defineProtobufCodec:export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, TValue>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>): ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:defineProtobufCodec:export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
           "fragment": "serialize-codecs/protobuf--defineProtobufCodec"
         },
         {
-          "name": "IProtobufBinding",
-          "kind": "type",
-          "signature": "export type IProtobufBinding<TValue> = Readonly<{ encode: (value: TValue) => Uint8Array; decode: (value: Uint8Array) => TValue; }>;",
-          "declarationLine": 3,
-          "source": "packages/serialize/dist/codecs/protobuf.d.ts",
-          "purpose": "Minimal generated-binding boundary accepted by the Protobuf codec.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufBinding.",
-          "advanced": "No additional advanced behavior is declared for IProtobufBinding.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IProtobufBinding."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProtobufBinding.",
-          "examples": [],
-          "members": [],
-          "exportPath": "./codecs/protobuf",
-          "overloadSignatures": [
-            "export type IProtobufBinding<TValue> = Readonly<{ encode: (value: TValue) => Uint8Array; decode: (value: Uint8Array) => TValue; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IProtobufBinding when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IProtobufBinding does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Minimal generated-binding boundary accepted by the Protobuf codec."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IProtobufBinding from @migaia/serialize/codecs/protobuf, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IProtobufBinding when its type contract and declared inputs match the result you need. Choose a different public symbol when IProtobufBinding does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufBinding."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IProtobufBinding."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufBinding:export type IProtobufBinding<TValue> = Readonly<{ encode: (value: TValue) => Uint8Array; decode: (value: Uint8Array) => TValue; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "serialize-codecs/protobuf--IProtobufBinding"
-        },
-        {
           "name": "IProtobufCodecOptions",
           "kind": "type",
-          "signature": "export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TValue> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: IProtobufBinding<TValue>; }>;",
-          "declarationLine": 11,
+          "signature": "export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TBinding extends DescMessage> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: TBinding; }>;",
+          "declarationLine": 9,
           "source": "packages/serialize/dist/codecs/protobuf.d.ts",
-          "purpose": "IProtobufCodecOptions is part of this module's public type contract.",
+          "purpose": "A generated Buf descriptor is the only executable binding accepted by a Protobuf codec.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufCodecOptions.",
           "advanced": "No additional advanced behavior is declared for IProtobufCodecOptions.",
           "parameters": ["This type declaration has no parameters."],
@@ -4271,7 +4324,7 @@
           "members": [],
           "exportPath": "./codecs/protobuf",
           "overloadSignatures": [
-            "export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TValue> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: IProtobufBinding<TValue>; }>;"
+            "export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TBinding extends DescMessage> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: TBinding; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4281,7 +4334,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IProtobufCodecOptions is part of this module's public type contract."
+              "content": "A generated Buf descriptor is the only executable binding accepted by a Protobuf codec."
             },
             {
               "id": "getting-started",
@@ -4310,7 +4363,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufCodecOptions:export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TValue> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: IProtobufBinding<TValue>; }>;",
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufCodecOptions:export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TBinding extends DescMessage> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: TBinding; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4320,9 +4373,9 @@
           "name": "IProtobufSchema",
           "kind": "type",
           "signature": "export type IProtobufSchema<TId extends string, TVersion extends number> = Readonly<{ id: TId; version: TVersion; }>;",
-          "declarationLine": 7,
+          "declarationLine": 4,
           "source": "packages/serialize/dist/codecs/protobuf.d.ts",
-          "purpose": "IProtobufSchema is part of this module's public type contract.",
+          "purpose": "Stable public schema identity remains independent from codec and binding versions.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufSchema.",
           "advanced": "No additional advanced behavior is declared for IProtobufSchema.",
           "parameters": ["This type declaration has no parameters."],
@@ -4344,7 +4397,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IProtobufSchema is part of this module's public type contract."
+              "content": "Stable public schema identity remains independent from codec and binding versions."
             },
             {
               "id": "getting-started",
@@ -4476,7 +4529,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/types.d.ts:assertSerializeType:export declare function assertSerializeType(type: string): void;",
           "guidance": [],
-          "usageScore": 76,
+          "usageScore": 82,
           "configuration": [],
           "fragment": "serialize-core--assertSerializeType"
         },
@@ -4791,7 +4844,7 @@
               ]
             }
           ],
-          "usageScore": 84,
+          "usageScore": 90,
           "configuration": [],
           "fragment": "serialize-core--base64ToBytes"
         },
@@ -4872,7 +4925,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/base64.d.ts:bytesToBase64:export declare function bytesToBase64(bytes: Uint8Array): string;",
           "guidance": [],
-          "usageScore": 80,
+          "usageScore": 86,
           "configuration": [],
           "fragment": "serialize-core--bytesToBase64"
         },
@@ -5177,7 +5230,7 @@
               ]
             }
           ],
-          "usageScore": 90,
+          "usageScore": 96,
           "configuration": [
             {
               "name": "signal",
@@ -6205,7 +6258,7 @@
               ]
             }
           ],
-          "usageScore": 132,
+          "usageScore": 138,
           "configuration": [
             {
               "name": "type",
@@ -8585,7 +8638,7 @@
               ]
             }
           ],
-          "usageScore": 64,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "serialize-core--SERIALIZE_TYPE_PATTERN"
         },
@@ -9007,7 +9060,7 @@
               ]
             }
           ],
-          "usageScore": 266,
+          "usageScore": 272,
           "configuration": [],
           "fragment": "serialize-core--SerializeCodecError"
         },
@@ -9395,7 +9448,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/base64.d.ts:streamBase64Chunks:export declare function streamBase64Chunks(bytes: Uint8Array): Generator<string, void, void>;",
           "guidance": [],
-          "usageScore": 64,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "serialize-core--streamBase64Chunks"
         },
@@ -9888,7 +9941,7 @@
               ]
             }
           ],
-          "usageScore": 148,
+          "usageScore": 154,
           "configuration": [
             {
               "name": "replacer",
@@ -10211,7 +10264,7 @@
               ]
             }
           ],
-          "usageScore": 100,
+          "usageScore": 106,
           "configuration": [],
           "fragment": "serialize-registry--chunkToBytes"
         },
@@ -10482,7 +10535,7 @@
               ]
             }
           ],
-          "usageScore": 96,
+          "usageScore": 102,
           "configuration": [],
           "fragment": "serialize-registry--chunkToText"
         },
@@ -10833,7 +10886,7 @@
               ]
             }
           ],
-          "usageScore": 190,
+          "usageScore": 196,
           "configuration": [
             {
               "name": "scheduler",

@@ -330,10 +330,26 @@ function App() {
 /** Keeps the previous page visually covered by a theme-aware particle veil while data routes load. */
 function RouteTransition() {
   const navigation = useNavigation()
+  const { hash, pathname } = useLocation()
+  const navigationType = useNavigationType()
+  const [routeAnimation, setRouteAnimation] = useState(0)
+  const [routeAnimationActive, setRouteAnimationActive] = useState(false)
+
+  /** Replays the particle veil after push/replace even when the next route is already cached. */
+  useEffect(() => {
+    if (navigationType === 'POP' || hash) return
+    setRouteAnimation((current) => current + 1)
+    setRouteAnimationActive(true)
+    const timeout = window.setTimeout(() => setRouteAnimationActive(false), 780)
+    return () => window.clearTimeout(timeout)
+  }, [hash, navigationType, pathname])
+
+  const isActive = navigation.state !== 'idle' || routeAnimationActive
   return (
     <div
+      key={routeAnimation}
       className="route-transition"
-      data-active={navigation.state === 'idle' ? 'false' : 'true'}
+      data-active={isActive ? 'true' : 'false'}
       aria-hidden="true"
     >
       <i />

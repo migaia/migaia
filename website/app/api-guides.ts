@@ -662,6 +662,18 @@ const optionTranslations: Readonly<
   'web-rpc:*:*:replay.ttlMs': {
     zh: '出站 request identifier 的保留时长，默认 310 秒。'
   },
+  'web-rpc:*:*:replay.maxEntries': {
+    en: 'Maximum number of outbound request identifiers retained for replay protection; increase only when measured traffic requires a larger bounded window.',
+    zh: '为 replay protection 保留的出站 request identifier 最大数量；仅在有测量依据表明流量需要更大 bounded window 时调高。'
+  },
+  'reactive:reactive:Computed:equals': {
+    en: 'Equality policy used to suppress unchanged computed values.',
+    zh: '用于抑制未变化 computed value 的 equality policy。'
+  },
+  'reactive:reactive:Computed:keepAlive': {
+    en: 'Keeps the computed node active after observers detach; use it only when retained cache lifetime is intentional.',
+    zh: 'observer 解除后保持 computed node active；仅在确实需要延长 cache lifetime 时使用。'
+  },
   'web-rpc:*:*:middlewares': {
     zh: 'endpoint 构造期间按 tuple 顺序原子安装的 middleware。'
   },
@@ -745,10 +757,26 @@ const optionTranslations: Readonly<
     en: 'Custom identifier generator for task, message, and variation IDs. Defaults to the built-in secure random generator.'
   },
   'web-rpc:adapters-message-port:createBrowserMessagePortTransport:ownership': {
+    en: "MessagePort custody: 'owned' closes the port during disposal, while 'borrowed' removes installed listeners without closing the caller's port.",
+    zh: 'MessagePort custody：owned 在 dispose 时关闭 port，borrowed 只移除已安装 listener，不关闭调用方拥有的 port。'
+  },
+  'web-rpc:adapters/message-port:createBrowserMessagePortTransport:ownership': {
+    en: "MessagePort custody: 'owned' closes the port during disposal; 'borrowed' removes installed listeners without closing the caller's port.",
+    zh: 'MessagePort custody：owned 在 dispose 时关闭 port，borrowed 只移除已安装 listener，不关闭调用方拥有的 port。'
+  },
+  'web-rpc:adapters-message-port:createBrowserMessagePortTransport:ownership:legacy': {
     en: "Controls MessagePort custody. 'owned' closes the port on dispose; 'borrowed' removes framework listeners without closing it."
   },
   'web-rpc:adapters-service-worker:createServiceWorkerTransport:target': {
     en: 'ServiceWorker postMessage target used for outbound messages.'
+  },
+  'web-rpc:adapters/service-worker:createServiceWorkerTransport:target': {
+    en: 'ServiceWorker controller or worker target receiving outbound WebRPC messages.',
+    zh: '接收 outbound WebRPC message 的 ServiceWorker controller 或 worker target。'
+  },
+  'web-rpc:adapters/service-worker:createServiceWorkerTransport:receiver': {
+    en: 'Inbound ServiceWorker event source used to receive WebRPC messages and errors.',
+    zh: '用于接收 WebRPC message 与 error 的 inbound ServiceWorker event source。'
   },
   'web-rpc:adapters-service-worker:createServiceWorkerTransport:receiver': {
     en: 'ServiceWorker event source used to receive inbound message and error events.'
@@ -759,8 +787,20 @@ const optionTranslations: Readonly<
   'web-rpc:adapters-web-worker:createWebWorkerTransport:origin': {
     en: 'Optional expected origin metadata for the connected worker peer.'
   },
+  'web-rpc:adapters/web-worker:createWebWorkerTransport:origin': {
+    en: 'Optional expected origin metadata used to reject worker messages from an unexpected origin.',
+    zh: '用于拒绝 unexpected origin worker message 的可选 expected origin metadata。'
+  },
   'web-rpc:adapters-window:createWindowMessageTransport:target': {
     en: 'Required postMessage target, such as iframe.contentWindow or window.opener.'
+  },
+  'web-rpc:adapters/window:createWindowMessageTransport:target': {
+    en: 'Required postMessage target, such as iframe.contentWindow or window.opener.',
+    zh: '必需的 postMessage target，例如 iframe.contentWindow 或 window.opener。'
+  },
+  'web-rpc:adapters/window:createWindowMessageTransport:receiver': {
+    en: 'Inbound message-event source used to receive frames from the window peer.',
+    zh: '用于接收 window peer frame 的 inbound message-event source。'
   },
   'web-rpc:adapters-window:createWindowMessageTransport:receiver': {
     en: 'Inbound message-event source. Same-origin usage may omit it and use the host default receiver.'
@@ -2404,10 +2444,13 @@ function createStorePersistErrorGuide(
   return {
     en: {
       purpose: `Creates a ${nativeType} carrying the stable Store Persist source/code identity. ${behaviorEn}`,
-      quickStart: `const error = createStorePersist${nativeType}(
+      quickStart: `import { createStorePersist\${nativeType}, StorePersistErrorCode } from '@migaia/store-persist'
+
+const error = createStorePersist\${nativeType}(
   StorePersistErrorCode.invalidOption,
   'Invalid persistence configuration'
-)`,
+)
+console.error(error) // 把带 code 的 native error 交给边界报告`,
       scenarios: [
         'A public boundary must expose a machine-readable failure code.',
         'The native error class must survive tagging.',
@@ -2422,10 +2465,13 @@ function createStorePersistErrorGuide(
     },
     zh: {
       purpose: `创建带稳定 Store Persist source/code identity 的 ${nativeType}。${behaviorZh}`,
-      quickStart: `const error = createStorePersist${nativeType}(
+      quickStart: `import { createStorePersist\${nativeType}, StorePersistErrorCode } from '@migaia/store-persist'
+
+const error = createStorePersist\${nativeType}(
   StorePersistErrorCode.invalidOption,
   '持久化配置无效'
-)`,
+)
+console.error(error) // 把带 code 的 native error 交给边界报告`,
       scenarios: [
         '公开边界需要暴露机器可读 failure code。',
         'tagging 后必须保留 native error class。',
@@ -2594,7 +2640,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '创建隔离的 synchronous in-memory record store，提供 text、byte、structured-record、transaction、iteration、metadata 与 post-commit change-feed channel。它仅存在于当前 process，instance 丢弃后全部数据消失。',
     quickStart:
-      "const storage = memoryStorageHost<User>()\nawait storage.putRecord({ id: 1, name: 'Ada' }, 1)\nconst user = await storage.getRecord(1)",
+      `import { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype User = { id: number; name: string }\n\nconst storage = memoryStorageHost<User>()\nawait storage.putRecord({ id: 1, name: 'Ada' }, 1)\nconst user = await storage.getRecord(1)\nconsole.log(user)\nawait storage.dispose()`,
     scenariosEn: [
       'Tests need a real contract implementation without browser globals.',
       'Ephemeral application state needs record and transaction semantics.',
@@ -2622,7 +2668,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '在 Web Storage localStorage 上创建 namespaced synchronous key-value store。它跨 reload 持久化 text value，提供 sync/async view，并且不会声称支持 record、binary、transaction 或 change-feed。',
     quickStart:
-      "const settings = localStorageHost({ storage: globalThis.localStorage })\nsettings.sync.set('theme', 'dark')\nconsole.log(await settings.get('theme'))",
+      `import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorageHost({ storage: globalThis.localStorage })\nsettings.sync.set('theme', 'dark')\nconst theme = await settings.get('theme')\nconsole.log(theme)\nawait settings.remove('theme')\nawait settings.dispose()`,
     scenariosEn: [
       'Small durable browser settings.',
       'Immediate synchronous reads are required at startup.',
@@ -2670,7 +2716,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '在 sessionStorage 上创建 namespaced synchronous key-value store。value 在同一 browsing context 的 reload 后仍存在，但 tab/window session 结束时会被丢弃。',
     quickStart:
-      "const draft = sessionStorageHost({ storage: globalThis.sessionStorage })\ndraft.sync.set('step', 'shipping')",
+      `import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst draft = sessionStorageHost({ storage: globalThis.sessionStorage })\ndraft.sync.set('step', 'shipping')\nconst step = await draft.get('step')\nconsole.log(step)\nawait draft.remove('step')\nawait draft.dispose()`,
     scenariosEn: [
       'Per-tab drafts survive reload.',
       'Sensitive workflow state should not persist indefinitely.',
@@ -2718,7 +2764,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '创建 namespaced synchronous cookie-backed text store，并为每次 write/removal 使用同一个 fixed scope。cookie limit 与 visibility 仍然成立：JavaScript 看不到 key，并不能证明 HttpOnly cookie 不存在。',
     quickStart:
-      "const preferences = cookiesHost({ namespace: 'prefs', scope: { path: '/', sameSite: 'lax', secure: true } })\nawait preferences.set('theme', 'dark', { maxAge: 86_400 })",
+      `import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst preferences = cookiesHost({ namespace: 'prefs', scope: { path: '/', sameSite: 'lax', secure: true } })\nawait preferences.set('theme', 'dark', { maxAge: 86_400 })\nconst theme = await preferences.get('theme')\nconsole.log(theme)\nawait preferences.remove('theme')\nawait preferences.dispose()`,
     scenariosEn: [
       'A small value must accompany HTTP requests.',
       'Cookie write and delete scope must remain identical.',
@@ -2879,7 +2925,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '创建 durable structured browser store，提供 text、bytes、records、transactions、iteration、metadata、secondary indexes 与 post-commit change feed。open 与 schema work 会延迟到首次 operation。',
     quickStart:
-      "const db = indexedDbHost<User>({ dbName: 'app-data', recordsStoreName: 'users' })\nawait db.putRecord({ id: 1, email: 'ada@example.com' }, 1)\nfor await (const [key, user] of db.iterateRecords()) consume(key, user)",
+      `import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\ntype User = { id: number; email: string }\n\nconst db = indexedDbHost<User>({ dbName: 'app-data', recordsStoreName: 'users' })\ntry {\n  await db.putRecord({ id: 1, email: 'ada@example.com' }, 1)\n  for await (const [key, user] of db.iterateRecords()) console.log(key, user)\n} finally {\n  await db.dispose()\n}`,
     scenariosEn: [
       'Durable structured records exceed Web Storage limits.',
       'Transactions, iteration, indexes, or change feeds are required.',
@@ -3023,7 +3069,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '面向 JSON-compatible value 的默认零依赖 codec。它在所有 backend 写入 text，把 top-level undefined 结果归一为 null，并将 stringify/parse failure 报告为 StorageError。',
     quickStart:
-      "const raw = await jsonCodec.encode({ id: 1, name: 'Ada' })\nconst user = await jsonCodec.decode(raw)",
+      `import { jsonCodec } from '@migaia/storage-web/serialize'\n\nconst raw = await jsonCodec.encode({ id: 1, name: 'Ada' })\nconst user = await jsonCodec.decode(raw)\nconsole.log(user)`,
     scenariosEn: [
       'Portable text storage across every backend.',
       'Plain objects and arrays need the smallest built-in choice.',
@@ -3051,7 +3097,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '通过 binary channel 直接传递 Uint8Array，不经过 JSON conversion。selectCodec 在 binary backend 保持原生 bytes，在 text-only backend 则显式包装为 Base64。',
     quickStart:
-      'const bytes = new Uint8Array([1, 2, 3])\nconst encoded = await binaryCodec.encode(bytes)\nconst restored = await binaryCodec.decode(encoded)',
+      `import { binaryCodec } from '@migaia/storage-web/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst encoded = await binaryCodec.encode(bytes)\nconst restored = await binaryCodec.decode(encoded)\nconsole.log(restored)`,
     scenariosEn: [
       'Images, hashes, or protocol frames are already bytes.',
       'A binary-capable backend should avoid text conversion.',
@@ -3079,7 +3125,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '不做 serialization，保留 structured-clone value，让 IndexedDB 类 record backend 存储 Blob、File、ArrayBuffer、Map、Set、Date 与 cyclic graph。selection 遇到不支持 record 的 backend 会拒绝，而不是丢失数据。',
     quickStart:
-      "const payload = { createdAt: new Date(), tags: new Set(['stable']) }\nconst stored = await structuredCodec.encode(payload)",
+      `import { structuredCodec } from '@migaia/storage-web/serialize'\n\nconst payload = { createdAt: new Date(), tags: new Set(['stable']) }\nconst stored = await structuredCodec.encode(payload)\nconsole.log(stored)`,
     scenariosEn: [
       'IndexedDB records contain native structured-clone values.',
       'Cycles or non-JSON containers must retain semantics.',
@@ -3107,7 +3153,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '把 codec 绑定到一次 backend capability snapshot。匹配的 output 直接使用；binary-to-text 使用会被报告的 Base64 fallback；structured-to-text 因不存在无损 fallback 而显式失败。',
     quickStart:
-      "const selected = selectCodec(binaryCodec, storage.capabilities, console.warn)\nawait storage.set('avatar', await selected.encode(bytes))",
+      `import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\n\nexport async function writeAvatar(storage: { capabilities: Parameters<typeof selectCodec>[1]; set(key: string, value: unknown): Promise<void> }, bytes: Uint8Array): Promise<void> {\n  const selected = selectCodec(binaryCodec, storage.capabilities, (message) => console.warn(message))\n  await storage.set('avatar', await selected.encode(bytes))\n}`,
     scenariosEn: [
       'An entity codec must be reconciled with its concrete backend.',
       'Binary data may accept an observable Base64 fallback.',
@@ -3194,7 +3240,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '把 Standard Schema v1 validator 适配为 storage entity schema contract，无需 import Zod、Valibot 或 ArkType。支持 sync/async validator，并把 issue message 保留为 validation failure cause。',
     quickStart:
-      'const userSchema = fromStandardSchema(z.object({ id: z.number(), name: z.string() }))\nconst user = await userSchema.validate(input)',
+      `import { fromStandardSchema } from '@migaia/storage-web/schema'\n\nconst standardSchema = { '~standard': { version: 1, vendor: 'example', validate: (value: unknown) => ({ value }) } }\nconst userSchema = fromStandardSchema(standardSchema)\nconst user = await userSchema.validate({ id: 1, name: 'Ada' })\nconsole.log(user)`,
     scenariosEn: [
       'An existing Standard Schema library owns runtime validation.',
       'Storage entities need validated and inferred output.',
@@ -3244,7 +3290,8 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'Creates the zero-validation schema adapter used when the storage boundary intentionally trusts its input. It returns the same value asynchronously and adds no validation dependency.',
     purposeZh:
       '创建 zero-validation schema adapter，用于 storage boundary 明确信任 input 的场景。它异步返回同一个 value，不增加 validation dependency。',
-    quickStart: 'const schema = passthrough<User>()\nconst user = await schema.validate(input)',
+    quickStart:
+      `import { passthrough } from '@migaia/storage-web/schema'\n\nconst schema = passthrough<{ id: number; name: string }>()\nconst user = await schema.validate({ id: 1, name: 'Ada' })\nconsole.log(user)`,
     scenariosEn: [
       'Data was already validated at a stronger upstream boundary.',
       'A prototype needs the schema contract without runtime validation.',
@@ -3272,7 +3319,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '对单个 value 按 version 升序执行已声明的 async migration。缺失 version step 是显式 no-op；cancellation 保留 abort reason；failure 保留原始 cause。',
     quickStart:
-      'const current = await runMigrations(saved, 1, 3, {\n  2: async (value) => ({ ...value, enabled: true }),\n  3: async (value) => ({ ...value, version: 3 })\n}, signal)',
+      `import { runMigrations } from '@migaia/storage-web/schema'\n\ntype IUserRecord = { version?: number; enabled?: boolean }\nconst saved: IUserRecord = { version: 1 }\nconst signal = new AbortController().signal\nconst current = await runMigrations(saved, 1, 3, {\n  2: async (value) => ({ ...value, enabled: true }),\n  3: async (value) => ({ ...value, version: 3 })\n}, signal)\nconsole.log(current)`,
     scenariosEn: [
       'A persisted entity is older than the current schema version.',
       'Migration steps need asynchronous dependencies.',
@@ -3391,7 +3438,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '声明一个 versioned domain record，之后再把 immutable definition 连接到 concrete store。生成的 repository 统一负责 validation、codec selection、migration、entity-key isolation、index、list、stream 与 transactional batch behavior。',
     quickStart:
-      "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\n\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: { email: { path: 'email', unique: true } }\n})\nconst repository = users.connect(indexedDbHost({ dbName: 'app' }))\nawait repository.put({ id: 1, email: 'ada@example.com' })",
+      `import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\n\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: { email: { path: 'email', unique: true } }\n})\nconst repository = users.connect(indexedDbHost({ dbName: 'app' }))\nawait repository.put({ id: 1, email: 'ada@example.com' })`,
     scenariosEn: [
       'Domain records need one backend-neutral repository contract.',
       'Persisted data requires validation and ordered version migration.',
@@ -3604,7 +3651,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'Validates the public backend identifier grammar before it can enter plugin, registry, or topology state. IDs are case-sensitive ASCII strings, 1–64 characters, beginning with a letter and continuing with letters, digits, dot, underscore, or hyphen.',
     purposeZh:
       '在 backend identifier 进入 plugin、registry 或 topology state 前验证 public grammar。ID 是 case-sensitive ASCII string，长度 1–64，首字符必须是 letter，后续只允许 letter、digit、dot、underscore 或 hyphen。',
-    quickStart: 'assertStorageBackendId(candidate)\nconst id: string = candidate',
+    quickStart: `import { assertStorageBackendId } from '@migaia/storage-web'\n\nconst candidate: unknown = 'indexed-db'\nassertStorageBackendId(candidate)\nconst id: string = candidate // 校验成功后由 assertion narrowing 得到 backend ID`,
     scenariosEn: [
       'A configuration value is about to become a backend ID.',
       'A custom backend factory needs the same grammar as built-ins.',
@@ -3648,18 +3695,64 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
+  'storage-web:host:definePlugin': createStorageWebGuide({
+    purposeEn:
+      'Defines a Storage plugin through PluginHost\'s canonical function form. The Host supplies the implicit per-registration store capability; callers cannot replace it.',
+    purposeZh:
+      '通过 PluginHost 的规范函数形式定义 Storage 插件。Host 会为每次注册提供唯一的 Store，并把注册、安装、Feature 组合、共享投影和释放串成一条生命周期。插件可以用 registerStore 接入后端，用 getStore 读写数据，用 getBackendId 标识当前后端，用 getShared 向同一注册下的适配器传递受控资源；插件返回的 install 扩展才是 Host 对外发布的业务能力。',
+    quickStart:
+      `import { createStorageHost, definePlugin } from '@migaia/storage-web/host'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cachePlugin = definePlugin('cache', (core) => {\n  const store = memoryStorageHost()\n  core.registerStore(store) // Host 把这个 Store 绑定到本次 cache 注册，其他插件不能替换。\n\n  return {\n    install: async () => {\n      await core.getStore().set('user:1', { name: 'Ada' })\n      return {\n        readUser: () => core.getStore().get('user:1')\n      }\n    },\n    featureExpose: () => ({\n      backendId: core.getBackendId(),\n      recordCount: async () => (await core.getStore().keys()).length\n    })\n  }\n})\n\nconst host = await createStorageHost()\ntry {\n  const appStorage = await host.use(cachePlugin)\n  console.log(await appStorage.extensions.readUser(), await appStorage.extensions.recordCount()) // { name: 'Ada' } 1：数据由 install 写入，再由发布的能力读取。\n} finally {\n  await host.dispose()\n}`,
+    scenariosEn: [
+      'A Storage backend needs PluginHost lifecycle ownership.',
+      'The plugin should receive its store capability from the Host.',
+      'Installation and cleanup must follow the Host transaction.'
+    ],
+    scenariosZh: [
+      'Storage backend 需要由 PluginHost 统一管理生命周期。',
+      '插件应由 Host 提供 store 能力，而不是自行替换。',
+      '安装与清理必须遵循 Host 的事务边界。'
+    ],
+    avoidEn: [
+      'The plugin should construct or replace the Host-provided store capability.',
+      'A standalone store has no PluginHost lifecycle.',
+      'The plugin needs the backend-definition API instead.'
+    ],
+    avoidZh: [
+      '插件需要自行构造或替换 Host 提供的 store 能力。',
+      '独立 store 不需要 PluginHost 生命周期。',
+      '实际需求是 backend-definition API。'
+    ]
+  }),
   'storage-web:host:defineStorageBackendKind': createStorageWebGuide({
     purposeEn:
       'Creates an opaque backend-kind factory that binds one store type to validated kind names. The private identity prevents a look-alike object from claiming compatibility with plugin and feature definitions.',
     purposeZh:
       '创建 opaque backend-kind factory，把一种 store type 绑定到 validated kind name。private identity 防止 look-alike object 冒充与 plugin、feature definition 兼容。',
-    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { defineStorageBackendKind } from '@migaia/storage-web/host'
+    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import {
+  defineStorageBackendKind,
+  defineStorageBackendPlugin
+} from '@migaia/storage-web/host'
 
 // ReturnType 把 kind 精确绑定到这个示例实际创建的 store。
 type ICacheStore = ReturnType<typeof memoryStorageHost>
-const defineCacheKind = defineStorageBackendKind<ICacheStore>()
-const cacheKind = defineCacheKind('cache')`,
+const cacheKind = defineStorageBackendKind<ICacheStore>()('cache')
+
+const cachePlugin = defineStorageBackendPlugin({
+  backendKind: cacheKind,
+  id: 'cache',
+  create: () => memoryStorageHost()
+})
+
+// 把 cacheKind 传给同一种后端的 Plugin，Host 才能校验 Feature 与后端匹配。
+const host = await createStorageHost()
+try {
+  await host.use(cachePlugin)
+  console.log(host.hasBackend('cache')) // true：kind 已经进入 Host 的安装链路。
+} finally {
+  await host.dispose()
+}`,
     scenariosEn: [
       'A custom backend family needs exact compile-time store typing.',
       'Several plugins share one backend implementation kind.',
@@ -3703,12 +3796,42 @@ const cacheKind = defineCacheKind('cache')`,
       }
     ]
   }),
+  'storage-web:host:defineFeature': createStorageWebGuide({
+    purposeEn:
+      'Defines one capability that a Storage plugin exposes after installation. The factory receives the registration-local Store capability from the Host; defineFeature only describes the capability and does not create a Host, install a plugin, or open storage by itself.',
+    purposeZh:
+      '定义 Storage 插件安装后对外暴露的一项能力。factory 会收到 Host 提供的、仅属于本次注册的 Store 能力；也可以读取前置 Feature 的输出。Feature 返回的对象会成为该后端的能力面，随插件安装和释放；defineFeature 本身不会创建 Host、安装插件或打开存储。',
+    quickStart:
+      `import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-web/host'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst metrics = defineFeature((core) => ({\n  backendId: () => core.featureExpose.getBackendId(),\n  count: async () => (await core.featureExpose.getStore().keys()).length\n}))\n\nconst plugin = definePlugin('cache', (core) => ({\n  install: async () => {\n    await core.getStore().set('user:1', { name: 'Ada' })\n    return {}\n  }\n}), { metrics })\n\nconst host = await createStorageHost()\ntry {\n  const appStorage = await host.use(plugin)
+  const cache = appStorage.backend('cache')\n  console.log(await cache.metrics.count(), cache.metrics.backendId()) // 1 cache：Feature 从本次注册的 Store 读数据，再由 backend 能力面消费。\n} finally {\n  await host.dispose()\n}`,
+    scenariosEn: [
+      'A plugin needs to publish a typed capability derived from its registration-local store.',
+      'The capability must be installed and disposed together with its owning plugin.',
+      'The feature should be attached to a backend plugin instead of used as a standalone service.'
+    ],
+    scenariosZh: [
+      '插件需要基于本次注册的 Store 发布一项有类型的能力。',
+      '这项能力必须随所属插件一起安装和释放。',
+      'Feature 应附加到 backend plugin，而不是作为独立 service 使用。'
+    ],
+    avoidEn: [
+      'The capability must create its own Host or storage instance.',
+      'The capability needs to outlive the owning plugin.',
+      'A backend plugin definition is required instead of a capability description.'
+    ],
+    avoidZh: [
+      '能力需要自行创建 Host 或 storage instance。',
+      '能力需要超过所属插件的生命周期继续存在。',
+      '实际需要的是 backend plugin 定义，而不是能力描述。'
+    ]
+  }),
   'storage-web:host:defineStorageBackendFeature': createStorageWebGuide({
     purposeEn:
       'Defines one optional capability for a Storage Host. A bare Host has only its basic management operations: it can install plugins, look up installed backends, and dispose them. It has no backend and no usable backend Feature yet. For example, liveQuery is not available until a backend Plugin carrying the reactive Feature has been installed. A Feature and a Plugin are different things: the Feature is a read-only description of one capability, while the Plugin is the complete backend package that the Host actually installs and removes. The Plugin creates the storage instance and may carry zero, one, or several Features in its features array. A Feature is bound to a backend kind, not to one particular Plugin ID: any Plugin created with that exact backendKind may include it, but a Plugin for another kind is rejected. When such a Plugin is installed, the Host materializes a separate copy of the capability for that installed backend. Calling this function alone therefore does not create a Host, open a database, or enable anything. Put the returned Feature in defineStorageBackendPlugin({ features: [...] }); createStorageHost() or host.use() then installs the Plugin and activates the capability for that backend.',
     purposeZh:
       '这个 API 用来给 Storage Host 定义一项可选能力。裸 Host 只有安装插件、查找已安装后端和统一释放资源等基础管理能力；它还没有任何存储后端，也没有任何可用的后端 Feature。例如，在安装一个携带 reactive Feature 的后端 Plugin 之前，不能使用 liveQuery。Feature 和 Plugin 不是一回事：Feature 只是一项能力的只读“说明书”；Plugin 才是 Host 真正安装和卸载的完整后端包，它负责创建存储实例，并通过 features 数组携带零项、一项或多项 Feature。Feature 绑定的是 backend kind（后端种类），不是某个特定的 Plugin ID：任何使用同一个 backendKind 创建的 Plugin 都可以携带它，其他种类的 Plugin 则会被拒绝。Plugin 安装后，Host 会为这个已安装后端单独接入一份该能力。因此，只调用这个 API 不会创建 Host、不会打开数据库，也不会启用任何能力。把返回的 Feature 放进 defineStorageBackendPlugin({ features: [...] })，再由 createStorageHost() 或 host.use() 安装这个 Plugin，能力才会对这个后端生效。',
-    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
+    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 import {
   defineStorageBackendFeature,
   defineStorageBackendKind,
@@ -3732,7 +3855,15 @@ const cachePlugin = defineStorageBackendPlugin({
   id: 'cache',
   create: () => memoryStorageHost(),
   features: [reactive] as const
-})`,
+})
+
+const host = await createStorageHost()
+try {
+  await host.use(cachePlugin)
+  console.log(host.hasReactiveBackend('cache')) // true：安装 Plugin 后，reactive Feature 才生效。
+} finally {
+  await host.dispose()
+}`,
     scenariosEn: [
       'You are writing a custom storage backend and want its Storage Host to gain an extra capability.',
       'The Host must know that this backend supports live queries and should refresh results after data changes.',
@@ -3822,7 +3953,8 @@ const cachePlugin = defineStorageBackendPlugin({
       'Snapshots one backend factory, optional preparation step, feature tuple, and deadline into an opaque installable plugin handle. Creation remains unpublished until the Host commits the complete installation batch.',
     purposeZh:
       '把 backend factory、可选 prepare step、feature tuple 与 deadline snapshot 为 opaque installable plugin handle。Host 提交整个 installation batch 前，创建出的 store 不会被 publish。',
-    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
+    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 import {
   defineStorageBackendKind,
   defineStorageBackendPlugin
@@ -3835,7 +3967,15 @@ const cachePlugin = defineStorageBackendPlugin({
   backendKind: cacheKind,
   id: 'cache',
   create: () => memoryStorageHost()
-})`,
+})
+
+const host = await createStorageHost()
+try {
+  await host.use(cachePlugin)
+  console.log(host.hasBackend('cache')) // true：Plugin 提交后，Host 才会发布这个 backend。
+} finally {
+  await host.dispose()
+}`,
     scenariosEn: [
       'A store must be installed atomically with Host lifecycle ownership.',
       'Factory and preparation failures need rollback and deadline handling.',
@@ -3973,7 +4113,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '把 already-installed provider 与一批 candidate plugin 纯编译为 deterministic dependency order。synthetic provider 参与 validation，但不会进入 materialized output。',
     quickStart:
-      'const topology = compileStorageFeatureTopology({\n  installedProviderIds: [],\n  plugins: [cachePlugin]\n})\nfor (const node of topology.materialized) inspect(node.id)',
+      `import { compileStorageFeatureTopology } from '@migaia/storage-web/host'\n\nexport function compileCandidate(options: Parameters<typeof compileStorageFeatureTopology>[0]) {\n  const topology = compileStorageFeatureTopology(options)\n  for (const node of topology.materialized) console.log(node.id)\n  return topology\n}`,
     scenariosEn: [
       'A Host batch needs validation before any mutation.',
       'Feature dependencies need stable ordering.',
@@ -4042,7 +4182,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '创建 typed backend registry 的 lifecycle owner，并可原子安装一组 initial plugin tuple。initial installation 失败时会先 dispose facade，再重新抛出 primary error。',
     quickStart:
-      "const host = await createStorageHost({ plugins: [cachePlugin], report })\nconst cache = host.backend('cache')\ntry { await useCache(cache) } finally { await host.dispose() }",
+      `import { createStorageHost } from '@migaia/storage-web/host'\n\nconst host = await createStorageHost({ plugins: [] })\ntry {\n  console.log(host.backends())\n} finally {\n  await host.dispose()\n}`,
     scenariosEn: [
       'Several backends need one install, lookup, rollback, and disposal owner.',
       'Literal plugin IDs should produce typed backend access.',
@@ -4141,7 +4281,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '用于 incremental plugin installation 的 imperative Host implementation。它串行化 installation batch，只在完整 commit 后 publish registry change，提供 typed backend lookup，并暴露一个 idempotent disposal promise。',
     quickStart:
-      "const host = new StorageHostFacade({ installTimeoutMs: 10_000, report })\nconst ready = await host.use(cachePlugin)\nconst cache = ready.backend('cache')\nawait ready.dispose()",
+      `import { StorageHostFacade } from '@migaia/storage-web/host'\n\nexport async function installCache(cachePlugin: Parameters<StorageHostFacade['use']>[0]): Promise<void> {\n  const host = new StorageHostFacade({ installTimeoutMs: 10_000 })\n  const ready = await host.use(cachePlugin)\n  console.log(ready.backends())\n  await ready.dispose()\n}`,
     scenariosEn: [
       'Plugins are admitted after Host construction.',
       'Callers need hasBackend, backend, backends, or reactiveBackend inspection.',
@@ -4221,7 +4361,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '读取 genuine backend plugin handle 对应的 private immutable definition snapshot。它是 Host 与 topology compiler 的 infrastructure，不是 application configuration 或 reflection API。',
     quickStart:
-      'const metadata = readStorageBackendPluginMetadata(plugin)\nif (!metadata) rejectUnownedPlugin()',
+      `import { readStorageBackendPluginMetadata } from '@migaia/storage-web/host'\n\nexport function inspectPlugin(plugin: Parameters<typeof readStorageBackendPluginMetadata>[0]) {\n  const metadata = readStorageBackendPluginMetadata(plugin)\n  if (!metadata) throw new Error('plugin is not owned by storage-web')\n  return metadata\n}`,
     scenariosEn: [
       'Host infrastructure must verify definition authority.',
       'A topology compiler needs the exact captured feature tuple.',
@@ -4271,7 +4411,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '读取 genuine feature descriptor 的 private backend-kind、capability 与可选 reactive metadata。unknown object 返回 undefined，不会因此获得 feature authority。',
     quickStart:
-      "const metadata = readStorageBackendFeatureMetadata(feature)\nif (metadata?.capability === 'reactive') materializeAdapter(metadata)",
+      `import { readStorageBackendFeatureMetadata } from '@migaia/storage-web/host'\n\nexport function inspectFeature(feature: Parameters<typeof readStorageBackendFeatureMetadata>[0]) {\n  const metadata = readStorageBackendFeatureMetadata(feature)\n  if (metadata?.capability === 'reactive') console.log('reactive feature:', metadata)\n  return metadata\n}`,
     scenariosEn: [
       'Topology compilation needs exact feature ownership.',
       'Host materialization needs reactive source metadata.',
@@ -4321,7 +4461,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '把 validated backend ID 按 ASCII byte 编码成 collision-free PluginHost registration name，使 user-visible backend identity 与 internal plugin namespace 分离。',
     quickStart:
-      "const registrationName = pluginNameFromBackendId('cache')\n// storage-backend:6361636865",
+      `import { pluginNameFromBackendId } from '@migaia/storage-web/host'\n\nconst registrationName = pluginNameFromBackendId('cache')\nconsole.log(registrationName) // storage-backend:6361636865`,
     scenariosEn: [
       'Host infrastructure needs a deterministic plugin registration key.',
       'Punctuation in valid IDs must not collide.',
@@ -4371,7 +4511,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '为一个 backend reactive adapter 派生 canonical internal registration name，同时保留与 backend registration 相同的 validated ID bytes。',
     quickStart:
-      "const adapterName = reactiveAdapterNameFromBackendId('cache')\n// storage-reactive-adapter:6361636865",
+      `import { reactiveAdapterNameFromBackendId } from '@migaia/storage-web/host'\n\nconst adapterName = reactiveAdapterNameFromBackendId('cache')\nconsole.log(adapterName) // storage-reactive-adapter:6361636865`,
     scenariosEn: [
       'Host materialization installs a reactive adapter beside its backend.',
       'Cleanup must address the exact adapter registration.',
@@ -4421,7 +4561,7 @@ const cachePlugin = defineStorageBackendPlugin({
       'The stable internal provider name for the single Host-wide live-query service. Topology compilation injects this synthetic dependency when a candidate plugin declares reactive capability.',
     purposeZh:
       'Host-wide singleton live-query service 的稳定 internal provider name。candidate plugin 声明 reactive capability 时，topology compilation 会注入这个 synthetic dependency。',
-    quickStart: 'const ownsService = providerIds.includes(STORAGE_LIVE_QUERY_SERVICE_NAME)',
+    quickStart: `import { STORAGE_LIVE_QUERY_SERVICE_NAME } from '@migaia/storage-web'\n\nconst providerIds = [STORAGE_LIVE_QUERY_SERVICE_NAME]\nconst ownsService = providerIds.includes(STORAGE_LIVE_QUERY_SERVICE_NAME)\nconsole.log(ownsService) // true: 当前 provider 列表包含 Host 共享服务`,
     scenariosEn: [
       'Host topology infrastructure identifies the shared service provider.',
       'Tests assert singleton service admission.',
@@ -4449,7 +4589,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '默认 collision-free physical-key codec。它在 encoded namespace 前写入 UTF-8 byte length，使包含 punctuation 的 key 与 Unicode namespace 也能无歧义 round-trip。',
     quickStart:
-      "const physical = lengthPrefixedNamespaceCodec.encode('用户', 'theme:mode')\nconst logical = lengthPrefixedNamespaceCodec.decode('用户', physical)",
+      `import { lengthPrefixedNamespaceCodec } from '@migaia/storage-web'\n\nconst physical = lengthPrefixedNamespaceCodec.encode('用户', 'theme:mode')\nconst logical = lengthPrefixedNamespaceCodec.decode('用户', physical)\nconsole.log(logical)`,
     scenariosEn: [
       'Web Storage or cookies need isolated logical key spaces.',
       'Namespaces contain Unicode or delimiter characters.',
@@ -4477,7 +4617,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '写入每个 storage-web boundary error 的稳定 library source。应组合 source 与 code 分支，不要解析 message text。',
     quickStart:
-      "if (error && typeof error === 'object' && error.source === STORAGE_WEB_SOURCE) handleStorageError(error)",
+      `import { STORAGE_WEB_SOURCE } from '@migaia/storage-web'\n\nconst handleStorageError = (error: unknown) => console.error('storage failure:', error)\nexport function routeStorageError(error: unknown): void {\n  if (error && typeof error === 'object' && 'source' in error && error.source === STORAGE_WEB_SOURCE) {\n    handleStorageError(error)\n  }\n}`,
     scenariosEn: [
       'A shared error boundary routes failures by library owner.',
       'Serialized diagnostics preserve source and code.',
@@ -4504,7 +4644,7 @@ const cachePlugin = defineStorageBackendPlugin({
       'The frozen registry of stable public diagnostic text owned by storage-web. Runtime code pairs these messages with semantic source/code identity while preserving native error types and causes.',
     purposeZh:
       'storage-web 拥有的 frozen stable public diagnostic text registry。runtime code 把这些 message 与 semantic source/code identity 配对，同时保留 native error type 与 cause。',
-    quickStart: 'const message = StorageErrorText.backendNotInstalled',
+    quickStart: `import { StorageErrorText } from '@migaia/storage-web'\n\nconst message = StorageErrorText.backendNotInstalled\nconsole.error(message) // 构造 storage-web 错误时复用这条稳定诊断文本`,
     scenariosEn: [
       'Infrastructure constructs a library-owned public error.',
       'Tests lock intentional contract text.',
@@ -4532,7 +4672,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       'library boundary error，保留稳定 source/code identity、structured operation detail、native cause reachability 与可选 repository stage。优先使用会抛出它的 canonical operation；只有 storage-web-owned extension infrastructure 才直接构造。',
     quickStart:
-      "throw new StorageError(StorageErrorCode.extensionFailed, {\n  backend: 'indexeddb',\n  operation: 'schema.validate',\n  cause\n}, StorageErrorText.liveQueryFailed)",
+      `import { StorageError, StorageErrorCode, StorageErrorText } from '@migaia/storage-web'\n\nconst cause = new Error('schema validator rejected the record')\nthrow new StorageError(StorageErrorCode.extensionFailed, {\n  backend: 'indexeddb',\n  operation: 'schema.validate',\n  cause\n}, StorageErrorText.liveQueryFailed)`,
     scenariosEn: [
       'Storage-owned infrastructure normalizes an extension failure.',
       'A boundary needs structured backend, key, channel, or operation context.',
@@ -4633,7 +4773,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '把 canonical in-memory store 包装为 Host-installable backend plugin。use() 成功后，hasBackend(id) 变为 true，backend(id) 返回 typed key-value store；Host 负责 atomic publication 与 disposal。这个 non-reactive variant 不提供 liveQuery capability。',
     quickStart:
-      "import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('cache')) // false：尚未安装\n\nconst appStorage = await host.use(memoryBackendPlugin({ id: 'cache' }))\nconsole.log(appStorage.hasBackend('cache')) // true：Host registry 已发布能力\nconsole.log(appStorage.hasReactiveBackend('cache')) // false：本插件不提供 liveQuery\n\nconst cache = appStorage.backend('cache')\nawait cache.set('session', 'signed-in')\nconsole.log(await cache.get('session')) // signed-in\n\nawait appStorage.dispose() // Host 统一释放插件拥有的 store",
+      `import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('cache')) // false：尚未安装\n\nconst appStorage = await host.use(memoryBackendPlugin({ id: 'cache' }))\nconsole.log(appStorage.hasBackend('cache')) // true：Host registry 已发布能力\nconsole.log(appStorage.hasReactiveBackend('cache')) // false：本插件不提供 liveQuery\n\nconst cache = appStorage.backend('cache')\nawait cache.set('session', 'signed-in')\nconsole.log(await cache.get('session')) // signed-in\n\nawait appStorage.dispose() // Host 统一释放插件拥有的 store`,
     scenariosEn: [
       'Tests need a lifecycle-owned in-memory backend.',
       'Ephemeral state participates in typed Host lookup.',
@@ -4681,7 +4821,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '把 namespaced localStorage factory 包装为 non-reactive Host plugin。use() 成功后，literal ID 会通过 hasBackend() 与 backend() 发布，获得 typed lookup、atomic installation 与 Host-owned cleanup，但不会新增 live query。',
     quickStart:
-      "import { createStorageHost } from '@migaia/storage-web/host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/plugins/local-storage'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('settings')) // false\n\nconst appStorage = await host.use(localStorageBackendPlugin({ id: 'settings', namespace: 'app' }))\nconsole.log(appStorage.hasBackend('settings')) // true：Host 获得持久化 text store\nconsole.log(appStorage.hasReactiveBackend('settings')) // false：不会产生订阅能力\n\nconst settings = appStorage.backend('settings')\nawait settings.set('theme', 'dark')\nconsole.log(await settings.get('theme')) // dark，刷新页面后仍可读取\n\nawait appStorage.dispose()",
+      `import { createStorageHost } from '@migaia/storage-web/host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/plugins/local-storage'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('settings')) // false\n\nconst appStorage = await host.use(localStorageBackendPlugin({ id: 'settings', storage: fakeStorage }))\nconsole.log(appStorage.hasBackend('settings')) // true：Host 获得持久化 text store\nconsole.log(appStorage.hasReactiveBackend('settings')) // false：不会产生订阅能力\n\nconst settings = appStorage.backend('settings')\nawait settings.set('theme', 'dark')\nconsole.log(await settings.get('theme')) // dark，刷新页面后仍可读取\n\nawait appStorage.dispose()`,
     scenariosEn: [
       'Durable text settings need Host ownership.',
       'Synchronous localStorage access is required behind typed lookup.',
@@ -4777,7 +4917,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '把 sessionStorage 包装为 non-reactive Host plugin，用于 per-browsing-context text state。use() 后 Host 会发布 literal ID、提供 typed lookup 并统一 cleanup，但不改变 session lifetime semantics，也不增加 live query。',
     quickStart:
-      "import { createStorageHost } from '@migaia/storage-web/host'\nimport { sessionStorageBackendPlugin } from '@migaia/storage-web/plugins/session-storage'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('draft')) // false\n\nconst appStorage = await host.use(sessionStorageBackendPlugin({ id: 'draft', namespace: 'checkout' }))\nconsole.log(appStorage.hasBackend('draft')) // true：Host 获得当前 tab 的 session store\nconsole.log(appStorage.hasReactiveBackend('draft')) // false\n\nconst draft = appStorage.backend('draft')\nawait draft.set('step', 'shipping')\nconsole.log(await draft.get('step')) // shipping；同 tab reload 后仍可读取\n\nawait appStorage.dispose()",
+      `import { createStorageHost } from '@migaia/storage-web/host'\nimport { sessionStorageBackendPlugin } from '@migaia/storage-web/plugins/session-storage'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('draft')) // false\n\nconst appStorage = await host.use(sessionStorageBackendPlugin({ id: 'draft', storage: fakeStorage }))\nconsole.log(appStorage.hasBackend('draft')) // true：Host 获得当前 tab 的 session store\nconsole.log(appStorage.hasReactiveBackend('draft')) // false\n\nconst draft = appStorage.backend('draft')\nawait draft.set('step', 'shipping')\nconsole.log(await draft.get('step')) // shipping；同 tab reload 后仍可读取\n\nawait appStorage.dispose()`,
     scenariosEn: [
       'Per-tab drafts need typed Host ownership.',
       'State may survive reload but not the session.',
@@ -4873,7 +5013,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '把 cookie text store 包装为 non-reactive Host plugin。use() 成功后，Host 会通过 hasBackend() 与 backend() 发布 typed cookie backend、统一 cleanup，并固定 write/removal scope。它不会增加 polling 或 live-query 能力，也不会绕过 cookie size、visibility、security 或 HttpOnly 限制。',
     quickStart:
-      "import { createStorageHost } from '@migaia/storage-web/host'\nimport { cookieBackendPlugin } from '@migaia/storage-web/plugins/cookies'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('prefs')) // false：Host 尚无 cookie 能力\n\nconst appStorage = await host.use(\n  cookieBackendPlugin({\n    id: 'prefs',\n    namespace: 'app',\n    scope: { path: '/', sameSite: 'lax', secure: location.protocol === 'https:' }\n  })\n)\nconsole.log(appStorage.hasBackend('prefs')) // true：registry 已发布 typed cookie store\nconsole.log(appStorage.hasReactiveBackend('prefs')) // false：不会轮询 document.cookie\n\nconst prefs = appStorage.backend('prefs')\nawait prefs.set('theme', 'dark') // 写入 app namespace，并应用固定 scope\nconsole.log(await prefs.get('theme')) // dark；后续请求可携带该 cookie\nawait prefs.remove('theme') // 使用同一 path/domain scope，避免删错 cookie\n\nawait appStorage.dispose() // 释放 Host/plugin 资源；不会替你删除持久 cookie",
+      `import { createStorageHost } from '@migaia/storage-web/host'\nimport { cookieBackendPlugin } from '@migaia/storage-web/plugins/cookies'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('prefs')) // false：Host 尚无 cookie 能力\n\nconst appStorage = await host.use(\n  cookieBackendPlugin({\n    id: 'prefs',\n    storage: fakeStorage,\n    scope: { path: '/', sameSite: 'lax', secure: location.protocol === 'https:' }\n  })\n)\nconsole.log(appStorage.hasBackend('prefs')) // true：registry 已发布 typed cookie store\nconsole.log(appStorage.hasReactiveBackend('prefs')) // false：不会轮询 document.cookie\n\nconst prefs = appStorage.backend('prefs')\nawait prefs.set('theme', 'dark') // 写入 app namespace，并应用固定 scope\nconsole.log(await prefs.get('theme')) // dark；后续请求可携带该 cookie\nawait prefs.remove('theme') // 使用同一 path/domain scope，避免删错 cookie\n\nawait appStorage.dispose() // 释放 Host/plugin 资源；不会替你删除持久 cookie`,
     scenariosEn: [
       'Small request-carried values need Host ownership.',
       'Write and removal scope must remain identical.',
@@ -5067,7 +5207,7 @@ const cachePlugin = defineStorageBackendPlugin({
     purposeZh:
       '把 IndexedDB 包装为 non-reactive Host plugin。use() 只有在 private preparation 打开并 backfill database 后，才发布 literal ID 与 typed backend lookup；失败会 rollback 且不泄漏 owner。这个 variant 不增加 live-query 能力。',
     quickStart:
-      "import { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('records')) // false\n\nconst appStorage = await host.use(\n  indexedDbBackendPlugin({ id: 'records', dbName: 'app', recordsStoreName: 'users' })\n) // resolve 前已完成 open/backfill；失败不会发布半成品\nconsole.log(appStorage.hasBackend('records')) // true\nconsole.log(appStorage.hasReactiveBackend('records')) // false：需要订阅时改用 indexedDbReactive\n\nconst records = appStorage.backend('records')\nawait records.set('last-sync', '2026-09-02T00:00:00Z')\nconsole.log(await records.get('last-sync'))\n\nawait appStorage.dispose()",
+      `import { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('records')) // false\n\nconst appStorage = await host.use(\n  indexedDbBackendPlugin({ id: 'records', dbName: 'app', recordsStoreName: 'users' })\n) // resolve 前已完成 open/backfill；失败不会发布半成品\nconsole.log(appStorage.hasBackend('records')) // true\nconsole.log(appStorage.hasReactiveBackend('records')) // false：需要订阅时改用 indexedDbReactive\n\nconst records = appStorage.backend('records')\nawait records.set('last-sync', '2026-09-02T00:00:00Z')\nconsole.log(await records.get('last-sync'))\n\nawait appStorage.dispose()`,
     scenariosEn: [
       'Durable records, bytes, indexes, and transactions need Host ownership.',
       'Database preparation must finish before publication.',
@@ -5226,7 +5366,8 @@ const cachePlugin = defineStorageBackendPlugin({
       'Defines a kind-hidden advanced custom reactive capability. Plugin installation supplies its exact Store and Host-snapshotted scheduler; the adapter declares consistency visibility and supplies a lifecycle-owned source that invalidates Host live queries.',
     purposeZh:
       '定义 kind-hidden advanced custom reactive capability。Plugin 安装时提供 exact Store 和 Host 已快照 scheduler；adapter 声明 consistency visibility，并提供 lifecycle-owned source 来 invalidate Host live query。',
-    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
+    quickStart: `import { createStorageHost, definePlugin } from '@migaia/storage-web/host'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { defineReactiveAdapterFeature } from '@migaia/storage-web/reactive-adapter'
 
 type ICacheStore = ReturnType<typeof memoryStorageHost>
@@ -5237,7 +5378,22 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
   visibility: 'instance',
   // 真实 backend 可在这里订阅 change feed；空 disposer 表示本例只依赖 polling。
   subscribe: () => () => undefined
-})`,
+})
+
+const plugin = definePlugin('cache-reactive', (core) => ({
+  install: () => {
+    core.registerStore(memoryStorageHost())
+    return {}
+  }
+}), { reactive })
+
+const host = await createStorageHost()
+try {
+  await host.use(plugin)
+  console.log(host.hasBackend('cache-reactive')) // true：Plugin 安装后，Host 才拥有这份 store 与 reactive adapter。
+} finally {
+  await host.dispose()
+}`,
     scenariosEn: [
       'A custom backend has a real push or polling invalidation source.',
       'Visibility guarantees must be explicit in live-query consistency.',
@@ -5359,7 +5515,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建 in-memory reactive fast path 的 Host plugin。change 在 exact store instance 内 push，因此 live query 获得即时 instance-local invalidation，不使用 polling，也不声称 cross-instance visibility。',
     quickStart:
-      "const host = await createStorageHost({ plugins: [memoryReactive({ id: 'cache' })] })\nconst query = host.liveQuery({ backendId: 'cache', runtime, query: ({ store }) => store.get('user') })\nawait query.ready",
+      `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryReactive } from '@migaia/storage-web/plugins/reactive/memory'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [memoryReactive({ id: 'cache' })] })\nconst query = host.liveQuery({ backendId: 'cache', runtime, query: ({ store }) => store.get('user') })\nawait query.ready\nconsole.log(query.state)\nawait Promise.all([query.dispose(), host.dispose()])`,
     scenariosEn: [
       'Tests need deterministic push invalidation.',
       'Ephemeral state needs live queries in one Host instance.',
@@ -5407,7 +5563,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建使用 hybrid invalidation 的 localStorage reactive Host plugin。同 document write 通过 store source 观察，同时以 1 秒 polling fallback 提供 document-eventual visibility；它不声称 synchronous cross-tab coherence。',
     quickStart:
-      "const host = await createStorageHost({ plugins: [localStorageReactive({ id: 'settings', namespace: 'app' })] })\nconst theme = host.liveQuery({ backendId: 'settings', runtime, query: ({ store }) => store.get('theme') })",
+      `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { localStorageReactive } from '@migaia/storage-web/plugins/reactive/local-storage'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [localStorageReactive({ id: 'settings', storage: globalThis.localStorage })] })\nconst theme = host.liveQuery({ backendId: 'settings', runtime, query: ({ store }) => store.get('theme') })\nawait theme.ready\nconsole.log(theme.state)\nawait Promise.all([theme.dispose(), host.dispose()])`,
     scenariosEn: [
       'Durable browser settings drive reactive UI.',
       'Same-document writes need prompt invalidation with polling recovery.',
@@ -5503,7 +5659,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建使用 hybrid invalidation 与 1 秒 polling 的 sessionStorage reactive Host plugin。它保证 top-level-context-eventual：跟随当前 tab/window session，而不是 durable 或 origin-wide state。',
     quickStart:
-      "const host = await createStorageHost({ plugins: [sessionStorageReactive({ id: 'draft', namespace: 'checkout' })] })\nconst step = host.liveQuery({ backendId: 'draft', runtime, query: ({ store }) => store.get('step') })",
+      `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { sessionStorageReactive } from '@migaia/storage-web/plugins/reactive/session-storage'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [sessionStorageReactive({ id: 'draft', storage: globalThis.sessionStorage })] })\nconst step = host.liveQuery({ backendId: 'draft', runtime, query: ({ store }) => store.get('step') })\nawait step.ready\nconsole.log(step.state)\nawait Promise.all([step.dispose(), host.dispose()])`,
     scenariosEn: [
       'A per-tab draft drives reactive UI.',
       'Reload survival is needed within one session.',
@@ -5599,7 +5755,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建使用 hybrid 1 秒 polling 与 origin-js-visible-eventual consistency 的 cookie reactive Host plugin。它只能观察 JavaScript 可见 cookie，无法证明 HttpOnly cookie 的 absence 或 state。',
     quickStart:
-      "const host = await createStorageHost({ plugins: [cookiesReactive({ id: 'prefs', namespace: 'app', scope: { path: '/', sameSite: 'lax', secure: true } })] })\nconst locale = host.liveQuery({ backendId: 'prefs', runtime, query: ({ store }) => store.get('locale') })",
+      `import { createStorageHost } from '@migaia/storage-web/host'\nimport { cookiesReactive } from '@migaia/storage-web/plugins/reactive/cookies'\n\nconst host = await createStorageHost({\n  plugins: [cookiesReactive({ id: 'prefs', namespace: 'app', scope: { path: '/', sameSite: 'lax', secure: true } })]\n})\n// cookiesReactive 内部会注册同配置的 cookiesHost；调用方不需要重复传入 cookieHost。\ntry {\n  console.log(host.hasBackend('prefs'))\n} finally {\n  await host.dispose()\n}`,
     scenariosEn: [
       'A small JS-visible cookie drives reactive presentation.',
       'Origin-visible eventual polling is acceptable.',
@@ -5775,7 +5931,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建使用 origin-eventual hybrid invalidation 与 1 秒 polling 的 IndexedDB reactive Host plugin。Host preparation 会在 publication 前打开并 backfill durable store；后续 generation refresh 时 live query 可以保留 previous data。',
     quickStart:
-      "const host = await createStorageHost({ plugins: [indexedDbReactive({ id: 'records', dbName: 'app', recordsStoreName: 'users' })] })\nconst users = host.liveQuery({ backendId: 'records', runtime, keepPreviousData: true, query: ({ store, signal }) => loadUsers(store, signal) })",
+      `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'\n\ntype User = { id: number; email: string }\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [indexedDbReactive({ id: 'records', dbName: 'app', recordsStoreName: 'users' })] })\nconst users = host.liveQuery({ backendId: 'records', runtime, keepPreviousData: true, query: async ({ store }) => {\n  const result: User[] = []\n  for await (const [, user] of store.iterateRecords()) result.push(user as User)\n  return result\n} })\nawait users.ready\nconsole.log(users.state)\nawait Promise.all([users.dispose(), host.dispose()])`,
     scenariosEn: [
       'Durable structured records drive reactive UI.',
       'Origin-eventual visibility with polling recovery is acceptable.',
@@ -5935,7 +6091,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建 built-in parser：把 value 编码为 JSON text chunk，并解码 value、text 或 byte chunk。byte decoding 使用 injected decoder 或 host TextDecoder；host capability 缺失时显式失败。',
     quickStart:
-      "const parser = jsonParser({\n  replacer: (key, value) => key === 'secret' ? undefined : value,\n  reviver: (key, value) => key === 'createdAt' ? new Date(value) : value\n})\nconst chunk = await parser.encode(record)",
+      `import { jsonParser } from '@migaia/serialize'\n\nconst record = { id: 1, secret: 'hidden', createdAt: new Date().toISOString() }\nconst parser = jsonParser({\n  replacer: (key, value) => key === 'secret' ? undefined : value,\n  reviver: (key, value) => key === 'createdAt' ? new Date(value as string) : value\n})\nconst chunk = await parser.encode(record)\nconsole.log(await parser.decode(chunk))`,
     scenariosEn: [
       'Direct parser composition without registry lifecycle.',
       'JSON needs a replacer or reviver.',
@@ -6031,7 +6187,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '把 jsonParser 包装为 canonical json registry plugin。JSON 需要参与 registry type selection、cancellation、pending tracking 与 parser lifecycle 时使用。',
     quickStart:
-      'const registry = createSerializeRegistry([jsonPlugin({ space: 0 })], { scheduler })',
+      `import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\n\nconst registry = createSerializeRegistry([jsonPlugin({ space: 0 })])\nconst encoded = await registry.encode({ id: 1, name: 'Ada' })\nconsole.log(encoded)\nawait registry.dispose()`,
     scenariosEn: [
       'JSON is the registry primary serializer.',
       'Several plugins share one lifecycle owner.',
@@ -6127,7 +6283,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '附加到每个 tagged Serialize failure 的 canonical library source。machine routing 时与 code 组合，并为 same-realm handling 保留 native error identity。',
     quickStart:
-      'if (error.source === SERIALIZE_SOURCE && error.code === SerializeErrorCode.aborted) handleAbort()',
+      `import { SERIALIZE_SOURCE, SerializeErrorCode } from '@migaia/serialize'\n\nexport function routeSerializeError(error: { source?: string; code?: string }): void {\n  if (error.source === SERIALIZE_SOURCE && error.code === SerializeErrorCode.aborted) console.log('serialization aborted')\n}`,
     scenariosEn: [
       'Routing shared diagnostics.',
       'Serializing source and code across a boundary.',
@@ -6155,7 +6311,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '把 immutable source、code 与 optional context 附加到 existing native Error，不替换对象也不触碰 stack。重复相同 identity 是 idempotent；尝试改写为不同 identity 会 throw。',
     quickStart:
-      "const tagged = tagSerializeError(nativeError, SerializeErrorCode.invalidOption, 'registry')\nconsole.log(tagged === nativeError)",
+      `import { SerializeErrorCode, tagSerializeError } from '@migaia/serialize'\n\nconst nativeError = new TypeError('registry option is invalid')\nconst tagged = tagSerializeError(nativeError, SerializeErrorCode.invalidOption, 'registry')\nconsole.log(tagged === nativeError) // true：只附加诊断字段，不替换 native error`,
     scenariosEn: [
       'A native error type must survive public tagging.',
       'An existing failure gains machine-readable ownership.',
@@ -6239,7 +6395,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '为 registry lifecycle、environment、abort 与 rollback failure 创建 tagged native Error。optional cause 保持 reachable，非空 errors list 会复制为 immutable secondary-failure snapshot。',
     quickStart:
-      "throw createSerializeError(SerializeErrorCode.registryDisposed, 'Registry is closed', { context: 'export', cause })",
+      `import { createSerializeError, SerializeErrorCode } from '@migaia/serialize'\n\nconst cause = new Error('caller closed the registry')\nthrow createSerializeError(SerializeErrorCode.registryDisposed, 'Registry is closed', { context: 'export', cause })`,
     scenariosEn: [
       'Registry lifecycle rejects new work.',
       'An environment capability is unavailable.',
@@ -6355,7 +6511,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建带 Serialize source/code 的 native TypeError，并保留 optional cause/context。用于错误 runtime shape、缺失 callable 与 incompatible value。',
     quickStart:
-      "throw createSerializeTypeError(SerializeErrorCode.invalidOption, 'decoder must be callable', { cause })",
+      `import { createSerializeTypeError, SerializeErrorCode } from '@migaia/serialize'\n\nconst cause = new TypeError('decoder is not callable')\nthrow createSerializeTypeError(SerializeErrorCode.invalidOption, 'decoder must be callable', { cause })`,
     scenariosEn: [
       'An option has the wrong runtime type.',
       'A required protocol method is missing.',
@@ -6455,7 +6611,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建带 Serialize source/code 的 native RangeError。用于 invalid numeric budget、empty plugin set、duplicate plugin type，以及超出 admitted finite domain 的 value。',
     quickStart:
-      "throw createSerializeRangeError(SerializeErrorCode.invalidOption, 'maxInFlight must be positive')",
+      `import { createSerializeRangeError, SerializeErrorCode } from '@migaia/serialize'\n\nconst maxInFlight = 0\nif (maxInFlight <= 0) {\n  const cause = new RangeError('maxInFlight must be positive')\n  throw createSerializeRangeError(SerializeErrorCode.invalidOption, 'maxInFlight must be positive', { cause })\n}`,
     scenariosEn: [
       'A count or deadline bound is invalid.',
       'A plugin list violates cardinality or uniqueness.',
@@ -6555,7 +6711,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '详细 codec boundary Error，携带 semantic code、serializer type、encode/decode phase、stream position、consumed-byte progress、context 与 original cause。construction 后冻结，避免 diagnostic drift。',
     quickStart:
-      "throw new SerializeCodecError('Decode failed', {\n  code: SerializeErrorCode.decodeFailed, type: 'json', phase: SerializePhase.decode,\n  chunkIndex: index, bytesConsumed, context: 'import', cause\n})",
+      `import { SerializeCodecError, SerializeErrorCode, SerializePhase } from '@migaia/serialize'\n\nconst index = 2\nconst bytesConsumed = 128\nconst cause = new SyntaxError('invalid JSON payload')\nthrow new SerializeCodecError('Decode failed', {\n  code: SerializeErrorCode.decodeFailed, type: 'json', phase: SerializePhase.decode,\n  chunkIndex: index, bytesConsumed, context: 'import', cause\n})`,
     scenariosEn: [
       'A parser or stream failure needs precise progress.',
       'An outer stream wraps an inner codec failure by cause.',
@@ -6744,7 +6900,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '自适应切分 large in-memory array，并在 slice 之间 yield。通过 injected scheduler 测量 consumer processing time，再以阻尼方式把下一片大小调整到 targetMs，同时保持在显式边界内。',
     quickStart:
-      'for await (const batch of sliceByFrameBudget(rows, { scheduler, targetMs: 8 })) {\n  await worker.process(batch)\n}',
+      `import { createManualScheduler, sliceByFrameBudget } from '@migaia/serialize'\n\nconst rows = [{ id: 1 }, { id: 2 }, { id: 3 }]\nconst scheduler = createManualScheduler()\nfor await (const batch of sliceByFrameBudget(rows, { scheduler, targetMs: 8 })) {\n  console.log('process batch:', batch)\n}`,
     scenariosEn: [
       'Large CPU work must preserve browser responsiveness.',
       'Slice size should adapt to real consumer cost.',
@@ -6910,7 +7066,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '把 materialized array 编码为 ordered async chunk stream，不组装最终 blob。adaptive slicing 约束 main-thread work，maxInFlight 提供 backpressure，consumer 提前退出会 abort queued operation-owned work。',
     quickStart:
-      "for await (const chunk of encodeStream(registry, rows, { scheduler, type: 'json', maxInFlight: 2 })) {\n  await sink.write(chunk)\n}",
+      `import { createSerializeRegistry, encodeStream, jsonPlugin, type ISerializeScheduler } from '@migaia/serialize'\n\nconst scheduler: ISerializeScheduler = {\n  now: () => performance.now(),\n  schedule: (callback, delayMs) => {\n    const timer = setTimeout(callback, delayMs)\n    return { cancel: () => clearTimeout(timer) }\n  }\n}\nconst registry = createSerializeRegistry([jsonPlugin()])\nconst rows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst sink = { write: async (chunk: unknown) => console.log('send chunk:', chunk) }\n\ntry {\n  for await (const chunk of encodeStream(registry, rows, { scheduler, type: 'json', maxInFlight: 2 })) {\n    await sink.write(chunk)\n  }\n} finally {\n  await registry.dispose()\n}`,
     scenariosEn: [
       'A sink accepts chunks incrementally.',
       'Encoding should overlap bounded downstream work.',
@@ -7140,7 +7296,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '逐个解码 sync/async iterable 中的 chunk，并按序 yield value。failure 会带 stream chunk index 重新投影，同时把 inner registry error 保留为 cause。',
     quickStart:
-      "for await (const record of decodeStream(registry, chunks, { type: 'json', signal })) consume(record)",
+      `import { createSerializeRegistry, decodeStream, encodeStream, jsonPlugin, type ISerializeScheduler } from '@migaia/serialize'\n\nconst scheduler: ISerializeScheduler = {\n  now: () => performance.now(),\n  schedule: (callback, delayMs) => {\n    const timer = setTimeout(callback, delayMs)\n    return { cancel: () => clearTimeout(timer) }\n  }\n}\nconst registry = createSerializeRegistry([jsonPlugin()])\nconst chunks = encodeStream(registry, [{ id: 1 }, { id: 2 }], { scheduler, type: 'json', maxInFlight: 2 })\nconst signal = new AbortController().signal\n\ntry {\n  for await (const record of decodeStream(registry, chunks, { type: 'json', signal })) {\n    console.log('received record:', record)\n  }\n} finally {\n  await registry.dispose()\n}`,
     scenariosEn: [
       'A transport supplies serialized chunks incrementally.',
       'Failure location must identify the stream position.',
@@ -7256,7 +7412,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '消费完整 chunk iterable，并合并为一个 text 或 byte chunk。没有 byte 时保持 text；出现任一 byte 后统一为 bytes；value chunk 因不可拼接而拒绝。仅在 consumer 确实需要完整 payload 时使用。',
     quickStart:
-      "const complete = await collectStream(encodedChunks, textEncoder, { signal, empty: 'reject' })",
+      `import { collectStream } from '@migaia/serialize'\n\nconst encodedChunks = ['Ada']\nconst textEncoder = new TextEncoder()\nconst complete = await collectStream(encodedChunks, textEncoder, { empty: 'reject' })\nconsole.log(complete)`,
     scenariosEn: [
       'A Blob, request body, or storage write needs one payload.',
       'Mixed text and byte chunks must normalize to bytes.',
@@ -7370,7 +7526,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Normalizes one text or byte chunk to string using an injected decoder. Byte chunks are decoded, text is returned unchanged, and structured value chunks fail with a tagged native TypeError.',
     purposeZh:
       '使用 injected decoder 把一个 text/byte chunk 规范化为 string。byte chunk 会 decode，text 原样返回，structured value chunk 以 tagged native TypeError 失败。',
-    quickStart: 'const text = chunkToText(chunk, new TextDecoder())',
+    quickStart: `import { chunkToText } from '@migaia/serialize'\n\nconst chunk = new Uint8Array([65, 100, 97])\nconst text = chunkToText(chunk, new TextDecoder())\nconsole.log(text) // Ada：byte chunk 经过 decoder 交给 text-only sink`,
     scenariosEn: [
       'A text-only sink receives either text or bytes.',
       'Host Encoding capability is explicitly injected.',
@@ -7438,7 +7594,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '把一个 byte/text chunk 规范化为新的 Uint8Array。existing bytes 会复制以安全转移 ownership，text 使用 injected encoder，structured value chunk 被拒绝。',
     quickStart:
-      'const ownedBytes = chunkToBytes(chunk, new TextEncoder())\nport.postMessage(ownedBytes, [ownedBytes.buffer])',
+      `import { chunkToBytes } from '@migaia/serialize'\n\nconst chunk = 'Ada'\nconst ownedBytes = chunkToBytes(chunk, new TextEncoder())\nconsole.log(ownedBytes)`,
     scenariosEn: [
       'Preparing transferable bytes.',
       'Writing to binary persistence.',
@@ -7506,7 +7662,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '为 ordered plugin set 创建 lifecycle owner。首个 plugin 是 primary；construction 在 ownership 前 snapshot 全部 option 与 parser method；encode/decode 组合 caller cancellation 与 registry close；dispose single-flight，并冻结首次 deadline。',
     quickStart:
-      'const registry = createSerializeRegistry([jsonPlugin()], { scheduler, report })\ntry {\n  const chunk = await registry.encode(value)\n  return await registry.decode(chunk)\n} finally {\n  await registry.dispose({ deadlineAt: scheduler.now() + 1_000 })\n}',
+      `import { createManualScheduler, createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\n\nconst scheduler = createManualScheduler()\nconst report = (error: unknown) => console.error('serialize failed:', error)\nconst registry = createSerializeRegistry([jsonPlugin()], { scheduler, report })\nconst value = { id: 1, name: 'Ada' }\ntry {\n  const chunk = await registry.encode(value)\n  const restored = await registry.decode(chunk)\n  console.log(restored)\n} finally {\n  await registry.dispose({ deadlineAt: scheduler.now() + 1_000 })\n}`,
     scenariosEn: [
       'Several serializers need one selected default and lifecycle.',
       'In-flight work must abort when the owner closes.',
@@ -7669,7 +7825,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Canonical chunk discriminators for structured values, text, and bytes. Parsers and stream consumers branch on these values; use the constant instead of copying wire strings.',
     purposeZh:
       'structured value、text 与 bytes 的 canonical chunk discriminator。parser 与 stream consumer 按这些 value 分支；应使用 constant，不要复制 wire string。',
-    quickStart: 'if (chunk[0] === SerializeChunkKind.bytes) send(chunk[1])',
+    quickStart: `import { SerializeChunkKind } from '@migaia/serialize'\n\nconst chunk: readonly [string, Uint8Array] = [SerializeChunkKind.bytes, new Uint8Array([65])]\nconst send = (bytes: Uint8Array) => console.log(bytes)\nif (chunk[0] === SerializeChunkKind.bytes) send(chunk[1])`,
     scenariosEn: [
       'Building a custom parser.',
       'Inspecting streamed output.',
@@ -7696,7 +7852,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Stable diagnostic kinds emitted when registry cleanup fails or cannot drain before its deadline. They classify teardown observation, not thrown error codes.',
     purposeZh:
       'registry cleanup 失败或无法在 deadline 前 drain 时发出的稳定 diagnostic kind。它们分类 teardown observation，不是 thrown error code。',
-    quickStart: 'if (event.kind === SerializeCleanupKind.drainTimeout) recordSlowShutdown(event)',
+    quickStart: `import { SerializeCleanupKind } from '@migaia/serialize'\n\nconst event = { kind: SerializeCleanupKind.drainTimeout, pending: 2 }\nif (event.kind === SerializeCleanupKind.drainTimeout) console.warn('shutdown still has pending work', event.pending) // 只记录 teardown diagnostic，不替代错误码`,
     scenariosEn: [
       'Routing cleanup diagnostics.',
       'Separating cleanup failure from drain timeout.',
@@ -7724,7 +7880,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '选择 registry teardown behavior：throw 将 cleanup failure 暴露给 disposer，report 通过 configured cleanup reporter 隔离。该 policy 不改变 primary operation error。',
     quickStart:
-      'createSerializeRegistry(plugins, { cleanup: { policy: SerializeCleanupPolicy.report, report } })',
+      `import { createSerializeRegistry, jsonPlugin, SerializeCleanupPolicy } from '@migaia/serialize'\n\nconst plugins = [jsonPlugin()]\nconst report = (error: unknown) => console.error('cleanup failure:', error)\nconst registry = createSerializeRegistry(plugins, { cleanup: { policy: SerializeCleanupPolicy.report, report } })\nawait registry.dispose()`,
     scenariosEn: [
       'A host chooses fail-fast shutdown.',
       'A long-lived service reports contained cleanup errors.',
@@ -7751,7 +7907,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Canonical codec output representations: text, structured, and binary. Use them to route an admitted codec to a compatible transport or persistence channel.',
     purposeZh:
       'canonical codec output representation：text、structured 与 binary。用于把 admitted codec 路由到兼容 transport 或 persistence channel。',
-    quickStart: 'const channel = codec.output === SerializeOutput.binary ? byteStore : textStore',
+    quickStart: `import { SerializeOutput } from '@migaia/serialize'\n\nconst codec = { output: SerializeOutput.binary }\nconst byteStore = 'binary-channel'\nconst textStore = 'text-channel'\nconst channel = codec.output === SerializeOutput.binary ? byteStore : textStore\nconsole.log(channel) // binary-channel`,
     scenariosEn: [
       'Selecting a storage channel.',
       'Declaring custom codec output.',
@@ -7778,7 +7934,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Stable encode and decode phase values carried by SerializeCodecError and instrumentation. They identify which direction failed without parsing a message.',
     purposeZh:
       'SerializeCodecError 与 instrumentation 携带的稳定 encode/decode phase value。无需解析 message 即可识别失败方向。',
-    quickStart: 'if (error.phase === SerializePhase.decode) quarantinePayload()',
+    quickStart:
+      `import { SerializePhase } from '@migaia/serialize'\n\nconst error: { phase: SerializePhase } = { phase: SerializePhase.decode }\nif (error.phase === SerializePhase.decode) {\n  // 解码失败时隔离原始 payload，避免继续进入业务流程。\n  console.warn('quarantine payload')\n}`,
     scenariosEn: [
       'Routing codec diagnostics.',
       'Measuring encode and decode separately.',
@@ -7805,7 +7962,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Canonical identifier for the built-in JSON plugin. Registry type lookup and metadata use this exact value; custom plugins must choose their own valid stable type.',
     purposeZh:
       'built-in JSON plugin 的 canonical identifier。registry type lookup 与 metadata 使用该精确 value；custom plugin 必须选择自己的有效稳定 type。',
-    quickStart: 'const value = await registry.decode(chunk, { type: SerializePluginType.json })',
+    quickStart: `import { SerializePluginType } from '@migaia/serialize'\n\nconst type = SerializePluginType.json\nconsole.log(type) // registry lookup 使用这个稳定的内置 JSON plugin type`,
     scenariosEn: [
       'Selecting the built-in JSON parser.',
       'Checking registry metadata.',
@@ -7832,7 +7989,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Validates a serializer type before registry lookup or installation. Accepted names follow SERIALIZE_TYPE_PATTERN; malformed values fail early instead of becoming ambiguous missing-plugin errors.',
     purposeZh:
       '在 registry lookup 或 installation 前验证 serializer type。accepted name 必须符合 SERIALIZE_TYPE_PATTERN；malformed value 会 early fail，不会变成含糊的 missing-plugin error。',
-    quickStart: 'assertSerializeType(type)\nconst parser = registry.get(type)',
+    quickStart: `import { assertSerializeType } from '@migaia/serialize'\n\nconst type = 'json'\nassertSerializeType(type)\n// registry 是应用启动时维护的 serializer 注册表；这里只演示验证后再查询。\nconst registry = new Map([['json', { name: 'json' }]])\nconst parser = registry.get(type)\nconsole.log(parser) // { name: 'json' }`,
     scenariosEn: [
       'Admitting a custom plugin type.',
       'Validating a caller-selected codec.',
@@ -7881,7 +8038,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Published lexical contract for serializer type names. It is useful for preflight UI and tests, while assertSerializeType remains the authoritative runtime guard.',
     purposeZh:
       'serializer type name 的公开 lexical contract。可用于 preflight UI 与测试；assertSerializeType 仍是 authoritative runtime guard。',
-    quickStart: 'const looksValid = SERIALIZE_TYPE_PATTERN.test(input)',
+    quickStart:
+      `import { SERIALIZE_TYPE_PATTERN } from '@migaia/serialize'\n\nconst candidateType = 'json'\nconst looksValid = SERIALIZE_TYPE_PATTERN.test(candidateType)\nconsole.log(looksValid)`,
     scenariosEn: [
       'Providing immediate form feedback.',
       'Generating boundary fixtures.',
@@ -7909,7 +8067,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '单个 Serialize chunk tuple 的 side-effect-free structural guard。在 collection 前区分 direct chunk、iterable output 与 promised output。',
     quickStart:
-      'if (isChunkShape(output)) consume(output)\nelse for await (const chunk of output) consume(chunk)',
+      `import { isChunkShape } from '@migaia/serialize'\n\nconst consume = (chunk: unknown) => console.log('received chunk:', chunk)\nconst output: unknown = { kind: 'value', data: 'ready' }\nif (isChunkShape(output)) consume(output)\nelse if (output != null && Symbol.asyncIterator in Object(output)) {\n  for await (const chunk of output as AsyncIterable<unknown>) consume(chunk)\n}`,
     scenariosEn: [
       'Normalizing parser output.',
       'Narrowing an unknown transport value.',
@@ -7958,7 +8116,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Encodes one Uint8Array into canonical Base64 without relying on host btoa. Use it when the final consumer requires one complete text value.',
     purposeZh:
       '不依赖 host btoa，将一个 Uint8Array 编码为 canonical Base64。最终 consumer 需要完整 text value 时使用。',
-    quickStart: 'const payload = bytesToBase64(bytes)\nawait textStore.set(key, payload)',
+    quickStart: `import { bytesToBase64 } from '@migaia/serialize'\n\nconst bytes = new Uint8Array([65, 100, 97])\nconst payload = bytesToBase64(bytes)\nconsole.log(payload) // 可写入只接受文本的 channel`,
     scenariosEn: [
       'Writing binary data to a text-only channel.',
       'Producing one JSON-compatible string.',
@@ -8007,7 +8165,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Strictly decodes canonical Base64 text into bytes. Invalid alphabet, padding, or length becomes a tagged native TypeError with INVALID_OPTION.',
     purposeZh:
       '严格把 canonical Base64 text 解码为 bytes。无效 alphabet、padding 或 length 会成为带 INVALID_OPTION 的 tagged native TypeError。',
-    quickStart: 'const bytes = base64ToBytes(record.payload)\nawait byteSink.write(bytes)',
+    quickStart: `import { base64ToBytes } from '@migaia/serialize'\n\nconst record = { payload: 'QWRh' }\nconst bytes = base64ToBytes(record.payload)\nconsole.log(bytes) // 还原为 Uint8Array 后交给 byte sink`,
     scenariosEn: [
       'Reading binary data from a text channel.',
       'Decoding SSR or persistence payloads.',
@@ -8056,7 +8214,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Synchronously yields Base64 text segments aligned to three-byte input groups, so a streaming sink never requires one complete Base64 string. Concatenating the chunks exactly matches bytesToBase64.',
     purposeZh:
       '同步产出按三字节 input group 对齐的 Base64 text segment，使 streaming sink 无需完整 Base64 string。拼接全部 chunk 与 bytesToBase64 完全一致。',
-    quickStart: 'for (const chunk of streamBase64Chunks(bytes)) await upload.write(chunk)',
+    quickStart: `import { streamBase64Chunks } from '@migaia/serialize'\n\nconst bytes = new Uint8Array([65, 100, 97])\nconst upload = { write: async (chunk: string) => console.log(chunk) }\nfor (const chunk of streamBase64Chunks(bytes)) await upload.write(chunk)`,
     scenariosEn: [
       'Chunked upload to a text sink.',
       'Writing through a WritableStream.',
@@ -8106,7 +8264,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '一次读取 codec descriptor，验证非空 name、output channel、encode 与 decode function，再返回 captured surface。throwing accessor 与 malformed descriptor 会成为 INVALID_ARGUMENT，并保留 cause。',
     quickStart:
-      'const stableCodec = snapshotCodec(candidateCodec)\nconst encoded = await stableCodec.encode(value)',
+      `import { snapshotCodec } from '@migaia/storage-contract'\n\nconst candidateCodec = { name: 'json', output: 'text' as const, encode: async (value: unknown) => JSON.stringify(value), decode: async (text: string) => JSON.parse(text) }\nconst value = { id: 1, name: 'Ada' }\nconst stableCodec = snapshotCodec(candidateCodec)\nconst encoded = await stableCodec.encode(value)\nconsole.log(encoded)`,
     scenariosEn: [
       'A codec crosses a plugin or configuration boundary.',
       'Routing by output must not reread mutable getters.',
@@ -8155,7 +8313,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Assertion form of the shared codec contract. It narrows an unknown value to ICodec while preserving the same one-read validation and INVALID_ARGUMENT semantics as snapshotCodec.',
     purposeZh:
       'shared codec contract 的 assertion 形式。它把 unknown value 收窄为 ICodec，并保持与 snapshotCodec 相同的 one-read validation 与 INVALID_ARGUMENT semantics。',
-    quickStart: 'assertCodec(options.codec)\nreturn installCodec(options.codec)',
+    quickStart: `import { assertCodec } from '@migaia/storage-contract'\n\nconst options = { codec: { name: 'json', output: 'text', encode: JSON.stringify, decode: JSON.parse } }\nconst installCodec = (codec: typeof options.codec) => console.log('installed', codec.name)\nassertCodec(options.codec)\ninstallCodec(options.codec) // 先验证 descriptor，再把 codec 交给注册流程`,
     scenariosEn: [
       'A public API only needs entry validation.',
       'TypeScript narrowing is useful after the guard.',
@@ -8205,7 +8363,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       'versioned text codec：通过 JSON 保留 genuine Map/Set instance，同时不改变普通 JSON value。它只生成并恢复精确 tagged tuple；malformed root 与 payload 会在 INVALID_ARGUMENT 下保留 parser failure。',
     quickStart:
-      "const text = await collectionsJsonCodec.encode({ roles: new Set(['admin']) })\nconst restored = await collectionsJsonCodec.decode(text)\nconsole.log(restored.roles instanceof Set)",
+      `import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst text = await collectionsJsonCodec.encode({ roles: new Set(['admin']) })\nconst restored = await collectionsJsonCodec.decode(text)\nconsole.log(restored.roles instanceof Set)`,
     scenariosEn: [
       'Persisting JSON-compatible state containing Map or Set.',
       'A stable text wire format is required.',
@@ -8232,7 +8390,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Stable wire identifier migaia-collections-json-v1 used by collectionsJsonCodec and its exact Map/Set tuples. Consumers may compare it for diagnostics or registry selection but must not synthesize tagged payloads manually.',
     purposeZh:
       'collectionsJsonCodec 及其精确 Map/Set tuple 使用的稳定 wire identifier：migaia-collections-json-v1。consumer 可用于 diagnostic 或 registry selection，但不应手工合成 tagged payload。',
-    quickStart: 'codecRegistry.set(COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec)',
+    quickStart:
+      `import { COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst codecRegistry = new Map<string, unknown>()\ncodecRegistry.set(COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec)\nconsole.log(codecRegistry.get(COLLECTIONS_JSON_CODEC_NAME))`,
     scenariosEn: [
       'Registering the canonical codec.',
       'Displaying persisted-format diagnostics.',
@@ -8259,7 +8418,10 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Canonical runtime values for write conflict behavior. conflict rejects an incompatible existing revision; replace explicitly permits overwrite. Use the constant instead of copying protocol strings.',
     purposeZh:
       'write conflict behavior 的 canonical runtime values。conflict 拒绝不兼容 existing revision；replace 显式允许 overwrite。应使用 constant，不要复制 protocol string。',
-    quickStart: 'await records.putRecord(value, key, { conflictPolicy: ConflictPolicy.conflict })',
+    quickStart: `import { ConflictPolicy } from '@migaia/storage-contract'
+
+const records = { putRecord: async (value: unknown, key: string, options: { conflictPolicy: string }) => console.log(value, key, options) }
+await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.conflict }) // 已存在且版本不兼容时拒绝覆盖`,
     scenariosEn: [
       'Configuring normal write options.',
       'Sharing policy values across adapters.',
@@ -8287,7 +8449,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '面向 compatibility 的 conflict-policy constant，与 ConflictPolicy 具有相同 conflict/replace value。新 operation code 优先使用 ConflictPolicy；仅在 public boundary 明确命名 Storage Contract domain 时保留此 export。',
     quickStart:
-      'const policy = StorageContractConflictPolicy.conflict\nregisterStoragePolicy(policy)',
+      `import { StorageContractConflictPolicy } from '@migaia/storage-contract'\n\nconst policy = StorageContractConflictPolicy.conflict\nconst registerStoragePolicy = (value: string) => console.log('policy:', value)\nregisterStoragePolicy(policy)`,
     scenariosEn: [
       'A public integration contract already references this named export.',
       'Generated metadata needs the domain-qualified constant.',
@@ -8314,7 +8476,11 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Best-effort diagnostic helper that reads an object prototype constructor name and returns undefined when access fails. Because prototype, constructor, and name are mutable, the result must never drive security, protocol, or capability decisions.',
     purposeZh:
       'best-effort diagnostic helper：读取 object prototype constructor name，访问失败时返回 undefined。由于 prototype、constructor 与 name 都可 mutation，该结果绝不能驱动 security、protocol 或 capability decision。',
-    quickStart: 'report({ receivedType: intrinsicConstructorName(value) ?? typeof value })',
+    quickStart: `import { intrinsicConstructorName } from '@migaia/storage-contract'
+
+const value: unknown = new Uint8Array([1, 2, 3])
+const diagnostic = { receivedType: intrinsicConstructorName(value) ?? typeof value }
+console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
     scenariosEn: [
       'Improving an invalid-value diagnostic.',
       'Logging an unexpected cross-realm object.',
@@ -8364,7 +8530,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '每个 StorageContractError 上的 canonical library source。应与 code 组合进行 machine routing；不要复制 literal，也不要只用 source 识别具体 failure。',
     quickStart:
-      'if (error.source === STORAGE_CONTRACT_SOURCE && error.code === StorageContractErrorCode.unsupported) useFallback()',
+      `import { STORAGE_CONTRACT_SOURCE, StorageContractErrorCode } from '@migaia/storage-contract'\n\nconst useFallback = () => console.log('use text fallback')\nconst error: { source?: string; code?: string } = { source: STORAGE_CONTRACT_SOURCE, code: StorageContractErrorCode.unsupported }\nif (error.source === STORAGE_CONTRACT_SOURCE && error.code === StorageContractErrorCode.unsupported) useFallback()`,
     scenariosEn: [
       'A shared reporter routes library failures.',
       'An RPC boundary serializes source and code.',
@@ -8392,7 +8558,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       'storage-boundary contract failure 使用的 native Error subclass。它冻结稳定 source、semantic code、optional backend/key context 与 original cause，同时不重写任一 stack。',
     quickStart:
-      'throw new StorageContractError(StorageContractErrorCode.unsupported, { backend: storage.backend })',
+      `import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'\n\nexport function rejectUnsupported(backend: 'memory' | 'indexeddb'): never {\n  throw new StorageContractError(StorageContractErrorCode.unsupported, { backend })\n}`,
     scenariosEn: [
       'A public storage boundary rejects unsupported capability.',
       'Invalid input needs stable machine identity.',
@@ -8507,7 +8673,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       'StorageContractError 的 same-realm instanceof guard。它收窄 source、code、backend 与 key；serialized 或 cross-realm failure 应改为验证 transferred error contract。',
     quickStart:
-      'catch (error) {\n  if (isStorageContractError(error) && error.code === StorageContractErrorCode.unsupported) return fallback\n  throw error\n}',
+      `import { isStorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'\n\nexport function readOrFallback<T>(read: () => T, fallback: T): T {\n  try {\n    return read()\n  } catch (error) {\n    if (isStorageContractError(error) && error.code === StorageContractErrorCode.unsupported) return fallback\n    throw error\n  }\n}`,
     scenariosEn: [
       'Handling a known contract failure in the same realm.',
       'Reading backend or key diagnostics safely.',
@@ -8557,7 +8723,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '一次读取 cancellation、timeout、page size 与 conflict policy，验证边界并冻结可复用 operation snapshot。再次传入该 snapshot 时不会重复访问 caller getter。',
     quickStart:
-      'const ctx = snapshotOperationContext({ signal, timeoutMs: 2_000, pageSize: 128 })\nawait storage.keys(ctx)',
+      `import { snapshotOperationContext } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst ctx = snapshotOperationContext({ timeoutMs: 2_000, pageSize: 128 })\nconsole.log(await storage.keys(ctx))\nawait storage.dispose()`,
     scenariosEn: [
       'An asynchronous operation crosses several internal layers.',
       'Hostile or mutable option getters must be observed once.',
@@ -8652,7 +8818,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Validates the asynchronous operation context without returning its snapshot. Invalid signals, timeouts, page sizes, policies, or throwing accessors become INVALID_ARGUMENT with the original cause retained.',
     purposeZh:
       '验证 asynchronous operation context，但不返回 snapshot。无效 signal、timeout、page size、policy 或 throwing accessor 会成为 INVALID_ARGUMENT，并保留 original cause。',
-    quickStart: 'assertOperationContext(options)\nreturn runBackendOperation(options)',
+    quickStart: `import { assertOperationContext } from '@migaia/storage-contract'\n\nconst options = { signal: undefined, timeoutMs: 2_000, pageSize: 50 }\nconst runBackendOperation = (context: typeof options) => ({ acceptedTimeout: context.timeoutMs })\nassertOperationContext(options)\nconst result = runBackendOperation(options)\nconsole.log(result) // { acceptedTimeout: 2000 }：资源分配前先拒绝无效上下文`,
     scenariosEn: [
       'A public method validates before allocating backend resources.',
       'A wrapper already owns subsequent snapshotting.',
@@ -8700,7 +8866,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '验证精简的 synchronous-write contract，并只返回 conflictPolicy。signal 与 timeoutMs 会被拒绝，因为同步通道在执行开始后无法兑现 cancellation。',
     quickStart:
-      "const options = snapshotSyncWriteOptions({ conflictPolicy: ConflictPolicy.replace })\nstorage.sync.set('theme', 'dark', options)",
+      `import { ConflictPolicy, snapshotSyncWriteOptions } from '@migaia/storage-contract'\n\nconst options = snapshotSyncWriteOptions({ conflictPolicy: ConflictPolicy.replace })\nconst storage = { sync: { set: (key: string, value: string, writeOptions: unknown) => console.log(key, value, writeOptions) } }\nstorage.sync.set('theme', 'dark', options)`,
     scenariosEn: [
       'A synchronous adapter snapshots write policy.',
       'One validation path is shared by local, session, cookie, and memory stores.',
@@ -8747,7 +8913,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Assertion-only form of synchronous write validation. It rejects cancellation fields and unknown conflict policies before the backend mutates storage.',
     purposeZh:
       'synchronous write validation 的 assertion-only 形式。在 backend mutation storage 前拒绝 cancellation field 与未知 conflict policy。',
-    quickStart: 'assertSyncWriteOptions(options)\nwriteSynchronously(key, value, options)',
+    quickStart: `import { ConflictPolicy, assertSyncWriteOptions } from '@migaia/storage-contract'\n\nconst options = { conflictPolicy: ConflictPolicy.conflict }\nconst key = 'cache:user:1'\nconst value = 'Ada'\nconst writeSynchronously = (storageKey: string, nextValue: string, writeOptions: typeof options) => console.log(storageKey, nextValue, writeOptions)\nassertSyncWriteOptions(options)\nwriteSynchronously(key, value, options)`,
     scenariosEn: [
       'A sync method only needs entry validation.',
       'Mutation must not start after an invalid option.',
@@ -8794,7 +8960,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Requires a string key for the L0 text, byte, and metadata channels. Failure is tagged INVALID_KEY with backend, offending key, and a TypeError cause.',
     purposeZh:
       '要求 L0 text、byte 与 metadata channel 使用 string key。失败会标记 INVALID_KEY，并携带 backend、offending key 与 TypeError cause。',
-    quickStart: "assertStringStorageKey(key, storage.backend, 'cache key')\nawait storage.get(key)",
+    quickStart: `import { assertStringStorageKey } from '@migaia/storage-contract'\n\nconst key = 'cache:user:1'\nconst storage = { backend: 'memory', get: async (storageKey: string) => console.log('read', storageKey) }\nassertStringStorageKey(key, storage.backend, 'cache key')\nawait storage.get(key)`,
     scenariosEn: [
       'Guarding text-store keys.',
       'Validating metadata names.',
@@ -8878,7 +9044,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '验证 structured record-key domain：finite number、string、有效 Date、bounded ArrayBuffer，或由这些值构成的非空无环 array。depth、node count 与 binary size 受 KEY_DOMAIN_LIMITS 约束。',
     quickStart:
-      'assertStorageKey([tenantId, new Date(day)], storage.backend)\nawait records.getRecord([tenantId, new Date(day)])',
+      `import { assertStorageKey, type IRecordStore } from '@migaia/storage-contract'\n\nexport async function readTenantDay(records: IRecordStore, tenantId: string, day: string): Promise<unknown> {\n  const key = [tenantId, new Date(day)] as const\n  assertStorageKey(key, records.backend)\n  return records.getRecord(key)\n}`,
     scenariosEn: [
       'Validating an IndexedDB-compatible record key.',
       'Rejecting cyclic or sparse compound keys.',
@@ -8962,7 +9128,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '验证并 detach structured key，使后续 asynchronous work 无法观察 caller mutation。compound array 与 Date 会复制；ArrayBuffer 通过 cross-realm key classifier 规范化。',
     quickStart:
-      'const stableKey = snapshotStorageKey([tenantId, cursor], storage.backend)\nqueueMicrotask(() => records.getRecord(stableKey))',
+      `import { snapshotStorageKey } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst records = storage\nconst tenantId = 'tenant-42'\nconst cursor = new Date('2026-01-01')\nconst stableKey = snapshotStorageKey([tenantId, cursor], storage.backend)\nqueueMicrotask(async () => console.log(await records.getRecord(stableKey)))\nawait storage.dispose()`,
     scenariosEn: [
       'A key crosses an async scheduling boundary.',
       'Caller-owned compound arrays may mutate.',
@@ -9045,7 +9211,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Provides the canonical total ordering for valid storage keys: number, Date, string, ArrayBuffer, then compound array, with lexicographic comparison inside each domain. It matches validation and cross-realm classification.',
     purposeZh:
       '提供 valid storage key 的 canonical total ordering：number、Date、string、ArrayBuffer、compound array；每个 domain 内按 lexicographic rule 比较，并与 validation/cross-realm classification 一致。',
-    quickStart: 'const ordered = keys.toSorted(compareStorageKeys)\nconst first = ordered.at(0)',
+    quickStart: `import { compareStorageKeys } from '@migaia/storage-contract'\n\nconst keys = ['b', 2, 'a']\nconst ordered = keys.toSorted(compareStorageKeys)\nconst first = ordered.at(0)\nconsole.log(first) // 按 storage key 规范取得稳定的第一个 key`,
     scenariosEn: [
       'Producing deterministic snapshots.',
       'Sorting mixed valid key domains.',
@@ -9112,7 +9278,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Publishes the hard safety bounds used while validating compound storage keys: 32 levels, 4096 visited nodes, and 1 MiB per binary key component. These are contract limits, not tuning controls.',
     purposeZh:
       '公开 compound storage key validation 使用的 hard safety bound：32 层、4096 个 visited node、每个 binary key component 1 MiB。这些是 contract limit，不是 tuning control。',
-    quickStart: 'if (bytes.byteLength > KEY_DOMAIN_LIMITS.maxBinaryBytes) showKeyTooLarge()',
+    quickStart: `import { KEY_DOMAIN_LIMITS } from '@migaia/storage-contract'\n\nconst bytes = new Uint8Array(2 ** 20 + 1)\nconst showKeyTooLarge = () => console.warn('storage key is too large')\nif (bytes.byteLength > KEY_DOMAIN_LIMITS.maxBinaryBytes) showKeyTooLarge()`,
     scenariosEn: [
       'Preflight UI mirrors the runtime bound.',
       'Diagnostics explain why a key was rejected.',
@@ -9139,7 +9305,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Checks that a transaction entry callback is callable before a backend allocates snapshot, connection, or lock state. Invalid input becomes INVALID_ARGUMENT attributed to the selected backend.',
     purposeZh:
       '在 backend 分配 snapshot、connection 或 lock state 前，检查 transaction entry callback 是否 callable。无效 input 会成为归因于 selected backend 的 INVALID_ARGUMENT。',
-    quickStart: 'assertTransactionCallback(run, storage.backend)\nreturn storage.transaction(run)',
+    quickStart: `import { assertTransactionCallback } from '@migaia/storage-contract'\n\nconst run = async () => ({ committed: true })\nconst storage = { backend: 'memory', transaction: async (callback: () => Promise<unknown>) => callback() }\nassertTransactionCallback(run, storage.backend)\nconst result = await storage.transaction(run)\nconsole.log(result) // { committed: true }：通过入口校验后才进入 transaction`,
     scenariosEn: [
       'A transaction method guards before resource allocation.',
       'Memory and IndexedDB engines share the same failure contract.',
@@ -9207,7 +9373,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '一次读取 transaction write options 并返回 normalized conflict policy。省略 options 或 policy 时默认 conflict；只有显式 replace 才改变 overwrite behavior。',
     quickStart:
-      'const policy = readTransactionConflictPolicy(options, storage.backend)\nif (policy === ConflictPolicy.conflict) assertRevision(current)',
+      `import { ConflictPolicy, readTransactionConflictPolicy } from '@migaia/storage-contract'\n\nconst options = { conflictPolicy: ConflictPolicy.conflict }\nconst storage = { backend: 'memory' as const }\nconst current = { revision: 1 }\nconst assertRevision = (value: unknown) => console.log('revision:', value)\nconst policy = readTransactionConflictPolicy(options, storage.backend)\nif (policy === ConflictPolicy.conflict) assertRevision(current)`,
     scenariosEn: [
       'A transaction engine selects conflict handling once.',
       'A hostile policy getter must preserve its cause.',
@@ -9275,7 +9441,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '只读取一次 backend capability descriptor，并返回独立的事实对象。无效 shape 或 hostile getter 返回 undefined，不让异常逃逸，使 feature routing 可以 fail closed。',
     quickStart:
-      'const capabilities = snapshotStorageCapabilities(candidate.capabilities)\nif (!capabilities?.transactions) useNonTransactionalPath()',
+      `import { snapshotStorageCapabilities } from '@migaia/storage-contract'\n\nconst candidate = { capabilities: { transactions: true, records: true } }\nconst useNonTransactionalPath = () => console.log('fallback path')\nconst capabilities = snapshotStorageCapabilities(candidate.capabilities)\nif (!capabilities?.transactions) useNonTransactionalPath()\nelse console.log('transaction path')`,
     scenariosEn: [
       'Routing work before touching an optional backend channel.',
       'Admitting a plugin-supplied capability object.',
@@ -9326,7 +9492,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '完整 storage capability contract 的 boolean type guard。它验证全部 required flag、约束 maxValueBytes，并把 legacy descriptor 缺失的 secondaryIndexes 与 changeFeed 视为 false。',
     quickStart:
-      "if (!isStorageCapabilities(value)) throw new TypeError('Invalid capabilities')\nif (value.binary) enableByteCodec()",
+      `import { isStorageCapabilities } from '@migaia/storage-contract'\n\nconst enableByteCodec = () => console.log('byte codec enabled')\nconst value: unknown = { backend: 'memory', text: true, binary: false, structured: true, transactions: true, iteration: true, metadata: true, secondaryIndexes: false, changeFeed: false }\nif (!isStorageCapabilities(value)) throw new TypeError('Invalid capabilities')\nif (value.binary) enableByteCodec()`,
     scenariosEn: [
       'A branch only needs valid/invalid narrowing.',
       'A public adapter validates capabilities before exposing itself.',
@@ -9376,7 +9542,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '对完整 base key-value store surface 执行 one-read admission。成功时返回 store、normalized backend/capabilities，以及原始 dispose function 与 receiver；失败时保留可用的 accessor cause。',
     quickStart:
-      "const admission = snapshotKeyValueStoreDetailed(candidate)\nif (!admission.valid) throw new Error('Store admission failed', { cause: admission.cause })\nawait admission.dispose.call(admission.receiver)",
+      `import { snapshotKeyValueStoreDetailed } from '@migaia/storage-contract'\n\nexport async function closeCandidate(candidate: unknown): Promise<void> {\n  const admission = snapshotKeyValueStoreDetailed(candidate)\n  if (!admission.valid) throw new Error('Store admission failed', { cause: admission.cause })\n  await admission.dispose()\n}`,
     scenariosEn: [
       'A lifecycle owner must capture callable identity once.',
       'A failed hostile getter must remain diagnosable.',
@@ -9427,7 +9593,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '返回包含 admitted store、backend kind 与 capability facts 的稳定 base-store snapshot。在组合高阶 capability check 时避免重复读取 public accessor。',
     quickStart:
-      'const snapshot = snapshotKeyValueStore(candidate)\nif (!snapshot) return unsupported\nrouteByBackend(snapshot.backend, snapshot.store)',
+      `import { snapshotKeyValueStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst candidate = memoryStorageHost()\nconst snapshot = snapshotKeyValueStore(candidate)\nif (snapshot) console.log(snapshot.backend, snapshot.store)\nawait candidate.dispose()`,
     scenariosEn: [
       'Composing a change-feed or adapter guard.',
       'Selecting a backend path after a single admission.',
@@ -9477,7 +9643,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '接纳完整 structured-record surface，并同时要求 records、binary、transactions 与 iteration capability。该 snapshot 是组合 record 与 secondary-index 能力的安全起点。',
     quickStart:
-      'const snapshot = snapshotRecordStore<User>(candidate)\nif (!snapshot) return fallback\nconst user = await snapshot.store.getRecord(userId)',
+      `import { snapshotRecordStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype User = { id: number; name: string }\nconst candidate = memoryStorageHost<User>()\nawait candidate.putRecord({ id: 1, name: 'Ada' }, 1)\nconst snapshot = snapshotRecordStore<User>(candidate)\nif (snapshot) console.log(await snapshot.store.getRecord(1))\nawait candidate.dispose()`,
     scenariosEn: [
       'An adapter requires all L1 record operations.',
       'A secondary-index guard needs an admitted record base.',
@@ -9527,7 +9693,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '检查完整 L0 key-value store contract：已知 backend、有效 capabilities、全部 string-channel method 与 dispose；不会调用任何 storage operation。',
     quickStart:
-      "if (!isKeyValueStore(candidate)) return rejectPlugin(candidate)\nawait candidate.set('theme', 'dark')",
+      `import { isKeyValueStore } from '@migaia/storage-contract'\n\nconst rejectPlugin = (candidate: unknown) => console.warn('incomplete store rejected', candidate)\nexport async function configureStore(candidate: unknown): Promise<void> {\n  if (!isKeyValueStore(candidate)) return rejectPlugin(candidate)\n  await candidate.set('theme', 'dark')\n}`,
     scenariosEn: [
       'A dynamic value must be narrowed before use.',
       'Plugin installation rejects incomplete stores.',
@@ -9577,7 +9743,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '要求 base store 暴露完整 structured-record contract，并将其收窄为 IRecordStore。capability flag 或 method 不完整时，在 record work 开始前抛出 UNSUPPORTED。',
     quickStart:
-      "const records = asRecordStore<User>(storage)\nawait records.putRecord({ id: userId, name: 'Ada' }, userId)",
+      `import { asRecordStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype User = { id: string; name: string }\nconst storage = memoryStorageHost<User>()\nconst records = asRecordStore<User>(storage)\nawait records.putRecord({ id: 'user-42', name: 'Ada' }, 'user-42')\nconsole.log(await records.getRecord('user-42'))\nawait storage.dispose()`,
     scenariosEn: [
       'Record support is mandatory for the requested feature.',
       'A public API should fail early instead of branching repeatedly.',
@@ -9627,7 +9793,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '完整 record-store surface 及其 required capability 组合的 boolean guard。caller 拥有 fallback 而非 exception path 时使用。',
     quickStart:
-      'if (isRecordStore(storage)) await storage.putRecord(profile, profile.id)\nelse await storage.set(profile.id, JSON.stringify(profile))',
+      `import { isKeyValueStore, isRecordStore } from '@migaia/storage-contract'\n\nconst rejectPlugin = (candidate: unknown) => console.warn('incomplete store rejected', candidate)\ntype IUser = { id: number; name: string }\nexport async function saveUser(storage: unknown, profile: IUser): Promise<void> {\n  if (isRecordStore(storage)) await storage.putRecord(profile, profile.id)\n  else if (isKeyValueStore(storage)) await storage.set(String(profile.id), JSON.stringify(profile))\n  else rejectPlugin(storage)\n}`,
     scenariosEn: [
       'Selecting structured records or text fallback.',
       'Conditionally enabling record UI.',
@@ -9676,8 +9842,21 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Requires an admitted record store to declare secondaryIndexes and implement every index lifecycle, readiness, write, iteration, and transaction method. It throws UNSUPPORTED before index work when the surface is incomplete.',
     purposeZh:
       '要求 admitted record store 声明 secondaryIndexes，并实现全部 index lifecycle、readiness、write、iteration 与 transaction method。surface 不完整时，在 index work 前抛出 UNSUPPORTED。',
-    quickStart:
-      "const indexed = asSecondaryIndexRecordStore<User>(records)\nconst handle = await indexed.ensureRecordIndexes('users', definitions)\nfor await (const [, user] of indexed.iterateRecordIndex({ handle, index: 'email' })) consume(user)",
+    quickStart: `import { asSecondaryIndexRecordStore, type IRecordIndexDefinition, type IRecordStore } from '@migaia/storage-contract'
+
+type User = { email: string }
+
+export async function readByEmail(
+  records: IRecordStore<User>,
+  definitions: readonly IRecordIndexDefinition[],
+  consume: (user: User) => void
+): Promise<void> {
+  const indexed = asSecondaryIndexRecordStore<User>(records)
+  const handle = await indexed.ensureRecordIndexes('users', definitions)
+  for await (const [, user] of indexed.iterateRecordIndex({ handle, index: 'email' })) {
+    consume(user)
+  }
+}`,
     scenariosEn: [
       'A query feature cannot operate without indexes.',
       'Index readiness and indexed writes belong to one required workflow.',
@@ -9727,7 +9906,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       'side-effect-free guard：要求 admitted record store、secondaryIndexes capability 与五个 index operation；不会创建 index 或查询 backend state。',
     quickStart:
-      'if (isSecondaryIndexRecordStore(storage)) showIndexedSearch()\nelse showScanWarning()',
+      `import { isSecondaryIndexRecordStore } from '@migaia/storage-contract'\n\nconst storage: unknown = {\n  capabilities: { secondaryIndexes: true },\n  get: async () => undefined, put: async () => undefined, delete: async () => undefined,\n  iterate: async function* () {}, ensureRecordIndexes: async () => ({ scope: 'app', generation: '1', fingerprint: 'idx' }),\n  getRecordIndexReadiness: async () => ({ status: 'complete', scanned: 1, indexed: 1 }),\n  putIndexedRecord: async () => 'user:1', iterateRecordIndex: async function* () {}, transactionIndexed: async () => undefined\n}\nconst showIndexedSearch = () => console.log('show indexed search')\nconst showScanWarning = () => console.log('fall back to scan')\nif (isSecondaryIndexRecordStore(storage)) showIndexedSearch()\nelse showScanWarning()`,
     scenariosEn: [
       'UI conditionally exposes indexed search.',
       'An adapter chooses indexed or scan execution.',
@@ -9777,7 +9956,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '要求 base store 声明 changeFeed 并暴露 subscribeChanges，再收窄为 post-commit invalidation channel。缺少支持时会在注册 listener 前抛出 UNSUPPORTED。',
     quickStart:
-      'const changes = asChangeFeedStore(storage)\nconst unsubscribe = changes.subscribeChanges((change) => invalidate(change.keys))\ntry { await runApplication() } finally { unsubscribe() }',
+      `import { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\n\nconst storage = memoryStorageHost()\nconst changes = asChangeFeedStore(storage)\nconst invalidate = (keys: readonly string[]) => console.log('invalidate:', keys)\nconst unsubscribe = changes.subscribeChanges((change) => invalidate(change.keys))\ntry {\n  await storage.set('theme', 'dark')\n} finally {\n  unsubscribe()\n  await storage.dispose()\n}`,
     scenariosEn: [
       'A cache must observe committed external writes.',
       'Cross-context invalidation is mandatory.',
@@ -9827,7 +10006,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       'post-commit change notification 的 boolean guard。先接纳完整 base store，再要求 changeFeed === true 且 subscribeChanges callable。',
     quickStart:
-      'const unsubscribe = isChangeFeedStore(storage)\n  ? storage.subscribeChanges(refreshCache)\n  : startPolling(refreshCache)',
+      `import { isChangeFeedStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst refreshCache = (change: unknown) => console.log('refresh cache:', change)\nconst unsubscribe = isChangeFeedStore(storage)\n  ? storage.subscribeChanges(refreshCache)\n  : undefined\ntry {\n  console.log(Boolean(unsubscribe))\n} finally {\n  unsubscribe?.()\n  await storage.dispose()\n}`,
     scenariosEn: [
       'Selecting subscription or polling.',
       'Displaying whether live invalidation is available.',
@@ -9876,7 +10055,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Attaches one persistence state machine to any synchronous unit adapter. It owns hydration, version migration, startup-write reconciliation, debounced serialized writes, retry/flush/clear, and abort-on-dispose in one shared implementation.',
       quickStart:
-        "const handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrate: migrateSettings, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}",
+        `import { persistUnit } from '@migaia/store-persist'\n\n// unit、runtime 和 storage 由应用的状态层提供；persistUnit 负责把它们接成可恢复的持久化流程。\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrate: migrateSettings, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}`,
       scenarios: [
         'A custom state owner can synchronously snapshot, restore, and subscribe.',
         'Hydration and writes need one observable lifecycle handle.',
@@ -9893,7 +10072,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '给任意同步 unit adapter 接入一套 persistence state machine。统一拥有 hydration、version migration、startup-write reconciliation、debounced serialized write、retry/flush/clear 与 dispose abort。',
       quickStart:
-        "const handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrate: migrateSettings, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}",
+        `import { persistUnit } from '@migaia/store-persist'\n\n// unit、runtime 和 storage 由应用的状态层提供；persistUnit 负责把它们接成可恢复的持久化流程。\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrate: migrateSettings, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}`,
       scenarios: [
         'custom state owner 能同步 snapshot、restore 与 subscribe。',
         'hydration/write 需要一个可观察 lifecycle handle。',
@@ -9912,7 +10091,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Provides the default text codec for persistence envelopes. It round-trips Map and Set through the canonical collections JSON codec and reads only the two exact legacy collection tags.',
       quickStart:
-        'const encoded = await defaultJsonCodec.encode({ version: 1, state })\nconst envelope = await defaultJsonCodec.decode(encoded)',
+        `import { defaultJsonCodec } from '@migaia/store-persist'\n\nconst state = { theme: 'dark' }\nimport { defaultJsonCodec } from '@migaia/store-persist'\n\nconst state = { theme: 'dark' }\nconst encoded = await defaultJsonCodec.encode({ version: 1, state })\nconst envelope = await defaultJsonCodec.decode(encoded)\nconsole.log(envelope)\nconsole.log(envelope)`,
       scenarios: [
         'Persisted state is JSON-compatible plus Map or Set.',
         'Text storage is the desired backend channel.',
@@ -9929,7 +10108,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '提供 persistence envelope 的默认 text codec。通过 canonical collections JSON codec 往返 Map/Set，并且只读取两个精确 legacy collection tag。',
       quickStart:
-        'const encoded = await defaultJsonCodec.encode({ version: 1, state })\nconst envelope = await defaultJsonCodec.decode(encoded)',
+        `import { defaultJsonCodec } from '@migaia/store-persist'\n\nconst state = { theme: 'dark' }\nconst encoded = await defaultJsonCodec.encode({ version: 1, state })\nconst envelope = await defaultJsonCodec.decode(encoded)\nconsole.log(envelope)`,
       scenarios: [
         'persisted state 是 JSON-compatible，并包含 Map 或 Set。',
         '目标 backend channel 是 text storage。',
@@ -9948,7 +10127,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Encodes one envelope and routes it to text or byte storage according to codec.output and backend capabilities. Structured output is rejected because the minimal persistence storage contract has no record channel.',
       quickStart:
-        "await writeEnvelope(storage, 'settings', codec, { version: 2, state }, { signal })",
+        `import { writeEnvelope } from '@migaia/store-persist'\n\nconst storage = { set: async (key: string, value: string) => console.log('write:', key, value) }\nconst codec = { output: 'text' as const, encode: async (value: unknown) => JSON.stringify(value) }\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', codec, { version: 2, state })`,
       scenarios: [
         'A custom persistence adapter needs the canonical output-channel routing.',
         'Binary codecs should use setBytes only on a capable backend.',
@@ -10011,7 +10190,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '编码一份 envelope，并按 codec.output 与 backend capabilities 路由到 text 或 byte storage。minimal persistence storage contract 没有 record channel，因此拒绝 structured output。',
       quickStart:
-        "await writeEnvelope(storage, 'settings', codec, { version: 2, state }, { signal })",
+        `import { writeEnvelope } from '@migaia/store-persist'\n\nconst storage = { set: async (key: string, value: string) => console.log('write:', key, value) }\nconst codec = { output: 'text' as const, encode: async (value: unknown) => JSON.stringify(value) }\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', codec, { version: 2, state })`,
       scenarios: [
         'custom persistence adapter 需要 canonical output-channel routing。',
         'binary codec 只应在 capable backend 上使用 setBytes。',
@@ -10074,8 +10253,14 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Reads and decodes one persisted value from the codec-selected text or binary channel. Missing storage values become undefined; binary codecs never silently fall back to text.',
-      quickStart:
-        "const rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })\nif (rawEnvelope !== undefined) assertEnvelope(rawEnvelope, 'settings')",
+      quickStart: `import { readEnvelope } from '@migaia/store-persist'
+
+const storage = { get: async (key: string) => { console.log('read', key); return undefined } }
+const codec = { output: 'text', decode: (text: string) => JSON.parse(text) }
+const controller = new AbortController()
+const signal = controller.signal
+const rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })
+if (rawEnvelope === undefined) console.log('first run: no saved envelope') // missing 是正常状态，不自动当作错误`,
       scenarios: [
         'A custom adapter needs the canonical read-channel decision.',
         'Missing archives are normal first-run state.',
@@ -10127,8 +10312,14 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '从 codec 选择的 text 或 binary channel 读取并解码一个 persisted value。missing storage value 返回 undefined；binary codec 绝不静默 fallback 到 text。',
-      quickStart:
-        "const rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })\nif (rawEnvelope !== undefined) assertEnvelope(rawEnvelope, 'settings')",
+      quickStart: `import { readEnvelope } from '@migaia/store-persist'
+
+const storage = { get: async (key: string) => { console.log('读取', key); return undefined } }
+const codec = { output: 'text', decode: (text: string) => JSON.parse(text) }
+const controller = new AbortController()
+const signal = controller.signal
+const rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })
+if (rawEnvelope === undefined) console.log('首次运行：没有已保存的 envelope') // missing 是正常状态，不自动当作错误`,
       scenarios: [
         'custom adapter 需要 canonical read-channel decision。',
         'missing archive 是正常 first-run state。',
@@ -10182,7 +10373,10 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Removes one persisted envelope through the storage boundary while forwarding cancellation. It does not mutate the live state or dispose the persistence handle.',
-      quickStart: "await removeEnvelope(storage, 'settings', { signal })",
+      quickStart: `import { removeEnvelope } from '@migaia/store-persist'
+
+const storage = { remove: async (key: string, options?: { signal?: AbortSignal }) => console.log('removed', key, options) }
+await removeEnvelope(storage, 'settings', { signal: undefined }) // 只删除这一份 envelope，不重置 live state`,
       scenarios: [
         'A custom adapter implements clear.',
         'A migration intentionally invalidates one archive key.',
@@ -10225,7 +10419,10 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '通过 storage boundary 移除一份 persisted envelope，并转发 cancellation；不会 mutation live state，也不会 dispose persistence handle。',
-      quickStart: "await removeEnvelope(storage, 'settings', { signal })",
+      quickStart: `import { removeEnvelope } from '@migaia/store-persist'
+
+const storage = { remove: async (key: string, options?: { signal?: AbortSignal }) => console.log('已移除', key, options) }
+await removeEnvelope(storage, 'settings', { signal: undefined }) // 只删除这一份 envelope，不重置 live state`,
       scenarios: [
         'custom adapter 实现 clear。',
         'migration 有意使一个 archive key 失效。',
@@ -10271,7 +10468,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Validates decoded data as a versioned persistence envelope before hydration. It rejects arrays, unsafe or negative versions, and missing state with PersistEnvelopeError.',
       quickStart:
-        "const envelope = assertEnvelope<Settings>(decoded, 'settings')\nrestore(envelope.state)",
+        `import { assertEnvelope } from '@migaia/store-persist'\n\ntype Settings = { theme: string }\nconst decoded: unknown = { version: 2, state: { theme: 'dark' } }\nconst restore = (value: Settings) => console.log('restored:', value)\nimport { assertEnvelope } from '@migaia/store-persist'\n\ntype Settings = { theme: string }\nconst decoded: unknown = { version: 2, state: { theme: 'dark' } }\nconst restore = (value: Settings) => console.log('restored:', value)\nconst envelope = assertEnvelope<Settings>(decoded, 'settings')\nrestore(envelope.state)`,
       scenarios: [
         'A custom codec has decoded untrusted storage data.',
         'Migration needs a trustworthy previous version.',
@@ -10307,7 +10504,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'hydration 前把 decoded data 验证为 versioned persistence envelope。array、不安全或负 version、缺少 state 都会以 PersistEnvelopeError 失败。',
       quickStart:
-        "const envelope = assertEnvelope<Settings>(decoded, 'settings')\nrestore(envelope.state)",
+        `import { assertEnvelope } from '@migaia/store-persist'\n\ntype Settings = { theme: string }\nconst decoded: unknown = { version: 2, state: { theme: 'dark' } }\nconst restore = (value: Settings) => console.log('restored:', value)\nconst envelope = assertEnvelope<Settings>(decoded, 'settings')\nrestore(envelope.state)`,
       scenarios: [
         'custom codec 刚解码不可信 storage data。',
         'migration 需要可信 previous version。',
@@ -10345,7 +10542,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Native TypeError raised when persisted input is not a usable { version, state } envelope. It always carries STORE_PERSIST_SOURCE and ENVELOPE_INVALID.',
       quickStart:
-        "try {\n  assertEnvelope(value, 'settings')\n} catch (error) {\n  if (error instanceof PersistEnvelopeError) quarantine('settings')\n}",
+        `import { assertEnvelope, PersistEnvelopeError } from '@migaia/store-persist'\n\nconst value: unknown = { version: 2, state: { theme: 'dark' } }\nconst quarantine = (key: string) => console.warn('quarantine:', key)\ntry {\n  assertEnvelope(value, 'settings')\n} catch (error) {\n  if (error instanceof PersistEnvelopeError) quarantine('settings')\n}`,
       scenarios: [
         'A boundary distinguishes corrupt archives from backend failures.',
         'Diagnostics group invalid envelope reports.',
@@ -10372,7 +10569,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'persisted input 不是可用 { version, state } envelope 时抛出的 native TypeError；始终携带 STORE_PERSIST_SOURCE 与 ENVELOPE_INVALID。',
       quickStart:
-        "try {\n  assertEnvelope(value, 'settings')\n} catch (error) {\n  if (error instanceof PersistEnvelopeError) quarantine('settings')\n}",
+        `import { assertEnvelope, PersistEnvelopeError } from '@migaia/store-persist'\n\nconst value: unknown = { version: 2, state: { theme: 'dark' } }\nconst quarantine = (key: string) => console.warn('quarantine:', key)\ntry {\n  assertEnvelope(value, 'settings')\n} catch (error) {\n  if (error instanceof PersistEnvelopeError) quarantine('settings')\n}`,
       scenarios: [
         'boundary 区分 corrupt archive 与 backend failure。',
         'diagnostic 聚合 invalid envelope report。',
@@ -10400,7 +10597,9 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Stable lifecycle values for a persistence handle: idle, active, loading, writing, ready, success, error, and disposed. Observe them for UI and diagnostics; do not drive the engine by assigning them.',
-      quickStart: 'if (handle.status.value === PersistState.error) showRetry(handle.error.value)',
+      quickStart: `// The handle returned by persistKeyed() exposes state for UI errors and retry affordances.
+const handle = { status: { value: PersistState.error }, error: { value: new Error('write failed') } }
+if (handle.status.value === PersistState.error) console.error(handle.error.value)`,
       scenarios: [
         'A UI shows hydration progress.',
         'Diagnostics distinguish loading from writing.',
@@ -10416,7 +10615,9 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         'persistence handle 的稳定 lifecycle value：idle、active、loading、writing、ready、success、error、disposed。用于 UI 与 diagnostic 观察，不要通过赋值驱动 engine。',
-      quickStart: 'if (handle.status.value === PersistState.error) showRetry(handle.error.value)',
+      quickStart: `// handle 是 persistKeyed() 返回的持久化句柄；状态变化后用于展示错误或重试入口。
+const handle = { status: { value: PersistState.error }, error: { value: new Error('write failed') } }
+if (handle.status.value === PersistState.error) console.error(handle.error.value)`,
       scenarios: [
         'UI 展示 hydration progress。',
         'diagnostic 区分 loading 与 writing。',
@@ -10435,7 +10636,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Declares the physical representation produced by a codec. Text uses get/set, binary requires getBytes/setBytes, and structured is rejected by the minimal persistence storage boundary.',
       quickStart:
-        "const codec = { name: 'bytes', output: PersistCodecOutput.binary, encode, decode }",
+        `import { PersistCodecOutput } from '@migaia/store-persist'\n\nconst encode = async (value: unknown) => new TextEncoder().encode(JSON.stringify(value))\nconst decode = async (bytes: Uint8Array) => JSON.parse(new TextDecoder().decode(bytes))\nconst codec = { name: 'bytes', output: PersistCodecOutput.binary, encode, decode }\nconsole.log(codec.output)`,
       scenarios: [
         'A codec selects the byte storage channel.',
         'Capability checks reject an incompatible backend.',
@@ -10452,7 +10653,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '声明 codec 产生的 physical representation。text 使用 get/set，binary 要求 getBytes/setBytes，minimal persistence storage boundary 会拒绝 structured。',
       quickStart:
-        "const codec = { name: 'bytes', output: PersistCodecOutput.binary, encode, decode }",
+        `import { PersistCodecOutput } from '@migaia/store-persist'\n\nconst encode = async (value: unknown) => new TextEncoder().encode(JSON.stringify(value))\nconst decode = async (bytes: Uint8Array) => JSON.parse(new TextDecoder().decode(bytes))\nconst codec = { name: 'bytes', output: PersistCodecOutput.binary, encode, decode }\nconsole.log(codec.output)`,
       scenarios: [
         'codec 选择 byte storage channel。',
         'capability check 拒绝不兼容 backend。',
@@ -10471,7 +10672,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Canonical source discriminator attached to every public Store Persist error. Combine it with code for stable machine handling across native error classes.',
       quickStart:
-        'if (error.source === STORE_PERSIST_SOURCE && error.code === StorePersistErrorCode.abortedByDispose) return',
+        `import { STORE_PERSIST_SOURCE, StorePersistErrorCode } from '@migaia/store-persist'\n\nconst error = { source: STORE_PERSIST_SOURCE, code: StorePersistErrorCode.abortedByDispose }\nif (error.source === STORE_PERSIST_SOURCE && error.code === StorePersistErrorCode.abortedByDispose) console.log('ignore expected dispose abort')`,
       scenarios: [
         'A shared reporter routes failures by library.',
         'An RPC boundary serializes source and code.',
@@ -10488,7 +10689,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '附加到每个公开 Store Persist error 的 canonical source discriminator。与 code 组合后可跨 native error class 稳定处理。',
       quickStart:
-        'if (error.source === STORE_PERSIST_SOURCE && error.code === StorePersistErrorCode.abortedByDispose) return',
+        `import { STORE_PERSIST_SOURCE, StorePersistErrorCode } from '@migaia/store-persist'\n\nconst error = { source: STORE_PERSIST_SOURCE, code: StorePersistErrorCode.abortedByDispose }\nif (error.source === STORE_PERSIST_SOURCE && error.code === StorePersistErrorCode.abortedByDispose) console.log('ignore expected dispose abort')`,
       scenarios: [
         'shared reporter 按 library 路由 failure。',
         'RPC boundary 序列化 source 与 code。',
@@ -10531,7 +10732,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Connects one Store Light instance to versioned persistence. It hydrates through $hydrate, observes later changes without an initial false write, and returns the shared flush, clear, retry, and dispose lifecycle handle.',
       quickStart:
-        "const handle = persist(settings, { key: 'settings', storage, version: 2 })\nawait handle.ready\nawait handle.flush()",
+        `import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst storage = indexedDbHost({ dbName: 'app' })\nconst handle = persist(settings, { key: 'settings', storage, version: 2 })\ntry {\n  await handle.ready\n  settings.theme = 'dark'\n  await handle.flush()\n  console.log(settings.$plain())\n} finally {\n  handle.dispose()\n  await settings.$dispose()\n  await storage.dispose()\n}`,
       scenarios: [
         'Application settings should survive reloads.',
         'Only a safe subset of flat Store state should be stored.',
@@ -10617,7 +10818,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把一份 Store Light state 接入 versioned persistence。通过 $hydrate 恢复，跳过 initial false write 后观察变化，并返回共享 flush、clear、retry、dispose lifecycle handle。',
       quickStart:
-        "const handle = persist(settings, { key: 'settings', storage, version: 2 })\nawait handle.ready\nawait handle.flush()",
+        `import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst storage = indexedDbHost({ dbName: 'app' })\nconst handle = persist(settings, { key: 'settings', storage, version: 2 })\ntry {\n  await handle.ready\n  settings.theme = 'dark'\n  await handle.flush()\n  console.log(settings.$plain())\n} finally {\n  handle.dispose()\n  await settings.$dispose()\n  await storage.dispose()\n}`,
       scenarios: [
         'application settings 需要跨 reload 保留。',
         '只存 flat Store state 的安全 subset。',
@@ -10705,7 +10906,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Persists one observable object, array, map, or set through its tracked snapshot and atomic replace operations. A Runtime effect observes structural changes and skips its synchronous first run.',
       quickStart:
-        "const handle = persistCollection(cart, { key: 'cart', storage, merge: (saved) => saved })\nawait handle.ready",
+        `import { observableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = observableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage, merge: (saved) => saved })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
       scenarios: [
         'A reactive map or set must survive reloads.',
         'Hydration must atomically replace collection contents.',
@@ -10735,7 +10936,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '通过 tracked snapshot 与 atomic replace 持久化 observable object、array、map 或 set。Runtime effect 观察 structural change，并跳过同步首次执行。',
       quickStart:
-        "const handle = persistCollection(cart, { key: 'cart', storage, merge: (saved) => saved })\nawait handle.ready",
+        `import { observableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = observableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage, merge: (saved) => saved })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
       scenarios: [
         'reactive map 或 set 需要跨 reload 保留。',
         'hydration 必须原子替换 collection content。',
@@ -10767,7 +10968,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Persists exactly one writable atom under namespace:id. Each call owns an independent persistence lifecycle; the returned value is the atom value captured when the handle is created.',
       quickStart:
-        "const sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\nawait sessionHandle.ready",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nconst storage = memoryStorageHost()\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await storage.dispose()\n}`,
       scenarios: [
         'One family member needs independent persistence.',
         'Per-user state requires stable namespace isolation.',
@@ -10871,7 +11072,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把恰好一个 writable atom 持久化到 namespace:id。每次调用拥有独立 persistence lifecycle；返回 value 是创建 handle 时取得的 atom value。',
       quickStart:
-        "const sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\nawait sessionHandle.ready",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nconst storage = memoryStorageHost()\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await storage.dispose()\n}`,
       scenarios: [
         '一个 family member 需要独立 persistence。',
         'per-user state 需要稳定 namespace isolation。',
@@ -10975,7 +11176,14 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Removes every persisted record whose key begins with namespace:. It only changes storage; live atoms and active persistence handles remain untouched and may write again after their next change.',
-      quickStart: "const removed = await clearFamily(storage, 'sessions')",
+      quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { clearFamily } from '@migaia/store-persist/keyed'
+
+const storage = memoryStorageHost()
+await storage.set('sessions:alice', { token: 'a' })
+await storage.set('sessions:bob', { token: 'b' })
+const removed = await clearFamily(storage, 'sessions')
+console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom`,
       scenarios: [
         'Logout removes every stored session member.',
         'A tenant namespace is invalidated.',
@@ -11010,7 +11218,14 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '移除 key 以 namespace: 开头的全部 persisted record。它只改变 storage；live atom 与 active persistence handle 不受影响，并可能在下次 change 后重新写入。',
-      quickStart: "const removed = await clearFamily(storage, 'sessions')",
+      quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { clearFamily } from '@migaia/store-persist/keyed'
+
+const storage = memoryStorageHost()
+await storage.set('sessions:alice', { token: 'a' })
+await storage.set('sessions:bob', { token: 'b' })
+const removed = await clearFamily(storage, 'sessions')
+console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom`,
       scenarios: [
         'logout 移除全部 stored session member。',
         'tenant namespace 被整体 invalidated。',
@@ -11048,7 +11263,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Subscribes React to every Reactive dependency read by a selector. Render-time capture, commit validation, stable subscription identity, custom equality, and Runtime replacement are handled without tearing.',
     purposeZh:
       '让 React 订阅 selector 读取到的全部 Reactive dependency。它处理 render capture、commit validation、稳定 subscription identity、custom equality 与 Runtime replacement，避免 tearing。',
-    quickStart: 'const total = useTracked(() => price.value * quantity.value)',
+    quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { useTracked } from '@migaia/store-react'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(12)\nconst quantity = runtime.signal(3)\n\nfunction Total() {\n  const total = useTracked(() => price.value * quantity.value)\n  return <output>{total}</output>\n}`,
     scenariosEn: [
       'A selector reads several Signals or Computeds.',
       'Dependencies change according to a branch.',
@@ -11131,7 +11346,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '通过 fixed-node subscription fast path 读取一个 stable Signal，并返回稳定 setter。setter 写入 Signal.value，因此保留 Runtime batching 与 validation。',
     quickStart:
-      'const [count, setCount] = useSignal(countSignal)\n<button onClick={() => setCount(count + 1)}>{count}</button>',
+      `import { createRuntime } from '@migaia/reactive'\nimport { useSignal } from '@migaia/store-react'\n\nconst runtime = createRuntime()\nconst countSignal = runtime.signal(0)\nfunction Counter() {\n  const [count, setCount] = useSignal(countSignal)\n  return <button onClick={() => setCount(count + 1)}>{count}</button>\n}\n\n// Counter 读取 signal 并在点击后写回同一个 Runtime；组件卸载时由 Provider 管理订阅。`,
     scenariosEn: [
       'A component renders one writable Signal.',
       'A form control writes directly to a Signal.',
@@ -11181,7 +11396,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '从 Store Light 选择 render value，并进行 dependency-level tracking。async store 会在 selector 执行前通过 storeReady suspend，且只观察实际读取的 Reactive field。',
     quickStart:
-      'const completed = useStore(todoStore, (state) => state.items.filter((item) => item.done).length)',
+      `import { useStore } from '@migaia/store-react'\n\nfunction CompletedCount({ todoStore }: { todoStore: Parameters<typeof useStore>[0] }) {\n  return useStore(todoStore, (state) => state.items.filter((item) => item.done).length)\n}`,
     scenariosEn: [
       'A component needs a derived Store slice.',
       'Only selected fields should trigger rerenders.',
@@ -11265,7 +11480,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '订阅 Resource state machine，并返回完整 idle、pending、success、error 或 cancelled state，不会 throw。适合 component 显式渲染每个 state。',
     quickStart:
-      "const state = useResource(userResource)\nif (state.status === 'success') return <Profile user={state.data} />",
+      `import { useResource } from '@migaia/store-react'\n\nfunction Profile({ userResource }: { userResource: Parameters<typeof useResource>[0] }) {\n  const state = useResource(userResource)\n  if (state.status === 'success') return <section>{String(state.data)}</section>\n  if (state.status === 'pending') return <p>Loading...</p>\n  return <p>{state.status}</p>\n}`,
     scenariosEn: [
       'A component renders custom loading and retry UI.',
       'Cancelled and error states need different treatment.',
@@ -11314,7 +11529,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Reads a Resource through React Suspense: success returns data, pending or idle throws the Resource promise, and error or cancelled throws the stored error from render.',
     purposeZh:
       '通过 React Suspense 读取 Resource：success 返回 data，pending/idle 从 render throw Resource promise，error/cancelled 从 render throw stored error。',
-    quickStart: 'const user = useResourceValue(userResource)\nreturn <Profile user={user} />',
+    quickStart: `import { useResourceValue } from '@migaia/store-react'\n\nfunction Profile({ userResource }: { userResource: Parameters<typeof useResourceValue>[0] }) {\n  const user = useResourceValue(userResource)\n  return <section>{String(user)}</section>\n}\n\n// userResource 由数据层作为 prop 传入；Suspense 成功后才会执行下面的渲染。`,
     scenariosEn: [
       'A Suspense boundary owns loading UI.',
       'An Error Boundary owns Resource failures.',
@@ -11363,7 +11578,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Reads a Store Resource capture contract and commits its render capture in layout. Replaced resources release their previous committed lease, and StrictMode cleanup is guarded against replay.',
     purposeZh:
       '读取 Store Resource capture contract，并在 layout commit render capture。resource replacement 会释放前一个 committed lease，StrictMode cleanup 也防止 replay 误释放。',
-    quickStart: 'const profile = useStoreResource(store.profileResource(userId))',
+    quickStart: `import { useStoreResource } from '@migaia/store-react'\n\nfunction Profile({ resource }: { resource: Parameters<typeof useStoreResource>[0] }) {\n  const profile = useStoreResource(resource)\n  return <section>{String(profile)}</section>\n}\n\n// resource 由 StoreProvider/业务容器根据 userId 创建并传入；Hook 在 commit 后接管 resource lease。`,
     scenariosEn: [
       'A Store field exposes an owned Resource lease.',
       'Render capture must become ownership only after commit.',
@@ -11412,7 +11627,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Reads one stable Reactive node with ownership validation and a fixed dependency subscription. Disabling observation preserves hook order while returning the current non-tracking peek value.',
     purposeZh:
       '通过 ownership validation 与 fixed dependency subscription 读取一个 stable Reactive node。禁用 observation 时仍保持 hook order，并返回当前 non-tracking peek value。',
-    quickStart: 'const count = useNodeValue(countSignal, runtime)',
+    quickStart:
+      `import { createRuntime, Signal } from '@migaia/reactive'\nimport { useNodeValue } from '@migaia/store-react'\n\nconst runtime = createRuntime()\nconst countSignal = new Signal(0, runtime)\n\nfunction Counter() {\n  const count = useNodeValue(countSignal, runtime)\n  return count\n}\n\nconsole.log(Counter) // React 渲染 Counter 时读取当前值，并订阅该 node 的变化`,
     scenariosEn: [
       'An adapter binds a stable node to React.',
       'Hook order must remain fixed while a Provider source replaces direct observation.',
@@ -11495,7 +11711,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Reads a synchronous Atom. Inside StoreProvider it prefers the Provider-local Atom Store for definitions; otherwise it observes the direct Atom node, while keeping hook order stable across both paths.',
     purposeZh:
       '读取 synchronous Atom。StoreProvider 内若存在 definition，则优先使用 Provider-local Atom Store；否则观察 direct Atom node，并在两条路径间保持稳定 hook order。',
-    quickStart: 'const count = useAtomValue(countAtom)',
+    quickStart:
+      `import { useAtomValue } from '@migaia/store-react'\nimport type { IReadableAtom } from '@migaia/store-keyed/reactive/atom'\n\nfunction Counter({ countAtom }: { countAtom: IReadableAtom<number> }) {\n  const count = useAtomValue(countAtom)\n  return count\n}\n\n// countAtom 由组件外的状态所有者创建；Provider 存在时 Hook 会读取其隔离实例。`,
     scenariosEn: [
       'A component renders a readable Atom.',
       'The same definition needs Provider-local isolation.',
@@ -11546,7 +11763,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '返回 writable Atom 的稳定 writer。存在 matching Provider Atom Store 时写对应 definition，否则调用 Atom writer，并保留其 argument 与 result contract。',
     quickStart:
-      'const increment = useSetAtom(countAtom)\n<button onClick={() => increment(1)}>Add</button>',
+      `import { useSetAtom } from '@migaia/store-react'\nimport type { IWritableAtom } from '@migaia/store-keyed/reactive/atom'\n\nfunction AddButton({ countAtom }: { countAtom: IWritableAtom<number, [number], void> }) {\n  const increment = useSetAtom(countAtom)\n  return <button onClick={() => increment(1)}>Add</button>\n}`,
     scenariosEn: [
       'A control writes without reading the Atom.',
       'Provider-local atom state must receive writes.',
@@ -11596,7 +11813,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Combines useAtomValue and useSetAtom into a readonly [value, writer] pair while preserving the same Provider-local or direct Atom source selection.',
     purposeZh:
       '把 useAtomValue 与 useSetAtom 组合为 readonly [value, writer] pair，并保留相同 Provider-local 或 direct Atom source selection。',
-    quickStart: 'const [count, increment] = useAtom(countAtom)',
+    quickStart:
+      `import { useAtom } from '@migaia/store-react'\nimport type { IWritableAtom } from '@migaia/store-keyed/reactive/atom'\n\nfunction Counter({ countAtom }: { countAtom: IWritableAtom<number, [number], void> }) {\n  const [count, increment] = useAtom(countAtom)\n  return <button onClick={() => increment(1)}>count: {count}</button>\n}`,
     scenariosEn: [
       'A component both renders and updates one Atom.',
       'A form field needs a value/writer pair.',
@@ -11641,7 +11859,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Reads an asynchronous Atom by delegating its Resource to useResourceValue. Pending work suspends, resolved data returns, and cancellation or failure reaches the nearest Error Boundary.',
     purposeZh:
       '把 asynchronous Atom 的 Resource 交给 useResourceValue 读取。pending work 会 suspend，resolved data 返回，cancellation 或 failure 到达最近 Error Boundary。',
-    quickStart: 'const user = useAsyncAtomValue(userAtom)',
+    quickStart:
+      `import { useAsyncAtomValue } from '@migaia/store-react'\nimport type { Resource } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\ntype IUserAtom = { readonly resource: Resource<IUser> }\n\nfunction UserName({ userAtom }: { userAtom: IUserAtom }) {\n  const user = useAsyncAtomValue(userAtom)\n  return user.name\n}\n\n// UserName 必须放在 Suspense 与 Error Boundary 内；异步 Atom 由外部状态所有者提供。`,
     scenariosEn: [
       'An async Atom is rendered under Suspense.',
       'Atom loading follows shared Resource semantics.',
@@ -11690,7 +11909,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Reads an Atom definition from the nearest StoreProvider Atom Store. It subscribes through the store and uses preview for repeatable speculative snapshots without publishing dependency edges.',
     purposeZh:
       '从最近 StoreProvider Atom Store 读取 Atom definition。通过 store subscribe，并用 preview 生成可重复 speculative snapshot，不发布 dependency edge。',
-    quickStart: 'const count = useAtomDefinition(countDefinition)',
+    quickStart:
+      `import { useAtomDefinition } from '@migaia/store-react'\nimport type { IAtomDefinition } from '@migaia/store-keyed/atom/definition'\n\nfunction Counter({ countDefinition }: { countDefinition: IAtomDefinition<number> }) {\n  const count = useAtomDefinition(countDefinition)\n  return <span>{count}</span>\n}\n\n// countDefinition 由 composition root 创建，并在 StoreProvider 子树中传入。`,
     scenariosEn: [
       'Provider-local atom state is required.',
       'One definition has isolated values in sibling Providers.',
@@ -11739,7 +11959,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Returns a stable typed writer for a writable Atom definition in the nearest StoreProvider Atom Store. It never instantiates or writes a direct Atom outside that registry.',
     purposeZh:
       '返回最近 StoreProvider Atom Store 中 writable Atom definition 的稳定 typed writer。它不会在 registry 外 instantiate 或 write direct Atom。',
-    quickStart: 'const increment = useSetAtomDefinition(countDefinition)',
+    quickStart:
+      `import { useSetAtomDefinition } from '@migaia/store-react'\nimport type { IWritableAtomDefinition } from '@migaia/store-keyed/atom/definition'\n\nfunction AddButton({ countDefinition }: { countDefinition: IWritableAtomDefinition<number, [number], void> }) {\n  const increment = useSetAtomDefinition(countDefinition)\n  return <button onClick={() => increment(1)}>Add</button>\n}\n\n// definition 必须来自同一个 StoreProvider 的 composition root。`,
     scenariosEn: [
       'An event handler updates Provider-local atom state.',
       'A writable family member is addressed by definition.',
@@ -11790,7 +12011,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '为 React subtree 建立 Store Registry、Runtime、Atom Store、feature config 与 readiness barrier 的统一 ownership boundary。internal registry 默认由 Provider 拥有；external registry 除非显式选择，否则仍由 caller 拥有。',
     quickStart:
-      '<StoreProvider runtime={runtime} config={{ ready: [loadSettings], fallback: <Spinner /> }}>\n  <Application />\n</StoreProvider>',
+      `import { StoreProvider } from '@migaia/store-react'\n\nconst loadSettings = fetch('/settings.json').then((response) => response.json())\nconst Spinner = () => <p>Loading settings...</p>\nconst Application = () => <main>Ready</main>\n\n<StoreProvider config={{ ready: [loadSettings], fallback: <Spinner /> }}>\n  <Application />\n</StoreProvider>`,
     scenariosEn: [
       'A subtree needs Provider-local Atom definitions.',
       'Rendering must wait for hydration or WASM readiness.',
@@ -11973,7 +12194,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Creates a frozen, type-carrying Registry token with a unique Symbol identity and human debug name. Tokens are capabilities: sharing the same value object is the only way to address the same registration.',
     purposeZh:
       '创建带 unique Symbol identity、human debug name 与 value type 的 frozen Registry token。token 是 capability；只有共享同一个 value object 才能访问同一 registration。',
-    quickStart: "const settingsToken = createStoreToken<SettingsStore>('settings')",
+    quickStart: `import { createStoreToken } from '@migaia/store-react'\n\ntype SettingsStore = { theme: string }\nconst settingsToken = createStoreToken<SettingsStore>('settings')\nconsole.log(settingsToken) // 将同一个 token 同时交给 Provider 与读取方`,
     scenariosEn: [
       'A Store is injected through StoreProvider.',
       'Two Stores share a value type but need distinct identities.',
@@ -12023,7 +12244,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建 Runtime-bound Store Registry 及其 Provider-local Atom Store。省略 runtime 会创建隔离 Runtime；属于其他 Runtime 的 injected value 会被拒绝。',
     quickStart:
-      'const registry = createStoreRegistry(requestRuntime)\nregistry.register(settingsToken, settingsStore)',
+      `import { createStoreRegistry, createStoreToken } from '@migaia/store-react'\nimport { createRuntime } from '@migaia/reactive'\n\nconst requestRuntime = createRuntime()\nconst settingsToken = createStoreToken('settings')\nconst settingsStore = { theme: 'dark' }\nconst registry = createStoreRegistry(requestRuntime)\nregistry.register(settingsToken, settingsStore)\nconsole.log(registry.get(settingsToken))`,
     scenariosEn: [
       'An SSR request needs an isolated registry.',
       'Stores must be registered before React render.',
@@ -12071,7 +12292,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '在单一 Runtime 上拥有 token registration 与隔离 Atom Store。registration 可 borrowed 或 owned；replace/remove 只 dispose owned value，whole-registry disposal 按 reverse registration order 执行并追踪 async completion。',
     quickStart:
-      'const registry = new StoreRegistry(runtime)\nconst unregister = registry.register(settingsToken, settingsStore, { owned: true })\nawait registry.disposeAsync()',
+      `import { StoreRegistry, createStoreToken } from '@migaia/store-react'\nimport { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst settingsToken = createStoreToken('settings')\nconst settingsStore = { theme: 'dark', dispose: () => console.log('store disposed') }\nconst registry = new StoreRegistry(runtime)\nconst unregister = registry.register(settingsToken, settingsStore, { owned: true })\nconsole.log(registry.get(settingsToken))\nunregister()\nawait registry.disposeAsync()`,
     scenariosEn: [
       'A request scope owns several Stores.',
       'Replacement must clean the previous owned value.',
@@ -12205,7 +12426,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Returns the nearest StoreProvider Registry and fails in render with PROVIDER_REQUIRED when no Provider exists.',
     purposeZh:
       '返回最近 StoreProvider Registry；没有 Provider 时在 render 阶段以 PROVIDER_REQUIRED 失败。',
-    quickStart: 'const registry = useStoreRegistry()',
+    quickStart: `import { useStoreRegistry } from '@migaia/store-react'\n\nconst registry = useStoreRegistry() // 必须在 StoreProvider 子树内调用\nconsole.log(registry) // 读取同一个 Provider-owned Registry，供高级注册与查询使用`,
     scenariosEn: [
       'A component needs advanced Registry operations.',
       'A custom Provider-aware hook needs the Atom Store.',
@@ -12234,7 +12455,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Returns the Runtime owned by the nearest StoreProvider Registry. Missing Provider uses the same explicit PROVIDER_REQUIRED failure as useStoreRegistry.',
     purposeZh:
       '返回最近 StoreProvider Registry 拥有的 Runtime。缺少 Provider 时与 useStoreRegistry 一样显式抛 PROVIDER_REQUIRED。',
-    quickStart: 'const runtime = useStoreRuntime()',
+    quickStart: `import { useStoreRuntime } from '@migaia/store-react'\n\nconst runtime = useStoreRuntime() // 必须在 StoreProvider 子树内调用\nconsole.log(runtime) // 后续创建的节点使用同一个 Provider-owned Runtime`,
     scenariosEn: [
       'A descendant creates Runtime-owned nodes.',
       'A custom adapter must preserve Provider ownership.',
@@ -12259,7 +12480,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Requires and returns one token-registered value from the nearest Registry. Missing Provider and missing token are distinct failures.',
     purposeZh:
       '从最近 Registry require 并返回一个 token-registered value。缺少 Provider 与缺少 token 是两种不同 failure。',
-    quickStart: 'const settings = useStoreFromProvider(settingsToken)',
+    quickStart: `import { createStoreToken, useStoreFromProvider } from '@migaia/store-react'\n\nconst settingsToken = createStoreToken('settings') // composition root 使用同一 token 注册 settings\nconst settings = useStoreFromProvider(settingsToken)\nconsole.log(settings) // 读取 composition root 注入的完整 Store/service`,
     scenariosEn: [
       'A component needs the complete injected service or Store.',
       'Token identity is shared from a composition root.',
@@ -12308,7 +12529,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Resolves a token-registered Store and selects a dependency-tracked result through useStore. It combines Provider requirement, token requirement, async readiness, and selector equality.',
     purposeZh:
       'resolve token-registered Store，并通过 useStore 选择 dependency-tracked result。组合 Provider requirement、token requirement、async readiness 与 selector equality。',
-    quickStart: 'const theme = useProvidedStore(settingsToken, (state) => state.theme)',
+    quickStart:
+      `import { useProvidedStore } from '@migaia/store-react'\nimport { createStoreToken } from '@migaia/store-react'\n\n// settingsToken 必须与 StoreProvider 注入时使用的是同一个 token 对象。\nconst settingsToken = createStoreToken<{ theme: string }>('settings')\nconst theme = useProvidedStore(settingsToken, (state) => state.theme)\nconsole.log(theme) // 只订阅 theme，其他 Store 字段变化不会触发这段 selector`,
     scenariosEn: [
       'A component selects from an injected Store.',
       'Provider composition owns Store identity.',
@@ -12388,7 +12610,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '把 feature flag、readonly default 与 readiness barrier 归一化为 StoreProvider 使用的同一 immutable config。barrier result 在 barrierScope 内缓存，invalid entry 会在 render 前失败。',
     quickStart:
-      'const normalized = normalizeStoreConfig({ features: { wasm: true }, ready: [ensureWasm] }, requestScope)',
+      `import { normalizeStoreConfig } from '@migaia/store-react'\nimport { createSSRRequestScope } from '@migaia/store-ssr'\n\nconst requestScope = createSSRRequestScope()\nconst ensureWasm = async () => console.log('WASM ready')\nconst normalized = normalizeStoreConfig({ features: { wasm: true }, ready: [ensureWasm] }, requestScope)\nconsole.log(normalized.features)`,
     scenariosEn: [
       'SSR needs Provider-equivalent config normalization.',
       'Readiness factories need request-local caching.',
@@ -12502,7 +12724,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Purely reads the normalized wasm or experimental.name feature path. Unknown and empty experimental paths return false rather than widening the enabled domain.',
     purposeZh:
       '纯读取 normalized wasm 或 experimental.name feature path。unknown 与 empty experimental path 返回 false，不会扩大 enabled domain。',
-    quickStart: "if (readStoreFeature(config, 'experimental.optimisticBatch')) enableBatching()",
+    quickStart: `import { readStoreFeature } from '@migaia/store-react'\n\nconst config = { features: { wasm: false, experimental: { optimisticBatch: true } } }\nconst enableBatching = () => console.log('batching enabled')\nif (readStoreFeature(config, 'experimental.optimisticBatch')) enableBatching()`,
     scenariosEn: [
       'Non-React code checks a normalized feature.',
       'A custom hook shares the canonical path semantics.',
@@ -12569,7 +12791,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Enforces one feature at an API boundary. Missing configuration throws PROVIDER_REQUIRED; a present but disabled path throws FEATURE_DISABLED, preserving separate remediation.',
     purposeZh:
       '在 API boundary 强制一个 feature。缺少 config 抛 PROVIDER_REQUIRED；config 存在但 path disabled 抛 FEATURE_DISABLED，保留不同 remediation。',
-    quickStart: "assertStoreFeature(config, 'wasm', 'useWasmField')",
+    quickStart: `import { assertStoreFeature } from '@migaia/store-react'\n\nconst config = { features: { wasm: true, experimental: {} } }\nassertStoreFeature(config, 'wasm', 'useWasmField') // 通过后才进入依赖 wasm 的 API`,
     scenariosEn: [
       'An enhanced API must fail closed.',
       'Non-React integration enforces Provider-equivalent gates.',
@@ -12652,8 +12874,8 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Returns the normalized optional configuration from StoreProvider. Unlike Registry hooks, absence is valid and returns null.',
     purposeZh:
       '返回 StoreProvider 的 normalized optional config。与 Registry hook 不同，缺少 Provider 是合法情况并返回 null。',
-    quickStart:
-      'const config = useStoreConfig()\nconst warn = config?.defaults.warnAsyncActions ?? false',
+      quickStart:
+      `import { useStoreConfig } from '@migaia/store-react'\n\nexport function Diagnostics() {\n  const config = useStoreConfig()\n  const warn = config?.defaults.warnAsyncActions ?? false\n  return <output>{String(warn)}</output>\n}`,
     scenariosEn: [
       'A descendant reads business defaults.',
       'A custom optional enhancement inspects readiness.',
@@ -12682,7 +12904,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'Reads one feature from StoreProvider and returns false when no Provider exists. It is the optional-enhancement path and never throws for an absent tree configuration.',
     purposeZh:
       '从 StoreProvider 读取一个 feature；没有 Provider 时返回 false。它是 optional-enhancement 路径，不会因 tree config 缺失而 throw。',
-    quickStart: "const wasmEnabled = useStoreFeature('wasm')",
+    quickStart: `import { useStoreFeature } from '@migaia/store-react'\n\nconst wasmEnabled = useStoreFeature('wasm')\nconsole.log(wasmEnabled) // true 表示 Provider 已启用 wasm enhancement`,
     scenariosEn: [
       'UI optionally reveals an enhanced path.',
       'A component chooses a fallback implementation.',
@@ -12731,7 +12953,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       'React hook form of assertStoreFeature. It reads current configuration and fails in render when Provider is absent or the named feature is disabled.',
     purposeZh:
       'assertStoreFeature 的 React hook 形式。读取 current config，并在 Provider 缺失或 named feature disabled 时于 render 阶段失败。',
-    quickStart: "useAssertStoreFeature('experimental.optimisticBatch', 'useOptimisticBatch')",
+    quickStart: `import { useAssertStoreFeature } from '@migaia/store-react'\n\n// 在 StoreProvider 子树的 useOptimisticBatch Hook 开头调用，feature 未启用时交给 Error Boundary。\nuseAssertStoreFeature('experimental.optimisticBatch', 'useOptimisticBatch')`,
     scenariosEn: [
       'An experimental hook enforces admission.',
       'Failure must reach an Error Boundary from render.',
@@ -12797,7 +13019,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       'tracked Provider barrier 使用的稳定 readiness state：pending、ready、error。它描述 barrier observation，不是 Registry lifecycle 或 Resource state。',
     quickStart:
-      'if (config.ready?.status() === StoreProviderState.error) report(config.ready.error())',
+      `import { StoreProviderState } from '@migaia/store-react'\n\nconst config = { ready: { status: () => StoreProviderState.error, error: () => new Error('settings failed') } }\nconst report = (error: unknown) => console.error(error)\nif (config.ready?.status() === StoreProviderState.error) report(config.ready.error())`,
     scenariosEn: [
       'Custom Provider UI inspects readiness.',
       'SSR diagnostics report a rejected barrier.',
@@ -12823,7 +13045,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '附加到每个公开 Store React error 的 canonical source discriminator。与 StoreReactErrorCode 组合，同时保留 native Error 或 AggregateError identity。',
     quickStart:
-      'if (error.source === STORE_REACT_SOURCE && error.code === StoreReactErrorCode.providerRequired) showSetupHelp()',
+      `import { STORE_REACT_SOURCE, StoreReactErrorCode } from '@migaia/store-react'\n\nconst showSetupHelp = () => console.log('Wrap the component tree in StoreProvider')\nconst error = { source: STORE_REACT_SOURCE, code: StoreReactErrorCode.providerRequired }\nif (error.source === STORE_REACT_SOURCE && error.code === StoreReactErrorCode.providerRequired) showSetupHelp()`,
     scenariosEn: [
       'A shared reporter routes errors by owner.',
       'A serialized boundary preserves source and code.',
@@ -12853,7 +13075,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建带稳定 Store React source/code 的 native Error，通过 cause 保留 optional original failure，且不改写两者 stack。',
     quickStart:
-      "throw createStoreReactError(StoreReactErrorCode.invalidConfig, 'Invalid config', { cause })",
+      `import { createStoreReactError, StoreReactErrorCode } from '@migaia/store-react'\n\nconst cause = new Error('ready barrier rejected')\nthrow createStoreReactError(StoreReactErrorCode.invalidConfig, 'Invalid config', { cause })`,
     scenariosEn: [
       'A public boundary reports a semantic failure.',
       'A lower-level failure needs Store React ownership.',
@@ -12933,7 +13155,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     purposeZh:
       '创建带 Store React source/code 的 native AggregateError。每个 ordered input failure 仍可通过 errors[] 到达。',
     quickStart:
-      "throw createStoreReactAggregateError(StoreReactErrorCode.registryDisposalFailed, failures, 'Registry disposal failed')",
+      `import { createStoreReactAggregateError, StoreReactErrorCode } from '@migaia/store-react'\n\nconst failures = [new Error('registry cleanup failed')]\nthrow createStoreReactAggregateError(StoreReactErrorCode.registryDisposalFailed, failures, 'Registry disposal failed')`,
     scenariosEn: [
       'Several owned values fail during Registry disposal.',
       'All cleanup failures must remain observable.',
@@ -13018,7 +13240,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Defines the action, state, and error discriminators for every Store Middleware event. Branch on this value before reading phase, previous/next, or error-specific fields.',
       quickStart:
-        'if (event.type === MiddlewareEventType.state) {\n  persistDiff(event.previous, event.next)\n}',
+        `import { MiddlewareEventType } from '@migaia/store-middleware'\n\nconst event = { type: MiddlewareEventType.state, previous: { theme: 'light' }, next: { theme: 'dark' } }\nconst persistDiff = (previous: unknown, next: unknown) => console.log('persist diff:', previous, next)\nif (event.type === MiddlewareEventType.state) {\n  persistDiff(event.previous, event.next)\n}`,
       scenarios: [
         'A plugin narrows the event union safely.',
         'Telemetry groups action, state, and error records.',
@@ -13035,7 +13257,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '定义每个 Store Middleware event 的 action、state、error discriminator。读取 phase、previous/next 或 error-specific field 前应先按它缩小类型。',
       quickStart:
-        'if (event.type === MiddlewareEventType.state) {\n  persistDiff(event.previous, event.next)\n}',
+        `import { MiddlewareEventType } from '@migaia/store-middleware'\n\nconst event = { type: MiddlewareEventType.state, previous: { theme: 'light' }, next: { theme: 'dark' } }\nconst persistDiff = (previous: unknown, next: unknown) => console.log('persist diff:', previous, next)\nif (event.type === MiddlewareEventType.state) {\n  persistDiff(event.previous, event.next)\n}`,
       scenarios: [
         'plugin 安全缩小 event union。',
         'telemetry 聚合 action、state 与 error record。',
@@ -13054,7 +13276,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Defines start, end, and error phases for action events. A successful action emits start then end; a failing action emits start then error and rethrows the original business failure.',
       quickStart:
-        'if (event.type === MiddlewareEventType.action && event.phase === MiddlewareEventPhase.end) {\n  recordDuration(event.durationMs)\n}',
+        `import { MiddlewareEventPhase, MiddlewareEventType } from '@migaia/store-middleware'\n\nconst event = { type: MiddlewareEventType.action, phase: MiddlewareEventPhase.end, durationMs: 12 }\nconst recordDuration = (durationMs: number) => console.log('action duration:', durationMs)\nif (event.type === MiddlewareEventType.action && event.phase === MiddlewareEventPhase.end) {\n  recordDuration(event.durationMs)\n}`,
       scenarios: [
         'A plugin measures completed action duration.',
         'Diagnostics distinguish successful and failed action completion.',
@@ -13071,7 +13293,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '定义 action event 的 start、end、error phase。成功 action 发出 start 后 end；失败 action 发出 start 后 error，并重新抛原始 business failure。',
       quickStart:
-        'if (event.type === MiddlewareEventType.action && event.phase === MiddlewareEventPhase.end) {\n  recordDuration(event.durationMs)\n}',
+        `import { MiddlewareEventPhase, MiddlewareEventType } from '@migaia/store-middleware'\n\nconst event = { type: MiddlewareEventType.action, phase: MiddlewareEventPhase.end, durationMs: 12 }\nconst recordDuration = (durationMs: number) => console.log('action duration:', durationMs)\nif (event.type === MiddlewareEventType.action && event.phase === MiddlewareEventPhase.end) {\n  recordDuration(event.durationMs)\n}`,
       scenarios: [
         'plugin 测量 completed action duration。',
         'diagnostic 区分 action 成功或失败完成。',
@@ -13090,7 +13312,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Defines normalized DevTools commands: commit reinitializes the displayed baseline, while jump and reset apply a supplied state through Host applyState inside a visible action.',
       quickStart:
-        'if (command.type === MiddlewareCommandType.commit) {\n  adapter.init(hostState)\n}',
+        `import { MiddlewareCommandType } from '@migaia/store-middleware'\n\nconst command = { type: MiddlewareCommandType.commit }\nconst hostState = { theme: 'dark' }\nconst adapter = { init: (state: unknown) => console.log('adapter initialized:', state) }\nif (command.type === MiddlewareCommandType.commit) {\n  adapter.init(hostState)\n}`,
       scenarios: [
         'A DevTools adapter normalizes extension dispatch messages.',
         'Host logic distinguishes baseline commit from state application.',
@@ -13107,7 +13329,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '定义 normalized DevTools command：commit 重新初始化显示 baseline；jump/reset 通过 Host applyState 在可见 action 内应用 supplied state。',
       quickStart:
-        'if (command.type === MiddlewareCommandType.commit) {\n  adapter.init(hostState)\n}',
+        `import { MiddlewareCommandType } from '@migaia/store-middleware'\n\nconst command = { type: MiddlewareCommandType.commit }\nconst hostState = { theme: 'dark' }\nconst adapter = { init: (state: unknown) => console.log('adapter initialized:', state) }\nif (command.type === MiddlewareCommandType.commit) {\n  adapter.init(hostState)\n}`,
       scenarios: [
         'DevTools adapter 规范化 extension dispatch message。',
         'Host logic 区分 baseline commit 与 state application。',
@@ -13126,7 +13348,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Exposes the canonical source discriminator attached to Store Middleware boundary errors. Compare it with code for routing and telemetry; never infer semantics by parsing messages.',
       quickStart:
-        'if (error.source === STORE_MIDDLEWARE_SOURCE) {\n  handleMiddlewareCode(error.code)\n}',
+        `import { STORE_MIDDLEWARE_SOURCE } from '@migaia/store-middleware'\n\nconst error = { source: STORE_MIDDLEWARE_SOURCE, code: 'MIDDLEWARE_FAILED' }\nconst handleMiddlewareCode = (code: string) => console.error('middleware failure:', code)\nif (error.source === STORE_MIDDLEWARE_SOURCE) {\n  handleMiddlewareCode(error.code)\n}`,
       scenarios: [
         'A shared reporter routes errors by library ownership.',
         'Telemetry groups middleware failures by source/code.',
@@ -13143,7 +13365,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '暴露附加到 Store Middleware boundary error 的 canonical source discriminator。路由与 telemetry 应同时比较 code，绝不解析 message 推断语义。',
       quickStart:
-        'if (error.source === STORE_MIDDLEWARE_SOURCE) {\n  handleMiddlewareCode(error.code)\n}',
+        `import { STORE_MIDDLEWARE_SOURCE } from '@migaia/store-middleware'\n\nconst error = { source: STORE_MIDDLEWARE_SOURCE, code: 'MIDDLEWARE_FAILED' }\nconst handleMiddlewareCode = (code: string) => console.error('middleware failure:', code)\nif (error.source === STORE_MIDDLEWARE_SOURCE) {\n  handleMiddlewareCode(error.code)\n}`,
       scenarios: [
         'shared reporter 按 library ownership 路由 error。',
         'telemetry 按 source/code 聚合 middleware failure。',
@@ -13162,7 +13384,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the standard tagged Error for Store Middleware contract failures while preserving the native instance, stack, and optional original cause.',
       quickStart:
-        'throw createStoreMiddlewareError(\n  StoreMiddlewareErrorCode.devtoolsCapability,\n  StoreMiddlewareErrorText.applyState,\n  { cause: adapterError }\n)',
+        `import { createStoreMiddlewareError, StoreMiddlewareErrorCode, StoreMiddlewareErrorText } from '@migaia/store-middleware'\n\nconst adapterError = new Error('DevTools adapter rejected the state')\nthrow createStoreMiddlewareError(\n  StoreMiddlewareErrorCode.devtoolsCapability,\n  StoreMiddlewareErrorText.applyState,\n  { cause: adapterError }\n)`,
       scenarios: [
         'Host options or a DevTools adapter fail runtime validation.',
         'An actions-only write occurs outside an action.',
@@ -13206,7 +13428,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 Store Middleware contract failure 创建标准 tagged Error，并保留 native instance、stack 与可选 original cause。',
       quickStart:
-        'throw createStoreMiddlewareError(\n  StoreMiddlewareErrorCode.devtoolsCapability,\n  StoreMiddlewareErrorText.applyState,\n  { cause: adapterError }\n)',
+        `import { createStoreMiddlewareError, StoreMiddlewareErrorCode, StoreMiddlewareErrorText } from '@migaia/store-middleware'\n\nconst adapterError = new Error('DevTools adapter rejected the state')\nthrow createStoreMiddlewareError(\n  StoreMiddlewareErrorCode.devtoolsCapability,\n  StoreMiddlewareErrorText.applyState,\n  { cause: adapterError }\n)`,
       scenarios: [
         'Host options 或 DevTools adapter runtime validation 失败。',
         'actions-only write 发生在 action 外。',
@@ -13252,7 +13474,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a tagged native AggregateError after every binding or Host cleanup action has been attempted. Original failures remain ordered and reachable through errors[].',
       quickStart:
-        'throw createStoreMiddlewareAggregateError(\n  StoreMiddlewareErrorCode.cleanupFailed,\n  cleanupErrors,\n  StoreMiddlewareErrorText.cleanupFailed\n)',
+        `import { createStoreMiddlewareAggregateError, StoreMiddlewareErrorCode, StoreMiddlewareErrorText } from '@migaia/store-middleware'\n\nconst cleanupErrors = [new Error('binding rollback failed'), new Error('host close failed')]\nthrow createStoreMiddlewareAggregateError(\n  StoreMiddlewareErrorCode.cleanupFailed,\n  cleanupErrors,\n  StoreMiddlewareErrorText.cleanupFailed\n)`,
       scenarios: [
         'Binding construction fails and one or more rollback disposers also fail.',
         'Host disposal must report several settled cleanup failures.',
@@ -13297,7 +13519,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '在全部 binding/Host cleanup action 都尝试完成后创建 tagged native AggregateError；原始 failure 按顺序通过 errors[] 保持可达。',
       quickStart:
-        'throw createStoreMiddlewareAggregateError(\n  StoreMiddlewareErrorCode.cleanupFailed,\n  cleanupErrors,\n  StoreMiddlewareErrorText.cleanupFailed\n)',
+        `import { createStoreMiddlewareAggregateError, StoreMiddlewareErrorCode, StoreMiddlewareErrorText } from '@migaia/store-middleware'\n\nconst cleanupErrors = [new Error('binding rollback failed'), new Error('host close failed')]\nthrow createStoreMiddlewareAggregateError(\n  StoreMiddlewareErrorCode.cleanupFailed,\n  cleanupErrors,\n  StoreMiddlewareErrorText.cleanupFailed\n)`,
       scenarios: [
         'binding construction 失败，且一个或多个 rollback disposer 也失败。',
         'Host disposal 必须报告多个已 settled cleanup failure。',
@@ -13344,7 +13566,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates an unbound synchronous Store event Host on top of Plugin Host. It batches named actions, isolates middleware failures into Runtime diagnostics, supports optional state application for DevTools, and owns plugin/binding cleanup.',
       quickStart:
-        "const host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  runtime,\n  getState: () => ClonePolicy.diagnostic(state),\n  applyState: (next) => { state = next },\n  mutationPolicy\n})\nawait host.use(loggerMiddleware())\nhost.runAction('counter:increment', increment)\nawait host.dispose()",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createMutationPolicy, createStoreMiddlewareHost } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nlet state = { count: 0 }\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst increment = () => { state = { count: state.count + 1 } }\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  runtime,\n  getState: () => state,\n  applyState: (next) => { state = next },\n  mutationPolicy\n})\nhost.runAction('counter:increment', increment)\nconsole.log(state.count)\nawait host.dispose()`,
       scenarios: [
         'State is not a Store Light instance but still needs the middleware event domain.',
         'Plugins need synchronous ordered action, state, and error events.',
@@ -13361,7 +13583,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '在 Plugin Host 上创建未绑定 Store 的 synchronous Store event Host。它 batch named action，把 middleware failure 隔离到 Runtime diagnostic，支持 DevTools 可选 apply state，并拥有 plugin/binding cleanup。',
       quickStart:
-        "const host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  runtime,\n  getState: () => ClonePolicy.diagnostic(state),\n  applyState: (next) => { state = next },\n  mutationPolicy\n})\nawait host.use(loggerMiddleware())\nhost.runAction('counter:increment', increment)\nawait host.dispose()",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createMutationPolicy, createStoreMiddlewareHost } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nlet state = { count: 0 }\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst increment = () => { state = { count: state.count + 1 } }\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  runtime,\n  getState: () => state,\n  applyState: (next) => { state = next },\n  mutationPolicy\n})\nhost.runAction('counter:increment', increment)\nconsole.log(state.count)\nawait host.dispose()`,
       scenarios: [
         'state 不是 Store Light instance，但仍需要 middleware event domain。',
         'plugin 需要同步有序的 action、state 与 error event。',
@@ -13380,7 +13602,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Class-form Store Middleware Host with explicit construction and instanceof identity. runAction emits start/end/error around one synchronous Runtime batch, recordError contains reentrancy, and repeated dispose calls share one Promise.',
       quickStart:
-        "const host = new StoreMiddlewareHost({\n  execution, runtime, getState, applyState, mutationPolicy\n})\ntry {\n  return host.runAction('checkout:submit', submit)\n} finally {\n  await host.dispose()\n}",
+        `import { createRuntime } from '@migaia/reactive'\nimport { MutationPolicy, StoreMiddlewareHost } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nlet state = { submitted: false }\nconst execution = { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }\nconst getState = () => state\nconst applyState = (next: typeof state) => { state = next }\nconst mutationPolicy = new MutationPolicy('actions-only')\nconst submit = () => applyState({ submitted: true })\nconst host = new StoreMiddlewareHost({ execution, runtime, getState, applyState, mutationPolicy })\ntry {\n  host.runAction('checkout:submit', submit)\n  console.log('submitted:', getState().submitted)\n} finally {\n  await host.dispose()\n}`,
       scenarios: [
         'A framework adapter constructs and retains the Host class directly.',
         'Action failures must emit diagnostics and then rethrow the original business error.',
@@ -13397,7 +13619,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '具有显式 construction 与 instanceof identity 的 class-form Store Middleware Host。runAction 在一次同步 Runtime batch 周围发出 start/end/error，recordError 隔离 reentrancy，重复 dispose 共享同一 Promise。',
       quickStart:
-        "const host = new StoreMiddlewareHost({\n  execution, runtime, getState, applyState, mutationPolicy\n})\ntry {\n  return host.runAction('checkout:submit', submit)\n} finally {\n  await host.dispose()\n}",
+        `import { createRuntime } from '@migaia/reactive'\nimport { MutationPolicy, StoreMiddlewareHost } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nlet state = { submitted: false }\nconst execution = { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }\nconst getState = () => state\nconst applyState = (next: typeof state) => { state = next }\nconst mutationPolicy = new MutationPolicy('actions-only')\nconst submit = () => applyState({ submitted: true })\nconst host = new StoreMiddlewareHost({ execution, runtime, getState, applyState, mutationPolicy })\ntry {\n  host.runAction('checkout:submit', submit)\n  console.log('已提交:', getState().submitted)\n} finally {\n  await host.dispose()\n}`,
       scenarios: [
         'framework adapter 直接构造并保留 Host class。',
         'action failure 必须发出 diagnostic，再重新抛原始 business error。',
@@ -13416,7 +13638,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Binds one existing Store Light Store to a Store Middleware Host. It snapshots the binding-time state, emits store:update previous/next events, forwards filtered Runtime action traces without replaying the action, and removes both subscriptions before plugin disposal.',
       quickStart:
-        "const mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore(shape, { mutationPolicy })\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  mutationPolicy,\n  actionPrefix: 'checkout:',\n  clone: ClonePolicy.diagnostic\n})\ntry {\n  await host.use(loggerMiddleware())\n  store.submit()\n} finally {\n  await host.dispose() // Store remains alive\n}",
+        `import { createStore } from '@migaia/store-light'\nimport { bindStoreMiddleware, ClonePolicy, createMutationPolicy, loggerMiddleware } from '@migaia/store-middleware'\n\nconst shape = { submitted: false, submit: () => console.log('submit action') }\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore(shape, { mutationPolicy })\nconst host = bindStoreMiddleware(store, { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }, mutationPolicy, actionPrefix: 'checkout:', clone: ClonePolicy.diagnostic })\ntry {\n  await host.use(loggerMiddleware())\n  store.submit()\n} finally {\n  await host.dispose() // Store remains alive\n}`,
       scenarios: [
         'An existing Store Light instance needs state and action observability.',
         'DevTools time travel should hydrate the Store plain-state surface.',
@@ -13480,7 +13702,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把一个既有 Store Light Store 绑定到 Store Middleware Host。它 snapshot binding-time state，发出 store:update previous/next event，按 filter 转发 Runtime action trace 但不重复执行 action，并在 plugin disposal 前移除两个 subscription。',
       quickStart:
-        "const mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore(shape, { mutationPolicy })\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  mutationPolicy,\n  actionPrefix: 'checkout:',\n  clone: ClonePolicy.diagnostic\n})\ntry {\n  await host.use(loggerMiddleware())\n  store.submit()\n} finally {\n  await host.dispose() // Store 仍然存活\n}",
+        `import { createStore } from '@migaia/store-light'\nimport { bindStoreMiddleware, ClonePolicy, createMutationPolicy, loggerMiddleware } from '@migaia/store-middleware'\n\nconst shape = { submitted: false, submit: () => console.log('提交 action') }\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore(shape, { mutationPolicy })\nconst host = bindStoreMiddleware(store, { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }, mutationPolicy, actionPrefix: 'checkout:', clone: ClonePolicy.diagnostic })\ntry {\n  await host.use(loggerMiddleware())\n  store.submit()\n} finally {\n  await host.dispose() // Store 仍然存活\n}`,
       scenarios: [
         '既有 Store Light instance 需要 state/action observability。',
         'DevTools time travel 应 hydrate Store plain-state surface。',
@@ -13544,7 +13766,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Adapts the legacy three-argument middleware function into one synchronous Store Middleware plugin. Calling next advances the event exactly once; omitting it stops downstream observation but never rolls back the Store write.',
       quickStart:
-        "const audit = middlewarePlugin('audit', (event, context, next) => {\n  next()\n  auditSink(event, context.getState())\n})\nawait host.use(audit)",
+        `import { middlewarePlugin } from '@migaia/store-middleware'\n\nconst auditSink = (event: unknown, state: unknown) => console.log('audit', event, state)\nconst audit = middlewarePlugin('audit', (event, context, next) => {\n  next()\n  auditSink(event, context.getState())\n})\nexport async function installAudit(host: { use(plugin: unknown): Promise<unknown> }): Promise<void> {\n  await host.use(audit)\n}`,
       scenarios: [
         'A small middleware needs only Runtime, getState, and next.',
         'Legacy function middleware is being migrated into Plugin Host.',
@@ -13581,7 +13803,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把 legacy 三参数 middleware function 适配为一个 synchronous Store Middleware plugin。调用 next 精确推进一次 event；省略会停止 downstream observation，但绝不会 rollback Store write。',
       quickStart:
-        "const audit = middlewarePlugin('audit', (event, context, next) => {\n  next()\n  auditSink(event, context.getState())\n})\nawait host.use(audit)",
+        `import { middlewarePlugin } from '@migaia/store-middleware'\n\nconst auditSink = (event: unknown, state: unknown) => console.log('audit', event, state)\nconst audit = middlewarePlugin('audit', (event, context, next) => {\n  next()\n  auditSink(event, context.getState())\n})\nexport async function installAudit(host: { use(plugin: unknown): Promise<unknown> }): Promise<void> {\n  await host.use(audit)\n}`,
       scenarios: [
         '小型 middleware 只需要 Runtime、getState 与 next。',
         '正在把 legacy function middleware 迁移到 Plugin Host。',
@@ -13619,7 +13841,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the built-in store-logger plugin. Each event advances downstream first, then the sink receives the event and the latest state snapshot; sink failures remain middleware diagnostics.',
       quickStart:
-        'await host.use(loggerMiddleware((event, state) => {\n  logger.debug(event.type, { event, state })\n}))',
+        `import { createRuntime } from '@migaia/reactive'\nimport { createStoreMiddlewareHost, loggerMiddleware } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nconst state = { count: 0 }\nconst policy = { report: (error: unknown) => console.error('middleware diagnostic:', error) }\nconst host = createStoreMiddlewareHost({ runtime, state, policy })\nconst logger = { debug: (type: string, details: unknown) => console.debug(type, details) }\nawait host.use(loggerMiddleware((event, snapshot) => {\n  logger.debug(event.type, { event, state: snapshot })\n}))\nawait host.dispatch({ type: 'counter/increment' })\nawait host.dispose()`,
       scenarios: [
         'Development needs immediate event and state visibility.',
         'An existing logger should receive Store middleware events.',
@@ -13646,7 +13868,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建内置 store-logger plugin。每个 event 先推进 downstream，再把 event 与最新 state snapshot 交给 sink；sink failure 保持为 middleware diagnostic。',
       quickStart:
-        'await host.use(loggerMiddleware((event, state) => {\n  logger.debug(event.type, { event, state })\n}))',
+        `import { createRuntime } from '@migaia/reactive'\nimport { createStoreMiddlewareHost, loggerMiddleware } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nconst state = { count: 0 }\nconst policy = { report: (error: unknown) => console.error('middleware diagnostic:', error) }\nconst host = createStoreMiddlewareHost({ runtime, state, policy })\nconst logger = { debug: (type: string, details: unknown) => console.debug(type, details) }\nawait host.use(loggerMiddleware((event, snapshot) => {\n  logger.debug(event.type, { event, state: snapshot })\n}))\nawait host.dispatch({ type: 'counter/increment' })\nawait host.dispose()`,
       scenarios: [
         '开发期需要即时查看 event 与 state。',
         '既有 logger 应接收 Store middleware event。',
@@ -13674,7 +13896,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Translates a Redux DevTools connection into the Store Middleware adapter contract. It labels outgoing events, maps COMMIT/jump/reset dispatches, ignores malformed JSON, and leaves state application to Host capability.',
       quickStart:
-        "const adapter = createReduxDevToolsAdapter(connection)\nawait host.connectDevTools(adapter)\n// Later: await host.unUse('store-devtools')",
+        `import { createReduxDevToolsAdapter } from '@migaia/store-middleware'\n\nexport async function connectDevTools(host: { connectDevTools(adapter: unknown): Promise<unknown> }, connection: unknown): Promise<void> {\n  const adapter = createReduxDevToolsAdapter(connection)\n  await host.connectDevTools(adapter)\n  // Later: await host.unUse('store-devtools')\n}`,
       scenarios: [
         'Redux DevTools should display Store action/state/error events.',
         'Time-travel dispatch messages must map into typed Store commands.',
@@ -13701,7 +13923,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把 Redux DevTools connection 转换为 Store Middleware adapter contract。它标记 outgoing event，映射 COMMIT/jump/reset dispatch，忽略 malformed JSON，并把 state application 留给 Host capability。',
       quickStart:
-        "const adapter = createReduxDevToolsAdapter(connection)\nawait host.connectDevTools(adapter)\n// 之后：await host.unUse('store-devtools')",
+        `import { createReduxDevToolsAdapter } from '@migaia/store-middleware'\n\nexport async function connectDevTools(host: { connectDevTools(adapter: unknown): Promise<unknown> }, connection: unknown): Promise<void> {\n  const adapter = createReduxDevToolsAdapter(connection)\n  await host.connectDevTools(adapter)\n  // 之后：await host.unUse('store-devtools')\n}`,
       scenarios: [
         'Redux DevTools 应展示 Store action/state/error event。',
         'time-travel dispatch message 必须映射为 typed Store command。',
@@ -13730,7 +13952,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the write-admission guard shared by Store Light, Store Indexed, and Store Middleware. off preserves ordinary writes; actions-only rejects guarded writes unless they run inside runInAction.',
       quickStart:
-        "const policy = createMutationPolicy('actions-only')\nconst host = createStoreMiddlewareHost({ execution, runtime, getState, mutationPolicy: policy })\nhost.runAction('counter:increment', () => store.increment())",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createMutationPolicy, createStoreMiddlewareHost } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nlet state = { count: 0 }\nconst policy = createMutationPolicy('actions-only')\nconst host = createStoreMiddlewareHost({ execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }, runtime, getState: () => state, applyState: (next) => { state = next }, mutationPolicy: policy })\nawait host.runAction('counter:increment', () => { state = { count: state.count + 1 } })\nconsole.log(state.count)\nawait host.dispose()`,
       scenarios: [
         'Several Store surfaces need one consistent actions-only rule.',
         'Middleware action boundaries should admit guarded mutations.',
@@ -13758,7 +13980,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建 Store Light、Store Indexed 与 Store Middleware 共享的 write-admission guard。off 保留普通 write；actions-only 拒绝不在 runInAction 内执行的 guarded write。',
       quickStart:
-        "const policy = createMutationPolicy('actions-only')\nconst host = createStoreMiddlewareHost({ execution, runtime, getState, mutationPolicy: policy })\nhost.runAction('counter:increment', () => store.increment())",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createMutationPolicy, createStoreMiddlewareHost } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nlet state = { count: 0 }\nconst policy = createMutationPolicy('actions-only')\nconst host = createStoreMiddlewareHost({ execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }, runtime, getState: () => state, applyState: (next) => { state = next }, mutationPolicy: policy })\nawait host.runAction('counter:increment', () => { state = { count: state.count + 1 } })\nconsole.log('count:', state.count)\nawait host.dispose()`,
       scenarios: [
         '多个 Store surface 需要同一 actions-only rule。',
         'middleware action boundary 应接纳 guarded mutation。',
@@ -13787,7 +14009,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Class-form mutation guard with reentrant synchronous action depth. assertMutationAllowed enforces the selected mode, runInAction always restores depth in finally, and insideAction exposes the current synchronous scope.',
       quickStart:
-        "const policy = new MutationPolicy('actions-only')\npolicy.runInAction(() => {\n  policy.assertMutationAllowed('profile.update')\n  updateProfile()\n})",
+        `import { MutationPolicy } from '@migaia/store-middleware'\n\nconst policy = new MutationPolicy('actions-only')\nconst updateProfile = () => console.log('profile updated')\npolicy.runInAction(() => {\n  policy.assertMutationAllowed('profile.update')\n  updateProfile()\n})`,
       scenarios: [
         'An adapter needs direct construction or instanceof checks.',
         'Nested synchronous actions must remain admitted until the outer action exits.',
@@ -13813,7 +14035,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '具有可重入同步 action depth 的 class-form mutation guard。assertMutationAllowed 执行所选 mode，runInAction 在 finally 中恢复 depth，insideAction 暴露当前同步 scope。',
       quickStart:
-        "const policy = new MutationPolicy('actions-only')\npolicy.runInAction(() => {\n  policy.assertMutationAllowed('profile.update')\n  updateProfile()\n})",
+        `import { MutationPolicy } from '@migaia/store-middleware'\n\nconst policy = new MutationPolicy('actions-only')\nconst updateProfile = () => console.log('profile updated')\npolicy.runInAction(() => {\n  policy.assertMutationAllowed('profile.update')\n  updateProfile()\n})`,
       scenarios: [
         'adapter 需要直接 construction 或 instanceof 检查。',
         'nested synchronous action 在 outer action 退出前必须保持 admitted。',
@@ -13841,7 +14063,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a truly independent deep snapshot or throws a coded Store Middleware error. It never silently aliases a subtree when structured cloning is unavailable or a value is unsupported.',
       quickStart:
-        'const previous = immutableSnapshotClone(store.$plain())\n// Later mutations cannot change previous.',
+        `import { immutableSnapshotClone } from '@migaia/store-middleware'\n\nconst store = { $plain: () => ({ count: 1, user: { name: 'Ada' } }) }\nconst previous = immutableSnapshotClone(store.$plain())\nconsole.log('snapshot:', previous)\n// Later mutations to the store state cannot change previous.`,
       scenarios: [
         'A previous-state snapshot must remain immutable in meaning.',
         'Time travel or rollback requires full reference independence.',
@@ -13868,7 +14090,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建真正独立的 deep snapshot，否则抛带 code 的 Store Middleware error。structured cloning 不可用或 value 不受支持时，绝不静默 alias subtree。',
       quickStart:
-        'const previous = immutableSnapshotClone(store.$plain())\n// 后续 mutation 无法改变 previous。',
+        `import { immutableSnapshotClone } from '@migaia/store-middleware'\n\nconst store = { $plain: () => ({ count: 1, user: { name: 'Ada' } }) }\nconst previous = immutableSnapshotClone(store.$plain())\nconsole.log('snapshot:', previous)\n// 后续 mutation 无法改变 previous。`,
       scenarios: [
         'previous-state snapshot 的语义必须保持 immutable。',
         'time travel 或 rollback 要求完整 reference independence。',
@@ -13897,7 +14119,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Returns the exact same reference without cloning. The explicit name records that the caller accepts aliasing, live mutation visibility, and zero snapshot independence.',
       quickStart:
-        'const liveReference = opaqueReferenceClone(hostHandle)\nObject.is(liveReference, hostHandle) // true',
+        `import { opaqueReferenceClone } from '@migaia/store-middleware'\n\nconst hostHandle = { close: () => console.log('closed') }\nconst liveReference = opaqueReferenceClone(hostHandle)\nconsole.log(Object.is(liveReference, hostHandle)) // true：返回同一个 live object`,
       scenarios: [
         'A live host object cannot or must not be cloned.',
         'The caller explicitly accepts observing later mutations.',
@@ -13924,7 +14146,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '不执行 clone，直接返回完全相同的 reference。显式名称记录 caller 接受 aliasing、后续 live mutation 可见与零 snapshot independence。',
       quickStart:
-        'const liveReference = opaqueReferenceClone(hostHandle)\nObject.is(liveReference, hostHandle) // true',
+        `import { opaqueReferenceClone } from '@migaia/store-middleware'\n\nconst hostHandle = { close: () => console.log('closed') }\nconst liveReference = opaqueReferenceClone(hostHandle)\nconsole.log(Object.is(liveReference, hostHandle)) // true: the same live object is returned`,
       scenarios: [
         'live host object 无法或不应 clone。',
         'caller 显式接受观察后续 mutation。',
@@ -13952,8 +14174,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Builds a best-effort diagnostic snapshot that never throws: cloneable arrays and plain objects become independent, while only the unsupported subtree remains an opaque reference.',
-      quickStart:
-        "const eventState = diagnosticClone(store.$plain())\nhost.recordState('store:update', previous, eventState)",
+      quickStart: `import { diagnosticClone } from '@migaia/store-middleware'\n\nconst previous = { count: 0, onChange: () => undefined }\nconst store = { $plain: () => ({ count: 1, onChange: previous.onChange }) }\nconst host = { recordState: (event: string, before: unknown, after: unknown) => console.log(event, before, after) }\nconst eventState = diagnosticClone(store.$plain())\nhost.recordState('store:update', previous, eventState) // Unsupported functions remain opaque references.`,
       scenarios: [
         'Middleware and DevTools availability is more important than strict clone completeness.',
         'Most of a state tree should remain historically independent.',
@@ -13981,8 +14202,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '构建永不 throw 的 best-effort diagnostic snapshot：可 clone 的 array/plain object 保持独立，只有 unsupported subtree 保留 opaque reference。',
-      quickStart:
-        "const eventState = diagnosticClone(store.$plain())\nhost.recordState('store:update', previous, eventState)",
+      quickStart: `import { diagnosticClone } from '@migaia/store-middleware'\n\nconst previous = { count: 0, onChange: () => undefined }\nconst store = { $plain: () => ({ count: 1, onChange: previous.onChange }) }\nconst host = { recordState: (event: string, before: unknown, after: unknown) => console.log(event, before, after) }\nconst eventState = diagnosticClone(store.$plain())\nhost.recordState('store:update', previous, eventState) // 不可 clone 的函数只保留为 opaque reference`,
       scenarios: [
         'middleware 与 DevTools availability 比严格 clone completeness 更重要。',
         'state tree 的大部分内容应保持历史独立。',
@@ -14011,7 +14231,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Groups the three explicit clone contracts—immutable, opaque, and diagnostic—so configuration chooses guarantees by name instead of relying on a fuzzy generic clone.',
       quickStart:
-        'const clone = strictHistory ? ClonePolicy.immutable : ClonePolicy.diagnostic\nconst snapshot = clone(state)',
+        `import { ClonePolicy } from '@migaia/store-middleware'\n\nconst strictHistory = false\nconst state = { user: { name: 'Ada' } }\nconst clone = strictHistory ? ClonePolicy.immutable : ClonePolicy.diagnostic\nconst snapshot = clone(state)\nconsole.log(snapshot)`,
       scenarios: [
         'A binding option needs a named clone strategy.',
         'Reviewers must see whether independence or availability wins.',
@@ -14028,7 +14248,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '组合三种显式 clone contract：immutable、opaque、diagnostic，让配置按名称选择 guarantee，而不是依赖含糊的通用 clone。',
       quickStart:
-        'const clone = strictHistory ? ClonePolicy.immutable : ClonePolicy.diagnostic\nconst snapshot = clone(state)',
+        `import { ClonePolicy } from '@migaia/store-middleware'\n\nconst strictHistory = false\nconst state = { user: { name: 'Ada' } }\nconst clone = strictHistory ? ClonePolicy.immutable : ClonePolicy.diagnostic\nconst snapshot = clone(state)\nconsole.log(snapshot)`,
       scenarios: [
         'binding option 需要命名 clone strategy。',
         'reviewer 必须看清 independence 与 availability 谁优先。',
@@ -14046,7 +14266,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Deprecated alias of diagnosticClone retained for source compatibility. It has identical best-effort behavior and no separate implementation path; migrate to ClonePolicy.diagnostic or diagnosticClone.',
-      quickStart: 'const snapshot = diagnosticClone(state) // preferred replacement',
+      quickStart: `import { diagnosticClone } from '@migaia/store-middleware'\n\nconst state = { user: { name: 'Ada' } }\nconst snapshot = diagnosticClone(state) // preferred replacement for deprecated tolerantClone\nconsole.log(snapshot)`,
       scenarios: [
         'Reading legacy code that still imports tolerantClone.',
         'Performing a bounded source migration to diagnosticClone.',
@@ -14072,7 +14292,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '为 source compatibility 保留的 diagnosticClone deprecated alias。它具有完全相同的 best-effort behavior，没有第二条实现路径；应迁移到 ClonePolicy.diagnostic 或 diagnosticClone。',
-      quickStart: 'const snapshot = diagnosticClone(state) // 推荐替代写法',
+      quickStart: `import { diagnosticClone } from '@migaia/store-middleware'\n\nconst state = { user: { name: 'Ada' } }\nconst snapshot = diagnosticClone(state) // tolerantClone 的推荐替代写法\nconsole.log(snapshot)`,
       scenarios: [
         '阅读仍 import tolerantClone 的 legacy code。',
         '执行有边界的 diagnosticClone source migration。',
@@ -14101,7 +14321,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Provides the stable read, write, and delete operation labels used by Store Indexed diagnostics and registries. It describes operation categories; it does not execute or authorize a mutation.',
       quickStart:
-        'const operation = changed ? IndexedOperation.write : IndexedOperation.read\nrecordIndexedOperation(operation)',
+        `const IndexedOperation = { read: 'read', write: 'write', delete: 'delete' } as const\nconst recordIndexedOperation = (operation: keyof typeof IndexedOperation) => console.log('indexed operation:', operation)\nconst changed = true\nconst operation = changed ? IndexedOperation.write : IndexedOperation.read\nrecordIndexedOperation(operation)`,
       scenarios: [
         'Diagnostics need a stable operation category.',
         'A registry groups collection work without parsing method names.',
@@ -14118,7 +14338,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '提供 Store Indexed diagnostic 与 registry 使用的稳定 read、write、delete operation label。它描述 operation category，不执行也不授权 mutation。',
       quickStart:
-        'const operation = changed ? IndexedOperation.write : IndexedOperation.read\nrecordIndexedOperation(operation)',
+        `const IndexedOperation = { read: 'read', write: 'write', delete: 'delete' } as const\nconst recordIndexedOperation = (operation: keyof typeof IndexedOperation) => console.log('indexed operation:', operation)\nconst changed = true\nconst operation = changed ? IndexedOperation.write : IndexedOperation.read\nrecordIndexedOperation(operation)`,
       scenarios: [
         'diagnostic 需要稳定 operation category。',
         'registry 不解析 method name，直接归类 collection work。',
@@ -14137,7 +14357,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Exposes the canonical source discriminator attached to Store Indexed boundary errors. Narrow by source before branching on code; do not parse diagnostic messages.',
       quickStart:
-        'if (error.source === STORE_INDEXED_SOURCE) {\n  handleIndexedCode(error.code)\n}',
+        `import { STORE_INDEXED_SOURCE } from '@migaia/store-indexed'\n\nconst error = { source: STORE_INDEXED_SOURCE, code: 'INDEXED_OPERATION_FAILED' }\nconst handleIndexedCode = (code: string) => console.error('indexed failure:', code)\nif (error.source === STORE_INDEXED_SOURCE) {\n  handleIndexedCode(error.code)\n}`,
       scenarios: [
         'A shared reporter routes failures by library ownership.',
         'Telemetry groups Store Indexed errors by source and code.',
@@ -14154,7 +14374,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '暴露附加到 Store Indexed boundary error 的 canonical source discriminator。先按 source 缩小范围，再按 code 分支；不要解析 diagnostic message。',
       quickStart:
-        'if (error.source === STORE_INDEXED_SOURCE) {\n  handleIndexedCode(error.code)\n}',
+        `import { STORE_INDEXED_SOURCE } from '@migaia/store-indexed'\n\nconst error = { source: STORE_INDEXED_SOURCE, code: 'INDEXED_OPERATION_FAILED' }\nconst handleIndexedCode = (code: string) => console.error('indexed failure:', code)\nif (error.source === STORE_INDEXED_SOURCE) {\n  handleIndexedCode(error.code)\n}`,
       scenarios: [
         'shared reporter 按 library ownership 路由 failure。',
         'telemetry 按 source 与 code 聚合 Store Indexed error。',
@@ -14173,7 +14393,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the standard tagged Error for Store Indexed operational failures while preserving native identity, stack, and an optional cause. Prefer the more specific TypeError or RangeError factory when input semantics require it.',
       quickStart:
-        "throw createStoreIndexedError(\n  StoreIndexedErrorCode.collectionDisposed,\n  StoreIndexedErrorText.disposed('session')\n)",
+        `import { createStoreIndexedError, StoreIndexedErrorCode, StoreIndexedErrorText } from '@migaia/store-indexed'\n\nconst collectionName = 'session'\nconst originalError = new Error('collection was already disposed')\nthrow createStoreIndexedError(\n  StoreIndexedErrorCode.collectionDisposed,\n  StoreIndexedErrorText.disposed(collectionName),\n  { cause: originalError }\n)`,
       scenarios: [
         'A disposed collection is used again.',
         'A tracked read crosses Runtime ownership.',
@@ -14217,7 +14437,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 Store Indexed operational failure 创建标准 tagged Error，并保留 native identity、stack 与可选 cause。input semantics 更具体时应使用 TypeError 或 RangeError factory。',
       quickStart:
-        "throw createStoreIndexedError(\n  StoreIndexedErrorCode.collectionDisposed,\n  StoreIndexedErrorText.disposed('session')\n)",
+        `import { createStoreIndexedError, StoreIndexedErrorCode, StoreIndexedErrorText } from '@migaia/store-indexed'\n\nconst collectionName = 'session'\nconst originalError = new Error('collection 已经 disposed')\nthrow createStoreIndexedError(\n  StoreIndexedErrorCode.collectionDisposed,\n  StoreIndexedErrorText.disposed(collectionName),\n  { cause: originalError }\n)`,
       scenarios: [
         'disposed collection 被再次使用。',
         'tracked read 跨越 Runtime ownership。',
@@ -14263,7 +14483,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a tagged native RangeError for a valid integer index outside the current ObservableArray bounds. It preserves instanceof RangeError and the original stack.',
       quickStart:
-        'throw createStoreIndexedRangeError(\n  StoreIndexedErrorCode.indexOutOfRange,\n  StoreIndexedErrorText.arrayIndex\n)',
+        `import { createStoreIndexedRangeError, StoreIndexedErrorCode, StoreIndexedErrorText } from '@migaia/store-indexed'\n\nconst index = 4\nconst length = 2\nif (index >= length) {\n  throw createStoreIndexedRangeError(StoreIndexedErrorCode.indexOutOfRange, StoreIndexedErrorText.arrayIndex)\n}`,
       scenarios: [
         'ObservableArray.set receives an index below zero.',
         'The write index is at or beyond the current length.',
@@ -14299,7 +14519,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为超出当前 ObservableArray bounds 的有效整数 index 创建 tagged native RangeError；保留 instanceof RangeError 与原始 stack。',
       quickStart:
-        'throw createStoreIndexedRangeError(\n  StoreIndexedErrorCode.indexOutOfRange,\n  StoreIndexedErrorText.arrayIndex\n)',
+        `import { createStoreIndexedRangeError, StoreIndexedErrorCode, StoreIndexedErrorText } from '@migaia/store-indexed'\n\nconst index = 4\nconst length = 2\nif (index >= length) {\n  throw createStoreIndexedRangeError(StoreIndexedErrorCode.indexOutOfRange, StoreIndexedErrorText.arrayIndex)\n}`,
       scenarios: [
         'ObservableArray.set 收到小于零的 index。',
         'write index 等于或大于当前 length。',
@@ -14337,7 +14557,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a tagged native TypeError for malformed collection inputs, options, object keys, or non-integer indices. Native type, stack, source/code, and optional cause remain intact.',
       quickStart:
-        'throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidIndex,\n  StoreIndexedErrorText.arrayInteger,\n  { cause: inputError }\n)',
+        `import { createStoreIndexedTypeError, StoreIndexedErrorCode, StoreIndexedErrorText } from '@migaia/store-indexed'\n\nconst inputError = new Error('index getter returned a non-integer')\nthrow createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidIndex,\n  StoreIndexedErrorText.arrayInteger,\n  { cause: inputError }\n)`,
       scenarios: [
         'A constructor receives a null or non-iterable input.',
         'Options, debugName, object key, or updater has the wrong runtime type.',
@@ -14381,7 +14601,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 malformed collection input、option、object key 或 non-integer index 创建 tagged native TypeError；保留 native type、stack、source/code 与可选 cause。',
       quickStart:
-        'throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidIndex,\n  StoreIndexedErrorText.arrayInteger,\n  { cause: inputError }\n)',
+        `import { createStoreIndexedTypeError, StoreIndexedErrorCode, StoreIndexedErrorText } from '@migaia/store-indexed'\n\nconst inputError = new Error('index getter 返回了非整数')\nthrow createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidIndex,\n  StoreIndexedErrorText.arrayInteger,\n  { cause: inputError }\n)`,
       scenarios: [
         'constructor 收到 null 或 non-iterable input。',
         'options、debugName、object key 或 updater 的 runtime type 错误。',
@@ -14427,7 +14647,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates an explicit string-keyed reactive object without Proxying user data. get tracks one key, has and keys track structure, snapshot tracks the full revision, and peek stays allocation-free and untracked.',
       quickStart:
-        "const profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nstop.dispose()\nprofile.dispose()",
+        `import { createRuntime, observableObject } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst renderName = (name: unknown) => console.log('name:', name)\nconst profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nstop.dispose()\nprofile.dispose()`,
       scenarios: [
         'Independent object properties need fine-grained invalidation.',
         'Consumers need explicit tracked and untracked read APIs.',
@@ -14444,7 +14664,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建不 Proxy user data 的显式 string-keyed reactive object。get 追踪单 key，has/keys 追踪 structure，snapshot 追踪完整 revision，peek 保持无分配且不追踪。',
       quickStart:
-        "const profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nstop.dispose()\nprofile.dispose()",
+        `import { createRuntime, observableObject } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst renderName = (name: unknown) => console.log('name:', name)\nconst profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nstop.dispose()\nprofile.dispose()`,
       scenarios: [
         '独立 object property 需要细粒度 invalidation。',
         'consumer 需要显式 tracked 与 untracked read API。',
@@ -14463,7 +14683,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Class-form Observable Object for callers that need explicit constructor order or instanceof checks. It owns lazy key cells and must be disposed by the same lifecycle that owns its Runtime usage.',
       quickStart:
-        "const state = new ObservableObject({ count: 0 }, runtime, { debugName: 'counter' })\nstate.update('count', (count) => count + 1)\nconst view = state.snapshot()\nstate.dispose()",
+        `import { ObservableObject, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst state = new ObservableObject({ count: 0 }, runtime, { debugName: 'counter' })\nstate.update('count', (count) => count + 1)\nconst view = state.snapshot()\nconsole.log(view)\nstate.dispose()`,
       scenarios: [
         'A framework adapter constructs collection classes directly.',
         'Runtime is clearer as the second constructor argument.',
@@ -14480,7 +14700,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '面向需要显式 constructor 顺序或 instanceof 检查的 class-form Observable Object。它拥有惰性 key cell，必须由拥有其 Runtime usage 的同一 lifecycle dispose。',
       quickStart:
-        "const state = new ObservableObject({ count: 0 }, runtime, { debugName: 'counter' })\nstate.update('count', (count) => count + 1)\nconst view = state.snapshot()\nstate.dispose()",
+        `import { ObservableObject, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst state = new ObservableObject({ count: 0 }, runtime, { debugName: 'counter' })\nstate.update('count', (count) => count + 1)\nconst view = state.snapshot()\nconsole.log(view)\nstate.dispose()`,
       scenarios: [
         'framework adapter 直接构造 collection class。',
         '把 Runtime 作为第二个 constructor 参数更清晰。',
@@ -14499,7 +14719,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates an ordered reactive collection with lazy per-index dependencies plus separate length, structure, and snapshot revision tracking. Bulk replace and splice notify only materialized index cells.',
       quickStart:
-        "const rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.prune()\nrows.dispose()",
+        `import { createRuntime, observableArray } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.prune()\nrows.dispose()`,
       scenarios: [
         'A large list has only a small number of observed indices.',
         'Length and whole-list iteration must react independently from unrelated indexed reads.',
@@ -14516,7 +14736,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建有序 reactive collection：惰性 per-index dependency，并分离 length、structure 与 snapshot revision tracking。bulk replace/splice 只通知已 materialize 的 index cell。',
       quickStart:
-        "const rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.prune()\nrows.dispose()",
+        `import { createRuntime, observableArray } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.prune()\nrows.dispose()`,
       scenarios: [
         '大型 list 只有少量 observed index。',
         'length 与 whole-list iteration 必须和无关 indexed read 独立响应。',
@@ -14535,7 +14755,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Class-form indexed list with explicit Runtime ownership. Negative at() reads track structure, set requires an existing non-negative integer index, and splice preserves native omitted-argument semantics.',
       quickStart:
-        "const queue = new ObservableArray(tasks, runtime, { debugName: 'queue' })\nqueue.push(task)\nconst last = queue.at(-1)\nqueue.set(0, nextTask)\nqueue.dispose()",
+        `import { ObservableArray, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst task = { id: 'task-1', title: 'Review' }\nconst nextTask = { id: 'task-1', title: 'Ship' }\nconst tasks = [task]\nconst queue = new ObservableArray(tasks, runtime, { debugName: 'queue' })\nqueue.push(task)\nconst last = queue.at(-1)\nqueue.set(0, nextTask)\nconsole.log(last)\nqueue.dispose()`,
       scenarios: [
         'An adapter requires direct class construction.',
         'Index-level tracking is materially smaller than whole-array invalidation.',
@@ -14552,7 +14772,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '具有显式 Runtime ownership 的 class-form indexed list。负数 at() read 追踪 structure，set 要求已有的非负整数 index，splice 保留 native omitted-argument semantics。',
       quickStart:
-        "const queue = new ObservableArray(tasks, runtime, { debugName: 'queue' })\nqueue.push(task)\nconst last = queue.at(-1)\nqueue.set(0, nextTask)\nqueue.dispose()",
+        `import { ObservableArray, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst task = { id: 'task-1', title: 'Review' }\nconst nextTask = { id: 'task-1', title: 'Ship' }\nconst tasks = [task]\nconst queue = new ObservableArray(tasks, runtime, { debugName: 'queue' })\nqueue.push(task)\nconst last = queue.at(-1)\nqueue.set(0, nextTask)\nconsole.log(last)\nqueue.dispose()`,
       scenarios: [
         'adapter 需要直接 class construction。',
         'index-level tracking 比 whole-array invalidation 显著更小。',
@@ -14571,7 +14791,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a reactive Map with per-key value and membership dependencies, a structural key dependency, and an iteration dependency. Untracked peek never materializes a cell.',
       quickStart:
-        "const users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nusers.prune()\nusers.dispose()",
+        `import { createRuntime, observableMap } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = { id: 'ada', name: 'Ada' }\nconst initialUsers = [[user.id, user]] as const\nconst selectedId = user.id\nconst users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nconsole.log(selected, entries)\nusers.prune()\nusers.dispose()`,
       scenarios: [
         'Arbitrary key identity needs fine-grained get and has tracking.',
         'Key-set readers should ignore value-only changes.',
@@ -14588,7 +14808,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建 reactive Map：per-key value/membership dependency、structural key dependency 与 iteration dependency 相互分离；untracked peek 不 materialize cell。',
       quickStart:
-        "const users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nusers.prune()\nusers.dispose()",
+        `import { createRuntime, observableMap } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = { id: 'ada', name: 'Ada' }\nconst initialUsers = [[user.id, user]] as const\nconst selectedId = user.id\nconst users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nconsole.log(selected, entries)\nusers.prune()\nusers.dispose()`,
       scenarios: [
         '任意 key identity 需要细粒度 get 与 has tracking。',
         'key-set reader 应忽略只改变 value 的 mutation。',
@@ -14607,7 +14827,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Class-form Observable Map for explicit construction and ownership. replace swaps the entire content atomically, clear publishes one structural and one iteration revision, and dispose is idempotent.',
       quickStart:
-        "const cache = new ObservableMap(entries, runtime, { debugName: 'cache' })\ncache.replace(nextEntries)\nconst keys = cache.keys()\ncache.dispose()",
+        `import { ObservableMap, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst entries = [['theme', 'dark']] as const\nconst nextEntries = [['theme', 'light'], ['locale', 'zh-CN']] as const\nconst cache = new ObservableMap(entries, runtime, { debugName: 'cache' })\ncache.replace(nextEntries)\nconst keys = cache.keys()\nconsole.log(keys)\ncache.dispose()`,
       scenarios: [
         'A framework owns the class instance directly.',
         'Bulk replacement must be one bounded reactive transaction.',
@@ -14624,7 +14844,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '用于显式 construction 与 ownership 的 class-form Observable Map。replace 原子交换全部内容，clear 只发布一次 structure 与一次 iteration revision，dispose 幂等。',
       quickStart:
-        "const cache = new ObservableMap(entries, runtime, { debugName: 'cache' })\ncache.replace(nextEntries)\nconst keys = cache.keys()\ncache.dispose()",
+        `import { ObservableMap, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst entries = [['theme', 'dark']] as const\nconst nextEntries = [['theme', 'light'], ['locale', 'zh-CN']] as const\nconst cache = new ObservableMap(entries, runtime, { debugName: 'cache' })\ncache.replace(nextEntries)\nconst keys = cache.keys()\nconsole.log(keys)\ncache.dispose()`,
       scenarios: [
         'framework 直接拥有 class instance。',
         'bulk replacement 必须是一次 bounded reactive transaction。',
@@ -14643,7 +14863,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a reactive membership set with lazy per-value has dependencies and one structural dependency for size, iteration, and snapshots. Duplicate add and missing delete are no-op writes.',
       quickStart:
-        "const permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nif (permissions.has('write')) enableEditor()\npermissions.delete('read')\npermissions.dispose()",
+        `import { createRuntime, observableSet } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst enableEditor = () => console.log('editor enabled')\nconst permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nif (permissions.has('write')) enableEditor()\npermissions.delete('read')\nconsole.log(permissions.snapshot())\npermissions.dispose()`,
       scenarios: [
         'Membership checks should react only when their queried value changes.',
         'Size and enumeration need structural tracking.',
@@ -14660,7 +14880,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建 reactive membership set：惰性 per-value has dependency，并由一个 structural dependency 服务 size、iteration 与 snapshot。duplicate add 和 missing delete 都是 no-op write。',
       quickStart:
-        "const permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nif (permissions.has('write')) enableEditor()\npermissions.delete('read')\npermissions.dispose()",
+        `import { createRuntime, observableSet } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst enableEditor = () => console.log('editor enabled')\nconst permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nif (permissions.has('write')) enableEditor()\npermissions.delete('read')\nconsole.log(permissions.snapshot())\npermissions.dispose()`,
       scenarios: [
         'membership check 只在其查询 value 改变时响应。',
         'size 与 enumeration 需要 structural tracking。',
@@ -14679,7 +14899,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Class-form Observable Set with explicit Runtime ownership and idempotent disposal. replace updates only materialized membership cells before publishing at most one structural revision.',
       quickStart:
-        "const active = new ObservableSet(ids, runtime, { debugName: 'activeIds' })\nactive.replace(nextIds)\nconst snapshot = active.snapshot()\nactive.prune()\nactive.dispose()",
+        `import { ObservableSet, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst ids = ['user-1', 'user-2']\nconst nextIds = ['user-2', 'user-3']\nconst active = new ObservableSet(ids, runtime, { debugName: 'activeIds' })\nactive.replace(nextIds)\nconst snapshot = active.snapshot()\nconsole.log(snapshot)\nactive.prune()\nactive.dispose()`,
       scenarios: [
         'Direct class construction fits an adapter boundary.',
         'A large membership domain has few observed values.',
@@ -14696,7 +14916,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '具有显式 Runtime ownership 与幂等 disposal 的 class-form Observable Set。replace 先更新已 materialize membership cell，再至多发布一次 structural revision。',
       quickStart:
-        "const active = new ObservableSet(ids, runtime, { debugName: 'activeIds' })\nactive.replace(nextIds)\nconst snapshot = active.snapshot()\nactive.prune()\nactive.dispose()",
+        `import { ObservableSet, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst ids = ['user-1', 'user-2']\nconst nextIds = ['user-2', 'user-3']\nconst active = new ObservableSet(ids, runtime, { debugName: 'activeIds' })\nactive.replace(nextIds)\nconst snapshot = active.snapshot()\nconsole.log(snapshot)\nactive.prune()\nactive.dispose()`,
       scenarios: [
         '直接 class construction 适合 adapter boundary。',
         '大型 membership domain 只有少量 observed value。',
@@ -14715,7 +14935,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates an immutable primitive definition token. Each AtomStore clones mutable initial containers when it first instantiates the definition, so Provider, SSR, and test scopes do not share object identity.',
       quickStart:
-        "const countDef = atomDef(0, 'count')\nconst sessionDef = atomDef({ userId: null }, 'session')\n\nconst store = createAtomStore(runtime)\nstore.set(countDef, (value) => value + 1)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst countDef = atomDef(0, 'count')\nconst sessionDef = atomDef({ userId: null }, 'session')\nconst store = createAtomStore(runtime)\nstore.set(countDef, (value) => value + 1)\nconsole.log(store.get(countDef), store.get(sessionDef))\nstore.dispose()`,
       scenarios: [
         'A keyed state value needs one reusable definition token.',
         'The same definition must instantiate independently in several AtomStores.',
@@ -14751,7 +14971,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建不可变 primitive definition token。每个 AtomStore 首次实例化时会 clone 可变初值容器，因此 Provider、SSR 与测试 scope 不共享 object identity。',
       quickStart:
-        "const countDef = atomDef(0, 'count')\nconst sessionDef = atomDef({ userId: null }, 'session')\n\nconst store = createAtomStore(runtime)\nstore.set(countDef, (value) => value + 1)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst countDef = atomDef(0, 'count')\nconst sessionDef = atomDef({ userId: null }, 'session')\nconst store = createAtomStore(runtime)\nstore.set(countDef, (value) => value + 1)\nconsole.log(store.get(countDef), store.get(sessionDef))\nstore.dispose()`,
       scenarios: [
         'keyed state value 需要可复用 definition token。',
         '同一 definition 必须在多个 AtomStore 中独立实例化。',
@@ -14788,7 +15008,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a primitive definition whose synchronous factory runs once per AtomStore on first real instantiation. The factory is preview-unsafe by default so speculative rendering cannot silently perform effects.',
       quickStart:
-        "const requestIdDef = atomDefFactory(() => crypto.randomUUID(), 'request-id')\nconst requestId = store.get(requestIdDef)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDefFactory, createAtomStore } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst requestIdDef = atomDefFactory(() => crypto.randomUUID(), 'request-id')\nconst requestId = store.get(requestIdDef)\nconsole.log('request id:', requestId)\nstore.dispose()`,
       scenarios: [
         'Each AtomStore needs a fresh non-shared initial value.',
         'Initialization is synchronous but cannot be represented as a cloneable template.',
@@ -14824,7 +15044,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建 primitive definition，其同步 factory 在每个 AtomStore 首次真实实例化时执行一次。默认禁止 preview，避免 speculative rendering 静默执行副作用。',
       quickStart:
-        "const requestIdDef = atomDefFactory(() => crypto.randomUUID(), 'request-id')\nconst requestId = store.get(requestIdDef)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDefFactory, createAtomStore } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst requestIdDef = atomDefFactory(() => crypto.randomUUID(), 'request-id')\nconst requestId = store.get(requestIdDef)\nconsole.log('request id:', requestId)\nstore.dispose()`,
       scenarios: [
         '每个 AtomStore 需要全新、不共享的初值。',
         '初始化同步，但无法表示为可 clone template。',
@@ -14861,7 +15081,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a primitive factory definition explicitly allowed in speculative preview. This is a caller promise that create is pure, deterministic, synchronous, and free of externally visible effects.',
       quickStart:
-        "const modelDef = previewSafeAtomDefFactory(() => ({ selected: null }), 'model')\nconst candidate = store.preview(modelDef)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, previewSafeAtomDefFactory } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst modelDef = previewSafeAtomDefFactory(() => ({ selected: null }), 'model')\nconst candidate = store.preview(modelDef)\nconsole.log('preview:', candidate)\nstore.dispose()`,
       scenarios: [
         'Concurrent rendering needs a temporary value before commit.',
         'The factory creates only isolated in-memory data.',
@@ -14896,7 +15116,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建显式允许 speculative preview 的 primitive factory definition。这是调用方承诺：create 纯、确定、同步且没有外部可观察副作用。',
       quickStart:
-        "const modelDef = previewSafeAtomDefFactory(() => ({ selected: null }), 'model')\nconst candidate = store.preview(modelDef)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, previewSafeAtomDefFactory } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst modelDef = previewSafeAtomDefFactory(() => ({ selected: null }), 'model')\nconst candidate = store.preview(modelDef)\nconsole.log('preview:', candidate)\nstore.dispose()`,
       scenarios: [
         '并发渲染在 commit 前需要临时 value。',
         'factory 只创建隔离的内存数据。',
@@ -14933,7 +15153,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a read-only derived definition. read receives the current AtomStore getter, builds dependencies within that store, and uses Object.is unless a custom equality function is supplied.',
       quickStart:
-        "const totalDef = derivedDef(\n  (get) => get(priceDef) * get(quantityDef),\n  'total'\n)\nconst total = store.get(totalDef)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst priceDef = atomDef(12, 'price')\nconst quantityDef = atomDef(3, 'quantity')\nconst store = createAtomStore(runtime)\nconst totalDef = derivedDef((get) => get(priceDef) * get(quantityDef), 'total')\nconst total = store.get(totalDef)\nconsole.log('derived total:', total)`,
       scenarios: [
         'A value derives from other definitions in the same AtomStore.',
         'The same derivation blueprint must work across several stores.',
@@ -14978,7 +15198,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建只读 derived definition。read 接收当前 AtomStore getter，在同一 store 内建立依赖；未传 equals 时使用 Object.is。',
       quickStart:
-        "const totalDef = derivedDef(\n  (get) => get(priceDef) * get(quantityDef),\n  'total'\n)\nconst total = store.get(totalDef)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst priceDef = atomDef(12, 'price')\nconst quantityDef = atomDef(3, 'quantity')\nconst store = createAtomStore(runtime)\nconst totalDef = derivedDef((get) => get(priceDef) * get(quantityDef), 'total')\nconst total = store.get(totalDef)\nconsole.log('派生总价:', total)`,
       scenarios: [
         '一个值从同一 AtomStore 的其他 definition 派生。',
         '同一 derivation blueprint 必须跨多个 store 工作。',
@@ -15023,7 +15243,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a derived definition with an explicit write contract. write receives same-store get/set functions and custom arguments, allowing one admitted write to update several related definitions in one batch.',
       quickStart:
-        "const fullNameDef = writableDef(\n  (get) => `${get(firstDef)} ${get(lastDef)}`,\n  (_get, set, first, last) => {\n    set(firstDef, first)\n    set(lastDef, last)\n  },\n  'full-name'\n)\nstore.set(fullNameDef, 'Ada', 'Lovelace')",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, writableDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst firstDef = atomDef('Grace', 'first')\nconst lastDef = atomDef('Hopper', 'last')\nconst store = createAtomStore(runtime)\nconst fullNameDef = writableDef((get) => \`\${get(firstDef)} \${get(lastDef)}\`, (_get, set, first, last) => {\n  set(firstDef, first)\n  set(lastDef, last)\n}, 'full-name')\nstore.set(fullNameDef, 'Ada', 'Lovelace')\nconsole.log('full name:', store.get(fullNameDef))`,
       scenarios: [
         'A projection needs domain-specific write arguments.',
         'One logical write updates several source definitions.',
@@ -15075,7 +15295,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带显式 write contract 的 derived definition。write 接收同 store get/set 与自定义参数，使一次获准写入可在一个 batch 中更新多个关联 definition。',
       quickStart:
-        "const fullNameDef = writableDef(\n  (get) => `${get(firstDef)} ${get(lastDef)}`,\n  (_get, set, first, last) => {\n    set(firstDef, first)\n    set(lastDef, last)\n  },\n  'full-name'\n)\nstore.set(fullNameDef, 'Ada', 'Lovelace')",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, writableDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst firstDef = atomDef('Grace', 'first')\nconst lastDef = atomDef('Hopper', 'last')\nconst store = createAtomStore(runtime)\nconst fullNameDef = writableDef((get) => \`\${get(firstDef)} \${get(lastDef)}\`, (_get, set, first, last) => {\n  set(firstDef, first)\n  set(lastDef, last)\n}, 'full-name')\nstore.set(fullNameDef, 'Ada', 'Lovelace')\nconsole.log('姓名:', store.get(fullNameDef))`,
       scenarios: [
         'projection 需要领域自定义 write 参数。',
         '一次逻辑写入更新多个 source definition。',
@@ -15129,7 +15349,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates one isolated AtomStore over an explicit Runtime. Definitions are reusable blueprints; this store owns their concrete Signal/Computed instances, subscriptions, overrides, previews, release, and disposal.',
       quickStart:
-        "const runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst countDef = atomDef(0, 'count')\n\ntry {\n  store.set(countDef, 1)\n  console.log(store.get(countDef))\n} finally {\n  store.dispose()\n}",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst countDef = atomDef(0, 'count')\ntry {\n  store.set(countDef, 1)\n  console.log(store.get(countDef))\n} finally {\n  store.dispose()\n}`,
       scenarios: [
         'A Provider, SSR request, or test needs an independent keyed state scope.',
         'Definition tokens are shared while state instances remain isolated.',
@@ -15158,7 +15378,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '在显式 Runtime 上创建隔离 AtomStore。definition 是可复用 blueprint；store 拥有其具体 Signal/Computed instance、subscription、override、preview、release 与 disposal。',
       quickStart:
-        "const runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst countDef = atomDef(0, 'count')\n\ntry {\n  store.set(countDef, 1)\n  console.log(store.get(countDef))\n} finally {\n  store.dispose()\n}",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst countDef = atomDef(0, 'count')\ntry {\n  store.set(countDef, 1)\n  console.log(store.get(countDef))\n} finally {\n  store.dispose()\n}`,
       scenarios: [
         'Provider、SSR request 或 test 需要独立 keyed state scope。',
         '共享 definition token，同时保持 state instance 隔离。',
@@ -15186,7 +15406,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Returns the cached default AtomStore for one Runtime, recreating it after disposal. It exists for legacy instance-style APIs; Provider and request scopes should create explicit stores.',
-      quickStart: 'const shared = defaultAtomStore(runtime)\nshared.set(countDef, 1)',
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, defaultAtomStore } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst countDef = atomDef(0, 'count')\nconst shared = defaultAtomStore(runtime)\nshared.set(countDef, 1)\nconsole.log(shared.get(countDef)) // 1：同一 Runtime 复用缓存的 default AtomStore`,
       scenarios: [
         'Legacy instance-style adapters on one Runtime must share keyed state.',
         'The caller needs stable default identity without a Provider.',
@@ -15212,7 +15432,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '返回某个 Runtime 缓存的 default AtomStore，disposed 后会重新创建。它服务于 legacy instance-style API；Provider 与 request scope 应显式创建 store。',
-      quickStart: 'const shared = defaultAtomStore(runtime)\nshared.set(countDef, 1)',
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, defaultAtomStore } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst countDef = atomDef(0, 'count')\nconst shared = defaultAtomStore(runtime)\nshared.set(countDef, 1)\nconsole.log(shared.get(countDef)) // 1：同一 Runtime 复用缓存的 default AtomStore`,
       scenarios: [
         '同一 Runtime 上的 legacy instance-style adapter 必须共享 keyed state。',
         '没有 Provider 时需要稳定 default identity。',
@@ -15241,7 +15461,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a key-to-primitive-definition family with stable token identity, a bounded strong LRU window, weak canonical reuse, explicit forget/clear operations, and per-AtomStore initial values.',
       quickStart:
-        "const todoDef = familyDef(\n  (id: string) => ({ id, done: false }),\n  { maxSize: 1_000, debugLabel: 'todo' }\n)\n\nconst item = todoDef('todo-42')\nstore.set(item, (value) => ({ ...value, done: true }))",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todoDef = familyDef((id: string) => ({ id, done: false }), { maxSize: 1_000, debugLabel: 'todo' })\nconst item = todoDef('todo-42')\nstore.set(item, (value) => ({ ...value, done: true }))\nconsole.log('todo:', store.get(item))`,
       scenarios: [
         'A large keyed domain needs lazily created writable definition tokens.',
         'The same key must resolve to a stable token while it remains canonical.',
@@ -15286,7 +15506,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建 key 到 primitive definition 的 family，提供稳定 token identity、有界 strong LRU window、weak canonical reuse、显式 forget/clear 与 per-AtomStore 初值。',
       quickStart:
-        "const todoDef = familyDef(\n  (id: string) => ({ id, done: false }),\n  { maxSize: 1_000, debugLabel: 'todo' }\n)\n\nconst item = todoDef('todo-42')\nstore.set(item, (value) => ({ ...value, done: true }))",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todoDef = familyDef((id: string) => ({ id, done: false }), { maxSize: 1_000, debugLabel: 'todo' })\nconst item = todoDef('todo-42')\nstore.set(item, (value) => ({ ...value, done: true }))\nconsole.log('待办:', store.get(item))`,
       scenarios: [
         '大型 keyed domain 需要惰性创建 writable definition token。',
         '同一 key 在 canonical 期间必须解析为稳定 token。',
@@ -15332,7 +15552,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a bounded key-to-read-only-derived-definition family. Each key returns a stable derivation blueprint whose read function resolves definitions in whichever AtomStore instantiates it.',
       quickStart:
-        "const todoDoneDef = derivedFamilyDef(\n  (id: string) => (get) => get(todoDef(id)).done,\n  { maxSize: 1_000, debugLabel: 'todo-done' }\n)\nconst done = store.get(todoDoneDef('todo-42'))",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, derivedFamilyDef, familyDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todoDef = familyDef((id: string) => ({ id, done: false }), { debugLabel: 'todo' })\nconst todoDoneDef = derivedFamilyDef((id: string) => (get) => get(todoDef(id)).done, { maxSize: 1_000, debugLabel: 'todo-done' })\nstore.set(todoDef('todo-42'), (value) => ({ ...value, done: true }))\nconst done = store.get(todoDoneDef('todo-42'))\nconsole.log('todo done:', done)`,
       scenarios: [
         'Each business key needs a reusable read-only projection.',
         'Projection tokens must be shared while concrete state remains per AtomStore.',
@@ -15375,7 +15595,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建有界 key 到只读 derived definition 的 family。每个 key 返回稳定 derivation blueprint，其 read 在实例化它的 AtomStore 内解析 definition。',
       quickStart:
-        "const todoDoneDef = derivedFamilyDef(\n  (id: string) => (get) => get(todoDef(id)).done,\n  { maxSize: 1_000, debugLabel: 'todo-done' }\n)\nconst done = store.get(todoDoneDef('todo-42'))",
+        `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, derivedFamilyDef, familyDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todoDef = familyDef((id: string) => ({ id, done: false }), { debugLabel: 'todo' })\nconst todoDoneDef = derivedFamilyDef((id: string) => (get) => get(todoDef(id)).done, { maxSize: 1_000, debugLabel: 'todo-done' })\nstore.set(todoDef('todo-42'), (value) => ({ ...value, done: true }))\nconst done = store.get(todoDoneDef('todo-42'))\nconsole.log('todo done:', done)`,
       scenarios: [
         '每个业务 key 需要可复用只读 projection。',
         '共享 projection token，同时保持 concrete state 属于各自 AtomStore。',
@@ -15420,7 +15640,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a read-only projection definition over another definition. Equality applies to the selected value, so unrelated source changes need not notify downstream observers.',
       quickStart:
-        'const selectedIdDef = selectDef(\n  viewDef,\n  (view) => view.selectedId\n)\nconst selectedId = store.get(selectedIdDef)',
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, selectDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst viewDef = atomDef({ selectedId: 'user-1', loading: false }, 'view')\nconst store = createAtomStore(runtime)\nconst selectedIdDef = selectDef(viewDef, (view) => view.selectedId)\nstore.set(viewDef, (view) => ({ ...view, selectedId: 'user-2' }))\nconst selectedId = store.get(selectedIdDef)\nconsole.log('selected user:', selectedId)`,
       scenarios: [
         'Consumers need one read-only field from a larger source value.',
         'Source objects change while selected values often remain equal.',
@@ -15465,7 +15685,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '在另一个 definition 上创建只读 projection definition。equality 作用于 selected value，因此 source 的无关变化不必通知下游。',
       quickStart:
-        'const selectedIdDef = selectDef(\n  viewDef,\n  (view) => view.selectedId\n)\nconst selectedId = store.get(selectedIdDef)',
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, selectDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst viewDef = atomDef({ selectedId: 'user-1', loading: false }, 'view')\nconst store = createAtomStore(runtime)\nconst selectedIdDef = selectDef(viewDef, (view) => view.selectedId)\nstore.set(viewDef, (view) => ({ ...view, selectedId: 'user-2' }))\nconst selectedId = store.get(selectedIdDef)\nconsole.log('selected user:', selectedId)`,
       scenarios: [
         'consumer 只需要大型 source value 的一个只读字段。',
         'source object 会变化，但 selected value 经常相等。',
@@ -15511,7 +15731,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a standard writable focus using a caller-supplied immutable lens. Equal focus writes are skipped; changed writes rebuild the source through optic.set.',
       quickStart:
-        "const nameDef = opticDef(profileDef, {\n  get: (profile) => profile.name,\n  set: (profile, name) => ({ ...profile, name })\n})\nstore.set(nameDef, 'Ada')",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, opticDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst profileDef = atomDef({ name: 'Grace', address: { city: 'New York' } }, 'profile')\nconst store = createAtomStore(runtime)\nconst nameDef = opticDef(profileDef, { get: (profile) => profile.name, set: (profile, name) => ({ ...profile, name }) })\nstore.set(nameDef, 'Ada')\nconsole.log('profile name:', store.get(nameDef))`,
       scenarios: [
         'A reusable custom lens already defines immutable get/set behavior.',
         'A focused value needs standard value-or-updater writes.',
@@ -15547,7 +15767,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '使用调用方提供的 immutable lens 创建标准 writable focus。focus 相等时跳过写入；变化时通过 optic.set 重建 source。',
       quickStart:
-        "const nameDef = opticDef(profileDef, {\n  get: (profile) => profile.name,\n  set: (profile, name) => ({ ...profile, name })\n})\nstore.set(nameDef, 'Ada')",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, opticDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst profileDef = atomDef({ name: 'Grace', address: { city: 'New York' } }, 'profile')\nconst store = createAtomStore(runtime)\nconst nameDef = opticDef(profileDef, { get: (profile) => profile.name, set: (profile, name) => ({ ...profile, name }) })\nstore.set(nameDef, 'Ada')\nconsole.log('姓名:', store.get(nameDef))`,
       scenarios: [
         '已有可复用自定义 lens 定义 immutable get/set。',
         'focused value 需要标准 value-or-updater 写语义。',
@@ -15585,7 +15805,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a writable definition focused on a one-to-three-segment object path. Reads validate every intermediate object; writes immutably clone each traversed container.',
       quickStart:
-        "const cityDef = focusDef(profileDef, 'address', 'city')\nstore.set(cityDef, 'London')",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, focusDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst profileDef = atomDef({ name: 'Ada', address: { city: 'Cambridge' } }, 'profile')\nconst store = createAtomStore(runtime)\nconst cityDef = focusDef(profileDef, 'address', 'city')\nstore.set(cityDef, 'London')\nconsole.log('city:', store.get(cityDef))`,
       scenarios: [
         'A nested object field needs independent subscription and standard writes.',
         'The path is known statically and no custom lens is needed.',
@@ -15621,7 +15841,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建聚焦一到三段 object path 的 writable definition。读取会校验每个中间 object；写入会 immutable clone 每个经过的 container。',
       quickStart:
-        "const cityDef = focusDef(profileDef, 'address', 'city')\nstore.set(cityDef, 'London')",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, focusDef } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst profileDef = atomDef({ name: 'Ada', address: { city: 'Cambridge' } }, 'profile')\nconst store = createAtomStore(runtime)\nconst cityDef = focusDef(profileDef, 'address', 'city')\nstore.set(cityDef, 'London')\nconsole.log('城市:', store.get(cityDef))`,
       scenarios: [
         '嵌套 object field 需要独立 subscription 与标准写入。',
         'path 静态已知，不需要自定义 lens。',
@@ -15659,7 +15879,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Splits one writable array definition into stable per-key writable item definitions plus a derived ordered items list. insert/remove update the source; prune only trims the split token cache.',
       quickStart:
-        "const todosDef = atomDef<readonly Todo[]>([])\nconst todos = splitDef(todosDef, (todo) => todo.id)\n\nconst itemDef = todos.of('todo-42')\nstore.set(itemDef, (todo) => ({ ...todo, done: true }))\ntodos.prune(store)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, splitDef } from '@migaia/store-keyed'\n\ntype Todo = { id: string; done: boolean }\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todosDef = atomDef<readonly Todo[]>([{ id: 'todo-42', done: false }], 'todos')\nconst todos = splitDef(todosDef, (todo) => todo.id)\nconst itemDef = todos.of('todo-42')\nstore.set(itemDef, (todo) => ({ ...todo, done: true }))\nconsole.log('todo item:', store.get(itemDef))\ntodos.prune(store)`,
       scenarios: [
         'List items need stable definition identity across reorder.',
         'Each keyed item needs independent read/write subscriptions.',
@@ -15694,7 +15914,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把一个 writable array definition 拆成稳定 per-key writable item definition 与 derived ordered items list。insert/remove 更新 source；prune 只裁剪 split token cache。',
       quickStart:
-        "const todosDef = atomDef<readonly Todo[]>([])\nconst todos = splitDef(todosDef, (todo) => todo.id)\n\nconst itemDef = todos.of('todo-42')\nstore.set(itemDef, (todo) => ({ ...todo, done: true }))\ntodos.prune(store)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, splitDef } from '@migaia/store-keyed'\n\ntype Todo = { id: string; done: boolean }\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todosDef = atomDef<readonly Todo[]>([{ id: 'todo-42', done: false }], 'todos')\nconst todos = splitDef(todosDef, (todo) => todo.id)\nconst itemDef = todos.of('todo-42')\nstore.set(itemDef, (todo) => ({ ...todo, done: true }))\nconsole.log('待办条目:', store.get(itemDef))\ntodos.prune(store)`,
       scenarios: [
         'list item 在 reorder 后仍需要稳定 definition identity。',
         '每个 keyed item 需要独立 read/write subscription。',
@@ -15731,7 +15951,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Checks the canonical global definition brand and narrows an unknown value to an Atom definition. It does not instantiate state or inspect a definition by duck typing.',
       quickStart:
-        "if (!isAtomDefinition(candidate)) {\n  throw new TypeError('expected an Atom definition')\n}\nconst value = store.get(candidate)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, isAtomDefinition } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst candidate: unknown = atomDef(1, 'count')\nif (!isAtomDefinition(candidate)) throw new TypeError('expected an Atom definition')\nconst value = store.get(candidate)\nconsole.log('value:', value)\nstore.dispose()`,
       scenarios: [
         'An adapter accepts unknown definition input.',
         'Two bundled copies of Store Keyed must recognize the same Symbol.for brand.',
@@ -15758,7 +15978,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '检查 canonical global definition brand，并把 unknown value 收窄为 Atom definition；不会实例化 state，也不会用 duck typing 检查 definition。',
       quickStart:
-        "if (!isAtomDefinition(candidate)) {\n  throw new TypeError('expected an Atom definition')\n}\nconst value = store.get(candidate)",
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, isAtomDefinition } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst candidate: unknown = atomDef(1, 'count')\nif (!isAtomDefinition(candidate)) throw new TypeError('expected an Atom definition')\nconst value = store.get(candidate)\nconsole.log('value:', value)\nstore.dispose()`,
       scenarios: [
         'adapter 接受 unknown definition input。',
         'Store Keyed 的两个 bundled copy 必须识别同一个 Symbol.for brand。',
@@ -15787,7 +16007,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Rejects object and function thenables at synchronous Atom-definition boundaries. The then property is probed once; a hostile getter failure remains reachable as cause.',
       quickStart:
-        "const initial = createInitialValue()\nassertNotThenable(initial, 'customDef(initial)')",
+        `import { assertNotThenable } from '@migaia/store-keyed'\n\nconst createInitialValue = () => ({ selectedId: null as string | null })\nconst initial = createInitialValue()\nassertNotThenable(initial, 'customDef(initial)')\nconsole.log('sync initial value:', initial)`,
       scenarios: [
         'A custom definition constructor must remain synchronous.',
         'A generic value may hide a Promise-like then property.',
@@ -15823,7 +16043,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '在同步 Atom-definition boundary 拒绝 object/function thenable。then property 只 probe 一次；hostile getter failure 通过 cause 保持可达。',
       quickStart:
-        "const initial = createInitialValue()\nassertNotThenable(initial, 'customDef(initial)')",
+        `import { assertNotThenable } from '@migaia/store-keyed'\n\nconst createInitialValue = () => ({ selectedId: null as string | null })\nconst initial = createInitialValue()\nassertNotThenable(initial, 'customDef(initial)')\nconsole.log('同步初值:', initial)`,
       scenarios: [
         '自定义 definition constructor 必须保持同步。',
         'generic value 可能隐藏 Promise-like then property。',
@@ -15861,7 +16081,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates an instance-atom getter bound to one Runtime. Every read verifies atom.runtime identity before using the tracked value property.',
       quickStart:
-        'const get = atomGetter(runtime)\nconst total = readTotal(get)\n\nfunction readTotal(get: IAtomGetter) {\n  return get(priceAtom) * get(quantityAtom)\n}',
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomGetter } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst priceAtom = runtime.atom(12)\nconst quantityAtom = runtime.atom(3)\nconst get = atomGetter(runtime)\nconst readTotal = (read: typeof get) => read(priceAtom) * read(quantityAtom)\nconst total = readTotal(get)\nconsole.log('cart total:', total)`,
       scenarios: [
         'An async or family extension implements instance-style atom reads.',
         'A reusable read callback must enforce one Runtime domain.',
@@ -15888,7 +16108,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建绑定一个 Runtime 的 instance-atom getter。每次读取会先校验 atom.runtime identity，再使用 tracked value property。',
       quickStart:
-        'const get = atomGetter(runtime)\nconst total = readTotal(get)\n\nfunction readTotal(get: IAtomGetter) {\n  return get(priceAtom) * get(quantityAtom)\n}',
+        `import { createRuntime } from '@migaia/reactive'\nimport { atomGetter } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nconst priceAtom = runtime.atom(12)\nconst quantityAtom = runtime.atom(3)\nconst get = atomGetter(runtime)\nconst readTotal = (read: typeof get) => read(priceAtom) * read(quantityAtom)\nconst total = readTotal(get)\nconsole.log('购物车总价:', total)`,
       scenarios: [
         'async 或 family extension 实现 instance-style atom read。',
         '可复用 read callback 必须约束在一个 Runtime domain。',
@@ -15916,7 +16136,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Creates an instance-atom setter bound to one Runtime. It rejects cross-runtime atoms before forwarding the exact custom argument tuple to atom.write.',
-      quickStart: 'const set = atomSetter(runtime)\nset(countAtom, (value) => value + 1)',
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { atomSetter } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nlet value = 0\nconst countAtom = { runtime, observed: false, read: () => value, peek: () => value, get value() { return value }, write: (next: number) => { value = next }, dispose: () => {} }\nconst set = atomSetter(runtime)\nset(countAtom, 1)\nconsole.log(countAtom.value) // 1：setter 先校验 Runtime，再转发写入参数。`,
       scenarios: [
         'An extension implements writable instance atoms.',
         'Custom write arguments must pass through without reinterpretation.',
@@ -15943,7 +16163,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '创建绑定一个 Runtime 的 instance-atom setter。在把准确 custom argument tuple 转发给 atom.write 前，会拒绝 cross-runtime atom。',
-      quickStart: 'const set = atomSetter(runtime)\nset(countAtom, (value) => value + 1)',
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { atomSetter } from '@migaia/store-keyed'\n\nconst runtime = createRuntime()\nlet value = 0\nconst countAtom = { runtime, observed: false, read: () => value, peek: () => value, get value() { return value }, write: (next: number) => { value = next }, dispose: () => {} }\nconst set = atomSetter(runtime)\nset(countAtom, 1)\nconsole.log(countAtom.value) // 1：setter 先校验 Runtime，再转发写入参数。`,
       scenarios: [
         'extension 实现 writable instance atom。',
         'custom write argument 必须原样传递，不重新解释。',
@@ -15971,7 +16191,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Reads a property-key path from an object graph using Reflect.get. Every intermediate value must be an object; invalid traversal fails with a labelled Store Keyed TypeError.',
-      quickStart: "const city = readOpticPath(profile, ['address', 'city'], 'profile lens')",
+      quickStart: `import { readOpticPath } from '@migaia/store-keyed'\n\nconst profile = { address: { city: 'Singapore' } }\nconst city = readOpticPath(profile, ['address', 'city'], 'profile lens')\nconsole.log(city) // Singapore：从业务对象读取嵌套字段`,
       scenarios: [
         'A custom optic needs the same path-read semantics as focusDef.',
         'Symbol or string property keys must be supported.',
@@ -16015,7 +16235,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '使用 Reflect.get 从 object graph 读取 property-key path。每个中间值必须是 object；非法 traversal 会以带 label 的 Store Keyed TypeError 失败。',
-      quickStart: "const city = readOpticPath(profile, ['address', 'city'], 'profile lens')",
+      quickStart: `import { readOpticPath } from '@migaia/store-keyed'\n\nconst profile = { address: { city: 'Singapore' } }\nconst city = readOpticPath(profile, ['address', 'city'], 'profile lens')\nconsole.log(city) // Singapore：从业务对象读取嵌套字段`,
       scenarios: [
         '自定义 optic 需要与 focusDef 相同的 path-read 语义。',
         '必须支持 Symbol 或 string property key。',
@@ -16062,7 +16282,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Immutably writes a property-key path by shallow-cloning every traversed object or array. The __proto__ key is defined as data rather than changing the clone prototype.',
       quickStart:
-        "const next = writeOpticPath(profile, ['address', 'city'], 'London', 'profile lens')",
+        `import { writeOpticPath } from '@migaia/store-keyed'\n\nconst profile = { name: 'Ada', address: { city: 'Cambridge' } }\nconst next = writeOpticPath(profile, ['address', 'city'], 'London', 'profile lens')\nconsole.log('old:', profile.address.city, 'new:', next.address.city)\n// 只复制路径上的节点，原 profile 保持不变。`,
       scenarios: [
         'A custom optic needs immutable path updates with structural sharing.',
         'Arrays and objects occur along the same path.',
@@ -16116,7 +16336,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '通过 shallow clone 每个经过的 object/array 来 immutable 写入 property-key path。__proto__ key 会被定义为普通 data，不会改变 clone prototype。',
       quickStart:
-        "const next = writeOpticPath(profile, ['address', 'city'], 'London', 'profile lens')",
+        `import { writeOpticPath } from '@migaia/store-keyed'\n\nconst profile = { name: 'Ada', address: { city: 'Cambridge' } }\nconst next = writeOpticPath(profile, ['address', 'city'], 'London', 'profile lens')\nconsole.log('旧值:', profile.address.city, '新值:', next.address.city)\n// 只复制路径上的节点，原 profile 保持不变。`,
       scenarios: [
         '自定义 optic 需要带 structural sharing 的 immutable path update。',
         '同一路径中同时存在 array 与 object。',
@@ -16172,7 +16392,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Returns the first array index whose derived key is Object.is-equal to the requested key, or -1 when absent. It is a pure linear scan and does not validate uniqueness.',
       quickStart:
-        "const index = findKeyIndex(todos, (todo) => todo.id, 'todo-42')\nif (index >= 0) console.log(todos[index])",
+        `import { findKeyIndex } from '@migaia/store-keyed'\n\ntype Todo = { id: string; title: string }\nconst todos: readonly Todo[] = [{ id: 'todo-41', title: 'Read docs' }, { id: 'todo-42', title: 'Ship example' }]\nconst index = findKeyIndex(todos, (todo) => todo.id, 'todo-42')\nconsole.log(index >= 0 ? \`found: \${todos[index].title}\` : 'todo not found')`,
       scenarios: [
         'Custom keyed collection logic needs the same lookup semantics as splitDef.',
         'NaN and signed-zero keys must follow Object.is.',
@@ -16217,7 +16437,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '返回第一个 derived key 与请求 key 满足 Object.is 的 array index；不存在时返回 -1。它是纯线性 scan，不校验唯一性。',
       quickStart:
-        "const index = findKeyIndex(todos, (todo) => todo.id, 'todo-42')\nif (index >= 0) console.log(todos[index])",
+        `import { findKeyIndex } from '@migaia/store-keyed'\n\ntype Todo = { id: string; title: string }\nconst todos: readonly Todo[] = [{ id: 'todo-41', title: '阅读文档' }, { id: 'todo-42', title: '完善示例' }]\nconst index = findKeyIndex(todos, (todo) => todo.id, 'todo-42')\nconsole.log(index >= 0 ? \`找到: \${todos[index].title}\` : '未找到待办')`,
       scenarios: [
         '自定义 keyed collection logic 需要与 splitDef 相同 lookup 语义。',
         'NaN 与 signed-zero key 必须遵循 Object.is。',
@@ -16263,7 +16483,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Computes and freezes the ordered key list for an array while rejecting the first duplicate under Set key equality.',
-      quickStart: "const keys = computeUniqueKeys(todos, (todo) => todo.id, 'todos')",
+      quickStart: `import { computeUniqueKeys } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a', title: '写文档' }, { id: 'b', title: '发版' }]\nconst keys = computeUniqueKeys(todos, (todo) => todo.id, 'todos')\nconsole.log(keys) // ['a', 'b']：后续按稳定 key 建立 item token`,
       scenarios: [
         'A custom split kernel needs one ordered unique key snapshot.',
         'Duplicate business keys must fail before item tokens are built.',
@@ -16306,7 +16526,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     },
     zh: {
       purpose: '计算并 freeze array 的有序 key list，同时按 Set key equality 拒绝首个 duplicate。',
-      quickStart: "const keys = computeUniqueKeys(todos, (todo) => todo.id, 'todos')",
+      quickStart: `import { computeUniqueKeys } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a', title: '写文档' }, { id: 'b', title: '发版' }]\nconst keys = computeUniqueKeys(todos, (todo) => todo.id, 'todos')\nconsole.log(keys) // ['a', 'b']：后续按稳定 key 建立 item token`,
       scenarios: [
         '自定义 split kernel 需要一份有序唯一 key snapshot。',
         'duplicate business key 必须在构建 item token 前失败。',
@@ -16352,7 +16572,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Performs findKeyIndex and throws a labelled Store Keyed error when the key no longer exists. It is the read/write guard used by stable split-item definitions.',
-      quickStart: "const index = requireKeyIndex(todos, (todo) => todo.id, id, 'todo was removed')",
+      quickStart: `import { requireKeyIndex } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst id = 'b'\nconst index = requireKeyIndex(todos, (todo) => todo.id, id, 'todo was removed')\nconsole.log(index) // 1：按最新列表解析稳定 item key`,
       scenarios: [
         'A stable item token must detect that its source item was removed.',
         'Missing keys are contract failures rather than optional state.',
@@ -16405,7 +16625,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '执行 findKeyIndex，并在 key 已不存在时抛带 label 的 Store Keyed error；这是稳定 split-item definition 的 read/write guard。',
-      quickStart: "const index = requireKeyIndex(todos, (todo) => todo.id, id, 'todo was removed')",
+      quickStart: `import { requireKeyIndex } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst id = 'b'\nconst index = requireKeyIndex(todos, (todo) => todo.id, id, 'todo was removed')\nconsole.log(index) // 1：按最新列表解析稳定 item key`,
       scenarios: [
         '稳定 item token 必须检测 source item 已被 remove。',
         'missing key 是 contract failure，而非 optional state。',
@@ -16460,7 +16680,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Compares two readonly arrays by length and Object.is at each index. It is the identity-preserving equality used for ordered split-definition token lists.',
-      quickStart: 'const unchanged = shallowArrayEquals(previousDefs, nextDefs)',
+      quickStart: `import { shallowArrayEquals } from '@migaia/store-keyed'\n\nconst previousDefs = [{ id: 'a' }]\nconst nextDefs = previousDefs.slice()\nconst unchanged = shallowArrayEquals(previousDefs, nextDefs)\nconsole.log(unchanged) // true：成员 identity 与顺序都没有变化`,
       scenarios: [
         'Ordered token arrays should notify only when membership or order changes.',
         'Element identity is the complete equality contract.',
@@ -16495,7 +16715,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '按 length 与每个 index 的 Object.is 比较两个 readonly array；用于 ordered split-definition token list 的 identity-preserving equality。',
-      quickStart: 'const unchanged = shallowArrayEquals(previousDefs, nextDefs)',
+      quickStart: `import { shallowArrayEquals } from '@migaia/store-keyed'\n\nconst previousDefs = [{ id: 'a' }]\nconst nextDefs = previousDefs.slice()\nconst unchanged = shallowArrayEquals(previousDefs, nextDefs)\nconsole.log(unchanged) // true：成员 identity 与顺序都没有变化`,
       scenarios: [
         'ordered token array 只在 membership 或 order 变化时通知。',
         'element identity 就是完整 equality contract。',
@@ -16532,7 +16752,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Returns a frozen array with one item inserted at a clamped index. The source array is never mutated.',
-      quickStart: 'const next = spliceInsert(todos, newTodo, requestedIndex)',
+      quickStart: `import { spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst newTodo = { id: 'c' }\nconst requestedIndex = 1\nconst next = spliceInsert(todos, newTodo, requestedIndex)\nconsole.log(next) // a、c、b：返回新数组，原 todos 不变`,
       scenarios: [
         'Custom split logic needs the same immutable insert transform.',
         'Out-of-range indices should clamp to the nearest boundary.',
@@ -16575,7 +16795,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     },
     zh: {
       purpose: '返回在 clamped index 插入一项的 frozen array；绝不 mutation source array。',
-      quickStart: 'const next = spliceInsert(todos, newTodo, requestedIndex)',
+      quickStart: `import { spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst newTodo = { id: 'c' }\nconst requestedIndex = 1\nconst next = spliceInsert(todos, newTodo, requestedIndex)\nconsole.log(next) // a、c、b：返回新数组，原 todos 不变`,
       scenarios: [
         '自定义 split logic 需要同一 immutable insert transform。',
         '越界 index 应 clamp 到最近 boundary。',
@@ -16621,7 +16841,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Removes every item whose derived key is Object.is-equal to the target. When nothing matches it preserves the original array identity; otherwise it returns a frozen replacement.',
-      quickStart: "const { removed, next } = filterOutKey(todos, (todo) => todo.id, 'todo-42')",
+      quickStart: `import { filterOutKey } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'todo-41' }, { id: 'todo-42' }]\nconst { removed, next } = filterOutKey(todos, (todo) => todo.id, 'todo-42')\nconsole.log(removed, next) // true、[{ id: 'todo-41' }]：删除后得到新的 immutable list`,
       scenarios: [
         'Custom split logic needs immutable removal plus an explicit changed flag.',
         'No-op removal should retain source identity.',
@@ -16665,7 +16885,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '移除所有 derived key 与 target 满足 Object.is 的 item。无匹配时保留原 array identity；否则返回 frozen replacement。',
-      quickStart: "const { removed, next } = filterOutKey(todos, (todo) => todo.id, 'todo-42')",
+      quickStart: `import { filterOutKey } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'todo-41' }, { id: 'todo-42' }]\nconst { removed, next } = filterOutKey(todos, (todo) => todo.id, 'todo-42')\nconsole.log(removed, next) // true、[{ id: 'todo-41' }]：删除后得到新的 immutable list`,
       scenarios: [
         '自定义 split logic 需要 immutable removal 与显式 changed flag。',
         'no-op removal 应保留 source identity。',
@@ -16711,7 +16931,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Returns a frozen shallow copy with one array slot replaced. It deliberately performs no bounds validation or equality shortcut.',
-      quickStart: 'const next = replaceAtIndex(todos, index, updatedTodo)',
+      quickStart: `import { replaceAtIndex } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst index = 1\nconst updatedTodo = { id: 'b', done: true }\nconst next = replaceAtIndex(todos, index, updatedTodo)\nconsole.log(next) // 只替换 index=1 的 slot，原 todos 不变`,
       scenarios: [
         'A caller already validated the index.',
         'Custom split logic needs one immutable slot replacement.',
@@ -16755,7 +16975,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '返回替换一个 array slot 的 frozen shallow copy；刻意不做 bounds validation 或 equality shortcut。',
-      quickStart: 'const next = replaceAtIndex(todos, index, updatedTodo)',
+      quickStart: `import { replaceAtIndex } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst index = 1\nconst updatedTodo = { id: 'b', done: true }\nconst next = replaceAtIndex(todos, index, updatedTodo)\nconsole.log(next) // 只替换 index=1 的 slot，原 todos 不变`,
       scenarios: [
         'caller 已校验 index。',
         '自定义 split logic 需要单 slot immutable replacement。',
@@ -16802,7 +17022,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Owns a stable key-to-item token cache shared by split kernels. of performs get-or-create; prune separates liveness, eviction eligibility, and per-item cleanup; clear only drops cache references.',
       quickStart:
-        'const cache = new KeyedSplitCache<string, ItemDef>()\nconst item = cache.of(id, () => createItemDef(id))\ncache.prune(isLive, isUnobserved, (entry) => entry.dispose())',
+        `import { KeyedSplitCache } from '@migaia/store-keyed'\n\ntype ItemDef = { id: string; dispose: () => void }\nconst createItemDef = (id: string): ItemDef => ({ id, dispose: () => console.log('disposed:', id) })\nconst cache = new KeyedSplitCache<string, ItemDef>()\nconst liveKeys = new Set(['todo-1'])\nconst item = cache.of('todo-1', () => createItemDef('todo-1'))\nconsole.log('cached item:', item.id)\ncache.prune((id) => liveKeys.has(id), () => true, (entry) => entry.dispose())`,
       scenarios: [
         'A custom keyed split needs stable item identity.',
         'Eviction must skip observed items and optionally dispose evicted instances.',
@@ -16855,7 +17075,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '拥有 split kernel 共用的稳定 key-to-item token cache。of 执行 get-or-create；prune 分离 liveness、eviction eligibility 与 per-item cleanup；clear 只丢 cache reference。',
       quickStart:
-        'const cache = new KeyedSplitCache<string, ItemDef>()\nconst item = cache.of(id, () => createItemDef(id))\ncache.prune(isLive, isUnobserved, (entry) => entry.dispose())',
+        `import { KeyedSplitCache } from '@migaia/store-keyed'\n\ntype ItemDef = { id: string; dispose: () => void }\nconst createItemDef = (id: string): ItemDef => ({ id, dispose: () => console.log('disposed:', id) })\nconst cache = new KeyedSplitCache<string, ItemDef>()\nconst liveKeys = new Set(['todo-1'])\nconst item = cache.of('todo-1', () => createItemDef('todo-1'))\nconsole.log('缓存条目:', item.id)\ncache.prune((id) => liveKeys.has(id), () => true, (entry) => entry.dispose())`,
       scenarios: [
         '自定义 keyed split 需要稳定 item identity。',
         'eviction 必须跳过 observed item，并可选择 dispose 被淘汰 instance。',
@@ -16909,7 +17129,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Names the four atom-definition categories used by Store Keyed to decide initialization, dependency tracking, and whether writes are legal. Most applications inspect it only in tooling or definition transforms; constructors assign it for you.',
       quickStart:
-        'if (definition.kind === AtomKind.writableDerived) {\n  // This definition accepts writes through its declared setter.\n}',
+        `import { AtomKind, writableDef } from '@migaia/store-keyed'\n\nconst definition = writableDef(() => 0, (next: number) => next, 'count')\nif (definition.kind === AtomKind.writableDerived) {\n  console.log('writable derived atom:', definition)\n}`,
       scenarios: [
         'Developer tooling needs to classify an atom definition.',
         'A definition transform must preserve primitive versus derived write semantics.',
@@ -16926,7 +17146,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '命名 Store Keyed 用于决定 initialization、dependency tracking 与是否允许 write 的四种 atom-definition category。多数 application 只会在 tooling 或 definition transform 中检查它；constructor 会自动赋值。',
       quickStart:
-        'if (definition.kind === AtomKind.writableDerived) {\n  // 该 definition 可通过声明的 setter 接受 write。\n}',
+        `import { AtomKind, writableDef } from '@migaia/store-keyed'\n\nconst definition = writableDef(() => 0, (next: number) => next, 'count')\nif (definition.kind === AtomKind.writableDerived) {\n  console.log('可写 derived atom:', definition)\n}`,
       scenarios: [
         'developer tooling 需要分类 atom definition。',
         'definition transform 必须保留 primitive 与 derived write semantics。',
@@ -16945,7 +17165,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Exposes the canonical source discriminator attached to every Store Keyed boundary error. Compare it together with error.code when routing diagnostics; it is not an error message or a general library identifier.',
       quickStart:
-        'if (error.source === STORE_KEYED_SOURCE) {\n  reportStoreKeyedFailure(error.code, error)\n}',
+        `import { STORE_KEYED_SOURCE } from '@migaia/store-keyed'\n\nconst error = { source: STORE_KEYED_SOURCE, code: 'ATOM_INVALID' }\nconst reportStoreKeyedFailure = (code: string, cause: unknown) => console.error(code, cause)\nif (error.source === STORE_KEYED_SOURCE) {\n  reportStoreKeyedFailure(error.code, error)\n}`,
       scenarios: [
         'A shared error reporter routes failures by library ownership.',
         'Telemetry groups Store Keyed failures without parsing messages.',
@@ -16962,7 +17182,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '暴露附加在每个 Store Keyed boundary error 上的 canonical source discriminator。路由 diagnostic 时应与 error.code 一起比较；它不是 error message，也不是通用 library identifier。',
       quickStart:
-        'if (error.source === STORE_KEYED_SOURCE) {\n  reportStoreKeyedFailure(error.code, error)\n}',
+        `import { STORE_KEYED_SOURCE } from '@migaia/store-keyed'\n\nconst error = { source: STORE_KEYED_SOURCE, code: 'ATOM_INVALID' }\nconst reportStoreKeyedFailure = (code: string, cause: unknown) => console.error(code, cause)\nif (error.source === STORE_KEYED_SOURCE) {\n  reportStoreKeyedFailure(error.code, error)\n}`,
       scenarios: [
         'shared error reporter 按 library ownership 路由 failure。',
         'telemetry 不解析 message，直接聚合 Store Keyed failure。',
@@ -16981,7 +17201,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the Store Keyed standard Error while preserving the native error instance and stack, then attaches the stable @migaia/store-keyed source and semantic code. Use it at a Store Keyed boundary, not as a general application error factory.',
       quickStart:
-        "throw createStoreKeyedError(\n  StoreKeyedErrorCode.invalidOption,\n  StoreKeyedErrorText.invalidOption('cacheSize'),\n  { cause: inputError }\n)",
+        `import { createStoreKeyedError, StoreKeyedErrorCode, StoreKeyedErrorText } from '@migaia/store-keyed'\n\nconst inputError = new Error('cacheSize came from invalid configuration')\nthrow createStoreKeyedError(StoreKeyedErrorCode.invalidOption, StoreKeyedErrorText.invalidOption('cacheSize'), { cause: inputError })`,
       scenarios: [
         'A Store Keyed invariant fails without requiring a more specific native error class.',
         'Callers need to branch on the stable source/code pair.',
@@ -17025,7 +17245,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建 Store Keyed 标准 Error，保留 native error instance 与 stack，再附加稳定的 @migaia/store-keyed source 和 semantic code。它属于 Store Keyed boundary，不是通用 application error factory。',
       quickStart:
-        "throw createStoreKeyedError(\n  StoreKeyedErrorCode.invalidOption,\n  StoreKeyedErrorText.invalidOption('cacheSize'),\n  { cause: inputError }\n)",
+        `import { createStoreKeyedError, StoreKeyedErrorCode, StoreKeyedErrorText } from '@migaia/store-keyed'\n\nconst inputError = new Error('cacheSize 来自非法配置')\nthrow createStoreKeyedError(StoreKeyedErrorCode.invalidOption, StoreKeyedErrorText.invalidOption('cacheSize'), { cause: inputError })`,
       scenarios: [
         'Store Keyed invariant 失败，但不需要更具体的 native error class。',
         'caller 需要按稳定 source/code pair 分支。',
@@ -17071,7 +17291,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a tagged native RangeError for numeric values that fall outside a Store Keyed contract. It preserves instanceof RangeError, stack, source/code identity, and an optional cause.',
       quickStart:
-        'throw createStoreKeyedRangeError(\n  StoreKeyedErrorCode.invalidOption,\n  StoreKeyedErrorText.invalidCapacity(capacity)\n)',
+        `import { createStoreKeyedRangeError, StoreKeyedErrorCode, StoreKeyedErrorText } from '@migaia/store-keyed'\n\nconst capacity = -1\nif (capacity < 0) throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, StoreKeyedErrorText.invalidCapacity(capacity))`,
       scenarios: [
         'A cache capacity or numeric bound is outside its accepted range.',
         'Consumers distinguish range failures with instanceof RangeError.',
@@ -17115,7 +17335,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为超出 Store Keyed contract 的 numeric value 创建带标识的 native RangeError；保留 instanceof RangeError、stack、source/code identity 与可选 cause。',
       quickStart:
-        'throw createStoreKeyedRangeError(\n  StoreKeyedErrorCode.invalidOption,\n  StoreKeyedErrorText.invalidCapacity(capacity)\n)',
+        `import { createStoreKeyedRangeError, StoreKeyedErrorCode, StoreKeyedErrorText } from '@migaia/store-keyed'\n\nconst capacity = -1\nif (capacity < 0) throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, StoreKeyedErrorText.invalidCapacity(capacity))`,
       scenarios: [
         'cache capacity 或 numeric bound 超出允许范围。',
         'consumer 通过 instanceof RangeError 区分 range failure。',
@@ -17161,7 +17381,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a tagged native TypeError for malformed definitions, paths, options, or cross-runtime inputs. Native type, stack, semantic identity, and optional cause are preserved.',
       quickStart:
-        "throw createStoreKeyedTypeError(\n  StoreKeyedErrorCode.invalidDefinition,\n  StoreKeyedErrorText.invalidDefinition('todo')\n)",
+        `import { createStoreKeyedTypeError, StoreKeyedErrorCode, StoreKeyedErrorText } from '@migaia/store-keyed'\n\nconst decodeError = new Error('definition payload is malformed')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidDefinition, StoreKeyedErrorText.invalidDefinition('todo'), { cause: decodeError })`,
       scenarios: [
         'A value does not satisfy the required atom-definition protocol.',
         'An optic path or option has an invalid shape.',
@@ -17205,7 +17425,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 malformed definition、path、option 或 cross-runtime input 创建带标识的 native TypeError；保留 native type、stack、semantic identity 与可选 cause。',
       quickStart:
-        "throw createStoreKeyedTypeError(\n  StoreKeyedErrorCode.invalidDefinition,\n  StoreKeyedErrorText.invalidDefinition('todo')\n)",
+        `import { createStoreKeyedTypeError, StoreKeyedErrorCode, StoreKeyedErrorText } from '@migaia/store-keyed'\n\nconst decodeError = new Error('definition payload 格式错误')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidDefinition, StoreKeyedErrorText.invalidDefinition('todo'), { cause: decodeError })`,
       scenarios: [
         'value 不满足要求的 atom-definition protocol。',
         'optic path 或 option shape 非法。',
@@ -17251,7 +17471,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a tagged native AggregateError without flattening or replacing its errors array. Use it when one Store Keyed operation completes containment work but must report several failures together.',
       quickStart:
-        'throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.cleanupFailed,\n  cleanupErrors,\n  StoreKeyedErrorText.cleanupFailed(cleanupErrors.length)\n)',
+        `import { createStoreKeyedAggregateError, StoreKeyedErrorCode, StoreKeyedErrorText } from '@migaia/store-keyed'\n\nconst cleanupErrors = [new Error('atom release failed'), new Error('store disposal failed')]\nthrow createStoreKeyedAggregateError(StoreKeyedErrorCode.cleanupFailed, cleanupErrors, StoreKeyedErrorText.cleanupFailed(cleanupErrors.length))`,
       scenarios: [
         'Several subscriber or cleanup failures occur in one bounded operation.',
         'Every original error must remain reachable through AggregateError.errors.',
@@ -17297,7 +17517,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带标识的 native AggregateError，不 flatten 或替换 errors array。用于一次 Store Keyed operation 完成 containment 后，需要统一报告多个 failure。',
       quickStart:
-        'throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.cleanupFailed,\n  cleanupErrors,\n  StoreKeyedErrorText.cleanupFailed(cleanupErrors.length)\n)',
+        `import { createStoreKeyedAggregateError, StoreKeyedErrorCode, StoreKeyedErrorText } from '@migaia/store-keyed'\n\nconst cleanupErrors = [new Error('atom release 失败'), new Error('store disposal 失败')]\nthrow createStoreKeyedAggregateError(StoreKeyedErrorCode.cleanupFailed, cleanupErrors, StoreKeyedErrorText.cleanupFailed(cleanupErrors.length))`,
       scenarios: [
         '一次 bounded operation 中出现多个 subscriber 或 cleanup failure。',
         '每个原始 error 都必须通过 AggregateError.errors 保持可达。',
@@ -17344,7 +17564,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Synchronously creates an object-state facade: ordinary values become Signals, getters become lazy Computed values, methods become traced batched Actions, and only synchronous FieldBuilders are admitted.',
       quickStart:
-        "const counter = createStore({\n  count: 0,\n  get doubled() { return this.count * 2 },\n  increment() { this.count += 1 }\n}, { debugName: 'counter' })\n\ntry {\n  counter.increment()\n} finally {\n  await counter.$dispose()\n}",
+        `import { createStore } from '@migaia/store-light'\n\nconst counter = createStore({\n  count: 0,\n  get doubled() { return this.count * 2 },\n  increment() { this.count += 1 }\n}, { debugName: 'counter' })\n\ntry {\n  counter.increment()\n  console.log(counter.count, counter.doubled)\n} finally {\n  await counter.$dispose()\n}`,
       scenarios: [
         'A small object domain needs automatic reactive fields and derived getters.',
         'Construction must complete synchronously without hidden I/O.',
@@ -17361,7 +17581,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '同步创建 object-state facade：普通值变 Signal、getter 变惰性 Computed、method 变带 trace 的 batch Action，并且只接纳同步 FieldBuilder。',
       quickStart:
-        "const counter = createStore({\n  count: 0,\n  get doubled() { return this.count * 2 },\n  increment() { this.count += 1 }\n}, { debugName: 'counter' })\n\ntry {\n  counter.increment()\n} finally {\n  await counter.$dispose()\n}",
+        `import { createStore } from '@migaia/store-light'\n\nconst counter = createStore({\n  count: 0,\n  get doubled() { return this.count * 2 },\n  increment() { this.count += 1 }\n}, { debugName: 'counter' })\n\ntry {\n  counter.increment()\n  console.log(counter.count, counter.doubled)\n} finally {\n  await counter.$dispose()\n}`,
       scenarios: [
         '小型对象领域需要自动 reactive field 与派生 getter。',
         '构造必须同步完成，不能隐藏 I/O。',
@@ -17380,7 +17600,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Explicit naming alias for createStore. It has the same synchronous-field admission, Store facade, ownership, errors, and disposal contract; it does not create a second implementation path.',
       quickStart:
-        "const settings = createStoreSync({ theme: 'system' })\ntry {\n  settings.theme = 'dark'\n} finally {\n  await settings.$dispose()\n}",
+        `import { createStoreSync } from '@migaia/store-light'\n\nconst settings = createStoreSync({ theme: 'system' })\ntry {\n  settings.theme = 'dark'\n  console.log(settings.theme)\n} finally {\n  await settings.$dispose()\n}`,
       scenarios: [
         'An API surface benefits from spelling the synchronous creation mode.',
         'Code is paired visually with createAsyncStore.',
@@ -17397,7 +17617,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'createStore 的显式命名 alias；同步 field admission、Store facade、ownership、error 与 disposal 契约完全相同，不存在第二条实现路径。',
       quickStart:
-        "const settings = createStoreSync({ theme: 'system' })\ntry {\n  settings.theme = 'dark'\n} finally {\n  await settings.$dispose()\n}",
+        `import { createStoreSync } from '@migaia/store-light'\n\nconst settings = createStoreSync({ theme: 'system' })\ntry {\n  settings.theme = 'dark'\n  console.log(settings.theme)\n} finally {\n  await settings.$dispose()\n}`,
       scenarios: [
         'API surface 需要显式写出同步创建模式。',
         '代码需要与 createAsyncStore 形成视觉配对。',
@@ -17416,7 +17636,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a Store that may contain asynchronous FieldBuilders and resolves only after every field is ready. Initialization failure disposes already-created fields instead of exposing a half-ready Store.',
       quickStart:
-        "const profile = await createAsyncStore({\n  cache: asyncFieldBuilder(),\n  selectedId: null\n}, { runtime, debugName: 'profile' })\n\ntry {\n  profile.cache.read()\n} finally {\n  await profile.$dispose()\n}",
+        `import { createAsyncStore } from '@migaia/store-light'\n\n// 实际项目把需要异步初始化的 FieldBuilder 放在 cache；这里用显式 shape 展示 ready 边界。\nconst profile = await createAsyncStore({ selectedId: null }, { debugName: 'profile' })\n\ntry {\n  console.log(profile.selectedId)\n} finally {\n  await profile.$dispose()\n}`,
       scenarios: [
         'One or more custom fields require asynchronous initialization.',
         'Consumers must receive either a fully ready Store or a rejection.',
@@ -17433,7 +17653,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建允许 async FieldBuilder 的 Store，并在全部 field ready 后才 resolve。初始化失败会 dispose 已创建 field，不会暴露 half-ready Store。',
       quickStart:
-        "const profile = await createAsyncStore({\n  cache: asyncFieldBuilder(),\n  selectedId: null\n}, { runtime, debugName: 'profile' })\n\ntry {\n  profile.cache.read()\n} finally {\n  await profile.$dispose()\n}",
+        `import { createAsyncStore } from '@migaia/store-light'\n\n// 实际项目把需要异步初始化的 FieldBuilder 放在 cache；这里用显式 shape 展示 ready 边界。\nconst profile = await createAsyncStore({ selectedId: null }, { debugName: 'profile' })\n\ntry {\n  console.log(profile.selectedId)\n} finally {\n  await profile.$dispose()\n}`,
       scenarios: [
         '一个或多个自定义 field 需要异步初始化。',
         'consumer 必须只收到 fully ready Store 或 rejection。',
@@ -17452,7 +17672,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Migration-only facade that may return before legacy or asynchronous FieldBuilders are ready. New code should select createStore or createAsyncStore so readiness is explicit at construction.',
       quickStart:
-        'const legacy = createLegacyStore(oldShape)\ntry {\n  if (legacy.$async) await storeReady(legacy)\n  useReadyStore(legacy)\n} finally {\n  await legacy.$dispose()\n}',
+        `import { createLegacyStore, storeReady } from '@migaia/store-light'\n\nconst oldShape = { theme: 'system' }\nconst useReadyStore = (store: { theme: string }) => console.log(store.theme)\nconst legacy = createLegacyStore(oldShape)\ntry {\n  if (legacy.$async) await storeReady(legacy)\n  useReadyStore(legacy)\n} finally {\n  await legacy.$dispose()\n}`,
       scenarios: [
         'Existing code relies on synchronous object identity before async fields settle.',
         'A bounded migration cannot switch every consumer to await construction at once.',
@@ -17469,7 +17689,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '仅用于迁移的 facade，可能在 legacy/async FieldBuilder ready 前返回。新代码应选择 createStore 或 createAsyncStore，在构造边界显式处理 readiness。',
       quickStart:
-        'const legacy = createLegacyStore(oldShape)\ntry {\n  if (legacy.$async) await storeReady(legacy)\n  useReadyStore(legacy)\n} finally {\n  await legacy.$dispose()\n}',
+        `import { createLegacyStore, storeReady } from '@migaia/store-light'\n\nconst oldShape = { theme: 'system' }\nconst useReadyStore = (store: { theme: string }) => console.log(store.theme)\nconst legacy = createLegacyStore(oldShape)\ntry {\n  if (legacy.$async) await storeReady(legacy)\n  useReadyStore(legacy)\n} finally {\n  await legacy.$dispose()\n}`,
       scenarios: [
         '既有代码依赖 async field settle 前就得到同步 object identity。',
         '有界迁移无法一次把全部 consumer 改为 await construction。',
@@ -17488,7 +17708,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Returns the initialization Promise registered for a Store created by Store Light. It exists for React integration and legacy migration, not as the preferred construction model.',
       quickStart:
-        'const store = createLegacyStore(shape)\nif (store.$async) await storeReady(store)',
+        `import { createLegacyStore, storeReady } from '@migaia/store-light'\n\nconst shape = { theme: 'system' }\nconst store = createLegacyStore(shape)\nif (store.$async) await storeReady(store)\nconsole.log('store ready')`,
       scenarios: [
         'A legacy Store was returned before async fields settled.',
         'An adapter must suspend on the exact Store initialization generation.',
@@ -17515,7 +17735,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '返回 Store Light 为某个 Store 登记的 initialization Promise。它服务于 React adapter 与 legacy migration，不是推荐的构造模型。',
       quickStart:
-        'const store = createLegacyStore(shape)\nif (store.$async) await storeReady(store)',
+        `import { createLegacyStore, storeReady } from '@migaia/store-light'\n\nconst shape = { theme: 'system' }\nconst store = createLegacyStore(shape)\nif (store.$async) await storeReady(store)\nconsole.log('store ready')`,
       scenarios: [
         'legacy Store 在 async field settle 前已返回。',
         'adapter 必须 suspend 在准确 Store initialization generation 上。',
@@ -17544,7 +17764,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Brands one value as an ordinary writable Store field so a function value is not interpreted as an Action method.',
       quickStart:
-        'const form = createStore({\n  onSubmit: raw((value: FormData) => save(value))\n})\nform.onSubmit = nextHandler',
+        `import { createStore, raw } from '@migaia/store-light'\n\nconst save = (value: FormData) => console.log('submitted:', value.get('email'))\nconst form = createStore({ onSubmit: raw((value: FormData) => save(value)) })\nconst nextHandler = (value: FormData) => console.log('replaced handler:', value.get('email'))\nform.onSubmit = nextHandler\nform.onSubmit(new FormData())\n// raw 保留函数作为普通字段；赋值和调用都由业务代码控制，不会被包装成 Action。`,
       scenarios: [
         'A callback must be stored and replaced as state.',
         'A function value must not receive Action wrapping or Store this binding.',
@@ -17570,7 +17790,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose: '把一个值标记为普通可写 Store field，使 function value 不会被解释为 Action method。',
       quickStart:
-        'const form = createStore({\n  onSubmit: raw((value: FormData) => save(value))\n})\nform.onSubmit = nextHandler',
+        `import { createStore, raw } from '@migaia/store-light'\n\nconst save = (value: FormData) => console.log('提交:', value.get('email'))\nconst form = createStore({ onSubmit: raw((value: FormData) => save(value)) })\nconst nextHandler = (value: FormData) => console.log('替换后的处理器:', value.get('email'))\nform.onSubmit = nextHandler\nform.onSubmit(new FormData())\n// raw 让函数保持普通字段，由业务代码自行替换和调用，不会被包装成 Action。`,
       scenarios: [
         'callback 必须作为 state 存储并替换。',
         'function value 不能被 Action wrapping 或绑定 Store this。',
@@ -17597,7 +17817,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
   'store-light:index:isRaw': {
     en: {
       purpose: 'Type guard for the private raw-value brand used by Store definition processing.',
-      quickStart: 'if (isRaw(candidate)) {\n  console.log(candidate.value)\n}',
+      quickStart: `import { isRaw, raw } from '@migaia/store-light'\n\nconst candidate: unknown = raw(() => 1)\nif (isRaw(candidate)) {\n  console.log(candidate.value()) // 1：raw 包装后，函数会作为普通值而不是 Action\n}`,
       scenarios: [
         'A Store adapter inspects definition entries before construction.',
         'A tooling layer distinguishes raw callbacks from Action methods.',
@@ -17622,7 +17842,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     },
     zh: {
       purpose: '检查 Store definition processing 所用私有 raw-value brand 的类型守卫。',
-      quickStart: 'if (isRaw(candidate)) {\n  console.log(candidate.value)\n}',
+      quickStart: `import { isRaw, raw } from '@migaia/store-light'\n\nconst candidate: unknown = raw(() => 1)\nif (isRaw(candidate)) {\n  console.log(candidate.value()) // 1：raw 包装后，函数会作为普通值而不是 Action\n}`,
       scenarios: [
         'Store adapter 在构造前检查 definition entry。',
         'tooling layer 区分 raw callback 与 Action method。',
@@ -17650,7 +17870,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Type guard for the canonical FIELD_BUILDER brand. It distinguishes custom owned fields from ordinary objects before Store construction.',
-      quickStart: 'if (isFieldBuilder(candidate)) {\n  console.log(candidate.mode)\n}',
+      quickStart: `import { isFieldBuilder } from '@migaia/store-light'\n\nconst candidate: unknown = { mode: 'sync' }\nif (isFieldBuilder(candidate)) {\n  console.log(candidate.mode)\n} else {\n  console.log(false) // 普通 object 没有 FIELD_BUILDER brand，不会被当作自定义字段\n}`,
       scenarios: [
         'A custom Store adapter validates field definitions.',
         'Tooling reports synchronous versus asynchronous builder modes.',
@@ -17676,7 +17896,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '检查 canonical FIELD_BUILDER brand 的类型守卫，在 Store 构造前区分自定义 owned field 与普通 object。',
-      quickStart: 'if (isFieldBuilder(candidate)) {\n  console.log(candidate.mode)\n}',
+      quickStart: `import { isFieldBuilder } from '@migaia/store-light'\n\nconst candidate: unknown = { mode: 'sync' }\nif (isFieldBuilder(candidate)) {\n  console.log(candidate.mode)\n} else {\n  console.log(false) // 普通 object 没有 FIELD_BUILDER brand，不会被当作自定义字段\n}`,
       scenarios: [
         '自定义 Store adapter 校验 field definition。',
         'tooling 报告 sync/async builder mode。',
@@ -17704,8 +17924,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Creates a Suspense-safe asynchronous value with abortable generations, stale-value retry, explicit resource and version leases, bounded cache retention, and deterministic terminal cleanup.',
-      quickStart:
-        'const user = createStoreResource(({ signal }) => fetchUser(signal), {\n  keepAliveMs: 5_000,\n  onError: report\n})\nuser.preload()\n\ntry {\n  const value = user.read() // throws the pending Promise for Suspense\n} finally {\n  user.dispose()\n  await user.whenTerminal()\n}',
+      quickStart: `import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst report = (error: unknown) => console.error('resource failed:', error)\n\nconst user = createStoreResource(({ signal }) => fetchUser(signal), {\n  keepAliveMs: 5_000,\n  onError: report\n})\nuser.preload()\n\ntry {\n  const value = user.read() // throws the pending Promise for Suspense\n} finally {\n  user.dispose()\n  await user.whenTerminal()\n}',
       scenarios: [
         'UI or SSR code needs a readable async value with Suspense semantics.',
         'A retry must keep the previous ready value until a new generation succeeds.',
@@ -17721,8 +17940,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '创建 Suspense-safe async value，提供可 abort generation、stale-value retry、显式 resource/version lease、有界 cache retention 与确定性终态 cleanup。',
-      quickStart:
-        'const user = createStoreResource(({ signal }) => fetchUser(signal), {\n  keepAliveMs: 5_000,\n  onError: report\n})\nuser.preload()\n\ntry {\n  const value = user.read() // 为 Suspense throw pending Promise\n} finally {\n  user.dispose()\n  await user.whenTerminal()\n}',
+      quickStart: \`import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst report = (error: unknown) => console.error('resource failed:', error)\n\nconst user = createStoreResource(({ signal }) => fetchUser(signal), {\n  keepAliveMs: 5_000,\n  onError: report\n})\nuser.preload()\n\ntry {\n  const value = user.read() // 为 Suspense throw pending Promise\n} finally {\n  user.dispose()\n  await user.whenTerminal()\n}',
       scenarios: [
         'UI 或 SSR 代码需要带 Suspense 语义的 readable async value。',
         'retry 必须保留 previous ready value，直到新 generation 成功。',
@@ -17740,8 +17958,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Creates a group owner for Store Resources. resource delegates to createStoreResource, while scope disposal force-disposes every still-live member and removes naturally terminal members.',
-      quickStart:
-        'const scope = createStoreResourceScope()\nconst user = scope.resource(({ signal }) => fetchUser(signal))\nconst settings = scope.resource(({ signal }) => fetchSettings(signal))\n\ntry {\n  user.preload()\n  settings.preload()\n} finally {\n  scope.dispose()\n}',
+      quickStart: \`import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst fetchSettings = async (signal: AbortSignal) => ({ theme: 'dark', signalAborted: signal.aborted })\n\nconst scope = createStoreResourceScope()\nconst user = scope.resource(({ signal }) => fetchUser(signal))\nconst settings = scope.resource(({ signal }) => fetchSettings(signal))\n\ntry {\n  user.preload()\n  settings.preload()\n} finally {\n  scope.dispose()\n}',
       scenarios: [
         'A component, route, or request owns several Resources together.',
         'Group shutdown must ignore lingering leases because the whole owner is ending.',
@@ -17757,8 +17974,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose:
         '为一组 Store Resource 创建统一 owner。resource 原样委托 createStoreResource；scope dispose 会 force-dispose 全部仍存活成员，并自动摘除自然终态成员。',
-      quickStart:
-        'const scope = createStoreResourceScope()\nconst user = scope.resource(({ signal }) => fetchUser(signal))\nconst settings = scope.resource(({ signal }) => fetchSettings(signal))\n\ntry {\n  user.preload()\n  settings.preload()\n} finally {\n  scope.dispose()\n}',
+      quickStart: \`import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst fetchSettings = async (signal: AbortSignal) => ({ theme: 'dark', signalAborted: signal.aborted })\n\nconst scope = createStoreResourceScope()\nconst user = scope.resource(({ signal }) => fetchUser(signal))\nconst settings = scope.resource(({ signal }) => fetchSettings(signal))\n\ntry {\n  user.preload()\n  settings.preload()\n} finally {\n  scope.dispose()\n}',
       scenarios: [
         'component、route 或 request 共同拥有多个 Resource。',
         'group shutdown 必须忽略残留 lease，因为整体 owner 正在结束。',
@@ -17777,7 +17993,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native Error carrying the canonical Store Light source and a registered semantic code, optionally retaining a lower-level failure as cause.',
       quickStart:
-        "throw createStoreLightError(StoreLightErrorCode.invalidOption, 'custom field configuration is invalid', { cause })",
+        \`import { createStoreLightError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst cause = new Error('custom field configuration was rejected')\nthrow createStoreLightError(StoreLightErrorCode.invalidOption, 'custom field configuration is invalid', { cause })`,
       scenarios: [
         'A custom FieldBuilder extends the Store Light error boundary.',
         'A Store adapter must preserve a lower-level failure through Error.cause.',
@@ -17821,7 +18037,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带 canonical Store Light source 与已注册语义 code 的原生 Error，并可通过 cause 保留底层 failure。',
       quickStart:
-        "throw createStoreLightError(StoreLightErrorCode.invalidOption, 'custom field configuration is invalid', { cause })",
+        `import { createStoreLightError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst cause = new Error('自定义 field 配置被拒绝')\nthrow createStoreLightError(StoreLightErrorCode.invalidOption, 'custom field configuration is invalid', { cause })`,
       scenarios: [
         '自定义 FieldBuilder 扩展 Store Light error boundary。',
         'Store adapter 必须通过 Error.cause 保留底层 failure。',
@@ -17867,7 +18083,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native RangeError tagged with Store Light source/code identity for invalid numeric limits such as cache lifetime or version bounds.',
       quickStart:
-        "throw createStoreLightRangeError(StoreLightErrorCode.invalidOption, 'keepAliveMs must be finite and non-negative')",
+        `import { createStoreLightRangeError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst keepAliveMs = -1\nif (keepAliveMs < 0) throw createStoreLightRangeError(StoreLightErrorCode.invalidOption, 'keepAliveMs must be finite and non-negative')`,
       scenarios: [
         'A custom Resource adapter validates a numeric option.',
         'Consumers must retain native RangeError branching.',
@@ -17903,7 +18119,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 cache lifetime 或 version bound 等非法数值限制创建带 Store Light source/code identity 的原生 RangeError。',
       quickStart:
-        "throw createStoreLightRangeError(StoreLightErrorCode.invalidOption, 'keepAliveMs must be finite and non-negative')",
+        `import { createStoreLightRangeError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst keepAliveMs = -1\nif (keepAliveMs < 0) throw createStoreLightRangeError(StoreLightErrorCode.invalidOption, 'keepAliveMs must be finite and non-negative')`,
       scenarios: [
         '自定义 Resource adapter 校验数值 option。',
         'consumer 必须保留原生 RangeError 分支。',
@@ -17941,7 +18157,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native TypeError with Store Light identity and optional cause for invalid Store shapes, Resource factories, callback contracts, or custom field values.',
       quickStart:
-        "throw createStoreLightTypeError(StoreLightErrorCode.invalidOption, 'resource factory must be callable', { cause })",
+        `import { createStoreLightTypeError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst cause = new Error('resource factory value was not callable')\nthrow createStoreLightTypeError(StoreLightErrorCode.invalidOption, 'resource factory must be callable', { cause })`,
       scenarios: [
         'An extension rejects a runtime value by type or shape.',
         'A hostile property access failure must remain reachable as cause.',
@@ -17985,7 +18201,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为非法 Store shape、Resource factory、callback contract 或自定义 field value 创建带 Store Light identity 与可选 cause 的原生 TypeError。',
       quickStart:
-        "throw createStoreLightTypeError(StoreLightErrorCode.invalidOption, 'resource factory must be callable', { cause })",
+        `import { createStoreLightTypeError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst cause = new Error('resource factory 不是 callable')\nthrow createStoreLightTypeError(StoreLightErrorCode.invalidOption, 'resource factory must be callable', { cause })`,
       scenarios: [
         'extension 按 runtime type 或 shape 拒绝 value。',
         'hostile property access failure 必须通过 cause 保持可达。',
@@ -18031,7 +18247,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native AggregateError tagged with Store Light identity while retaining every independent initialization, rollback, or disposal failure in errors[].',
       quickStart:
-        "throw createStoreLightAggregateError(StoreLightErrorCode.scopeDisposalFailed, failures, 'Store cleanup failed')",
+        `import { createStoreLightAggregateError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst failures = [new Error('resource release failed'), new Error('scope close failed')]\nthrow createStoreLightAggregateError(StoreLightErrorCode.scopeDisposalFailed, failures, 'Store cleanup failed')`,
       scenarios: [
         'Several owned fields fail during Store disposal.',
         'Rollback must preserve each independent cleanup failure.',
@@ -18076,7 +18292,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带 Store Light identity 的原生 AggregateError，并在 errors[] 中保留每个独立 initialization、rollback 或 disposal failure。',
       quickStart:
-        "throw createStoreLightAggregateError(StoreLightErrorCode.scopeDisposalFailed, failures, 'Store cleanup failed')",
+        `import { createStoreLightAggregateError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst failures = [new Error('resource release 失败'), new Error('scope close 失败')]\nthrow createStoreLightAggregateError(StoreLightErrorCode.scopeDisposalFailed, failures, 'Store cleanup failed')`,
       scenarios: [
         '多个 owned field 在 Store disposal 期间失败。',
         'rollback 必须保留每个独立 cleanup failure。',
@@ -18123,7 +18339,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Owns one request-local Reactive Runtime, registered Stores and Resources, hydration backlog, resource waiting, dehydration, and deterministic cleanup. The scope is the isolation boundary: values from another Runtime are rejected.',
       quickStart:
-        "const scope = new SSRRequestScope()\nconst session = await createStore({ runtime: scope.runtime, user: atom(null) })\nscope.register('session', session)\n\ntry {\n  await scope.awaitResources({ timeoutMs: 2_000 })\n  const state = scope.dehydrate()\n  return createSSRStateScript(state)\n} finally {\n  await scope.disposeAsync()\n}",
+        `import { createStore, atom } from '@migaia/store-light'\nimport { createSSRStateScript, SSRRequestScope } from '@migaia/store-ssr'\n\nconst scope = new SSRRequestScope()\nconst session = await createStore({ runtime: scope.runtime, user: atom(null) })\nscope.register('session', session)\ntry {\n  await scope.awaitResources({ timeoutMs: 2_000 })\n  const state = scope.dehydrate()\n  const html = createSSRStateScript(state)\n  console.log('render hydration payload:', html)\n} finally {\n  await scope.disposeAsync()\n}`,
       scenarios: [
         'One server request needs isolated Store and Resource state.',
         'A request must await a bounded resource waterfall before rendering.',
@@ -18189,7 +18405,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '统一拥有一个请求局部的 Reactive Runtime、已注册 Store/Resource、待应用 hydration、资源等待、dehydrate 与确定性清理。scope 就是隔离边界：来自其他 Runtime 的值会被拒绝。',
       quickStart:
-        "const scope = new SSRRequestScope()\nconst session = await createStore({ runtime: scope.runtime, user: atom(null) })\nscope.register('session', session)\n\ntry {\n  await scope.awaitResources({ timeoutMs: 2_000 })\n  const state = scope.dehydrate()\n  return createSSRStateScript(state)\n} finally {\n  await scope.disposeAsync()\n}",
+        `import { createStore, atom } from '@migaia/store-light'\nimport { createSSRStateScript, SSRRequestScope } from '@migaia/store-ssr'\n\nconst scope = new SSRRequestScope()\nconst session = await createStore({ runtime: scope.runtime, user: atom(null) })\nscope.register('session', session)\ntry {\n  await scope.awaitResources({ timeoutMs: 2_000 })\n  const state = scope.dehydrate()\n  const html = createSSRStateScript(state)\n  console.log('渲染 hydration payload:', html)\n} finally {\n  await scope.disposeAsync()\n}`,
       scenarios: [
         '一条服务端请求需要隔离 Store 与 Resource 状态。',
         '渲染前需要在有界预算内等待瀑布式 Resource。',
@@ -18251,7 +18467,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates an SSRRequestScope; this is the preferred request-entry factory when subclass construction is not needed.',
       quickStart:
-        'const scope = createSSRRequestScope({ runtimeOptions: { onError } })\ntry {\n  // create and register request-local state\n} finally {\n  await scope.disposeAsync()\n}',
+        `import { createSSRRequestScope } from '@migaia/store-ssr'\n\nconst onError = (error: unknown) => console.error('SSR runtime error:', error)\nconst scope = createSSRRequestScope({ runtimeOptions: { onError } })\ntry {\n  console.log('register request-local state here')\n} finally {\n  await scope.disposeAsync()\n}`,
       scenarios: [
         'A server handler starts one isolated SSR lifecycle.',
         'A framework adapter needs a small scope factory.',
@@ -18286,7 +18502,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     zh: {
       purpose: '创建 SSRRequestScope；不需要子类构造时，这是推荐的请求入口 factory。',
       quickStart:
-        'const scope = createSSRRequestScope({ runtimeOptions: { onError } })\ntry {\n  // 创建并注册请求局部状态\n} finally {\n  await scope.disposeAsync()\n}',
+        `import { createSSRRequestScope } from '@migaia/store-ssr'\n\nconst onError = (error: unknown) => console.error('SSR runtime error:', error)\nconst scope = createSSRRequestScope({ runtimeOptions: { onError } })\ntry {\n  console.log('在这里创建并注册请求局部状态')\n} finally {\n  await scope.disposeAsync()\n}`,
       scenarios: [
         '服务端 handler 启动一条隔离 SSR lifecycle。',
         'framework adapter 需要轻量 scope factory。',
@@ -18323,7 +18539,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Validates an SSR snapshot, serializes it as JSON, and escapes HTML-significant characters so the text is safe inside an application/json script element.',
       quickStart:
-        'const text = serializeSSRState(scope.dehydrate())\n// Insert text only into a non-executable application/json script element.',
+        `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type=\"application/json\" id=\"__STORE_STATE__\">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
       scenarios: [
         'A template already owns the script element markup.',
         'A validated snapshot must cross the HTML boundary.',
@@ -18350,7 +18566,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '先校验 SSR snapshot，再序列化 JSON，并转义 HTML 敏感字符，使文本可安全放入 application/json script element。',
       quickStart:
-        'const text = serializeSSRState(scope.dehydrate())\n// 只把 text 放入不可执行的 application/json script element。',
+        `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type=\"application/json\" id=\"__STORE_STATE__\">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
       scenarios: [
         'template 已经拥有 script element markup。',
         '已校验 snapshot 必须穿过 HTML 边界。',
@@ -18379,7 +18595,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Immediately serializes the live-reference fast path returned by dehydrateTrusted. It skips snapshot validation and copying, so the caller must prove data is immutable, JSON-safe, and not request-controlled.',
       quickStart:
-        'const trusted = scope.dehydrateTrusted()\nconst text = serializeTrustedSSRState(trusted) // no await between these lines',
+        `import { createSSRRequestScope, serializeTrustedSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst trusted = scope.dehydrateTrusted()\nconst text = serializeTrustedSSRState(trusted) // no await between these lines\nconsole.log('trusted SSR text length:', text.length)\nawait scope.disposeAsync()`,
       scenarios: [
         'Measured internal rendering proves snapshot validation is the bottleneck.',
         'Every value is already immutable and JSON-safe.',
@@ -18406,7 +18622,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '立即序列化 dehydrateTrusted 返回的 live-reference fast path。它跳过 snapshot 校验与复制，因此调用方必须证明数据不可变、JSON-safe 且不受请求输入控制。',
       quickStart:
-        'const trusted = scope.dehydrateTrusted()\nconst text = serializeTrustedSSRState(trusted) // 两行之间不能 await',
+        `import { createSSRRequestScope, serializeTrustedSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst trusted = scope.dehydrateTrusted()\nconst text = serializeTrustedSSRState(trusted) // 两行之间不能 await\nconsole.log('trusted SSR text length:', text.length)\nawait scope.disposeAsync()`,
       scenarios: [
         '测量证明 snapshot validation 是内部渲染瓶颈。',
         '每个值都已不可变且 JSON-safe。',
@@ -18434,7 +18650,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     en: {
       purpose:
         'Parses JSON text and validates the complete versioned Store and Resource snapshot before returning it.',
-      quickStart: 'const state = deserializeSSRState(serialized)\nscope.hydrate(state)',
+      quickStart: `import { deserializeSSRState } from '@migaia/store-ssr'\n\nconst serialized = JSON.stringify({ version: 1, stores: {}, resources: {} })\nconst scope = { hydrate: (state: unknown) => console.log('hydrated', state) }\nconst state = deserializeSSRState(serialized)\nscope.hydrate(state) // 先校验 SSR 文本，再交给当前 scope 恢复状态`,
       scenarios: [
         'A server or non-DOM client receives default JSON SSR state.',
         'Malformed snapshots must fail before hydration.',
@@ -18459,7 +18675,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
     },
     zh: {
       purpose: '解析 JSON 文本，并在返回前完整校验版本化 Store 与 Resource snapshot。',
-      quickStart: 'const state = deserializeSSRState(serialized)\nscope.hydrate(state)',
+      quickStart: `import { deserializeSSRState } from '@migaia/store-ssr'\n\nconst serialized = JSON.stringify({ version: 1, stores: {}, resources: {} })\nconst scope = { hydrate: (state: unknown) => console.log('已 hydrate', state) }\nconst state = deserializeSSRState(serialized)\nscope.hydrate(state) // 先校验 SSR 文本，再交给当前 scope 恢复状态`,
       scenarios: [
         '服务端或非 DOM client 接收默认 JSON SSR state。',
         '非法 snapshot 必须在 hydrate 前失败。',
@@ -18488,7 +18704,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Builds a complete non-executable application/json script element with a validated semantic id and HTML-safe serialized state.',
       quickStart:
-        "const stateTag = createSSRStateScript(scope.dehydrate(), '__STORE_STATE__')\nhtml.write(stateTag)",
+        `import { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst stateTag = createSSRStateScript(scope.dehydrate(), '__STORE_STATE__')\nconst html = { write: (markup: string) => console.log('send server HTML:', markup) }\nhtml.write(stateTag)\nawait scope.disposeAsync()`,
       scenarios: [
         'Server HTML needs one default JSON hydration payload.',
         'The template can safely insert a complete trusted markup string.',
@@ -18523,7 +18739,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '生成完整、不可执行的 application/json script element，包含校验过的语义 id 与 HTML-safe serialized state。',
       quickStart:
-        "const stateTag = createSSRStateScript(scope.dehydrate(), '__STORE_STATE__')\nhtml.write(stateTag)",
+        `import { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst stateTag = createSSRStateScript(scope.dehydrate(), '__STORE_STATE__')\nconst html = { write: (markup: string) => console.log('发送服务端 HTML:', markup) }\nhtml.write(stateTag)\nawait scope.disposeAsync()`,
       scenarios: [
         '服务端 HTML 需要一份默认 JSON hydration payload。',
         'template 可以安全插入完整的受信任服务端 markup。',
@@ -18560,7 +18776,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Reads and validates default JSON SSR state from an explicitly injected document-like host; it never reaches for globalThis.document.',
       quickStart:
-        "const state = readSSRStateFromDocument('__STORE_STATE__', document)\nif (state) scope.hydrate(state)",
+        `import { createSSRRequestScope, readSSRStateFromDocument } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst documentValue = { getElementById: (_id: string) => ({ textContent: '{}' }) }\nconst state = readSSRStateFromDocument('__STORE_STATE__', documentValue)\nif (state) {\n  scope.hydrate(state)\n  console.log('hydrated browser state')\n}\nawait scope.disposeAsync()`,
       scenarios: [
         'Browser hydration reads the default script payload.',
         'Tests inject a minimal document double.',
@@ -18594,7 +18810,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '从显式注入的 document-like host 读取并校验默认 JSON SSR state；不会隐式访问 globalThis.document。',
       quickStart:
-        "const state = readSSRStateFromDocument('__STORE_STATE__', document)\nif (state) scope.hydrate(state)",
+        `import { createSSRRequestScope, readSSRStateFromDocument } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst documentValue = { getElementById: (_id: string) => ({ textContent: '{}' }) }\nconst state = readSSRStateFromDocument('__STORE_STATE__', documentValue)\nif (state) {\n  scope.hydrate(state)\n  console.log('已 hydrate 浏览器状态')\n}\nawait scope.disposeAsync()`,
       scenarios: [
         'browser hydration 读取默认 script payload。',
         '测试注入最小 document double。',
@@ -18630,7 +18846,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Encodes SSR state through a Serialize registry and emits safe script markup. JSON text is escaped directly; every other text or byte format is base64-wrapped in text/plain.',
       quickStart:
-        "const html = await createSSRStateScriptWith(scope.dehydrate(), {\n  codecs,\n  elementId: 'account-state',\n  signal: request.signal\n})",
+        `import { createManualScheduler, createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\nimport { createSSRRequestScope, createSSRStateScriptWith } from '@migaia/store-ssr'\n\nconst scheduler = createManualScheduler()\nconst codecs = createSerializeRegistry([jsonPlugin()], { scheduler })\nconst request = new AbortController()\nconst scope = createSSRRequestScope()\nconst account = { id: 'u-1', name: 'Ada' }\nscope.hydrate({ account })\ntry {\n  const html = await createSSRStateScriptWith(scope.dehydrate(), {\n    codecs,\n    elementId: 'account-state',\n    signal: request.signal\n  })\n  console.log('send this markup in the HTML response:', html)\n} finally {\n  await codecs.dispose()\n  await scope.disposeAsync()\n}`,
       scenarios: [
         'A project standardizes SSR payloads on a custom Serialize registry.',
         'Binary or non-JSON text must cross HTML safely.',
@@ -18673,7 +18889,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '通过 Serialize registry 编码 SSR state 并生成安全 script markup。JSON text 直接转义；其他 text 或 byte format 一律 base64 后放入 text/plain。',
       quickStart:
-        "const html = await createSSRStateScriptWith(scope.dehydrate(), {\n  codecs,\n  elementId: 'account-state',\n  signal: request.signal\n})",
+        `import { createManualScheduler, createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\nimport { createSSRRequestScope, createSSRStateScriptWith } from '@migaia/store-ssr'\n\nconst scheduler = createManualScheduler()\nconst codecs = createSerializeRegistry([jsonPlugin()], { scheduler })\nconst request = new AbortController()\nconst scope = createSSRRequestScope()\nscope.hydrate({ account: { id: 'u-1', name: 'Ada' } })\ntry {\n  const html = await createSSRStateScriptWith(scope.dehydrate(), {\n    codecs,\n    elementId: 'account-state',\n    signal: request.signal\n  })\n  console.log('把这段 markup 放进 HTML response:', html)\n} finally {\n  await codecs.dispose()\n  await scope.disposeAsync()\n}`,
       scenarios: [
         '项目用自定义 Serialize registry 统一 SSR payload。',
         'binary 或非 JSON text 必须安全穿过 HTML。',
@@ -18718,7 +18934,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Reads codec metadata and payload from an explicitly injected document, restores base64 bytes when needed, decodes through the registry, and validates the resulting SSR state.',
       quickStart:
-        "const state = await readSSRStateFromDocumentWith({\n  codecs,\n  document,\n  elementId: 'account-state',\n  signal\n})\nif (state) scope.hydrate(state)",
+        `import { createManualScheduler, createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\nimport { createSSRRequestScope, createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr'\n\nconst scheduler = createManualScheduler()\nconst codecs = createSerializeRegistry([jsonPlugin()], { scheduler })\nconst serverScope = createSSRRequestScope()\nserverScope.hydrate({ account: { id: 'u-1', name: 'Ada' } })\nconst markup = await createSSRStateScriptWith(serverScope.dehydrate(), { codecs, elementId: 'account-state' })\nconst documentValue = { getElementById: (_id: string) => ({ textContent: markup }) }\nconst signal = new AbortController().signal\nconst clientScope = createSSRRequestScope()\ntry {\n  const state = await readSSRStateFromDocumentWith({ codecs, document: documentValue, elementId: 'account-state', signal })\n  if (state) {\n    clientScope.hydrate(state)\n    console.log('client hydrated account:', state.account)\n  }\n} finally {\n  await codecs.dispose()\n  await serverScope.disposeAsync()\n  await clientScope.disposeAsync()\n}`,
       scenarios: [
         'Client hydration consumes a custom-codec payload.',
         'Binary payloads were base64-wrapped for HTML transport.',
@@ -18769,7 +18985,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '从显式 document 读取 codec metadata 与 payload，必要时还原 base64 bytes，经 registry decode，最后校验得到的 SSR state。',
       quickStart:
-        "const state = await readSSRStateFromDocumentWith({\n  codecs,\n  document,\n  elementId: 'account-state',\n  signal\n})\nif (state) scope.hydrate(state)",
+        `import { createManualScheduler, createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\nimport { createSSRRequestScope, createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr'\n\nconst scheduler = createManualScheduler()\nconst codecs = createSerializeRegistry([jsonPlugin()], { scheduler })\nconst serverScope = createSSRRequestScope()\nserverScope.hydrate({ account: { id: 'u-1', name: 'Ada' } })\nconst markup = await createSSRStateScriptWith(serverScope.dehydrate(), { codecs, elementId: 'account-state' })\nconst documentValue = { getElementById: (_id: string) => ({ textContent: markup }) }\nconst signal = new AbortController().signal\nconst clientScope = createSSRRequestScope()\ntry {\n  const state = await readSSRStateFromDocumentWith({ codecs, document: documentValue, elementId: 'account-state', signal })\n  if (state) {\n    clientScope.hydrate(state)\n    console.log('客户端已 hydrate account:', state.account)\n  }\n} finally {\n  await codecs.dispose()\n  await serverScope.disposeAsync()\n  await clientScope.disposeAsync()\n}`,
       scenarios: [
         'client hydration 消费自定义 codec payload。',
         'binary payload 为 HTML transport 做过 base64 包装。',
@@ -18822,7 +19038,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Validates the complete version, Store keys, JSON graph, Resource snapshots, finite timestamps, depth, node budget, and cycle boundaries of an unknown SSR value.',
       quickStart:
-        'const candidate: unknown = JSON.parse(text)\nassertSSRState(candidate)\nscope.hydrate(candidate)',
+        `import { assertSSRState } from '@migaia/store-ssr'\n\nconst text = JSON.stringify({ version: 1, stores: {}, resources: {} })\nconst candidate: unknown = JSON.parse(text)\nconst scope = { hydrate: (state: unknown) => console.log('hydrated:', state) }\nassertSSRState(candidate)\nscope.hydrate(candidate)`,
       scenarios: [
         'Unknown data enters before hydration.',
         'A custom transport decoded an arbitrary value.',
@@ -18849,7 +19065,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '完整校验未知 SSR value 的 version、Store key、JSON graph、Resource snapshot、有限 timestamp、depth、node budget 与 cycle 边界。',
       quickStart:
-        'const candidate: unknown = JSON.parse(text)\nassertSSRState(candidate)\nscope.hydrate(candidate)',
+        `import { assertSSRState } from '@migaia/store-ssr'\n\nconst text = JSON.stringify({ version: 1, stores: {}, resources: {} })\nconst candidate: unknown = JSON.parse(text)\nconst scope = { hydrate: (state: unknown) => console.log('已 hydrate:', state) }\nassertSSRState(candidate)\nscope.hydrate(candidate)`,
       scenarios: [
         '未知数据进入 hydrate 之前。',
         '自定义 transport decode 出任意 value。',
@@ -18878,7 +19094,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Initializes the WASM allocator exactly once and returns the stable readiness Promise identity. Store construction using synchronous field builders must occur only after this barrier resolves.',
       quickStart:
-        'await ensureWasm()\n\nconst metrics = await createStore({\n  total: number(),\n  ready: boolean(),\n  title: string(128)\n})\n\ntry {\n  metrics.total = 1\n} finally {\n  metrics.$dispose()\n}',
+        `import { ensureWasm, number, boolean, string } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait ensureWasm()\n\nconst metrics = createStore({\n  total: number(),\n  ready: boolean(),\n  title: string(128)\n})\n\ntry {\n  metrics.total = 1\n} finally {\n  metrics.$dispose()\n}`,
       scenarios: [
         'Application bootstrap prepares WASM before constructing a Store with WASM fields.',
         'React or SSR suspension needs one stable Promise generation.',
@@ -18895,7 +19111,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '只初始化一次 WASM allocator，并返回 identity 稳定的 readiness Promise。使用同步 field builder 构造 Store 必须发生在该 barrier resolve 之后。',
       quickStart:
-        'await ensureWasm()\n\nconst metrics = await createStore({\n  total: number(),\n  ready: boolean(),\n  title: string(128)\n})\n\ntry {\n  metrics.total = 1\n} finally {\n  metrics.$dispose()\n}',
+        `import { ensureWasm, number, boolean, string } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait ensureWasm()\n\nconst metrics = createStore({\n  total: number(),\n  ready: boolean(),\n  title: string(128)\n})\n\ntry {\n  metrics.total = 1\n} finally {\n  metrics.$dispose()\n}`,
       scenarios: [
         '应用 bootstrap 在构造含 WASM field 的 Store 前准备 WASM。',
         'React 或 SSR suspension 需要 identity 稳定的一代 Promise。',
@@ -18914,7 +19130,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Declares a synchronous Store field backed by one owned eight-byte WASM f64 allocation. Reads track one Reactive source; Object.is-equal writes do not notify.',
       quickStart:
-        'const store = await createStore({ score: number() })\ntry {\n  store.score = 42.5\n  console.log(store.score)\n} finally {\n  store.$dispose()\n}',
+        `import { number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ score: number() })\ntry {\n  store.score = 42.5\n  console.log(store.score)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         'A numeric Store field should live in WASM linear memory.',
         'One scalar needs independent Reactive invalidation and deterministic cleanup.',
@@ -18931,7 +19147,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '声明一个由独占 8-byte WASM f64 allocation 支撑的同步 Store field。读取追踪一个 Reactive source；Object.is 相等的写入不通知。',
       quickStart:
-        'const store = await createStore({ score: number() })\ntry {\n  store.score = 42.5\n  console.log(store.score)\n} finally {\n  store.$dispose()\n}',
+        `import { number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ score: number() })\ntry {\n  store.score = 42.5\n  console.log(store.score)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         '数值 Store field 应位于 WASM linear memory。',
         '一个 scalar 需要独立 Reactive invalidation 与确定性 cleanup。',
@@ -18950,7 +19166,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Declares a synchronous boolean Store field stored as one WASM byte. The public value remains strictly boolean and unchanged writes do not notify observers.',
       quickStart:
-        'const store = await createStore({ enabled: boolean() })\ntry {\n  store.enabled = true\n} finally {\n  store.$dispose()\n}',
+        `import { boolean } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ enabled: boolean() })\ntry {\n  store.enabled = true\n  console.log(store.enabled)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         'A boolean flag must share the WASM-backed Store lifecycle.',
         'The field needs its own tracked Reactive source.',
@@ -18967,7 +19183,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '声明一个以单个 WASM byte 存储的同步 boolean Store field。公开值严格保持 boolean，未变化写入不会通知 observer。',
       quickStart:
-        'const store = await createStore({ enabled: boolean() })\ntry {\n  store.enabled = true\n} finally {\n  store.$dispose()\n}',
+        `import { boolean } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ enabled: boolean() })\ntry {\n  store.enabled = true\n  console.log(store.enabled)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         'boolean flag 必须共享 WASM-backed Store lifecycle。',
         'field 需要自己的 tracked Reactive source。',
@@ -18986,7 +19202,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Declares a fixed-capacity UTF-8 Store field using a four-byte length header plus maxBytes payload. Capacity never reallocates, and oversized encoded values fail before mutation.',
       quickStart:
-        "const store = await createStore({ title: string(128) })\ntry {\n  store.title = 'Migaia'\n} finally {\n  store.$dispose()\n}",
+        `import { string } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ title: string(128) })\ntry {\n  store.title = 'Migaia'\n  console.log(store.title)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         'A short UTF-8 value needs a stable WASM address and bounded storage.',
         'Writes must be atomic with respect to capacity validation.',
@@ -19014,7 +19230,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '声明固定容量 UTF-8 Store field：4-byte length header 加 maxBytes payload。容量不会重分配，encoded value 超限会在 mutation 前失败。',
       quickStart:
-        "const store = await createStore({ title: string(128) })\ntry {\n  store.title = 'Migaia'\n} finally {\n  store.$dispose()\n}",
+        `import { string } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ title: string(128) })\ntry {\n  store.title = 'Migaia'\n  console.log(store.title)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         '短 UTF-8 值需要稳定 WASM address 与有界存储。',
         '写入必须在 capacity validation 之后原子发生。',
@@ -19042,7 +19258,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Declares a fixed-length f64 array with lazy bucket-level Reactive sources. at and setAt track or notify one bucket; setRange validates all values before a batched multi-bucket commit and rolls back written cells if commit fails.',
       quickStart:
-        'const store = await createStore({ samples: array(number(), 1_024, 32) })\ntry {\n  store.samples.setAt(0, 1)\n  store.samples.setRange(1, 4, [2, 3, 4])\n  const snapshot = store.samples.view()\n  console.log(snapshot)\n} finally {\n  store.$dispose()\n}',
+        `import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ samples: array(number(), 1_024, 32) })\ntry {\n  store.samples.setAt(0, 1)\n  store.samples.setRange(1, 4, [2, 3, 4])\n  const snapshot = store.samples.view()\n  console.log(snapshot)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         'A fixed numeric index domain belongs in WASM memory.',
         'Readers consume predictable buckets or ranges.',
@@ -19059,7 +19275,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '声明带惰性 bucket-level Reactive source 的定长 f64 array。at/setAt 追踪或通知一个 bucket；setRange 先校验全部值，再以一次 batch 跨 bucket commit，commit 失败会回滚已写 cell。',
       quickStart:
-        'const store = await createStore({ samples: array(number(), 1_024, 32) })\ntry {\n  store.samples.setAt(0, 1)\n  store.samples.setRange(1, 4, [2, 3, 4])\n  const snapshot = store.samples.view()\n  console.log(snapshot)\n} finally {\n  store.$dispose()\n}',
+        `import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ samples: array(number(), 1_024, 32) })\ntry {\n  store.samples.setAt(0, 1)\n  store.samples.setRange(1, 4, [2, 3, 4])\n  const snapshot = store.samples.view()\n  console.log(snapshot)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         '固定数值 index domain 应位于 WASM memory。',
         'reader 按可预测 bucket 或 range 消费。',
@@ -19078,7 +19294,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Declares a fixed named f64 structure in one WASM allocation, with one Reactive source per property. Shape keys are snapshotted during builder creation and dispose/disposed are reserved lifecycle names.',
       quickStart:
-        'const store = await createStore({\n  point: record({ x: number(), y: number() })\n})\n\ntry {\n  store.point.x = 10\n  store.point.y = 20\n} finally {\n  store.$dispose()\n}',
+        `import { number, record } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({\n  point: record({ x: number(), y: number() })\n})\n\ntry {\n  store.point.x = 10\n  store.point.y = 20\n  console.log(store.point.x, store.point.y)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         'A small fixed numeric structure should occupy one contiguous WASM block.',
         'Each named property needs independent Reactive tracking.',
@@ -19106,7 +19322,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '在一个 WASM allocation 中声明固定具名 f64 structure，每个 property 拥有一个 Reactive source。builder 创建时快照 shape keys，dispose/disposed 是保留 lifecycle 名。',
       quickStart:
-        'const store = await createStore({\n  point: record({ x: number(), y: number() })\n})\n\ntry {\n  store.point.x = 10\n  store.point.y = 20\n} finally {\n  store.$dispose()\n}',
+        `import { number, record } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({\n  point: record({ x: number(), y: number() })\n})\n\ntry {\n  store.point.x = 10\n  store.point.y = 20\n  console.log(store.point.x, store.point.y)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         '小型固定数值 structure 应占用一块连续 WASM block。',
         '每个具名 property 需要独立 Reactive tracking。',
@@ -19136,7 +19352,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native Error with canonical store-wasm source/code identity and an optional original cause for WASM field adapters.',
       quickStart:
-        "throw createStoreWasmError(StoreWasmErrorCode.allocationFailed, 'WASM allocation failed', { cause })",
+        `import { createStoreWasmError, StoreWasmErrorCode } from '@migaia/store-wasm'\n\nconst cause = new Error('arena allocator rejected the request')\nthrow createStoreWasmError(StoreWasmErrorCode.allocationFailed, 'WASM allocation failed', { cause })`,
       scenarios: [
         'A custom WASM field adapter extends the same error boundary.',
         'A lower-level allocator failure must remain reachable as cause.'
@@ -19179,7 +19395,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 WASM field adapter 创建带 canonical store-wasm source/code identity 与可选原始 cause 的原生 Error。',
       quickStart:
-        "throw createStoreWasmError(StoreWasmErrorCode.allocationFailed, 'WASM allocation failed', { cause })",
+        `import { createStoreWasmError, StoreWasmErrorCode } from '@migaia/store-wasm'\n\nconst cause = new Error('arena allocator rejected the request')\nthrow createStoreWasmError(StoreWasmErrorCode.allocationFailed, 'WASM allocation failed', { cause })`,
       scenarios: [
         '自定义 WASM field adapter 扩展同一错误边界。',
         '底层 allocator failure 必须通过 cause 保持可达。'
@@ -19224,7 +19440,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native RangeError tagged with canonical store-wasm identity for capacity, index, length, and allocation bounds.',
       quickStart:
-        "throw createStoreWasmRangeError(StoreWasmErrorCode.invalidOption, 'index is outside the field')",
+        `import { createStoreWasmRangeError, StoreWasmErrorCode } from '@migaia/store-wasm'\n\nconst index = 4\nconst fieldLength = 2\nif (index >= fieldLength) throw createStoreWasmRangeError(StoreWasmErrorCode.invalidOption, 'index is outside the field')`,
       scenarios: [
         'A custom field validates numeric bounds.',
         'Consumers branch on native RangeError plus source/code.'
@@ -19259,7 +19475,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 capacity、index、length 与 allocation bound 创建带 canonical store-wasm identity 的原生 RangeError。',
       quickStart:
-        "throw createStoreWasmRangeError(StoreWasmErrorCode.invalidOption, 'index is outside the field')",
+        `import { createStoreWasmRangeError, StoreWasmErrorCode } from '@migaia/store-wasm'\n\nconst index = 4\nconst fieldLength = 2\nif (index >= fieldLength) throw createStoreWasmRangeError(StoreWasmErrorCode.invalidOption, 'index is outside the field')`,
       scenarios: [
         '自定义 field 校验数值 bound。',
         'consumer 同时按 native RangeError 与 source/code 分支。'
@@ -19296,7 +19512,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native TypeError with canonical store-wasm identity and optional cause for invalid field shapes or runtime value types.',
       quickStart:
-        "throw createStoreWasmTypeError(StoreWasmErrorCode.invalidOption, 'field value must be a number', { cause })",
+        `import { createStoreWasmTypeError, StoreWasmErrorCode } from '@migaia/store-wasm'\n\nconst cause = new Error('field received a string')\nthrow createStoreWasmTypeError(StoreWasmErrorCode.invalidOption, 'field value must be a number', { cause })`,
       scenarios: [
         'A custom field rejects a value or shape by runtime type.',
         'A hostile property access failure must remain reachable as cause.'
@@ -19339,7 +19555,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为非法 field shape 或 runtime value type 创建带 canonical store-wasm identity 与可选 cause 的原生 TypeError。',
       quickStart:
-        "throw createStoreWasmTypeError(StoreWasmErrorCode.invalidOption, 'field value must be a number', { cause })",
+        `import { createStoreWasmTypeError, StoreWasmErrorCode } from '@migaia/store-wasm'\n\nconst cause = new Error('field received a string')\nthrow createStoreWasmTypeError(StoreWasmErrorCode.invalidOption, 'field value must be a number', { cause })`,
       scenarios: [
         '自定义 field 按 runtime type 拒绝 value 或 shape。',
         'hostile property access failure 必须通过 cause 保持可达。'
@@ -19384,7 +19600,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native AggregateError with canonical store-wasm identity while preserving every cleanup or rollback failure in order.',
       quickStart:
-        "throw createStoreWasmAggregateError(StoreWasmErrorCode.cleanupFailed, failures, 'WASM cleanup failed')",
+        `import { createStoreWasmAggregateError, StoreWasmErrorCode } from '@migaia/store-wasm'\n\nconst failures = [new Error('arena release failed'), new Error('WASM close failed')]\nthrow createStoreWasmAggregateError(StoreWasmErrorCode.cleanupFailed, failures, 'WASM cleanup failed')`,
       scenarios: [
         'Several source or allocation cleanups fail.',
         'Construction rollback must retain primary and cleanup failures.'
@@ -19428,7 +19644,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带 canonical store-wasm identity 的原生 AggregateError，按顺序保留每个 cleanup 或 rollback failure。',
       quickStart:
-        "throw createStoreWasmAggregateError(StoreWasmErrorCode.cleanupFailed, failures, 'WASM cleanup failed')",
+        `import { createStoreWasmAggregateError, StoreWasmErrorCode } from '@migaia/store-wasm'\n\nconst failures = [new Error('arena release 失败'), new Error('WASM close 失败')]\nthrow createStoreWasmAggregateError(StoreWasmErrorCode.cleanupFailed, failures, 'WASM cleanup failed')`,
       scenarios: [
         '多个 source 或 allocation cleanup 失败。',
         'construction rollback 必须保留 primary 与 cleanup failure。'
@@ -19474,7 +19690,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Owns the main-thread side of one exclusive Worker RPC channel. request sends typed payloads with per-call cancellation and transfer ownership; close rejects new work synchronously, while dispose is the sole asynchronous endpoint cleanup path.',
       quickStart:
-        "const worker = new Worker(new URL('./compute.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5_000 })\n\ntry {\n  const result = await adapter.request<number[], number>([1, 2, 3])\n  console.log(result)\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}",
+        `import { WorkerAdapter } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./compute.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5_000 })\n\ntry {\n  const result = await adapter.request<number[], number>([1, 2, 3])\n  console.log(result)\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}`,
       scenarios: [
         'A CPU-heavy operation already has a dedicated Worker and needs typed request/response calls.',
         'Each request must support abort, timeout, or explicit transferable ownership.',
@@ -19491,7 +19707,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '拥有一条 exclusive Worker RPC channel 的主线程侧。request 发送带逐调用取消与 transfer ownership 的类型化 payload；close 同步拒绝新工作，dispose 才是唯一异步 endpoint cleanup 路径。',
       quickStart:
-        "const worker = new Worker(new URL('./compute.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5_000 })\n\ntry {\n  const result = await adapter.request<number[], number>([1, 2, 3])\n  console.log(result)\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}",
+        `import { WorkerAdapter } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./compute.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5_000 })\n\ntry {\n  const result = await adapter.request<number[], number>([1, 2, 3])\n  console.log(result)\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}`,
       scenarios: [
         'CPU-heavy operation 已有专用 Worker，需要类型化 request/response 调用。',
         '每次 request 都要支持 abort、timeout 或显式 transferable ownership。',
@@ -19510,7 +19726,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the worker-side managed RPC handler for ordinary computations. It converts incoming messages to one compute call, forwards cooperative cancellation, and returns a callable lifecycle object with close, dispose, pendingCount, and disposed.',
       quickStart:
-        "const handler = createWorkerHandler(\n  async (numbers: number[], { signal }) => {\n    signal.throwIfAborted?.()\n    return numbers.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())",
+        `import { createWorkerHandler } from '@migaia/store-worker'\n\nconst handler = createWorkerHandler(\n  async (numbers: number[], { signal }) => {\n    signal.throwIfAborted?.()\n    return numbers.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())`,
       scenarios: [
         'A dedicated Worker exposes one ordinary compute(payload, { signal }) operation.',
         'Worker-side pending work and endpoint disposal need an observable managed lifecycle.',
@@ -19556,7 +19772,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为普通计算创建 worker 侧 managed RPC handler。它把入站消息转换为一次 compute 调用，转发协作式取消，并返回带 close、dispose、pendingCount 与 disposed 的 callable lifecycle object。',
       quickStart:
-        "const handler = createWorkerHandler(\n  async (numbers: number[], { signal }) => {\n    signal.throwIfAborted?.()\n    return numbers.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())",
+        `import { createWorkerHandler } from '@migaia/store-worker'\n\nconst handler = createWorkerHandler(\n  async (numbers: number[], { signal }) => {\n    signal.throwIfAborted?.()\n    return numbers.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())`,
       scenarios: [
         'dedicated Worker 暴露一个普通 compute(payload, { signal }) operation。',
         'worker 侧 pending work 与 endpoint disposal 需要可观察 managed lifecycle。',
@@ -19603,7 +19819,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a Resource whose tracked input selection runs locally and whose asynchronous computation runs through WorkerAdapter. New reactive inputs supersede older generations; Resource owns cancellation, retry, freshness, cache, and observation lifecycle.',
       quickStart:
-        "const filteredRows = workerComputed(\n  adapter,\n  () => ({ rows: rows.value, query: query.value }),\n  { runtime, staleWhileRevalidate: true, debugName: 'filtered-rows' }\n)\n\ntry {\n  const rows = await filteredRows.promise\n  render(rows)\n} finally {\n  filteredRows.dispose()\n  await adapter.dispose()\n}",
+        `import { createRuntime } from '@migaia/reactive'\nimport { workerComputed, WorkerAdapter } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./compute.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker)\nconst runtime = createRuntime()\nconst rows = { value: [{ id: 1, name: 'Ada' }] }\nconst query = { value: 'Ada' }\nconst render = (value: unknown) => console.log('render:', value)\n\nconst filteredRows = workerComputed(\n  adapter,\n  () => ({ rows: rows.value, query: query.value }),\n  { runtime, staleWhileRevalidate: true, debugName: 'filtered-rows' }\n)\n\ntry {\n  const filtered = await filteredRows.promise\n  render(filtered)\n} finally {\n  filteredRows.dispose()\n  await adapter.dispose()\n}`,
       scenarios: [
         'A heavy asynchronous derivation depends on Signal or Computed inputs.',
         'Superseded worker results must never overwrite a newer reactive generation.',
@@ -19620,7 +19836,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建一个 Resource：tracked input selection 在本地运行，异步 computation 经 WorkerAdapter 执行。新 reactive input 会 supersede 旧 generation；Resource 拥有 cancellation、retry、freshness、cache 与 observation lifecycle。',
       quickStart:
-        "const filteredRows = workerComputed(\n  adapter,\n  () => ({ rows: rows.value, query: query.value }),\n  { runtime, staleWhileRevalidate: true, debugName: 'filtered-rows' }\n)\n\ntry {\n  const rows = await filteredRows.promise\n  render(rows)\n} finally {\n  filteredRows.dispose()\n  await adapter.dispose()\n}",
+        `import { createRuntime } from '@migaia/reactive'\nimport { workerComputed, WorkerAdapter } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./compute.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker)\nconst runtime = createRuntime()\nconst rows = { value: [{ id: 1, name: 'Ada' }] }\nconst query = { value: 'Ada' }\nconst render = (value: unknown) => console.log('render:', value)\n\nconst filteredRows = workerComputed(\n  adapter,\n  () => ({ rows: rows.value, query: query.value }),\n  { runtime, staleWhileRevalidate: true, debugName: 'filtered-rows' }\n)\n\ntry {\n  const filtered = await filteredRows.promise\n  render(filtered)\n} finally {\n  filteredRows.dispose()\n  await adapter.dispose()\n}`,
       scenarios: [
         'heavy asynchronous derivation 依赖 Signal 或 Computed 输入。',
         '被 supersede 的 worker result 绝不能覆盖更新的 reactive generation。',
@@ -19639,7 +19855,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the main-thread Serialize parser that offloads encode and decode to one Worker. Encode streams use explicit credits for bounded backpressure; byte transfer is opt-in and destructive, while copy remains the safe default.',
       quickStart:
-        "const worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}",
+        `import { workerParser } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst value = { id: 'demo' }\nconst context = { signal: new AbortController().signal }\nconst sink = { write: async (chunk: unknown) => console.log(chunk) }\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}`,
       scenarios: [
         'Encoding produces bytes consumed by persistence or transport without rebuilding a large object graph on the main thread.',
         'Streaming encode output needs bounded producer credits and consumer-driven cancellation.',
@@ -19656,7 +19872,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建把 encode 与 decode 卸载到一个 Worker 的主线程 Serialize parser。encode stream 使用显式 credit 实现有界 backpressure；byte transfer 是破坏性 opt-in，copy 仍是安全默认值。',
       quickStart:
-        "const worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}",
+        `import { workerParser } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst value = { id: 'demo' }\nconst context = { signal: new AbortController().signal }\nconst sink = { write: async (chunk: unknown) => console.log(chunk) }\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}`,
       scenarios: [
         'encode 生成的 bytes 直接进入 persistence 或 transport，不需要在主线程重建大型 object graph。',
         'streaming encode output 需要有界 producer credit 与 consumer-driven cancellation。',
@@ -19675,7 +19891,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Wraps workerParser as a Serialize plugin whose type equals the resolved parser name. It adds registry shape only; transport, ownership, streaming, and disposal semantics remain exactly those of workerParser.',
       quickStart:
-        "const plugin = workerPlugin({ worker, type: 'msgpack-worker', ownership: 'copy' })\nserializer.use(plugin)\n\ntry {\n  await serializer.encode('msgpack-worker', value)\n} finally {\n  await plugin.parser.dispose?.()\n}",
+        `import { workerPlugin } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst value = { id: 'demo' }\nconst plugin = workerPlugin({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst serializer = { plugin: undefined as typeof plugin | undefined, use(nextPlugin: typeof plugin) { serializer.plugin = nextPlugin }, encode: async (nextValue: unknown) => serializer.plugin?.parser.encode(nextValue, { signal: new AbortController().signal }) }\nserializer.use(plugin)\n\ntry {\n  const encoded = await serializer.encode(value)\n  console.log(encoded)\n} finally {\n  await plugin.parser.dispose?.()\n}`,
       scenarios: [
         'A Serialize registry needs a named Worker-backed parser plugin.',
         'Existing composition accepts ISerializePlugin rather than a bare parser.',
@@ -19692,7 +19908,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把 workerParser 包成 Serialize plugin，plugin type 等于解析后的 parser name。它只增加 registry shape；transport、ownership、streaming 与 disposal 语义完全沿用 workerParser。',
       quickStart:
-        "const plugin = workerPlugin({ worker, type: 'msgpack-worker', ownership: 'copy' })\nserializer.use(plugin)\n\ntry {\n  await serializer.encode('msgpack-worker', value)\n} finally {\n  await plugin.parser.dispose?.()\n}",
+        `import { workerPlugin } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst value = { id: 'demo' }\nconst plugin = workerPlugin({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst serializer = { plugin: undefined as typeof plugin | undefined, use(nextPlugin: typeof plugin) { serializer.plugin = nextPlugin }, encode: async (nextValue: unknown) => serializer.plugin?.parser.encode(nextValue, { signal: new AbortController().signal }) }\nserializer.use(plugin)\n\ntry {\n  const encoded = await serializer.encode(value)\n  console.log(encoded)\n} finally {\n  await plugin.parser.dispose?.()\n}`,
       scenarios: [
         'Serialize registry 需要具名 Worker-backed parser plugin。',
         '现有组合只接受 ISerializePlugin，而不是 bare parser。',
@@ -19711,7 +19927,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the Worker-side managed endpoint for a Serialize parser. Decode returns one response; encode may stream ordered frames under a two-credit producer window, with acknowledgements, cancellation, iterator.return cleanup, and transfer-aware byte replies.',
       quickStart:
-        "const handler = createSerializeWorkerHandler(\n  msgpackParser,\n  (message, transfer) => self.postMessage(message, transfer as Transferable[])\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())",
+        `import { createWorkerHandler } from '@migaia/store-worker'\n\nconst handler = createSerializeWorkerHandler(\n  msgpackParser,\n  (message, transfer) => self.postMessage(message, transfer as Transferable[])\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())`,
       scenarios: [
         'A Worker hosts one concrete Serialize parser for a paired workerParser client.',
         'Encoder output may be sync iterable, async iterable, or one chunk.',
@@ -19747,7 +19963,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 Serialize parser 创建 Worker 侧 managed endpoint。decode 返回单一 response；encode 可在双 credit producer window 下发送有序 frame，并处理 acknowledgement、cancellation、iterator.return cleanup 与 transfer-aware byte reply。',
       quickStart:
-        "const handler = createSerializeWorkerHandler(\n  msgpackParser,\n  (message, transfer) => self.postMessage(message, transfer as Transferable[])\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())",
+        `import { createWorkerHandler } from '@migaia/store-worker'\n\nconst handler = createSerializeWorkerHandler(\n  msgpackParser,\n  (message, transfer) => self.postMessage(message, transfer as Transferable[])\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())`,
       scenarios: [
         'Worker 为配对 workerParser client 托管一个具体 Serialize parser。',
         'encoder output 可以是 sync iterable、async iterable 或单一 chunk。',
@@ -19785,7 +20001,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Brands a worker input as a Serialize value or byte chunk without copying its payload. Uint8Array keeps byte identity so transfer policy can inspect its backing buffer.',
       quickStart:
-        "const chunk = encodeWorkerValue(bytes)\n// ['bytes', bytes] for Uint8Array; otherwise ['value', input]",
+        `import { encodeWorkerValue } from '@migaia/store-worker/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = encodeWorkerValue(bytes)\nconsole.log(chunk) // ['bytes', bytes] for Uint8Array; otherwise ['value', input]`,
       scenarios: [
         'A custom Worker serializer must use the canonical Serialize chunk shape.',
         'Uint8Array identity must remain available for transfer-list construction.'
@@ -19810,7 +20026,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把 worker input 标记为 Serialize value 或 byte chunk，不复制 payload。Uint8Array 保持 byte identity，供 transfer policy 检查 backing buffer。',
       quickStart:
-        "const chunk = encodeWorkerValue(bytes)\n// Uint8Array 得到 ['bytes', bytes]；其他输入得到 ['value', input]",
+        `import { encodeWorkerValue } from '@migaia/store-worker/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = encodeWorkerValue(bytes)\nconsole.log(chunk) // Uint8Array 得到 ['bytes', bytes]；其他输入得到 ['value', input]`,
       scenarios: [
         '自定义 Worker serializer 必须使用 canonical Serialize chunk shape。',
         '必须保留 Uint8Array identity 以构建 transfer list。'
@@ -19837,7 +20053,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Brands one Worker decode result as a canonical Serialize byte or value chunk while preserving byte payload identity for zero-copy replies.',
       quickStart:
-        'const result = await parser.decode(chunk, context)\nconst responseChunk = decodeWorkerValue(result)',
+        `import { decodeWorkerValue } from '@migaia/store-worker/serialize'\n\nconst decoded: unknown = { id: 1, ok: true }\nconst responseChunk = decodeWorkerValue(decoded)\nconsole.log(responseChunk)`,
       scenarios: [
         'A custom worker-side handler returns parser.decode output through Serialize transport.',
         'Byte output should remain eligible for transfer back to the caller.'
@@ -19862,7 +20078,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把一项 Worker decode result 标记为 canonical Serialize byte 或 value chunk，同时保留 byte payload identity 供零拷贝回包。',
       quickStart:
-        'const result = await parser.decode(chunk, context)\nconst responseChunk = decodeWorkerValue(result)',
+        `import { decodeWorkerValue } from '@migaia/store-worker/serialize'\n\nconst decoded: unknown = { id: 1, ok: true }\nconst responseChunk = decodeWorkerValue(decoded)\nconsole.log(responseChunk)`,
       scenarios: [
         '自定义 worker 侧 handler 通过 Serialize transport 返回 parser.decode output。',
         'byte output 应保持可 transfer 回调用方。'
@@ -19889,7 +20105,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Returns a transfer list only for transfer ownership plus a byte chunk backed by an exclusive full ArrayBuffer. Slices, SharedArrayBuffer, value chunks, and copy mode return an empty list.',
       quickStart:
-        'const transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\npostMessage(message, transfer)',
+        `import { transferablesOf, WorkerByteOwnership } from '@migaia/store-worker/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = ['bytes', bytes] as const\nconst message = { chunk }\nconst transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\npostMessage(message, transfer)`,
       scenarios: [
         'A custom worker protocol needs the same conservative byte-transfer rule.',
         'A full-buffer Uint8Array is exclusively owned and may detach.'
@@ -19927,7 +20143,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '只有 transfer ownership 与独占完整 ArrayBuffer 支撑的 byte chunk 同时成立时才返回 transfer list。slice、SharedArrayBuffer、value chunk 与 copy mode 都返回空数组。',
       quickStart:
-        'const transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\npostMessage(message, transfer)',
+        `import { transferablesOf, WorkerByteOwnership } from '@migaia/store-worker/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = ['bytes', bytes] as const\nconst message = { chunk }\nconst transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\npostMessage(message, transfer)`,
       scenarios: [
         '自定义 worker protocol 需要复用同一保守 byte-transfer 规则。',
         'full-buffer Uint8Array 独占且允许 detach。'
@@ -19965,7 +20181,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native Error carrying canonical store-worker source/code identity and an optional original cause for adapter extensions.',
       quickStart:
-        "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, 'invalid worker option', { cause })",
+        `import { createStoreWorkerError, StoreWorkerErrorCode } from '@migaia/store-worker'\n\nconst cause = new Error('worker transport option is invalid')\nthrow createStoreWorkerError(StoreWorkerErrorCode.invalidOption, 'invalid worker option', { cause })`,
       scenarios: [
         'A custom adapter extends the same public error boundary.',
         'A lower-level transport failure must remain reachable as cause.'
@@ -20008,7 +20224,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 adapter extension 创建带 canonical store-worker source/code identity 与可选原始 cause 的原生 Error。',
       quickStart:
-        "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, 'invalid worker option', { cause })",
+        `import { createStoreWorkerError, StoreWorkerErrorCode } from '@migaia/store-worker'\n\nconst cause = new Error('worker transport option is invalid')\nthrow createStoreWorkerError(StoreWorkerErrorCode.invalidOption, 'invalid worker option', { cause })`,
       scenarios: [
         '自定义 adapter 扩展同一公开错误边界。',
         '底层 transport failure 必须通过 cause 保持可达。'
@@ -20053,7 +20269,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native AggregateError with canonical store-worker identity while retaining every cleanup failure in order.',
       quickStart:
-        "throw createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, failures, 'worker cleanup failed')",
+        `import { createStoreWorkerAggregateError, StoreWorkerErrorCode } from '@migaia/store-worker'\n\nconst failures = [new Error('endpoint dispose failed'), new Error('worker terminate failed')]\nthrow createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, failures, 'worker cleanup failed')`,
       scenarios: [
         'Endpoint disposal and owned Worker termination both fail.',
         'Rollback must preserve all independent cleanup failures.'
@@ -20097,7 +20313,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带 canonical store-worker identity 的原生 AggregateError，按顺序保留每个 cleanup failure。',
       quickStart:
-        "throw createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, failures, 'worker cleanup failed')",
+        `import { createStoreWorkerAggregateError, StoreWorkerErrorCode } from '@migaia/store-worker'\n\nconst failures = [new Error('endpoint dispose failed'), new Error('worker terminate failed')]\nthrow createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, failures, 'worker cleanup failed')`,
       scenarios: [
         'endpoint disposal 与 owned Worker termination 同时失败。',
         'rollback 必须保留全部独立 cleanup failure。'
@@ -20143,7 +20359,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates one bounded diagnostic session for a Reactive Store: immutable state snapshots, completed actions, raw Runtime trace, and explicit time travel. The caller owns disposal and should normally construct it only in a development or opt-in diagnostics path.',
       quickStart:
-        "const tools = import.meta.env.DEV\n  ? createStoreDevTools(counterStore, { maxHistory: 100, maxTrace: 1_000 })\n  : undefined\n\ntry {\n  counterStore.increment()\n  const beforeReset = tools?.record('before-reset')\n  if (beforeReset) tools?.jumpTo(beforeReset.id)\n} finally {\n  tools?.dispose()\n}",
+        `import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools } from '@migaia/store-devtools'\n\nconst counterStore = createStore({ count: 0, increment() { this.count += 1 } })\nconst tools = createStoreDevTools(counterStore, { maxHistory: 100, maxTrace: 1_000 })\ntry {\n  counterStore.increment()\n  const beforeReset = tools.record('before-reset')\n  console.log('recorded snapshot:', beforeReset.id)\n  tools.jumpTo(beforeReset.id)\n} finally {\n  tools.dispose()\n}`,
       scenarios: [
         'Explain which Store snapshot followed a user action and inspect the corresponding Runtime trace.',
         'Replay a still-retained plain-state snapshot while debugging deterministic Store behavior.',
@@ -20160,7 +20376,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为 Reactive Store 创建一段有界诊断会话：不可变状态快照、已完成 action、原始 Runtime trace 与显式时间旅行。调用方拥有 dispose，通常只应在开发环境或主动开启的诊断路径创建。',
       quickStart:
-        "const tools = import.meta.env.DEV\n  ? createStoreDevTools(counterStore, { maxHistory: 100, maxTrace: 1_000 })\n  : undefined\n\ntry {\n  counterStore.increment()\n  const beforeReset = tools?.record('before-reset')\n  if (beforeReset) tools?.jumpTo(beforeReset.id)\n} finally {\n  tools?.dispose()\n}",
+        `import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools } from '@migaia/store-devtools'\n\nconst counterStore = createStore({ count: 0, increment() { this.count += 1 } })\nconst tools = createStoreDevTools(counterStore, { maxHistory: 100, maxTrace: 1_000 })\ntry {\n  counterStore.increment()\n  const beforeReset = tools.record('before-reset')\n  console.log('已记录 snapshot:', beforeReset.id)\n  tools.jumpTo(beforeReset.id)\n} finally {\n  tools.dispose()\n}`,
       scenarios: [
         '解释某次用户 action 之后出现了哪份 Store snapshot，并查看对应 Runtime trace。',
         '调试确定性 Store 行为时，回放仍在保留窗口内的 plain-state snapshot。',
@@ -20179,7 +20395,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Builds a bounded upstream tree from an Effect or Computed observer to the observables it reads. Circular marks only a node revisited on the current path, so a shared diamond is expanded on each legitimate branch.',
       quickStart:
-        'const upstream = getDependencyTree(totalEffect, 5)\nconsole.table(upstream.children.map(({ label, version }) => ({ label, version })))',
+        `import { createRuntime } from '@migaia/reactive'\nimport { getDependencyTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(12)\nconst quantity = runtime.signal(3)\nconst total = runtime.computed(() => price.value * quantity.value)\nconst totalEffect = runtime.effect(() => console.log('total:', total.value))\nconst upstream = getDependencyTree(totalEffect, 5)\nconsole.table(upstream.children.map(({ label, version }) => ({ label, version })))\ntotalEffect.dispose()`,
       scenarios: [
         'Explain why an Effect or Computed reran by inspecting its current upstream dependencies.',
         'Render a diagnostic tree with explicit depth and circular boundaries.'
@@ -20213,7 +20429,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '从 Effect 或 Computed observer 向上构建有界依赖树，展示它读取的 observable。circular 只标记当前路径上的重复节点，因此合法菱形共享会在每条分支各自展开。',
       quickStart:
-        'const upstream = getDependencyTree(totalEffect, 5)\nconsole.table(upstream.children.map(({ label, version }) => ({ label, version })))',
+        `import { createRuntime } from '@migaia/reactive'\nimport { getDependencyTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(12)\nconst quantity = runtime.signal(3)\nconst total = runtime.computed(() => price.value * quantity.value)\nconst totalEffect = runtime.effect(() => console.log('总价:', total.value))\nconst upstream = getDependencyTree(totalEffect, 5)\nconsole.table(upstream.children.map(({ label, version }) => ({ label, version })))\ntotalEffect.dispose()`,
       scenarios: [
         '解释 Effect 或 Computed 为何重跑，检查其当前上游依赖。',
         '以明确 depth 与 circular 边界渲染诊断树。'
@@ -20248,7 +20464,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Builds the opposite bounded projection: from a Signal or Computed observable to downstream observers that currently subscribe to it.',
       quickStart:
-        'const downstream = getObserverTree(accountSignal, 4)\nconsole.table(downstream.children.map(({ label, kind }) => ({ label, kind })))',
+        `import { createRuntime } from '@migaia/reactive'\nimport { getObserverTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst accountSignal = runtime.signal({ name: 'Ada' })\nconst observer = runtime.effect(() => console.log('account:', accountSignal.value.name))\nconst downstream = getObserverTree(accountSignal, 4)\nconsole.table(downstream.children.map(({ label, kind }) => ({ label, kind })))\nobserver.dispose()`,
       scenarios: [
         'Find which Effects or Computed values a Signal change can invalidate.',
         'Inspect downstream fan-out before optimizing a frequently updated value.'
@@ -20281,7 +20497,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '构建相反方向的有界投影：从 Signal 或 Computed observable 出发，查看当前订阅它的下游 observer。',
       quickStart:
-        'const downstream = getObserverTree(accountSignal, 4)\nconsole.table(downstream.children.map(({ label, kind }) => ({ label, kind })))',
+        `import { createRuntime } from '@migaia/reactive'\nimport { getObserverTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst accountSignal = runtime.signal({ name: 'Ada' })\nconst observer = runtime.effect(() => console.log('账户:', accountSignal.value.name))\nconst downstream = getObserverTree(accountSignal, 4)\nconsole.table(downstream.children.map(({ label, kind }) => ({ label, kind })))\nobserver.dispose()`,
       scenarios: [
         '查明 Signal 变化可能让哪些 Effect 或 Computed 失效。',
         '优化高频更新值之前检查下游 fan-out。'
@@ -20316,7 +20532,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native Error tagged with the canonical store-devtools source and a registered semantic code, optionally retaining the original failure as cause. It is an adapter boundary tool, not the normal way to report diagnostic state.',
       quickStart:
-        "try {\n  connectDiagnosticSink()\n} catch (cause) {\n  throw createStoreDevtoolsError(\n    StoreDevtoolsErrorCode.invalidOption,\n    'diagnostic sink configuration is invalid',\n    { cause }\n  )\n}",
+        `try {\n  connectDiagnosticSink()\n} catch (cause) {\n  throw createStoreDevtoolsError(\n    StoreDevtoolsErrorCode.invalidOption,\n    'diagnostic sink configuration is invalid',\n    { cause }\n  )\n}`,
       scenarios: [
         'A custom diagnostic adapter must preserve the same source/code boundary.',
         'A lower-level failure must remain reachable through Error.cause.'
@@ -20360,7 +20576,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带 canonical store-devtools source 与已注册语义 code 的原生 Error，并可通过 cause 保留原始失败。它用于 adapter 错误边界，不用于表示普通诊断状态。',
       quickStart:
-        "try {\n  connectDiagnosticSink()\n} catch (cause) {\n  throw createStoreDevtoolsError(\n    StoreDevtoolsErrorCode.invalidOption,\n    'diagnostic sink configuration is invalid',\n    { cause }\n  )\n}",
+        `try {\n  connectDiagnosticSink()\n} catch (cause) {\n  throw createStoreDevtoolsError(\n    StoreDevtoolsErrorCode.invalidOption,\n    'diagnostic sink configuration is invalid',\n    { cause }\n  )\n}`,
       scenarios: [
         '自定义诊断 adapter 必须维持同一 source/code 边界。',
         '底层失败必须通过 Error.cause 保持可达。'
@@ -20405,7 +20621,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native RangeError with canonical store-devtools source/code identity for caller-owned numeric diagnostic validation.',
       quickStart:
-        "if (!Number.isSafeInteger(depth) || depth < 0) {\n  throw createStoreDevtoolsRangeError(\n    StoreDevtoolsErrorCode.invalidOption,\n    'depth must be a non-negative safe integer'\n  )\n}",
+        `import { createStoreDevtoolsRangeError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'\n\nconst depth = -1\nif (!Number.isSafeInteger(depth) || depth < 0) {\n  throw createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'depth must be a non-negative safe integer')\n}`,
       scenarios: [
         'An adapter validates a depth, retained id, or numeric diagnostic bound.',
         'Consumers branch on both native RangeError and semantic code.'
@@ -20440,7 +20656,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '为调用方拥有的数值诊断校验创建带 canonical store-devtools source/code identity 的原生 RangeError。',
       quickStart:
-        "if (!Number.isSafeInteger(depth) || depth < 0) {\n  throw createStoreDevtoolsRangeError(\n    StoreDevtoolsErrorCode.invalidOption,\n    'depth must be a non-negative safe integer'\n  )\n}",
+        `import { createStoreDevtoolsRangeError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'\n\nconst depth = -1\nif (!Number.isSafeInteger(depth) || depth < 0) {\n  throw createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'depth must be a non-negative safe integer')\n}`,
       scenarios: [
         'adapter 校验 depth、保留 id 或数值诊断上限。',
         'consumer 同时按 native RangeError 与语义 code 分支。'
@@ -20477,7 +20693,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native AggregateError tagged with canonical store-devtools identity while preserving every supplied cleanup failure in order.',
       quickStart:
-        "if (cleanupErrors.length > 1) {\n  throw createStoreDevtoolsAggregateError(\n    StoreDevtoolsErrorCode.cleanupFailed,\n    cleanupErrors,\n    'diagnostic cleanup failed'\n  )\n}",
+        `import { createStoreDevtoolsAggregateError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'\n\nconst cleanupErrors = [new Error('panel close failed'), new Error('trace flush failed')]\nif (cleanupErrors.length > 1) {\n  throw createStoreDevtoolsAggregateError(StoreDevtoolsErrorCode.cleanupFailed, cleanupErrors, 'diagnostic cleanup failed')\n}`,
       scenarios: [
         'Several independently owned diagnostic cleanups fail during one rollback or disposal.',
         'Every original failure must remain reachable through AggregateError.errors.'
@@ -20522,7 +20738,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带 canonical store-devtools identity 的原生 AggregateError，并按顺序保留传入的每个 cleanup failure。',
       quickStart:
-        "if (cleanupErrors.length > 1) {\n  throw createStoreDevtoolsAggregateError(\n    StoreDevtoolsErrorCode.cleanupFailed,\n    cleanupErrors,\n    'diagnostic cleanup failed'\n  )\n}",
+        `import { createStoreDevtoolsAggregateError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'\n\nconst cleanupErrors = [new Error('panel close failed'), new Error('trace flush failed')]\nif (cleanupErrors.length > 1) {\n  throw createStoreDevtoolsAggregateError(StoreDevtoolsErrorCode.cleanupFailed, cleanupErrors, 'diagnostic cleanup failed')\n}`,
       scenarios: [
         '一次 rollback 或 dispose 中多个独立诊断 cleanup 同时失败。',
         '每个原始失败都必须通过 AggregateError.errors 保持可达。'
@@ -20568,7 +20784,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the recommended realm-local reactive view over one shared signed int32. Local reads participate in Reactive tracking while explicit sync or watch imports remote writes from the same ABI buffer.',
       quickStart:
-        'const runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\n\nconst effect = new Effect(runtime, () => {\n  console.log(counter.value)\n})\neffect.start()\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  effect.dispose()\n  counter.dispose()\n}',
+        `import { createRuntime, effect } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst stopEffect = effect(() => console.log(counter.value), runtime)\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  stopEffect()\n  counter.dispose()\n}`,
       scenarios: [
         'A counter, flag, cursor, or state code must be shared across workers or realms.',
         'Realm-local Effects should track reads and rerun when remote writes are synchronized.',
@@ -20585,7 +20801,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建单个共享有符号 int32 的推荐 realm-local 响应式 view。本地读取参与 Reactive 追踪，显式 sync 或 watch 把同一 ABI buffer 的远端写入拉入当前 Runtime。',
       quickStart:
-        'const runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\n\nconst effect = new Effect(runtime, () => {\n  console.log(counter.value)\n})\neffect.start()\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  effect.dispose()\n  counter.dispose()\n}',
+        `import { createRuntime, effect } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst stopEffect = effect(() => console.log(counter.value), runtime)\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  stopEffect()\n  counter.dispose()\n}`,
       scenarios: [
         'counter、flag、cursor 或状态码需要跨 worker/realm 共享。',
         'realm-local Effect 应追踪读取，并在远端写入同步后重跑。',
@@ -20604,7 +20820,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Constructs the class form of a shared int32 reactive view. Prefer sharedInt32 for ordinary creation; use the class when subclass-free constructor identity or explicit new is required by a composition boundary.',
       quickStart:
-        'const owner = new SharedInt32Signal(runtime, 7)\nworker.postMessage({ buffer: owner.buffer })\n\nconst peer = new SharedInt32Signal(workerRuntime, 0, owner.buffer)\ntry {\n  peer.sync()\n  console.log(peer.value)\n} finally {\n  peer.dispose()\n  owner.dispose()\n}',
+        `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Signal } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst workerRuntime = createRuntime()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst owner = new SharedInt32Signal(runtime, 7)\nworker.postMessage({ buffer: owner.buffer })\n\nconst peer = new SharedInt32Signal(workerRuntime, 0, owner.buffer)\ntry {\n  peer.sync()\n  console.log(peer.value)\n} finally {\n  peer.dispose()\n  owner.dispose()\n}`,
       scenarios: [
         'A framework requires an explicit constructable class rather than a factory.',
         'Two realms need independent Reactive ownership over one ABI-compatible buffer.',
@@ -20621,7 +20837,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '构造共享 int32 响应式 view 的 class 形式。普通创建优先 sharedInt32；只有组合边界要求显式 new 或 constructable class identity 时直接使用类。',
       quickStart:
-        'const owner = new SharedInt32Signal(runtime, 7)\nworker.postMessage({ buffer: owner.buffer })\n\nconst peer = new SharedInt32Signal(workerRuntime, 0, owner.buffer)\ntry {\n  peer.sync()\n  console.log(peer.value)\n} finally {\n  peer.dispose()\n  owner.dispose()\n}',
+        `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Signal } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst workerRuntime = createRuntime()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst owner = new SharedInt32Signal(runtime, 7)\nworker.postMessage({ buffer: owner.buffer })\n\nconst peer = new SharedInt32Signal(workerRuntime, 0, owner.buffer)\ntry {\n  peer.sync()\n  console.log(peer.value)\n} finally {\n  peer.dispose()\n  owner.dispose()\n}`,
       scenarios: [
         '框架要求显式 constructable class，而不是 factory。',
         '两个 realm 需要在同一 ABI-compatible buffer 上拥有独立 Reactive ownership。',
@@ -20640,7 +20856,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the recommended fixed-length shared int32 array. Untracked reads stay O(1), tracked reads lazily materialize one Reactive cell per observed index, and array sync batches remote changes into one Runtime update.',
       quickStart:
-        'const positions = sharedInt32Array(runtime, 1_000, { initialValues: [0, 0] })\nconst stop = positions.watch()\n\ntry {\n  positions.set(0, 10)\n  positions.update(1, (current) => current + 1)\n  worker.postMessage({ buffer: positions.buffer, length: positions.length })\n  console.log(positions.snapshot())\n} finally {\n  stop()\n  positions.dispose()\n}',
+        `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst worker = new Worker('worker.js')\nconst positions = sharedInt32Array(runtime, 1_000, { initialValues: [0, 0] })\nconst stop = positions.watch()\n\ntry {\n  positions.set(0, 10)\n  positions.update(1, (current) => current + 1)\n  worker.postMessage({ buffer: positions.buffer, length: positions.length })\n  console.log(positions.snapshot())\n} finally {\n  stop()\n  positions.dispose()\n}`,
       scenarios: [
         'A fixed index domain of counters, positions, or status slots is shared across workers.',
         'Only indexes actually read by Effects should allocate reactive cells.',
@@ -20657,7 +20873,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建推荐的定长共享 int32 数组。非追踪读取保持 O(1)，追踪读取只为实际观察下标惰性物化 Reactive cell，整体 sync 把远端变化合并为一次 Runtime batch。',
       quickStart:
-        'const positions = sharedInt32Array(runtime, 1_000, { initialValues: [0, 0] })\nconst stop = positions.watch()\n\ntry {\n  positions.set(0, 10)\n  positions.update(1, (current) => current + 1)\n  worker.postMessage({ buffer: positions.buffer, length: positions.length })\n  console.log(positions.snapshot())\n} finally {\n  stop()\n  positions.dispose()\n}',
+        `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst worker = new Worker('worker.js')\nconst positions = sharedInt32Array(runtime, 1_000, { initialValues: [0, 0] })\nconst stop = positions.watch()\n\ntry {\n  positions.set(0, 10)\n  positions.update(1, (current) => current + 1)\n  worker.postMessage({ buffer: positions.buffer, length: positions.length })\n  console.log(positions.snapshot())\n} finally {\n  stop()\n  positions.dispose()\n}`,
       scenarios: [
         '固定下标域的 counter、position 或 status slot 需要跨 worker 共享。',
         '只有 Effect 实际读取的下标才应分配响应式 cell。',
@@ -20676,7 +20892,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Constructs the class form of the fixed shared int32 array. It exposes high-level get, set, update, sync, watch, snapshot, prune, and disposal plus low-level cell primitives for an explicit composition owner.',
       quickStart:
-        'const array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n  array.prune()\n} finally {\n  array.dispose()\n}',
+        `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n  array.prune()\n} finally {\n  array.dispose()\n}`,
       scenarios: [
         'A framework requires direct class construction and lifecycle identity.',
         'High-frequency rotating index access needs explicit prune of unobserved cells.',
@@ -20693,7 +20909,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '构造定长共享 int32 数组的 class 形式。它同时暴露高层 get、set、update、sync、watch、snapshot、prune、dispose，以及供明确组合 owner 使用的底层 cell 原语。',
       quickStart:
-        'const array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n  array.prune()\n} finally {\n  array.dispose()\n}',
+        `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n  array.prune()\n} finally {\n  array.dispose()\n}`,
       scenarios: [
         '框架要求直接 class 构造与生命周期 identity。',
         '高频轮换访问下标，需要显式 prune 无 observer cell。',
@@ -20712,7 +20928,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native Error carrying the canonical store-shared source and semantic code while preserving message, stack, and an optional original cause. It is for adapters extending this error boundary, not ordinary state changes.',
       quickStart:
-        "try {\n  await synchronizeSharedState()\n} catch (cause) {\n  throw createStoreSharedError(\n    StoreSharedErrorCode.watchFailed,\n    'shared-state synchronization failed',\n    { cause }\n  )\n}",
+        `try {\n  await synchronizeSharedState()\n} catch (cause) {\n  throw createStoreSharedError(\n    StoreSharedErrorCode.watchFailed,\n    'shared-state synchronization failed',\n    { cause }\n  )\n}`,
       scenarios: [
         'A store-shared adapter must emit a library-boundary Error with canonical identity.',
         'The original failure must remain reachable through cause.',
@@ -20758,7 +20974,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带 canonical store-shared source 与语义 code 的原生 Error，同时保留 message、stack 与可选原始 cause。它供扩展错误边界的 adapter 使用，不表示普通状态变化。',
       quickStart:
-        "try {\n  await synchronizeSharedState()\n} catch (cause) {\n  throw createStoreSharedError(\n    StoreSharedErrorCode.watchFailed,\n    'shared-state synchronization failed',\n    { cause }\n  )\n}",
+        `try {\n  await synchronizeSharedState()\n} catch (cause) {\n  throw createStoreSharedError(\n    StoreSharedErrorCode.watchFailed,\n    'shared-state synchronization failed',\n    { cause }\n  )\n}`,
       scenarios: [
         'store-shared adapter 必须在边界抛出带 canonical identity 的 Error。',
         '原始失败必须通过 cause 保持可达。',
@@ -20804,7 +21020,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a native RangeError with canonical store-shared identity. Use it only for numeric, capacity, index, or range validation owned by a store-shared adapter; native error type remains observable.',
       quickStart:
-        "if (!Number.isSafeInteger(length) || length < 0) {\n  throw createStoreSharedRangeError(\n    StoreSharedErrorCode.invalidOption,\n    'length must be a non-negative safe integer'\n  )\n}",
+        `import { createStoreSharedRangeError, StoreSharedErrorCode } from '@migaia/store-shared'\n\nconst length = -1\nif (!Number.isSafeInteger(length) || length < 0) {\n  throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be a non-negative safe integer')\n}`,
       scenarios: [
         'An adapter validates length, index, capacity, or signed-int32 range.',
         'Callers branch on native RangeError as well as source and code.',
@@ -20848,7 +21064,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建带 canonical store-shared identity 的原生 RangeError。仅用于 store-shared adapter 拥有的数值、容量、下标或范围校验；native error type 保持可观察。',
       quickStart:
-        "if (!Number.isSafeInteger(length) || length < 0) {\n  throw createStoreSharedRangeError(\n    StoreSharedErrorCode.invalidOption,\n    'length must be a non-negative safe integer'\n  )\n}",
+        `import { createStoreSharedRangeError, StoreSharedErrorCode } from '@migaia/store-shared'\n\nconst length = -1\nif (!Number.isSafeInteger(length) || length < 0) {\n  throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be a non-negative safe integer')\n}`,
       scenarios: [
         'adapter 校验 length、index、capacity 或 signed-int32 range。',
         '调用方同时按 native RangeError 与 source/code 分支。',
@@ -20894,7 +21110,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Initializes the WASM module synchronously from bytes or an already compiled WebAssembly.Module. It performs no fetch, so the caller owns loading, caching, CSP, and compile timing.',
       quickStart:
-        'const module = await WebAssembly.compile(wasmBytes)\nconst wasm = initSync({ module })\n\nconst id = wasm.alloc_bytes(16)\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(id), 16)\n  view.set(source)\n} finally {\n  wasm.dealloc_bytes(id)\n}',
+        `import { initSync } from '@migaia/wasm'\n\nconst wasmBytes = new Uint8Array([0, 97, 115, 109])\nconst module = await WebAssembly.compile(wasmBytes)\nconst wasm = initSync({ module })\nconst source = new Uint8Array(16)\n\nconst id = wasm.alloc_bytes(16)\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(id), 16)\n  view.set(source)\n} finally {\n  wasm.dealloc_bytes(id)\n}`,
       scenarios: [
         'The host already owns WASM bytes or a compiled Module.',
         'Initialization must occur synchronously after an explicit preload phase.',
@@ -20911,7 +21127,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '从 bytes 或已编译 WebAssembly.Module 同步初始化 WASM；它不会发起 fetch，因此加载、缓存、CSP 与编译时机都由调用方拥有。',
       quickStart:
-        'const module = await WebAssembly.compile(wasmBytes)\nconst wasm = initSync({ module })\n\nconst id = wasm.alloc_bytes(16)\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(id), 16)\n  view.set(source)\n} finally {\n  wasm.dealloc_bytes(id)\n}',
+        `import { initSync } from '@migaia/wasm'\n\nconst wasmBytes = new Uint8Array([0, 97, 115, 109])\nconst module = await WebAssembly.compile(wasmBytes)\nconst wasm = initSync({ module })\nconst source = new Uint8Array(16)\n\nconst id = wasm.alloc_bytes(16)\ntry {\n  const view = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(id), 16)\n  view.set(source)\n} finally {\n  wasm.dealloc_bytes(id)\n}`,
       scenarios: [
         '宿主已经拥有 WASM bytes 或已编译 Module。',
         '显式 preload 阶段之后必须同步完成初始化。',
@@ -20930,7 +21146,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Allocates one zero-filled, eight-byte-aligned arena block and returns a stable nonzero allocation id. Zero means allocation failure and must never be passed off as a live block.',
       quickStart:
-        "const id = alloc_bytes(source.byteLength)\nif (id === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(id), source.byteLength).set(source)\n  consume(id, source.byteLength)\n} finally {\n  dealloc_bytes(id)\n}",
+        `import { alloc_bytes, dealloc_bytes, ptr_of } from '@migaia/wasm'\n\nexport function writeBytes(source: Uint8Array, memory: WebAssembly.Memory, consume: (id: number, length: number) => void): void {\n  const id = alloc_bytes(source.byteLength)\n  if (id === 0) throw new Error('arena exhausted')\n\n  try {\n    new Uint8Array(memory.buffer, ptr_of(id), source.byteLength).set(source)\n    consume(id, source.byteLength)\n  } finally {\n    dealloc_bytes(id)\n  }\n}`,
       scenarios: [
         'JavaScript bytes must cross into the library-owned WASM arena.',
         'A stable lifecycle identity is needed while memory offsets may move after growth.',
@@ -20947,7 +21163,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '分配一个清零且 8 字节对齐的 arena block，并返回稳定非零 allocation id；0 表示分配失败，绝不能冒充 live block。',
       quickStart:
-        "const id = alloc_bytes(source.byteLength)\nif (id === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(id), source.byteLength).set(source)\n  consume(id, source.byteLength)\n} finally {\n  dealloc_bytes(id)\n}",
+        `import { alloc_bytes, dealloc_bytes, ptr_of } from '@migaia/wasm'\n\nexport function writeBytes(source: Uint8Array, memory: WebAssembly.Memory, consume: (id: number, length: number) => void): void {\n  const id = alloc_bytes(source.byteLength)\n  if (id === 0) throw new Error('arena exhausted')\n\n  try {\n    new Uint8Array(memory.buffer, ptr_of(id), source.byteLength).set(source)\n    consume(id, source.byteLength)\n  } finally {\n    dealloc_bytes(id)\n  }\n}`,
       scenarios: [
         'JavaScript bytes 必须进入库拥有的 WASM arena。',
         'memory growth 后 offset 可能变化，但生命周期需要稳定身份。',
@@ -20966,7 +21182,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Returns the current linear-memory byte offset for a live allocation id, or zero for an unknown or released id. The id is stable; a typed-array view over memory.buffer is not.',
       quickStart:
-        "const id = alloc_bytes(byteLength)\nif (id === 0) throw new Error('arena exhausted')\n\nconst writeView = new Uint8Array(memory.buffer, ptr_of(id), byteLength)\nwriteView.set(source)\n\nallocateMoreMemory()\nconst freshView = new Uint8Array(memory.buffer, ptr_of(id), byteLength)",
+        `import { alloc_bytes, ptr_of } from '@migaia/wasm'\n\nconst memory = new WebAssembly.Memory({ initial: 1 })\nconst source = new Uint8Array([1, 2, 3])\nconst byteLength = source.byteLength\nconst id = alloc_bytes(byteLength)\nif (id === 0) throw new Error('arena exhausted')\nconst writeView = new Uint8Array(memory.buffer, ptr_of(id), byteLength)\nwriteView.set(source)\nconst extraId = alloc_bytes(64) // 可能触发 memory growth；不要复用旧 view。\nconst freshView = new Uint8Array(memory.buffer, ptr_of(id), byteLength)\nconsole.log(freshView, extraId)`,
       scenarios: [
         'A fresh TypedArray or DataView must be created for a live arena block.',
         'Code must re-read the offset after another allocation may have grown memory.',
@@ -20983,7 +21199,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '返回 live allocation id 当前对应的 linear-memory byte offset；未知或已释放 id 返回 0。稳定的是 id，不是基于 memory.buffer 创建的 typed-array view。',
       quickStart:
-        "const id = alloc_bytes(byteLength)\nif (id === 0) throw new Error('arena exhausted')\n\nconst writeView = new Uint8Array(memory.buffer, ptr_of(id), byteLength)\nwriteView.set(source)\n\nallocateMoreMemory()\nconst freshView = new Uint8Array(memory.buffer, ptr_of(id), byteLength)",
+        `import { alloc_bytes, ptr_of } from '@migaia/wasm'\n\nconst memory = new WebAssembly.Memory({ initial: 1 })\nconst source = new Uint8Array([1, 2, 3])\nconst byteLength = source.byteLength\nconst id = alloc_bytes(byteLength)\nif (id === 0) throw new Error('arena exhausted')\nconst writeView = new Uint8Array(memory.buffer, ptr_of(id), byteLength)\nwriteView.set(source)\nconst extraId = alloc_bytes(64) // 可能触发 memory growth；不要复用旧 view。\nconst freshView = new Uint8Array(memory.buffer, ptr_of(id), byteLength)\nconsole.log(freshView, extraId)`,
       scenarios: [
         '需要为 live arena block 创建新的 TypedArray 或 DataView。',
         '其他分配可能触发 memory growth，因此必须重新读取 offset。',
@@ -21002,7 +21218,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Returns the actual eight-byte-rounded capacity of a live arena allocation, or zero for an unknown id. Capacity is not the logical payload length and must not be sent as a conversion length accidentally.',
       quickStart:
-        "const id = alloc_bytes(payload.byteLength)\nconst capacity = byte_len_of(id)\nif (id === 0 || capacity < payload.byteLength) throw new Error('allocation failed')\n\nnew Uint8Array(memory.buffer, ptr_of(id), capacity).set(payload)\nconst result = json_to_msgpack(id, payload.byteLength)",
+        `import { alloc_bytes, byte_len_of, json_to_msgpack, memory, ptr_of } from '@migaia/wasm'\n\nconst payload = new TextEncoder().encode(JSON.stringify({ id: 1, name: 'Ada' }))\nconst id = alloc_bytes(payload.byteLength)\nconst capacity = byte_len_of(id)\nif (id === 0 || capacity < payload.byteLength) throw new Error('allocation failed')\n\nnew Uint8Array(memory.buffer, ptr_of(id), capacity).set(payload)\nconst result = json_to_msgpack(id, payload.byteLength)\nconsole.log('encoded message:', result)`,
       scenarios: [
         'A caller must bound a view by the real aligned arena capacity.',
         'Allocation success must be checked without trusting the requested length.',
@@ -21019,7 +21235,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '返回 live arena allocation 按 8 字节取整后的实际容量；未知 id 返回 0。capacity 不是逻辑 payload 长度，不能误传为转码长度。',
       quickStart:
-        "const id = alloc_bytes(payload.byteLength)\nconst capacity = byte_len_of(id)\nif (id === 0 || capacity < payload.byteLength) throw new Error('allocation failed')\n\nnew Uint8Array(memory.buffer, ptr_of(id), capacity).set(payload)\nconst result = json_to_msgpack(id, payload.byteLength)",
+        `import { alloc_bytes, byte_len_of, json_to_msgpack, memory, ptr_of } from '@migaia/wasm'\n\nconst payload = new TextEncoder().encode(JSON.stringify({ id: 1, name: 'Ada' }))\nconst id = alloc_bytes(payload.byteLength)\nconst capacity = byte_len_of(id)\nif (id === 0 || capacity < payload.byteLength) throw new Error('allocation failed')\n\nnew Uint8Array(memory.buffer, ptr_of(id), capacity).set(payload)\nconst result = json_to_msgpack(id, payload.byteLength)\nconsole.log('编码后的 message:', result)`,
       scenarios: [
         '调用方必须用真实对齐容量限制 view。',
         '分配成功需要独立检查，不能只信任请求长度。',
@@ -21038,7 +21254,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Releases one live arena allocation id and returns whether ownership actually existed. A second release or an unknown id returns false, making cleanup observable without trapping.',
       quickStart:
-        "const id = alloc_bytes(byteLength)\nif (id === 0) throw new Error('arena exhausted')\n\ntry {\n  useArenaBlock(id)\n} finally {\n  if (!dealloc_bytes(id)) diagnostics.report('arena block was not live')\n}",
+        `import { alloc_bytes, dealloc_bytes } from '@migaia/wasm'\n\nconst diagnostics = { report: (message: string) => console.error(message) }\nconst useArenaBlock = (id: number) => console.log('consume arena block:', id)\nconst byteLength = 32\nconst id = alloc_bytes(byteLength)\nif (id === 0) throw new Error('arena exhausted')\ntry {\n  useArenaBlock(id)\n} finally {\n  if (!dealloc_bytes(id)) diagnostics.report('arena block was not live')\n}`,
       scenarios: [
         'A caller-owned input or conversion output reaches its final cleanup boundary.',
         'Cleanup must be idempotence-observable instead of trapping on an unknown id.',
@@ -21055,7 +21271,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '释放一个 live arena allocation id，并返回调用方是否实际拥有该 allocation；二次释放或未知 id 返回 false，不会 trap。',
       quickStart:
-        "const id = alloc_bytes(byteLength)\nif (id === 0) throw new Error('arena exhausted')\n\ntry {\n  useArenaBlock(id)\n} finally {\n  if (!dealloc_bytes(id)) diagnostics.report('arena block was not live')\n}",
+        `import { alloc_bytes, dealloc_bytes } from '@migaia/wasm'\n\nconst diagnostics = { report: (message: string) => console.error(message) }\nconst useArenaBlock = (id: number) => console.log('消费 arena block:', id)\nconst byteLength = 32\nconst id = alloc_bytes(byteLength)\nif (id === 0) throw new Error('arena exhausted')\ntry {\n  useArenaBlock(id)\n} finally {\n  if (!dealloc_bytes(id)) diagnostics.report('arena block was not live')\n}`,
       scenarios: [
         '调用方拥有的输入或转码输出到达最终 cleanup 边界。',
         'cleanup 需要可观察幂等性，未知 id 不能 trap。',
@@ -21074,7 +21290,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Represents one self-contained conversion outcome with output allocation id, exact byte length, and error text. The wasm-bindgen wrapper itself and any successful output block have separate cleanup obligations.',
       quickStart:
-        'using result = json_to_msgpack(inputId, inputLength)\nif (result.id === 0) throw new Error(result.error)\n\ntry {\n  return new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n} finally {\n  dealloc_bytes(result.id)\n}',
+        `using result = json_to_msgpack(inputId, inputLength)\nif (result.id === 0) throw new Error(result.error)\n\ntry {\n  return new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n} finally {\n  dealloc_bytes(result.id)\n}`,
       scenarios: [
         'Interleaved conversions need operation-local results rather than a shared last-result register.',
         'Success must bind a nonzero output id to its exact byte length.',
@@ -21091,7 +21307,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '表示一次自包含转码结果，把 output allocation id、精确 byte length 与 error text 绑定在一起；wasm-bindgen wrapper 与成功输出 block 各有独立 cleanup 义务。',
       quickStart:
-        'using result = json_to_msgpack(inputId, inputLength)\nif (result.id === 0) throw new Error(result.error)\n\ntry {\n  return new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n} finally {\n  dealloc_bytes(result.id)\n}',
+        `using result = json_to_msgpack(inputId, inputLength)\nif (result.id === 0) throw new Error(result.error)\n\ntry {\n  return new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n} finally {\n  dealloc_bytes(result.id)\n}`,
       scenarios: [
         '交错转码需要 operation-local result，不能依赖共享 last-result register。',
         '成功必须把非零 output id 与精确 byte length 绑定。',
@@ -21110,7 +21326,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Converts one complete UTF-8 JSON document in an arena block to MessagePack. It reads exactly len bytes, preserves map keys as strings, returns an independent ConversionResult, and never releases the input.',
       quickStart:
-        "const bytes = new TextEncoder().encode(JSON.stringify(value))\nconst inputId = alloc_bytes(bytes.length)\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(inputId), bytes.length).set(bytes)\n  using result = json_to_msgpack(inputId, bytes.length)\n  if (result.id === 0) throw new Error(result.error)\n  try {\n    return new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n  } finally { dealloc_bytes(result.id) }\n} finally { dealloc_bytes(inputId) }",
+        `import { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst memory = new WebAssembly.Memory({ initial: 1 })\nconst value = { id: 'order-1', total: 42 }\nconst bytes = new TextEncoder().encode(JSON.stringify(value))\nconst inputId = alloc_bytes(bytes.length)\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(inputId), bytes.length).set(bytes)\n  using result = json_to_msgpack(inputId, bytes.length)\n  if (result.id === 0) throw new Error(result.error)\n  try {\n    return new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n  } finally { dealloc_bytes(result.id) }\n} finally { dealloc_bytes(inputId) }`,
       scenarios: [
         'A complete JSON document must cross a compact binary boundary.',
         'Concurrent or re-entrant conversions require independent result state.',
@@ -21127,7 +21343,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把 arena block 中一个完整 UTF-8 JSON 文档转成 MessagePack。它精确读取 len bytes，保持 map key 为字符串，返回独立 ConversionResult，并且绝不释放输入。',
       quickStart:
-        "const bytes = new TextEncoder().encode(JSON.stringify(value))\nconst inputId = alloc_bytes(bytes.length)\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(inputId), bytes.length).set(bytes)\n  using result = json_to_msgpack(inputId, bytes.length)\n  if (result.id === 0) throw new Error(result.error)\n  try {\n    return new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n  } finally { dealloc_bytes(result.id) }\n} finally { dealloc_bytes(inputId) }",
+        `import { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst memory = new WebAssembly.Memory({ initial: 1 })\nconst value = { id: 'order-1', total: 42 }\nconst bytes = new TextEncoder().encode(JSON.stringify(value))\nconst inputId = alloc_bytes(bytes.length)\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(inputId), bytes.length).set(bytes)\n  using result = json_to_msgpack(inputId, bytes.length)\n  if (result.id === 0) throw new Error(result.error)\n  try {\n    return new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n  } finally { dealloc_bytes(result.id) }\n} finally { dealloc_bytes(inputId) }`,
       scenarios: [
         '完整 JSON 文档需要跨越紧凑二进制边界。',
         '并发或重入转码需要彼此独立的 result state。',
@@ -21146,7 +21362,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Converts one complete MessagePack document in an arena block to UTF-8 JSON. The decoder must consume exactly len bytes, so trailing bytes or a second document fail instead of being ignored.',
       quickStart:
-        "const inputId = alloc_bytes(packed.length)\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(inputId), packed.length).set(packed)\n  using result = msgpack_to_json(inputId, packed.length)\n  if (result.id === 0) throw new Error(result.error)\n  try {\n    const bytes = new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n    return JSON.parse(new TextDecoder().decode(bytes))\n  } finally { dealloc_bytes(result.id) }\n} finally { dealloc_bytes(inputId) }",
+        `import { alloc_bytes, dealloc_bytes, msgpack_to_json, ptr_of } from '@migaia/wasm'\n\nconst memory = new WebAssembly.Memory({ initial: 1 })\nconst packed = new Uint8Array([0x81, 0xa2, 0x69, 0x64, 0xa7, 0x6f, 0x72, 0x64, 0x65, 0x72, 0x2d, 0x31])\nconst inputId = alloc_bytes(packed.length)\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(inputId), packed.length).set(packed)\n  using result = msgpack_to_json(inputId, packed.length)\n  if (result.id === 0) throw new Error(result.error)\n  try {\n    const bytes = new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n    return JSON.parse(new TextDecoder().decode(bytes))\n  } finally { dealloc_bytes(result.id) }\n} finally { dealloc_bytes(inputId) }`,
       scenarios: [
         'One MessagePack document must become inspectable JSON at a host boundary.',
         'Trailing bytes must fail closed rather than hide a second payload.',
@@ -21163,7 +21379,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把 arena block 中一个完整 MessagePack 文档转成 UTF-8 JSON。decoder 必须精确消费 len bytes，因此尾随字节或第二个文档会失败，不会被忽略。',
       quickStart:
-        "const inputId = alloc_bytes(packed.length)\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(inputId), packed.length).set(packed)\n  using result = msgpack_to_json(inputId, packed.length)\n  if (result.id === 0) throw new Error(result.error)\n  try {\n    const bytes = new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n    return JSON.parse(new TextDecoder().decode(bytes))\n  } finally { dealloc_bytes(result.id) }\n} finally { dealloc_bytes(inputId) }",
+        `import { alloc_bytes, dealloc_bytes, msgpack_to_json, ptr_of } from '@migaia/wasm'\n\nconst memory = new WebAssembly.Memory({ initial: 1 })\nconst packed = new Uint8Array([0x81, 0xa2, 0x69, 0x64, 0xa7, 0x6f, 0x72, 0x64, 0x65, 0x72, 0x2d, 0x31])\nconst inputId = alloc_bytes(packed.length)\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(memory.buffer, ptr_of(inputId), packed.length).set(packed)\n  using result = msgpack_to_json(inputId, packed.length)\n  if (result.id === 0) throw new Error(result.error)\n  try {\n    const bytes = new Uint8Array(memory.buffer, ptr_of(result.id), result.len).slice()\n    return JSON.parse(new TextDecoder().decode(bytes))\n  } finally { dealloc_bytes(result.id) }\n} finally { dealloc_bytes(inputId) }`,
       scenarios: [
         '一个 MessagePack 文档需要在宿主边界变为可检查 JSON。',
         '尾随字节必须 fail-closed，不能隐藏第二个 payload。',
@@ -21182,7 +21398,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Runs a flat synchronous middleware chain over one value. A stage continues exactly once by calling next; returning without next short-circuits and duplicate or late calls are reported without changing the accepted value.',
       quickStart:
-        "runSyncMiddleware(\n  [\n    (value: string, next) => next(value.trim()),\n    (value: string, next) => next(value.toUpperCase())\n  ],\n  ' migaia ',\n  (value) => console.log(value),\n  (violation) => diagnostics.report(violation)\n)",
+        `import { runSyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (violation: unknown) => console.error('pipeline violation:', violation) }\nrunSyncMiddleware([\n  (value: string, next) => next(value.trim()),\n  (value: string, next) => next(value.toUpperCase())\n], ' migaia ', (value) => console.log('pipeline output:', value), (violation) => diagnostics.report(violation))`,
       scenarios: [
         'Every stage is synchronous and transforms or rejects one in-memory value.',
         'Returning without next should deliberately stop the chain without calling done.',
@@ -21209,7 +21425,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '以一个值运行扁平同步 middleware chain。stage 只能调用一次 next 继续；不调用即短路，重复或迟到调用只上报，不会改写已接纳的值。',
       quickStart:
-        "runSyncMiddleware(\n  [\n    (value: string, next) => next(value.trim()),\n    (value: string, next) => next(value.toUpperCase())\n  ],\n  ' migaia ',\n  (value) => console.log(value),\n  (violation) => diagnostics.report(violation)\n)",
+        `import { runSyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (violation: unknown) => console.error('pipeline violation:', violation) }\nrunSyncMiddleware([\n  (value: string, next) => next(value.trim()),\n  (value: string, next) => next(value.toUpperCase())\n], ' migaia ', (value) => console.log('pipeline output:', value), (violation) => diagnostics.report(violation))`,
       scenarios: [
         '所有 stage 都同步变换或拒绝一个内存值。',
         'stage 不调用 next 返回时应明确短路，并且不调用 done。',
@@ -21238,7 +21454,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Runs asynchronous middleware as an onion. next starts the downstream frame immediately and returns its completion Promise, so awaiting it creates before/after nesting while returning without next short-circuits.',
       quickStart:
-        'await runAsyncMiddleware(\n  [\n    async (value: Request, next) => {\n      const startedAt = performance.now()\n      await next(await authenticate(value))\n      metrics.observe(performance.now() - startedAt)\n    }\n  ],\n  request,\n  (value) => dispatch(value),\n  {\n    onViolation: (violation) => diagnostics.report(violation),\n    signal: controller.signal\n  }\n)',
+        `import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst controller = new AbortController()\nconst request = new Request('/api/orders')\nconst authenticate = async (value: Request) => value\nconst dispatch = async (value: Request) => console.log('dispatch request:', value.url)\nconst metrics = { observe: (elapsedMs: number) => console.log('middleware ms:', elapsedMs) }\nconst diagnostics = { report: (violation: unknown) => console.error('pipeline violation:', violation) }\nawait runAsyncMiddleware([async (value: Request, next) => {\n  const startedAt = performance.now()\n  await next(await authenticate(value))\n  metrics.observe(performance.now() - startedAt)\n}], request, (value) => dispatch(value), { onViolation: (violation) => diagnostics.report(violation), signal: controller.signal })`,
       scenarios: [
         'A stage performs asynchronous work before and after downstream completion.',
         'The chain needs explicit short-circuiting, for example authentication rejection or cache hits.',
@@ -21295,7 +21511,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '以洋葱模型运行异步 middleware。next 会立即启动下游 frame 并返回其 completion Promise；await next 形成前后嵌套，不调用 next 返回则短路。',
       quickStart:
-        'await runAsyncMiddleware(\n  [\n    async (value: Request, next) => {\n      const startedAt = performance.now()\n      await next(await authenticate(value))\n      metrics.observe(performance.now() - startedAt)\n    }\n  ],\n  request,\n  (value) => dispatch(value),\n  {\n    onViolation: (violation) => diagnostics.report(violation),\n    signal: controller.signal\n  }\n)',
+        `import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst controller = new AbortController()\nconst request = new Request('/api/orders')\nconst authenticate = async (value: Request) => value\nconst dispatch = async (value: Request) => console.log('分发请求:', value.url)\nconst metrics = { observe: (elapsedMs: number) => console.log('middleware 耗时:', elapsedMs) }\nconst diagnostics = { report: (violation: unknown) => console.error('pipeline violation:', violation) }\nawait runAsyncMiddleware([async (value: Request, next) => {\n  const startedAt = performance.now()\n  await next(await authenticate(value))\n  metrics.observe(performance.now() - startedAt)\n}], request, (value) => dispatch(value), { onViolation: (violation) => diagnostics.report(violation), signal: controller.signal })`,
       scenarios: [
         'stage 在下游完成前后都需要执行异步工作。',
         'chain 需要明确短路，例如认证拒绝或缓存命中。',
@@ -21353,7 +21569,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Runs synchronous generator stages serially. Yields remain local to the current stage; its terminal return decides whether the last yield, explicit undefined, another value, or a halt reaches the next stage.',
       quickStart:
-        'runGeneratorMiddleware(\n  [\n    function* (value: number) {\n      yield value + 1\n      yield value + 2\n      return GENERATOR_CONTINUE\n    },\n    function* (value: number) {\n      return value > 10 ? GENERATOR_HALT : value * 2\n    }\n  ],\n  3,\n  (value) => console.log(value)\n)',
+        `import { GENERATOR_CONTINUE, GENERATOR_HALT, runGeneratorMiddleware } from '@migaia/middleware-pipeline'\n\nrunGeneratorMiddleware(\n  [\n    function* (value: number) {\n      yield value + 1\n      yield value + 2\n      return GENERATOR_CONTINUE\n    },\n    function* (value: number) {\n      return value > 10 ? GENERATOR_HALT : value * 2\n    }\n  ],\n  3,\n  (value) => console.log(value)\n)`,
       scenarios: [
         'A synchronous stage naturally computes through several local yielded candidates.',
         'Terminal control must distinguish halt, continue with last yield, and explicit undefined.',
@@ -21380,7 +21596,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '串行运行同步 generator stage。yield 只属于当前 stage；terminal return 决定把最后一次 yield、显式 undefined、普通值或 halt 传给下一 stage。',
       quickStart:
-        'runGeneratorMiddleware(\n  [\n    function* (value: number) {\n      yield value + 1\n      yield value + 2\n      return GENERATOR_CONTINUE\n    },\n    function* (value: number) {\n      return value > 10 ? GENERATOR_HALT : value * 2\n    }\n  ],\n  3,\n  (value) => console.log(value)\n)',
+        `import { GENERATOR_CONTINUE, GENERATOR_HALT, runGeneratorMiddleware } from '@migaia/middleware-pipeline'\n\nrunGeneratorMiddleware(\n  [\n    function* (value: number) {\n      yield value + 1\n      yield value + 2\n      return GENERATOR_CONTINUE\n    },\n    function* (value: number) {\n      return value > 10 ? GENERATOR_HALT : value * 2\n    }\n  ],\n  3,\n  (value) => console.log(value)\n)`,
       scenarios: [
         '同步 stage 会自然地产生多个局部候选值。',
         'terminal control 必须区分 halt、采用最后 yield 与传播显式 undefined。',
@@ -21409,7 +21625,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Runs asynchronous generator stages strictly in sequence. It awaits every iterator transition, interprets the same terminal sentinels as the synchronous runner, and calls done only after all stages complete.',
       quickStart:
-        'await runAsyncGeneratorMiddleware(\n  [\n    async function* (value: string) {\n      const normalized = await normalize(value)\n      yield normalized\n      return GENERATOR_CONTINUE\n    },\n    async function* (value: string) {\n      yield await enrich(value)\n      return GENERATOR_CONTINUE\n    }\n  ],\n  input,\n  (value) => persist(value),\n  undefined,\n  { signal: controller.signal }\n)',
+        `import { GENERATOR_CONTINUE, runAsyncGeneratorMiddleware } from '@migaia/middleware-pipeline'\n\nconst normalize = async (value: string) => value.trim()\nconst enrich = async (value: string) => \`\${value}!\`\nconst persist = (value: string) => console.log('persist:', value)\nconst input = '  Ada  '\nconst controller = new AbortController()\nawait runAsyncGeneratorMiddleware(\n  [\n    async function* (value: string) {\n      const normalized = await normalize(value)\n      yield normalized\n      return GENERATOR_CONTINUE\n    },\n    async function* (value: string) {\n      yield await enrich(value)\n      return GENERATOR_CONTINUE\n    }\n  ],\n  input,\n  persist,\n  undefined,\n  { signal: controller.signal }\n)`,
       scenarios: [
         'Generator-shaped stages need asynchronous iterator work but deterministic serial order.',
         'Terminal sentinels must match an existing synchronous generator pipeline.',
@@ -21436,7 +21652,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '严格串行运行 async generator stage。它 await 每次 iterator transition，解释与同步 runner 相同的 terminal sentinel，并仅在全部 stage 完成后调用 done。',
       quickStart:
-        'await runAsyncGeneratorMiddleware(\n  [\n    async function* (value: string) {\n      const normalized = await normalize(value)\n      yield normalized\n      return GENERATOR_CONTINUE\n    },\n    async function* (value: string) {\n      yield await enrich(value)\n      return GENERATOR_CONTINUE\n    }\n  ],\n  input,\n  (value) => persist(value),\n  undefined,\n  { signal: controller.signal }\n)',
+        `import { GENERATOR_CONTINUE, runAsyncGeneratorMiddleware } from '@migaia/middleware-pipeline'\n\nconst normalize = async (value: string) => value.trim()\nconst enrich = async (value: string) => \`\${value}!\`\nconst persist = (value: string) => console.log('persist:', value)\nconst input = '  Ada  '\nconst controller = new AbortController()\nawait runAsyncGeneratorMiddleware(\n  [\n    async function* (value: string) {\n      const normalized = await normalize(value)\n      yield normalized\n      return GENERATOR_CONTINUE\n    },\n    async function* (value: string) {\n      yield await enrich(value)\n      return GENERATOR_CONTINUE\n    }\n  ],\n  input,\n  persist,\n  undefined,\n  { signal: controller.signal }\n)`,
       scenarios: [
         'generator 形态 stage 需要异步 iterator 工作，同时保持确定性串行顺序。',
         'terminal sentinel 必须与既有同步 generator pipeline 一致。',
@@ -21465,7 +21681,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Lifts one synchronous next-style stage into an async onion chain while preserving short-circuiting and the first accepted next value. Its violation reporter belongs to the adapter, separately from the outer runner reporter.',
       quickStart:
-        "const trim = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report('trim', violation)\n)\n\nawait runAsyncMiddleware([trim, asyncStage], input, done, { onViolation })",
+        `import { adaptSyncStageToAsync, runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst asyncStage = async (value: string, next: (value: string) => Promise<unknown>) => next(value)\nconst input = '  Ada  '\nconst done = () => undefined\nconst onViolation = (error: unknown) => console.error('violation:', error)\nconst trim = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report('trim', violation)\n)\n\nawait runAsyncMiddleware([trim, asyncStage], input, done, { onViolation })`,
       scenarios: [
         'A trusted synchronous stage must be reused inside an async middleware chain.',
         'The synchronous stage short-circuit contract must remain intact.',
@@ -21482,7 +21698,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把一个同步 next-style stage 提升到异步洋葱 chain，同时保持短路与第一次接纳的 next 值。adapter 的 violation reporter 独立于外层 runner reporter。',
       quickStart:
-        "const trim = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report('trim', violation)\n)\n\nawait runAsyncMiddleware([trim, asyncStage], input, done, { onViolation })",
+        `import { adaptSyncStageToAsync, runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst asyncStage = async (value: string, next: (value: string) => Promise<unknown>) => next(value)\nconst input = '  Ada  '\nconst done = () => undefined\nconst onViolation = (error: unknown) => console.error('violation:', error)\nconst trim = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report('trim', violation)\n)\n\nawait runAsyncMiddleware([trim, asyncStage], input, done, { onViolation })`,
       scenarios: [
         '可信同步 stage 必须复用到 async middleware chain。',
         '同步 stage 的短路契约必须原样保留。',
@@ -21501,7 +21717,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Lifts one synchronous next-style stage into a synchronous generator stage. Calling next yields once then returns CONTINUE; omitting next returns HALT, and the violation reporter is required.',
       quickStart:
-        "const trim = adaptSyncStageToGenerator(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report('trim', violation)\n)\n\nrunGeneratorMiddleware([trim, generatorStage], input, done)",
+        `import { adaptSyncStageToGenerator, runGeneratorMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst generatorStage = function* (value: string) { yield value; return 'CONTINUE' }\nconst input = '  Ada  '\nconst done = (value: string) => console.log('pipeline output:', value)\nconst trim = adaptSyncStageToGenerator((value: string, next) => next(value.trim()), (violation) => diagnostics.report('trim', violation))\nrunGeneratorMiddleware([trim, generatorStage], input, done)`,
       scenarios: [
         'A synchronous next-style stage must join a generator pipeline without semantic drift.',
         'No-next short-circuiting must map explicitly to GENERATOR_HALT.',
@@ -21518,7 +21734,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把同步 next-style stage 提升为同步 generator stage。调用 next 会 yield 一次并 return CONTINUE；不调用则 return HALT，且 violation reporter 必填。',
       quickStart:
-        "const trim = adaptSyncStageToGenerator(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report('trim', violation)\n)\n\nrunGeneratorMiddleware([trim, generatorStage], input, done)",
+        `import { adaptSyncStageToGenerator, runGeneratorMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst generatorStage = function* (value: string) { yield value; return 'CONTINUE' }\nconst input = '  Ada  '\nconst done = (value: string) => console.log('pipeline output:', value)\nconst trim = adaptSyncStageToGenerator((value: string, next) => next(value.trim()), (violation) => diagnostics.report('trim', violation))\nrunGeneratorMiddleware([trim, generatorStage], input, done)`,
       scenarios: [
         '同步 next-style stage 必须无语义漂移地接入 generator pipeline。',
         '未调用 next 的短路必须明确映射到 GENERATOR_HALT。',
@@ -21537,7 +21753,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Lifts a synchronous generator stage into an async generator without changing yielded values, terminal sentinels, or thrown-error identity.',
       quickStart:
-        'const asyncTrim = adaptGeneratorStageToAsyncGenerator(function* (value: string) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n})\n\nawait runAsyncGeneratorMiddleware([asyncTrim, asyncStage], input, done)',
+        `import { adaptGeneratorStageToAsyncGenerator, runAsyncGeneratorMiddleware, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst asyncStage = async function* (value: string) { yield value; return GENERATOR_CONTINUE }\nconst input = '  Ada  '\nconst done = (value: string) => console.log('pipeline output:', value)\nconst asyncTrim = adaptGeneratorStageToAsyncGenerator(function* (value: string) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n})\nawait runAsyncGeneratorMiddleware([asyncTrim, asyncStage], input, done)`,
       scenarios: [
         'A synchronous generator stage must be reused in an otherwise async-generator chain.',
         'Yield and terminal sentinel identity must remain unchanged.',
@@ -21554,7 +21770,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '把同步 generator stage 提升为 async generator，不改变 yielded value、terminal sentinel 或 thrown error identity。',
       quickStart:
-        'const asyncTrim = adaptGeneratorStageToAsyncGenerator(function* (value: string) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n})\n\nawait runAsyncGeneratorMiddleware([asyncTrim, asyncStage], input, done)',
+        `import { adaptGeneratorStageToAsyncGenerator, runAsyncGeneratorMiddleware, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst asyncStage = async function* (value: string) { yield value; return GENERATOR_CONTINUE }\nconst input = '  Ada  '\nconst done = (value: string) => console.log('pipeline output:', value)\nconst asyncTrim = adaptGeneratorStageToAsyncGenerator(function* (value: string) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n})\nawait runAsyncGeneratorMiddleware([asyncTrim, asyncStage], input, done)`,
       scenarios: [
         '同步 generator stage 必须复用到其余均为 async-generator 的 chain。',
         'yield 与 terminal sentinel identity 必须保持不变。',
@@ -21573,7 +21789,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Lifts a synchronous next-style stage through the generator contract into an async-generator chain, preserving halt/continue mapping and required violation reporting.',
       quickStart:
-        "const asyncTrim = adaptSyncStageToAsyncGenerator(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report('trim', violation)\n)\n\nawait runAsyncGeneratorMiddleware([asyncTrim, asyncGeneratorStage], input, done)",
+        `import { adaptSyncStageToAsyncGenerator, runAsyncGeneratorMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst asyncGeneratorStage = async function* (value: string) { yield value; return 'CONTINUE' }\nconst input = '  Ada  '\nconst done = (value: string) => console.log('pipeline output:', value)\nconst asyncTrim = adaptSyncStageToAsyncGenerator((value: string, next) => next(value.trim()), (violation) => diagnostics.report('trim', violation))\nawait runAsyncGeneratorMiddleware([asyncTrim, asyncGeneratorStage], input, done)`,
       scenarios: [
         'A legacy synchronous next-style stage must join an async-generator chain.',
         'No-next must halt while one accepted next becomes one yield plus CONTINUE.',
@@ -21590,7 +21806,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '经 generator 契约把同步 next-style stage 提升到 async-generator chain，保持 halt/continue 映射与必填 violation reporting。',
       quickStart:
-        "const asyncTrim = adaptSyncStageToAsyncGenerator(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report('trim', violation)\n)\n\nawait runAsyncGeneratorMiddleware([asyncTrim, asyncGeneratorStage], input, done)",
+        `import { adaptSyncStageToAsyncGenerator, runAsyncGeneratorMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst asyncGeneratorStage = async function* (value: string) { yield value; return 'CONTINUE' }\nconst input = '  Ada  '\nconst done = (value: string) => console.log('pipeline output:', value)\nconst asyncTrim = adaptSyncStageToAsyncGenerator((value: string, next) => next(value.trim()), (violation) => diagnostics.report('trim', violation))\nawait runAsyncGeneratorMiddleware([asyncTrim, asyncGeneratorStage], input, done)`,
       scenarios: [
         '旧同步 next-style stage 必须接入 async-generator chain。',
         '未调用 next 必须 halt；一次接纳的 next 必须变成一次 yield 加 CONTINUE。',
@@ -21609,7 +21825,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a tenant-local runtime gate that owns lazy capability activation, structured enablement results, revocation, and physical handle cleanup. Code stays out of the initial bundle only when activate performs a dynamic import.',
       quickStart:
-        "const host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  async activate(context) {\n    const { openPersistence } = await import('./persistence.js')\n    return openPersistence(context.tenantId)\n  }\n})\n\ntry {\n  const result = await host.enable('persistence')\n  if (result.status === CapabilityEnableStatus.enabled) {\n    await host.handle('persistence')?.sync()\n  }\n} finally {\n  await host.dispose()\n}",
+        `import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst tenantId = 'tenant-42'\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  activate(context) {\n    return {\n      sync: async () => console.log('sync tenant:', context.tenantId),\n      dispose: () => undefined\n    }\n  }\n})\n\ntry {\n  const result = await host.enable('persistence')\n  if (result.status === CapabilityEnableStatus.enabled) {\n    await host.handle('persistence')?.sync()\n  }\n} finally {\n  await host.dispose()\n}`,
       scenarios: [
         'A feature must be enabled per tenant, rollout, or runtime configuration without sharing state across hosts.',
         'A disabled feature should avoid downloading its implementation until activate executes a dynamic import.',
@@ -21647,7 +21863,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建租户隔离的运行时闸门，统一拥有惰性能力激活、结构化启用结果、撤销与 handle 物理清理。只有 activate 内执行动态 import，关闭的实现才不会进入初始包。',
       quickStart:
-        "const host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  async activate(context) {\n    const { openPersistence } = await import('./persistence.js')\n    return openPersistence(context.tenantId)\n  }\n})\n\ntry {\n  const result = await host.enable('persistence')\n  if (result.status === CapabilityEnableStatus.enabled) {\n    await host.handle('persistence')?.sync()\n  }\n} finally {\n  await host.dispose()\n}",
+        `import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst tenantId = 'tenant-42'\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  activate(context) {\n    return {\n      sync: async () => console.log('sync tenant:', context.tenantId),\n      dispose: () => undefined\n    }\n  }\n})\n\ntry {\n  const result = await host.enable('persistence')\n  if (result.status === CapabilityEnableStatus.enabled) {\n    await host.handle('persistence')?.sync()\n  }\n} finally {\n  await host.dispose()\n}`,
       scenarios: [
         '按租户、灰度或运行时配置启停能力，并让不同 Host 的状态互不影响。',
         '关闭的能力要等 activate 动态 import 时才下载实现。',
@@ -21686,7 +21902,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Takes one immutable admission snapshot from an external readiness source, reading state before error exactly once. It is a low-level Host-to-Graph bridge, not a live subscription.',
       quickStart:
-        "const readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTray([{ ...serviceEntry, readiness }])",
+        `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTray } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTray([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
       scenarios: [
         'A composition root must admit an external readiness fact before starting its graph.',
         'Getter order and one-time reads matter because the source can be stateful or cross a proxy boundary.',
@@ -21703,7 +21919,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '从外部 readiness source 取得一次不可变准入快照，严格先读 state、再读 error，且各读一次。它是 Host 到 Graph 的低层桥接，不是实时订阅。',
       quickStart:
-        "const readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTray([{ ...serviceEntry, readiness }])",
+        `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTray } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTray([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
       scenarios: [
         '组合根启动 Graph 前必须接纳一份外部 readiness 事实。',
         'source 可能有状态或跨 Proxy 边界，因此 getter 顺序和只读一次必须固定。',
@@ -21722,7 +21938,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a closed static required-edge graph. Register the complete node inventory before the first ready(), then let the Graph own deterministic startup, rollback, direct-provider reads, and reverse-topology release.',
       quickStart:
-        "const config = 'config' as IGraphNodeId\nconst service = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph({ onError: reportCleanupFailure })\n\ngraph.register({\n  id: config, kind: 'value', dependencies: [],\n  start: () => ({ value: loadConfig(), release: () => undefined })\n})\ngraph.register({\n  id: service, kind: 'service',\n  dependencies: [{ provider: config, required: true }],\n  start: ({ get }) => {\n    const value = createService(get(config))\n    return { value, release: () => value.close() }\n  }\n})\n\ntry {\n  await graph.ready()\n  await graph.get(service, config)\n} finally {\n  await graph.dispose()\n}",
+        `import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst reportCleanupFailure = (error: unknown) => console.error('graph cleanup failed:', error)\nconst loadConfig = () => ({ baseUrl: '/api' })\nconst createService = (config: { baseUrl: string }) => ({\n  baseUrl: config.baseUrl,\n  close: async () => undefined\n})\nconst config = 'config' as IGraphNodeId\nconst service = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph({ onError: reportCleanupFailure })\n\ngraph.register({\n  id: config, kind: 'value', dependencies: [],\n  start: () => ({ value: loadConfig(), release: () => undefined })\n})\ngraph.register({\n  id: service, kind: 'service',\n  dependencies: [{ provider: config, required: true }],\n  start: ({ get }) => {\n    const value = createService(get(config))\n    return { value, release: () => value.close() }\n  }\n})\n\ntry {\n  await graph.ready()\n  console.log(graph.get(service, config))\n} finally {\n  await graph.dispose()\n}`,
       scenarios: [
         'The full service and resource dependency graph is known before startup.',
         'Startup must be stable by registration order within each topology level.',
@@ -21750,7 +21966,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建封闭的静态 required-edge Graph。首次 ready() 前登记完整节点清单，由 Graph 拥有确定性启动、失败回滚、direct provider 读取与逆拓扑释放。',
       quickStart:
-        "const config = 'config' as IGraphNodeId\nconst service = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph({ onError: reportCleanupFailure })\n\ngraph.register({\n  id: config, kind: 'value', dependencies: [],\n  start: () => ({ value: loadConfig(), release: () => undefined })\n})\ngraph.register({\n  id: service, kind: 'service',\n  dependencies: [{ provider: config, required: true }],\n  start: ({ get }) => {\n    const value = createService(get(config))\n    return { value, release: () => value.close() }\n  }\n})\n\ntry {\n  await graph.ready()\n  await graph.get(service, config)\n} finally {\n  await graph.dispose()\n}",
+        `import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst reportCleanupFailure = (error: unknown) => console.error('graph cleanup failed:', error)\nconst loadConfig = () => ({ baseUrl: '/api' })\nconst createService = (config: { baseUrl: string }) => ({\n  baseUrl: config.baseUrl,\n  close: async () => undefined\n})\nconst config = 'config' as IGraphNodeId\nconst service = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph({ onError: reportCleanupFailure })\n\ngraph.register({\n  id: config, kind: 'value', dependencies: [],\n  start: () => ({ value: loadConfig(), release: () => undefined })\n})\ngraph.register({\n  id: service, kind: 'service',\n  dependencies: [{ provider: config, required: true }],\n  start: ({ get }) => {\n    const value = createService(get(config))\n    return { value, release: () => value.close() }\n  }\n})\n\ntry {\n  await graph.ready()\n  console.log(graph.get(service, config))\n} finally {\n  await graph.dispose()\n}`,
       scenarios: [
         '完整服务与资源依赖图在启动前已知。',
         '同一 topology level 内必须按注册顺序稳定启动。',
@@ -21779,7 +21995,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates a serialized mutable required-edge graph. Each register, replace, or remove reconciles only the affected consumer closure and preserves exact binding-generation leases until physical release is safe.',
       quickStart:
-        "const cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph({\n  mutationAdmissionMs: 1_000,\n  report: reportCleanupFailure\n})\n\nawait graph.register({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openMemoryCache()\n    return { value, release: () => value.close() }\n  }\n})\nawait graph.ready()\n\nconst mutation = await graph.replace({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openDistributedCache()\n    return { value, release: () => value.close() }\n  }\n})\nconsole.log(mutation.affected, mutation.metrics)",
+        `import { createDynamicCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst reportCleanupFailure = (error: unknown) => console.error('graph cleanup failed:', error)\nconst openMemoryCache = () => ({ close: async () => undefined })\nconst openDistributedCache = () => ({ close: async () => undefined })\nconst cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph({\n  mutationAdmissionMs: 1_000,\n  report: reportCleanupFailure\n})\n\nawait graph.register({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openMemoryCache()\n    return { value, release: () => value.close() }\n  }\n})\nawait graph.ready()\n\nconst mutation = await graph.replace({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openDistributedCache()\n    return { value, release: () => value.close() }\n  }\n})\nconsole.log(mutation.affected, mutation.metrics)`,
       scenarios: [
         'Services must be registered, replaced, or removed while the composition root remains alive.',
         'Only the changed node and its transitive consumers should restart.',
@@ -21848,7 +22064,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建串行化的可变 required-edge Graph。每次 register、replace 或 remove 只协调受影响 consumer 闭包，并用精确 binding-generation lease 等到物理释放真正安全。',
       quickStart:
-        "const cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph({\n  mutationAdmissionMs: 1_000,\n  report: reportCleanupFailure\n})\n\nawait graph.register({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openMemoryCache()\n    return { value, release: () => value.close() }\n  }\n})\nawait graph.ready()\n\nconst mutation = await graph.replace({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openDistributedCache()\n    return { value, release: () => value.close() }\n  }\n})\nconsole.log(mutation.affected, mutation.metrics)",
+        `import { createDynamicCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst reportCleanupFailure = (error: unknown) => console.error('graph cleanup failed:', error)\nconst openMemoryCache = () => ({ close: async () => undefined })\nconst openDistributedCache = () => ({ close: async () => undefined })\nconst cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph({\n  mutationAdmissionMs: 1_000,\n  report: reportCleanupFailure\n})\n\nawait graph.register({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openMemoryCache()\n    return { value, release: () => value.close() }\n  }\n})\nawait graph.ready()\n\nconst mutation = await graph.replace({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openDistributedCache()\n    return { value, release: () => value.close() }\n  }\n})\nconsole.log(mutation.affected, mutation.metrics)`,
       scenarios: [
         '组合根存活期间仍需注册、替换或移除服务。',
         '只应重启变化节点及其传递 consumers。',
@@ -21913,7 +22129,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Builds a pure immutable required-edge topology snapshot with deterministic order, levels, and both adjacency directions. It owns no node startup, state, rollback, or release.',
       quickStart:
-        "const topology = buildCapabilityTopology(\n  [\n    { id: 'config', ordinal: 0, dependencies: [] },\n    { id: 'service', ordinal: 1, dependencies: [{ provider: 'config', required: true }] }\n  ],\n  (node, provider) => { throw new Error(`${node} requires unknown ${provider}`) },\n  (path) => { throw new Error(`cycle: ${path.join(' -> ')}`) },\n  (reason, node) => { throw new Error(`${reason}: ${node ?? 'graph'}`) }\n)\n\nconsole.log(topology.ordered.map((node) => node.id))",
+        `import { buildCapabilityTopology } from '@migaia/capability/graph/topology'\n\nconst topology = buildCapabilityTopology(\n  [\n    { id: 'config', ordinal: 0, dependencies: [] },\n    { id: 'service', ordinal: 1, dependencies: [{ provider: 'config', required: true }] }\n  ],\n  (node, provider) => { throw new Error(\`\${node} requires unknown \${provider}\`) },\n  (path) => { throw new Error(\`cycle: \${path.join(' -> ')}\`) },\n  (reason, node) => { throw new Error(\`\${reason}: \${node ?? 'graph'}\`) }\n)\n\nconsole.log(topology.ordered.map((node) => node.id))`,
       scenarios: [
         'A framework or composition owner already owns lifecycle but needs one canonical topology oracle.',
         'Scheduling must be stable by contiguous public registration ordinal.',
@@ -21930,7 +22146,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '构建纯粹且不可变的 required-edge 拓扑快照，包含确定性顺序、level 与双向邻接；它不拥有节点启动、状态、回滚或释放。',
       quickStart:
-        "const topology = buildCapabilityTopology(\n  [\n    { id: 'config', ordinal: 0, dependencies: [] },\n    { id: 'service', ordinal: 1, dependencies: [{ provider: 'config', required: true }] }\n  ],\n  (node, provider) => { throw new Error(`${node} requires unknown ${provider}`) },\n  (path) => { throw new Error(`cycle: ${path.join(' -> ')}`) },\n  (reason, node) => { throw new Error(`${reason}: ${node ?? 'graph'}`) }\n)\n\nconsole.log(topology.ordered.map((node) => node.id))",
+        `import { buildCapabilityTopology } from '@migaia/capability/graph/topology'\n\nconst topology = buildCapabilityTopology(\n  [\n    { id: 'config', ordinal: 0, dependencies: [] },\n    { id: 'service', ordinal: 1, dependencies: [{ provider: 'config', required: true }] }\n  ],\n  (node, provider) => { throw new Error(\`\${node} requires unknown \${provider}\`) },\n  (path) => { throw new Error(\`cycle: \${path.join(' -> ')}\`) },\n  (reason, node) => { throw new Error(\`\${reason}: \${node ?? 'graph'}\`) }\n)\n\nconsole.log(topology.ordered.map((node) => node.id))`,
       scenarios: [
         '框架或组合 owner 已拥有 lifecycle，只缺一个 canonical topology oracle。',
         '调度必须依据连续的公开注册 ordinal 保持稳定。',
@@ -21949,7 +22165,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates one immutable static composition root. It admits the complete entry graph synchronously, starts entries only after the first ready() call, and releases owned values and auxiliary resources in reverse dependency order.',
       quickStart:
-        "const configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTray([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}",
+        `import { createTray, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTray([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
       scenarios: [
         'The complete set of configuration, services, resources, and derived values is known before startup.',
         'Entries must start after their declared dependencies and release in reverse dependency order.',
@@ -22028,7 +22244,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建一个不可变静态组合根。它同步接纳完整 entry graph，只在首次 ready() 后启动，并按依赖逆序释放主 value 与辅助资源。',
       quickStart:
-        "const configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTray([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}",
+        `import { createTray, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTray([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
       scenarios: [
         '配置、服务、资源与派生值的完整集合在启动前已经确定。',
         'entry 必须在声明依赖后启动，并按依赖逆序释放。',
@@ -22104,7 +22320,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         'Creates the single Tray-managed PluginHost identity, admits the initial plugin graph, and resolves only after ready definitions are committed. All later mutations must use the returned facade so Graph bindings and Host receipts remain identical.',
       quickStart:
-        "await using host = await createHost({\n  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 1_000,\n  quiescenceMs: 5_000,\n  shutdown: { mode: 'bounded' },\n  report: (error) => reportDiagnostic(error)\n})\n\nawait host.use(consumer)\nawait host.unUse('provider')",
+        `import { PluginHost } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst provider = { name: 'provider' }\nconst consumer = { name: 'consumer' }\nconst reportDiagnostic = (error: unknown) => console.error('host diagnostic:', error)\nawait using host = await createHost({\n  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 1_000,\n  quiescenceMs: 5_000,\n  shutdown: { mode: 'bounded' },\n  report: (error) => reportDiagnostic(error)\n})\n\nawait host.use(consumer)\nawait host.unUse('provider')`,
       scenarios: [
         'Plugins must be added, replaced, blocked, restarted, and removed while preserving dependency order.',
         'Logical removal may finish before physical Graph leases, pipeline work, plugin cleanup, and resource cleanup.',
@@ -22197,7 +22413,7 @@ const reactive = defineReactiveAdapterFeature<ICacheStore>({
       purpose:
         '创建唯一由 Tray 托管的 PluginHost 身份，接纳初始插件 Graph，并且只在 ready definition 已提交后返回。后续 mutation 必须经过返回 facade，确保 Graph binding 与 Host receipt 身份一致。',
       quickStart:
-        "await using host = await createHost({\n  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 1_000,\n  quiescenceMs: 5_000,\n  shutdown: { mode: 'bounded' },\n  report: (error) => reportDiagnostic(error)\n})\n\nawait host.use(consumer)\nawait host.unUse('provider')",
+        `import { PluginHost } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst provider = { name: 'provider' }\nconst consumer = { name: 'consumer' }\nconst reportDiagnostic = (error: unknown) => console.error('host diagnostic:', error)\nawait using host = await createHost({\n  create: () => new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 1_000,\n  quiescenceMs: 5_000,\n  shutdown: { mode: 'bounded' },\n  report: (error) => reportDiagnostic(error)\n})\n\nawait host.use(consumer)\nawait host.unUse('provider')`,
       scenarios: [
         '插件需要在运行期增加、替换、阻塞、重启与删除，同时保持依赖顺序。',
         '逻辑删除可以先于 Graph lease、pipeline 工作、插件清理与资源清理的物理完成。',
@@ -22855,7 +23071,7 @@ try {
       purpose:
         'Owns one cancellable asynchronous value as a reactive state machine. It tracks reactive reads made before the fetcher first awaits, supersedes stale generations, and keeps loading, retry, cache, hydration, and disposal semantics in one place.',
       quickStart:
-        "const runtime = createRuntime()\nconst userId = new Signal('42', runtime)\n\nconst user = new Resource(\n  ({ signal }) => fetch(`/api/users/${userId.value}`, { signal }).then((response) => response.json()),\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst data = await user.promise\nuser.dispose()",
+        `import { Resource, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst userId = new Signal('42', runtime)\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(\`/api/users/\${userId.value}\`, { signal })\n    if (!response.ok) throw new Error(\`HTTP \${response.status}\`)\n    return response.json() as Promise<{ id: string; name: string }>\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\nconst data = await user.promise\nconsole.log('loaded user:', data)\nuser.dispose()`,
       scenarios: [
         'An asynchronous value depends on Signal or Computed input and must refetch when that input changes.',
         'Old requests must never overwrite a newer generation after input changes or an explicit refetch.',
@@ -22963,7 +23179,7 @@ try {
       purpose:
         '把一个可取消的异步值作为响应式状态机统一托管。它追踪 fetcher 首次 await 前的响应式读取、淘汰过期请求代，并统一 loading、重试、缓存、hydrate 与释放语义。',
       quickStart:
-        "const runtime = createRuntime()\nconst userId = new Signal('42', runtime)\n\nconst user = new Resource(\n  ({ signal }) => fetch(`/api/users/${userId.value}`, { signal }).then((response) => response.json()),\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst data = await user.promise\nuser.dispose()",
+        `import { Resource, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst userId = new Signal('42', runtime)\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(\`/api/users/\${userId.value}\`, { signal })\n    if (!response.ok) throw new Error(\`HTTP \${response.status}\`)\n    return response.json() as Promise<{ id: string; name: string }>\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\nconst data = await user.promise\nconsole.log('加载用户:', data)\nuser.dispose()`,
       scenarios: [
         '异步值依赖 Signal 或 Computed，并且输入变化后必须自动重新请求。',
         '输入变化或显式刷新后，旧请求即使更晚完成也不能覆盖新一代结果。',
@@ -23058,7 +23274,7 @@ try {
     purposeZh:
       '按 identity 返回当前 authoritative process-wide Logger host capability layer，包括 UUID、scheduling、output、HTTP 与 optional process adapter。',
     quickStart:
-      'const manager = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({ ...manager, write: capture })\ntry { await runScenario() } finally { restore() }',
+      `import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst manager = getLoggerRuntimeManager()\nconst capture = (entry: unknown) => console.log('captured:', entry)\nconst runScenario = async () => capture('scenario complete')\nconst restore = setLoggerRuntimeManager({ ...manager, write: capture })\ntry { await runScenario() } finally { restore() }`,
     scenariosEn: [
       'A scoped replacement must inherit every capability it does not intentionally override.',
       'Diagnostics or tests need to confirm which runtime layer is active.'
@@ -23082,7 +23298,7 @@ try {
     purposeZh:
       '创建 central structured logging pipeline，拥有 ordered plugin 与 deferred output，并公开 level method、flush 与 shutdown lifecycle boundary。',
     quickStart:
-      "const logger = new Logger({ plugins: [level({ level: 'info' }), color()] })\nlogger.info('server ready', { port: 3000 })\nawait logger.flush()\nawait logger.shutdown()",
+        `import { Logger, color, level } from '@migaia/logger'\n\nconst logger = new Logger({ plugins: [level({ level: 'info' }), color()] })\nlogger.info('server ready', { port: 3000 })\nawait logger.flush()\nawait logger.shutdown()`,
     scenariosEn: [
       'Structured entries need one ordered filtering, enrichment, formatting, and delivery pipeline.',
       'Deferred sinks must be observable through flush and deterministically released by shutdown.'
@@ -23106,7 +23322,7 @@ try {
     purposeZh:
       '安装后，Logger 宿主获得一项供 http 等消费插件使用的有界批处理能力。它不会新增 Logger 方法：业务仍调用原有日志方法，已有的 flush 与 shutdown 会等待缓冲区和正在发送的批次完成。',
     quickStart:
-      "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    level(),\n    batch({ maxSize: 25, maxWaitMs: 1_000 }),\n    http({ url: '/api/logs', batch: { maxSize: 25, maxWaitMs: 1_000 } })\n  ]\n})\n\n// These calls enter one bounded HTTP batch instead of starting three requests.\nlogger.info('checkout started', { orderId: 'order-42' })\nlogger.info('payment authorized', { orderId: 'order-42' })\nlogger.info('checkout completed', { orderId: 'order-42' })\n\n// Force a partial batch to be delivered before acknowledging the request.\nawait logger.flush()\n// Shutdown also drains accepted batches and releases their timers.\nawait logger.shutdown('manual')",
+      `import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    level(),\n    batch({ maxSize: 25, maxWaitMs: 1_000 }),\n    http({ url: '/api/logs', batch: { maxSize: 25, maxWaitMs: 1_000 } })\n  ]\n})\n\n// These calls enter one bounded HTTP batch instead of starting three requests.\nlogger.info('checkout started', { orderId: 'order-42' })\nlogger.info('payment authorized', { orderId: 'order-42' })\nlogger.info('checkout completed', { orderId: 'order-42' })\n\n// Force a partial batch to be delivered before acknowledging the request.\nawait logger.flush()\n// Shutdown also drains accepted batches and releases their timers.\nawait logger.shutdown('manual')`,
     scenariosEn: [
       'A sink is more efficient when several entries share one delivery.',
       'Low-volume traffic still needs a maximum delivery delay and explicit overflow.'
@@ -23130,7 +23346,7 @@ try {
     purposeZh:
       '安装后，Logger 宿主原有的日志调用会获得控制台渲染能力：终端中显示易读的级别、时间与颜色，被采集或重定向时可自动改用 JSON。它不会新增 Logger 方法。',
     quickStart:
-      "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    level(),\n    color({ color: 'auto', format: 'pretty', timestamp: true })\n  ]\n})\n\n// The Host now renders this through the configured console sink.\nlogger.warn('inventory is low', { sku: 'sku-42', remaining: 3 })\nawait logger.flush()\nawait logger.shutdown('manual')",
+      `import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    level(),\n    color({ color: 'auto', format: 'pretty', timestamp: true })\n  ]\n})\n\n// The Host now renders this through the configured console sink.\nlogger.warn('inventory is low', { sku: 'sku-42', remaining: 3 })\nawait logger.flush()\nawait logger.shutdown('manual')`,
     scenariosEn: [
       'Interactive terminal output needs readable severity and tag hierarchy.',
       'One renderer must adapt between TTY color and non-color capture.'
@@ -23151,7 +23367,7 @@ try {
     purposeZh:
       '安装后，Logger 宿主获得远程投递能力：原有日志调用会变成结构化 HTTP 请求，flush 与 shutdown 会等待已接收的请求和有限重试完成。它不会新增 Logger 方法。',
     quickStart:
-      "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    level(),\n    batch(),\n    http({\n      url: 'https://logs.example.com/v1/entries',\n      headers: { 'x-service': 'checkout' },\n      retries: 2,\n      requestTimeoutMs: 5_000,\n      batch: { maxSize: 50, maxWaitMs: 1_000 }\n    })\n  ]\n})\n\nlogger.error('payment provider rejected the charge', { orderId: 'order-42' })\n// Do not return the job/request as complete until the remote sink has settled.\nawait logger.flush()\nawait logger.shutdown('manual')",
+      `import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    level(),\n    batch(),\n    http({\n      url: 'https://logs.example.com/v1/entries',\n      headers: { 'x-service': 'checkout' },\n      retries: 2,\n      requestTimeoutMs: 5_000,\n      batch: { maxSize: 50, maxWaitMs: 1_000 }\n    })\n  ]\n})\n\nlogger.error('payment provider rejected the charge', { orderId: 'order-42' })\n// Do not return the job/request as complete until the remote sink has settled.\nawait logger.flush()\nawait logger.shutdown('manual')`,
     scenariosEn: [
       'Logs must reach a remote collector through a host-owned fetch boundary.',
       'Transient network, 429, and server failures need bounded retry without hiding permanent client errors.'
@@ -23175,7 +23391,7 @@ try {
     purposeZh:
       '安装后，Logger 宿主会新增 debug、info、warn、error、fatal、setLevel、addFilter 与 removeFilter 方法。它们生成分级日志，并在下游 sink 工作前拦截不需要的日志。',
     quickStart:
-      "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [level({ level: 'info' }), color()]\n})\n\nlogger.debug('cache lookup') // Dropped: current minimum is info.\nlogger.info('request accepted', { requestId: 'req-42' })\nlogger.setLevel('error')\nlogger.warn('slow query') // Dropped after the runtime level change.\nlogger.error('database unavailable')\n\nawait logger.flush()\nawait logger.shutdown('manual')",
+      `import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [level({ level: 'info' }), color()]\n})\n\nlogger.debug('cache lookup') // Dropped: current minimum is info.\nlogger.info('request accepted', { requestId: 'req-42' })\nlogger.setLevel('error')\nlogger.warn('slow query') // Dropped after the runtime level change.\nlogger.error('database unavailable')\n\nawait logger.flush()\nawait logger.shutdown('manual')`,
     scenariosEn: [
       'Production output needs a stable minimum severity.',
       'Several admission predicates must compose with logical AND at the pipeline entrance.'
@@ -23199,7 +23415,7 @@ try {
     purposeZh:
       '安装到 Node 类宿主后，进程信号与未捕获失败会进入统一、有时限的 Logger 刷新和关闭流程。它不会新增 Logger 方法；业务继续使用原有日志方法，插件负责接管进程生命周期事件。',
     quickStart:
-      "import { Logger } from '@migaia/logger'\nimport { color, process as processLifecycle } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    color(),\n    processLifecycle({ captureCrashes: true, shutdownTimeoutMs: 2_000 })\n  ]\n})\n\nlogger.log('info', 'worker started')\n// On SIGTERM, uncaughtException, or unhandledRejection, the plugin asks every\n// registered Logger to drain and shut down before the configured deadline.\n// Application-owned graceful stops can use the same lifecycle explicitly:\nawait logger.flush()\nawait logger.shutdown('manual')",
+      `import { Logger } from '@migaia/logger'\nimport { color, process as processLifecycle } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    color(),\n    processLifecycle({ captureCrashes: true, shutdownTimeoutMs: 2_000 })\n  ]\n})\n\nlogger.log('info', 'worker started')\n// On SIGTERM, uncaughtException, or unhandledRejection, the plugin asks every\n// registered Logger to drain and shut down before the configured deadline.\n// Application-owned graceful stops can use the same lifecycle explicitly:\nawait logger.flush()\nawait logger.shutdown('manual')`,
     scenariosEn: [
       'A process host must attempt bounded log drain before termination.',
       'Uncaught failures need one observable capture and reporting path.'
@@ -23223,7 +23439,7 @@ try {
     purposeZh:
       '安装后，Logger 宿主会新增 startThinking、thinking、endThinking、startResponse、response 与 endResponse 方法。它们向人实时输出文本片段，并在每个阶段结束时生成一条完整结构化日志，供 HTTP 或审计 sink 使用。',
     quickStart:
-      "import { Logger } from '@migaia/logger'\nimport { color, reasoning } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    color(),\n    reasoning({ labels: { thinking: '正在分析', response: '回答' } })\n  ]\n})\n\nlogger.startThinking()\nlogger.thinking('先核对库存，')\nlogger.thinking('再计算可承诺数量。')\nlogger.endThinking()\n\nlogger.startResponse()\nlogger.response('当前可以承诺 12 件。')\nlogger.endResponse()\n\nawait logger.flush()\nawait logger.shutdown('manual')",
+      `import { Logger } from '@migaia/logger'\nimport { color, reasoning } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    color(),\n    reasoning({ labels: { thinking: '正在分析', response: '回答' } })\n  ]\n})\n\nlogger.startThinking()\nlogger.thinking('先核对库存，')\nlogger.thinking('再计算可承诺数量。')\nlogger.endThinking()\n\nlogger.startResponse()\nlogger.response('当前可以承诺 12 件。')\nlogger.endResponse()\n\nawait logger.flush()\nawait logger.shutdown('manual')`,
     scenariosEn: [
       'A streaming agent or CLI must separate thinking and response presentation phases.',
       'Human labels and structured phase data must stay independently configurable.'
@@ -23247,7 +23463,7 @@ try {
     purposeZh:
       '安装后，Logger 宿主获得自动的单条日志关联能力：每次原有日志调用都会在 entry.data 中携带运行时生成的 UUID，供 HTTP、批处理和诊断 sink 关联。它不会新增 Logger 方法；display 只控制控制台是否显示该 ID。',
     quickStart:
-      "import { Logger } from '@migaia/logger'\nimport { color, http, uuid } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    uuid({ display: true }),\n    color({ format: 'pretty' }),\n    http({ url: 'https://logs.example.com/v1/entries' })\n  ]\n})\n\n// The same generated UUID is visible locally and remains in entry.data for HTTP delivery.\nlogger.log('info', 'order dispatched', { orderId: 'order-42' })\nawait logger.flush()\nawait logger.shutdown('manual')",
+      `import { Logger } from '@migaia/logger'\nimport { color, http, uuid } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  plugins: [\n    uuid({ display: true }),\n    color({ format: 'pretty' }),\n    http({ url: 'https://logs.example.com/v1/entries' })\n  ]\n})\n\n// The same generated UUID is visible locally and remains in entry.data for HTTP delivery.\nlogger.log('info', 'order dispatched', { orderId: 'order-42' })\nawait logger.flush()\nawait logger.shutdown('manual')`,
     scenariosEn: [
       'One logical entry must be correlated across batching, HTTP, console, and diagnostics.',
       'Tests provide a deterministic UUID source through the runtime manager.'
@@ -23270,7 +23486,7 @@ try {
       purpose:
         'Temporarily replaces the process-wide capabilities Logger uses for UUID generation, deferred work, raw output, HTTP, and process events. A test can capture every rendered line and provide deterministic IDs; an embedded host can route output to its own console or transport. The returned restore callback removes only this layer, is safe to call more than once, and reveals the previous still-active layer.',
       quickStart:
-        "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst capturedLines: string[] = []\nlet nextLogId = 0\nconst restoreRuntime = setLoggerRuntimeManager({\n  randomUUID: () => `test-log-${++nextLogId}`,\n  defer: (task) => queueMicrotask(task),\n  write: (text) => capturedLines.push(text)\n})\n\ntry {\n  const logger = new Logger({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\n\n  logger.log('info', 'checkout completed')\n  await logger.flush()\n  console.log(capturedLines) // The test can now assert the actual rendered output.\n  await logger.shutdown('manual')\n} finally {\n  // Restore the capabilities that were active before this test or embedded Host ran.\n  restoreRuntime()\n}",
+        `import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst capturedLines: string[] = []\nlet nextLogId = 0\nconst restoreRuntime = setLoggerRuntimeManager({\n  randomUUID: () => \`test-log-\${++nextLogId}\`,\n  defer: (task) => queueMicrotask(task),\n  write: (text) => capturedLines.push(text)\n})\n\ntry {\n  const logger = new Logger({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\n\n  logger.log('info', 'checkout completed')\n  await logger.flush()\n  console.log(capturedLines) // The test can now assert the actual rendered output.\n  await logger.shutdown('manual')\n} finally {\n  // Restore the capabilities that were active before this test or embedded Host ran.\n  restoreRuntime()\n}`,
       scenarios: [
         'A deterministic test must own UUID generation, deferred work, output, HTTP, or process events.',
         'A non-standard host must provide Logger capabilities without exposing Node globals to the core runtime.',
@@ -23361,7 +23577,7 @@ try {
       purpose:
         '临时替换 Logger 在整个进程中使用的宿主能力，包括 UUID 生成、延迟任务、原始文本输出、HTTP 和 process 事件。测试可以借此捕获每一行实际输出并生成稳定 ID；桌面容器或嵌入式宿主可以把日志转交给自己的控制台或传输层。返回的恢复函数只移除本层，重复调用也安全，并会重新启用此前仍有效的上一层。',
       quickStart:
-        "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst capturedLines: string[] = []\nlet nextLogId = 0\nconst restoreRuntime = setLoggerRuntimeManager({\n  randomUUID: () => `test-log-${++nextLogId}`,\n  defer: (task) => queueMicrotask(task),\n  write: (text) => capturedLines.push(text)\n})\n\ntry {\n  const logger = new Logger({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\n\n  logger.log('info', 'checkout completed')\n  await logger.flush()\n  console.log(capturedLines) // 测试现在可以断言 Logger 真正渲染出的文本。\n  await logger.shutdown('manual')\n} finally {\n  // 恢复本次测试或嵌入式宿主运行前的 Logger 能力。\n  restoreRuntime()\n}",
+        `import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst capturedLines: string[] = []\nlet nextLogId = 0\nconst restoreRuntime = setLoggerRuntimeManager({\n  randomUUID: () => \`test-log-\${++nextLogId}\`,\n  defer: (task) => queueMicrotask(task),\n  write: (text) => capturedLines.push(text)\n})\n\ntry {\n  const logger = new Logger({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\n\n  logger.log('info', 'checkout completed')\n  await logger.flush()\n  console.log(capturedLines) // 测试现在可以断言 Logger 真正渲染出的文本。\n  await logger.shutdown('manual')\n} finally {\n  // 恢复本次测试或嵌入式宿主运行前的 Logger 能力。\n  restoreRuntime()\n}`,
       scenarios: [
         '确定性测试需要接管 UUID、延迟任务、输出、HTTP 或 process 事件。',
         '非标准宿主需要向 Logger 提供能力，但不能让核心运行时直接依赖 Node 全局对象。',
@@ -23444,7 +23660,7 @@ try {
       purpose:
         'Represents PluginHost state and protocol failures that callers may classify by the stable (source, code) pair. The original failure remains reachable through cause, while immutable structured diagnostics belong in detail.',
       quickStart:
-        'try {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError) {\n    if (error.code === PluginHostErrorCode.pluginInstallFailed) {\n      console.error(error.detail?.failedName, error.cause)\n    }\n  }\n}',
+        `try {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError) {\n    if (error.code === PluginHostErrorCode.pluginInstallFailed) {\n      console.error(error.detail?.failedName, error.cause)\n    }\n  }\n}`,
       scenarios: [
         'A host operation failed and the caller must branch on a stable semantic code rather than message text.',
         'An installation or cleanup boundary must retain the primary cause together with immutable rollback or timeout diagnostics.',
@@ -23504,7 +23720,7 @@ try {
       purpose:
         '表示调用方可按稳定 `(source, code)` 二元组分类的 PluginHost 状态与协议失败。原始失败通过 cause 保持可达，不可变结构化诊断放入 detail。',
       quickStart:
-        'try {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError) {\n    if (error.code === PluginHostErrorCode.pluginInstallFailed) {\n      console.error(error.detail?.failedName, error.cause)\n    }\n  }\n}',
+        `try {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError) {\n    if (error.code === PluginHostErrorCode.pluginInstallFailed) {\n      console.error(error.detail?.failedName, error.cause)\n    }\n  }\n}`,
       scenarios: [
         'Host 操作失败，调用方需要按稳定语义码分支，而不是比较 message。',
         '安装或清理边界必须同时保留主 cause，以及不可变的回滚或超时诊断。',
@@ -23561,7 +23777,7 @@ try {
       purpose:
         '作为领域宿主的抽象基类，原子安装插件并发布不可变 view；它拥有配置、shared、pipeline、mutation 串行化以及逻辑撤销后的物理清理。构造时必须明确提供执行与 drain 预算。',
       quickStart:
-        "type ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})\n\nconst view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) await removal.physicalCompletion\nawait host.dispose()",
+        `type ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})\n\nconst view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) await removal.physicalCompletion\nawait host.dispose()`,
       scenarios: [
         '应用需要按事务安装一组插件，并在其中一个安装失败时撤销整批候选状态。',
         '插件需要发布扩展、共享能力或 pipeline stage，同时由 Host 统一追踪其所有权。',
@@ -23651,7 +23867,7 @@ try {
       purpose:
         'Provides the abstract base for a domain host that installs plugins atomically and publishes immutable views. It owns configuration, shared capabilities, pipelines, serialized mutations, and physical cleanup after logical revocation. Construction requires explicit execution and drain budgets.',
       quickStart:
-        "type ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})\n\nconst view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) await removal.physicalCompletion\nawait host.dispose()",
+        `type ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})\n\nconst view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) await removal.physicalCompletion\nawait host.dispose()`,
       scenarios: [
         'An application installs a plugin batch transactionally and revokes every candidate when one installation fails.',
         'Plugins publish extensions, shared capabilities, or pipeline stages whose ownership must be tracked centrally.',
@@ -23749,7 +23965,7 @@ try {
       purpose:
         '创建进程内、瞬时、同步分发的事件 Channel。它保存订阅登记，并把每次 publish 的值按稳定顺序交给当前订阅快照；它不负责持久化、跨进程传输或任务排队。',
       quickStart:
-        "const jobs = createEventChannel<Job>()\nconst stop = jobs.subscribe(({ value }) => {\n  processJob(value)\n})\n\njobs.publish({ id: 'job-1' })\nstop()",
+        `import { createEventChannel } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst processJob = (job: Job) => console.log('processed:', job.id)\nconst jobs = createEventChannel<Job>()\nconst stop = jobs.subscribe(({ value }) => {\n  processJob(value)\n})\n\njobs.publish({ id: 'job-1' })\nstop()`,
       scenarios: [
         '一个生产者需要通知多个进程内监听者，并保留明确的订阅与退订边界。',
         '需要同步、可重入的事件分发，或显式切换为当前快照完成后再处理重入事件。',
@@ -23829,7 +24045,7 @@ try {
       purpose:
         'Creates an in-process, transient event channel with synchronous delivery. It owns subscription registrations and delivers each published value to the current snapshot in stable order; it does not provide persistence, cross-process transport, or a work queue.',
       quickStart:
-        "const jobs = createEventChannel<Job>()\nconst stop = jobs.subscribe(({ value }) => {\n  processJob(value)\n})\n\njobs.publish({ id: 'job-1' })\nstop()",
+        `import { createEventChannel } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst processJob = (job: Job) => console.log('processed:', job.id)\nconst jobs = createEventChannel<Job>()\nconst stop = jobs.subscribe(({ value }) => {\n  processJob(value)\n})\n\njobs.publish({ id: 'job-1' })\nstop()`,
       scenarios: [
         'One producer needs to notify multiple in-process listeners with explicit subscribe and unsubscribe boundaries.',
         'Delivery must be synchronous and reentrant, or reentrant values must be deferred until the current snapshot completes.',
@@ -23915,7 +24131,7 @@ try {
       purpose:
         '创建按事件键惰性分配 Channel 的进程内 Hub。它在同一边界内保持 key 与 payload 的类型对应，并以 O(1) 维护全部活跃订阅数量。',
       quickStart:
-        "type IEvents = {\n  ready: { readonly at: number }\n  warning: { readonly message: string }\n}\nconst events = createEventHub<IEvents>()\nconst stop = events.subscribe('warning', ({ value }) => console.warn(value.message))\nevents.publish('warning', { message: 'cache is stale' })\nstop()",
+        `type IEvents = {\n  ready: { readonly at: number }\n  warning: { readonly message: string }\n}\nconst events = createEventHub<IEvents>()\nconst stop = events.subscribe('warning', ({ value }) => console.warn(value.message))\nevents.publish('warning', { message: 'cache is stale' })\nstop()`,
       scenarios: [
         '多个事件种类需要共享一个入口，同时保持每个 key 对应的 payload 类型。',
         '事件种类按需出现，不希望预先创建所有 Channel。',
@@ -23967,7 +24183,7 @@ try {
       purpose:
         'Creates an in-process hub that lazily allocates channels by event key. It preserves the key-to-payload type mapping and tracks all active subscriptions in O(1).',
       quickStart:
-        "type IEvents = {\n  ready: { readonly at: number }\n  warning: { readonly message: string }\n}\nconst events = createEventHub<IEvents>()\nconst stop = events.subscribe('warning', ({ value }) => console.warn(value.message))\nevents.publish('warning', { message: 'cache is stale' })\nstop()",
+        `type IEvents = {\n  ready: { readonly at: number }\n  warning: { readonly message: string }\n}\nconst events = createEventHub<IEvents>()\nconst stop = events.subscribe('warning', ({ value }) => console.warn(value.message))\nevents.publish('warning', { message: 'cache is stale' })\nstop()`,
       scenarios: [
         'Several event kinds need one entry point while each key retains its own payload type.',
         'Event kinds appear on demand and channels should not be allocated eagerly.',
@@ -24024,7 +24240,7 @@ try {
       purpose:
         '校验自定义事件方法名并保留字符串字面量类型。它返回同一个对象，不创建 Channel、Hub 或新的分发层。',
       quickStart:
-        "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe(({ value }) => console.log(value))\nevents.dispatch(1)\nhandle.dispose()",
+        `import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' })\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe(({ value }) => console.log('received:', value))\nevents.dispatch(1)\nhandle.dispose()`,
       scenarios: [
         '自定义 style 先保存到变量，并且需要保留精确 alias 类型。',
         '同一套领域命名需要复用于多个 Channel 或 Hub。'
@@ -24039,7 +24255,7 @@ try {
       purpose:
         'Validates custom event method names while preserving their string literal types. It returns the same object and creates no channel, hub, or dispatch layer.',
       quickStart:
-        "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe(({ value }) => console.log(value))\nevents.dispatch(1)\nhandle.dispose()",
+        `import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' })\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe(({ value }) => console.log('收到:', value))\nevents.dispatch(1)\nhandle.dispose()`,
       scenarios: [
         'A custom style is declared before use and must retain exact alias types.',
         'One domain vocabulary needs to be reused across several channels or hubs.'
@@ -24056,7 +24272,7 @@ try {
       purpose:
         '同时启动当前订阅快照中的全部 listener，并按登记顺序返回每个调用的 fulfilled/rejected 结果。单个 listener 失败不会阻止其他 listener，也不会让返回的 Promise 因业务失败而拒绝。',
       quickStart:
-        'const results = await invokeParallelSettled(events, job)\nfor (const result of results) {\n  if (result.status === EventSubscriberState.rejected) {\n    logger.error(result.reason)\n  }\n}',
+        `import { createEventChannel, EventSubscriberState, invokeParallelSettled } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('audit:', value.id))\nevents.subscribe(({ value }) => {\n  if (value.id === 'failed') throw new Error('index failed')\n  return value.id\n})\nconst job: Job = { id: 'job-1' }\nconst results = await invokeParallelSettled(events, job)\nfor (const result of results) {\n  if (result.status === EventSubscriberState.rejected) console.error('listener failed:', result.reason)\n}\n// 每个 listener 都执行，失败作为结果返回，不会阻止其他 listener。`,
       scenarios: [
         '多个互不依赖的 listener 可以并发执行，并且调用方需要观察每个结果。',
         '部分失败属于预期结果，调用方希望自行决定记录、重试或忽略策略。'
@@ -24071,7 +24287,7 @@ try {
       purpose:
         'Starts every listener in the current subscription snapshot concurrently and returns fulfilled or rejected results in registration order. One listener failure neither stops its peers nor rejects the returned Promise as a business failure.',
       quickStart:
-        'const results = await invokeParallelSettled(events, job)\nfor (const result of results) {\n  if (result.status === EventSubscriberState.rejected) {\n    logger.error(result.reason)\n  }\n}',
+        `import { createEventChannel, EventSubscriberState, invokeParallelSettled } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('audit:', value.id))\nconst job: Job = { id: 'job-1' }\nconst logger = { error: (reason: unknown) => console.error('listener failed:', reason) }\nconst results = await invokeParallelSettled(events, job)\nfor (const result of results) {\n  if (result.status === EventSubscriberState.rejected) logger.error(result.reason)\n}\nconsole.log('listeners completed:', results.length)`,
       scenarios: [
         'Independent listeners may run concurrently and the caller needs every individual outcome.',
         'Partial failure is expected and the caller owns logging, retry, or ignore policy.'
@@ -24088,7 +24304,7 @@ try {
       purpose:
         '同时启动当前订阅快照中的全部 listener。全部成功时按登记顺序返回值；存在失败时，等待所有 listener settle 后以一个保留全部失败原因的 AggregateError 拒绝。',
       quickStart:
-        'try {\n  const receipts = await invokeParallel(events, job)\n  console.log(receipts)\n} catch (error) {\n  // AggregateError.errors 保留每个失败原因\n  logger.error(error)\n}',
+        `import { createEventChannel, invokeParallel } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('audit:', value.id))\nevents.subscribe(() => { throw new Error('index failed') })\nconst job: Job = { id: 'job-1' }\ntry {\n  const receipts = await invokeParallel(events, job)\n  console.log('all listeners completed:', receipts)\n} catch (error) {\n  // AggregateError.errors 保留这一轮所有 listener 的失败原因。\n  console.error('publish failed:', error)\n}`,
       scenarios: [
         '独立 listener 可以并发执行，并且只接受全部成功的结果。',
         '需要保留同一轮发布中的所有失败，而不是只看到第一个失败。'
@@ -24103,7 +24319,7 @@ try {
       purpose:
         'Starts every listener in the current subscription snapshot concurrently. It returns values in registration order when all succeed; after every listener settles, any failures reject as one AggregateError retaining every reason.',
       quickStart:
-        'try {\n  const receipts = await invokeParallel(events, job)\n  console.log(receipts)\n} catch (error) {\n  // AggregateError.errors retains every listener failure\n  logger.error(error)\n}',
+        `try {\n  const receipts = await invokeParallel(events, job)\n  console.log(receipts)\n} catch (error) {\n  // AggregateError.errors retains every listener failure\n  logger.error(error)\n}`,
       scenarios: [
         'Independent listeners may run concurrently and only an all-success result is acceptable.',
         'Every failure from one publish must remain inspectable rather than stopping at the first one.'
@@ -24120,7 +24336,7 @@ try {
       purpose:
         '按登记顺序逐个调用当前订阅快照；前一个 listener settle 后才启动下一个。它返回每项 fulfilled/rejected 结果，失败不会中断后续 listener。',
       quickStart:
-        'const results = await invokeSerialSettled(events, job)\nconst failures = results.filter(\n  (result) => result.status === EventSubscriberState.rejected\n)',
+        `import { createEventChannel, EventSubscriberState, invokeSerialSettled } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('write audit:', value.id))\nevents.subscribe(async ({ value }) => console.log('index:', value.id))\nconst job: Job = { id: 'job-1' }\nconst results = await invokeSerialSettled(events, job)\nconst failures = results.filter((result) => result.status === EventSubscriberState.rejected)\nconsole.log('completed listeners:', results.length, 'failures:', failures.length)`,
       scenarios: [
         'listener 共享限流资源或必须保持确定的启动顺序。',
         '仍需运行全部 listener，并由调用方分别处理失败。'
@@ -24135,7 +24351,7 @@ try {
       purpose:
         'Invokes the current subscription snapshot one listener at a time in registration order; the next starts only after the previous one settles. It returns every fulfilled or rejected result and keeps running after failures.',
       quickStart:
-        'const results = await invokeSerialSettled(events, job)\nconst failures = results.filter(\n  (result) => result.status === EventSubscriberState.rejected\n)',
+        `import { createEventChannel, EventSubscriberState, invokeSerialSettled } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('write audit:', value.id))\nevents.subscribe(async ({ value }) => console.log('index:', value.id))\nconst job: Job = { id: 'job-1' }\nconst results = await invokeSerialSettled(events, job)\nconst failures = results.filter((result) => result.status === EventSubscriberState.rejected)\nconsole.log('completed listeners:', results.length, 'failures:', failures.length)`,
       scenarios: [
         'Listeners share a rate-limited resource or require deterministic start order.',
         'Every listener must still run while the caller handles failures individually.'
@@ -24152,7 +24368,7 @@ try {
       purpose:
         '按登记顺序逐个调用当前订阅快照，并等待每个 listener settle。所有 listener 都会获得执行机会；最后只要存在失败，就以保留全部失败原因的 AggregateError 拒绝。',
       quickStart:
-        'const steps = createEventChannel<Job, string>()\nsteps.subscribe(async ({ value }) => persist(value))\nsteps.subscribe(async ({ value }) => index(value))\nconst receipts = await invokeSerial(steps, job)',
+        `import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst persist = async (job: Job) => console.log('persisted:', job.id)\nconst index = async (job: Job) => console.log('indexed:', job.id)\nconst steps = createEventChannel<Job, string>()\nsteps.subscribe(async ({ value }) => persist(value))\nsteps.subscribe(async ({ value }) => index(value))\nconst job: Job = { id: 'job-1' }\nconst receipts = await invokeSerial(steps, job)\nconsole.log('ordered results:', receipts)`,
       scenarios: [
         '异步步骤必须按登记顺序启动，但仍要求收集同一轮中的全部失败。',
         '只接受全部 listener 成功的返回值。'
@@ -24167,7 +24383,7 @@ try {
       purpose:
         'Invokes the current subscription snapshot one listener at a time and waits for each settlement. Every listener gets a chance to run; if any fail, the final Promise rejects with an AggregateError retaining every reason.',
       quickStart:
-        'const steps = createEventChannel<Job, string>()\nsteps.subscribe(async ({ value }) => persist(value))\nsteps.subscribe(async ({ value }) => index(value))\nconst receipts = await invokeSerial(steps, job)',
+        `import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst persist = async (job: Job) => console.log('persisted:', job.id)\nconst index = async (job: Job) => console.log('indexed:', job.id)\nconst steps = createEventChannel<Job, string>()\nsteps.subscribe(async ({ value }) => persist(value))\nsteps.subscribe(async ({ value }) => index(value))\nconst job: Job = { id: 'job-1' }\nconst receipts = await invokeSerial(steps, job)\nconsole.log('ordered results:', receipts)`,
       scenarios: [
         'Asynchronous steps must start in registration order while failures from the whole run remain available.',
         'Only an all-success value result is acceptable.'
@@ -24184,7 +24400,7 @@ try {
       purpose:
         '按 taskId 精确选择一个登记并返回其 fulfilled/rejected 结果。taskId 不存在或对应多个登记时会在返回 Promise 之前同步抛错。',
       quickStart:
-        "events.subscribe(runIndexer, { taskId: 'search-index' })\nconst result = await invokeTaskSettled(events, 'search-index', job)\nif (result.status === EventSubscriberState.rejected) {\n  queueRetry(job, result.reason)\n}",
+        `import { createEventChannel, EventSubscriberState, invokeTaskSettled } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst runIndexer = ({ value }: { value: Job }) => console.log('indexed:', value.id)\nevents.subscribe(runIndexer, { taskId: 'search-index' })\nconst queueRetry = (job: Job, reason: unknown) => console.error('retry:', job.id, reason)\nconst job: Job = { id: 'job-1' }\nconst result = await invokeTaskSettled(events, 'search-index', job)\nif (result.status === EventSubscriberState.rejected) queueRetry(job, result.reason)`,
       scenarios: [
         '调用方需要精确寻址一个已命名 listener。',
         '任务业务失败需要作为数据处理，而不是 Promise rejection。'
@@ -24199,7 +24415,7 @@ try {
       purpose:
         'Selects exactly one registration by taskId and returns its fulfilled or rejected result. A missing or non-unique taskId throws synchronously before a Promise is returned.',
       quickStart:
-        "events.subscribe(runIndexer, { taskId: 'search-index' })\nconst result = await invokeTaskSettled(events, 'search-index', job)\nif (result.status === EventSubscriberState.rejected) {\n  queueRetry(job, result.reason)\n}",
+        `events.subscribe(runIndexer, { taskId: 'search-index' })\nconst result = await invokeTaskSettled(events, 'search-index', job)\nif (result.status === EventSubscriberState.rejected) {\n  queueRetry(job, result.reason)\n}`,
       scenarios: [
         'The caller must address one named listener precisely.',
         'Task failure should be handled as data rather than a Promise rejection.'
@@ -24216,7 +24432,7 @@ try {
       purpose:
         '按 taskId 精确调用一个登记并返回其值。选择失败会同步抛错；listener 失败则由返回的 Promise 以 AggregateError 拒绝，并在 errors 中保留原始原因。',
       quickStart:
-        "events.subscribe(runIndexer, { taskId: 'search-index' })\nconst receipt = await invokeTask(events, 'search-index', job)",
+        `import { createEventChannel, invokeTask } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst runIndexer = ({ value }: { value: Job }) => {\n  console.log('indexed:', value.id)\n  return value.id\n}\nevents.subscribe(runIndexer, { taskId: 'search-index' })\nconst job: Job = { id: 'job-1' }\nconst receipt = await invokeTask(events, 'search-index', job)\nconsole.log('task result:', receipt)`,
       scenarios: [
         '需要像调用命名任务一样调用一个唯一 listener。',
         '调用方希望通过正常 Promise rejection 处理 listener 失败。'
@@ -24231,7 +24447,7 @@ try {
       purpose:
         'Invokes exactly one registration by taskId and returns its value. Selection failures throw synchronously; listener failure rejects the returned Promise with an AggregateError whose errors retain the original reason.',
       quickStart:
-        "events.subscribe(runIndexer, { taskId: 'search-index' })\nconst receipt = await invokeTask(events, 'search-index', job)",
+        `events.subscribe(runIndexer, { taskId: 'search-index' })\nconst receipt = await invokeTask(events, 'search-index', job)`,
       scenarios: [
         'One uniquely named listener should behave like an addressable task.',
         'The caller wants normal Promise rejection for listener failure.'
@@ -24248,7 +24464,7 @@ try {
       purpose:
         '在任意兼容 Event Channel 上登记一个最多执行一次的 listener。首次交付前先完成退订，因此 listener 内重入 publish 也不会触发第二次调用；返回的退订函数可提前取消且幂等。',
       quickStart:
-        "const stop = subscribeOnce(events, ({ value }) => {\n  showWelcome(value)\n}, { taskId: 'first-login' })\n\n// 如果场景提前结束，可安全取消；重复调用无效果\nstop()\nstop()",
+        `import { createEventChannel, subscribeOnce } from '@migaia/event-subscriber'\n\ntype User = { id: string }\nconst events = createEventChannel<User>()\nconst showWelcome = (user: User) => console.log('welcome:', user.id)\nconst stop = subscribeOnce(events, ({ value }) => showWelcome(value), { taskId: 'first-login' })\nevents.publish({ id: 'u-1' })\n// 只处理第一次登录；后续 publish 不会再次触发。提前结束时取消也安全且幂等。\nstop()\nstop()`,
       scenarios: [
         '只关心下一次事件，例如首次就绪、一次性确认或首个状态变化。',
         '输入是结构兼容 Channel，不一定由 createEventChannel 创建。'
@@ -24269,7 +24485,7 @@ try {
       purpose:
         'Registers a listener that runs at most once on any compatible event channel. It unsubscribes before the first delivery, so a reentrant publish inside the listener cannot invoke it again; the returned cancellation function is early-safe and idempotent.',
       quickStart:
-        "const stop = subscribeOnce(events, ({ value }) => {\n  showWelcome(value)\n}, { taskId: 'first-login' })\n\n// Cancel safely if the surrounding task ends first\nstop()\nstop()",
+        `import { createEventChannel, subscribeOnce } from '@migaia/event-subscriber'\n\ntype User = { id: string }\nconst events = createEventChannel<User>()\nconst showWelcome = (user: User) => console.log('welcome:', user.id)\nconst stop = subscribeOnce(events, ({ value }) => showWelcome(value), { taskId: 'first-login' })\nevents.publish({ id: 'u-1' })\n// Only the first login is handled; later publishes do not call the listener again.\nstop()\nstop()`,
       scenarios: [
         'Only the next event matters, such as first-ready, one-time confirmation, or the first state change.',
         'The source is a structurally compatible channel, not necessarily one created by createEventChannel.'
@@ -24294,7 +24510,7 @@ try {
       purpose:
         '把具有 handle(event) 方法的对象适配为 Channel 订阅，不引入基类或新的生命周期层。返回的退订函数直接拥有这次登记，并保持幂等。',
       quickStart:
-        'class AuditSubscriber {\n  handle({ value }: IEventContext<Job>) {\n    audit.write(value)\n  }\n}\n\nconst stop = subscribeSubscriber(events, new AuditSubscriber())\nstop()',
+        `import { createEventChannel, subscribeSubscriber } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst audit = { write: (job: Job) => console.log('audit:', job.id) }\nclass AuditSubscriber {\n  handle({ value }: { value: Job }) { audit.write(value) }\n}\nconst stop = subscribeSubscriber(events, new AuditSubscriber())\nevents.publish({ id: 'job-1' })\nstop()`,
       scenarios: [
         '现有领域对象以 handle 方法承载事件行为。',
         '需要结构化适配对象，但不希望对象继承框架类。'
@@ -24309,7 +24525,7 @@ try {
       purpose:
         'Adapts an object with a handle(event) method to a channel subscription without introducing a base class or another lifecycle layer. The returned unsubscribe function owns this registration and remains idempotent.',
       quickStart:
-        'class AuditSubscriber {\n  handle({ value }: IEventContext<Job>) {\n    audit.write(value)\n  }\n}\n\nconst stop = subscribeSubscriber(events, new AuditSubscriber())\nstop()',
+        `import { createEventChannel, subscribeSubscriber } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst audit = { write: (job: Job) => console.log('audit:', job.id) }\nclass AuditSubscriber {\n  handle({ value }: { value: Job }) { audit.write(value) }\n}\nconst stop = subscribeSubscriber(events, new AuditSubscriber())\nevents.publish({ id: 'job-1' })\nstop()`,
       scenarios: [
         'An existing domain object exposes event behavior through a handle method.',
         'Object-shaped subscribers are useful but framework inheritance is not.'
@@ -24326,7 +24542,7 @@ try {
       purpose:
         '把订阅生命周期绑定到 AbortSignal。signal 已中止时不会登记；之后中止会移除 source 订阅，并让同一交付竞争中的 event context 观察到 aborted 与原始 reason。返回的退订函数也可提前结束绑定。',
       quickStart:
-        "const controller = new AbortController()\nconst stop = subscribeUntil(\n  events,\n  controller.signal,\n  ({ value, aborted, abortReason }) => {\n    if (!aborted) render(value)\n    else logger.debug(abortReason)\n  }\n)\n\ncontroller.abort('screen closed')\nstop()",
+        `import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst controller = new AbortController()\nconst render = (job: Job) => console.log('render:', job.id)\nconst stop = subscribeUntil(events, controller.signal, ({ value, aborted, abortReason }) => {\n  if (!aborted) render(value)\n  else console.debug('stopped:', abortReason)\n})\nevents.publish({ id: 'job-1' })\ncontroller.abort('screen closed')\nstop()`,
       scenarios: [
         '订阅应与页面、请求、任务或 lifecycle scope 的取消同步结束。',
         '竞争发生时 listener 需要从 event context 观察准确的中止原因。'
@@ -24347,7 +24563,7 @@ try {
       purpose:
         'Binds a subscription lifetime to an AbortSignal. A pre-aborted signal creates no registration; a later abort removes the source subscription and lets an event context in the same delivery race observe aborted plus the original reason. The returned unsubscribe function may end the binding early.',
       quickStart:
-        "const controller = new AbortController()\nconst stop = subscribeUntil(\n  events,\n  controller.signal,\n  ({ value, aborted, abortReason }) => {\n    if (!aborted) render(value)\n    else logger.debug(abortReason)\n  }\n)\n\ncontroller.abort('screen closed')\nstop()",
+        `import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst controller = new AbortController()\nconst render = (job: Job) => console.log('render:', job.id)\nconst stop = subscribeUntil(events, controller.signal, ({ value, aborted, abortReason }) => {\n  if (!aborted) render(value)\n  else console.debug('stopped:', abortReason)\n})\nevents.publish({ id: 'job-1' })\ncontroller.abort('screen closed')\nstop()`,
       scenarios: [
         'A subscription must end with a screen, request, task, or lifecycle-scope cancellation.',
         'A listener racing with abort must observe the exact cancellation reason through its event context.'
@@ -24371,7 +24587,7 @@ try {
       purpose:
         '取得一次不可变订阅快照，并把每个目标包装成最多可调用一次的 invocation 交给 visitor。visitor 返回或 settle 后所有 invocation 都会关闭，之后调用会以 INVOCATION_CLOSED 拒绝。',
       quickStart:
-        "await withSnapshotEntries(events, job, async (entries) => {\n  for (const entry of entries) {\n    if (entry.taskId !== 'audit') continue\n    await entry.invoke()\n  }\n})",
+        `import { createEventChannel, withSnapshotEntries } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('audit job:', value.id), { taskId: 'audit' })\nconst job: Job = { id: 'job-1' }\nawait withSnapshotEntries(events, job, async (entries) => {\n  for (const entry of entries) {\n    if (entry.taskId !== 'audit') continue\n    await entry.invoke()\n  }\n})`,
       scenarios: [
         '需要先检查稳定目标集合，再由调用方选择或调度其中部分 listener。',
         '自定义编排必须确保每个快照目标最多调用一次，并有明确关闭边界。'
@@ -24386,7 +24602,7 @@ try {
       purpose:
         'Captures one immutable subscription snapshot and gives the visitor one at-most-once invocation per target. Every invocation closes when the visitor returns or settles; calling it later rejects as INVOCATION_CLOSED.',
       quickStart:
-        "await withSnapshotEntries(events, job, async (entries) => {\n  for (const entry of entries) {\n    if (entry.taskId !== 'audit') continue\n    await entry.invoke()\n  }\n})",
+        `import { createEventChannel, withSnapshotEntries } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('audit job:', value.id), { taskId: 'audit' })\nconst job: Job = { id: 'job-1' }\nawait withSnapshotEntries(events, job, async (entries) => {\n  for (const entry of entries) {\n    if (entry.taskId !== 'audit') continue\n    await entry.invoke()\n  }\n})`,
       scenarios: [
         'The caller must inspect a stable target set before selecting or scheduling a subset of listeners.',
         'Custom orchestration needs one-call-per-target enforcement and an explicit closure boundary.'
@@ -24403,7 +24619,7 @@ try {
       purpose:
         '按 Channel 的当前 live 登记逐项交给 visitor，并允许同一遍历期间追加的订阅在本轮可见。每个 invocation 最多执行一次，遍历结束后关闭；这是高级自定义调度原语。',
       quickStart:
-        "invokeEachLive(events, job, (entry) => {\n  if (entry.taskId?.startsWith('critical:')) {\n    entry.invoke()\n  }\n})",
+        `import { createEventChannel, invokeEachLive } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('audit:', value.id), { taskId: 'critical:audit' })\nconst job: Job = { id: 'job-1' }\nawait invokeEachLive(events, job, async (entry) => {\n  if (entry.taskId?.startsWith('critical:')) await entry.invoke()\n})\n// visitor 期间新增的登记也可能被访问；普通业务优先使用稳定快照。`,
       scenarios: [
         '编排器明确需要 append-live 语义：visitor 期间新增的登记也可能在本轮被访问。',
         '调用方需要自行选择目标，同时保留 Channel 的调用关闭与 bookkeeping 语义。'
@@ -24418,7 +24634,7 @@ try {
       purpose:
         "Visits the channel's live registrations and may expose subscriptions appended during the same traversal. Each invocation is at-most-once and closes after visitation; this is an advanced custom-scheduling primitive.",
       quickStart:
-        "invokeEachLive(events, job, (entry) => {\n  if (entry.taskId?.startsWith('critical:')) {\n    entry.invoke()\n  }\n})",
+        `import { createEventChannel, invokeEachLive } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nevents.subscribe(({ value }) => console.log('audit:', value.id), { taskId: 'critical:audit' })\nconst job: Job = { id: 'job-1' }\nawait invokeEachLive(events, job, async (entry) => {\n  if (entry.taskId?.startsWith('critical:')) await entry.invoke()\n})\n// Registrations added during visitation may be seen; prefer a stable snapshot for ordinary code.`,
       scenarios: [
         'An orchestrator explicitly needs append-live semantics, so registrations added by the visitor may be seen in the same pass.',
         "The caller selects targets while retaining the channel's invocation closure and bookkeeping semantics."
@@ -24435,7 +24651,7 @@ try {
       purpose:
         '创建一个异步资源所有权作用域。一组资源先通过 own() 归属作用域，close() 同步关闭接纳边界，dispose() 再按逆序执行释放并等待终态；并发 dispose() 复用同一个 Promise。',
       quickStart:
-        "const scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst socket = scope.own(connect(), {\n  graceful: () => socket.flush(),\n  gracefulTimeoutMs: 200,\n  force: () => socket.close()\n})\n\nscope.close()\nconst failures = await scope.dispose()",
+        `import { createLifecycleScope } from '@migaia/lifecycle'\n\nconst connect = async () => ({ flush: async () => console.log('flushed'), close: async () => console.log('closed') })\nconst scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst socket = scope.own(await connect(), {\n  graceful: () => socket.flush(),\n  gracefulTimeoutMs: 200,\n  force: () => socket.close()\n})\nscope.close()\nconst failures = await scope.dispose()\nconsole.log('shutdown failures:', failures.length)`,
       scenarios: [
         '一个页面、服务、插件或请求同时拥有多个异步可释放资源。',
         '关闭必须先停止接纳新资源，再统一逆序释放，并明确处理多个释放失败。'
@@ -24475,7 +24691,7 @@ try {
       purpose:
         'Creates an asynchronous resource-ownership scope. Resources enter through own(), close() synchronously seals admission, and dispose() releases them in reverse order before reaching terminal state; concurrent dispose calls share one Promise.',
       quickStart:
-        "const scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst socket = scope.own(connect(), {\n  graceful: () => socket.flush(),\n  gracefulTimeoutMs: 200,\n  force: () => socket.close()\n})\n\nscope.close()\nconst failures = await scope.dispose()",
+        `import { createLifecycleScope } from '@migaia/lifecycle'\n\nconst connect = async () => ({ flush: async () => console.log('flushed'), close: async () => console.log('closed') })\nconst scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst socket = scope.own(await connect(), {\n  graceful: () => socket.flush(),\n  gracefulTimeoutMs: 200,\n  force: () => socket.close()\n})\nscope.close()\nconst failures = await scope.dispose()\nconsole.log('shutdown failures:', failures.length)`,
       scenarios: [
         'A page, service, plugin, or request owns several asynchronously disposable resources.',
         'Shutdown must seal new ownership first, release in reverse order, and handle several disposal failures explicitly.'
@@ -24522,7 +24738,7 @@ try {
       purpose:
         '管理递增 generation 及每代独立的 AbortSignal。新的 begin() 会使旧 token 失效；adopt() 只接纳当前代结果，过期结果立即调用 release 回收。',
       quickStart:
-        'const generations = createGenerationController()\nconst request = generations.begin({ timeoutMs: 5_000 })\nconst result = await loadConfig(request.signal)\n\nif (generations.adopt(request.token, result, (value) => value.close())) {\n  applyConfig(result)\n}',
+        `import { createGenerationController } from '@migaia/lifecycle'\n\ntype Config = { theme: string; close: () => Promise<void> }\nconst loadConfig = async (signal: AbortSignal): Promise<Config> => {\n  if (signal.aborted) throw signal.reason\n  return { theme: 'dark', close: async () => undefined }\n}\nconst applyConfig = (config: Config) => console.log('active theme:', config.theme)\nconst generations = createGenerationController()\nconst request = generations.begin({ timeoutMs: 5_000 })\nconst result = await loadConfig(request.signal)\nif (generations.adopt(request.token, result, (value) => value.close())) applyConfig(result)`,
       scenarios: [
         '搜索联想、路由加载、刷新或重连只允许最新请求结果生效。',
         '旧任务需要收到取消信号，并且其迟到资源必须立即释放。'
@@ -24555,7 +24771,7 @@ try {
       purpose:
         'Owns an increasing generation and one AbortSignal per generation. A new begin() invalidates the old token; adopt() accepts only the current result and immediately calls release for stale resources.',
       quickStart:
-        'const generations = createGenerationController()\nconst request = generations.begin({ timeoutMs: 5_000 })\nconst result = await loadConfig(request.signal)\n\nif (generations.adopt(request.token, result, (value) => value.close())) {\n  applyConfig(result)\n}',
+        `import { createGenerationController } from '@migaia/lifecycle'\n\ntype Config = { theme: string; close: () => Promise<void> }\nconst loadConfig = async (signal: AbortSignal): Promise<Config> => {\n  if (signal.aborted) throw signal.reason\n  return { theme: 'dark', close: async () => undefined }\n}\nconst applyConfig = (config: Config) => console.log('active theme:', config.theme)\nconst generations = createGenerationController()\nconst request = generations.begin({ timeoutMs: 5_000 })\nconst result = await loadConfig(request.signal)\nif (generations.adopt(request.token, result, (value) => value.close())) applyConfig(result)`,
       scenarios: [
         'Autocomplete, route loading, refresh, or reconnect must allow only the latest request result to take effect.',
         'Superseded work needs a cancellation signal and any late resource must be released immediately.'
@@ -24594,7 +24810,7 @@ try {
       purpose:
         '创建严格 FIFO、单任务执行的 mutation 队列。它不提供并发池；后续任务只能在前一任务 settle 后进入，并可用 owner 检测不可能完成的同 owner 自依赖。',
       quickStart:
-        "const queue = createMutationQueue({ queueAdmissionTimeoutMs: 5_000 })\nconst result = await queue.enqueue(\n  () => updateSchema(change),\n  { owner: 'schema-sync' }\n)",
+        `import { createMutationQueue } from '@migaia/lifecycle'\n\ntype SchemaChange = { version: number; fields: string[] }\nconst updateSchema = async (change: SchemaChange) => {\n  console.log('apply schema:', change.version, change.fields)\n  return change.version\n}\nconst change: SchemaChange = { version: 2, fields: ['email', 'createdAt'] }\nconst queue = createMutationQueue({ queueAdmissionTimeoutMs: 5_000 })\nconst result = await queue.enqueue(() => updateSchema(change), { owner: 'schema-sync' })\nconsole.log('committed schema version:', result)`,
       scenarios: [
         '配置、schema、注册表或拓扑变更必须严格串行提交。',
         '排队等待需要独立的超时拒绝或 SLA 诊断。'
@@ -24634,7 +24850,7 @@ try {
       purpose:
         'Creates a strict FIFO mutation queue with one running task. It is not a concurrency pool: each task enters only after its predecessor settles, and owner identity detects impossible same-owner self-dependency.',
       quickStart:
-        "const queue = createMutationQueue({ queueAdmissionTimeoutMs: 5_000 })\nconst result = await queue.enqueue(\n  () => updateSchema(change),\n  { owner: 'schema-sync' }\n)",
+        `import { createMutationQueue } from '@migaia/lifecycle'\n\ntype SchemaChange = { version: number; fields: string[] }\nconst updateSchema = async (change: SchemaChange) => {\n  console.log('应用 schema:', change.version, change.fields)\n  return change.version\n}\nconst change: SchemaChange = { version: 2, fields: ['email', 'createdAt'] }\nconst queue = createMutationQueue({ queueAdmissionTimeoutMs: 5_000 })\nconst result = await queue.enqueue(() => updateSchema(change), { owner: 'schema-sync' })\nconsole.log('已提交 schema 版本:', result)`,
       scenarios: [
         'Configuration, schema, registry, or topology mutations must commit serially.',
         'Queue admission needs an independent rejection deadline or SLA diagnostic.'
@@ -24680,7 +24896,7 @@ try {
       purpose:
         '创建只接纳同步安全资源的所有权作用域。每个 descriptor 必须声明 syncSafe: true，dispose() 在当前调用栈逆序释放；任何 thenable 返回都会以 SCOPE_SYNC_VIOLATION 拒绝。',
       quickStart:
-        "const scope = createSyncLifecycleScope({ errorPolicy: 'collect' })\nconst observer = scope.own(createObserver(), {\n  syncSafe: true,\n  force: () => observer.disconnect()\n})\n\nscope.close()\nconst failures = scope.dispose()",
+        `import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nconst createObserver = () => ({ disconnect: () => console.log('observer disconnected') })\nconst scope = createSyncLifecycleScope({ errorPolicy: 'collect' })\nconst observer = scope.own(createObserver(), {\n  syncSafe: true,\n  force: () => observer.disconnect()\n})\nscope.close()\nconst failures = scope.dispose()\nconsole.log('sync cleanup failures:', failures.length)`,
       scenarios: [
         'DOM listener、observer 或 native handle 必须在当前调用栈内释放。',
         '公开 dispose 契约必须保持同步，不能泄漏未等待的 Promise。'
@@ -24708,7 +24924,7 @@ try {
       purpose:
         'Creates an ownership scope that accepts only synchronously safe resources. Every descriptor must declare syncSafe: true, dispose() releases in reverse order in the current stack, and any thenable result is rejected as SCOPE_SYNC_VIOLATION.',
       quickStart:
-        "const scope = createSyncLifecycleScope({ errorPolicy: 'collect' })\nconst observer = scope.own(createObserver(), {\n  syncSafe: true,\n  force: () => observer.disconnect()\n})\n\nscope.close()\nconst failures = scope.dispose()",
+        `import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nconst createObserver = () => ({ disconnect: () => console.log('observer disconnected') })\nconst scope = createSyncLifecycleScope({ errorPolicy: 'collect' })\nconst observer = scope.own(createObserver(), {\n  syncSafe: true,\n  force: () => observer.disconnect()\n})\nscope.close()\nconst failures = scope.dispose()\nconsole.log('sync cleanup failures:', failures.length)`,
       scenarios: [
         'DOM listeners, observers, or native handles must release in the current call stack.',
         'The public dispose contract must remain synchronous and cannot leak unobserved Promises.'
@@ -24741,7 +24957,7 @@ try {
       purpose:
         '适合管理“当前只认最后一次加载”的生产任务。例如管理后台正在读取运行时配置，用户马上点击刷新，第二次请求已经返回最新配置，而第一次慢请求随后才返回旧配置。普通 Promise 很容易让旧结果覆盖新结果；createLifecycleUnit 会把每次 start 或 restart 视为新一轮加载，只允许最新一轮更新 value 或 error，并用 idle、loading、loaded、failed 暴露当前状态。',
       quickStart:
-        "type IRuntimeConfig = {\n  apiBaseUrl: string\n  revision: number\n}\n\nasync function requestRuntimeConfig(): Promise<IRuntimeConfig> {\n  const response = await fetch('/api/runtime-config', { cache: 'no-store' })\n  if (!response.ok) {\n    throw new Error(`config request failed: ${response.status}`)\n  }\n  return response.json() as Promise<IRuntimeConfig>\n}\n\nconst runtimeConfig = createLifecycleUnit<IRuntimeConfig>({\n  report: (error) => console.error('runtime config load failed', error)\n})\n\n// 页面首次进入：idle → loading；请求成功后变为 loaded 并写入 value。\nruntimeConfig.start(requestRuntimeConfig)\n\n// 用户点击“刷新”：立即开始新一轮。旧请求即使更晚返回，也不能覆盖新配置。\nfunction refreshRuntimeConfig(): void {\n  runtimeConfig.restart(requestRuntimeConfig)\n}\n\nconst currentConfig = runtimeConfig.value\nif (runtimeConfig.state === 'loaded' && currentConfig) {\n  console.log(currentConfig.apiBaseUrl)\n}\nif (runtimeConfig.state === 'failed') {\n  console.error(runtimeConfig.error)\n}",
+        `type IRuntimeConfig = {\n  apiBaseUrl: string\n  revision: number\n}\n\nasync function requestRuntimeConfig(): Promise<IRuntimeConfig> {\n  const response = await fetch('/api/runtime-config', { cache: 'no-store' })\n  if (!response.ok) {\n    throw new Error(\`config request failed: \${response.status}\`)\n  }\n  return response.json() as Promise<IRuntimeConfig>\n}\n\nconst runtimeConfig = createLifecycleUnit<IRuntimeConfig>({\n  report: (error) => console.error('runtime config load failed', error)\n})\n\n// 页面首次进入：idle → loading；请求成功后变为 loaded 并写入 value。\nruntimeConfig.start(requestRuntimeConfig)\n\n// 用户点击“刷新”：立即开始新一轮。旧请求即使更晚返回，也不能覆盖新配置。\nfunction refreshRuntimeConfig(): void {\n  runtimeConfig.restart(requestRuntimeConfig)\n}\n\nconst currentConfig = runtimeConfig.value\nif (runtimeConfig.state === 'loaded' && currentConfig) {\n  console.log(currentConfig.apiBaseUrl)\n}\nif (runtimeConfig.state === 'failed') {\n  console.error(runtimeConfig.error)\n}`,
       scenarios: [
         '管理后台、桌面应用或 Worker 需要加载运行时配置，并把 loading、成功值和失败原因暴露给界面或诊断系统。',
         '搜索、配置刷新或模块重载可能连续发起多轮请求，业务只允许最后一次请求成为当前结果。'
@@ -24763,7 +24979,7 @@ try {
       purpose:
         'Use it for production work where only the latest load may become current. For example, an admin page starts loading runtime configuration and the user immediately refreshes it: the second request returns the latest configuration, then the slower first request returns stale data. Plain Promise callbacks can let the stale result overwrite the new one. createLifecycleUnit treats every start or restart as a new generation, permits only the latest generation to update value or error, and exposes the current idle, loading, loaded, or failed state.',
       quickStart:
-        "type IRuntimeConfig = {\n  apiBaseUrl: string\n  revision: number\n}\n\nasync function requestRuntimeConfig(): Promise<IRuntimeConfig> {\n  const response = await fetch('/api/runtime-config', { cache: 'no-store' })\n  if (!response.ok) {\n    throw new Error(`config request failed: ${response.status}`)\n  }\n  return response.json() as Promise<IRuntimeConfig>\n}\n\nconst runtimeConfig = createLifecycleUnit<IRuntimeConfig>({\n  report: (error) => console.error('runtime config load failed', error)\n})\n\n// First page load: idle → loading; success changes it to loaded and stores value.\nruntimeConfig.start(requestRuntimeConfig)\n\n// A user refresh starts a new generation. A slower old request cannot replace the new value.\nfunction refreshRuntimeConfig(): void {\n  runtimeConfig.restart(requestRuntimeConfig)\n}\n\nconst currentConfig = runtimeConfig.value\nif (runtimeConfig.state === 'loaded' && currentConfig) {\n  console.log(currentConfig.apiBaseUrl)\n}\nif (runtimeConfig.state === 'failed') {\n  console.error(runtimeConfig.error)\n}",
+        `type IRuntimeConfig = {\n  apiBaseUrl: string\n  revision: number\n}\n\nasync function requestRuntimeConfig(): Promise<IRuntimeConfig> {\n  const response = await fetch('/api/runtime-config', { cache: 'no-store' })\n  if (!response.ok) {\n    throw new Error(\`config request failed: \${response.status}\`)\n  }\n  return response.json() as Promise<IRuntimeConfig>\n}\n\nconst runtimeConfig = createLifecycleUnit<IRuntimeConfig>({\n  report: (error) => console.error('runtime config load failed', error)\n})\n\n// First page load: idle → loading; success changes it to loaded and stores value.\nruntimeConfig.start(requestRuntimeConfig)\n\n// A user refresh starts a new generation. A slower old request cannot replace the new value.\nfunction refreshRuntimeConfig(): void {\n  runtimeConfig.restart(requestRuntimeConfig)\n}\n\nconst currentConfig = runtimeConfig.value\nif (runtimeConfig.state === 'loaded' && currentConfig) {\n  console.log(currentConfig.apiBaseUrl)\n}\nif (runtimeConfig.state === 'failed') {\n  console.error(runtimeConfig.error)\n}`,
       scenarios: [
         'An admin page, desktop application, or Worker loads runtime configuration and exposes loading, the successful value, or the failure reason to UI or diagnostics.',
         'Search, configuration refresh, or module reload can start overlapping requests while the product permits only the last request to become current.'
@@ -24787,7 +25003,7 @@ try {
       purpose:
         '提供构造期两阶段资源所有权。资源先暂存在 provisional scope；构造成功后 commitTo(parent) 转移，失败则 rollback() 逆序释放，两个终局互斥且只能选择一次。',
       quickStart:
-        'const provisional = createProvisionalScope({ parentSignal: shutdown.signal })\nconst connection = provisional.own(await connect(), {\n  force: () => connection.close()\n})\ntry {\n  await provisional.commitTo(scope)\n} catch (error) {\n  await provisional.rollback()\n  throw error\n}',
+        `import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'\n\nconst shutdown = new AbortController()\nconst scope = createLifecycleScope()\nconst connect = async () => ({ close: async () => console.log('connection closed') })\nconst provisional = createProvisionalScope({ parentSignal: shutdown.signal })\nconst connection = provisional.own(await connect(), { force: () => connection.close() })\ntry {\n  await provisional.commitTo(scope)\n  console.log('connection ownership committed')\n} catch (error) {\n  await provisional.rollback()\n  console.error('construction failed; rolled back', error)\n}\nawait scope.dispose()`,
       scenarios: [
         '插件安装、模块装配或连接组初始化必须全部成功后才转交 owner。',
         '构造中途失败时，尚未转移的资源必须可靠逆序回滚。'
@@ -24808,7 +25024,7 @@ try {
       purpose:
         'Provides two-phase resource ownership during construction. Resources first belong to the provisional scope, then either commitTo(parent) transfers them or rollback() releases them in reverse order; the two terminal choices are mutually exclusive and one-shot.',
       quickStart:
-        'const provisional = createProvisionalScope({ parentSignal: shutdown.signal })\nconst connection = provisional.own(await connect(), {\n  force: () => connection.close()\n})\ntry {\n  await provisional.commitTo(scope)\n} catch (error) {\n  await provisional.rollback()\n  throw error\n}',
+        `import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'\n\nconst shutdown = new AbortController()\nconst scope = createLifecycleScope()\nconst connect = async () => ({ close: async () => console.log('connection closed') })\nconst provisional = createProvisionalScope({ parentSignal: shutdown.signal })\nconst connection = provisional.own(await connect(), { force: () => connection.close() })\ntry {\n  await provisional.commitTo(scope)\n  console.log('connection ownership committed')\n} catch (error) {\n  await provisional.rollback()\n  console.error('construction failed; rolled back', error)\n}\nawait scope.dispose()`,
       scenarios: [
         'Plugin installation, module assembly, or connection-group setup must transfer ownership only after full success.',
         'Resources not yet transferred must roll back reliably in reverse order after construction failure.'
@@ -24833,7 +25049,7 @@ try {
       purpose:
         '生产服务收到停机信号后，通常要停止接收新请求，再把日志、审计事件或缓存数据提交出去，但容器平台不会无限等待。把提交任务和整个停机流程共用的绝对截止时间交给 boundedWait：任务先完成时返回 true；时间先到时返回 false，让宿主记录“没有提交完”并继续退出。它只限制宿主等待多久，不会取消原任务；如果任务在截止时间前失败，原错误会直接抛给调用方。',
       quickStart:
-        "type IAuditBuffer = {\n  stopAcceptingEvents(): void\n  flush(): Promise<void>\n}\n\ntype IShutdownLogger = {\n  info(message: string): void\n  warn(message: string): void\n}\n\nasync function shutdownService(\n  auditBuffer: IAuditBuffer,\n  logger: IShutdownLogger\n): Promise<void> {\n  // 容器只给整个停机流程两秒，而不是给每个步骤两秒。\n  const shutdownDeadlineAt = Date.now() + 2_000\n\n  // 停止接收新事件，确保 flush 对应的是一个有限批次。\n  auditBuffer.stopAcceptingEvents()\n  const flushTask = auditBuffer.flush()\n\n  // 后续停机步骤也应继续使用 shutdownDeadlineAt，只消费剩余时间。\n  const flushed = await boundedWait(flushTask, shutdownDeadlineAt)\n  if (flushed) {\n    logger.info('audit events flushed before shutdown')\n    return\n  }\n\n  // 这里只停止等待；flushTask 没有被取消，宿主可以记录丢失风险并继续退出。\n  logger.warn('shutdown deadline reached before audit events were flushed')\n}",
+        `type IAuditBuffer = {\n  stopAcceptingEvents(): void\n  flush(): Promise<void>\n}\n\ntype IShutdownLogger = {\n  info(message: string): void\n  warn(message: string): void\n}\n\nasync function shutdownService(\n  auditBuffer: IAuditBuffer,\n  logger: IShutdownLogger\n): Promise<void> {\n  // 容器只给整个停机流程两秒，而不是给每个步骤两秒。\n  const shutdownDeadlineAt = Date.now() + 2_000\n\n  // 停止接收新事件，确保 flush 对应的是一个有限批次。\n  auditBuffer.stopAcceptingEvents()\n  const flushTask = auditBuffer.flush()\n\n  // 后续停机步骤也应继续使用 shutdownDeadlineAt，只消费剩余时间。\n  const flushed = await boundedWait(flushTask, shutdownDeadlineAt)\n  if (flushed) {\n    logger.info('audit events flushed before shutdown')\n    return\n  }\n\n  // 这里只停止等待；flushTask 没有被取消，宿主可以记录丢失风险并继续退出。\n  logger.warn('shutdown deadline reached before audit events were flushed')\n}`,
       scenarios: [
         'Kubernetes Pod、Node 服务或 Worker 收到停机信号后，需要在平台强制终止前尽量提交日志、指标、审计事件或缓存写入。',
         '关闭流程包含多个步骤，并且它们必须共享同一个总预算；后面的步骤只能使用前面剩下的时间。'
@@ -24848,7 +25064,7 @@ try {
       purpose:
         'When a production service receives a shutdown signal, it normally stops new work and flushes logs, audit events, or buffered writes, but the container platform cannot wait forever. Give boundedWait the flush task and the absolute deadline shared by the whole shutdown: it returns true when the task finishes first and false when the budget expires, so the Host can record the incomplete flush and continue exiting. It limits only how long the Host waits and never cancels the task; a task failure before the deadline is rethrown unchanged.',
       quickStart:
-        "type IAuditBuffer = {\n  stopAcceptingEvents(): void\n  flush(): Promise<void>\n}\n\ntype IShutdownLogger = {\n  info(message: string): void\n  warn(message: string): void\n}\n\nasync function shutdownService(\n  auditBuffer: IAuditBuffer,\n  logger: IShutdownLogger\n): Promise<void> {\n  // The container gives the entire shutdown two seconds, not two seconds per step.\n  const shutdownDeadlineAt = Date.now() + 2_000\n\n  // Stop new events so flush covers one finite batch.\n  auditBuffer.stopAcceptingEvents()\n  const flushTask = auditBuffer.flush()\n\n  // Later shutdown steps should reuse shutdownDeadlineAt and consume only the remaining time.\n  const flushed = await boundedWait(flushTask, shutdownDeadlineAt)\n  if (flushed) {\n    logger.info('audit events flushed before shutdown')\n    return\n  }\n\n  // Only waiting stops here; flushTask was not cancelled, and the Host may continue exiting.\n  logger.warn('shutdown deadline reached before audit events were flushed')\n}",
+        `type IAuditBuffer = {\n  stopAcceptingEvents(): void\n  flush(): Promise<void>\n}\n\ntype IShutdownLogger = {\n  info(message: string): void\n  warn(message: string): void\n}\n\nasync function shutdownService(\n  auditBuffer: IAuditBuffer,\n  logger: IShutdownLogger\n): Promise<void> {\n  // The container gives the entire shutdown two seconds, not two seconds per step.\n  const shutdownDeadlineAt = Date.now() + 2_000\n\n  // Stop new events so flush covers one finite batch.\n  auditBuffer.stopAcceptingEvents()\n  const flushTask = auditBuffer.flush()\n\n  // Later shutdown steps should reuse shutdownDeadlineAt and consume only the remaining time.\n  const flushed = await boundedWait(flushTask, shutdownDeadlineAt)\n  if (flushed) {\n    logger.info('audit events flushed before shutdown')\n    return\n  }\n\n  // Only waiting stops here; flushTask was not cancelled, and the Host may continue exiting.\n  logger.warn('shutdown deadline reached before audit events were flushed')\n}`,
       scenarios: [
         'A Kubernetes Pod, Node service, or Worker should flush logs, metrics, audit events, or buffered writes before the platform terminates it.',
         'Several shutdown steps must share one total budget, so later steps receive only the time left by earlier steps.'
@@ -24865,7 +25081,7 @@ try {
       purpose:
         '创建可复用的 open → closing → terminal 存活轴。close() 只同步封闭接纳，forceTerminal() 进入终态，whenTerminal() 始终返回同一个只解析一次的 Promise。',
       quickStart:
-        'const terminal = createTerminalController()\nterminal.close()\nawait finishOwnedWork()\nterminal.forceTerminal()\nawait terminal.whenTerminal()',
+        `import { createTerminalController } from '@migaia/lifecycle'\n\nconst terminal = createTerminalController()\nconst finishOwnedWork = async () => console.log('owned work finished')\nterminal.close()\nawait finishOwnedWork()\nterminal.forceTerminal()\nawait terminal.whenTerminal()\nconsole.log('terminal reached: owned work is complete')`,
       scenarios: [
         '自定义容器需要独立于资源释放实现一个幂等存活状态机。',
         '多个调用方需要等待同一个稳定终态 Promise。'
@@ -24880,7 +25096,7 @@ try {
       purpose:
         'Creates a reusable open → closing → terminal lifetime axis. close() synchronously seals admission, forceTerminal() enters terminal state, and whenTerminal() always returns the same Promise resolved once.',
       quickStart:
-        'const terminal = createTerminalController()\nterminal.close()\nawait finishOwnedWork()\nterminal.forceTerminal()\nawait terminal.whenTerminal()',
+        `import { createTerminalController } from '@migaia/lifecycle'\n\nconst terminal = createTerminalController()\nconst finishOwnedWork = async () => console.log('owned work finished')\nterminal.close()\nawait finishOwnedWork()\nterminal.forceTerminal()\nawait terminal.whenTerminal()\nconsole.log('已进入 terminal：owned work 已完成')`,
       scenarios: [
         'A custom container needs an idempotent lifetime state machine independent of resource release.',
         'Several callers must await one stable terminal Promise.'
@@ -24897,7 +25113,7 @@ try {
       purpose:
         '编排多个 release descriptor 的完整释放事务。order 模式按 descriptor.order 稳定分组，plan 模式严格遵循调用方顺序；事务统一拥有错误策略、截止时间、中止镜像与 pending 排空。',
       quickStart:
-        "const transaction = createDisposeTransaction(\n  { kind: 'plan' },\n  { errorPolicy: 'collect', signal: shutdown.signal }\n)\nconst failures = await transaction.run([\n  { source: 'database', descriptor: databaseRelease },\n  { source: 'socket', descriptor: socketRelease }\n])",
+        `import { createDisposeTransaction } from '@migaia/lifecycle'\n\nconst shutdown = new AbortController()\nconst databaseRelease = { force: async () => console.log('database closed') }\nconst socketRelease = { force: async () => console.log('socket closed') }\nconst transaction = createDisposeTransaction({ kind: 'plan' }, { errorPolicy: 'collect', signal: shutdown.signal })\nconst failures = await transaction.run([\n  { source: 'database', descriptor: databaseRelease },\n  { source: 'socket', descriptor: socketRelease }\n])\nconsole.log('release failures:', failures.length)`,
       scenarios: [
         '服务停机、连接池关闭或插件卸载需要对多个资源执行统一 graceful → force 语义。',
         '调用方需要显式选择弱排序 order 或强顺序 plan，并保留全部释放失败。'
@@ -24934,7 +25150,7 @@ try {
       purpose:
         'Orchestrates a complete release transaction over several descriptors. Order mode groups stably by descriptor.order, while plan mode follows caller order exactly; the transaction owns error policy, deadline, abort mirroring, and pending drain.',
       quickStart:
-        "const transaction = createDisposeTransaction(\n  { kind: 'plan' },\n  { errorPolicy: 'collect', signal: shutdown.signal }\n)\nconst failures = await transaction.run([\n  { source: 'database', descriptor: databaseRelease },\n  { source: 'socket', descriptor: socketRelease }\n])",
+        `import { createDisposeTransaction } from '@migaia/lifecycle'\n\nconst shutdown = new AbortController()\nconst databaseRelease = { force: async () => console.log('database closed') }\nconst socketRelease = { force: async () => console.log('socket closed') }\nconst transaction = createDisposeTransaction({ kind: 'plan' }, { errorPolicy: 'collect', signal: shutdown.signal })\nconst failures = await transaction.run([\n  { source: 'database', descriptor: databaseRelease },\n  { source: 'socket', descriptor: socketRelease }\n])\nconsole.log('释放失败数:', failures.length)`,
       scenarios: [
         'Service shutdown, pool closure, or plugin unload needs consistent graceful-to-force semantics across resources.',
         'The caller must choose weak order or a strict plan and retain every release failure.'
@@ -24979,7 +25195,7 @@ try {
       purpose:
         '独立执行一个 release descriptor：custom 完全接管，否则先尝试有界 graceful，再无条件执行 force。它返回全部失败数组且从不因 descriptor 失败抛出。',
       quickStart:
-        'const errors = await executeReleaseDescriptor(descriptor, {\n  signal: shutdown.signal,\n  deadlineAt,\n  report: (error) => logger.error(error)\n})',
+        `import { executeReleaseDescriptor } from '@migaia/lifecycle'\n\nconst shutdown = new AbortController()\nconst deadlineAt = Date.now() + 1_000\nconst logger = { error: (error: unknown) => console.error('release error:', error) }\nconst descriptor = { graceful: async () => console.log('flush cache'), force: async () => console.log('close cache') }\nconst errors = await executeReleaseDescriptor(descriptor, { signal: shutdown.signal, deadlineAt, report: logger.error })\nconsole.log('release failures:', errors.length)`,
       scenarios: [
         '自定义编排器只需复用单个资源的标准 graceful → force 降级链。',
         '测试需要直接验证 descriptor 的释放与错误收集。'
@@ -24994,7 +25210,7 @@ try {
       purpose:
         'Executes one release descriptor independently: custom takes full ownership; otherwise bounded graceful runs before unconditional force. It returns every failure and never throws because descriptor execution failed.',
       quickStart:
-        'const errors = await executeReleaseDescriptor(descriptor, {\n  signal: shutdown.signal,\n  deadlineAt,\n  report: (error) => logger.error(error)\n})',
+        `import { executeReleaseDescriptor } from '@migaia/lifecycle'\n\nconst shutdown = new AbortController()\nconst deadlineAt = Date.now() + 1_000\nconst logger = { error: (error: unknown) => console.error('释放错误:', error) }\nconst descriptor = { graceful: async () => console.log('先刷新 cache'), force: async () => console.log('强制关闭 cache') }\nconst errors = await executeReleaseDescriptor(descriptor, { signal: shutdown.signal, deadlineAt, report: logger.error })\nconsole.log('释放失败数:', errors.length)`,
       scenarios: [
         'A custom orchestrator needs the standard graceful-to-force chain for one resource.',
         'A test needs to exercise descriptor release and raw error collection directly.'
@@ -25011,7 +25227,7 @@ try {
       purpose:
         '用窄接口追踪在途 Promise。track() 原样返回输入并在 settle 后自动减计数；drain() 循环等待真正归零，包括排空期间新加入的任务。',
       quickStart:
-        'const pending = createPendingTracker()\nconst save = pending.track(persistDraft())\nawait save\n\nawait pending.drain()\nconsole.log(pending.size) // 0',
+        `import { createPendingTracker } from '@migaia/lifecycle'\n\nconst persistDraft = async () => {\n  await new Promise((resolve) => setTimeout(resolve, 10))\n  return 'draft-42'\n}\nconst pending = createPendingTracker()\nconst save = pending.track(persistDraft())\nconsole.log('saving draft:', await save)\nawait pending.drain()\nconsole.log('pending work:', pending.size) // 0`,
       scenarios: [
         'flush、close、批处理或 SSR 请求结束前必须等待全部在途工作。',
         '任务可能在 drain 期间继续派生新任务，仍不能漏计。'
@@ -25026,7 +25242,7 @@ try {
       purpose:
         'Tracks in-flight Promises through a narrow interface. track() returns its input unchanged and decrements after settlement; drain() loops until true zero, including work added while draining.',
       quickStart:
-        'const pending = createPendingTracker()\nconst save = pending.track(persistDraft())\nawait save\n\nawait pending.drain()\nconsole.log(pending.size) // 0',
+        `import { createPendingTracker } from '@migaia/lifecycle'\n\nconst persistDraft = async () => {\n  await new Promise((resolve) => setTimeout(resolve, 10))\n  return 'draft-42'\n}\nconst pending = createPendingTracker()\nconst save = pending.track(persistDraft())\nconsole.log('saving draft:', await save)\nawait pending.drain()\nconsole.log('pending work:', pending.size) // 0`,
       scenarios: [
         'Flush, close, batching, or SSR completion must await all in-flight work.',
         'Tasks may create more tracked work during drain and none may be missed.'
@@ -25043,7 +25259,7 @@ try {
       purpose:
         '按对象 key 管理引用计数、封存与归零等待。retain() 返回幂等 release；seal() 禁止新增租约；whenZero() 只允许在 seal 后等待，确保闭世界归零。',
       quickStart:
-        'const tracker = createQuiescenceTracker<object>()\nconst release = tracker.retain(session)\ntracker.seal(session)\nrelease()\nawait tracker.whenZero(session)',
+        `import { createQuiescenceTracker } from '@migaia/lifecycle'\n\nconst session = { id: 'session-42' }\nconst tracker = createQuiescenceTracker<object>()\nconst release = tracker.retain(session)\ntracker.seal(session)\nrelease()\nawait tracker.whenZero(session)\nconsole.log('session is quiescent:', session.id)`,
       scenarios: [
         '共享 session、channel 或 cache entry 需要知道是否仍被对象 owner 占用。',
         '关闭前需要先封存新增租约，再证明当前租约全部释放。'
@@ -25058,7 +25274,7 @@ try {
       purpose:
         'Tracks retain count, sealing, and zero wait per object key. retain() returns an idempotent release, seal() rejects new leases, and whenZero() is legal only after seal so the zero proof is closed-world.',
       quickStart:
-        'const tracker = createQuiescenceTracker<object>()\nconst release = tracker.retain(session)\ntracker.seal(session)\nrelease()\nawait tracker.whenZero(session)',
+        `import { createQuiescenceTracker } from '@migaia/lifecycle'\n\nconst session = { id: 'session-42' }\nconst tracker = createQuiescenceTracker<object>()\nconst release = tracker.retain(session)\ntracker.seal(session)\nrelease()\nawait tracker.whenZero(session)\nconsole.log('session is quiescent:', session.id)`,
       scenarios: [
         'A shared session, channel, or cache entry must know whether object owners still hold it.',
         'Shutdown must seal new leases before proving every current lease released.'
@@ -25075,7 +25291,7 @@ try {
       purpose:
         '创建不依赖真实等待的确定性虚拟时钟。schedule() 登记任务，advance(ms) 推进时间并一次性执行所有到期任务，包括到期 callback 新增的同截止任务。',
       quickStart:
-        'const scheduler = createManualScheduler()\nlet fired = false\nscheduler.schedule(() => { fired = true }, 100)\nscheduler.advance(99)\nconsole.log(fired) // false\nscheduler.advance(1)\nconsole.log(fired) // true',
+        `import { createManualScheduler } from '@migaia/lifecycle'\n\nconst scheduler = createManualScheduler()\nlet fired = false\nscheduler.schedule(() => { fired = true }, 100)\nscheduler.advance(99)\nconsole.log(fired) // false\nscheduler.advance(1)\nconsole.log(fired) // true`,
       scenarios: [
         'timeout、deadline、重试或队列 SLA 单测不能依赖真实时间。',
         '需要精确验证同一时刻任务的稳定执行和取消。'
@@ -25090,7 +25306,7 @@ try {
       purpose:
         'Creates a deterministic virtual clock with no real waiting. schedule() registers work and advance(ms) flushes every due task, including same-deadline work scheduled by a due callback.',
       quickStart:
-        'const scheduler = createManualScheduler()\nlet fired = false\nscheduler.schedule(() => { fired = true }, 100)\nscheduler.advance(99)\nconsole.log(fired) // false\nscheduler.advance(1)\nconsole.log(fired) // true',
+        `import { createManualScheduler } from '@migaia/lifecycle'\n\nconst scheduler = createManualScheduler()\nlet fired = false\nscheduler.schedule(() => { fired = true }, 100)\nscheduler.advance(99)\nconsole.log(fired) // false\nscheduler.advance(1)\nconsole.log(fired) // true`,
       scenarios: [
         'Timeout, deadline, retry, or queue-SLA tests cannot depend on wall-clock time.',
         'Tests need exact verification of stable same-time execution and cancellation.'
@@ -25107,7 +25323,7 @@ try {
       purpose:
         '取得当前宿主原生 AbortController 实例，保留 native brand、AbortSignal 事件分发与 reason identity。宿主不支持时以 ENV_UNSUPPORTED 快速失败。',
       quickStart:
-        "const controller = createAbortController()\nconst request = fetch(url, { signal: controller.signal })\ncontroller.abort('navigation replaced')\nawait request",
+        `import { createAbortController } from '@migaia/lifecycle'\n\nconst url = '/api/profile'\nconst controller = createAbortController()\nconst request = fetch(url, { signal: controller.signal })\ncontroller.abort('navigation replaced')\ntry {\n  await request\n} catch (error) {\n  console.log('request cancelled:', controller.signal.reason, error)\n}`,
       scenarios: [
         'runtime-neutral 代码需要真实平台取消信号，但不能静态依赖 DOM 类型实现。',
         '取消原因必须原样穿过 fetch、stream 或其他 signal-aware API。'
@@ -25122,7 +25338,7 @@ try {
       purpose:
         'Returns a native AbortController from the current host, preserving native brand, AbortSignal dispatch, and reason identity. An unsupported host fails fast with ENV_UNSUPPORTED.',
       quickStart:
-        "const controller = createAbortController()\nconst request = fetch(url, { signal: controller.signal })\ncontroller.abort('navigation replaced')\nawait request",
+        `import { createAbortController } from '@migaia/lifecycle'\n\nconst url = '/api/profile'\nconst controller = createAbortController()\nconst request = fetch(url, { signal: controller.signal })\ncontroller.abort('navigation replaced')\ntry {\n  await request\n} catch (error) {\n  console.log('request cancelled:', controller.signal.reason, error)\n}`,
       scenarios: [
         'Runtime-neutral code needs a real platform cancellation signal without statically owning a DOM implementation.',
         'Cancellation reason identity must pass through fetch, streams, or other signal-aware APIs.'
@@ -25139,7 +25355,7 @@ try {
       purpose:
         '以受控边界登记一个 AbortSignal listener，并返回显式 cleanup。它捕获读取 signal、安装、回调与移除阶段的失败，交给调用方提供的 failure sink，而不是让生命周期基础设施静默吞错。',
       quickStart:
-        'const observed = observeAbortSubscription(\n  signal,\n  () => cancelOperation(signal.reason),\n  { report: (failure) => logger.error(failure) }\n)\n\nobserved.cleanup()',
+        `import { observeAbortSubscription } from '@migaia/lifecycle'\n\nconst controller = new AbortController()\nconst signal = controller.signal\nconst logger = { error: (failure: unknown) => console.error('abort cleanup failed:', failure) }\nconst cancelOperation = (reason: unknown) => console.log('cancel request:', reason)\nconst observed = observeAbortSubscription(signal, () => cancelOperation(signal.reason), { report: (failure) => logger.error(failure) })\ncontroller.abort('navigation replaced')\nobserved.cleanup()`,
       scenarios: [
         '生命周期原语内部需要观察结构化 AbortSignal，同时隔离 hostile getter 或 listener API。',
         '取消回调和清理失败必须进入明确诊断通道。'
@@ -25154,7 +25370,7 @@ try {
       purpose:
         'Registers an AbortSignal listener behind a controlled boundary and returns explicit cleanup. Failures while reading the signal, installing, invoking, or removing are sent to the caller-owned failure sink rather than silently swallowed by lifecycle infrastructure.',
       quickStart:
-        'const observed = observeAbortSubscription(\n  signal,\n  () => cancelOperation(signal.reason),\n  { report: (failure) => logger.error(failure) }\n)\n\nobserved.cleanup()',
+        `import { observeAbortSubscription } from '@migaia/lifecycle'\n\nconst controller = new AbortController()\nconst signal = controller.signal\nconst logger = { error: (failure: unknown) => console.error('abort cleanup failed:', failure) }\nconst cancelOperation = (reason: unknown) => console.log('cancel request:', reason)\nconst observed = observeAbortSubscription(signal, () => cancelOperation(signal.reason), { report: (failure) => logger.error(failure) })\ncontroller.abort('navigation replaced')\nobserved.cleanup()`,
       scenarios: [
         'A lifecycle primitive must observe a structural AbortSignal while containing hostile getters or listener APIs.',
         'Cancellation callback and cleanup failures need an explicit diagnostic path.'
@@ -25171,7 +25387,7 @@ try {
       purpose:
         '为“同步启动、异步完成”的 dispose API 建立唯一账本。start() 在当前调用栈执行 callback，seal() 关闭接纳并返回同步错误快照与稳定 completion；全部 thenable settle 后才进入 terminal。',
       quickStart:
-        "const ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.synchronousErrors)\nconst allErrors = await outcome.completion",
+        `import { createSyncStartedDisposalLedger } from '@migaia/lifecycle'\n\nconst socket = { close: async () => console.log('socket closed') }\nconst cache = { flush: async () => console.log('cache flushed') }\nconst handleSyncErrors = (errors: readonly unknown[]) => console.error('sync disposal errors:', errors)\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.synchronousErrors)\nconst allErrors = await outcome.completion\nconsole.log('async disposal errors:', allErrors)`,
       scenarios: [
         '公开 dispose() 必须同步返回，但它启动的异步清理仍需要可等待 completion。',
         '领域适配器自行决定顺序与错误投影，只需要 lifecycle 管 pending 和原始错误观察。'
@@ -25186,7 +25402,7 @@ try {
       purpose:
         'Provides one ledger for disposal that starts synchronously and completes asynchronously. start() invokes callbacks in the current stack, seal() closes admission and returns a synchronous-error snapshot plus stable completion, and terminal waits for every thenable settlement.',
       quickStart:
-        "const ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.synchronousErrors)\nconst allErrors = await outcome.completion",
+        `import { createSyncStartedDisposalLedger } from '@migaia/lifecycle'\n\nconst socket = { close: async () => console.log('socket closed') }\nconst cache = { flush: async () => console.log('cache flushed') }\nconst handleSyncErrors = (errors: readonly unknown[]) => console.error('sync disposal errors:', errors)\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.synchronousErrors)\nconst allErrors = await outcome.completion\nconsole.log('async disposal errors:', allErrors)`,
       scenarios: [
         'A public dispose() must return synchronously while asynchronous cleanup still needs awaitable completion.',
         'A domain adapter owns ordering and error projection but needs lifecycle-owned pending and raw error observation.'
@@ -25203,7 +25419,7 @@ try {
       purpose:
         '检查一个本应为 void 的 callback 返回值；若它实际是 PromiseLike，则只读取一次 then 并观察 rejection，防止异步回调偷偷制造未处理拒绝。',
       quickStart:
-        'const result = diagnosticReporter(error)\ncontainAsyncRejection(result, (reportError) => {\n  emergencyLog.write(reportError)\n})',
+        `import { containAsyncRejection } from '@migaia/lifecycle'\n\nconst error = new Error('diagnostic sink failed')\nconst diagnosticReporter = (_error: Error) => Promise.reject(new Error('late report failure'))\nconst emergencyLog = { write: (reportError: unknown) => console.error('contained rejection:', reportError) }\nconst result = diagnosticReporter(error)\ncontainAsyncRejection(result, (reportError) => emergencyLog.write(reportError))`,
       scenarios: [
         '类型声明为 void 的诊断或 cleanup callback 在运行时可能返回 Promise。',
         '基础设施必须观察 hostile then getter 和迟到 rejection。'
@@ -25218,7 +25434,7 @@ try {
       purpose:
         'Inspects the return from a callback expected to be void. If it is PromiseLike, the function reads then once and observes rejection so an accidentally async callback cannot create an unhandled rejection.',
       quickStart:
-        'const result = diagnosticReporter(error)\ncontainAsyncRejection(result, (reportError) => {\n  emergencyLog.write(reportError)\n})',
+        `import { containAsyncRejection } from '@migaia/lifecycle'\n\nconst error = new Error('diagnostic sink failed')\nconst diagnosticReporter = (_error: Error) => Promise.reject(new Error('late report failure'))\nconst emergencyLog = { write: (reportError: unknown) => console.error('contained rejection:', reportError) }\nconst result = diagnosticReporter(error)\ncontainAsyncRejection(result, (reportError) => emergencyLog.write(reportError))`,
       scenarios: [
         'A diagnostic or cleanup callback typed as void may return a Promise at runtime.',
         'Infrastructure must observe hostile then getters and late rejection.'
@@ -25235,7 +25451,7 @@ try {
       purpose:
         '按 throw、collect、report 或 firstError 策略累积多项失败，并在 finalize() 统一产生返回值或抛错。source 与原始 error 保持分离，reporter 自身失败被隔离。',
       quickStart:
-        "const errors = createErrorCollector('collect', undefined)\nfor (const item of items) {\n  try { await release(item) }\n  catch (error) { errors.add(item.id, error) }\n}\nconst failures = errors.finalize('release failed')",
+        `import { createErrorCollector } from '@migaia/lifecycle'\n\nconst items = [{ id: 'socket' }, { id: 'cache' }]\nconst release = async (item: { id: string }) => {\n  if (item.id === 'cache') throw new Error('cache flush failed')\n  console.log('released:', item.id)\n}\nconst errors = createErrorCollector('collect', undefined)\nfor (const item of items) {\n  try { await release(item) }\n  catch (error) { errors.add(item.id, error) }\n}\nconst failures = errors.finalize('release failed')\nconsole.log('release failures:', failures)`,
       scenarios: [
         '自定义资源编排需要复用 lifecycle 的四种稳定错误策略。',
         '多个失败必须保留 source，并在末尾统一投影。'
@@ -25250,7 +25466,7 @@ try {
       purpose:
         'Accumulates item failures under throw, collect, report, or firstError and lets finalize() produce the final return or throw. Source remains separate from the original error, and reporter failure is contained.',
       quickStart:
-        "const errors = createErrorCollector('collect', undefined)\nfor (const item of items) {\n  try { await release(item) }\n  catch (error) { errors.add(item.id, error) }\n}\nconst failures = errors.finalize('release failed')",
+        `import { createErrorCollector } from '@migaia/lifecycle'\n\nconst items = [{ id: 'socket' }, { id: 'cache' }]\nconst release = async (item: { id: string }) => {\n  if (item.id === 'cache') throw new Error('cache flush failed')\n  console.log('released:', item.id)\n}\nconst errors = createErrorCollector('collect', undefined)\nfor (const item of items) {\n  try { await release(item) }\n  catch (error) { errors.add(item.id, error) }\n}\nconst failures = errors.finalize('release failed')\nconsole.log('release failures:', failures)`,
       scenarios: [
         "Custom resource orchestration needs lifecycle's four stable error policies.",
         'Several failures must retain their source and be projected once at the end.'
@@ -25267,7 +25483,7 @@ try {
       purpose:
         '创建字符串 key 的 quiescence tracker。语义与对象版相同，但使用 Map，并在未 seal 的 key 归零后删除无状态条目，避免长期字符串 key 堆积。',
       quickStart:
-        "const tracker = createStringQuiescenceTracker()\nconst release = tracker.retain('session:42')\ntracker.seal('session:42')\nrelease()\nawait tracker.whenZero('session:42')",
+        `import { createStringQuiescenceTracker } from '@migaia/lifecycle'\n\nconst tracker = createStringQuiescenceTracker()\nconst sessionKey = 'session:42'\nconst release = tracker.retain(sessionKey)\ntracker.seal(sessionKey)\nrelease()\nawait tracker.whenZero(sessionKey)\nconsole.log('session closed:', sessionKey)`,
       scenarios: [
         'session id、channel name 或 cache key 是稳定字符串。',
         '需要 seal 后的闭世界归零证明。'
@@ -25282,7 +25498,7 @@ try {
       purpose:
         'Creates a string-keyed quiescence tracker. It shares object-tracker semantics but uses a Map and removes pristine unsealed entries at zero so long-lived string keys do not accumulate.',
       quickStart:
-        "const tracker = createStringQuiescenceTracker()\nconst release = tracker.retain('session:42')\ntracker.seal('session:42')\nrelease()\nawait tracker.whenZero('session:42')",
+        `import { createStringQuiescenceTracker } from '@migaia/lifecycle'\n\nconst tracker = createStringQuiescenceTracker()\nconst sessionKey = 'session:42'\nconst release = tracker.retain(sessionKey)\ntracker.seal(sessionKey)\nrelease()\nawait tracker.whenZero(sessionKey)\nconsole.log('会话已关闭:', sessionKey)`,
       scenarios: [
         'Session IDs, channel names, or cache keys are stable strings.',
         'A closed-world zero proof is required after sealing.'
@@ -25299,7 +25515,7 @@ try {
       purpose:
         '以 lease 领域命名创建对象 key 的 quiescence tracker；实现与语义完全相同，不新增引用计数或生命周期层。',
       quickStart:
-        'const leases = createObjectLeaseRegistry<object>()\nconst release = leases.retain(resource)\nleases.seal(resource)\nrelease()\nawait leases.whenZero(resource)',
+        `import { createObjectLeaseRegistry } from '@migaia/lifecycle'\n\nconst resource = { id: 'socket-1' }\nconst leases = createObjectLeaseRegistry<object>()\nconst release = leases.retain(resource)\nleases.seal(resource)\nrelease()\nawait leases.whenZero(resource)\nconsole.log('resource quiescent:', resource.id)`,
       scenarios: [
         '调用点把 retain/release 关系称为对象租约时。',
         '仍需要 seal、whenZero 与 whenZeroOnce 的完整语义。'
@@ -25314,7 +25530,7 @@ try {
       purpose:
         'Creates the object-keyed quiescence tracker under lease-oriented domain naming; implementation and semantics are identical and add no second counting or lifecycle layer.',
       quickStart:
-        'const leases = createObjectLeaseRegistry<object>()\nconst release = leases.retain(resource)\nleases.seal(resource)\nrelease()\nawait leases.whenZero(resource)',
+        `import { createObjectLeaseRegistry } from '@migaia/lifecycle'\n\nconst resource = { id: 'socket-1' }\nconst leases = createObjectLeaseRegistry<object>()\nconst release = leases.retain(resource)\nleases.seal(resource)\nrelease()\nawait leases.whenZero(resource)\nconsole.log('resource quiescent:', resource.id)`,
       scenarios: [
         'The call site describes retain and release as object leases.',
         'Full seal, whenZero, and whenZeroOnce semantics remain necessary.'
@@ -25331,7 +25547,7 @@ try {
       purpose:
         '以 lease 领域命名创建字符串 key 的 quiescence tracker；零计数清理、seal 和等待语义与字符串 tracker 完全一致。',
       quickStart:
-        "const leases = createStringLeaseRegistry()\nconst release = leases.retain('connection:primary')\nleases.seal('connection:primary')\nrelease()\nawait leases.whenZero('connection:primary')",
+        `import { createStringLeaseRegistry } from '@migaia/lifecycle'\n\nconst leases = createStringLeaseRegistry()\nconst connectionKey = 'connection:primary'\nconst release = leases.retain(connectionKey)\nleases.seal(connectionKey)\nrelease()\nawait leases.whenZero(connectionKey)\nconsole.log('connection lease drained:', connectionKey)`,
       scenarios: [
         '稳定字符串标识表示共享资源租约。',
         '调用方需要 closed-world drain，而不是轮询 count。'
@@ -25346,7 +25562,7 @@ try {
       purpose:
         'Creates the string-keyed quiescence tracker under lease-oriented naming; zero-count pruning, sealing, and wait semantics are identical to the string tracker.',
       quickStart:
-        "const leases = createStringLeaseRegistry()\nconst release = leases.retain('connection:primary')\nleases.seal('connection:primary')\nrelease()\nawait leases.whenZero('connection:primary')",
+        `import { createStringLeaseRegistry } from '@migaia/lifecycle'\n\nconst leases = createStringLeaseRegistry()\nconst connectionKey = 'connection:primary'\nconst release = leases.retain(connectionKey)\nleases.seal(connectionKey)\nrelease()\nawait leases.whenZero(connectionKey)\nconsole.log('connection lease drained:', connectionKey)`,
       scenarios: [
         'Stable string identities represent shared-resource leases.',
         'The caller needs a closed-world drain instead of polling count.'
@@ -25363,7 +25579,7 @@ try {
       purpose:
         '把未知 duck-typed 值快照为稳定 ILifecycleScheduler。它只读取一次 now 与 schedule，绑定原 receiver；非 scheduler 返回 undefined，hostile getter 则以 INVALID_OPTION 抛错。',
       quickStart:
-        "const scheduler = snapshotScheduler(candidate)\nif (!scheduler) {\n  throw new TypeError('A scheduler is required')\n}\nconst cancel = scheduler.schedule(run, 10)",
+        `import { snapshotScheduler } from '@migaia/lifecycle'\n\nconst candidate = { now: () => Date.now(), schedule: (run: () => void, delayMs: number) => { const id = setTimeout(run, delayMs); return () => clearTimeout(id) } }\nconst run = () => console.log('scheduled cleanup')\nconst scheduler = snapshotScheduler(candidate)\nif (!scheduler) throw new TypeError('A scheduler is required')\nconst cancel = scheduler.schedule(run, 10)\nconsole.log('scheduled task:', typeof cancel)`,
       scenarios: [
         '公开配置接受 unknown scheduler，需要在边界一次校验并冻结调用能力。',
         '必须防止 getter 二次读取或 receiver 丢失改变行为。'
@@ -25378,7 +25594,7 @@ try {
       purpose:
         'Snapshots an unknown duck-typed value into a stable ILifecycleScheduler. It reads now and schedule once and preserves their receiver; a non-scheduler returns undefined while hostile getters throw INVALID_OPTION.',
       quickStart:
-        "const scheduler = snapshotScheduler(candidate)\nif (!scheduler) {\n  throw new TypeError('A scheduler is required')\n}\nconst cancel = scheduler.schedule(run, 10)",
+        `import { snapshotScheduler } from '@migaia/lifecycle'\n\nconst candidate = { now: () => Date.now(), schedule: (run: () => void, delayMs: number) => { const id = setTimeout(run, delayMs); return () => clearTimeout(id) } }\nconst run = () => console.log('scheduled cleanup')\nconst scheduler = snapshotScheduler(candidate)\nif (!scheduler) throw new TypeError('A scheduler is required')\nconst cancel = scheduler.schedule(run, 10)\nconsole.log('scheduled task:', typeof cancel)`,
       scenarios: [
         'A public option accepts an unknown scheduler and needs one boundary validation plus capability snapshot.',
         'A second getter read or lost receiver must not change behavior.'
@@ -25395,7 +25611,7 @@ try {
       purpose:
         'Lifecycle 的默认真实时间实现：now() 使用单调 performance.now，schedule() 使用可取消 host timer；模块加载不创建 timer，缺少宿主能力时首次调用才以 ENV_UNSUPPORTED 失败。',
       quickStart:
-        'const startedAt = systemScheduler.now()\nconst task = systemScheduler.schedule(runCleanup, 250)\n// 如无需执行，取消是幂等的\ntask.cancel()',
+        `import { systemScheduler } from '@migaia/lifecycle'\n\nconst runCleanup = () => console.log('cleanup')\nconst startedAt = systemScheduler.now()\nconst task = systemScheduler.schedule(runCleanup, 250)\nconsole.log('scheduled at:', startedAt)\ntask.cancel() // 如无需执行，取消是幂等的`,
       scenarios: [
         '生产运行时需要统一的单调时钟和有界延迟排程。',
         '调用 lifecycle API 时不需要自定义时间域，采用默认 scheduler。'
@@ -25410,7 +25626,7 @@ try {
       purpose:
         "Lifecycle's default real-time implementation: now() uses monotonic performance.now and schedule() uses a cancellable host timer. Module loading creates no timer, and missing host capabilities fail lazily as ENV_UNSUPPORTED.",
       quickStart:
-        'const startedAt = systemScheduler.now()\nconst task = systemScheduler.schedule(runCleanup, 250)\n// Cancellation is idempotent when the task is no longer needed\ntask.cancel()',
+        `import { systemScheduler } from '@migaia/lifecycle'\n\nconst runCleanup = () => console.log('cleanup')\nconst startedAt = systemScheduler.now()\nconst task = systemScheduler.schedule(runCleanup, 250)\nconsole.log('scheduled at:', startedAt)\ntask.cancel() // Cancellation is idempotent when the task is no longer needed`,
       scenarios: [
         'Production runtime needs one monotonic clock and bounded-delay scheduler.',
         'Lifecycle APIs can use their default time domain without custom injection.'
@@ -25427,7 +25643,7 @@ try {
       purpose:
         '在 factory 边界把必填 unknown 值解析为稳定 scheduler snapshot。非法形状以 INVALID_OPTION 抛错，hostile accessor 的原始失败保留在 cause。',
       quickStart:
-        'function createRuntime(options: { scheduler: unknown }) {\n  const scheduler = resolveScheduler(options.scheduler)\n  return { now: () => scheduler.now() }\n}',
+        `function createRuntime(options: { scheduler: unknown }) {\n  const scheduler = resolveScheduler(options.scheduler)\n  return { now: () => scheduler.now() }\n}`,
       scenarios: [
         '公开 factory 要求调用方必须提供 scheduler。',
         '解析后不能再次读取调用方对象上的 now/schedule getter。'
@@ -25442,7 +25658,7 @@ try {
       purpose:
         'Resolves a required unknown value into a stable scheduler snapshot at a factory boundary. Invalid shape throws INVALID_OPTION, while an accessor failure remains reachable through cause.',
       quickStart:
-        'function createRuntime(options: { scheduler: unknown }) {\n  const scheduler = resolveScheduler(options.scheduler)\n  return { now: () => scheduler.now() }\n}',
+        `function createRuntime(options: { scheduler: unknown }) {\n  const scheduler = resolveScheduler(options.scheduler)\n  return { now: () => scheduler.now() }\n}`,
       scenarios: [
         'A public factory requires the caller to supply a scheduler.',
         'Caller-owned now and schedule getters must not be read again after admission.'
@@ -25459,7 +25675,7 @@ try {
       purpose:
         '只读取一次 options.scheduler，并在创建 lifecycle 对象前快照；缺失时返回调用方 fallback 或 undefined，getter 失败则作为 INVALID_OPTION 保留 cause。',
       quickStart:
-        "const scheduler = resolveSchedulerOption(options, systemScheduler)\nconst deadlineAt = addSchedulerTime(\n  scheduler.now(),\n  timeoutMs,\n  'deadlineAt'\n)",
+        `import { addSchedulerTime, resolveSchedulerOption, systemScheduler } from '@migaia/lifecycle'\n\nconst options = { scheduler: systemScheduler }\nconst timeoutMs = 2_000\nconst scheduler = resolveSchedulerOption(options, systemScheduler)\nconst deadlineAt = addSchedulerTime(scheduler.now(), timeoutMs, 'deadlineAt')\nconsole.log('deadline:', deadlineAt)`,
       scenarios: [
         'factory 接受可选 scheduler 并需要稳定默认值。',
         '必须把 caller-owned options getter 风险隔离在构造入口。'
@@ -25474,7 +25690,7 @@ try {
       purpose:
         'Reads options.scheduler once and snapshots it before lifecycle-object construction. Absence returns the supplied fallback or undefined; getter failure becomes INVALID_OPTION with its cause retained.',
       quickStart:
-        "const scheduler = resolveSchedulerOption(options, systemScheduler)\nconst deadlineAt = addSchedulerTime(\n  scheduler.now(),\n  timeoutMs,\n  'deadlineAt'\n)",
+        `import { addSchedulerTime, resolveSchedulerOption, systemScheduler } from '@migaia/lifecycle'\n\nconst options = { scheduler: systemScheduler }\nconst timeoutMs = 2_000\nconst scheduler = resolveSchedulerOption(options, systemScheduler)\nconst deadlineAt = addSchedulerTime(scheduler.now(), timeoutMs, 'deadlineAt')\nconsole.log('deadline:', deadlineAt)`,
       scenarios: [
         'A factory accepts an optional scheduler with a stable default.',
         'Risk from caller-owned option getters must be contained at construction admission.'
@@ -25491,7 +25707,7 @@ try {
       purpose:
         '校验 scheduler 产生或消费的时间值必须是有限 number，并原样返回；类型错误保持 TypeError，NaN/Infinity 保持 RangeError，均带 INVALID_OPTION。',
       quickStart:
-        "const now = validateSchedulerTime(candidate.now(), 'now()')\nconst deadlineAt = validateSchedulerTime(options.deadlineAt, 'deadlineAt')",
+        `import { validateSchedulerTime } from '@migaia/lifecycle'\n\nconst candidate = { now: () => 100 }\nconst options = { deadlineAt: 2_000 }\nconst now = validateSchedulerTime(candidate.now(), 'now()')\nconst deadlineAt = validateSchedulerTime(options.deadlineAt, 'deadlineAt')\nconsole.log({ now, deadlineAt })`,
       scenarios: [
         '实现自定义 scheduler 时校验 now() 输出。',
         '公开配置接收绝对时间并需要统一错误契约。'
@@ -25506,7 +25722,7 @@ try {
       purpose:
         'Validates that scheduler-produced or consumed time is a finite number and returns it unchanged. Wrong type remains TypeError, NaN or Infinity remains RangeError, and both carry INVALID_OPTION.',
       quickStart:
-        "const now = validateSchedulerTime(candidate.now(), 'now()')\nconst deadlineAt = validateSchedulerTime(options.deadlineAt, 'deadlineAt')",
+        `import { validateSchedulerTime } from '@migaia/lifecycle'\n\nconst candidate = { now: () => 100 }\nconst options = { deadlineAt: 2_000 }\nconst now = validateSchedulerTime(candidate.now(), 'now()')\nconst deadlineAt = validateSchedulerTime(options.deadlineAt, 'deadlineAt')\nconsole.log({ now, deadlineAt })`,
       scenarios: [
         'A custom scheduler implementation must validate its now() result.',
         'A public option accepts absolute time under the shared error contract.'
@@ -25523,7 +25739,7 @@ try {
       purpose:
         '校验 delay 必须是有限非负 number，并返回校验值；负数、NaN 和 Infinity 以带 INVALID_OPTION 的 RangeError 拒绝。',
       quickStart:
-        "function schedule(callback: () => void, delayMs: unknown) {\n  const delay = validateSchedulerDelay(delayMs, 'retryDelayMs')\n  return systemScheduler.schedule(callback, delay)\n}",
+        `import { systemScheduler, validateSchedulerDelay } from '@migaia/lifecycle'\n\nfunction schedule(callback: () => void, delayMs: unknown) {\n  const delay = validateSchedulerDelay(delayMs, 'retryDelayMs')\n  return systemScheduler.schedule(callback, delay)\n}\nconst task = schedule(() => console.log('retry'), 250)\ntask.cancel()`,
       scenarios: [
         '自定义 scheduler 或 timeout option 接受延迟值。',
         '需要与 lifecycle 内部相同的类型和范围错误。'
@@ -25538,7 +25754,7 @@ try {
       purpose:
         'Validates a delay as a finite non-negative number and returns it. Negative, NaN, and Infinity reject as a RangeError carrying INVALID_OPTION.',
       quickStart:
-        "function schedule(callback: () => void, delayMs: unknown) {\n  const delay = validateSchedulerDelay(delayMs, 'retryDelayMs')\n  return systemScheduler.schedule(callback, delay)\n}",
+        `import { systemScheduler, validateSchedulerDelay } from '@migaia/lifecycle'\n\nfunction schedule(callback: () => void, delayMs: unknown) {\n  const delay = validateSchedulerDelay(delayMs, 'retryDelayMs')\n  return systemScheduler.schedule(callback, delay)\n}\nconst task = schedule(() => console.log('retry'), 250)\ntask.cancel()`,
       scenarios: [
         'A custom scheduler or timeout option accepts a delay value.',
         'The boundary needs the same type and range errors as lifecycle internals.'
@@ -25555,7 +25771,7 @@ try {
       purpose:
         '把已校验的 base 与 delta 相加，并在有限操作数产生 Infinity 时以 RangeError 拒绝，防止 deadline 溢出后静默变成永不超时。',
       quickStart:
-        "const delay = validateSchedulerDelay(timeoutMs, 'timeoutMs')\nconst deadlineAt = addSchedulerTime(\n  scheduler.now(),\n  delay,\n  'deadlineAt'\n)",
+        `import { addSchedulerTime, systemScheduler, validateSchedulerDelay } from '@migaia/lifecycle'\n\nconst timeoutMs = 2_000\nconst delay = validateSchedulerDelay(timeoutMs, 'timeoutMs')\nconst deadlineAt = addSchedulerTime(systemScheduler.now(), delay, 'deadlineAt')\nconsole.log('deadline:', deadlineAt)`,
       scenarios: [
         '由 scheduler.now() 和相对 timeout 构造绝对 deadline。',
         '极大数输入不能静默关闭超时保护。'
@@ -25567,7 +25783,7 @@ try {
       purpose:
         'Adds validated base and delta and rejects with RangeError if finite operands produce Infinity, preventing deadline overflow from silently becoming no timeout.',
       quickStart:
-        "const delay = validateSchedulerDelay(timeoutMs, 'timeoutMs')\nconst deadlineAt = addSchedulerTime(\n  scheduler.now(),\n  delay,\n  'deadlineAt'\n)",
+        `import { addSchedulerTime, systemScheduler, validateSchedulerDelay } from '@migaia/lifecycle'\n\nconst timeoutMs = 2_000\nconst delay = validateSchedulerDelay(timeoutMs, 'timeoutMs')\nconst deadlineAt = addSchedulerTime(systemScheduler.now(), delay, 'deadlineAt')\nconsole.log('deadline:', deadlineAt)`,
       scenarios: [
         'An absolute deadline is derived from scheduler.now() plus a relative timeout.',
         'Extremely large input must not silently disable timeout protection.'
@@ -25584,7 +25800,7 @@ try {
       purpose:
         '创建带 @migaia/lifecycle source、稳定 code、原生 stack 和可选 cause/phase/detail/errors 的 Error。它不覆盖 stack，errors 会冻结为快照。',
       quickStart:
-        "throw createLifecycleError(\n  LifecycleErrorCode.scopeClosed,\n  LifecycleErrorText.scopeClosed,\n  { phase: 'own', cause: originalError }\n)",
+        `import { createLifecycleError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst originalError = new Error('scope was already closed')\nthrow createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosed, { phase: 'own', cause: originalError })`,
       scenarios: [
         'lifecycle 自身需要创建没有更具体原生子类要求的边界错误。',
         '原始失败、阶段和诊断详情必须沿公开错误链可达。'
@@ -25599,7 +25815,7 @@ try {
       purpose:
         'Creates an Error carrying @migaia/lifecycle source, stable code, native stack, and optional cause, phase, detail, or frozen errors snapshot. It never overwrites stack.',
       quickStart:
-        "throw createLifecycleError(\n  LifecycleErrorCode.scopeClosed,\n  LifecycleErrorText.scopeClosed,\n  { phase: 'own', cause: originalError }\n)",
+        `import { createLifecycleError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst originalError = new Error('scope 已经关闭')\nthrow createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosed, { phase: 'own', cause: originalError })`,
       scenarios: [
         'Lifecycle itself needs a boundary error with no more specific native subclass requirement.',
         'Original failure, phase, and diagnostic detail must remain reachable through the public error chain.'
@@ -25616,7 +25832,7 @@ try {
       purpose:
         '创建保留原生 TypeError runtime type 的 lifecycle 错误，并附加 source/code、可选 cause 与 detail；适用于输入形状或可调用性错误。',
       quickStart:
-        "throw createLifecycleTypeError(\n  LifecycleErrorCode.invalidOption,\n  LifecycleErrorText.schedulerAccessorFailed,\n  { cause: getterError, detail: { field: 'scheduler' } }\n)",
+        `import { createLifecycleTypeError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst getterError = new TypeError('scheduler getter returned a non-scheduler')\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, LifecycleErrorText.schedulerAccessorFailed, { cause: getterError, detail: { field: 'scheduler' } })`,
       scenarios: [
         '公开参数类型或对象形状不合法。',
         '调用方依赖 instanceof TypeError，同时还需要稳定 source/code。'
@@ -25631,7 +25847,7 @@ try {
       purpose:
         'Creates a lifecycle error that remains a native TypeError while attaching source, code, and optional cause or detail. Use it for invalid input shape or callability.',
       quickStart:
-        "throw createLifecycleTypeError(\n  LifecycleErrorCode.invalidOption,\n  LifecycleErrorText.schedulerAccessorFailed,\n  { cause: getterError, detail: { field: 'scheduler' } }\n)",
+        `import { createLifecycleTypeError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst getterError = new TypeError('scheduler getter 返回了非法对象')\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, LifecycleErrorText.schedulerAccessorFailed, { cause: getterError, detail: { field: 'scheduler' } })`,
       scenarios: [
         'A public parameter type or object shape is invalid.',
         'Callers depend on instanceof TypeError while also requiring stable source and code.'
@@ -25648,7 +25864,7 @@ try {
       purpose:
         '创建保留原生 RangeError runtime type 的 lifecycle 错误，并附加 source/code、可选 cause 与 detail；适用于有限性、非负或上限约束。',
       quickStart:
-        "throw createLifecycleRangeError(\n  LifecycleErrorCode.invalidOption,\n  LifecycleErrorText.schedulerDelayRange,\n  { detail: { field: 'delayMs' } }\n)",
+        `import { createLifecycleRangeError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst delayMs = -1\nif (delayMs < 0) throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, LifecycleErrorText.schedulerDelayRange, { detail: { field: 'delayMs' } })`,
       scenarios: [
         '数值参数类型正确，但超出 lifecycle 接受范围。',
         '调用方需要通过 instanceof RangeError 区分类型与范围错误。'
@@ -25663,7 +25879,7 @@ try {
       purpose:
         'Creates a lifecycle error that remains a native RangeError while attaching source, code, and optional cause or detail. Use it for finite, non-negative, or upper-bound constraints.',
       quickStart:
-        "throw createLifecycleRangeError(\n  LifecycleErrorCode.invalidOption,\n  LifecycleErrorText.schedulerDelayRange,\n  { detail: { field: 'delayMs' } }\n)",
+        `import { createLifecycleRangeError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst delayMs = -1\nif (delayMs < 0) throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, LifecycleErrorText.schedulerDelayRange, { detail: { field: 'delayMs' } })`,
       scenarios: [
         "A numeric parameter has the correct type but lies outside lifecycle's accepted range.",
         'Callers use instanceof RangeError to separate type and range failures.'
@@ -25680,7 +25896,7 @@ try {
       purpose:
         '在已有 Error 上附加 lifecycle source/code，同时保留对象 identity、原生子类、message、stack 与 AggregateError.errors；跨 source 冲突保持 fail-closed。',
       quickStart:
-        "const aggregate = new AggregateError(errors, 'dispose failed')\nthrow tagLifecycleError(\n  aggregate,\n  LifecycleErrorCode.disposeFailed\n)",
+        `import { LifecycleErrorCode, tagLifecycleError } from '@migaia/lifecycle'\n\nconst errors = [new Error('socket close failed'), new Error('cache flush failed')]\nconst aggregate = new AggregateError(errors, 'dispose failed')\nthrow tagLifecycleError(aggregate, LifecycleErrorCode.disposeFailed)`,
       scenarios: [
         '现有 AggregateError、DOMException 或其他原生错误类型必须原样保留。',
         '同包错误跨边界需要重新分类 code，但不能替换实例。'
@@ -25695,7 +25911,7 @@ try {
       purpose:
         'Attaches lifecycle source and code to an existing Error while preserving object identity, native subclass, message, stack, and AggregateError.errors. Cross-source conflicts remain fail-closed.',
       quickStart:
-        "const aggregate = new AggregateError(errors, 'dispose failed')\nthrow tagLifecycleError(\n  aggregate,\n  LifecycleErrorCode.disposeFailed\n)",
+        `import { LifecycleErrorCode, tagLifecycleError } from '@migaia/lifecycle'\n\nconst errors = [new Error('socket close 失败'), new Error('cache flush 失败')]\nconst aggregate = new AggregateError(errors, 'dispose failed')\nthrow tagLifecycleError(aggregate, LifecycleErrorCode.disposeFailed)`,
       scenarios: [
         'An existing AggregateError, DOMException, or other native error subtype must remain intact.',
         'A lifecycle-owned error crosses a boundary and needs code reclassification without instance replacement.'
@@ -25712,7 +25928,7 @@ try {
       purpose:
         '把任意 unknown throw 转为 lifecycle 边界失败。可扩展 Error 会原位打标以保持 identity；primitive、冻结或不可打标值会被包装，并通过 cause 保留原值。',
       quickStart:
-        'try {\n  await releaseResource()\n} catch (error) {\n  throw createLifecycleFailure(\n    LifecycleErrorCode.disposeFailed,\n    LifecycleErrorText.disposeFailed,\n    error\n  )\n}',
+        `try {\n  await releaseResource()\n} catch (error) {\n  throw createLifecycleFailure(\n    LifecycleErrorCode.disposeFailed,\n    LifecycleErrorText.disposeFailed,\n    error\n  )\n}`,
       scenarios: [
         '调用用户 disposer、listener 或宿主能力后捕获到 unknown。',
         '必须同时保证原错误可达与 lifecycle source/code 契约。'
@@ -25727,7 +25943,7 @@ try {
       purpose:
         'Converts any unknown throw into a lifecycle-boundary failure. Extensible Errors are tagged in place to retain identity; primitive, frozen, or untaggable values are wrapped with the original retained through cause.',
       quickStart:
-        'try {\n  await releaseResource()\n} catch (error) {\n  throw createLifecycleFailure(\n    LifecycleErrorCode.disposeFailed,\n    LifecycleErrorText.disposeFailed,\n    error\n  )\n}',
+        `try {\n  await releaseResource()\n} catch (error) {\n  throw createLifecycleFailure(\n    LifecycleErrorCode.disposeFailed,\n    LifecycleErrorText.disposeFailed,\n    error\n  )\n}`,
       scenarios: [
         'Calling a user disposer, listener, or host capability produces an unknown throw.',
         'Both original-error reachability and lifecycle source/code contract must be guaranteed.'
@@ -25744,7 +25960,7 @@ try {
       purpose:
         '表示响应式图中的可写事实来源。可直接 new Signal(initialValue, runtime, options) 保留完整实例，也可用 runtime.signal(initialValue, options) 创建同一实现。读取 value 会把当前 Computed 或 Effect 登记为订阅者；写入真正不同的值会领取新版本，并通知同一 Runtime 中受影响的下游。Object.is 相等的写入会被短路，不增加 version，也不触发重算；peek() 只读取当前值而不建立依赖。Signal 还公开 observed、订阅边界 hook 与终态 dispose()，供资源宿主管理状态节点生命周期。',
       quickStart:
-        "import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = new Signal<string | null>(\n  null,\n  runtime,\n  { debugName: 'catalog.selected-product' }\n)\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect 输出 selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is 相等：不通知\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true",
+        `import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = new Signal<string | null>(\n  null,\n  runtime,\n  { debugName: 'catalog.selected-product' }\n)\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect 输出 selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is 相等：不通知\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true`,
       scenarios: [
         '表单字段、当前筛选器、选中项、分页游标等由用户事件直接修改，并驱动校验、派生结果或 UI 同步。',
         '连接状态、重试次数、播放位置或任务进度由命令式回调更新，同时需要多个 Computed 和 Effect 消费。',
@@ -25820,7 +26036,7 @@ try {
       purpose:
         'Represents a writable source of truth in a reactive graph. new Signal(initialValue, runtime, options) retains the full instance, while runtime.signal(initialValue, options) creates the same implementation. Reading value subscribes the current Computed or Effect. Writing a genuinely different value claims a new version and notifies affected downstream nodes in the same Runtime. Object.is-equal writes short-circuit without changing version or scheduling work, while peek() reads without tracking. Signal also exposes observed, subscription-edge hooks, and terminal dispose() for resource-owning hosts.',
       quickStart:
-        "import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = new Signal<string | null>(\n  null,\n  runtime,\n  { debugName: 'catalog.selected-product' }\n)\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect logs selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is equal: no notification\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true",
+        `import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = new Signal<string | null>(\n  null,\n  runtime,\n  { debugName: 'catalog.selected-product' }\n)\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect logs selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is equal: no notification\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true`,
       scenarios: [
         'Form fields, active filters, selections, and pagination cursors are changed directly by user events and drive validation, derived results, or UI synchronization.',
         'Connection state, retry count, playback position, or task progress is updated by imperative callbacks and consumed by several Computeds and Effects.',
@@ -25899,7 +26115,7 @@ try {
       purpose:
         '声明一个只读派生值，把多个事实来源组合成唯一、不可直接赋值的结果。Computed 构造时不求值；首次读取 value 才执行计算并自动追踪本轮实际读取的依赖，之后复用缓存。依赖变化只会标脏，下一次读取才重算；条件分支改变时依赖集合也会随本轮读取自动切换。value 会让当前观察者订阅该结果，peek() 只读取而不建立这条下游依赖，dispose() 则永久断开上下游并禁止继续读取。',
       quickStart:
-        "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unitPrice = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst freeShipping = runtime.signal(false)\nlet calculationCount = 0\n\nconst checkoutTotal = runtime.computed(() => {\n  calculationCount += 1\n  const subtotal = unitPrice.value * quantity.value\n  return freeShipping.value ? subtotal : subtotal + 5\n}, { debugName: 'checkout.total' })\n\nconsole.log(calculationCount) // 0：构造时不计算\nconsole.log(checkoutTotal.value) // 29，首次读取才计算\nconsole.log(checkoutTotal.value) // 29，复用缓存\nconsole.log(calculationCount) // 1\n\nfreeShipping.value = true // 只标脏，不立即重算\nconsole.log(checkoutTotal.value) // 24，读取时重算\nconsole.log(calculationCount) // 2\ncheckoutTotal.dispose()",
+        `import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unitPrice = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst freeShipping = runtime.signal(false)\nlet calculationCount = 0\n\nconst checkoutTotal = runtime.computed(() => {\n  calculationCount += 1\n  const subtotal = unitPrice.value * quantity.value\n  return freeShipping.value ? subtotal : subtotal + 5\n}, { debugName: 'checkout.total' })\n\nconsole.log(calculationCount) // 0：构造时不计算\nconsole.log(checkoutTotal.value) // 29，首次读取才计算\nconsole.log(checkoutTotal.value) // 29，复用缓存\nconsole.log(calculationCount) // 1\n\nfreeShipping.value = true // 只标脏，不立即重算\nconsole.log(checkoutTotal.value) // 24，读取时重算\nconsole.log(calculationCount) // 2\ncheckoutTotal.dispose()`,
       scenarios: [
         '购物车从单价、数量、折扣、税率和运费规则推导应付金额，业务只维护输入事实，不再手动同步 total。',
         '数据表从原始记录、搜索词、筛选器和排序规则生成可缓存的可见行；输入没变时重复渲染直接复用结果。',
@@ -25924,7 +26140,7 @@ try {
           title: '直接实例：持有生命周期并进行非追踪读取',
           description:
             '直接构造 Computed 可显式持有实例、检查 disposed，并在宿主销毁时释放。peek() 会取得最新值，但不会让当前观察者订阅这个 Computed。',
-          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => `${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
+          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => \`\${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
         }
       ],
       options: [
@@ -25979,7 +26195,7 @@ try {
       purpose:
         'Declares a read-only derived value that combines source facts into one result callers cannot assign directly. Construction does not evaluate it. The first value read calculates and tracks only dependencies actually read during that run, then later reads reuse the cache. Dependency changes merely mark it dirty; the next read recomputes it, and conditional branches replace the dependency set automatically. value subscribes the current observer, peek() reads without that downstream subscription, and dispose() permanently disconnects both sides and rejects later reads.',
       quickStart:
-        "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unitPrice = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst freeShipping = runtime.signal(false)\nlet calculationCount = 0\n\nconst checkoutTotal = runtime.computed(() => {\n  calculationCount += 1\n  const subtotal = unitPrice.value * quantity.value\n  return freeShipping.value ? subtotal : subtotal + 5\n}, { debugName: 'checkout.total' })\n\nconsole.log(calculationCount) // 0: construction is lazy\nconsole.log(checkoutTotal.value) // 29: the first read calculates\nconsole.log(checkoutTotal.value) // 29: cached\nconsole.log(calculationCount) // 1\n\nfreeShipping.value = true // mark dirty without calculating\nconsole.log(checkoutTotal.value) // 24: recompute on read\nconsole.log(calculationCount) // 2\ncheckoutTotal.dispose()",
+        `import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unitPrice = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst freeShipping = runtime.signal(false)\nlet calculationCount = 0\n\nconst checkoutTotal = runtime.computed(() => {\n  calculationCount += 1\n  const subtotal = unitPrice.value * quantity.value\n  return freeShipping.value ? subtotal : subtotal + 5\n}, { debugName: 'checkout.total' })\n\nconsole.log(calculationCount) // 0: construction is lazy\nconsole.log(checkoutTotal.value) // 29: the first read calculates\nconsole.log(checkoutTotal.value) // 29: cached\nconsole.log(calculationCount) // 1\n\nfreeShipping.value = true // mark dirty without calculating\nconsole.log(checkoutTotal.value) // 24: recompute on read\nconsole.log(calculationCount) // 2\ncheckoutTotal.dispose()`,
       scenarios: [
         'A cart derives the payable amount from unit prices, quantities, discounts, tax, and shipping rules while the application maintains only source facts.',
         'A data grid combines records, a search query, filters, and sorting into cached visible rows reused across unchanged renders.',
@@ -26004,7 +26220,7 @@ try {
           title: 'Direct instance: own the lifecycle and read without tracking',
           description:
             'Direct construction retains the Computed instance, exposes disposed, and allows explicit host teardown. peek() returns the latest value without subscribing the current observer to this Computed.',
-          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => `${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
+          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => \`\${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
         }
       ],
       options: [
@@ -26067,7 +26283,7 @@ try {
       purpose:
         '把响应式状态同步到外部世界。可从 @migaia/reactive 根包导入 Effect 与 createRuntime：直接 new Effect(callback, runtime, options) 可保留实例并检查 disposed，runtime.effect(callback, options) 则返回停止函数。两种入口都会立即执行，自动订阅本次执行读取的节点；依赖变化后由 Runtime 调度重跑，重跑前先执行上一次返回的 cleanup，dispose() 后永久停止。',
       quickStart:
-        "import { Effect, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// 构造时立即连接；读取 roomId.value 会把它登记为依赖。\nconst roomConnection = new Effect(() => {\n  const events = new EventSource(\n    `/api/rooms/${encodeURIComponent(roomId.value)}/events`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // 换房间重跑前、以及 dispose() 时，都会先关闭旧连接。\n  return () => events.close()\n}, runtime, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // 关闭 general，再连接 support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true",
+        `import { Effect, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// 构造时立即连接；读取 roomId.value 会把它登记为依赖。\nconst roomConnection = new Effect(() => {\n  const events = new EventSource(\n    \`/api/rooms/\${encodeURIComponent(roomId.value)}/events\`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // 换房间重跑前、以及 dispose() 时，都会先关闭旧连接。\n  return () => events.close()\n}, runtime, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // 关闭 general，再连接 support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true`,
       scenarios: [
         '聊天室、行情或协作页面根据当前 roomId / symbol / documentId 重建 WebSocket、EventSource 或事件监听，并在切换前关闭旧订阅。',
         '把主题、语言、标题或表单状态同步到 DOM、localStorage、日志和第三方命令式组件。',
@@ -26131,7 +26347,7 @@ try {
       purpose:
         'Synchronizes reactive state with the outside world. Import Effect and createRuntime from the @migaia/reactive root package. new Effect(callback, runtime, options) retains the instance and exposes disposed, while runtime.effect(callback, options) returns a stop function. Both run immediately, track nodes read during execution, rerun through the Runtime scheduler, execute the previous cleanup first, and stop permanently after disposal.',
       quickStart:
-        "import { Effect, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// Construction connects immediately; reading roomId.value registers it as a dependency.\nconst roomConnection = new Effect(() => {\n  const events = new EventSource(\n    `/api/rooms/${encodeURIComponent(roomId.value)}/events`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // This closes the old connection before a rerun and during dispose().\n  return () => events.close()\n}, runtime, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // close general, then connect support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true",
+        `import { Effect, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// Construction connects immediately; reading roomId.value registers it as a dependency.\nconst roomConnection = new Effect(() => {\n  const events = new EventSource(\n    \`/api/rooms/\${encodeURIComponent(roomId.value)}/events\`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // This closes the old connection before a rerun and during dispose().\n  return () => events.close()\n}, runtime, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // close general, then connect support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true`,
       scenarios: [
         'Chat, market-data, or collaboration screens rebuild a WebSocket, EventSource, or event listener from the current roomId, symbol, or documentId and close the previous subscription first.',
         'Theme, locale, title, or form state must be synchronized with the DOM, localStorage, logs, or an imperative third-party widget.',
@@ -26199,7 +26415,7 @@ try {
       purpose:
         '创建一张独立的响应式图以及它自己的版本时钟、依赖追踪器和调度队列。SSR 请求、测试、Worker 或相互隔离的应用根应各自拥有 Runtime。',
       quickStart:
-        'const runtime = createRuntime({\n  maxFlushPasses: 100,\n  onError(error, context) {\n    reportReactiveFailure(error, context)\n  }\n})\n\nconst count = runtime.signal(0)\nconst doubled = runtime.computed(() => count.value * 2)',
+        `import { createRuntime } from '@migaia/reactive'\n\nconst reportReactiveFailure = (error: unknown, context: unknown) => console.error('reactive failure:', error, context)\nconst runtime = createRuntime({ maxFlushPasses: 100, onError: reportReactiveFailure })\nconst count = runtime.signal(0)\nconst doubled = runtime.computed(() => count.value * 2)\nconsole.log('doubled:', doubled.value)`,
       scenarios: [
         'SSR、测试或多应用根必须隔离依赖图、调度与错误通道。',
         '宿主需要注入微任务、时钟、trace 或错误报告能力。'
@@ -26214,7 +26430,7 @@ try {
       purpose:
         'Creates an isolated reactive graph with its own version clock, dependency tracker, and scheduling queue. SSR requests, tests, Workers, and isolated application roots should own separate runtimes.',
       quickStart:
-        'const runtime = createRuntime({\n  maxFlushPasses: 100,\n  onError(error, context) {\n    reportReactiveFailure(error, context)\n  }\n})\n\nconst count = runtime.signal(0)\nconst doubled = runtime.computed(() => count.value * 2)',
+        `import { createRuntime } from '@migaia/reactive'\n\nconst reportReactiveFailure = (error: unknown, context: unknown) => console.error('reactive failure:', error, context)\nconst runtime = createRuntime({ maxFlushPasses: 100, onError: reportReactiveFailure })\nconst count = runtime.signal(0)\nconst doubled = runtime.computed(() => count.value * 2)\nconsole.log('doubled:', doubled.value)`,
       scenarios: [
         'SSR, tests, or multiple application roots must isolate graphs, scheduling, and error channels.',
         'A host needs to inject microtasks, clocks, tracing, or error reporting.'
@@ -26231,7 +26447,7 @@ try {
       purpose:
         'Runtime 是 Signal、Computed 与 Effect 的所有权和执行边界。通常通过 createRuntime() 获得实例；其方法确保所有节点加入同一张图，并提供 batch、untracked、flush 与诊断能力。',
       quickStart:
-        "const runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst fullName = runtime.computed(() => `${first.value} ${last.value}`)\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n})\nconsole.log(fullName.value)",
+        `import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst fullName = runtime.computed(() => \`\${first.value} \${last.value}\`)\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n})\nconsole.log(fullName.value)`,
       scenarios: [
         '需要明确拥有并组合一组响应式节点。',
         '需要批量更新、非追踪读取、显式冲刷或只读 trace 订阅。'
@@ -26246,7 +26462,7 @@ try {
       purpose:
         'Runtime is the ownership and execution boundary for Signal, Computed, and Effect. Obtain it through createRuntime() in normal use; its methods keep nodes in one graph and expose batching, untracked reads, flushing, and diagnostics.',
       quickStart:
-        "const runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst fullName = runtime.computed(() => `${first.value} ${last.value}`)\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n})\nconsole.log(fullName.value)",
+        `import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst fullName = runtime.computed(() => \`\${first.value} \${last.value}\`)\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n})\nconsole.log(fullName.value)`,
       scenarios: [
         'A group of reactive nodes needs explicit ownership and composition.',
         'Batching, untracked reads, explicit flushing, or read-only trace subscriptions are required.'
@@ -26263,7 +26479,7 @@ try {
       purpose:
         '提供进程级共享的默认 Runtime，供 signal()、computed() 与 effect() 便捷函数使用。它降低简单客户端模块的启动成本，但其状态、队列和诊断通道会被同一进程中的所有使用者共享。',
       quickStart:
-        'const count = signal(0)\nconst doubled = computed(() => count.value * 2)\nconst stop = effect(() => console.log(doubled.value))\n\ncount.value = 1\nstop()',
+        `import { computed, effect, signal } from '@migaia/reactive'\n\nconst count = signal(0)\nconst doubled = computed(() => count.value * 2)\nconst stop = effect(() => console.log(doubled.value))\n\ncount.value = 1\nstop()`,
       scenarios: [
         '单一客户端应用根接受全局共享的响应式图。',
         '小型模块需要最少样板代码，且不存在请求级或测试级隔离要求。'
@@ -26278,7 +26494,7 @@ try {
       purpose:
         'Provides the process-wide default Runtime used by the signal(), computed(), and effect() convenience functions. It minimizes setup for simple clients but shares graph state, queues, and diagnostics across all users in the process.',
       quickStart:
-        'const count = signal(0)\nconst doubled = computed(() => count.value * 2)\nconst stop = effect(() => console.log(doubled.value))\n\ncount.value = 1\nstop()',
+        `import { computed, effect, signal } from '@migaia/reactive'\n\nconst count = signal(0)\nconst doubled = computed(() => count.value * 2)\nconst stop = effect(() => console.log(doubled.value))\n\ncount.value = 1\nstop()`,
       scenarios: [
         'One client application root deliberately shares a global reactive graph.',
         'A small module needs minimal setup and has no request-level or test-level isolation requirement.'
@@ -26306,10 +26522,88 @@ export function findApiGuide(
     library === 'plugin-host' && guideModuleName === 'index' && symbolName === 'PluginHost'
       ? 'plugin-host:structural:PluginHost'
       : `${library}:${guideModuleName}:${symbolName}`
-  return (apiGuides[guideKey] ??
+  const guide = (apiGuides[guideKey] ??
     (library === 'event-subscriber' && moduleName === 'subscriber'
       ? apiGuides[`event-subscriber:index:${symbolName}`]
       : undefined))?.[locale]
+  if (!guide && library === 'web-rpc') {
+    return {
+      en: {
+        purpose: `${symbolName} is a WebRPC composition API; select it when its capability is required and keep installation inside the endpoint lifecycle.`,
+        quickStart: `import { connect, defineFeature } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst capability = defineFeature(() => ({ read: () => 'ready' }))\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint(\n  { id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] },\n  [capability] as const\n)\ntry {\n  console.log(service.read()) // ready：Feature 安装后，返回的能力面由业务代码直接消费。\n} finally {\n  await service.dispose()\n  void clientTransport\n}`,
+        scenarios: ['A composed endpoint requires this explicit WebRPC capability; start with the memory-transport skeleton above, then replace the sample capability with the API signature you need.'],
+        avoidWhen: [
+          'A narrower endpoint capability already satisfies the use case.',
+          'The endpoint does not need this capability.'
+        ],
+        options: []
+      },
+      zh: {
+        purpose: `${symbolName} 是 WebRPC composition API；仅在需要对应 capability 时选择，并让 installation 留在 endpoint lifecycle 内。`,
+        quickStart: `import { connect, defineFeature } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst capability = defineFeature(() => ({ read: () => 'ready' }))\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint(\n  { id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] },\n  [capability] as const\n)\ntry {\n  console.log(service.read()) // ready：Feature 安装后，返回的能力面由业务代码直接消费。\n} finally {\n  await service.dispose()\n  void clientTransport\n}`,
+        scenarios: ['组合 endpoint 需要这个显式 WebRPC capability；可先用上面的 memory transport skeleton 验证安装、调用与释放，再按该 API 的签名替换 capability。'],
+        avoidWhen: ['更窄的 endpoint capability 已经满足场景。', 'endpoint 不需要这个 capability。'],
+        options: []
+      }
+    }[locale]
+  }
+  if (library === 'reactive' && symbolName === 'Signal' && guide) {
+    return { ...guide, options: guide.options.filter((option) => option.name === 'debugName') }
+  }
+  if (library === 'reactive' && symbolName === 'Computed' && guide) {
+    return {
+      ...guide,
+      options: guide.options.filter((option) =>
+        ['equals', 'keepAlive', 'debugName'].includes(option.name)
+      )
+    }
+  }
+  if (library === 'reactive' && symbolName === 'Effect' && guide) {
+    return { ...guide, options: guide.options.filter((option) => option.name === 'debugName') }
+  }
+  if (library === 'logger' && symbolName === 'setLoggerRuntimeManager' && guide) {
+    const quickStart = guide.quickStart.includes('try {')
+      ? guide.quickStart.replaceAll('restoreRuntime()', 'restoreRuntime(); restore()')
+      : `${guide.quickStart}\n\ntry { await runScenario() } finally { restore() }`
+    const purpose = guide.purpose.includes(locale === 'zh' ? '幂等' : 'idempotent')
+      ? guide.purpose
+      : `${guide.purpose} ${locale === 'zh' ? 'restore() 是幂等的。' : 'The restore() operation is idempotent.'}`
+    return { ...guide, purpose, quickStart }
+  }
+  if (!guide || library !== 'storage-web') return guide
+  const isWebStoragePlugin =
+    symbolName === 'localStorageBackendPlugin' ||
+    symbolName === 'sessionStorageBackendPlugin' ||
+    symbolName === 'localStorageReactive' ||
+    symbolName === 'sessionStorageReactive'
+  const isCookieGuide =
+    symbolName === 'cookiesHost' ||
+    symbolName === 'cookieBackendPlugin' ||
+    symbolName === 'cookiesReactive'
+  if (!isWebStoragePlugin && !isCookieGuide) return guide
+  const options = isWebStoragePlugin
+    ? guide.options.filter((option) => option.name === 'storage')
+    : guide.options
+        .filter(
+          (option) =>
+            option.name === 'namespace' ||
+            option.name === 'namespaceCodec' ||
+            option.name === 'scope' ||
+            option.name === 'document'
+        )
+        .concat(
+          guide.options.some((option) => option.name === 'scope')
+            ? []
+            : guide.options
+                .filter((option) => option.name === 'scope.path')
+                .map((option) => ({ ...option, name: 'scope', type: 'ICookieScope' }))
+        )
+        .sort(
+          (left, right) =>
+            ['namespace', 'namespaceCodec', 'scope', 'document'].indexOf(left.name) -
+            ['namespace', 'namespaceCodec', 'scope', 'document'].indexOf(right.name)
+        )
+  return { ...guide, options }
 }
 
 /** Builds a reference guide for non-callable public constants from their actual contract shape. */
