@@ -1,6 +1,6 @@
 {
   "name": "@migaia/web-rpc",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "private": true,
   "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
   "license": "MIT",
