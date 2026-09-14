@@ -1,5 +1,9 @@
 /** Public runtime-neutral API for bidirectional web-rpc endpoints. */
-export { createFullEndpoint as createEndpoint, createFullEndpoint } from './full.js'
+export {
+  createFullEndpoint as createEndpoint,
+  createFullEndpoint,
+  createFullOneWayEndpoint
+} from './full.js'
 export {
   defineFeature,
   type IWebRpcFeature,
