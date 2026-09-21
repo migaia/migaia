@@ -11,6 +11,20 @@ export type IAbortSignal = {
   removeEventListener(type: 'abort', listener: () => void): void
 }
 
+/**
+ * The abort-controller members this module consumes, named locally so the published declarations
+ * stay self-contained. A real `AbortController` satisfies it directly.
+ *
+ * The global would work inside this workspace and fail outside it: once a consumer reaches these
+ * declarations through a package that aliases them, `lib.dom` or `@types/node` becomes a silent
+ * requirement of every such consumer, and a packed consumer compiling under `lib: ["ES2022"]` fails
+ * on a name this runtime-neutral package should never have asked it to provide.
+ */
+export type IAbortControllerLike = {
+  readonly signal: IAbortSignal
+  abort(reason?: unknown): void
+}
+
 /** Stable reasons for rejecting an untrusted abort-signal-shaped value without throwing. */
 export type IAbortSignalRejection =
   | 'not-object'
@@ -544,7 +558,7 @@ type IWithTimeoutOptions = IAsyncControls & {
   readonly zeroTimeoutBehavior?: 'skip' | 'start'
   /** Disables internal cancellation allocation for deadline-only operations. */
   readonly cooperativeCancellation?: boolean
-  readonly [retryAttemptController]?: AbortController
+  readonly [retryAttemptController]?: IAbortControllerLike
 }
 
 /** Races a lazy operation against an abort-aware deadline. */
@@ -574,12 +588,12 @@ export function withTimeout<T>(
   const report = reportOption ?? hostRethrowReporter
   const internalController = (
     options as typeof options & {
-      [retryAttemptController]?: AbortController
+      [retryAttemptController]?: IAbortControllerLike
     }
   )[retryAttemptController]
   const controller =
     internalController ?? (cooperativeCancellation ? new AbortController() : undefined)
-  const operationSignal = controller?.signal as unknown as IAbortSignal | undefined
+  const operationSignal = controller?.signal
   return new Promise<T>((resolve, reject) => {
     let settled = false
     let timedOut = false
