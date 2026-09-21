@@ -10,6 +10,55 @@ export type IAbortSignal = {
   addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
   removeEventListener(type: 'abort', listener: () => void): void
 }
+
+/** Stable reasons for rejecting an untrusted abort-signal-shaped value without throwing. */
+export type IAbortSignalRejection =
+  | 'not-object'
+  | 'aborted-not-boolean'
+  | 'aborted-threw'
+  | 'listener-not-function'
+
+/** Result of one structural signal admission read; callers retain all error and abort policy. */
+export type IAbortSignalAdmission =
+  | { readonly kind: 'valid'; readonly signal: IAbortSignal; readonly aborted: boolean }
+  | { readonly kind: 'invalid'; readonly reason: IAbortSignalRejection; readonly cause?: unknown }
+
+/**
+ * Admits an abort signal shape through one `aborted` read without probing `reason` or subscribing.
+ * Getter and proxy failures remain data so the owning caller can apply its own error policy.
+ */
+export function admitAbortSignal(candidate: unknown): IAbortSignalAdmission {
+  if (candidate === null || (typeof candidate !== 'object' && typeof candidate !== 'function'))
+    return { kind: 'invalid', reason: 'not-object' }
+  try {
+    if (Array.isArray(candidate)) return { kind: 'invalid', reason: 'not-object' }
+  } catch (cause) {
+    return { kind: 'invalid', reason: 'not-object', cause }
+  }
+  /** Structural candidate is safe to type after its object-or-function and array admission checks. */
+  const signal = candidate as IAbortSignal
+  /** Captures the only `aborted` observation so mutable getters cannot be reread by this helper. */
+  let aborted: unknown
+  try {
+    aborted = signal.aborted
+  } catch (cause) {
+    return { kind: 'invalid', reason: 'aborted-threw', cause }
+  }
+  if (typeof aborted !== 'boolean') return { kind: 'invalid', reason: 'aborted-not-boolean' }
+  /** Listener methods are read together so either hostile accessor has one classified outcome. */
+  let addEventListener: unknown
+  /** Counterpart cleanup method must exist before callers can safely own an admitted signal. */
+  let removeEventListener: unknown
+  try {
+    addEventListener = signal.addEventListener
+    removeEventListener = signal.removeEventListener
+  } catch (cause) {
+    return { kind: 'invalid', reason: 'listener-not-function', cause }
+  }
+  if (typeof addEventListener !== 'function' || typeof removeEventListener !== 'function')
+    return { kind: 'invalid', reason: 'listener-not-function' }
+  return { kind: 'valid', signal, aborted }
+}
 export type IScheduledTask = { cancel(): void; unref?(): void }
 export type IUtilsScheduler = {
   now(): number

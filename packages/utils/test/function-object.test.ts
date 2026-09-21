@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { assimilateCapturedThen, once, onceAsync, probeThenable } from '../src/function.js'
+import {
+  assimilateCapturedThen,
+  MAX_NATIVE_RECURSION_DEPTH,
+  once,
+  onceAsync,
+  probeThenable
+} from '../src/function.js'
+import * as utils from '../src/index.js'
 import {
   diagnosticSnapshot,
   immutableSnapshot,
@@ -9,6 +16,11 @@ import {
 } from '../src/object.js'
 
 describe('function and object primitives', () => {
+  it('exports the shared native recursion boundary from the module and root barrel', () => {
+    expect(MAX_NATIVE_RECURSION_DEPTH).toBe(256)
+    expect(utils.MAX_NATIVE_RECURSION_DEPTH).toBe(256)
+  })
+
   it('memoizes sync and async calls', async () => {
     let calls = 0
     const value = once(() => ++calls)

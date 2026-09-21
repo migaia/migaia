@@ -640,6 +640,28 @@ describe('signal round 2 contract', () => {
     await expect(
       runAsyncGeneratorMiddleware([], 1, () => undefined, undefined, null as never)
     ).rejects.toThrowError(expect.objectContaining({ code: 'INVALID_OPTION' }))
+    const admissionCause = new Error('hostile aborted getter')
+    const malformedSignal = {
+      get aborted(): never {
+        throw admissionCause
+      },
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined
+    }
+    let malformedError: unknown
+    try {
+      runSyncMiddleware(
+        [],
+        1,
+        () => undefined,
+        () => undefined,
+        { signal: malformedSignal }
+      )
+    } catch (error) {
+      malformedError = error
+    }
+    expect(malformedError).toMatchObject({ code: 'INVALID_OPTION' })
+    expect((malformedError as Error).cause).toBe(admissionCause)
   })
 
   it('MP-T59/MP-T61 drains generator cleanup once without exposing cleanup yields', async () => {

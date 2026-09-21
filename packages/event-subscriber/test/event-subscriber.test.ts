@@ -305,6 +305,91 @@ describe('event channel', () => {
 })
 
 describe('abort overlay', () => {
+  it('ES-T187 rejects callable and array signals before observing members, and codes revoked predicates', () => {
+    let reads = 0
+    const signal = () => undefined
+    Object.defineProperty(signal, 'aborted', {
+      get: () => {
+        reads += 1
+        return false
+      }
+    })
+    const channel = createEventChannel<number>()
+
+    expect(() => channel.subscribeUntil(signal as never, () => undefined)).toThrowError(
+      expect.objectContaining({ code: EventSubscriberErrorCode.invalidSignal })
+    )
+    expect(reads).toBe(0)
+
+    let arrayReads = 0
+    const arraySignal: unknown[] = []
+    Object.defineProperty(arraySignal, 'aborted', {
+      get: () => {
+        arrayReads += 1
+        return false
+      }
+    })
+    expect(() => channel.subscribeUntil(arraySignal as never, () => undefined)).toThrowError(
+      expect.objectContaining({ code: EventSubscriberErrorCode.invalidSignal })
+    )
+    expect(arrayReads).toBe(0)
+
+    const { proxy: revokedSignal, revoke } = Proxy.revocable(
+      { aborted: false, addEventListener: () => undefined, removeEventListener: () => undefined },
+      {}
+    )
+    revoke()
+    let revokedFailure: unknown
+    try {
+      channel.subscribeUntil(revokedSignal as never, () => undefined)
+    } catch (error) {
+      revokedFailure = error
+    }
+    expect(revokedFailure).toBeInstanceOf(TypeError)
+    expect(revokedFailure).toMatchObject({ code: EventSubscriberErrorCode.invalidSignal })
+  })
+
+  it('ES-T183 keeps pre-aborted admission silent by default and rejects it only for strict channels', () => {
+    const signal = {
+      aborted: true,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined
+    }
+    const silentChannel = createEventChannel<number>()
+    expect(silentChannel.subscribeUntil(signal, () => undefined)).toBeTypeOf('function')
+
+    const strictChannel = createEventChannel<number>({ throwOnAborted: true })
+    expect(() => strictChannel.subscribeUntil(signal, () => undefined)).toThrowError(
+      expect.objectContaining({ code: EventSubscriberErrorCode.aborted })
+    )
+  })
+
+  it('ES-T184 rejects non-boolean strict abort configuration with INVALID_OPTIONS', () => {
+    expect(() => createEventChannel<number>({ throwOnAborted: null as never })).toThrowError(
+      expect.objectContaining({ code: EventSubscriberErrorCode.invalidOptions })
+    )
+  })
+
+  it('ES-T185 completes second-site cleanup before strict abort is thrown', () => {
+    let reads = 0
+    const remove = vi.fn()
+    const signal = {
+      get aborted() {
+        reads += 1
+        return reads > 1
+      },
+      addEventListener: () => undefined,
+      removeEventListener: remove
+    }
+    const channel = createEventChannel<number>({ throwOnAborted: true })
+
+    expect(() => channel.subscribeUntil(signal, () => undefined)).toThrowError(
+      expect.objectContaining({ code: EventSubscriberErrorCode.aborted })
+    )
+    expect(remove).toHaveBeenCalledOnce()
+    expect(channel.size).toBe(0)
+  })
+
   it('ES-T54 marks canonical event context aborted and releases once on signal abort', () => {
     let abortListener!: () => void
     const remove = vi.fn()

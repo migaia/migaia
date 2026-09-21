@@ -38,29 +38,70 @@ export class UtilsTimeoutError extends UtilsError {
   }
 }
 
-/** Attaches stable error identity without replacing the original error object. */
-export function attachErrorIdentity<T extends Error>(
+/** Stable identity fields shared by package-boundary native errors. */
+export type IErrorIdentity = {
+  readonly source: string
+  readonly code: string
+  readonly phase?: string
+  readonly detail?: Readonly<Record<string, unknown>>
+}
+
+/**
+ * Caller-owned recovery for an identity attachment conflict or descriptor write failure. Each hook
+ * returns the target that receives any remaining identity fields.
+ */
+export type IErrorIdentityHooks<T extends object> = {
+  readonly onConflict?: (context: {
+    readonly target: T
+    readonly key: string
+    readonly existing: unknown
+    readonly incoming: unknown
+  }) => T
+  readonly onFailure?: (context: {
+    readonly target: T
+    readonly key: string
+    readonly incoming: unknown
+    readonly cause: unknown
+  }) => T
+}
+
+/**
+ * Attaches stable identity without replacing the original object. Optional hooks let a package
+ * preserve its own fallback semantics for conflicts and non-extensible targets.
+ */
+export function attachErrorIdentity<T extends object>(
   error: T,
-  identity: {
-    readonly source: string
-    readonly code: string
-    readonly phase?: string
-    readonly detail?: Readonly<Record<string, unknown>>
-  }
+  identity: IErrorIdentity,
+  hooks?: IErrorIdentityHooks<T>
 ): T {
+  /** Target may change only when caller-selected recovery returns a replacement object. */
+  let target = error
   for (const [key, value] of Object.entries(identity)) {
-    const existing = Object.getOwnPropertyDescriptor(error, key)
-    if (existing && existing.value !== value)
-      throw new TypeError(UtilsErrorText.errorIdentityConflict(key), { cause: error })
-    if (!existing)
-      Object.defineProperty(error, key, {
+    const existing = Object.getOwnPropertyDescriptor(target, key)
+    if (existing && existing.value !== value) {
+      if (hooks?.onConflict) {
+        target = hooks.onConflict({ target, key, existing: existing.value, incoming: value })
+        continue
+      }
+      throw new TypeError(UtilsErrorText.errorIdentityConflict(key), { cause: target })
+    }
+    if (existing) continue
+    try {
+      Object.defineProperty(target, key, {
         configurable: false,
         enumerable: true,
         value,
         writable: false
       })
+    } catch (cause) {
+      if (hooks?.onFailure) {
+        target = hooks.onFailure({ target, key, incoming: value, cause })
+        continue
+      }
+      throw cause
+    }
   }
-  return error
+  return target
 }
 
 /**

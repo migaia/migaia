@@ -14,6 +14,8 @@ export const EventSubscriberErrorCode = {
    * signal.
    */
   invalidSignal: 'INVALID_SIGNAL',
+  /** A canonical channel was subscribed with an already-aborted signal under strict admission. */
+  aborted: 'ABORTED',
   /** An object subscriber lacks handle(); caller must implement the typing contract. */
   invalidSubscriber: 'INVALID_SUBSCRIBER',
   /** A hub key is not string, number, or symbol; caller must use a valid property key. */
@@ -44,8 +46,12 @@ export const EventSubscriberErrorCode = {
    * Handle descriptor projection failed after registration; the package rolls back the first
    * registration and preserves the projection failure as the primary cause.
    */
-  subscriptionHandleProjectionFailed:
-    'SUBSCRIPTION_HANDLE_PROJECTION_FAILED' /** A captured invocation was called after completion or more than once. */,
+  /**
+   * Handle descriptor projection failed after registration; the package rolls back the first
+   * registration and preserves the projection failure as the primary cause.
+   */
+  subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED',
+  /** A captured invocation was called after completion or more than once. */
   invocationClosed: 'INVOCATION_CLOSED'
 } as const
 

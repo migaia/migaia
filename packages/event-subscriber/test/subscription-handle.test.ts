@@ -7,6 +7,26 @@ import {
 } from '../src/index.js'
 
 describe('callable subscription handles', () => {
+  it('ES-T186 removes the strict abort observer before surfacing second-site ABORTED', () => {
+    let reads = 0
+    const lifecycle: string[] = []
+    const signal = {
+      get aborted() {
+        reads += 1
+        return reads > 1
+      },
+      addEventListener: () => lifecycle.push('add'),
+      removeEventListener: () => lifecycle.push('remove')
+    }
+    const channel = createEventChannel<number>({ throwOnAborted: true })
+
+    expect(() => channel.subscribeUntil(signal, () => undefined)).toThrowError(
+      expect.objectContaining({ code: EventSubscriberErrorCode.aborted })
+    )
+    expect(lifecycle).toEqual(['add', 'remove'])
+    expect(channel.size).toBe(0)
+  })
+
   it('ES-T100 keeps callable self-alias and chain identity', () => {
     const channel = createEventChannel<number>()
     const handle = channel.subscribe(() => undefined)

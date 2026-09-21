@@ -1196,4 +1196,74 @@ describe('event-subscriber contract hardening', () => {
     expect(host.calls).toBe(1)
     expect(callbacks).toHaveLength(1)
   })
+
+  // Behaviour-equivalence promise, and the case that was missing when it broke. A hostile `aborted`
+  // getter throws the caller's own value; coding it in place is what keeps `thrown === original` and
+  // its native type, and a wrapper carrying it on `cause` keeps neither. The shared validator
+  // captures that throw instead of letting it escape, so only the call site can preserve the
+  // identity — and both admission reads can lose it independently, so both are asserted here.
+  it('ES-T188 preserves the thrown identity of a hostile aborted getter at both admission reads', () => {
+    class HostileAbortedError extends RangeError {}
+
+    const entryFailure = new HostileAbortedError('aborted getter failed at entry')
+    let thrownAtEntry: unknown
+    try {
+      subscribeUntil(
+        createEventChannel<number>(),
+        {
+          get aborted(): boolean {
+            throw entryFailure
+          },
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn()
+        } as never,
+        () => undefined
+      )
+    } catch (error) {
+      thrownAtEntry = error
+    }
+    expect(thrownAtEntry).toBe(entryFailure)
+    expect(thrownAtEntry).toBeInstanceOf(HostileAbortedError)
+    expect(thrownAtEntry).toHaveProperty('code', EventSubscriberErrorCode.invalidSignal)
+
+    const installFailure = new HostileAbortedError('aborted getter failed during install')
+    let reads = 0
+    let thrownDuringInstall: unknown
+    try {
+      subscribeUntil(
+        createEventChannel<number>(),
+        {
+          get aborted(): boolean {
+            reads += 1
+            if (reads > 1) throw installFailure
+            return false
+          },
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn()
+        } as never,
+        () => undefined
+      )
+    } catch (error) {
+      thrownDuringInstall = error
+    }
+    expect(reads).toBeGreaterThan(1)
+    expect(thrownDuringInstall).toBe(installFailure)
+    expect(thrownDuringInstall).toBeInstanceOf(HostileAbortedError)
+    expect(thrownDuringInstall).toHaveProperty('code', EventSubscriberErrorCode.invalidSignal)
+
+    // A shape this package rejected itself has no original to preserve; it stays a fresh TypeError.
+    let thrownForBadShape: unknown
+    try {
+      subscribeUntil(
+        createEventChannel<number>(),
+        { aborted: 'yes', addEventListener: vi.fn(), removeEventListener: vi.fn() } as never,
+        () => undefined
+      )
+    } catch (error) {
+      thrownForBadShape = error
+    }
+    expect(thrownForBadShape).toBeInstanceOf(TypeError)
+    expect(thrownForBadShape).not.toBeInstanceOf(HostileAbortedError)
+    expect(thrownForBadShape).toHaveProperty('code', EventSubscriberErrorCode.invalidSignal)
+  })
 })

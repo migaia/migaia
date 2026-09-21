@@ -4,6 +4,7 @@ import {
   type IEventSubscriberErrorCode
 } from './error-code.js'
 import { EventSubscriberErrorText } from './error-text.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
 type IEventError = Error & {
   readonly source?: string
@@ -42,7 +43,26 @@ const isNativeErrorValue = (value: object): boolean => {
   }
 }
 
-/** Adds the package contract without replacing the original native error object. */
+/** Creates the existing package wrapper when utils cannot attach identity in place. */
+const eventErrorAttachmentFallback = <T extends object>(
+  error: T,
+  code: IEventSubscriberErrorCode,
+  attachError: unknown
+): T & {
+  readonly source: typeof EVENT_SUBSCRIBER_SOURCE
+  readonly code: IEventSubscriberErrorCode
+} => {
+  const wrapped = new TypeError(eventErrorText(code), { cause: error })
+  Object.defineProperty(wrapped, 'source', { value: EVENT_SUBSCRIBER_SOURCE, enumerable: true })
+  Object.defineProperty(wrapped, 'code', { value: code, enumerable: true })
+  Object.defineProperty(wrapped, 'detail', { value: { attachError }, enumerable: true })
+  return wrapped as unknown as T & {
+    readonly source: typeof EVENT_SUBSCRIBER_SOURCE
+    readonly code: IEventSubscriberErrorCode
+  }
+}
+
+/** Adds the package contract through utils without replacing the original native error object. */
 export const attachEventErrorCode = <T extends object>(
   error: T,
   code: IEventSubscriberErrorCode
@@ -51,21 +71,24 @@ export const attachEventErrorCode = <T extends object>(
   readonly code: IEventSubscriberErrorCode
 } => {
   try {
-    Object.defineProperty(error, 'source', { value: EVENT_SUBSCRIBER_SOURCE, enumerable: true })
-    Object.defineProperty(error, 'code', { value: code, enumerable: true })
-    return error as T & {
+    return attachErrorIdentity(
+      error,
+      { source: EVENT_SUBSCRIBER_SOURCE, code },
+      {
+        onFailure: ({ cause }) => eventErrorAttachmentFallback(error, code, cause),
+        onConflict: ({ key, existing, incoming }) =>
+          eventErrorAttachmentFallback(
+            error,
+            code,
+            new TypeError(eventErrorText(code), { cause: { key, existing, incoming } })
+          )
+      }
+    ) as T & {
       readonly source: typeof EVENT_SUBSCRIBER_SOURCE
       readonly code: IEventSubscriberErrorCode
     }
   } catch (attachError) {
-    const wrapped = new TypeError(eventErrorText(code), { cause: error })
-    Object.defineProperty(wrapped, 'source', { value: EVENT_SUBSCRIBER_SOURCE, enumerable: true })
-    Object.defineProperty(wrapped, 'code', { value: code, enumerable: true })
-    Object.defineProperty(wrapped, 'detail', { value: { attachError }, enumerable: true })
-    return wrapped as unknown as T & {
-      readonly source: typeof EVENT_SUBSCRIBER_SOURCE
-      readonly code: IEventSubscriberErrorCode
-    }
+    return eventErrorAttachmentFallback(error, code, attachError)
   }
 }
 
@@ -128,6 +151,7 @@ export const eventErrorText = (code: IEventSubscriberErrorCode): string => {
     [EventSubscriberErrorCode.invalidReporter]: EventSubscriberErrorText.invalidReporter,
     [EventSubscriberErrorCode.invalidChannel]: EventSubscriberErrorText.invalidChannel,
     [EventSubscriberErrorCode.invalidSignal]: EventSubscriberErrorText.invalidSignal,
+    [EventSubscriberErrorCode.aborted]: EventSubscriberErrorText.aborted,
     [EventSubscriberErrorCode.invalidSubscriber]: EventSubscriberErrorText.invalidSubscriber,
     [EventSubscriberErrorCode.invalidEventKey]: EventSubscriberErrorText.invalidEventKey,
     [EventSubscriberErrorCode.taskNotFound]: EventSubscriberErrorText.taskNotFound,

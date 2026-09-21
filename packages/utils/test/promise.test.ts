@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
+  admitAbortSignal,
   createAbortTimeoutSignal,
   createConcurrencyLimiter,
   createManualScheduler,
@@ -38,6 +39,72 @@ const createHostileReasonSignal = (cause: Error) => {
 }
 
 describe('promise primitives', () => {
+  it('admits only structural signals, reads aborted once, and never reads reason', () => {
+    const reasonFailure = new Error('reason must remain unread')
+    const reads = { aborted: 0, reason: 0 }
+    const signal = {
+      get aborted(): boolean {
+        reads.aborted += 1
+        return false
+      },
+      get reason(): never {
+        reads.reason += 1
+        throw reasonFailure
+      },
+      addEventListener: (): void => undefined,
+      removeEventListener: (): void => undefined
+    }
+    expect(admitAbortSignal(signal)).toEqual({ kind: 'valid', signal, aborted: false })
+    expect(reads).toEqual({ aborted: 1, reason: 0 })
+  })
+
+  it('classifies hostile and malformed signal candidates without throwing', () => {
+    const abortedFailure = new Error('aborted getter failed')
+    const listenerFailure = new Error('listener getter failed')
+    const revoked = Proxy.revocable({}, {})
+    revoked.revoke()
+
+    expect(admitAbortSignal(null)).toEqual({ kind: 'invalid', reason: 'not-object' })
+    expect(admitAbortSignal([])).toEqual({ kind: 'invalid', reason: 'not-object' })
+    expect(admitAbortSignal(revoked.proxy)).toMatchObject({
+      kind: 'invalid',
+      reason: 'not-object',
+      cause: expect.any(TypeError)
+    })
+    expect(
+      admitAbortSignal({
+        aborted: 'false',
+        addEventListener: (): void => undefined,
+        removeEventListener: (): void => undefined
+      })
+    ).toEqual({ kind: 'invalid', reason: 'aborted-not-boolean' })
+    expect(
+      admitAbortSignal({
+        get aborted(): never {
+          throw abortedFailure
+        },
+        addEventListener: (): void => undefined,
+        removeEventListener: (): void => undefined
+      })
+    ).toEqual({ kind: 'invalid', reason: 'aborted-threw', cause: abortedFailure })
+    expect(
+      admitAbortSignal({
+        aborted: false,
+        get addEventListener(): never {
+          throw listenerFailure
+        },
+        removeEventListener: (): void => undefined
+      })
+    ).toEqual({ kind: 'invalid', reason: 'listener-not-function', cause: listenerFailure })
+    expect(
+      admitAbortSignal({
+        aborted: false,
+        addEventListener: undefined,
+        removeEventListener: (): void => undefined
+      })
+    ).toEqual({ kind: 'invalid', reason: 'listener-not-function' })
+  })
+
   it('UT-T145 normalizes synchronous values without deferring the computation', async () => {
     let calls = 0
     const pending = toPromise(() => {

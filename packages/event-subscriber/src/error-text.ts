@@ -8,6 +8,8 @@ export const EventSubscriberErrorText = {
   invalidChannel: 'event-subscriber channel is invalid',
   /** Stable text for malformed abort signals or signal cleanup failures; used by subscribeUntil. */
   invalidSignal: 'event-subscriber abort signal is invalid',
+  /** Stable text for strict already-aborted channel admission; used by subscribeUntil. */
+  aborted: 'event-subscriber abort signal is already aborted',
   /** Stable text for malformed subscriber objects; used by subscribeSubscriber. */
   invalidSubscriber: 'event-subscriber subscriber must expose handle()',
   /** Stable text for unsupported hub keys; used by keyed event routing. */
@@ -29,7 +31,8 @@ export const EventSubscriberErrorText = {
   /** Stable text for extension after chain teardown; used by subscription handles. */
   subscriptionClosed: 'event-subscriber subscription is closed',
   /** Stable text for failed handle descriptor projection; used by the raw subscription owner. */
-  subscriptionHandleProjectionFailed:
-    'event-subscriber subscription handle projection failed' /** Stable text for invocation entries that are no longer callable. */,
+  /** Stable text for failed handle descriptor projection; used by the raw subscription owner. */
+  subscriptionHandleProjectionFailed: 'event-subscriber subscription handle projection failed',
+  /** Stable text for invocation entries that are no longer callable. */
   invocationClosed: 'event-subscriber invocation is closed'
 } as const
