@@ -1,4 +1,6 @@
 import { EventSubscriberErrorCode } from './error-code.js'
+import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
+import { admitAbortSignal } from '@migaia/utils/promise'
 import {
   attachEventErrorCode,
   codeExistingError,
@@ -486,6 +488,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   let dispatchPolicy: IEventChannelOptions<T, undefined, V>['dispatchPolicy']
   let removalPolicy: IEventChannelOptions<T, undefined, V>['removalPolicy']
   let publishBudget: number | undefined
+  let throwOnAborted: boolean
   let valueConfig: unknown
   let style: IEventApiStyle | undefined
   let stylePlan: IEventApiStylePlan
@@ -501,6 +504,8 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     dispatchPolicy = options.dispatchPolicy ?? EventDispatchPolicy.recursive
     removalPolicy = options.removalPolicy ?? 'handle'
     publishBudget = options.publishBudget ?? 100_000
+    const suppliedThrowOnAborted = options.throwOnAborted
+    throwOnAborted = suppliedThrowOnAborted === undefined ? false : suppliedThrowOnAborted
     valueConfig = options.valueConfig as unknown
   } catch (error) {
     throw codeExistingError(error, EventSubscriberErrorCode.invalidOptions)
@@ -554,13 +559,19 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       EventSubscriberErrorCode.invalidOptions,
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
+  if (typeof throwOnAborted !== 'boolean')
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidOptions,
+      eventErrorText(EventSubscriberErrorCode.invalidOptions)
+    )
   const normalizedOptions: IEventChannelOptions<T, undefined, V> = {
     report,
     terminalReport,
     valueConfig: valueConfig as IEventChannelOptions<T, undefined, V>['valueConfig'],
     removalPolicy,
     dispatchPolicy,
-    publishBudget
+    publishBudget,
+    throwOnAborted
   }
   const projectionPlan = suppliedProjectionPlan ?? createEventValueProjectionPlan(valueConfig)
   let first: IRegistrationOwner<T, R, V> | undefined
@@ -646,7 +657,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       for (const snapshot of snapshots) {
         if (!remaining) return
         --remaining
-        if (nativeDepth > 255) spillCapture = []
+        if (nativeDepth >= MAX_NATIVE_RECURSION_DEPTH) spillCapture = []
         let result: R | PromiseLike<R>
         try {
           result = invokeDispatchSnapshot(snapshot, value, projection)
@@ -657,7 +668,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
           if (spillCapture) {
             while (spillCapture.length) pendingValues.push(spillCapture.pop()!)
             spillCapture = undefined
-            if (nativeDepth === 256)
+            if (nativeDepth === MAX_NATIVE_RECURSION_DEPTH)
               while (pendingValues.length && remaining) dispatchValue(pendingValues.pop()!)
           }
         }
@@ -693,7 +704,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       return
     }
     if (dispatchPolicy === EventDispatchPolicy.recursive) {
-      if (!remaining || nativeDepth > 255) {
+      if (!remaining || nativeDepth >= MAX_NATIVE_RECURSION_DEPTH) {
         if (spillCapture) spillCapture.push(initialValue)
         else pendingValues.push(initialValue)
         return
@@ -1075,36 +1086,39 @@ export const subscribeUntil = <T, R, V = undefined>(
       eventErrorText(EventSubscriberErrorCode.invalidListener)
     )
   }
-  let firstAborted: unknown
+  let admission
   try {
-    if (!isRecord(signal)) {
+    if (!isRecord(signal))
       throw createEventTypeError(
         EventSubscriberErrorCode.invalidSignal,
         eventErrorText(EventSubscriberErrorCode.invalidSignal)
       )
-    }
-    if (
-      !('addEventListener' in signal) ||
-      !('removeEventListener' in signal) ||
-      typeof signal.addEventListener !== 'function' ||
-      typeof signal.removeEventListener !== 'function'
-    ) {
-      throw createEventTypeError(
-        EventSubscriberErrorCode.invalidSignal,
-        eventErrorText(EventSubscriberErrorCode.invalidSignal)
-      )
-    }
-    firstAborted = signal.aborted
+    admission = admitAbortSignal(signal)
   } catch (error) {
     throw codeExistingError(error, EventSubscriberErrorCode.invalidSignal)
   }
-  if (typeof firstAborted !== 'boolean') {
+  if (admission.kind === 'invalid') {
+    // A hostile `aborted` getter threw the caller's own value; the shared validator captures it
+    // rather than letting it escape, so this is the throw site that owns its identity. Coding it in
+    // place keeps `thrown === original` and its native type, which is what the incumbent did by
+    // reading `aborted` inside the try. A shape this package rejected itself has no such original.
+    if (admission.reason === 'aborted-threw')
+      throw codeExistingError(admission.cause, EventSubscriberErrorCode.invalidSignal)
     throw createEventTypeError(
       EventSubscriberErrorCode.invalidSignal,
-      eventErrorText(EventSubscriberErrorCode.invalidSignal)
+      eventErrorText(EventSubscriberErrorCode.invalidSignal),
+      admission.cause
     )
   }
-  if (firstAborted) return () => undefined
+  const throwOnAborted = channelCapabilities.get(channel as object)?.options.throwOnAborted === true
+  if (admission.aborted) {
+    if (throwOnAborted)
+      throw createEventTypeError(
+        EventSubscriberErrorCode.aborted,
+        eventErrorText(EventSubscriberErrorCode.aborted)
+      )
+    return () => undefined
+  }
   let overlayAborted = false
   let overlayReason: unknown
   let captured = false
@@ -1263,6 +1277,11 @@ export const subscribeUntil = <T, R, V = undefined>(
     if (secondAborted) {
       overlayAborted = true
       completeAbort(true)
+      if (throwOnAborted)
+        throw createEventTypeError(
+          EventSubscriberErrorCode.aborted,
+          eventErrorText(EventSubscriberErrorCode.aborted)
+        )
     }
     installing = false
   } catch (primary) {

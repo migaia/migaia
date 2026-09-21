@@ -1,4 +1,7 @@
 import { createMiddlewarePipelineExecutionError } from './errors.js'
+import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
+import { admitAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createMiddlewarePipelineAbortCleanupError,
   createMiddlewarePipelineAbortError,
@@ -47,12 +50,8 @@ type IGeneratorUndefinedSignal<TValue> = undefined extends TValue
   ? typeof GENERATOR_UNDEFINED
   : never
 
-export type IMiddlewarePipelineAbortSignal = {
-  readonly aborted: boolean
-  readonly reason?: unknown
-  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
-  removeEventListener(type: 'abort', listener: () => void): void
-}
+/** Public compatibility name for utils-owned structural abort-signal admission. */
+export type IMiddlewarePipelineAbortSignal = IAbortSignal
 export type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal }
 export type IMiddlewarePipelineControlOptions = {
   readonly signal?: IMiddlewarePipelineAbortSignal
@@ -127,16 +126,9 @@ const admit = (
   signal: IMiddlewarePipelineAbortSignal | undefined
 ): IMiddlewarePipelineContext | undefined => {
   if (signal === undefined) return undefined
-  if ((typeof signal !== 'object' && typeof signal !== 'function') || Array.isArray(signal))
-    throw invalidSignal()
-  const aborted = signal.aborted
-  if (
-    typeof aborted !== 'boolean' ||
-    typeof signal.addEventListener !== 'function' ||
-    typeof signal.removeEventListener !== 'function'
-  )
-    throw invalidSignal()
-  if (aborted) throw makeAbortError(signal.reason)
+  const admission = admitAbortSignal(signal)
+  if (admission.kind === 'invalid') throw invalidSignal(admission.cause)
+  if (admission.aborted) throw makeAbortError(signal.reason)
   return Object.freeze({ signal })
 }
 const check = (context: IMiddlewarePipelineContext | undefined): void => {
@@ -321,8 +313,6 @@ export const runAsyncMiddleware = async <TValue>(
   const stageSnapshot = stages.slice()
   let index = -1
   let completed = false
-  /** Bounds native recursion while retaining synchronous shallow downstream entry. */
-  const maxNativeDepth = 256
   /** Synchronous spill records used only after the native depth guard trips. */
   const spill: Array<{
     readonly value: TValue
@@ -463,7 +453,7 @@ export const runAsyncMiddleware = async <TValue>(
     drainingSpill = false
   }
   invokeStep = (current, parentControlPath) => {
-    if (drainingSpill || nativeDepth >= maxNativeDepth) {
+    if (drainingSpill || nativeDepth >= MAX_NATIVE_RECURSION_DEPTH) {
       return new Promise<void>((resolve, reject) => {
         spill.push({
           value: current,

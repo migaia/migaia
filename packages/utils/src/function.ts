@@ -2,6 +2,12 @@ import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 
 /**
+ * Maximum synchronous reentrancy before consumers spill work from the native stack.
+ * Event-subscriber dispatch and middleware-pipeline invocation share this stable boundary.
+ */
+export const MAX_NATIVE_RECURSION_DEPTH = 256
+
+/**
  * Stable outcomes for one `.then` admission read. Consumers must branch on this value instead of
  * probing a thenable again, which preserves hostile getter and receiver semantics.
  */

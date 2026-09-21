@@ -16,6 +16,65 @@ describe('error primitives', () => {
     expect(UtilsErrorCode.invalidArgument).toBe('INVALID_ARGUMENT')
   })
 
+  it('keeps the two-argument path and delegates distinct conflicts and write failures to hooks', () => {
+    const original = new Error('original')
+    const sameValue = attachErrorIdentity(original, { source: '@test', code: 'X' })
+    expect(attachErrorIdentity(sameValue, { source: '@test', code: 'X' })).toBe(original)
+
+    const conflictFallback = new Error('conflict fallback')
+    expect(
+      attachErrorIdentity(
+        original,
+        { source: '@other', code: 'X' },
+        {
+          onConflict: ({ target, key, existing, incoming }) => {
+            expect(target).toBe(original)
+            expect({ key, existing, incoming }).toEqual({
+              key: 'source',
+              existing: '@test',
+              incoming: '@other'
+            })
+            return conflictFallback
+          }
+        }
+      )
+    ).toBe(conflictFallback)
+
+    const frozen = Object.freeze(new Error('frozen'))
+    const failureFallback = new Error('failure fallback')
+    expect(
+      attachErrorIdentity(
+        frozen,
+        { source: '@test', code: 'X' },
+        {
+          onFailure: ({ target, key, incoming, cause }) => {
+            expect(target).toBe(frozen)
+            expect(key).toBe('source')
+            expect(incoming).toBe('@test')
+            expect(cause).toBeInstanceOf(TypeError)
+            return failureFallback
+          }
+        }
+      )
+    ).toBe(failureFallback)
+
+    const mixedFallback = Object.defineProperty(new Error('mixed fallback'), 'code', {
+      value: 'OTHER'
+    })
+    let mixedFailure: unknown
+    try {
+      attachErrorIdentity(
+        frozen,
+        { source: '@test', code: 'X' },
+        { onFailure: () => mixedFallback }
+      )
+    } catch (error) {
+      mixedFailure = error
+    }
+    expect(mixedFailure).toBeInstanceOf(TypeError)
+    expect((mixedFailure as Error).cause).toBe(mixedFallback)
+  })
+
   it('keeps non-error causes reachable', () => {
     const cause = { bad: true }
     expect(toError(cause).cause).toBe(cause)

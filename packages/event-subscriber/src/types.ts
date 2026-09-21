@@ -1,4 +1,5 @@
 import type { IObjectPath, IObjectPathValue } from '@migaia/utils/object-path'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { EventSubscriberState } from './state-constants.js'
 import type { IEventDispatchPolicy } from './state-constants.js'
 import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } from './style.js'
@@ -93,16 +94,8 @@ export type IEventSubscriberResultStatus =
   | typeof EventSubscriberState.fulfilled
   | typeof EventSubscriberState.rejected
 
-export type IEventAbortSignal = {
-  readonly aborted: boolean
-  readonly reason?: unknown
-  addEventListener(
-    type: IEventSubscriberAbortType,
-    listener: () => void,
-    options?: { readonly once?: boolean }
-  ): void
-  removeEventListener(type: IEventSubscriberAbortType, listener: () => void): void
-}
+/** Public compatibility name for utils-owned structural abort-signal admission. */
+export type IEventAbortSignal = IAbortSignal
 
 export type IEventContext<T> = {
   readonly value: T
@@ -340,6 +333,8 @@ export type IEventChannelOptions<
   readonly removalPolicy?: 'handle' | 'listener-all'
   /** Maximum listener invocations in one top-level synchronous publish transaction. */
   readonly publishBudget?: number
+  /** Makes already-aborted canonical-channel admission fail after owned cleanup completes. */
+  readonly throwOnAborted?: boolean
   readonly style?: IEventApiStyleOption<S>
   readonly valueConfig?: IValidatedEventValueConfig<T, V>
 }
