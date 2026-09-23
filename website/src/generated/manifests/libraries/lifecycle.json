@@ -3,7 +3,7 @@
   "library": {
     "slug": "lifecycle",
     "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "exports": [
       ".",
       "./abort",

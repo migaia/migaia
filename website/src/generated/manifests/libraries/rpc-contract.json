@@ -3,7 +3,7 @@
   "library": {
     "slug": "rpc-contract",
     "description": "Runtime-neutral RPC semantic and framing contracts.",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "exports": [".", "./framing", "./framing/v1", "./v1"],
     "documentation": {
       "readme": {

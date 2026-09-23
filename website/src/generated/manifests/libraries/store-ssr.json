@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-ssr",
     "description": "Request-scoped Store SSR dehydration and hydration.",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "exports": ["."],
     "documentation": {
       "readme": {

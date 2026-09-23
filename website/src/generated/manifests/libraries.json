@@ -4,7 +4,7 @@
     {
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": [".", "./graph", "./graph/dynamic", "./graph/topology"],
       "documentation": {
         "readme": {
@@ -1253,7 +1253,7 @@
     {
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [".", "./subscriber"],
       "documentation": {
         "readme": {
@@ -2470,7 +2470,7 @@
     {
       "slug": "lifecycle",
       "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [
         ".",
         "./abort",
@@ -4689,8 +4689,8 @@
     {
       "slug": "logger",
       "description": null,
-      "version": "0.0.6",
-      "exports": [".", "./plugins"],
+      "version": "0.0.7",
+      "exports": [".", "./plugins", "./plugins/file"],
       "documentation": {
         "readme": {
           "sections": [
@@ -4861,6 +4861,12 @@
                       "`config: IHttpPluginConfig`（`url` 必填）",
                       "同步",
                       "把 entry 批量 POST 到 HTTP endpoint，内置重试/超时/429 退避"
+                    ],
+                    [
+                      "`file(config)`",
+                      "`config: IFilePluginConfig`（`path` 必填）",
+                      "同步",
+                      "批量写入逐行 JSON；仅从 `@migaia/logger/plugins/file` 导入"
                     ],
                     [
                       "`process(config?)`",
@@ -5613,6 +5619,21 @@
               ]
             },
             {
+              "id": "文件插件-独立子路径",
+              "heading": "文件插件（独立子路径）",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')"
+                }
+              ]
+            },
+            {
               "id": "9-5-process-config",
               "heading": "9.5 process(config?)",
               "blocks": [
@@ -5842,6 +5863,11 @@
                       "`batchOverflow`",
                       "`BATCH_OVERFLOW`",
                       "pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃"
+                    ],
+                    [
+                      "`fileSinkUnavailable`",
+                      "`FILE_SINK_UNAVAILABLE`",
+                      "file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件"
                     ]
                   ]
                 }
@@ -5893,7 +5919,7 @@
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -6845,8 +6871,8 @@
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-      "version": "0.0.6",
-      "exports": [".", "./composition", "./defined", "./structural"],
+      "version": "0.0.7",
+      "exports": [".", "./composition"],
       "documentation": {
         "readme": {
           "sections": [
@@ -6946,7 +6972,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, descriptorFactory) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>('upper', (core) => ({\n  install: () => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}))\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
+                  "code": "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, descriptorFactory) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>('upper', (core) => ({\n  install: () => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}))\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -6955,6 +6981,20 @@
                 {
                   "type": "paragraph",
                   "text": "`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后返回不可变 view，业务代码从 `view.extensions` 调用这些方法；`view.unUse()` 卸载插件，`host.dispose()` 关闭整个宿主。"
+                }
+              ]
+            },
+            {
+              "id": "禁用不是卸载",
+              "heading": "禁用不是卸载",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`host.plugin.disable(name)` 暂时关闭该插件的 extension、Feature expose、pipeline stage 和 shared 能力，返回收缩后的 view 与可精确还原类型的 `token`。`await token.enable()` 恢复原插件与 stage 顺序；按字符串操作时可用 `host.plugin.enable(name)`，当前禁用列表由 `host.plugin.disabled()` 返回。class 宿主与 `defineHost()` handle 使用同一套入口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "禁用保留资源与插件注册，不调用 `dispose` 或资源 disposer。`onDisable`/`onEnable` 只是通知：安装成功后先发一次 `onEnable`，之后每次真实状态切换各发一次；钩子失败只进入诊断，不回滚已提交状态。需要释放资源时调用 `unUse(name)`。被禁用插件拥有的 shared 键抛 `PREREQUISITE_DISABLED`（可启用恢复），卸载后抛 `PREREQUISITE_REMOVED`（需重装），从未发布的键仍返回 `undefined`。"
                 }
               ]
             },
@@ -7261,8 +7301,8 @@
                   "type": "list",
                   "items": [
                     "`PluginHostError`：本包语义化错误的基类，`extends Error`，携带只读 `source`（恒为 `'@migaia/plugin-host'`）、`code: IPluginHostErrorCode`、可选 `detail`（结构化诊断字段，如队列超时的 `owner`/`waitedMs`）。除此之外，插件名/配置路径/pipeline stage/extension/domain core/资源 disposer 等入参校验失败一律用原生 `TypeError`（挂 `code: 'INVALID_OPTION'`）表达，不是 `PluginHostError`——判断输入错误用 `error instanceof TypeError`，判断协议/状态错误用 `error instanceof PluginHostError` 或按 `error.code` 分支。",
-                    "`PluginHostErrorCode`：32 个稳定错误码常量对象，取值见 USEGUIDE §9。",
-                    "导出的稳定码包括：`HOST_DISPOSED`、`HOST_DISPOSING`、`HOST_CORE_SETUP_FAILED`、`HOST_SETUP_TIMEOUT`、`HOST_SETUP_ABORTED`、`HOST_SETUP_ROLLBACK_FAILED`、`PLUGIN_DUPLICATE`、`PLUGIN_NOT_INSTALLED`、`PLUGIN_INSTALL_FAILED`、`PLUGIN_DISPOSE_FAILED`、`HOST_DISPOSE_FAILED`、`EXTENSION_DUPLICATE`、`EXTENSION_OBJECT_PROTOTYPE`、`EXTENSION_RESERVED`、`SHARED_DUPLICATE`、`RESOURCE_OUTSIDE_INSTALL`、`LIFECYCLE_MUTATION`、`INVALID_PIPELINE_MODE`、`PIPELINE_MODE_MISMATCH`、`PIPELINE_NEXT_DUPLICATE`、`PIPELINE_NEXT_LATE`、`PIPELINE_EXECUTING`、`PIPELINE_FAILED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`MUTATION_QUEUE_TIMEOUT`、`DISPOSE_STEP_TIMEOUT`、`INVALID_OPTION`、`MUTATION_EXECUTION_TIMEOUT`、`VIEW_REVOKED`、`PIPELINE_DRAIN_TIMEOUT`、`CLEANUP_INCOMPLETE`。完整触发条件与处理建议见 USEGUIDE §9。",
+                    "`PluginHostErrorCode`：33 个稳定错误码常量对象，取值见 USEGUIDE §9。",
+                    "导出的稳定码包括：`HOST_DISPOSED`、`HOST_DISPOSING`、`PLUGIN_DUPLICATE`、`PLUGIN_NOT_INSTALLED`、`PLUGIN_INSTALL_FAILED`、`PLUGIN_DISPOSE_FAILED`、`EXTENSION_DUPLICATE`、`EXTENSION_OBJECT_PROTOTYPE`、`EXTENSION_RESERVED`、`SHARED_DUPLICATE`、`PREREQUISITE_DISABLED`、`PREREQUISITE_REMOVED`、`RESOURCE_OUTSIDE_INSTALL`、`LIFECYCLE_MUTATION`、`INVALID_PIPELINE_MODE`、`PIPELINE_MODE_MISMATCH`、`PIPELINE_NEXT_DUPLICATE`、`PIPELINE_NEXT_LATE`、`PIPELINE_EXECUTING`、`PIPELINE_FAILED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`、`INSTALL_RESULT_THENABLE`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`MUTATION_QUEUE_TIMEOUT`、`DISPOSE_STEP_TIMEOUT`、`INVALID_OPTION`、`INVALID_CONFIG_VALUE`、`CONFIG_CYCLE_REJECTED`、`MUTATION_EXECUTION_TIMEOUT`、`VIEW_REVOKED`、`PIPELINE_DRAIN_TIMEOUT`、`CLEANUP_INCOMPLETE`、`COMPOSITION_TARGET_UNMANAGED`。完整触发条件与处理建议见 USEGUIDE §9。",
                     "`ERROR_TEXT`（默认导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHost.setLocale(locale: ILocaleKey)`：静态方法，`ILocaleKey = 'en' | 'zh'`，切换 `ERROR_TEXT` 与后续抛出错误的默认语言，默认 `'zh'`，全局生效（不是每个 Host 实例独立）。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
@@ -7783,11 +7823,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  install: () => ({ check: () => ({ ok: true as const }) })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})"
+                  "code": "import { definePlugin } from '@migaia/plugin-host'\n\nconst health = definePlugin('health', () => ({\n  install: () => ({ check: () => ({ ok: true as const }) })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})"
                 },
                 {
                   "type": "paragraph",
-                  "text": "第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
+                  "text": "第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`defineHost()` 与 `PluginHost` 都只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
                 },
                 {
                   "type": "paragraph",
@@ -8078,12 +8118,30 @@
               ]
             },
             {
+              "id": "禁用与启用",
+              "heading": "禁用与启用",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`host.plugin.disable(name)` 只切换可达性，返回 `{ token, view }`：新 view 的 extension 类型和运行时键都不含被禁用插件；禁用前保存的 extension 与 Feature expose 会报 `VIEW_REVOKED`。`await token.enable()` 用同一注册恢复精确类型和原 stage 位置。`host.plugin.enable(name)` 面向字符串操作，返回动态 view；`host.plugin.disabled()` 返回当前禁用插件名的只读快照。`PluginHost` class 与 `defineHost()` handle 都提供这个门面。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "禁用不会调用插件 `dispose`、资源 disposer，也不释放 scope；它不是轻量卸载。`onDisable`/`onEnable` 是通知钩子，失败经 `diagnostic` 上报而不回滚。初装成功后也会触发一次 `onEnable`。要回收资源须调用 `unUse(name)`。禁用期间 `host.config` 仍可读取和更新该插件配置；收缩后的 view 在类型层不再列出被禁用插件配置，需要更新时从宿主自身的 `config` 入口操作。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "已发布的 shared 键若所有者被禁用，`getShared` 抛 `PREREQUISITE_DISABLED`，`detail.recoverable === true`；卸载后同一键抛 `PREREQUISITE_REMOVED`，`detail.recoverable === false`。一个新插件重新发布该键后，读取恢复正常。从未发布的键仍返回 `undefined`。"
+                }
+              ]
+            },
+            {
               "id": "9-错误码完整参考",
               "heading": "9. 错误码完整参考",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`PluginHostErrorCode` 导出以下 32 个稳定错误码，均可通过 `error.code` 分支处理："
+                  "text": "`PluginHostErrorCode` 导出以下 33 个稳定错误码，均可通过 `error.code` 分支处理："
                 },
                 {
                   "type": "table",
@@ -8091,13 +8149,6 @@
                   "rows": [
                     ["`HOST_DISPOSED`", "Host 已完成卸载，不能再访问或变更。"],
                     ["`HOST_DISPOSING`", "Host 正在卸载，不能开始新的变更。"],
-                    ["`HOST_CORE_SETUP_FAILED`", "Core 构造失败；原始错误位于 `cause`。"],
-                    ["`HOST_SETUP_TIMEOUT`", "Host setup 超过配置的截止时间。"],
-                    ["`HOST_SETUP_ABORTED`", "Host setup 被调用方取消。"],
-                    [
-                      "`HOST_SETUP_ROLLBACK_FAILED`",
-                      "setup 失败且回滚清理也失败；原始错误保持可追踪。"
-                    ],
                     ["`PLUGIN_DUPLICATE`", "插件已安装，或同一批次中出现重复名字。"],
                     [
                       "`PLUGIN_NOT_INSTALLED`",
@@ -8108,8 +8159,15 @@
                       "`PLUGIN_INSTALL_ROLLBACK_FAILED`",
                       "诊断（非抛出）：插件安装失败且回滚清理也失败；原始安装错误保持 primary（顶层码 `PLUGIN_INSTALL_FAILED`），回滚失败经 `diagnostic` 上报。"
                     ],
+                    [
+                      "`INSTALL_RESULT_THENABLE`",
+                      "插件 `install()` 返回值自带 `then` key；同步 `useSync()` 与异步 `use()` 一致拒绝，不会发布可被误当作 Promise 的扩展。"
+                    ],
+                    [
+                      "`COMPOSITION_TARGET_UNMANAGED`",
+                      "`openComposition()` 的目标不是本包登记的托管宿主。托管协议只对本包构造出的宿主开放，普通对象、另一份包副本产出的宿主都会被拒绝；组合方应先用 `isManagedHost()` 判定。"
+                    ],
                     ["`PLUGIN_DISPOSE_FAILED`", "单个插件卸载失败；原始错误位于 `cause`。"],
-                    ["`HOST_DISPOSE_FAILED`", "Host 整体卸载失败；原始错误位于 `cause`。"],
                     ["`EXTENSION_DUPLICATE`", "extension key 与已有成员冲突。"],
                     [
                       "`EXTENSION_OBJECT_PROTOTYPE`",
@@ -8124,6 +8182,11 @@
                       "诊断（非抛出）：`install()` 返回值上的非枚举 key 被有意忽略，未挂载到 Host；通过 `diagnostic` 回调上报。"
                     ],
                     ["`SHARED_DUPLICATE`", "shared key 已被占用。"],
+                    ["`PREREQUISITE_DISABLED`", "shared key 的所有者被禁用；可启用该插件后重试。"],
+                    [
+                      "`PREREQUISITE_REMOVED`",
+                      "shared key 的所有者已卸载；需重新安装提供该键的插件。"
+                    ],
                     [
                       "`RESOURCE_OUTSIDE_INSTALL`",
                       "在允许的插件生命周期之外注册资源或 pipeline stage。"
@@ -8167,6 +8230,14 @@
                     [
                       "`CLEANUP_INCOMPLETE`",
                       "逻辑清理已提交但仍有物理 cleanup 未完成；调用方应观察 `physicalCompletion`。"
+                    ],
+                    [
+                      "`INVALID_CONFIG_VALUE`",
+                      "config 值不满足准入的 plain-data 语法（如 symbol、非法原型、危险键名、descriptor、thenable）；调用方需改用受支持的取值。"
+                    ],
+                    [
+                      "`CONFIG_CYCLE_REJECTED`",
+                      "config 输入存在引用循环；调用方需提供无环的值图。"
                     ],
                     [
                       "`INVALID_OPTION`",
@@ -8365,7 +8436,7 @@
     {
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [
         ".",
         "./copy-check",
@@ -9346,7 +9417,7 @@
     {
       "slug": "resource",
       "description": "Store-neutral cancellable asynchronous reactive resources.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -9971,7 +10042,7 @@
     {
       "slug": "rpc-contract",
       "description": "Runtime-neutral RPC semantic and framing contracts.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": [".", "./framing", "./framing/v1", "./v1"],
       "documentation": {
         "readme": {
@@ -10050,7 +10121,7 @@
     {
       "slug": "serialize",
       "description": "Store-neutral chunked serialization and codec registry.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [
         ".",
         "./codec",
@@ -11572,7 +11643,7 @@
     {
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -12795,7 +12866,7 @@
     {
       "slug": "storage-web",
       "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [
         ".",
         "./cookies",
@@ -14949,7 +15020,7 @@
     {
       "slug": "store-devtools",
       "description": "Store dependency tracing, snapshots, and time travel diagnostics.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -15720,7 +15791,7 @@
     {
       "slug": "store-indexed",
       "description": "Indexed reactive collections with lazy cell materialization.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -16861,7 +16932,7 @@
     {
       "slug": "store-keyed",
       "description": "Definition-based keyed Store state, AtomStore, family, and optics.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": [".", "./atom/definition", "./atom/store", "./reactive/atom"],
       "documentation": {
         "readme": {
@@ -18745,7 +18816,7 @@
     {
       "slug": "store-light",
       "description": "Minimal object-state Store facade.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -20057,7 +20128,7 @@
     {
       "slug": "store-middleware",
       "description": "Store mutation policy and middleware pipeline.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": [".", "./tolerant-clone"],
       "documentation": {
         "readme": {
@@ -20989,7 +21060,7 @@
     {
       "slug": "store-persist",
       "description": "Store snapshot persistence and storage adapter protocol.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": [".", "./indexed", "./keyed", "./light"],
       "documentation": {
         "readme": {
@@ -21829,7 +21900,7 @@
     {
       "slug": "store-react",
       "description": "React Provider and hooks for the Store runtime.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -23096,7 +23167,7 @@
     {
       "slug": "store-shared",
       "description": "SharedArrayBuffer and Atomics-backed Store state.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -24119,7 +24190,7 @@
     {
       "slug": "store-ssr",
       "description": "Request-scoped Store SSR dehydration and hydration.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -25519,7 +25590,7 @@
     {
       "slug": "store-wasm",
       "description": "Optional WASM-backed fields for Store light.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -26481,7 +26552,7 @@
     {
       "slug": "store-worker",
       "description": "Worker adapters and worker-backed Resource/serialization integrations.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": [".", "./serialize/*"],
       "documentation": {
         "readme": {
@@ -27602,7 +27673,7 @@
     {
       "slug": "tray",
       "description": null,
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": [".", "./adapter", "./host", "./loader", "./runtime"],
       "documentation": {
         "readme": {
@@ -30286,7 +30357,7 @@
     {
       "slug": "wasm",
       "description": null,
-      "version": "0.1.0",
+      "version": "0.1.1",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -30520,7 +30591,7 @@
     {
       "slug": "web-rpc",
       "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
-      "version": "0.0.4",
+      "version": "0.0.7",
       "exports": [
         ".",
         "./adapters/broadcast-channel",

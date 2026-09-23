@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-devtools",
     "description": "Store dependency tracing, snapshots, and time travel diagnostics.",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "exports": ["."],
     "documentation": {
       "readme": {

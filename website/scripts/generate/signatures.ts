@@ -1792,13 +1792,13 @@ async function generateManifests() {
           target.set(key, localizedCandidates)
         }
       }
-  /** Maintained descriptions for setupHost fields whose declaration comments live above aliases. */
-  const setupHostDescriptions: Readonly<Record<string, string>> = {
-    setupTimeoutMs: 'Maximum time allowed for core creation and the initial plugin transaction.',
-    signal: 'Abort signal that cancels setup and triggers rollback of resources already created.',
-    core: 'Factory that creates the domain core before any plugin installer runs.',
-    plugins:
-      'Initial plugin definitions installed together before the returned view becomes visible.',
+  /** Maintained descriptions for defineHost fields whose declaration comments live above aliases. */
+  const defineHostDescriptions: Readonly<Record<string, string>> = {
+    host: 'Runtime policies forwarded to the canonical Host engine.',
+    domainCore: "Factory for one plugin registration's domain capabilities.",
+    translateDisposalError: 'Optional package-boundary translation for terminal cleanup failures.',
+    dispose: 'Optional wrapper around the canonical terminal disposal operation.',
+    receiver: 'Optional this receiver for callable extensions.',
     'host.diagnostic': 'Optional sink for queue, lifecycle, and pipeline diagnostics.',
     'host.pipeline.mode': 'Selects the admitted pipeline execution mode for the new host.'
   }
@@ -1815,21 +1815,23 @@ async function generateManifests() {
           const candidatesZh = descriptionCandidatesZh.get(
             `${api.library}:${field.name}:${field.type}`
           )
-          const setupHostDescription =
-            api.library === 'plugin-host' && api.module === 'defined'
-              ? setupHostDescriptions[field.name]
+          const defineHostDescription =
+            api.library === 'plugin-host' &&
+            api.module === 'index' &&
+            String(symbol.identity).includes(':defineHost:')
+              ? defineHostDescriptions[field.name]
               : undefined
           return {
             ...field,
             description:
               field.description ||
               (candidates?.size === 1 ? ([...candidates][0] ?? '') : '') ||
-              setupHostDescription ||
+              defineHostDescription ||
               '',
             descriptionEn:
               field.descriptionEn ||
               (candidatesEn?.size === 1 ? ([...candidatesEn][0] ?? '') : '') ||
-              setupHostDescription ||
+              defineHostDescription ||
               '',
             descriptionZh:
               field.descriptionZh || (candidatesZh?.size === 1 ? ([...candidatesZh][0] ?? '') : '')

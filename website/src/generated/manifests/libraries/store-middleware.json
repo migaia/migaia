@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-middleware",
     "description": "Store mutation policy and middleware pipeline.",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "exports": [".", "./tolerant-clone"],
     "documentation": {
       "readme": {
@@ -1503,7 +1503,7 @@
         {
           "name": "createStoreMiddlewareHost",
           "kind": "function",
-          "signature": "export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): StoreMiddlewareHost<S>;",
+          "signature": "export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;",
           "declarationLine": 33,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "createStoreMiddlewareHost is part of this module's public function contract.",
@@ -1517,7 +1517,7 @@
               "optional": false
             }
           ],
-          "returns": "StoreMiddlewareHost<S>",
+          "returns": "IStoreMiddlewareHost<S>",
           "errors": ["No documented errors are declared for createStoreMiddlewareHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreMiddlewareHost.",
           "examples": [
@@ -1527,7 +1527,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): StoreMiddlewareHost<S>;"
+            "export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;"
           ],
           "overloadParameterDetails": [
             [
@@ -1538,7 +1538,7 @@
               }
             ]
           ],
-          "overloadReturns": ["StoreMiddlewareHost<S>"],
+          "overloadReturns": ["IStoreMiddlewareHost<S>"],
           "whenToUse": "Use createStoreMiddlewareHost when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createStoreMiddlewareHost does not match the required inputs or return contract.",
           "sections": [
@@ -1599,7 +1599,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:createStoreMiddlewareHost:export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): StoreMiddlewareHost<S>;",
+          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:createStoreMiddlewareHost:export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;",
           "guidance": [],
           "usageScore": 26,
           "configuration": [
@@ -2544,7 +2544,7 @@
         {
           "name": "IStoreMiddlewareBinding",
           "kind": "type",
-          "signature": "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<Record<string, unknown>> & { readonly store: IReactiveStore<S>; };",
+          "signature": "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<Record<string, unknown>> & { readonly store: IReactiveStore<S>; };",
           "declarationLine": 42,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "IStoreMiddlewareBinding is part of this module's public type contract.",
@@ -2561,7 +2561,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<Record<string, unknown>> & { readonly store: IReactiveStore<S>; };"
+            "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<Record<string, unknown>> & { readonly store: IReactiveStore<S>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2600,7 +2600,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareBinding:export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<Record<string, unknown>> & { readonly store: IReactiveStore<S>; };",
+          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareBinding:export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<Record<string, unknown>> & { readonly store: IReactiveStore<S>; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -2675,7 +2675,7 @@
           "name": "IStoreMiddlewareCore",
           "kind": "type",
           "signature": "export type IStoreMiddlewareCore<S> = { readonly runtime: IRuntime; getState(): S; applyState(state: S): void; reportError(error: unknown, phase: string): void; };",
-          "declarationLine": 6,
+          "declarationLine": 5,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "IStoreMiddlewareCore is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreMiddlewareCore.",
@@ -2739,10 +2739,73 @@
           "fragment": "store-middleware-index--IStoreMiddlewareCore"
         },
         {
+          "name": "IStoreMiddlewareHost",
+          "kind": "type",
+          "signature": "export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Readonly<{ readonly mutationPolicy: MutationPolicy; emit(event: IMiddlewareEvent<S>): void; runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T; recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void; recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void; connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; attachBindingDisposer(disposer: IDisposer): void; }>;",
+          "declarationLine": 24,
+          "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
+          "purpose": "Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 plugin-host 提供。 由 `defineHost` 组合而成而不是继承 `PluginHost`：这个壳层真正需要基类的只有一个 domain core 钩子 和一条 dispose 前置，继承却把宿主的整个表面一并交了出去。句柄只带 Store 自己的成员加宿主的公开面。",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreMiddlewareHost.",
+          "advanced": "No additional advanced behavior is declared for IStoreMiddlewareHost.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStoreMiddlewareHost."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreMiddlewareHost.",
+          "examples": [],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Readonly<{ readonly mutationPolicy: MutationPolicy; emit(event: IMiddlewareEvent<S>): void; runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T; recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void; recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void; connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; attachBindingDisposer(disposer: IDisposer): void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStoreMiddlewareHost when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStoreMiddlewareHost does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 plugin-host 提供。 由 `defineHost` 组合而成而不是继承 `PluginHost`：这个壳层真正需要基类的只有一个 domain core 钩子 和一条 dispose 前置，继承却把宿主的整个表面一并交了出去。句柄只带 Store 自己的成员加宿主的公开面。"
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStoreMiddlewareHost from @migaia/store-middleware, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStoreMiddlewareHost when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreMiddlewareHost does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreMiddlewareHost."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStoreMiddlewareHost."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareHost:export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Readonly<{ readonly mutationPolicy: MutationPolicy; emit(event: IMiddlewareEvent<S>): void; runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T; recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void; recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void; connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; attachBindingDisposer(disposer: IDisposer): void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "store-middleware-index--IStoreMiddlewareHost"
+        },
+        {
           "name": "IStoreMiddlewareHostOptions",
           "kind": "type",
           "signature": "export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & { readonly runtime: IRuntime; readonly getState: () => S; readonly applyState?: (state: S) => void; readonly mutationPolicy?: MutationPolicy; };",
-          "declarationLine": 13,
+          "declarationLine": 12,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "IStoreMiddlewareHostOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreMiddlewareHostOptions.",
@@ -2807,7 +2870,7 @@
           "name": "IStoreMiddlewarePlugin",
           "kind": "type",
           "signature": "export type IStoreMiddlewarePlugin<S, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends Record<string, unknown> = Record<string, unknown>, TShared extends object = Record<string, never>> = IPlugin<IStoreMiddlewareCore<S> & import('@migaia/plugin-host').IPluginHostCore<IMiddlewareEvent<S>>, TExt, TConfig, TShared>;",
-          "declarationLine": 12,
+          "declarationLine": 11,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "IStoreMiddlewarePlugin is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreMiddlewarePlugin.",
@@ -3435,328 +3498,6 @@
           "usageScore": 12,
           "configuration": [],
           "fragment": "store-middleware-index--STORE_MIDDLEWARE_SOURCE"
-        },
-        {
-          "name": "StoreMiddlewareHost",
-          "kind": "class",
-          "signature": "export declare class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> { #private; readonly mutationPolicy: MutationPolicy; constructor(options: IStoreMiddlewareHostOptions<S>); protected createPluginDomainCore(): IStoreMiddlewareCore<S>; emit(event: IMiddlewareEvent<S>): void; runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T; recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void; recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void; connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; attachBindingDisposer(disposer: IDisposer): void; dispose(): Promise<IPluginHostDisposalResult>; }",
-          "declarationLine": 20,
-          "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
-          "purpose": "Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 PluginHost 提供。",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreMiddlewareHost.",
-          "advanced": "No additional advanced behavior is declared for StoreMiddlewareHost.",
-          "parameters": ["options: IStoreMiddlewareHostOptions<S>"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "IStoreMiddlewareHostOptions<S>",
-              "optional": false
-            }
-          ],
-          "returns": "No explicit return annotation is declared for this class.",
-          "errors": ["No documented errors are declared for StoreMiddlewareHost."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreMiddlewareHost.",
-          "examples": [
-            "const host = new StoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state\n});\nhost.runAction('increment', () => {\n  state = { ...state, count: state.count + 1 };\n});\n  await host.dispose(); // returns the structured PluginHost disposal result"
-          ],
-          "members": [
-            {
-              "name": "mutationPolicy",
-              "kind": "property",
-              "signature": "readonly mutationPolicy: MutationPolicy;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "MutationPolicy"
-            },
-            {
-              "name": "emit",
-              "kind": "method",
-              "signature": "emit(event: IMiddlewareEvent<S>): void;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "event",
-                  "type": "IMiddlewareEvent<S>",
-                  "optional": false
-                }
-              ],
-              "returns": "void"
-            },
-            {
-              "name": "runAction",
-              "kind": "method",
-              "signature": "runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "name",
-                  "type": "string",
-                  "optional": false
-                },
-                {
-                  "name": "fn",
-                  "type": "() => T",
-                  "optional": false
-                },
-                {
-                  "name": "metadata",
-                  "type": "Readonly<Record<string, unknown>>",
-                  "optional": true
-                }
-              ],
-              "returns": "T"
-            },
-            {
-              "name": "recordState",
-              "kind": "method",
-              "signature": "recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "name",
-                  "type": "string",
-                  "optional": false
-                },
-                {
-                  "name": "previous",
-                  "type": "S",
-                  "optional": false
-                },
-                {
-                  "name": "next",
-                  "type": "S",
-                  "optional": false
-                },
-                {
-                  "name": "metadata",
-                  "type": "Readonly<Record<string, unknown>>",
-                  "optional": true
-                }
-              ],
-              "returns": "void"
-            },
-            {
-              "name": "recordError",
-              "kind": "method",
-              "signature": "recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "phase",
-                  "type": "string",
-                  "optional": false
-                },
-                {
-                  "name": "error",
-                  "type": "unknown",
-                  "optional": false
-                },
-                {
-                  "name": "metadata",
-                  "type": "Readonly<Record<string, unknown>>",
-                  "optional": true
-                }
-              ],
-              "returns": "void"
-            },
-            {
-              "name": "connectDevTools",
-              "kind": "method",
-              "signature": "connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "adapter",
-                  "type": "IDevToolsAdapter<S>",
-                  "optional": false
-                },
-                {
-                  "name": "name",
-                  "type": "string",
-                  "optional": true
-                }
-              ],
-              "returns": "Promise<void>"
-            },
-            {
-              "name": "attachBindingDisposer",
-              "kind": "method",
-              "signature": "attachBindingDisposer(disposer: IDisposer): void;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "disposer",
-                  "type": "IDisposer",
-                  "optional": false
-                }
-              ],
-              "returns": "void"
-            },
-            {
-              "name": "dispose",
-              "kind": "method",
-              "signature": "dispose(): Promise<IPluginHostDisposalResult>;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "Promise<IPluginHostDisposalResult>"
-            }
-          ],
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> { #private; readonly mutationPolicy: MutationPolicy; constructor(options: IStoreMiddlewareHostOptions<S>); protected createPluginDomainCore(): IStoreMiddlewareCore<S>; emit(event: IMiddlewareEvent<S>): void; runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T; recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void; recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void; connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; attachBindingDisposer(disposer: IDisposer): void; dispose(): Promise<IPluginHostDisposalResult>; }"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "IStoreMiddlewareHostOptions<S>",
-                "optional": false
-              }
-            ]
-          ],
-          "overloadReturns": [],
-          "whenToUse": "Use StoreMiddlewareHost when its class contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when StoreMiddlewareHost does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 PluginHost 提供。"
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import StoreMiddlewareHost from @migaia/store-middleware, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use StoreMiddlewareHost when its class contract and declared inputs match the result you need. Choose a different public symbol when StoreMiddlewareHost does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreMiddlewareHost."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for StoreMiddlewareHost."
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "runtime",
-              "type": "IRuntime",
-              "optional": false,
-              "description": ""
-            },
-            {
-              "name": "getState",
-              "type": "() => S",
-              "optional": false,
-              "description": ""
-            },
-            {
-              "name": "applyState",
-              "type": "(state: S) => void",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "mutationPolicy",
-              "type": "MutationPolicy",
-              "optional": true,
-              "description": ""
-            }
-          ],
-          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:StoreMiddlewareHost:export declare class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> { #private; readonly mutationPolicy: MutationPolicy; constructor(options: IStoreMiddlewareHostOptions<S>); protected createPluginDomainCore(): IStoreMiddlewareCore<S>; emit(event: IMiddlewareEvent<S>): void; runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T; recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void; recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void; connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; attachBindingDisposer(disposer: IDisposer): void; dispose(): Promise<IPluginHostDisposalResult>; }",
-          "guidance": [
-            {
-              "id": "9-pipeline-模式与错误边界",
-              "heading": "9. Pipeline 模式与错误边界",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为 `ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告 `MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；多项清理失败为 `CLEANUP_FAILED`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`StoreMiddlewareHost` 的 pipeline 模式固定是 `sync`（见 §4），这决定了："
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "中间件只能用 `core.usePipeline((event, next) => void)`，`next(event)` 必须在 stage 函数返回前调用。",
-                    "sync 是\"扁平转换管道\"：`next()` 只是记录下一个值，下游 stage 在当前 stage 返回之后才执行，当前 stage 调用 `next()` 之后无法同步观察到下游已经处理完的结果（想要\"后置逻辑能看到下游效果\"的洋葱模型语义，需要 async pipeline——但本包的 Host 不支持切换）。",
-                    "`emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走 `#emitIsolated()`：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，不会从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。",
-                    "如果一个 pipeline stage 忘了调用 `next()`，`emit()` 会检测到 `completed` 标记未被置位，同样以 `phase: 'trace-listener'` 上报一条 `[store] middleware did not call next()` 错误。"
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "更细的 pipeline 执行顺序、错误码、`onDispose` 清理协议等通用机制，见 `@migaia/plugin-host` 的 USEGUIDE。"
-                }
-              ]
-            },
-            {
-              "id": "10-生命周期与资源释放",
-              "heading": "10. 生命周期与资源释放",
-              "blocks": [
-                {
-                  "type": "list",
-                  "items": [
-                    "`host.use(plugin)` / `host.unUse(name)` / `host.dispose()` 都是异步 API，语义完全继承自 `@migaia/plugin-host`——安装失败自动回滚，卸载资源自动逆序清理。",
-                    "`StoreMiddlewareHost` 重写了 `dispose()`：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再调用 `super.dispose()` 卸载所有已安装插件。",
-                    "`host.dispose()` 不会销毁 Store 或 Runtime，只释放这个 middleware Host 自己拥有的资源（订阅、已安装插件）。",
-                    "同一个 Host 内插件名称必须唯一；重复安装同名插件会按 `@migaia/plugin-host` 的规则报错。",
-                    "middleware 诊断层的失败不应该、也不会阻断业务写入；真正的业务异常仍按原始异常传播（见 §9）。"
-                  ]
-                }
-              ]
-            }
-          ],
-          "usageScore": 90,
-          "configuration": [
-            {
-              "name": "runtime",
-              "type": "IRuntime",
-              "optional": false,
-              "description": "`emit(event)` — `event: IMiddlewareEvent<S>` — 同步 — 同步跑一遍 pipeline；若某个 stage 忘了调用 `next()`，会以 `phase: 'trace-listener'` 上报到 `runtime.reportError()`，但 `emit()` 本身不抛错 — 不抛错，异常通过 `runtime.reportError` 上报",
-              "descriptionEn": "",
-              "descriptionZh": "`emit(event)` — `event: IMiddlewareEvent<S>` — 同步 — 同步跑一遍 pipeline；若某个 stage 忘了调用 `next()`，会以 `phase: 'trace-listener'` 上报到 `runtime.reportError()`，但 `emit()` 本身不抛错 — 不抛错，异常通过 `runtime.reportError` 上报"
-            },
-            {
-              "name": "getState",
-              "type": "() => S",
-              "optional": false,
-              "description": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。",
-              "descriptionEn": "",
-              "descriptionZh": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。"
-            },
-            {
-              "name": "applyState",
-              "type": "(state: S) => void",
-              "optional": true,
-              "description": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。",
-              "descriptionEn": "",
-              "descriptionZh": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。"
-            },
-            {
-              "name": "mutationPolicy",
-              "type": "MutationPolicy",
-              "optional": true,
-              "description": "`runAction(name, fn, metadata?)` — `name: string`；`fn: () => T`；`metadata?: Readonly<Record<string, unknown>>` — 同步 — 派发 `action:start` → 用 `mutationPolicy.runInAction(() => runtime.batch(fn))` 执行 `fn` → 成功派发 `action:end`（带 `durationMs`），失败派发 `action:error` 后重新抛出原始异常 — `fn` 抛出的异常会正常向调用方传播",
-              "descriptionEn": "",
-              "descriptionZh": "`runAction(name, fn, metadata?)` — `name: string`；`fn: () => T`；`metadata?: Readonly<Record<string, unknown>>` — 同步 — 派发 `action:start` → 用 `mutationPolicy.runInAction(() => runtime.batch(fn))` 执行 `fn` → 成功派发 `action:end`（带 `durationMs`），失败派发 `action:error` 后重新抛出原始异常 — `fn` 抛出的异常会正常向调用方传播"
-            }
-          ],
-          "fragment": "store-middleware-index--StoreMiddlewareHost"
         }
       ],
       "aliases": [

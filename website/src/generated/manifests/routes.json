@@ -1847,6 +1847,30 @@
       "library": "logger"
     },
     {
+      "path": "/en/docs/logger/plugins/file",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/en/docs/logger/plugins/file/FILE_PLUGIN_NAME",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/en/docs/logger/plugins/file/IFilePluginConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/en/docs/logger/plugins/file/file",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
       "path": "/en/docs/logger/plugins/http",
       "locale": "en",
       "domain": "docs",
@@ -2087,6 +2111,24 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/IDefineHostOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IDefinedPluginConstraint",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IExcludePluginByName",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/IExtractPluginConfig",
       "locale": "en",
       "domain": "docs",
@@ -2160,6 +2202,24 @@
     },
     {
       "path": "/en/docs/plugin-host/IGeneratorPipelineStage",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IHostCoreConstructionRequest",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IHostDomainCoreRequest",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IHostHandle",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -2243,7 +2303,19 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/IPluginConstraint",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/IPluginDataOrderSlot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IPluginDisableToken",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -2261,6 +2333,12 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/IPluginEnablement",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/IPluginFeatureCore",
       "locale": "en",
       "domain": "docs",
@@ -2273,13 +2351,25 @@
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/IPluginHostCompositionIntegration",
+      "path": "/en/docs/plugin-host/IPluginHostConfigFor",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/IPluginHostConfigFor",
+      "path": "/en/docs/plugin-host/IPluginHostCore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IPluginHostDisposalNodeKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IPluginHostDisposalProvenance",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -2309,7 +2399,19 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/IPluginHostIdentity",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/IPluginHostInstalledPlugins",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/IPluginHostOptions",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -2429,6 +2531,24 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/PluginHostDisposalNodeKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/PluginHostError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/PluginHostErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/PluginHostPipelineMode",
       "locale": "en",
       "domain": "docs",
@@ -2477,7 +2597,19 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/asyncDisposeKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/composition",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/composition/IPluginHostCompositionIntegration",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -2495,6 +2627,12 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/composition/buildManagedPort",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/composition/createView",
       "locale": "en",
       "domain": "docs",
@@ -2502,6 +2640,24 @@
     },
     {
       "path": "/en/docs/plugin-host/composition/inspectFeatures",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/composition/isManagedHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/composition/openComposition",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/composition/registerManagedHost",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -2519,73 +2675,19 @@
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/defined",
+      "path": "/en/docs/plugin-host/defineHost",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/defined/IDefinedPluginConstraint",
+      "path": "/en/docs/plugin-host/definePlugin",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/defined/IHostSetupContext",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/ISetupHostOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/ISetupHostView",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/ISetupPluginHost",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/PluginHostError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/PluginHostErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/asyncDisposeKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/definePlugin",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/disposeKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/defined/setupHost",
+      "path": "/en/docs/plugin-host/disposeKey",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -2603,55 +2705,7 @@
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/structural",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/IPluginConstraint",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/IPluginHostCore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/IPluginHostDisposalNodeKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/IPluginHostDisposalProvenance",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/IPluginHostOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/PluginHost",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/PluginHostDisposalNodeKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/structural/readPluginHostDisposalProvenance",
+      "path": "/en/docs/plugin-host/readPluginHostDisposalProvenance",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -6149,6 +6203,12 @@
       "library": "store-middleware"
     },
     {
+      "path": "/en/docs/store-middleware/IStoreMiddlewareHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
       "path": "/en/docs/store-middleware/IStoreMiddlewareHostOptions",
       "locale": "en",
       "domain": "docs",
@@ -6186,12 +6246,6 @@
     },
     {
       "path": "/en/docs/store-middleware/STORE_MIDDLEWARE_SOURCE",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
-      "path": "/en/docs/store-middleware/StoreMiddlewareHost",
       "locale": "en",
       "domain": "docs",
       "library": "store-middleware"
@@ -7901,6 +7955,18 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/error/IErrorIdentity",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/IErrorIdentityHooks",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/error/UtilsAbortError",
       "locale": "en",
       "domain": "docs",
@@ -7992,6 +8058,12 @@
     },
     {
       "path": "/en/docs/utils/function/IThenableProbeKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/MAX_NATIVE_RECURSION_DEPTH",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -8327,6 +8399,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/promise/IAbortControllerLike",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/promise/IAbortOperation",
       "locale": "en",
       "domain": "docs",
@@ -8334,6 +8412,18 @@
     },
     {
       "path": "/en/docs/utils/promise/IAbortSignal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAbortSignalAdmission",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAbortSignalRejection",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -8406,6 +8496,12 @@
     },
     {
       "path": "/en/docs/utils/promise/IUtilsScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/admitAbortSignal",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -9569,6 +9665,12 @@
       "library": "web-rpc"
     },
     {
+      "path": "/en/docs/web-rpc/full/createFullOneWayEndpoint",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/en/docs/web-rpc/hooks",
       "locale": "en",
       "domain": "docs",
@@ -10012,16 +10114,6 @@
       "domain": "guides",
       "library": "rpc-contract"
     },
-    {
-      "path": "/en/guides/rpc-contract/real-world-bindings",
-      "locale": "en",
-      "domain": "guides",
-      "library": "rpc-contract"
-    },
-    { "path": "/en/guides/rpc-contract/fetch", "locale": "en", "domain": "guides", "library": "rpc-contract" },
-    { "path": "/en/guides/rpc-contract/websocket", "locale": "en", "domain": "guides", "library": "rpc-contract" },
-    { "path": "/en/guides/rpc-contract/sse", "locale": "en", "domain": "guides", "library": "rpc-contract" },
-    { "path": "/en/guides/rpc-contract/process", "locale": "en", "domain": "guides", "library": "rpc-contract" },
     {
       "path": "/en/guides/serialize",
       "locale": "en",
@@ -12843,6 +12935,30 @@
       "library": "logger"
     },
     {
+      "path": "/zh/docs/logger/plugins/file",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/plugins/file/FILE_PLUGIN_NAME",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/plugins/file/IFilePluginConfig",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/plugins/file/file",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
       "path": "/zh/docs/logger/plugins/http",
       "locale": "zh",
       "domain": "docs",
@@ -13107,6 +13223,24 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/IDefineHostOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IDefinedPluginConstraint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IExcludePluginByName",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/IExtractPluginConfig",
       "locale": "zh",
       "domain": "docs",
@@ -13180,6 +13314,24 @@
     },
     {
       "path": "/zh/docs/plugin-host/IGeneratorPipelineStage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IHostCoreConstructionRequest",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IHostDomainCoreRequest",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IHostHandle",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -13263,7 +13415,19 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/IPluginConstraint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/IPluginDataOrderSlot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IPluginDisableToken",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -13281,6 +13445,12 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/IPluginEnablement",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/IPluginFeatureCore",
       "locale": "zh",
       "domain": "docs",
@@ -13293,13 +13463,25 @@
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/IPluginHostCompositionIntegration",
+      "path": "/zh/docs/plugin-host/IPluginHostConfigFor",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/IPluginHostConfigFor",
+      "path": "/zh/docs/plugin-host/IPluginHostCore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IPluginHostDisposalNodeKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IPluginHostDisposalProvenance",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -13329,7 +13511,19 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/IPluginHostIdentity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/IPluginHostInstalledPlugins",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/IPluginHostOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -13449,6 +13643,24 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/PluginHostDisposalNodeKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/PluginHostError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/PluginHostErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/PluginHostPipelineMode",
       "locale": "zh",
       "domain": "docs",
@@ -13509,7 +13721,19 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/asyncDisposeKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/composition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/composition/IPluginHostCompositionIntegration",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -13527,6 +13751,12 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/composition/buildManagedPort",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/composition/createView",
       "locale": "zh",
       "domain": "docs",
@@ -13534,6 +13764,24 @@
     },
     {
       "path": "/zh/docs/plugin-host/composition/inspectFeatures",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/composition/isManagedHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/composition/openComposition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/composition/registerManagedHost",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -13551,73 +13799,19 @@
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/defined",
+      "path": "/zh/docs/plugin-host/defineHost",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/defined/IDefinedPluginConstraint",
+      "path": "/zh/docs/plugin-host/definePlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/defined/IHostSetupContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/ISetupHostOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/ISetupHostView",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/ISetupPluginHost",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/PluginHostError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/PluginHostErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/asyncDisposeKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/definePlugin",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/disposeKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/defined/setupHost",
+      "path": "/zh/docs/plugin-host/disposeKey",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -13641,55 +13835,7 @@
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/structural",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginConstraint",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginHostCore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginHostDisposalNodeKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginHostDisposalProvenance",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/IPluginHostOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/PluginHost",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/PluginHostDisposalNodeKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/structural/readPluginHostDisposalProvenance",
+      "path": "/zh/docs/plugin-host/readPluginHostDisposalProvenance",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -17277,6 +17423,12 @@
       "library": "store-middleware"
     },
     {
+      "path": "/zh/docs/store-middleware/IStoreMiddlewareHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
       "path": "/zh/docs/store-middleware/IStoreMiddlewareHostOptions",
       "locale": "zh",
       "domain": "docs",
@@ -17314,12 +17466,6 @@
     },
     {
       "path": "/zh/docs/store-middleware/STORE_MIDDLEWARE_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
-      "path": "/zh/docs/store-middleware/StoreMiddlewareHost",
       "locale": "zh",
       "domain": "docs",
       "library": "store-middleware"
@@ -19041,6 +19187,18 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/error/IErrorIdentity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/IErrorIdentityHooks",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/error/UtilsAbortError",
       "locale": "zh",
       "domain": "docs",
@@ -19132,6 +19290,12 @@
     },
     {
       "path": "/zh/docs/utils/function/IThenableProbeKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/MAX_NATIVE_RECURSION_DEPTH",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -19467,6 +19631,12 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/promise/IAbortControllerLike",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/promise/IAbortOperation",
       "locale": "zh",
       "domain": "docs",
@@ -19474,6 +19644,18 @@
     },
     {
       "path": "/zh/docs/utils/promise/IAbortSignal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortSignalAdmission",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortSignalRejection",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -19546,6 +19728,12 @@
     },
     {
       "path": "/zh/docs/utils/promise/IUtilsScheduler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/admitAbortSignal",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -20727,6 +20915,12 @@
       "library": "web-rpc"
     },
     {
+      "path": "/zh/docs/web-rpc/full/createFullOneWayEndpoint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/zh/docs/web-rpc/hooks",
       "locale": "zh",
       "domain": "docs",
@@ -21176,16 +21370,6 @@
       "domain": "guides",
       "library": "rpc-contract"
     },
-    {
-      "path": "/zh/guides/rpc-contract/real-world-bindings",
-      "locale": "zh",
-      "domain": "guides",
-      "library": "rpc-contract"
-    },
-    { "path": "/zh/guides/rpc-contract/fetch", "locale": "zh", "domain": "guides", "library": "rpc-contract" },
-    { "path": "/zh/guides/rpc-contract/websocket", "locale": "zh", "domain": "guides", "library": "rpc-contract" },
-    { "path": "/zh/guides/rpc-contract/sse", "locale": "zh", "domain": "guides", "library": "rpc-contract" },
-    { "path": "/zh/guides/rpc-contract/process", "locale": "zh", "domain": "guides", "library": "rpc-contract" },
     {
       "path": "/zh/guides/serialize",
       "locale": "zh",

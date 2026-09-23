@@ -3,7 +3,7 @@
   "library": {
     "slug": "storage-contract",
     "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "exports": ["."],
     "documentation": {
       "readme": {

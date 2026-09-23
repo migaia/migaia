@@ -3,7 +3,7 @@
   "library": {
     "slug": "storage-web",
     "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "exports": [
       ".",
       "./cookies",
@@ -5283,7 +5283,7 @@
           "name": "createStorageHost",
           "kind": "const",
           "signature": "export declare const createStorageHost: <const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []>(options?: IStorageHostCreateOptions<TPlugins>) => Promise<IStorageHost<IPluginStoreMap<TPlugins>, Extract<IStoragePluginReactiveId<TPlugins[number]>, keyof IPluginStoreMap<TPlugins> & string>, IStoragePluginExtensions<TPlugins[number]>>>;",
-          "declarationLine": 26,
+          "declarationLine": 55,
           "source": "packages/storage-web/dist/host/storage-host.d.ts",
           "purpose": "Creates an async R02 facade shell; constructor sync work never reads platform globals.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStorageHost.",
@@ -7497,7 +7497,7 @@
           "name": "StorageHostFacade",
           "kind": "class",
           "signature": "export declare class StorageHostFacade<TStores extends Record<string, IKeyValueStore> = Record<never, never>, TReactiveIds extends keyof TStores & string = never> { #private; /** Creates the shell and snapshots lifecycle/deadline inputs before any plugin runs. */ constructor(options?: IStorageHostOptions); /** Materializes one immutable plugin tuple through the canonical PluginHost batch. */ use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>): Promise<IStorageHost<TStores & IPluginStoreMap<TPlugins>, TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>, IStoragePluginExtensions<TPlugins[number]>>>; /** Returns the current immutable extension plane after its corresponding batch has committed. */ get extensions(): Readonly<Record<PropertyKey, unknown>>; /** Looks up an exact store from the last atomically published registry snapshot. */ backend<TId extends keyof TStores & string>(id: TId): TStores[TId]; /** Narrows a lookup to IDs in the current immutable registry snapshot. */ hasBackend(id: string): id is keyof TStores & string; /** Returns a mutation-incapable copy of the current store registry. */ backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>; /** Reports whether the committed Host registry contains an exact reactive adapter. */ hasReactiveBackend(id: string): id is TReactiveIds; /** Returns exact adapter-bound store shell and delegates query state to Resource. */ reactiveBackend<TId extends keyof TStores & string>(id: TId): IReactiveBackendHandle<TStores[TId], TId> | undefined; /** Seals the facade once and delegates lifecycle cleanup to PluginHost. */ dispose(): Promise<void>; }",
-          "declarationLine": 4,
+          "declarationLine": 33,
           "source": "packages/storage-web/dist/host/storage-host.d.ts",
           "purpose": "Storage facade over the canonical PluginHost lifecycle owner and its batch transaction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorageHostFacade.",
@@ -9088,7 +9088,7 @@
         {
           "name": "memoryBackendPlugin",
           "kind": "const",
-          "signature": "export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, boolean, Record<never, never>>;",
+          "signature": "export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/plugins/memory.d.ts",
           "purpose": "Creates a memory backend plugin using the canonical factory exactly once at install.",
@@ -9107,7 +9107,7 @@
           "members": [],
           "exportPath": "./plugins/memory",
           "overloadSignatures": [
-            "export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, boolean, Record<never, never>>;"
+            "export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -9146,7 +9146,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/plugins/memory.d.ts:memoryBackendPlugin:export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, boolean, Record<never, never>>;",
+          "identity": "packages/storage-web/dist/plugins/memory.d.ts:memoryBackendPlugin:export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;",
           "guidance": [],
           "usageScore": 52,
           "configuration": [],
@@ -9173,9 +9173,9 @@
       "symbols": [],
       "aliases": [
         {
-          "identity": "packages/storage-web/dist/plugins/reactive/cookies.d.ts:cookiesReactive:export declare function cookiesReactive<const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/cookies.d.ts:cookiesReactive:export declare const cookiesReactive: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
           "name": "cookiesReactive",
-          "signature": "export declare function cookiesReactive<const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
+          "signature": "export declare const cookiesReactive: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
           "source": "packages/storage-web/dist/plugins/reactive/cookies.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/cookies",
@@ -9183,9 +9183,9 @@
           "ownerFragment": "storage-web-plugins/reactive/cookies--cookiesReactive"
         },
         {
-          "identity": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts:indexedDbReactive:export declare function indexedDbReactive<const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts:indexedDbReactive:export declare const indexedDbReactive: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
           "name": "indexedDbReactive",
-          "signature": "export declare function indexedDbReactive<const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
+          "signature": "export declare const indexedDbReactive: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
           "source": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/indexed-db",
@@ -9193,9 +9193,9 @@
           "ownerFragment": "storage-web-plugins/reactive/indexed-db--indexedDbReactive"
         },
         {
-          "identity": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts:localStorageReactive:export declare function localStorageReactive<const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts:localStorageReactive:export declare const localStorageReactive: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
           "name": "localStorageReactive",
-          "signature": "export declare function localStorageReactive<const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
+          "signature": "export declare const localStorageReactive: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
           "source": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/local-storage",
@@ -9203,9 +9203,9 @@
           "ownerFragment": "storage-web-plugins/reactive/local-storage--localStorageReactive"
         },
         {
-          "identity": "packages/storage-web/dist/plugins/reactive/memory.d.ts:memoryReactive:export declare function memoryReactive<const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/memory.d.ts:memoryReactive:export declare const memoryReactive: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
           "name": "memoryReactive",
-          "signature": "export declare function memoryReactive<const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
+          "signature": "export declare const memoryReactive: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
           "source": "packages/storage-web/dist/plugins/reactive/memory.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/memory",
@@ -9213,9 +9213,9 @@
           "ownerFragment": "storage-web-plugins/reactive/memory--memoryReactive"
         },
         {
-          "identity": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts:sessionStorageReactive:export declare function sessionStorageReactive<const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts:sessionStorageReactive:export declare const sessionStorageReactive: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
           "name": "sessionStorageReactive",
-          "signature": "export declare function sessionStorageReactive<const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
+          "signature": "export declare const sessionStorageReactive: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
           "source": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/session-storage",
@@ -9242,43 +9242,27 @@
       "symbols": [
         {
           "name": "cookiesReactive",
-          "kind": "function",
-          "signature": "export declare function cookiesReactive<const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
+          "kind": "const",
+          "signature": "export declare const cookiesReactive: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
           "declarationLine": 5,
           "source": "packages/storage-web/dist/plugins/reactive/cookies.d.ts",
           "purpose": "Creates the canonical cookiesHost reactive fast-path plugin.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for cookiesReactive.",
           "advanced": "No additional advanced behavior is declared for cookiesReactive.",
-          "parameters": ["options: ICookiesOptions & IBuiltInPluginId<TId> (optional)"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "ICookiesOptions & IBuiltInPluginId<TId>",
-              "optional": true
-            }
-          ],
-          "returns": "IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for cookiesReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for cookiesReactive.",
           "examples": [],
           "members": [],
           "exportPath": "./plugins/reactive/cookies",
           "overloadSignatures": [
-            "export declare function cookiesReactive<const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;"
+            "export declare const cookiesReactive: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;"
           ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "ICookiesOptions & IBuiltInPluginId<TId>",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": [
-            "IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>"
-          ],
-          "whenToUse": "Use cookiesReactive when its function contract and declared inputs match the result you need.",
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use cookiesReactive when its const contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when cookiesReactive does not match the required inputs or return contract.",
           "sections": [
             {
@@ -9294,12 +9278,12 @@
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use cookiesReactive when its function contract and declared inputs match the result you need. Choose a different public symbol when cookiesReactive does not match the required inputs or return contract."
+              "content": "Use cookiesReactive when its const contract and declared inputs match the result you need. Choose a different public symbol when cookiesReactive does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
               "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
             },
             {
               "id": "core-usage",
@@ -9338,7 +9322,7 @@
               "description": "注入点：测试环境用。默认为 globalThis.document。"
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/reactive/cookies.d.ts:cookiesReactive:export declare function cookiesReactive<const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/cookies.d.ts:cookiesReactive:export declare const cookiesReactive: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [
@@ -9398,22 +9382,16 @@
       "symbols": [
         {
           "name": "indexedDbReactive",
-          "kind": "function",
-          "signature": "export declare function indexedDbReactive<const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
+          "kind": "const",
+          "signature": "export declare const indexedDbReactive: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
           "declarationLine": 5,
           "source": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts",
           "purpose": "Creates the canonical IndexedDB reactive fast-path plugin with private preparation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for indexedDbReactive.",
           "advanced": "No additional advanced behavior is declared for indexedDbReactive.",
-          "parameters": ["options: IIndexedDbOptions & IBuiltInPluginId<TId> (optional)"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "IIndexedDbOptions & IBuiltInPluginId<TId>",
-              "optional": true
-            }
-          ],
-          "returns": "IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for indexedDbReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for indexedDbReactive.",
           "examples": [
@@ -9423,21 +9401,11 @@
           "members": [],
           "exportPath": "./plugins/reactive/indexed-db",
           "overloadSignatures": [
-            "export declare function indexedDbReactive<const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;"
+            "export declare const indexedDbReactive: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;"
           ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "IIndexedDbOptions & IBuiltInPluginId<TId>",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": [
-            "IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>"
-          ],
-          "whenToUse": "Use indexedDbReactive when its function contract and declared inputs match the result you need.",
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use indexedDbReactive when its const contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when indexedDbReactive does not match the required inputs or return contract.",
           "sections": [
             {
@@ -9453,12 +9421,12 @@
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use indexedDbReactive when its function contract and declared inputs match the result you need. Choose a different public symbol when indexedDbReactive does not match the required inputs or return contract."
+              "content": "Use indexedDbReactive when its const contract and declared inputs match the result you need. Choose a different public symbol when indexedDbReactive does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
               "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
             },
             {
               "id": "core-usage",
@@ -9515,7 +9483,7 @@
               "description": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。"
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts:indexedDbReactive:export declare function indexedDbReactive<const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts:indexedDbReactive:export declare const indexedDbReactive: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
           "guidance": [],
           "usageScore": 28,
           "configuration": [
@@ -9599,43 +9567,27 @@
       "symbols": [
         {
           "name": "localStorageReactive",
-          "kind": "function",
-          "signature": "export declare function localStorageReactive<const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
+          "kind": "const",
+          "signature": "export declare const localStorageReactive: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
           "declarationLine": 5,
           "source": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts",
           "purpose": "Creates the canonical localStorageHost reactive fast-path plugin.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for localStorageReactive.",
           "advanced": "No additional advanced behavior is declared for localStorageReactive.",
-          "parameters": ["options: ILocalStorageOptions & IBuiltInPluginId<TId> (optional)"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "ILocalStorageOptions & IBuiltInPluginId<TId>",
-              "optional": true
-            }
-          ],
-          "returns": "IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for localStorageReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for localStorageReactive.",
           "examples": [],
           "members": [],
           "exportPath": "./plugins/reactive/local-storage",
           "overloadSignatures": [
-            "export declare function localStorageReactive<const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;"
+            "export declare const localStorageReactive: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;"
           ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "ILocalStorageOptions & IBuiltInPluginId<TId>",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": [
-            "IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>"
-          ],
-          "whenToUse": "Use localStorageReactive when its function contract and declared inputs match the result you need.",
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use localStorageReactive when its const contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when localStorageReactive does not match the required inputs or return contract.",
           "sections": [
             {
@@ -9651,12 +9603,12 @@
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use localStorageReactive when its function contract and declared inputs match the result you need. Choose a different public symbol when localStorageReactive does not match the required inputs or return contract."
+              "content": "Use localStorageReactive when its const contract and declared inputs match the result you need. Choose a different public symbol when localStorageReactive does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
               "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
             },
             {
               "id": "core-usage",
@@ -9677,7 +9629,7 @@
               "description": "注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。"
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts:localStorageReactive:export declare function localStorageReactive<const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts:localStorageReactive:export declare const localStorageReactive: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [
@@ -9713,43 +9665,27 @@
       "symbols": [
         {
           "name": "memoryReactive",
-          "kind": "function",
-          "signature": "export declare function memoryReactive<const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
+          "kind": "const",
+          "signature": "export declare const memoryReactive: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
           "declarationLine": 4,
           "source": "packages/storage-web/dist/plugins/reactive/memory.d.ts",
           "purpose": "Creates the canonical memory reactive fast-path plugin with exact store identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for memoryReactive.",
           "advanced": "No additional advanced behavior is declared for memoryReactive.",
-          "parameters": ["options: IBuiltInPluginId<TId> (optional)"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "IBuiltInPluginId<TId>",
-              "optional": true
-            }
-          ],
-          "returns": "IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for memoryReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for memoryReactive.",
           "examples": [],
           "members": [],
           "exportPath": "./plugins/reactive/memory",
           "overloadSignatures": [
-            "export declare function memoryReactive<const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;"
+            "export declare const memoryReactive: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;"
           ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "IBuiltInPluginId<TId>",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": [
-            "IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>"
-          ],
-          "whenToUse": "Use memoryReactive when its function contract and declared inputs match the result you need.",
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use memoryReactive when its const contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when memoryReactive does not match the required inputs or return contract.",
           "sections": [
             {
@@ -9765,12 +9701,12 @@
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use memoryReactive when its function contract and declared inputs match the result you need. Choose a different public symbol when memoryReactive does not match the required inputs or return contract."
+              "content": "Use memoryReactive when its const contract and declared inputs match the result you need. Choose a different public symbol when memoryReactive does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
               "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
             },
             {
               "id": "core-usage",
@@ -9784,7 +9720,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/plugins/reactive/memory.d.ts:memoryReactive:export declare function memoryReactive<const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/memory.d.ts:memoryReactive:export declare const memoryReactive: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -9811,43 +9747,27 @@
       "symbols": [
         {
           "name": "sessionStorageReactive",
-          "kind": "function",
-          "signature": "export declare function sessionStorageReactive<const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
+          "kind": "const",
+          "signature": "export declare const sessionStorageReactive: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
           "declarationLine": 5,
           "source": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts",
           "purpose": "Creates the canonical sessionStorageHost reactive fast-path plugin.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sessionStorageReactive.",
           "advanced": "No additional advanced behavior is declared for sessionStorageReactive.",
-          "parameters": ["options: ISessionStorageOptions & IBuiltInPluginId<TId> (optional)"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "ISessionStorageOptions & IBuiltInPluginId<TId>",
-              "optional": true
-            }
-          ],
-          "returns": "IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for sessionStorageReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for sessionStorageReactive.",
           "examples": [],
           "members": [],
           "exportPath": "./plugins/reactive/session-storage",
           "overloadSignatures": [
-            "export declare function sessionStorageReactive<const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;"
+            "export declare const sessionStorageReactive: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;"
           ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "ISessionStorageOptions & IBuiltInPluginId<TId>",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": [
-            "IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>"
-          ],
-          "whenToUse": "Use sessionStorageReactive when its function contract and declared inputs match the result you need.",
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use sessionStorageReactive when its const contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when sessionStorageReactive does not match the required inputs or return contract.",
           "sections": [
             {
@@ -9863,12 +9783,12 @@
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use sessionStorageReactive when its function contract and declared inputs match the result you need. Choose a different public symbol when sessionStorageReactive does not match the required inputs or return contract."
+              "content": "Use sessionStorageReactive when its const contract and declared inputs match the result you need. Choose a different public symbol when sessionStorageReactive does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
               "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
             },
             {
               "id": "core-usage",
@@ -9889,7 +9809,7 @@
               "description": "注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。"
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts:sessionStorageReactive:export declare function sessionStorageReactive<const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
+          "identity": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts:sessionStorageReactive:export declare const sessionStorageReactive: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [

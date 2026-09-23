@@ -18,7 +18,7 @@ const webRpcGuideSource = readFileSync(join(websiteRoot, 'app/web-rpc-api-guides
 const routeManifest = JSON.parse(
   readFileSync(join(websiteRoot, 'src/generated/manifests/routes.json'), 'utf8')
 ) as {
-  readonly entries: readonly { readonly path: string }[]
+  readonly entries: readonly { readonly locale: string; readonly path: string }[]
 }
 const apiManifest = JSON.parse(
   readFileSync(join(websiteRoot, 'src/generated/manifests/apis.json'), 'utf8')
@@ -534,6 +534,7 @@ test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every ho
     'defer',
     'write',
     'console',
+    'fs',
     'fetch'
   ]) {
     assert.match(loggerHtml, new RegExp(`--option-${option}"`))
@@ -542,7 +543,7 @@ test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every ho
 
 test('SITE-T-PLUGIN-HOST-ERROR renders identity, cause, and detail as separate contracts', () => {
   const errorHtml = readFileSync(
-    join(buildRoot, 'zh/docs/plugin-host/defined/PluginHostError/index.html'),
+    join(buildRoot, 'zh/docs/plugin-host/PluginHostError/index.html'),
     'utf8'
   )
   assert.match(errorHtml, /\(source, code\)/)
@@ -853,14 +854,14 @@ test('SITE-T-PLUGIN-HOST-DEFINE uses definePlugin and consumes the committed vie
   const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/plugin-host')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /import \{ definePlugin \} from '@migaia\/plugin-host\/defined'/)
+  assert.match(text, /import \{ definePlugin, PluginHost \} from '@migaia\/plugin-host'/)
   assert.match(text, /const upper = definePlugin<ICore, \{ upper\(value: string\): string \}>/)
   assert.match(text, /const view = await host\.use\(upper\)/)
   assert.match(text, /view\.extensions\.upper\('migaia'\)/)
   assert.match(text, /await view\.unUse\('upper'\)/)
-  assert.match(text, /definePlugin\(name, install\).*短写法/s)
+  assert.match(text, /函数形 definePlugin\(name, descriptorFactory\)/)
   assert.match(text, /definePlugin\(\{ name, config, install, shared, update, dispose \}\)/)
-  assert.match(text, /只会校验并保存定义，不会执行 install\(\)/)
+  assert.match(text, /只会校验并保存定义，不会执行 descriptor 或 install\(\)/)
   assert.match(text, /use\(\) 成功后返回不可变 view/)
 })
 
