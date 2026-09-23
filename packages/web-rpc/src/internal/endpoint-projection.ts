@@ -1,4 +1,4 @@
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
+import { WebRpcError, WebRpcErrorCode, WebRpcLifecycleError } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
 import { registerComposedDisposalPromises } from './composed-disposal-observer.js'
 
@@ -9,6 +9,15 @@ export type IEndpointProjectionOptions = {
   readonly exposedKeys: readonly string[]
   readonly on?: (...args: readonly unknown[]) => unknown
   readonly hooks?: unknown
+  /**
+   * Members whose revoked-view failure must surface as a rejection rather than a throw.
+   *
+   * The endpoint's surface is not uniform: `ping` and `provide` guarded synchronously before the
+   * call reached any promise, while the fanout members rejected. The host's liveness check now
+   * preempts both, and it cannot know which shape a member used to have — so the shape is declared
+   * here rather than guessed from the member's signature, which would get `ping` wrong.
+   */
+  readonly rejectionKeys?: readonly string[]
   readonly hostDispose: () => Promise<void>
   readonly beforeDispose?: (endpoint: object) => void
 }
@@ -23,6 +32,7 @@ export function createEndpointProjection(
 ): Readonly<Record<string, unknown>> {
   const publicKeys = uniqueStrings(options.publicKeys)
   const exposedKeys = uniqueStrings(options.exposedKeys)
+  const rejectionKeys = new Set(options.rejectionKeys ?? [])
   const reservedKeys = new Set([
     'on',
     'hooks',
@@ -88,10 +98,17 @@ export function createEndpointProjection(
       key,
       key === 'provide' && typeof value === 'function'
         ? (...args: readonly unknown[]) => {
-            value(...args)
+            // `provide` 是同步的，翻译后的失败也必须同步抛出。
+            translateRevokedView(() => value(...args), false)
             return target
           }
-        : value
+        : typeof value === 'function'
+          ? (...args: readonly unknown[]) =>
+              translateRevokedView(
+                () => (value as (...rest: unknown[]) => unknown)(...args),
+                rejectionKeys.has(key)
+              )
+          : value
     )
   }
   return Object.freeze(target)
@@ -138,4 +155,45 @@ function defineValue(target: Record<string, unknown>, key: string, value: unknow
 /** Uses the package's existing invalid-composition contract for every projection rejection. */
 function projectionError(): WebRpcError {
   return new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+}
+
+/**
+ * Retells a revoked-view failure as this endpoint's own disposal error.
+ *
+ * A published extension closure is revoked the moment its registrations are, which is the host's
+ * guarantee and the right one — but the caller here holds an _endpoint_, and what it needs to learn
+ * is that the endpoint is disposed, not that some host view it never saw is gone. The host error
+ * stays on `cause`, so the chain still reaches the decision that was actually made.
+ *
+ * Only `VIEW_REVOKED` is translated. Every other failure belongs to the member being called and is
+ * rethrown untouched; widening this would make the endpoint claim disposal for faults it did not
+ * cause.
+ */
+function translateRevokedView<T>(call: () => T, asRejection: boolean): T {
+  try {
+    const result = call()
+    if (result instanceof Promise)
+      return result.catch((error: unknown) => {
+        throw asEndpointDisposed(error)
+      }) as T
+    return result
+  } catch (error) {
+    const translated = asEndpointDisposed(error)
+    // 端点这一侧除 `provide` 外全是异步成员：同步抛出会绕过调用方的 `await`，让失败以另一种形态出现。
+    // 只有真正被翻译过的失败才改变形态；其余原样抛出，不为无关故障编造一个 Promise。
+    if (asRejection && translated !== error) return Promise.reject(translated) as T
+    throw translated
+  }
+}
+
+/** The endpoint's disposal error when `error` is a revoked view, otherwise `error` unchanged. */
+function asEndpointDisposed(error: unknown): unknown {
+  if (
+    error &&
+    typeof error === 'object' &&
+    (error as { code?: unknown }).code === 'VIEW_REVOKED' &&
+    (error as { source?: unknown }).source === '@migaia/plugin-host'
+  )
+    return new WebRpcLifecycleError(WebRpcErrorText.endpointDisposed, error)
+  return error
 }

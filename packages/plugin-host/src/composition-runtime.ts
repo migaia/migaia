@@ -172,12 +172,6 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
         PluginHostErrorCode.pluginInstallFailed,
         ERROR_TEXT.PREPARED_ADMISSION_DRIFT
       )
-    for (const registration of state.installed)
-      if (this.#port.registrations.has(registration.name))
-        throw new PluginHostError(
-          PluginHostErrorCode.pluginDuplicate,
-          ERROR_TEXT.PLUGIN_DUPLICATE(registration.name)
-        )
     this.#port.publish(state.installed, state.batch)
     state.committed = true
     return Object.freeze(

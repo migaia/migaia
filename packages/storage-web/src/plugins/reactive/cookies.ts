@@ -1,5 +1,6 @@
 import { cookiesHost, type ICookiesOptions } from '../../backends/cookie.js'
-import { defineBuiltInReactivePlugin, defineNativeReactiveFeature } from '../../host/contracts.js'
+import { defineNativeReactiveFeature } from '../../host/contracts.js'
+import { createBuiltInBackendPlugin } from '../builtin-factory.js'
 import {
   cookieBackendKind,
   type IBuiltInPluginId,
@@ -17,20 +18,14 @@ const cookiesReactiveFeature = defineNativeReactiveFeature(
 )
 
 /** Creates the canonical cookiesHost reactive fast-path plugin. */
-export function cookiesReactive<const TId extends string = 'cookies'>(
-  options: ICookiesOptions & IBuiltInPluginId<TId> = {}
-): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true> {
-  return defineBuiltInReactivePlugin(
-    cookieBackendKind,
-    (options.id ?? 'cookies') as TId,
-    (core) => ({
-      install: () => {
-        core.registerStore(cookiesHost(options))
-        return {}
-      }
-    }),
-    { reactive: cookiesReactiveFeature }
-  )
-}
-
-Object.defineProperty(cookiesReactive, 'name', { value: 'cookiesReactive' })
+export const cookiesReactive = {
+  cookiesReactive: <const TId extends string = 'cookies'>(
+    options: ICookiesOptions & IBuiltInPluginId<TId> = {}
+  ): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true> =>
+    createBuiltInBackendPlugin(
+      cookieBackendKind,
+      (options.id ?? 'cookies') as TId,
+      () => cookiesHost(options),
+      { reactive: cookiesReactiveFeature }
+    )
+}.cookiesReactive

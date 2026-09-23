@@ -1,5 +1,6 @@
 import type { IPluginHostErrorCode, IPluginHostErrorDetail } from './typing.js'
 import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js'
+import { readHostIdentity } from './host-identity.js'
 
 export type ILocaleKey = 'en' | 'zh'
 
@@ -20,6 +21,39 @@ export class PluginHostError<TDetail = IPluginHostErrorDetail> extends Error {
     this.code = code
     if (options?.detail !== undefined) this.detail = options.detail
   }
+}
+
+/** Adds the issuing Host identity to a package error without replacing its detail object. */
+export function attachPluginHostIdentity<TError extends PluginHostError>(
+  error: TError,
+  target: object
+): TError {
+  const identity = readHostIdentity(target)
+  if (!identity) return error
+  if (error.detail === undefined) {
+    Object.defineProperty(error, 'detail', {
+      value: { host: identity },
+      enumerable: true,
+      configurable: true
+    })
+    return error
+  }
+  if (
+    error.detail !== null &&
+    (typeof error.detail === 'object' || typeof error.detail === 'function') &&
+    Object.isExtensible(error.detail) &&
+    !Object.hasOwn(error.detail, 'host')
+  )
+    Object.defineProperty(error.detail, 'host', { value: identity, enumerable: true })
+  return error
+}
+
+/** Prefixes one diagnostic with the identity issued for its exact Host target. */
+export function formatPluginHostDiagnostic(target: object, message: string): string {
+  const identity = readHostIdentity(target)
+  if (!identity) return message
+  const body = message.startsWith(PREFIX) ? message.slice(PREFIX.length) : message
+  return `[plugin-host:${identity.id}] ${body}`
 }
 
 /**
@@ -54,18 +88,58 @@ const localize = (_zh: string, en: string): string => `${PREFIX}${en}`
 
 /** PluginHost 错误与诊断文本集中维护处，便于调用方和维护者查找。 */
 const ERROR_TEXT = {
+  /** Stable validation text for the optional human-readable Host identity name. */
+  get HOST_IDENTITY_NAME() {
+    return localize('宿主身份名称必须为非空字符串', 'host identity name must be a non-empty string')
+  },
   get HOST_DISPOSED() {
     return localize('宿主已关闭', 'host is disposed')
   },
   get HOST_DISPOSING() {
     return localize('宿主正在关闭', 'host is disposing')
   },
+  /** Stable text for a composition target this package never registered as a managed host. */
+  get COMPOSITION_TARGET_UNMANAGED() {
+    return localize('该目标不是本包登记的托管宿主', 'target is not a managed host of this package')
+  },
   get INVALID_PIPELINE_MODE() {
     return localize('无效的 pipeline mode', 'invalid pipeline mode')
+  },
+  /** Stable text distinguishing a temporarily disabled shared prerequisite owner. */
+  PREREQUISITE_DISABLED(key: PropertyKey, owner: string) {
+    return localize(
+      `共享前置 ${String(key)} 的所有者 ${owner} 已禁用`,
+      `shared prerequisite ${String(key)} is disabled with owner ${owner}`
+    )
+  },
+  /** Stable text distinguishing a permanently removed shared prerequisite owner. */
+  PREREQUISITE_REMOVED(key: PropertyKey, owner: string) {
+    return localize(
+      `共享前置 ${String(key)} 的所有者 ${owner} 已卸载`,
+      `shared prerequisite ${String(key)} was removed with owner ${owner}`
+    )
+  },
+  /** Stable diagnostic for an enablement notification failure that never rolls state back. */
+  ENABLEMENT_HOOK_FAILED(name: string, hook: string, error: unknown) {
+    return localize(
+      `插件 ${name} 的 ${hook} 通知失败：${String(error)}`,
+      `plugin ${name} ${hook} notification failed: ${String(error)}`
+    )
   },
   /** Admission 读取 plugin/resource getter 失败时使用，原始异常挂在 cause。 */
   get INVALID_OPTION() {
     return localize('plugin-host 选项读取失败', 'plugin-host option read failed')
+  },
+  /** Stable config-domain failure text; config.ts appends the rejected path and grammar reason. */
+  INVALID_CONFIG_VALUE(path: string, reason: string) {
+    return localize(
+      `无效 config 值：${path} (${reason})`,
+      `invalid config value: ${path} (${reason})`
+    )
+  },
+  /** Stable cycle diagnostic for config graphs that cannot be owned safely. */
+  CONFIG_CYCLE_REJECTED(path: string) {
+    return localize(`config 存在循环引用：${path}`, `config contains a cycle: ${path}`)
   },
   /** Feature definition validation uses these stable boundary messages under `INVALID_OPTION`. */
   get FEATURE_FACTORY_REQUIRED() {
@@ -96,15 +170,6 @@ const ERROR_TEXT = {
     return localize(
       'Feature factory 必须同步返回对象',
       'feature factory must return a synchronous object'
-    )
-  },
-  get PLUGIN_FEATURES_RECORD() {
-    return localize('plugin features 必须是 record', 'plugin features must be a record')
-  },
-  get PLUGIN_FEATURES_DEFINED() {
-    return localize(
-      'plugin features 必须包含已定义 Feature',
-      'plugin features must contain defined features'
     )
   },
   get PLUGIN_FEATURE_EXPOSE() {
@@ -246,10 +311,6 @@ const ERROR_TEXT = {
       'pipeline stages cannot be registered during pipeline execution'
     )
   },
-  /** `pipeline.ts#registerStage` 拒绝非函数 stage 时使用，保持公开 INVALID_OPTION 文案集中可追踪。 */
-  get PIPELINE_STAGE_MUST_BE_FUNCTION() {
-    return 'pipeline stage must be a function'
-  },
   /** `pipeline.ts#runAsyncPipeline` 同时观测到 stage 与 downstream 失败时使用。 */
   get PIPELINE_STAGE_AND_DOWNSTREAM_FAILED() {
     return 'pipeline stage and downstream failed'
@@ -262,9 +323,6 @@ const ERROR_TEXT = {
   get PLUGIN_DISPOSE_FAILED() {
     return (name: string) =>
       localize(`插件 "${name}" 卸载失败`, `plugin "${name}" failed to dispose`)
-  },
-  get HOST_DISPOSE_FAILED() {
-    return localize('宿主卸载失败', 'host failed to dispose')
   },
   get PLUGIN_INSTALL_FAILED() {
     return (name: string) =>
@@ -364,28 +422,21 @@ const ERROR_TEXT = {
   get VIEW_REVOKED() {
     return localize('宿主视图已撤销', 'plugin-host view has been revoked')
   },
+  /** Stable install-result contract text shared by synchronous and asynchronous rejection paths. */
+  INSTALL_RESULT_THENABLE: (name: string) =>
+    localize(
+      `plugin ${name} 的 install() 返回值不能包含 then`,
+      `plugin ${name} install() result must not contain then`
+    ),
+  /** Diagnostic text preserves failed secondary attachment without replacing the primary error. */
+  CAUSE_ATTACH_FAILED: (failure: string) =>
+    localize(`附加错误原因失败：${failure}`, `failed to attach error cause: ${failure}`),
   /** Stable diagnostic text for an active pipeline that missed the disposal drain budget. */
   PIPELINE_DRAIN_TIMEOUT: (waitedMs: number) =>
     localize(
       `pipeline drain 超过 ${waitedMs}ms，已进入逻辑终态`,
       `pipeline drain exceeded its ${waitedMs}ms budget and entered logical terminal`
     ),
-  /** Stable text for logical cleanup that still has physical work outstanding. */
-  get CLEANUP_INCOMPLETE() {
-    return localize('清理尚未物理完成', 'physical cleanup is incomplete')
-  },
-  get HOST_CORE_SETUP_FAILED() {
-    return localize('Core 构造失败', 'Core setup failed')
-  },
-  get HOST_SETUP_TIMEOUT() {
-    return localize('setup 超时', 'setup timed out')
-  },
-  get HOST_SETUP_ABORTED() {
-    return localize('setup 已取消', 'setup was aborted')
-  },
-  get HOST_SETUP_ROLLBACK_FAILED() {
-    return localize('setup 回滚失败', 'setup rollback failed')
-  },
   /** A composition fence rejection is reported while cleanup still proceeds after settlement. */
   get CLEANUP_FENCE_REJECTED() {
     return localize('prepared cleanup fence rejected', 'prepared cleanup fence rejected')

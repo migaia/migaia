@@ -12,7 +12,6 @@ import {
   type IPluginAdmission,
   type IPluginDataOrderSlot,
   type IPluginRegistrationReceipt,
-  type IPluginHostCompositionIntegration,
   type IPluginHostDisposalResult,
   type IPluginHostView
 } from '@migaia/plugin-host'
@@ -38,10 +37,15 @@ import {
   registerRuntimeBridge,
   type ITrayArtifactCustody
 } from './internal-capability.js'
-import { createView as createRegistrationView } from '@migaia/plugin-host/composition'
+import {
+  createView as createRegistrationView,
+  isManagedHost,
+  openComposition,
+  type IPluginHostCompositionIntegration
+} from '@migaia/plugin-host/composition'
 
-type IAnyHost = PluginHost<any, any, any> &
-  IPluginHostCompositionIntegration<PluginHost<any, any, any>>
+// 宿主不再结构上包含托管协议：协议经 `openComposition` 取得，宿主类型只描述宿主自己。
+type IAnyHost = PluginHost<any, any, any>
 type IAnyView = IPluginHostView<IAnyHost, readonly IPluginConstraint<any>[]>
 type IPluginBinding = ITrayPluginConstraint<IAnyHost>
 type IGraphId = IGraphNodeId
@@ -72,6 +76,8 @@ export async function createHost<
 >(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>> {
   const captured = snapshotOptions(options)
   let concrete: THost | undefined
+  /** 托管协议出口，与 `concrete` 同生命周期；取一次，整个会话复用。 */
+  let composition: IPluginHostCompositionIntegration<object> | undefined
   let graph: IGraph | undefined
   let session: object | undefined
   let anchorName: string | undefined
@@ -93,8 +99,10 @@ export async function createHost<
   }
   try {
     concrete = captured.create()
-    if (!(concrete instanceof PluginHost) || claims.has(concrete as object))
+    // 用登记谓词而不是 `instanceof`：名义检查在两份包副本之间会失败，也看不见工厂产出的宿主。
+    if (!isManagedHost(concrete) || claims.has(concrete as object))
       throw createTrayError(TrayErrorCode.invalidEntry)
+    composition = openComposition(concrete as object)
     session = {}
     claims.set(concrete as object, session)
     const baselineView = (await concrete.use()) as unknown as IAnyView
@@ -104,7 +112,7 @@ export async function createHost<
       install: () => ({})
     }
     let hostView = (await baselineView.use(anchor as never)) as unknown as IAnyView
-    let receipt = (concrete as IAnyHost).revision
+    let receipt = composition!.revision
     const report = (error: unknown): void => {
       try {
         captured.report?.(error)
@@ -117,26 +125,26 @@ export async function createHost<
       return {
         plugin: plugin as unknown as IPluginBinding,
         snapshot,
-        admission: concrete!.createPluginAdmission<IPluginConstraint<any>>(
+        admission: composition!.createPluginAdmission<IPluginConstraint<any>>(
           plugin as IPluginConstraint<any>
         ),
-        slot: concrete!.createDataOrderSlot(snapshot.name)
+        slot: composition!.createDataOrderSlot(snapshot.name)
       }
     })
     const orderedAdmissions = orderAdmissions(admissions)
     const initialAdmissions = computeReadyAdmissions(orderedAdmissions)
-    const prepared = await concrete.prepareAdmissions(
+    const prepared = await composition!.prepareAdmissions(
       initialAdmissions.map(({ admission, slot }) => ({ admission, slot }))
     )
     let receipts: readonly IPluginRegistrationReceipt[]
     try {
-      receipts = concrete.commitPreparedAdmissions(prepared)
+      receipts = composition!.commitPreparedAdmissions(prepared)
     } catch (error) {
-      await concrete.discardPreparedAdmissions(prepared)
+      await composition!.discardPreparedAdmissions(prepared)
       throw error
     }
-    hostView = concrete.getCurrentView() as unknown as IAnyView
-    receipt = concrete.revision
+    hostView = composition!.getCurrentView() as unknown as IAnyView
+    receipt = composition!.revision
     initialAdmissions.forEach((entry, index) => {
       entry.receipt = receipts[index]
     })
@@ -152,22 +160,22 @@ export async function createHost<
           .filter((entry): entry is IAdmissionRecord => entry !== undefined)
           .filter((entry) => !receiptsByName.has(entry.snapshot.name))
         if (missing.length > 0) {
-          const prepared = await concrete!.prepareAdmissions(
+          const prepared = await composition!.prepareAdmissions(
             missing.map(({ admission, slot }) => ({ admission, slot }))
           )
           let nextReceipts: readonly IPluginRegistrationReceipt[]
           try {
-            nextReceipts = concrete!.commitPreparedAdmissions(prepared)
+            nextReceipts = composition!.commitPreparedAdmissions(prepared)
           } catch (error) {
-            await concrete!.discardPreparedAdmissions(prepared)
+            await composition!.discardPreparedAdmissions(prepared)
             throw error
           }
           missing.forEach((entry, index) => {
             entry.receipt = nextReceipts[index]
             receiptsByName.set(entry.snapshot.name, nextReceipts[index])
           })
-          hostView = concrete!.getCurrentView() as unknown as IAnyView
-          receipt = concrete!.revision
+          hostView = composition!.getCurrentView() as unknown as IAnyView
+          receipt = composition!.revision
         }
         return entries.map((entry) => {
           const record = entry.binding
@@ -182,8 +190,8 @@ export async function createHost<
           if (!receipt) throw createTrayError(TrayErrorCode.hostMutationBypass)
           return receipt
         })
-        const removalPromise = concrete!.commitPreparedUnUseBatch(
-          concrete!.prepareUnUseBatch(currentReceipts),
+        const removalPromise = composition!.commitPreparedUnUseBatch(
+          composition!.prepareUnUseBatch(currentReceipts),
           { beforeCleanup: fence }
         )
         const bounded =
@@ -193,14 +201,14 @@ export async function createHost<
         if (!bounded.complete) {
           cleanup.complete = false
           cleanup.physical.push(observePhysical(removalPromise))
-          hostView = concrete!.getCurrentView() as unknown as IAnyView
-          receipt = concrete!.revision
+          hostView = composition!.getCurrentView() as unknown as IAnyView
+          receipt = composition!.revision
           for (const entry of cleanupOrder) receiptsByName.delete(String(entry.id))
           return
         }
         const removal = bounded.value
         hostView = removal.view as unknown as IAnyView
-        receipt = concrete!.revision
+        receipt = composition!.revision
         cleanup.errors.push(...removal.cleanupErrors)
         cleanup.complete = cleanup.complete && removal.cleanupComplete
         if (removal.physicalCompletion) {
@@ -246,10 +254,10 @@ export async function createHost<
       () => hostView,
       (next) => {
         hostView = next
-        receipt = (concrete as IAnyHost).revision
+        receipt = composition!.revision
       },
       () => {
-        if ((concrete as IAnyHost).revision !== receipt)
+        if (composition!.revision !== receipt)
           throw createTrayError(TrayErrorCode.hostMutationBypass)
       },
       session,
@@ -475,6 +483,8 @@ function createManagedHost(
   activeRuntimeNames: ReadonlyMap<string, number>,
   waitForRuntimeQuiescence: () => Promise<void>
 ): ITrayHost<IAnyHost, readonly IPluginBinding[], readonly IPluginBinding[]> {
+  /** 该会话的托管协议出口；宿主已由调用方判定为登记过的托管宿主。 */
+  const composition = openComposition(concrete as object)
   let state: ITrayHostState = TrayHostState.active
   let terminalError: unknown
   let disposal: Promise<ITrayHostDisposalResult> | undefined
@@ -578,7 +588,7 @@ function createManagedHost(
           !existedBefore &&
           graph.getBinding(name as IGraphId) === candidate
         if (candidate && !committed) {
-          concrete.retireDataOrderSlot(candidate.slot)
+          composition!.retireDataOrderSlot(candidate.slot)
           await candidate.artifactCustody?.rollback()
         }
         const failure = mutationFailure('use', name, error, facade, committed)
@@ -608,7 +618,7 @@ function createManagedHost(
         publicationPending = true
         const result = await graph.remove(name as IGraphId)
         publicationPending = false
-        if (target) concrete.retireDataOrderSlot(target.slot)
+        if (target) composition!.retireDataOrderSlot(target.slot)
         const output = removalResult(name, result.affected.map(String), facade, cleanup)
         hub.publish('unUse', output as never)
         hub.publish('removed', output as never)
@@ -690,7 +700,7 @@ function createManagedHost(
             physical.push(observePhysical(delayed))
             return true
           }
-          const externallyMutated = concrete.revision !== readExpectedRevision()
+          const externallyMutated = composition!.revision !== readExpectedRevision()
           if (externallyMutated) {
             await graph.dispose()
             cleanupErrors.push(...cleanup.errors)
@@ -812,10 +822,10 @@ function createManagedHost(
     const record = {
       plugin,
       snapshot,
-      admission: concrete.createPluginAdmission<IPluginConstraint<any>>(
+      admission: composition.createPluginAdmission<IPluginConstraint<any>>(
         plugin as IPluginConstraint<any>
       ),
-      slot: slot ?? concrete.createDataOrderSlot(snapshot.name),
+      slot: slot ?? composition!.createDataOrderSlot(snapshot.name),
       artifactCustody: claimArtifactCustody(plugin as object)
     }
     return record

@@ -19,7 +19,7 @@ import {
   preflightFeatureClaims,
   readFeaturePolicy
 } from './internal/feature-policy.js'
-import { WebRpcPluginHost } from './internal/web-rpc-plugin-host.js'
+import { createWebRpcPluginHost, type IWebRpcPluginHost } from './internal/web-rpc-plugin-host.js'
 import {
   readFirstPartyPublicRoots,
   type IWebRpcPublicFirstPartyRootNames
@@ -139,8 +139,8 @@ async function createComposedEndpointRuntime<
     { requireCompleteGraph: false }
   )
   let kernel: IEndpointKernelHost | undefined
-  let host: WebRpcPluginHost | undefined
-  let hostView: import('@migaia/plugin-host').IPluginHostView<WebRpcPluginHost> | undefined
+  let host: IWebRpcPluginHost | undefined
+  let hostView: import('@migaia/plugin-host').IPluginHostView<IWebRpcPluginHost> | undefined
   let construction: ReturnType<typeof createConstructionControl> | undefined
   let prepared: IPreparedEndpoint<TTargetId> | undefined
   let rootCleanupErrors: IWebRpcCleanupError[] = []
@@ -155,11 +155,11 @@ async function createComposedEndpointRuntime<
       timeoutMs: constructionConfig?.timeoutMs
     })
     const hookEvents: IWebRpcHookEvent[] = []
-    host = new WebRpcPluginHost(
+    host = createWebRpcPluginHost(
       deferred.id,
       deferred.transport,
       construction,
-      (event) => hookEvents.push(event),
+      (event: IWebRpcHookEvent) => hookEvents.push(event),
       {
         execution: {
           mutationTimeoutMs: constructionConfig?.timeoutMs ?? false,
@@ -378,9 +378,13 @@ async function createComposedEndpointRuntime<
   let endpointHostDispose: Promise<void> | undefined
   try {
     publicSurface = createEndpointProjection({
-      host: hostView?.extensions ?? host!,
+      // 投影的来源是 view 的 extensions;没有 view 就没有任何可投影的成员。此处曾回退到宿主本身,
+      // 那只在宿主是类实例（方法都在原型上、自有键为空）时碰巧等价——宿主改为句柄后就不再成立。
+      host: hostView?.extensions ?? {},
       publicKeys,
       exposedKeys,
+      // 扇出成员在守卫前就是以 rejection 形态失败的；`ping`/`provide` 则是同步抛出。
+      rejectionKeys: ['sendAll', 'pingAll', 'send'],
       ...(publicFirstPartyRoots.includes('first-party-provider') && nativeOn
         ? {
             on: (...args: readonly unknown[]) =>

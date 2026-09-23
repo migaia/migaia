@@ -1,4 +1,5 @@
 import { tagWebRpcError, WebRpcErrorCode } from '../errors.js'
+import { reportDiagnostic } from './diagnostic-reporter.js'
 
 /** Minimal cancellation signal shape shared by browser, worker and Node consumers. */
 export type IAbortSignal = {
@@ -57,17 +58,13 @@ export function waitWithSignal(
       try {
         timer?.clear()
       } catch (error) {
-        try {
-          onDiagnostic?.(error)
-        } catch {}
+        reportDiagnostic(onDiagnostic, error)
       }
       for (const signal of signals) {
         try {
           signal.removeEventListener('abort', onAbort)
         } catch (error) {
-          try {
-            onDiagnostic?.(error)
-          } catch {}
+          reportDiagnostic(onDiagnostic, error)
         }
       }
       try {
@@ -138,17 +135,13 @@ export function raceWithAsyncControl<T>(options: {
       try {
         timer?.clear()
       } catch (error) {
-        try {
-          options.onDiagnostic?.(error)
-        } catch {}
+        reportDiagnostic(options.onDiagnostic, error)
       }
       for (const signal of signals) {
         try {
           signal.removeEventListener('abort', onAbort)
         } catch (error) {
-          try {
-            options.onDiagnostic?.(error)
-          } catch {}
+          reportDiagnostic(options.onDiagnostic, error)
         }
       }
       try {
@@ -181,14 +174,10 @@ export function raceWithAsyncControl<T>(options: {
           try {
             const timeoutEffect = options.onTimeout?.()
             void Promise.resolve(timeoutEffect).catch((error) => {
-              try {
-                options.onDiagnostic?.(error)
-              } catch {}
+              reportDiagnostic(options.onDiagnostic, error)
             })
           } catch (error) {
-            try {
-              options.onDiagnostic?.(error)
-            } catch {}
+            reportDiagnostic(options.onDiagnostic, error)
           }
           finish(() => reject(options.createTimeoutError()))
         }, options.timeoutMs)
@@ -197,9 +186,7 @@ export function raceWithAsyncControl<T>(options: {
           try {
             createdTimer.clear()
           } catch (error) {
-            try {
-              options.onDiagnostic?.(error)
-            } catch {}
+            reportDiagnostic(options.onDiagnostic, error)
           }
         }
       } catch (error) {
@@ -207,16 +194,12 @@ export function raceWithAsyncControl<T>(options: {
         try {
           cleanup = options.onSetupFailure?.(error)
         } catch (cleanupError) {
-          try {
-            options.onDiagnostic?.(cleanupError)
-          } catch {}
+          reportDiagnostic(options.onDiagnostic, cleanupError)
         }
         void Promise.resolve(cleanup).then(
           () => finish(() => reject(error)),
           (cleanupError) => {
-            try {
-              options.onDiagnostic?.(cleanupError)
-            } catch {}
+            reportDiagnostic(options.onDiagnostic, cleanupError)
             finish(() => reject(error))
           }
         )

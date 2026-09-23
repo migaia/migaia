@@ -1,3 +1,7 @@
+/**
+ * This file checks delivery-process artifacts, not product behavior. It needs workspace-local docs/
+ * and is excluded from the package gate.
+ */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -154,7 +158,7 @@ type ISolAdmissionInput = {
   loopStatePath: string
 }
 
-const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..')
+const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..', '..')
 const sddPath = resolve(
   repositoryRoot,
   'docs/web-rpc/endpoint-feature-composition-continuation-run2.sdd.md'
@@ -324,10 +328,10 @@ const directTestBindings = new Map<string, readonly string[]>([
 ])
 
 directTestBindings.set('MET-RED-036', [
-  'packages/web-rpc/test/continuation-sdd.test.ts::executes direct T65 and T68 process invariants'
+  'packages/web-rpc/test/control-plane/continuation-sdd.test.ts::executes direct T65 and T68 process invariants'
 ])
 directTestBindings.set('MET-RED-037', [
-  'packages/web-rpc/test/continuation-sdd.test.ts::executes direct T65 and T68 process invariants'
+  'packages/web-rpc/test/control-plane/continuation-sdd.test.ts::executes direct T65 and T68 process invariants'
 ])
 directTestBindings.set('MET-RED-038', [
   'packages/web-rpc/test/architecture.test.ts::WRC-C-T72 requires canonical PluginHost and capability topology owners'

@@ -18,6 +18,7 @@ export type IPluginHostOperationRuntimeOptions = Readonly<{
   readonly scheduler: ILifecycleScheduler
   readonly timeoutMs: number | false
   readonly isHostOpen: () => boolean
+  readonly diagnostic: (message: string) => void
 }>
 
 /** Owns lifecycle-hook generation authority, deadlines, and timeout supersession. */
@@ -71,8 +72,12 @@ export class PluginHostOperationRuntime {
           enumerable: true,
           configurable: true
         })
-      } catch {
-        // The timeout primary remains authoritative when signal cleanup is hostile.
+      } catch (attachFailure) {
+        try {
+          this.#options.diagnostic(ERROR_TEXT.CAUSE_ATTACH_FAILED(String(attachFailure)))
+        } catch {
+          // The timeout primary remains authoritative when diagnostic delivery is hostile.
+        }
       }
     }
     throw timeout

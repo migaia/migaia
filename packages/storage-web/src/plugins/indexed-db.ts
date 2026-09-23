@@ -1,6 +1,6 @@
 import { indexedDbHost, type IIndexedDbOptions } from '../backends/indexed-db.js'
 import { asIndexedDbBackfillStore } from '../backends/indexed-db-backfill.js'
-import { defineBuiltInPlugin, type IStoragePluginCore } from '../host/contracts.js'
+import { createBuiltInBackendPlugin } from './builtin-factory.js'
 import {
   indexedDbBackendKind,
   type IBuiltInPluginId,
@@ -26,15 +26,9 @@ export const prepareIndexedDbStore = async (store: IKeyValueStore): Promise<void
 export const indexedDbBackendPlugin = <const TId extends string = 'indexed-db'>(
   options: IIndexedDbOptions & IBuiltInPluginId<TId> = {}
 ): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId> =>
-  defineBuiltInPlugin(
+  createBuiltInBackendPlugin(
     indexedDbBackendKind,
     (options.id ?? 'indexed-db') as TId,
-    (core: IStoragePluginCore<IIndexedDbBackendStore>) => ({
-      install: async () => {
-        const store = indexedDbHost(options)
-        core.registerStore(store)
-        await prepareIndexedDbStore(store)
-        return {}
-      }
-    })
-  ) as IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>
+    () => indexedDbHost(options),
+    { prepare: prepareIndexedDbStore }
+  )

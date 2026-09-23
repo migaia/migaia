@@ -21,6 +21,35 @@ export type IPluginHostPublicationPort<THost, TDomainCore extends object, TValue
   unUse(name: string): unknown
 }>
 
+/** Weak registration-set cache preserving callable identity across disable/enable round trips. */
+type IExtensionCacheNode = {
+  readonly next: WeakMap<object, IExtensionCacheNode>
+  readonly functions: Map<PropertyKey, Function>
+}
+
+/** Per-host cache root; exact registration objects distinguish later reinstall generations. */
+const extensionCache = new WeakMap<object, IExtensionCacheNode>()
+
+/** Returns the cache node for one exact ordered registration set. */
+const readExtensionCache = (
+  host: object,
+  registrations: readonly object[]
+): IExtensionCacheNode => {
+  const existing = extensionCache.get(host)
+  const root: IExtensionCacheNode = existing ?? { next: new WeakMap(), functions: new Map() }
+  if (!existing) extensionCache.set(host, root)
+  let node: IExtensionCacheNode = root
+  for (const registration of registrations) {
+    let child: IExtensionCacheNode | undefined = node.next.get(registration)
+    if (!child) {
+      child = { next: new WeakMap(), functions: new Map() }
+      node.next.set(registration, child)
+    }
+    node = child
+  }
+  return node
+}
+
 /**
  * Materializes one immutable publication snapshot. All liveness and mutation decisions remain in
  * PluginHost; this module owns only descriptor-safe view construction.
@@ -36,6 +65,8 @@ export const createPluginHostPublication = <
 ): IPluginHostView<THost, TViewPlugins> => {
   /** Frozen registration identities defining this exact publication generation. */
   const captured = Object.freeze([...registrations])
+  /** Exact-set cache keeps restored callable references stable without sharing stale generations. */
+  const cached = readExtensionCache(port.host as object, captured)
   /** Null-prototype extension record excluding Host and Object prototype capabilities. */
   const extensions = Object.create(null) as Record<PropertyKey, unknown>
   for (const registration of captured)
@@ -43,10 +74,17 @@ export const createPluginHostPublication = <
       /** Captured extension value published without re-reading the candidate object. */
       const value = descriptor.value
       /** Callable extensions retain the concrete Host receiver through the canonical invoker. */
-      const published =
-        typeof value === 'function'
-          ? (...args: unknown[]) => invokeCaptured(value, port.host, args)
-          : value
+      let published = value
+      if (typeof value === 'function') {
+        published = cached.functions.get(key)
+        if (!published) {
+          published = (...args: unknown[]) => {
+            port.assertLive(captured)
+            return invokeCaptured(value, port.host, args)
+          }
+          cached.functions.set(key, published as Function)
+        }
+      }
       Object.defineProperty(extensions, key, {
         value: published,
         enumerable: true,
@@ -126,7 +164,10 @@ export const createPluginHostExtensionPublication = <THost, TDomainCore extends 
       const value = descriptor.value
       const published =
         typeof value === 'function'
-          ? (...args: unknown[]) => invokeCaptured(value, host, args)
+          ? (...args: unknown[]) => {
+              assertLive(captured)
+              return invokeCaptured(value, host, args)
+            }
           : value
       Object.defineProperty(extensions, key, {
         value: published,

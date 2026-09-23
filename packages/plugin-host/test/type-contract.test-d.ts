@@ -1,10 +1,12 @@
 import {
+  openComposition,
+  type IPluginHostCompositionIntegration
+} from '../src/composition-entry.js'
+import {
   definePlugin,
   defineFeature,
-  setupHost,
   type IPlugin,
-  type IPluginHostCompositionIntegration,
-  type IPluginHostOptions,
+  type IExcludePluginByName,
   type IPluginRegistrationReceipt,
   PluginHost
 } from '../src/index.js'
@@ -114,6 +116,25 @@ declare const contractHost: PluginHost<{}>
 declare const contractA: IContractA
 declare const contractB: IContractB
 
+/** Type-level removal keeps the other installed extension while dropping the named one. */
+declare const reducedContract: IExcludePluginByName<[IContractA, IContractB], 'a'>
+void reducedContract[0].name
+
+declare const enablementHost: PluginHost<{}, never, [IContractA, IContractB]>
+const enablementTypeContract = async (): Promise<void> => {
+  const { token, view: reduced } = await enablementHost.plugin.disable('a')
+  // @ts-expect-error The disabled plugin is absent from the reduced view tuple.
+  void reduced.extensions.aExtension
+  const remaining: string = reduced.extensions.bExtension
+  const restored = await token.enable()
+  const original: string = restored.extensions.aExtension
+  const stillInstalled = await enablementHost.plugin.disable('b')
+  void stillInstalled.token
+  void remaining
+  void original
+}
+void enablementTypeContract
+
 const accumulatedContract = async (): Promise<void> => {
   const appA = await contractHost.use(contractA)
   const appAB = await appA.use(contractB)
@@ -149,7 +170,10 @@ const descriptorTypeContract = async (): Promise<void> => {
   void exposed
 }
 
-const compositionIntegration: IPluginHostCompositionIntegration<typeof contractHost> = contractHost
+// 托管协议不再是 Host 实例的结构子集：它经 `openComposition` 取得，因此这里断言的是出口的形状，
+// 而不是「宿主碰巧长得像出口」。
+const compositionIntegration: IPluginHostCompositionIntegration<object> =
+  openComposition(contractHost)
 void compositionIntegration.createPluginAdmission(contractA)
 void compositionIntegration.createDataOrderSlot('a')
 void compositionIntegration.getCurrentView()
@@ -185,75 +209,4 @@ const corefulView = await corefulHost.use(coreBoundDescriptor)
 await contractHost.getCurrentView().use(coreBoundDescriptor)
 // @ts-expect-error dynamic view use retains the descriptor core requirement.
 await corelessHost.getCurrentView().use(coreBoundDescriptor)
-const validSetup = await setupHost({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
-  setupTimeoutMs: false,
-  core: () => ({ domain: 1 }),
-  plugins: [coreBoundDescriptor] as const
-})
-void validSetup.extensions.domainValue
-await setupHost({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
-  setupTimeoutMs: false,
-  core: () => ({}),
-  // @ts-expect-error setup initial tuple retains the descriptor core requirement.
-  plugins: [coreBoundDescriptor] as const
-})
-const corelessSetup = await setupHost({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
-  setupTimeoutMs: false,
-  core: () => ({})
-})
-// @ts-expect-error setup host use retains the descriptor core requirement.
-await corelessSetup.host.use(coreBoundDescriptor)
-// @ts-expect-error setup view use retains the descriptor core requirement.
-await corelessSetup.use(coreBoundDescriptor)
 void corefulView
-
-type ISetupCore = { readonly value: number }
-const setupPlugin = definePlugin<ISetupCore, { readonly doubled: number }, number>({
-  name: 'setup',
-  install: (core) => {
-    core.usePipeline((value, next) => next(value + 1))
-    return { doubled: core.value * 2 }
-  }
-})
-const setupHostOptions = {
-  host: {
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-  } satisfies IPluginHostOptions,
-  setupTimeoutMs: false,
-  core: () => ({ value: 1 }),
-  plugins: [setupPlugin] as const
-} as const
-
-const setupTypeContract = async (): Promise<void> => {
-  const setupView = await setupHost<ISetupCore, readonly [typeof setupPlugin], number>(
-    setupHostOptions
-  )
-  void setupView.extensions.doubled
-  setupView.host.usePipeline((value, next) => next(value + 1))
-  setupView.host.useAsyncPipeline(async (value, next) => next(value + 1))
-  setupView.host.useGeneratorPipeline(function* (value) {
-    yield value + 1
-    return undefined
-  })
-  setupView.host.useAsyncGeneratorPipeline(async function* (value) {
-    yield value + 1
-    return undefined
-  })
-  // @ts-expect-error setupHost exposes one ordered `plugins` tuple, not a second async queue.
-  setupHost({ ...setupHostOptions, asyncPlugins: [setupPlugin] })
-}
-
-const emptySetupTypeContract = async (): Promise<void> => {
-  const setupView = await setupHost<ISetupCore>({
-    host: setupHostOptions.host,
-    setupTimeoutMs: false,
-    core: setupHostOptions.core
-  })
-  setupView.config.get('missing')
-}
-
-void setupTypeContract
-void emptySetupTypeContract

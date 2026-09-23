@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createWebRpcPluginHost } from '../../src/internal/web-rpc-plugin-host.js'
 import { createComposedEndpoint } from '../../src/core.js'
 import { defineFeature } from '../../src/feature.js'
 import { createClientFirstPartyRoots } from '../../src/internal/client-first-party-roots.js'
@@ -9,7 +10,6 @@ import { createMemoryTransportPair } from '../../src/adapters/memory.js'
 import { createConstructionControl } from '../../src/internal/construction-install.js'
 import { createEndpointProjection } from '../../src/internal/endpoint-projection.js'
 import type { IWebRpcPluginConstraint } from '../../src/internal/plugin-contract.js'
-import { WebRpcPluginHost } from '../../src/internal/web-rpc-plugin-host.js'
 import type { IWebRpcAbortSignal } from '../../src/typing.js'
 
 /** Native output with an undefined public value must fail closed at the projection boundary. */
@@ -39,8 +39,13 @@ describe('canonical endpoint projection', () => {
     expect(Reflect.ownKeys(projection)).toEqual(['on', 'hooks', 'dispose', 'send', 'provide'])
     expect(Object.getPrototypeOf(projection)).toBeNull()
     expect(Object.isFrozen(projection)).toBe(true)
-    expect(projection.send).toBe(send)
+    // 投影现在把可调用成员包一层，用来把宿主的 `VIEW_REVOKED` 翻译成本包的 ENDPOINT_DISPOSED——
+    // 宿主的存活判定在成员体之前执行，端点没有别的拦截点。保证从「同一个引用」放宽为「同一个实现」：
+    // 调用投影出的成员，被调到的必须还是原来那一个函数，且同一个键每次读到同一个对象。
     expect(projection.send).toBe(projection.send)
+    projection.send('payload')
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(send).toHaveBeenCalledWith('payload')
     expect(projection.provide('echo', () => undefined)).toBe(projection)
     expect(provide).toHaveBeenCalledWith('echo', expect.any(Function))
     await projection.dispose()
@@ -135,8 +140,6 @@ describe('canonical endpoint projection', () => {
         clientTransport.close()
       }
     }
-    const hostDispose = vi.spyOn(WebRpcPluginHost.prototype, 'dispose')
-
     try {
       const construction = createComposedEndpoint(
         {
@@ -151,10 +154,10 @@ describe('canonical endpoint projection', () => {
         code: WebRpcErrorCode.invalidConfig,
         message: WebRpcErrorText.endpointModuleInvalid
       })
-      expect(hostDispose).toHaveBeenCalledTimes(1)
+      // 宿主由工厂产出而非类，没有原型可监视；它 dispose 的外部效应就是这一次 transport 关闭。
       expect(closeCalls).toBe(1)
     } finally {
-      hostDispose.mockRestore()
+      // 无需还原任何 spy。
     }
   })
 
@@ -201,7 +204,7 @@ describe('canonical endpoint projection', () => {
   it('delegates to a real WebRpcPluginHost Promise and preserves translated disposal errors', async () => {
     const cleanup = new Error('integrated projection cleanup failed')
     const [transport] = createMemoryTransportPair()
-    const host = new WebRpcPluginHost(
+    const host = createWebRpcPluginHost(
       'integrated-projection-host',
       transport,
       createConstructionControl({
@@ -222,18 +225,19 @@ describe('canonical endpoint projection', () => {
     }
     await host.installBatch([plugin])
     const endpoint = createEndpointProjection({
-      host,
+      // 与生产一致：投影的来源是 extensions，不是宿主本身。
+      host: {},
       publicKeys: [],
       exposedKeys: [],
       on: () => undefined,
       hooks: Object.freeze({}),
       hostDispose: () => host.dispose() as unknown as Promise<void>
     }) as Readonly<{ readonly dispose: () => Promise<void> }>
-    const hostDisposeSpy = vi.spyOn(host, 'dispose')
     try {
       const first = endpoint.dispose()
-      const hostResult = hostDisposeSpy.mock.results[0]?.value
-      expect(first).toBe(hostResult)
+      // 宿主句柄是冻结的，不能被 spy 重定义；等价观测是它自己的保证：dispose 链被记忆化，所以
+      // 端点交出的 Promise 与直接向宿主索取的是同一个引用。
+      expect(first).toBe(host.dispose())
       expect(endpoint.dispose()).toBe(first)
       expect(endpoint.dispose()).toBe(first)
       await expect(first).rejects.toMatchObject({
@@ -245,7 +249,6 @@ describe('canonical endpoint projection', () => {
       })
       await expect(first).rejects.toBeInstanceOf(WebRpcLifecycleError)
     } finally {
-      hostDisposeSpy.mockRestore()
       await host.dispose().catch(() => undefined)
     }
   })

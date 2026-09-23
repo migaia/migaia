@@ -14,23 +14,17 @@
     "USEGUIDE.md"
   ],
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/host-runtime.js"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./defined": {
-      "types": "./dist/defined.d.ts",
-      "default": "./dist/defined.js"
-    },
     "./composition": {
       "types": "./dist/composition-entry.d.ts",
       "default": "./dist/composition-entry.js"
-    },
-    "./structural": {
-      "types": "./dist/structural.d.ts",
-      "default": "./dist/structural.js"
     }
   },
   "publishConfig": {
@@ -43,6 +37,7 @@
     "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test",
     "test": "pnpm run build && vitest run",
+    "test:packed": "pnpm run build && node test/packed-smoke.mjs",
     "test:coverage": "pnpm run build && vitest run --coverage",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",

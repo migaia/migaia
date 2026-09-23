@@ -17,6 +17,8 @@ const hostReservedKeys = new Set<PropertyKey>([
   'use',
   'unUse',
   'dispose',
+  'plugin',
+  'identity',
   'host',
   'extensions'
 ])
@@ -35,7 +37,6 @@ export const assertExtensionResult = (extension: unknown, pluginName: string): o
     throw createPluginHostTypeError('plugin install() must return a plain object')
   for (const key of Reflect.ownKeys(extension)) {
     if (
-      key === 'then' ||
       (asyncDisposeKey !== undefined && key === asyncDisposeKey) ||
       (disposeKey !== undefined && key === disposeKey)
     )

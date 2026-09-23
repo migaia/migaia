@@ -148,7 +148,7 @@ const prefix: IPlugin<IPluginCore, { greet(name: string): void }, IPluginConfig>
 推荐用 `definePlugin()` 创建插件定义，而不是手写类型断言：
 
 ```ts
-import { definePlugin } from '@migaia/plugin-host/defined'
+import { definePlugin } from '@migaia/plugin-host'
 
 const health = definePlugin('health', () => ({
   install: () => ({ check: () => ({ ok: true as const }) })
@@ -162,7 +162,7 @@ const configurable = definePlugin({
 })
 ```
 
-第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。
+第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`defineHost()` 与 `PluginHost` 都只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。
 
 安装时获得的 `core` 是一个稳定的 facade（`src/core.ts` 的 `createPluginCore`）。它包含子类提供的领域方法，加上下面的通用能力：
 
@@ -303,29 +303,36 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 ---
 
+## 禁用与启用
+
+`host.plugin.disable(name)` 只切换可达性，返回 `{ token, view }`：新 view 的 extension 类型和运行时键都不含被禁用插件；禁用前保存的 extension 与 Feature expose 会报 `VIEW_REVOKED`。`await token.enable()` 用同一注册恢复精确类型和原 stage 位置。`host.plugin.enable(name)` 面向字符串操作，返回动态 view；`host.plugin.disabled()` 返回当前禁用插件名的只读快照。`PluginHost` class 与 `defineHost()` handle 都提供这个门面。
+
+禁用不会调用插件 `dispose`、资源 disposer，也不释放 scope；它不是轻量卸载。`onDisable`/`onEnable` 是通知钩子，失败经 `diagnostic` 上报而不回滚。初装成功后也会触发一次 `onEnable`。要回收资源须调用 `unUse(name)`。禁用期间 `host.config` 仍可读取和更新该插件配置；收缩后的 view 在类型层不再列出被禁用插件配置，需要更新时从宿主自身的 `config` 入口操作。
+
+已发布的 shared 键若所有者被禁用，`getShared` 抛 `PREREQUISITE_DISABLED`，`detail.recoverable === true`；卸载后同一键抛 `PREREQUISITE_REMOVED`，`detail.recoverable === false`。一个新插件重新发布该键后，读取恢复正常。从未发布的键仍返回 `undefined`。
+
 ## 9. 错误码完整参考
 
-`PluginHostErrorCode` 导出以下 32 个稳定错误码，均可通过 `error.code` 分支处理：
+`PluginHostErrorCode` 导出以下 33 个稳定错误码，均可通过 `error.code` 分支处理：
 
 | code                               | 含义                                                                                                                                                                                                                                                                             |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `HOST_DISPOSED`                    | Host 已完成卸载，不能再访问或变更。                                                                                                                                                                                                                                              |
 | `HOST_DISPOSING`                   | Host 正在卸载，不能开始新的变更。                                                                                                                                                                                                                                                |
-| `HOST_CORE_SETUP_FAILED`           | Core 构造失败；原始错误位于 `cause`。                                                                                                                                                                                                                                            |
-| `HOST_SETUP_TIMEOUT`               | Host setup 超过配置的截止时间。                                                                                                                                                                                                                                                  |
-| `HOST_SETUP_ABORTED`               | Host setup 被调用方取消。                                                                                                                                                                                                                                                        |
-| `HOST_SETUP_ROLLBACK_FAILED`       | setup 失败且回滚清理也失败；原始错误保持可追踪。                                                                                                                                                                                                                                 |
 | `PLUGIN_DUPLICATE`                 | 插件已安装，或同一批次中出现重复名字。                                                                                                                                                                                                                                           |
 | `PLUGIN_NOT_INSTALLED`             | 目标插件未安装（`unUse`/`config.update` 找不到对应插件）。                                                                                                                                                                                                                       |
 | `PLUGIN_INSTALL_FAILED`            | 插件安装失败；原始错误位于 `cause`。                                                                                                                                                                                                                                             |
 | `PLUGIN_INSTALL_ROLLBACK_FAILED`   | 诊断（非抛出）：插件安装失败且回滚清理也失败；原始安装错误**保持 primary**（顶层码 `PLUGIN_INSTALL_FAILED`），回滚失败经 `diagnostic` 上报。                                                                                                                                     |
+| `INSTALL_RESULT_THENABLE`          | 插件 `install()` 返回值自带 `then` key；同步 `useSync()` 与异步 `use()` 一致拒绝，不会发布可被误当作 Promise 的扩展。                                                                                                                                                            |
+| `COMPOSITION_TARGET_UNMANAGED`     | `openComposition()` 的目标不是本包登记的托管宿主。托管协议只对本包构造出的宿主开放，普通对象、另一份包副本产出的宿主都会被拒绝；组合方应先用 `isManagedHost()` 判定。                                                                                                                                                            |
 | `PLUGIN_DISPOSE_FAILED`            | 单个插件卸载失败；原始错误位于 `cause`。                                                                                                                                                                                                                                         |
-| `HOST_DISPOSE_FAILED`              | Host 整体卸载失败；原始错误位于 `cause`。                                                                                                                                                                                                                                        |
 | `EXTENSION_DUPLICATE`              | extension key 与已有成员冲突。                                                                                                                                                                                                                                                   |
 | `EXTENSION_OBJECT_PROTOTYPE`       | extension key 与 `Object.prototype` 上的成员冲突（如 `toString`）。                                                                                                                                                                                                              |
 | `EXTENSION_RESERVED`               | extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。                                                                                                                                                                                                   |
 | `EXTENSION_NON_ENUMERABLE_IGNORED` | 诊断（非抛出）：`install()` 返回值上的非枚举 key 被有意忽略，未挂载到 Host；通过 `diagnostic` 回调上报。                                                                                                                                                                         |
 | `SHARED_DUPLICATE`                 | shared key 已被占用。                                                                                                                                                                                                                                                            |
+| `PREREQUISITE_DISABLED`            | shared key 的所有者被禁用；可启用该插件后重试。                                                                                                                                                                                                                                    |
+| `PREREQUISITE_REMOVED`             | shared key 的所有者已卸载；需重新安装提供该键的插件。                                                                                                                                                                                                                              |
 | `RESOURCE_OUTSIDE_INSTALL`         | 在允许的插件生命周期之外注册资源或 pipeline stage。                                                                                                                                                                                                                              |
 | `LIFECYCLE_MUTATION`               | 插件生命周期钩子内尝试变更 Host，见 [§8](#8-生命周期与错误)。                                                                                                                                                                                                                    |
 | `INVALID_PIPELINE_MODE`            | 构造时传入的 pipeline mode 无效。                                                                                                                                                                                                                                                |
@@ -340,6 +347,8 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 | `VIEW_REVOKED`                     | 已撤销的 immutable view 或其 core 被访问；调用方应改用最近一次返回的 view。                                                                                                                                                                                                      |
 | `PIPELINE_DRAIN_TIMEOUT`           | Host 进入逻辑终态前 active pipeline 未在 drain 预算内归零；检查返回的 disposal result 与 physical completion。                                                                                                                                                                   |
 | `CLEANUP_INCOMPLETE`               | 逻辑清理已提交但仍有物理 cleanup 未完成；调用方应观察 `physicalCompletion`。                                                                                                                                                                                                     |
+| `INVALID_CONFIG_VALUE`             | config 值不满足准入的 plain-data 语法（如 symbol、非法原型、危险键名、descriptor、thenable）；调用方需改用受支持的取值。                                                                                                                                                         |
+| `CONFIG_CYCLE_REJECTED`            | config 输入存在引用循环；调用方需提供无环的值图。                                                                                                                                                                                                                                |
 | `INVALID_OPTION`                   | 入参校验失败（`TypeError`）：插件名/配置路径/pipeline stage/extension/domain core/资源 disposer/构造选项等输入不满足契约，检查用 `error instanceof TypeError`，不按 `PluginHostError` 分支。                                                                                     |
 
 ```ts

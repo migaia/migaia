@@ -1,5 +1,5 @@
 import { sessionStorageHost, type ISessionStorageOptions } from '../backends/session-storage.js'
-import { defineBuiltInPlugin, type IStoragePluginCore } from '../host/contracts.js'
+import { createBuiltInBackendPlugin } from './builtin-factory.js'
 import {
   sessionStorageBackendKind,
   type IBuiltInPluginId,
@@ -11,13 +11,6 @@ import type { IStorageBackendPlugin } from '../host/types.js'
 export const sessionStorageBackendPlugin = <const TId extends string = 'session'>(
   options: ISessionStorageOptions & IBuiltInPluginId<TId> = {}
 ): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId> =>
-  defineBuiltInPlugin(
-    sessionStorageBackendKind,
-    (options.id ?? 'session') as TId,
-    (core: IStoragePluginCore<ISessionStorageBackendStore>) => ({
-      install: () => {
-        core.registerStore(sessionStorageHost(options))
-        return {}
-      }
-    })
-  ) as IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>
+  createBuiltInBackendPlugin(sessionStorageBackendKind, (options.id ?? 'session') as TId, () =>
+    sessionStorageHost(options)
+  )

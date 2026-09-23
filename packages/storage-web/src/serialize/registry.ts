@@ -10,6 +10,7 @@ import {
 import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes'
 import { snapshotStorageCapabilities, type IStorageCapabilities } from '../types/capabilities.js'
 import { isUint8Array } from '../core/bytes.js'
+import { reportCleanupError } from '../core/operation-reporter.js'
 
 // codec 描述符 guard 已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
 export { snapshotCodec, assertCodec }
@@ -82,13 +83,11 @@ export const selectCodec = (
 
   if (normalizedCodec.output === 'binary') {
     if (normalizedCapabilities.binary) return normalizedCodec
-    try {
-      onDiagnostic?.(
+    if (onDiagnostic)
+      reportCleanupError(
+        (error) => onDiagnostic(String(error)),
         `[storage-web] codec "${normalizedCodec.name}" falls back to base64 on a text-only backend (+33% size)`
       )
-    } catch {
-      // Diagnostics are observational; a broken sink cannot change codec selection.
-    }
     return {
       encode: async (value, ctx) =>
         bytesToBase64(toBinaryBytes(await normalizedCodec.encode(value, ctx))),

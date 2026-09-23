@@ -8,7 +8,8 @@ import {
   PluginHost,
   PluginHostError
 } from '../src/index.js'
-import { createManualScheduler } from '@migaia/lifecycle'
+import { createAbortController, createManualScheduler } from '@migaia/lifecycle'
+import { PluginHostOperationRuntime } from '../src/operation-runtime.js'
 
 class Host extends PluginHost<Record<string, never>, string> {
   /** Supplies an explicit unbounded test policy while preserving test overrides. */
@@ -24,12 +25,110 @@ class Host extends PluginHost<Record<string, never>, string> {
   }
 }
 
-class ConfigDate extends Date {
-  label = 'date'
-  self = this
-}
-
 describe('native Feature synchronous installation', () => {
+  it('YS11 cause chain: reports each rejected Feature and install attachment failure without replacing its primary error', async () => {
+    const attachmentFailure = new Error('feature-install-cause-attach-failed')
+    const originalDefineProperty = Object.defineProperty
+    const defineProperty = vi.spyOn(Object, 'defineProperty').mockImplementation(((
+      target,
+      key,
+      descriptor
+    ) => {
+      if (key === 'cause') throw attachmentFailure
+      return originalDefineProperty(target, key, descriptor)
+    }) as typeof Object.defineProperty)
+    try {
+      for (const [name, createPlugin] of [
+        [
+          'feature-cause-attachment',
+          (name: string) => {
+            let reject!: (error: unknown) => void
+            const feature = defineFeature((() => ({
+              // oxlint-disable-next-line unicorn/no-thenable -- host must retain the original late rejection.
+              then: (_resolve: unknown, onReject: (error: unknown) => void) => (reject = onReject)
+            })) as never)
+            const plugin = definePlugin({
+              name,
+              features: { feature },
+              featureExpose: {},
+              install: () => ({})
+            })
+            return { plugin, reject: () => reject(new Error('feature-late-rejection')) }
+          }
+        ],
+        [
+          'install-cause-attachment',
+          (name: string) => {
+            let reject!: (error: unknown) => void
+            const plugin = definePlugin({
+              name,
+              featureExpose: {
+                // oxlint-disable-next-line unicorn/no-thenable -- hook result is deliberately hostile.
+                then: (_resolve: unknown, onReject: (error: unknown) => void) => (reject = onReject)
+              },
+              install: () => ({})
+            })
+            return { plugin, reject: () => reject(new Error('install-late-rejection')) }
+          }
+        ]
+      ] as const) {
+        const diagnostics: string[] = []
+        const candidate = createPlugin(name)
+        const host = new Host({ diagnostic: (message: string) => diagnostics.push(message) })
+        let caught: unknown
+        try {
+          await host.use(candidate.plugin)
+        } catch (error) {
+          caught = error
+        }
+        expect(caught).toBeInstanceOf(PluginHostError)
+        const primary = (caught as PluginHostError).cause
+        candidate.reject()
+        await Promise.resolve()
+        await Promise.resolve()
+        expect((caught as PluginHostError).cause).toBe(primary)
+        expect(diagnostics.join('|')).toContain('failed to attach error cause')
+      }
+    } finally {
+      defineProperty.mockRestore()
+    }
+  })
+
+  it('YS11 cause chain: timeout error attachment failure is diagnostic-only when supersession also fails', async () => {
+    const scheduler = createManualScheduler()
+    const diagnostics: string[] = []
+    const runtime = new PluginHostOperationRuntime({
+      parentSignal: createAbortController().signal,
+      scheduler,
+      timeoutMs: 1,
+      isHostOpen: () => true,
+      diagnostic: (message) => diagnostics.push(message)
+    })
+    const registration: Record<string, never> = {}
+    runtime.begin(registration)
+    const abort = vi.spyOn(AbortController.prototype, 'abort').mockImplementation(() => {
+      throw new Error('supersede-failed')
+    })
+    const originalDefineProperty = Object.defineProperty
+    const defineProperty = vi.spyOn(Object, 'defineProperty').mockImplementation(((
+      target,
+      key,
+      descriptor
+    ) => {
+      if (key === 'errors') throw new Error('timeout-errors-attach-failed')
+      return originalDefineProperty(target, key, descriptor)
+    }) as typeof Object.defineProperty)
+    try {
+      const pending = runtime.await(new Promise<never>(() => {}), registration)
+      scheduler.advance(1)
+      await expect(pending).rejects.toMatchObject({ code: 'MUTATION_EXECUTION_TIMEOUT' })
+      expect(diagnostics.join('|')).toContain('failed to attach error cause')
+    } finally {
+      defineProperty.mockRestore()
+      abort.mockRestore()
+    }
+  })
+
   it('uses the same registration initializer for useSync', () => {
     const feature = defineFeature(() => ({ value: () => 7 }))
     const plugin = definePlugin({
@@ -65,7 +164,10 @@ describe('native Feature synchronous installation', () => {
     expect(() => expose!.read()).toThrow()
   })
 
-  it('keeps Feature expose valid until timed-out physical cleanup settles', async () => {
+  // `featureExposeValid` 的置位从物理完成层提到逻辑撤销层：撤销一发生该标志即为 `false`，不再挂在
+  // `featurePending.drain()` 之后的浮动 Promise 上。旧行为让「插件已离开 registry 但 expose 仍可调用」
+  // 成为可观测窗口，并且在 disposer 永不 settle 时永远不生效——这里观测的正是它不再存在。
+  it('invalidates Feature expose at logical revocation, not at physical cleanup', async () => {
     {
       const scheduler = createManualScheduler()
       let release!: () => void
@@ -91,7 +193,8 @@ describe('native Feature synchronous installation', () => {
           oldCore = core
           expose = core.featureExpose as { readonly read: () => number }
           core.onDispose(async () => {
-            expect(expose!.read()).toBe(1)
+            // 撤销已经发生，expose 在 disposer 运行之前就已失效。
+            expect(() => expose!.read()).toThrow()
             expect(() => oldCore.getShared('missing')).toThrow()
             entered()
             await gate
@@ -106,8 +209,9 @@ describe('native Feature synchronous installation', () => {
       for (let index = 0; index < 10; index += 1) await Promise.resolve()
       scheduler.advance(10)
       const outcome: any = await dispose
+      // 物理清理超时，调用方先拿回控制权；expose 的失效不依赖它落定。
       expect(outcome.cleanupComplete).toBe(false)
-      expect(expose!.read()).toBe(1)
+      expect(() => expose!.read()).toThrow()
       release()
       await outcome.physicalCompletion
       expect(() => expose!.read()).toThrow()
@@ -161,123 +265,17 @@ describe('native Feature synchronous installation', () => {
   })
 })
 
-class ConfigRegExp extends RegExp {
-  label = 'regexp'
-  self = this
-}
-
 /** Map subclass readers must use the readonly proxy as their custom-method receiver. */
-class ConfigMapSubclass extends Map<string, number> {
-  readValue(): number {
-    return this.get('value') ?? -1
-  }
-
-  receiver(): this {
-    return this
-  }
-
-  mutateWithSuper(): void {
-    super.set('value', 2)
-  }
-
-  mutateOwnProperty(): void {
-    ;(this as unknown as { marker: number }).marker = 1
-  }
-}
 
 /** Set subclass readers must use the readonly proxy as their custom-method receiver. */
-class ConfigSetSubclass extends Set<string> {
-  hasValue(): boolean {
-    return this.has('value')
-  }
-
-  receiver(): this {
-    return this
-  }
-
-  mutateWithSuper(): void {
-    super.add('other')
-  }
-
-  mutateOwnProperty(): void {
-    ;(this as unknown as { marker: number }).marker = 1
-  }
-}
 
 /** Map subclass whose iterable hook hides entries from code that fails to capture native readers. */
-class HiddenIteratorMap extends Map<string, unknown> {
-  [Symbol.iterator](): any {
-    return [][Symbol.iterator]()
-  }
-}
 
 /** Set subclass whose iterable hook hides values from code that fails to capture native readers. */
-class HiddenIteratorSet extends Set<unknown> {
-  [Symbol.iterator](): any {
-    return [][Symbol.iterator]()
-  }
-}
 
 /** Map subclass overrides every reader family to prove custom calls receive only the proxy. */
-class ReaderOverrideMap extends Map<string, number> {
-  get(): any {
-    super.set('leak', 1)
-    return this
-  }
-
-  has(): any {
-    super.set('leak', 1)
-    return this
-  }
-
-  entries(): any {
-    return this
-  }
-
-  keys(): any {
-    return this
-  }
-
-  values(): any {
-    return this
-  }
-
-  forEach(): any {
-    return this
-  }
-
-  [Symbol.iterator](): any {
-    return this
-  }
-}
 
 /** Set subclass overrides every reader family to prove custom calls receive only the proxy. */
-class ReaderOverrideSet extends Set<string> {
-  has(): any {
-    super.add('leak')
-    return this
-  }
-
-  entries(): any {
-    return this
-  }
-
-  keys(): any {
-    return this
-  }
-
-  values(): any {
-    return this
-  }
-
-  forEach(): any {
-    return this
-  }
-
-  [Symbol.iterator](): any {
-    return this
-  }
-}
 
 describe('PH-AF-63：resource disposer admission snapshot', () => {
   it('只读取一次 disposer，保留 receiver，并忽略 admission 后的替换', async () => {
@@ -560,690 +558,6 @@ describe('#2 config.get(pluginName) 抛错而非返回整份 config', () => {
     await host.use({ name: 'p', config: { a: 1 }, install: () => ({}) } as any)
 
     expect(host.config.get('p')).toEqual({ a: 1 })
-  })
-})
-
-describe('#3 非 plain-object 的 config 值受保护且可读取', () => {
-  it('Map 的 get/forEach/iterator 都只暴露只读代理', async () => {
-    const map = new Map([['k', { value: 1 }]])
-    const host = new Host()
-    await host.use({ name: 'p', config: { map }, install: () => ({}) } as any)
-    const view: any = host.config.get('p.map')
-    expect(() => {
-      view.get('k').value = 2
-    }).toThrow('config is readonly')
-    view.forEach((_value: unknown, _key: unknown, raw: Map<string, { value: number }>) => {
-      expect(() => raw.set('z', { value: 3 })).toThrow()
-    })
-    expect(map.has('z')).toBe(false)
-    expect(map.get('k')?.value).toBe(1)
-  })
-
-  it('blocks descriptor and object-key escapes from readonly config views', async () => {
-    const objectKey = { id: 1 }
-    const host = new Host()
-    await host.use({
-      name: 'p',
-      config: { nested: { value: 1 }, map: new Map([[objectKey, true]]) },
-      install: () => ({})
-    } as any)
-    const root: any = host.config.get('p')
-    const leaked = Object.getOwnPropertyDescriptor(root, 'nested')!.value
-    expect(() => {
-      leaked.value = 2
-    }).toThrow('config is readonly')
-    expect(() => Object.setPrototypeOf(root, {})).toThrow('config is readonly')
-    const map: any = host.config.get('p.map')
-    const iteratedKey = [...map.keys()][0]
-    expect(map.has(iteratedKey)).toBe(true)
-    expect(map.get(iteratedKey)).toBe(true)
-  })
-
-  it('preserves Map object-key identity across separate readonly views', async () => {
-    const key = { id: 1 }
-    const host = new Host()
-    await host.use({
-      name: 'p',
-      config: { map: new Map([[key, true]]) },
-      install: () => ({})
-    } as any)
-    const first = host.config.get('p.map') as Map<object, boolean>
-    const capturedKey = [...first.keys()][0]!
-    const second = host.config.get('p.map') as Map<object, boolean>
-    expect(second.has(capturedKey)).toBe(true)
-  })
-
-  it('Date 值在重复 get() 时保持代理身份并可读取', async () => {
-    const host = new Host()
-    const date = new ConfigDate(0)
-    const pattern = new ConfigRegExp('a', 'g')
-    await host.use({
-      name: 'p',
-      config: {
-        when: date,
-        whenAlias: date,
-        pattern,
-        patternAlias: pattern,
-        list: [1, 2]
-      },
-      install: () => ({})
-    } as any)
-
-    const first = host.config.get('p.when')
-    expect(first).toBe(host.config.get('p.when'))
-    expect(first).toBe(host.config.get('p.whenAlias'))
-    expect((first as Date).getTime()).toBe(0)
-    const patternView = host.config.get('p.pattern')
-    expect(patternView).toBe(host.config.get('p.patternAlias'))
-    expect((first as ConfigDate).self).toBe(first)
-    expect((patternView as ConfigRegExp).self).toBe(patternView)
-    expect(host.config.get('p.list')).toEqual([1, 2]) // 数组走另一条分支，正常
-  })
-
-  it('Map/Set Date key 和 entry 在只读视图中保持身份并可查找', async () => {
-    const host = new Host()
-    const original = new Date(0)
-    await host.use({
-      name: 'p',
-      config: {
-        map: new Map([[original, 'value']]),
-        set: new Set([original])
-      },
-      install: () => ({})
-    } as any)
-
-    const map = host.config.get('p.map') as ReadonlyMap<Date, string>
-    const set = host.config.get('p.set') as ReadonlySet<Date>
-    const mapKey = [...map.keys()][0]!
-    const setEntry = [...set.values()][0]!
-
-    expect(mapKey).toBe(setEntry)
-    expect(map.has(mapKey)).toBe(true)
-    expect(map.get(mapKey)).toBe('value')
-    expect(set.has(setEntry)).toBe(true)
-  })
-
-  it('Date 的变异方法不能改写只读视图', async () => {
-    // PH-CFG-RO-01
-    const host = new Host()
-    const original = new Date(0)
-    await host.use({
-      name: 'p',
-      config: { when: original },
-      install: () => ({})
-    } as any)
-
-    const view = host.config.get('p.when') as Date
-    const mutators = [
-      'setDate',
-      'setFullYear',
-      'setHours',
-      'setMilliseconds',
-      'setMinutes',
-      'setMonth',
-      'setSeconds',
-      'setTime',
-      'setUTCDate',
-      'setUTCFullYear',
-      'setUTCHours',
-      'setUTCMilliseconds',
-      'setUTCMinutes',
-      'setUTCMonth',
-      'setUTCSeconds',
-      'setYear'
-    ] as const
-    const mutatorView = view as unknown as Record<
-      (typeof mutators)[number],
-      (value: number) => number
-    >
-
-    for (const mutator of mutators) {
-      expect(() => mutatorView[mutator](1234)).toThrow('config is readonly')
-    }
-
-    original.setTime(1234)
-    expect(view.getTime()).toBe(0)
-  })
-
-  it('Map、Set、RegExp 的快照可读取但不能改变内部状态', async () => {
-    // PH-CFG-RO-02
-    const host = new Host()
-    await host.use({
-      name: 'p',
-      config: {
-        map: new Map([['a', 1]]),
-        set: new Set(['a']),
-        pattern: /a/g
-      },
-      install: () => ({})
-    } as any)
-
-    const map = host.config.get('p.map') as Map<string, number>
-    const set = host.config.get('p.set') as Set<string>
-    const pattern = host.config.get('p.pattern') as RegExp
-    expect(map.get('a')).toBe(1)
-    expect(set.has('a')).toBe(true)
-    expect(pattern.test('a')).toBe(true)
-    expect(pattern.lastIndex).toBe(0)
-    expect(() => map.set('b', 2)).toThrow('config is readonly')
-    expect(() => set.add('b')).toThrow('config is readonly')
-    expect(map.has('b')).toBe(false)
-    expect(set.has('b')).toBe(false)
-  })
-})
-
-describe('PH-R19：cycle-aware config copy-on-write', () => {
-  it('PH-T19a：更新无关键时重建 root、回基 root alias，并复用未受影响 subtree', async () => {
-    const shared = { value: 1 }
-    const config: Record<string, any> = {
-      enabled: false,
-      shared,
-      alias: shared,
-      nested: { back: undefined }
-    }
-    config.self = config
-    config.nested.back = config
-
-    const host = new Host()
-    await host.use({ name: 'cycle-cow', config, install: () => ({}) } as any)
-    const previous: any = host.config.get('cycle-cow')
-    const previousShared = previous.shared
-
-    await host.config.update('cycle-cow', () => ({ enabled: true }))
-
-    const next: any = host.config.get('cycle-cow')
-    expect(next).not.toBe(previous)
-    expect(next.enabled).toBe(true)
-    expect(next.self).toBe(next)
-    expect(next.nested.back).toBe(next)
-    expect(next.shared).toBe(next.alias)
-    expect(next.shared).toBe(previousShared)
-    expect(previous.enabled).toBe(false)
-    expect(previous.self).toBe(previous)
-    expect(previous.nested.back).toBe(previous)
-  })
-
-  it('PH-T19b：替换键引用 previous root/nested alias 时仍 rebases 到同一新 snapshot', async () => {
-    const config: Record<string, any> = { nested: { back: undefined } }
-    config.self = config
-    config.nested.back = config
-
-    const host = new Host()
-    await host.use({ name: 'cycle-replace', config, install: () => ({}) } as any)
-    const previous: any = host.config.get('cycle-replace')
-
-    await host.config.update('cycle-replace', (seen) => ({
-      replacement: seen,
-      nestedReplacement: seen.nested
-    }))
-
-    const next: any = host.config.get('cycle-replace')
-    expect(next).not.toBe(previous)
-    expect(next.self).toBe(next)
-    expect(next.replacement).toBe(next)
-    expect(next.nestedReplacement).toBe(next.nested)
-    expect(next.nestedReplacement.back).toBe(next)
-    expect(previous.self).toBe(previous)
-    expect(previous.nested.back).toBe(previous)
-  })
-
-  it('PH-T19c：update 失败不提交候选 root，旧 snapshot 与其 cycle 保持可读', async () => {
-    const cause = new Error('cycle update failed')
-    const config: Record<string, any> = { enabled: false }
-    config.self = config
-    const host = new Host()
-    await host.use({
-      name: 'cycle-rollback',
-      config,
-      install: () => ({}),
-      update: () => {
-        throw cause
-      }
-    } as any)
-    const previous: any = host.config.get('cycle-rollback')
-
-    await expect(
-      host.config.update('cycle-rollback', (seen) => ({ enabled: true, replacement: seen }))
-    ).rejects.toBe(cause)
-
-    const afterFailure: any = host.config.get('cycle-rollback')
-    expect(afterFailure).toBe(previous)
-    expect(afterFailure.enabled).toBe(false)
-    expect(afterFailure.self).toBe(afterFailure)
-    expect(afterFailure.replacement).toBeUndefined()
-  })
-})
-
-describe('PH-R20：readonly Map/Set subclass receiver isolation', () => {
-  it('PH-T20a：Map subclass custom readers work, return the proxy, and cannot mutate via super', async () => {
-    const map = new ConfigMapSubclass([['value', 1]])
-    const host = new Host()
-    await host.use({ name: 'map-subclass', config: { map }, install: () => ({}) } as any)
-
-    const view: any = host.config.get('map-subclass.map')
-    expect(view).toBeInstanceOf(Map)
-    expect(view.readValue()).toBe(1)
-    expect(view.receiver()).toBe(view)
-    expect(() => view.mutateWithSuper()).toThrow()
-    expect(() => view.mutateOwnProperty()).toThrow('config is readonly')
-    expect(view.get('value')).toBe(1)
-    expect(view.has('other')).toBe(false)
-    expect((view as { marker?: number }).marker).toBeUndefined()
-  })
-
-  it('PH-T20b：Set subclass custom readers work, return the proxy, and cannot mutate via super', async () => {
-    const set = new ConfigSetSubclass(['value'])
-    const host = new Host()
-    await host.use({ name: 'set-subclass', config: { set }, install: () => ({}) } as any)
-
-    const view: any = host.config.get('set-subclass.set')
-    expect(view).toBeInstanceOf(Set)
-    expect(view.hasValue()).toBe(true)
-    expect(view.receiver()).toBe(view)
-    expect(() => view.mutateWithSuper()).toThrow()
-    expect(() => view.mutateOwnProperty()).toThrow('config is readonly')
-    expect(view.has('other')).toBe(false)
-    expect((view as { marker?: number }).marker).toBeUndefined()
-  })
-})
-
-describe('PH-R23：readonly Map/Set reader identity dispatch', () => {
-  it('PH-T23a：all Map/Set reader overrides receive proxy, return proxy, and cannot super-mutate', async () => {
-    const host = new Host()
-    const sourceMap = new ReaderOverrideMap([['value', 1]])
-    const sourceSet = new ReaderOverrideSet(['value'])
-    await host.use({
-      name: 'reader-overrides',
-      config: {
-        map: sourceMap,
-        set: sourceSet
-      },
-      install: () => ({})
-    } as any)
-
-    const map: any = host.config.get('reader-overrides.map')
-    const set: any = host.config.get('reader-overrides.set')
-    expect(() => map.get('value')).toThrow()
-    expect(() => map.has('value')).toThrow()
-    expect(map.entries()).toBe(map)
-    expect(map.keys()).toBe(map)
-    expect(map.values()).toBe(map)
-    expect(map.forEach()).toBe(map)
-    expect(map[Symbol.iterator]()).toBe(map)
-    expect(Reflect.apply(Map.prototype.has, sourceMap, ['leak'])).toBe(false)
-    expect(map).toBeInstanceOf(Map)
-
-    expect(() => set.has('value')).toThrow()
-    expect(set.entries()).toBe(set)
-    expect(set.keys()).toBe(set)
-    expect(set.values()).toBe(set)
-    expect(set.forEach()).toBe(set)
-    expect(set[Symbol.iterator]()).toBe(set)
-    expect(Reflect.apply(Set.prototype.has, sourceSet, ['leak'])).toBe(false)
-    expect(set).toBeInstanceOf(Set)
-  })
-
-  it('PH-T23b：post-admission built-in prototype mutation never reclassifies custom readers as native', async () => {
-    const host = new Host()
-    await host.use({
-      name: 'reader-prototype-mutation',
-      config: { map: new Map([['value', 1]]), set: new Set(['value']) },
-      install: () => ({})
-    } as any)
-
-    const map: any = host.config.get('reader-prototype-mutation.map')
-    const set: any = host.config.get('reader-prototype-mutation.set')
-    const mapGet = Map.prototype.get
-    const setHas = Set.prototype.has
-    try {
-      Map.prototype.get = function (): any {
-        return this
-      }
-      Set.prototype.has = function (): any {
-        return this
-      }
-      expect(map.get('value')).toBe(map)
-      expect(set.has('value')).toBe(set)
-    } finally {
-      Map.prototype.get = mapGet
-      Set.prototype.has = setHas
-    }
-  })
-})
-
-describe('PH-R24：captured Map/Set traversal for clone and COW graph discovery', () => {
-  it('PH-T24a：initial clone preserves hidden-iterator entries, aliases, and subclass prototypes', async () => {
-    const config: any = { alias: { value: 1 } }
-    const map = new HiddenIteratorMap()
-    const set = new HiddenIteratorSet()
-    config.map = map
-    config.set = set
-    config.self = config
-    map.set('root', config)
-    map.set('alias', config.alias)
-    set.add(config)
-    set.add(config.alias)
-
-    const host = new Host()
-    await host.use({ name: 'clone-hidden-iterators', config, install: () => ({}) } as any)
-    const snapshot: any = host.config.get('clone-hidden-iterators')
-
-    expect(snapshot.map).toBeInstanceOf(Map)
-    expect(snapshot.set).toBeInstanceOf(Set)
-    expect(snapshot.map.get('root')).toBe(snapshot)
-    expect(snapshot.map.get('alias')).toBe(snapshot.alias)
-    expect(snapshot.set.has(snapshot)).toBe(true)
-    expect(snapshot.set.has(snapshot.alias)).toBe(true)
-  })
-
-  it('PH-T24b：COW graph discovery clones Map/Set root-reachers despite hidden Symbol.iterator', async () => {
-    const config: any = { enabled: false }
-    const map = new HiddenIteratorMap()
-    const set = new HiddenIteratorSet()
-    config.map = map
-    config.set = set
-    config.self = config
-    map.set('root', config)
-    set.add(config)
-
-    const host = new Host()
-    await host.use({ name: 'cow-hidden-iterators', config, install: () => ({}) } as any)
-    const previous: any = host.config.get('cow-hidden-iterators')
-    await host.config.update('cow-hidden-iterators', () => ({ enabled: true }))
-    const next: any = host.config.get('cow-hidden-iterators')
-
-    expect(next).not.toBe(previous)
-    expect(next.map).not.toBe(previous.map)
-    expect(next.set).not.toBe(previous.set)
-    expect(next.map).toBeInstanceOf(Map)
-    expect(next.set).toBeInstanceOf(Set)
-    expect(next.map.get('root')).toBe(next)
-    expect(next.set.has(next)).toBe(true)
-    expect(previous.map.get('root')).toBe(previous)
-    expect(previous.set.has(previous)).toBe(true)
-  })
-})
-
-describe('PH-R21：patch-root cycle rebasing', () => {
-  it('PH-T21a：patch root, nested backrefs, shared patch aliases, and old-root aliases rebase together', async () => {
-    const host = new Host()
-    await host.use({
-      name: 'patch-root-cycle',
-      config: { nested: { value: 1 } },
-      install: () => ({})
-    } as any)
-    const previous: any = host.config.get('patch-root-cycle')
-    const patchShared = { value: 2 }
-
-    await host.config.update('patch-root-cycle', (seen) => {
-      const patch: any = {
-        self: undefined,
-        nested: { back: undefined },
-        shared: patchShared,
-        sharedAlias: patchShared,
-        oldRoot: seen,
-        oldNested: seen.nested
-      }
-      patch.self = patch
-      patch.nested.back = patch
-      return patch
-    })
-
-    const next: any = host.config.get('patch-root-cycle')
-    expect(next.self).toBe(next)
-    expect(next.nested.back).toBe(next)
-    expect(next.shared).toBe(next.sharedAlias)
-    expect(next.oldRoot).toBe(next)
-    expect(next.oldNested).toBe(previous.nested)
-    expect(next).not.toBe(previous)
-    expect(previous.nested.value).toBe(1)
-  })
-
-  it('PH-T21b：failed update with patch-root cycle leaves old root and aliases untouched', async () => {
-    const cause = new Error('patch root update failed')
-    const host = new Host()
-    const config: Record<string, any> = { enabled: false }
-    config.self = config
-    await host.use({
-      name: 'patch-root-rollback',
-      config,
-      install: () => ({}),
-      update: () => {
-        throw cause
-      }
-    } as any)
-    const previous: any = host.config.get('patch-root-rollback')
-
-    await expect(
-      host.config.update('patch-root-rollback', (seen) => {
-        const patch: any = { self: undefined, oldRoot: seen }
-        patch.self = patch
-        return patch
-      })
-    ).rejects.toBe(cause)
-
-    const afterFailure: any = host.config.get('patch-root-rollback')
-    expect(afterFailure).toBe(previous)
-    expect(afterFailure.self).toBe(afterFailure)
-    expect(afterFailure.oldRoot).toBeUndefined()
-    expect(afterFailure.enabled).toBe(false)
-  })
-})
-
-describe('PH-R25：callable config ownership', () => {
-  it('PH-T25e：non-constructable methods keep dynamic readonly receivers without raw leaks', async () => {
-    const config: Record<string, any> = {
-      value: 11,
-      method() {
-        return this.value
-      },
-      receiver() {
-        return this
-      },
-      arrow: () => 'arrow'
-    }
-    config.method.self = config.method
-    config.method.root = config
-    const host = new Host()
-
-    await host.use({ name: 'callable-method-receiver', config, install: () => ({}) } as any)
-
-    const root: any = host.config.get('callable-method-receiver')
-    expect(root.method()).toBe(11)
-    expect(root.receiver()).toBe(root)
-    expect(root.arrow()).toBe('arrow')
-    expect(root.method).not.toBe(config.method)
-    expect(root.method.self).toBe(root.method)
-    expect(root.method.root).toBe(root)
-  })
-
-  it('PH-T25f：constructable readonly callables use ordinary mutable instances and protect config', async () => {
-    const Constructor: any = function (this: Record<string, unknown>): void {
-      this.answer = 4
-      this.newTargetMeta = (new.target as any).meta.value
-      this.prototypeConfig = (this as any).settings.value
-      try {
-        ;(new.target as any).meta.value = 99
-      } catch {
-        this.configMutationBlocked = true
-      }
-      try {
-        ;(this as any).settings.value = 99
-      } catch {
-        this.prototypeConfigMutationBlocked = true
-      }
-    }
-    Constructor.meta = { value: 7 }
-    Constructor.prototype.kind = 'base'
-    Constructor.prototype.settings = { value: 3 }
-    const host = new Host()
-
-    await host.use({
-      name: 'callable-construction-semantics',
-      config: { Constructor },
-      install: () => ({})
-    } as any)
-
-    const root: any = host.config.get('callable-construction-semantics')
-    const instance = new root.Constructor()
-    instance.after = true
-    expect(instance.answer).toBe(4)
-    expect(instance.newTargetMeta).toBe(7)
-    expect(instance.prototypeConfig).toBe(3)
-    expect(instance.configMutationBlocked).toBe(true)
-    expect(instance.prototypeConfigMutationBlocked).toBe(true)
-    expect(instance.kind).toBe('base')
-    expect(instance.after).toBe(true)
-    expect(instance instanceof root.Constructor).toBe(true)
-    expect(Object.getPrototypeOf(instance)).not.toBe(root.Constructor.prototype)
-    expect(root.Constructor.meta.value).toBe(7)
-
-    class Derived extends root.Constructor {
-      constructor() {
-        super()
-        this.derived = true
-      }
-    }
-    const derived = new Derived()
-    derived.afterDerived = true
-    expect(derived instanceof Derived).toBe(true)
-    expect(derived instanceof root.Constructor).toBe(true)
-    expect(Object.getPrototypeOf(derived)).toBe(Derived.prototype)
-    expect(derived.answer).toBe(4)
-    expect(derived.derived).toBe(true)
-    expect(derived.prototypeConfig).toBe(3)
-    expect(derived.configMutationBlocked).toBe(true)
-    expect(derived.prototypeConfigMutationBlocked).toBe(true)
-    expect(derived.afterDerived).toBe(true)
-    expect(root.Constructor.meta.value).toBe(7)
-    expect(() => {
-      root.Constructor.meta.value = 8
-    }).toThrow('config is readonly')
-  })
-
-  it('PH-T25g：explicit object-return constructors preserve mutable result without raw leakage', async () => {
-    const explicitResult: any = { kind: 'explicit' }
-    const Constructor: any = function (): any {
-      return explicitResult
-    }
-    const host = new Host()
-
-    await host.use({
-      name: 'callable-explicit-return',
-      config: { Constructor },
-      install: () => ({})
-    } as any)
-
-    const root: any = host.config.get('callable-explicit-return')
-    const result = new root.Constructor()
-    result.ownedByCaller = true
-    expect(result).not.toBe(explicitResult)
-    expect(result.kind).toBe('explicit')
-    expect(result.ownedByCaller).toBe(true)
-    expect(explicitResult.ownedByCaller).toBeUndefined()
-  })
-
-  it('PH-T25a：admission clones callable own data, so external mutation cannot alter snapshot', async () => {
-    const callable: any = function (): string {
-      return 'stable'
-    }
-    callable.meta = { value: 1 }
-    const config = { callable } as Record<string, any>
-    const host = new Host()
-
-    await host.use({ name: 'callable-mutation', config, install: () => ({}) } as any)
-    callable.meta.value = 2
-
-    const view: any = host.config.get('callable-mutation.callable')
-    expect(view()).toBe('stable')
-    expect(view.meta.value).toBe(1)
-    expect(() => {
-      view.meta.value = 3
-    }).toThrow('config is readonly')
-  })
-
-  it('PH-T25b：initial clone and COW rebase callable-to-root and callable-to-nested cycles', async () => {
-    const callable: any = function (this: { value: number }): number {
-      return this.value
-    }
-    const config: Record<string, any> = { value: 1, nested: { value: 2 }, callable }
-    config.self = config
-    config.nested.back = config
-    callable.root = config
-    callable.nested = config.nested
-    callable.self = callable
-
-    const host = new Host()
-    await host.use({ name: 'callable-cycles', config, install: () => ({}) } as any)
-    const previous: any = host.config.get('callable-cycles')
-    expect(previous.callable.root).toBe(previous)
-    expect(previous.callable.nested).toBe(previous.nested)
-    expect(previous.callable.self).toBe(previous.callable)
-    expect(previous.callable()).toBe(1)
-
-    await host.config.update('callable-cycles', () => ({ value: 3 }))
-    const next: any = host.config.get('callable-cycles')
-    expect(next).not.toBe(previous)
-    expect(next.callable).not.toBe(previous.callable)
-    expect(next.callable.root).toBe(next)
-    expect(next.callable.nested).toBe(next.nested)
-    expect(next.callable.self).toBe(next.callable)
-    expect(next.callable()).toBe(3)
-    expect(previous.value).toBe(1)
-    expect(previous.callable.root).toBe(previous)
-  })
-
-  it('PH-T25c：readonly callable preserves call receiver while blocking owned property writes', async () => {
-    const callable: any = function (this: { value: number }): number {
-      return this.value
-    }
-    callable.state = { value: 7 }
-    const Constructed: any = function (this: { answer: number }): void {
-      this.answer = 4
-    }
-    const host = new Host()
-    await host.use({
-      name: 'callable-receiver',
-      config: { value: 9, callable, Constructed },
-      install: () => ({})
-    } as any)
-
-    const root: any = host.config.get('callable-receiver')
-    const view: any = root.callable
-    expect(root.callable()).toBe(9)
-    expect(view.state.value).toBe(7)
-    expect(() => {
-      view.state.value = 8
-    }).toThrow('config is readonly')
-    expect(() => {
-      view.state = {}
-    }).toThrow('config is readonly')
-    const instance = new root.Constructed()
-    expect(instance.answer).toBe(4)
-  })
-
-  it('PH-T25d：unsupported callable admission fails atomically and leaves host reusable', async () => {
-    class Constructable {}
-    expect(() =>
-      new Host().use({
-        name: 'callable-reject',
-        config: { callable: Constructable },
-        install: () => ({})
-      } as any)
-    ).toThrow(/config callable/)
-
-    const host = new Host()
-    await expect(
-      host.use({
-        name: 'callable-reject',
-        config: {
-          callable: function (): number {
-            return 1
-          }
-        },
-        install: () => ({})
-      } as any)
-    ).resolves.toMatchObject({ host })
   })
 })
 

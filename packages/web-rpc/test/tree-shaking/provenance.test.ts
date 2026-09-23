@@ -92,6 +92,8 @@ function readCanonicalEnvironment(): NodeJS.ProcessEnv {
   )
 }
 
+// 这套用例各自 spawn 一次 tree-shaking provenance 脚本；在 `--coverage` 下全量跑时会超过 vitest 的
+// 默认 5s 上限。给足显式预算，而不是让它按负载随机变红。
 describe('WRC-C-B11 retained provenance', () => {
   it('hashes cwd-independent current inputs while preserving historical approval custody', async () => {
     /** Physical checkout root must never enter the portable signed subject. */
@@ -477,4 +479,4 @@ describe('WRC-C-B11 retained provenance', () => {
       )
     ).toBeTruthy()
   })
-})
+}, 120_000)

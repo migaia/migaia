@@ -26,6 +26,8 @@ const knownKeys = new Set<PropertyKey>([
   'config',
   'install',
   'update',
+  'onEnable',
+  'onDisable',
   'dispose',
   'shared',
   'features',
@@ -51,6 +53,8 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   const rawConfig = readData(source, 'config')
   const install = readData(source, 'install')
   const update = readData(source, 'update')
+  const onEnable = readData(source, 'onEnable')
+  const onDisable = readData(source, 'onDisable')
   const shared = readData(source, 'shared')
   const dispose = readData(source, 'dispose')
   const features = readData(source, 'features')
@@ -66,6 +70,8 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     throw createPluginHostTypeError('plugin install must be a function')
   for (const [key, value] of [
     ['update', update],
+    ['onEnable', onEnable],
+    ['onDisable', onDisable],
     ['shared', shared],
     ['dispose', dispose],
     [String(Symbol.asyncDispose), asyncDisposer],
@@ -116,6 +122,16 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
         invokeCaptured(update as Function, source, [next, core]),
       enumerable: true
     })
+  if (onEnable !== undefined)
+    Object.defineProperty(plugin, 'onEnable', {
+      value: (context: unknown) => invokeCaptured(onEnable as Function, source, [context]),
+      enumerable: true
+    })
+  if (onDisable !== undefined)
+    Object.defineProperty(plugin, 'onDisable', {
+      value: (context: unknown) => invokeCaptured(onDisable as Function, source, [context]),
+      enumerable: true
+    })
   if (shared !== undefined)
     Object.defineProperty(plugin, 'shared', {
       value: (core: unknown) => invokeCaptured(shared as Function, source, [core]),
@@ -151,6 +167,8 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     config: ownedConfig,
     install: plugin.install as IPluginConstraint<any>['install'],
     update: plugin.update as IPluginConstraint<any>['update'],
+    onEnable: plugin.onEnable as IPluginConstraint<any>['onEnable'],
+    onDisable: plugin.onDisable as IPluginConstraint<any>['onDisable'],
     dispose: plugin.dispose as IPluginConstraint<any>['dispose'],
     shared: plugin.shared as IPluginConstraint<any>['shared'],
     features: Object.freeze(featureRecord),

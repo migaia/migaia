@@ -10,25 +10,31 @@ import { raceWithAsyncControl } from '../../src/internal/async-control.js'
 import { createEndpointTimePort } from '../../src/internal/time-port.js'
 import type { IWebRpcPluginConstraint } from '../../src/internal/plugin-contract.js'
 import { WebRpcSharedKey, type IWebRpcProtocolPort } from '../../src/internal/plugin-shared-keys.js'
-import { WebRpcPluginHost } from '../../src/internal/web-rpc-plugin-host.js'
+import {
+  createWebRpcPluginHost,
+  type IWebRpcPluginHost
+} from '../../src/internal/web-rpc-plugin-host.js'
 
 const transport = {} as IWebRpcTransport
 const signal = new AbortController().signal as IWebRpcAbortSignal
 
-/** Exercises PluginHost's inherited synchronous primitive without restoring a WebRPC wrapper. */
+/**
+ * Exercises the host's synchronous primitive without restoring a WebRPC wrapper.
+ *
+ * The handle takes plugins as rest arguments, as the class's public entry always did; the shell
+ * used to reach the `protected` array form through inheritance, which a handle has no way to
+ * offer.
+ */
 const installHostSyncForTest = (
-  host: WebRpcPluginHost,
+  host: IWebRpcPluginHost,
   plugins: readonly IWebRpcPluginConstraint[]
-): unknown =>
-  (host as unknown as { useSync(values: readonly IWebRpcPluginConstraint[]): unknown }).useSync(
-    plugins
-  )
+): unknown => host.useSync(...(plugins as never))
 
 describe('B12a WebRPC PluginHost shell', () => {
   it('uses typed shared symbols and one host rollback transaction', async () => {
     let disposed = 0
     let observed: IWebRpcProtocolPort | undefined
-    const host = new WebRpcPluginHost(
+    const host = createWebRpcPluginHost(
       'shell',
       transport,
       createConstructionControl({ signal }),
@@ -352,8 +358,8 @@ describe('B12a WebRPC PluginHost shell', () => {
   })
 
   it('keeps fixed kernel-to-activation order and prevents activation after rollback', async () => {
-    const createHost = (): WebRpcPluginHost =>
-      new WebRpcPluginHost(
+    const createHost = (): IWebRpcPluginHost =>
+      createWebRpcPluginHost(
         'shell',
         transport,
         createConstructionControl({ signal }),
@@ -424,7 +430,7 @@ describe('B12a WebRPC PluginHost shell', () => {
 
   it('supports direct synchronous PluginHost installation only in the isolated host test', async () => {
     const events: string[] = []
-    const host = new WebRpcPluginHost(
+    const host = createWebRpcPluginHost(
       'shell',
       transport,
       createConstructionControl({ signal }),
@@ -458,8 +464,8 @@ describe('B12a WebRPC PluginHost shell', () => {
     const diagnostic = vi.fn(() => {
       throw new Error('diagnostic')
     })
-    const createFailingHost = (): WebRpcPluginHost =>
-      new WebRpcPluginHost(
+    const createFailingHost = (): IWebRpcPluginHost =>
+      createWebRpcPluginHost(
         'shell',
         transport,
         createConstructionControl({ signal }),

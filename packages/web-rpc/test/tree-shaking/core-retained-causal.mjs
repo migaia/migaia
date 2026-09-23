@@ -48,8 +48,8 @@ function normalizeInventoryModule(module) {
 
 /** Normalizes a root-build module path to frozen baseline identity. */
 function normalizeRootModule(module) {
-  const relativeModule = module.startsWith(`${workspaceDirectory}/`)
-    ? module.slice(workspaceDirectory.length + 1)
+  const relativeModule = module.includes('/packages/')
+    ? module.slice(module.indexOf('/packages/') + 1)
     : module
   return relativeModule.startsWith('packages/web-rpc/')
     ? relativeModule

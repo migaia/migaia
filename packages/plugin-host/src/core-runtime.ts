@@ -9,9 +9,17 @@ import type { IInstallBatchContext } from './install-runtime.js'
 import type { IRegistration, ISharedEntry } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IPluginHostCore, IPluginResource, IPipelineMode } from './typing.js'
+import type { IHostCoreConstructionRequest } from './define-host.js'
 
 export type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
-  readonly createDomainCore: () => TDomainCore
+  /**
+   * Builds one registration's domain core.
+   *
+   * The request carries who it is for: a functional host replaces the `protected` override with a
+   * callback, and a callback with no arguments could not tell two registrations of one batch
+   * apart.
+   */
+  readonly createDomainCore: (request: IHostCoreConstructionRequest) => TDomainCore
   readonly assertRegistrationValid: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly committedShared: Map<PropertyKey, ISharedEntry<TDomainCore, TValue>>
   readonly executionSignal: IAbortSignal
@@ -42,7 +50,8 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
     if (registration.core) return registration.core
     registration.core = createPluginCore({
       registration,
-      createDomainCore: this.#port.createDomainCore,
+      createDomainCore: () =>
+        this.#port.createDomainCore({ pluginName: registration.name, batch: batch ?? this }),
       assertRegistrationValid: () => this.#port.assertRegistrationValid(registration),
       getShared: (key) => {
         const shared = batch?.committed
@@ -89,13 +98,8 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
       throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause })
     }
     if (!disposer) throw createPluginHostTypeError('plugin resource must provide a disposer')
-    const owner: IProvisionalScope | ILifecycleScope | undefined =
-      registration.provisional ?? registration.scope
-    if (!owner)
-      throw new PluginHostError(
-        PluginHostErrorCode.resourceOutsideInstall,
-        ERROR_TEXT.RESOURCE_OUTSIDE_INSTALL
-      )
+    const owner: IProvisionalScope | ILifecycleScope =
+      registration.provisional ?? registration.scope!
     const ownedResource = () => Promise.resolve(disposer())
     owner.own(
       ownedResource,

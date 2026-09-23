@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   PluginHostDisposalNodeKind,
-  PluginHostErrorCode,
   PluginHost,
   readPluginHostDisposalProvenance
 } from '@migaia/plugin-host'
@@ -53,7 +52,6 @@ describe('composed endpoint root disposal boundary', () => {
 
     const hostResult = await host.dispose()
     expect(hostResult).toMatchObject({ logicalTerminal: true, cleanupComplete: true })
-    expect(PluginHostErrorCode.hostDisposeFailed).toBe('HOST_DISPOSE_FAILED')
     const hostChild = hostResult.cleanupErrors[0]
     expect(readPluginHostDisposalProvenance(hostChild)).toEqual({
       kind: PluginHostDisposalNodeKind.disposerWrapper,

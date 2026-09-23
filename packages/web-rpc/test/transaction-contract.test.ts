@@ -47,44 +47,49 @@ vi.mock('../src/internal/web-rpc-plugin-host.js', async () => {
     '../src/internal/web-rpc-plugin-host.js'
   )
 
-  class ObservedWebRpcPluginHost extends actual.WebRpcPluginHost {
-    constructor(...args: ConstructorParameters<typeof actual.WebRpcPluginHost>) {
-      const [id, transport, construction, hooks, options, readCleanupErrors] = args
-      super(
-        id,
-        transport,
-        construction,
-        (event) => {
-          observed.hookEvents.push(event)
-          hooks(event)
-          if (observed.throwFromHook) throw new Error('diagnostic observer failed')
-        },
-        options,
-        readCleanupErrors
-      )
-      observed.hosts.push(this)
-    }
-
-    override async installBatch(plugins: readonly IWebRpcPluginConstraint[]) {
-      observed.events.push('host:installBatch')
-      observed.batches.push({
-        host: this,
-        names: plugins.map((plugin) => plugin.name)
-      })
-      const view = await super.installBatch(plugins)
-      observed.views.push(view)
-      return view
-    }
-
-    override dispose(): Promise<IPluginHostDisposalResult> {
-      observed.events.push('host:dispose')
-      const promise = super.dispose()
-      observed.disposals.push({ host: this, promise })
-      return promise
-    }
+  // 宿主现在是工厂产出的句柄而不是类：观测点从「继承并 override」变成「包装工厂返回的句柄」。
+  // 观测到的是同一批外部可见行为，且不再要求被观测对象必须可被继承。
+  const createObserved: typeof actual.createWebRpcPluginHost = (
+    id,
+    transport,
+    construction,
+    hooks,
+    options,
+    readCleanupErrors
+  ) => {
+    const host = actual.createWebRpcPluginHost(
+      id,
+      transport,
+      construction,
+      (event) => {
+        observed.hookEvents.push(event)
+        hooks(event)
+        if (observed.throwFromHook) throw new Error('diagnostic observer failed')
+      },
+      options,
+      readCleanupErrors
+    )
+    const wrapped = Object.freeze({
+      ...host,
+      installBatch: async (plugins: readonly IWebRpcPluginConstraint[]) => {
+        observed.events.push('host:installBatch')
+        observed.batches.push({ host: wrapped, names: plugins.map((plugin) => plugin.name) })
+        const view = await host.installBatch(plugins)
+        observed.views.push(view as IObservedView)
+        return view
+      },
+      dispose: (): Promise<IPluginHostDisposalResult> => {
+        observed.events.push('host:dispose')
+        const promise = host.dispose()
+        observed.disposals.push({ host: wrapped, promise })
+        return promise
+      }
+    }) as ReturnType<typeof actual.createWebRpcPluginHost>
+    observed.hosts.push(wrapped as unknown as IObservedHost)
+    return wrapped
   }
 
-  return { ...actual, WebRpcPluginHost: ObservedWebRpcPluginHost }
+  return { ...actual, createWebRpcPluginHost: createObserved }
 })
 
 const emptyClaims = Object.freeze({

@@ -21,8 +21,15 @@ export {
 } from './host-runtime.js'
 export { definePlugin } from './define-plugin.js'
 export { defineFeature } from './define-feature.js'
-export { setupHost } from './setup-host.js'
+export {
+  defineHost,
+  type IDefineHostOptions,
+  type IHostCoreConstructionRequest,
+  type IHostDomainCoreRequest,
+  type IHostHandle
+} from './define-host.js'
 export type { IPluginHostInstalledPlugins } from './host-runtime.js'
+export type { IPluginHostIdentity } from './host-identity.js'
 export {
   PluginHostStatus,
   PluginHostPipelineMode,
@@ -45,16 +52,12 @@ export type {
   IPlugin,
   IPluginConfig,
   IPluginConstraint,
+  IDefinedPluginConstraint,
   IPluginFeatureCore,
   IPluginFeatureOptions,
   IPluginDisposer,
   IPluginAwaitable,
   IPluginInstaller,
-  IDefinedPluginConstraint,
-  IHostSetupContext,
-  ISetupHostOptions,
-  ISetupHostView,
-  ISetupPluginHost,
   IPluginResource,
   IPluginHostConfigFor,
   IPluginLifecycleConfig,
@@ -64,6 +67,9 @@ export type {
   IPluginInstallFailureDetail,
   IPluginHostCore,
   IPluginHostOptions,
+  IPluginEnablement,
+  IPluginDisableToken,
+  IExcludePluginByName,
   IPluginOperationContext,
   IPluginRegistrationContext,
   IPluginDisposalContext,
@@ -83,7 +89,6 @@ export type {
   IPluginBatchRemovalOptions,
   IPluginBatchRemovalResult,
   IPluginBatchRemovalLeaf,
-  IPluginHostCompositionIntegration,
   IPipelineMode,
   IPipelineConfig,
   ISyncPipelineStage,

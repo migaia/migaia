@@ -201,14 +201,14 @@ const runPackedConsumers = (temporaryDirectory, packageDirectory) => {
   const nodeConsumer = join(consumerDirectory, 'node-consumer.mjs')
   writeFileSync(
     nodeConsumer,
-    "import * as root from '@migaia/plugin-host';\nimport * as defined from '@migaia/plugin-host/defined';\nimport * as structural from '@migaia/plugin-host/structural';\nif (typeof root.definePlugin !== 'function' || typeof root.setupHost !== 'function') throw new Error('packed root');\nif (typeof defined.definePlugin !== 'function' || typeof defined.setupHost !== 'function') throw new Error('packed defined');\nif ('definePlugin' in structural || 'setupHost' in structural) throw new Error('packed structural');\nconsole.log(JSON.stringify({ nodeEsm: true, root: true, defined: true, structural: true }));\n"
+    "import * as root from '@migaia/plugin-host';\nimport * as composition from '@migaia/plugin-host/composition';\nif (typeof root.definePlugin !== 'function' || typeof root.defineHost !== 'function' || typeof root.PluginHost !== 'function') throw new Error('packed root');\nif (typeof composition.openComposition !== 'function') throw new Error('packed composition');\nconsole.log(JSON.stringify({ nodeEsm: true, root: true, composition: true }));\n"
   )
   run(process.execPath, [nodeConsumer], consumerDirectory)
 
   const typeConsumer = join(consumerDirectory, 'type-consumer.mts')
   writeFileSync(
     typeConsumer,
-    "import { definePlugin, setupHost } from '@migaia/plugin-host';\nimport type { IPluginConstraint } from '@migaia/plugin-host';\nconst plugin: IPluginConstraint<Record<string, never>> = definePlugin({ name: 'typed', install: () => ({}) });\nvoid plugin;\nvoid setupHost;\n"
+    "import { defineHost, definePlugin } from '@migaia/plugin-host';\nimport type { IPluginConstraint } from '@migaia/plugin-host';\nconst plugin: IPluginConstraint<Record<string, never>> = definePlugin({ name: 'typed', install: () => ({}) });\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } });\nvoid plugin;\nvoid host;\n"
   )
   const config = join(consumerDirectory, 'tsconfig.json')
   writeFileSync(
@@ -231,16 +231,11 @@ const runPackedConsumers = (temporaryDirectory, packageDirectory) => {
   return { packageDirectory, consumerDirectory }
 }
 
-/** Build a packed subpath consumer and return actual sourcemap source entries. */
-const buildPackedGraph = (temporaryDirectory, packageDirectory, subpath, forbidden) => {
-  const graphDirectory = join(temporaryDirectory, `graph-${subpath}`)
+/** Build a packed entry consumer and return actual sourcemap source entries. */
+const buildPackedGraph = (temporaryDirectory, packageDirectory, graphName, source, forbidden) => {
+  const graphDirectory = join(temporaryDirectory, `graph-${graphName}`)
   mkdirSync(graphDirectory, { recursive: true })
-  writeFileSync(
-    join(graphDirectory, 'entry.ts'),
-    subpath === 'functional'
-      ? "import { definePlugin } from '@migaia/plugin-host/defined'; export const plugin = definePlugin({ name: 'graph', install: () => ({}) });\n"
-      : "import { PluginHost } from '@migaia/plugin-host/structural'; console.log(PluginHost.name);\n"
-  )
+  writeFileSync(join(graphDirectory, 'entry.ts'), source)
   writeFileSync(
     join(graphDirectory, 'vite.config.mjs'),
     `export default { resolve: { preserveSymlinks: true }, build: { outDir: ${JSON.stringify(join(graphDirectory, 'dist'))}, emptyOutDir: true, sourcemap: true, rollupOptions: { input: ${JSON.stringify(join(graphDirectory, 'entry.ts'))}, output: { entryFileNames: 'bundle.js' } } } }\n`
@@ -259,8 +254,8 @@ const buildPackedGraph = (temporaryDirectory, packageDirectory, subpath, forbidd
   const map = JSON.parse(readFileSync(mapPath, 'utf8'))
   const sources = map.sources.map((source) => source.replaceAll('\\', '/'))
   if (sources.some((source) => forbidden.some((token) => source.includes(token))))
-    throw new Error(`${subpath} retained forbidden module: ${sources.join(',')}`)
-  return { subpath, sources, mapPath }
+    throw new Error(`${graphName} retained forbidden module: ${sources.join(',')}`)
+  return { graphName, sources, mapPath }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -269,19 +264,25 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const temporaryDirectory = mkdtempSync(join(tmpdir(), 'migaia-plugin-host-v16-'))
   const packageDirectory = extractPackedPackage(temporaryDirectory, resolve(archive))
   const consumers = runPackedConsumers(temporaryDirectory, packageDirectory)
-  const functionalGraph = buildPackedGraph(temporaryDirectory, packageDirectory, 'functional', [
-    '/structural.js'
-  ])
-  const structuralGraph = buildPackedGraph(temporaryDirectory, packageDirectory, 'structural', [
-    '/defined.js',
-    '/setup-host.js',
-    '/define-plugin.js'
-  ])
+  const pluginGraph = buildPackedGraph(
+    temporaryDirectory,
+    packageDirectory,
+    'define-plugin',
+    "import { definePlugin } from '@migaia/plugin-host'; export const plugin = definePlugin({ name: 'graph', install: () => ({}) });\n",
+    ['/host-runtime.js', '/composition-entry.js']
+  )
+  const bareRootGraph = buildPackedGraph(
+    temporaryDirectory,
+    packageDirectory,
+    'bare-root',
+    "import '@migaia/plugin-host'; export const loaded = true;\n",
+    ['/composition-entry.js']
+  )
   console.log(
     JSON.stringify({
       consumers: { nodeEsm: true, typescript: true },
-      functionalGraph: { map: functionalGraph.mapPath, retainedModules: functionalGraph.sources },
-      structuralGraph: { map: structuralGraph.mapPath, retainedModules: structuralGraph.sources },
+      pluginGraph: { map: pluginGraph.mapPath, retainedModules: pluginGraph.sources },
+      bareRootGraph: { map: bareRootGraph.mapPath, retainedModules: bareRootGraph.sources },
       packageDirectory: consumers.packageDirectory
     })
   )

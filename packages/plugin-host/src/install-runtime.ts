@@ -67,6 +67,8 @@ export type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = 
     rollbackErrors: unknown[]
   ) => void
   readonly diagnostic: (message: string, code?: IPluginHostErrorCode) => void
+  /** Attributes a Host boundary error before its structured detail is frozen. */
+  readonly decorateError: <TError extends PluginHostError>(error: TError) => TError
 }>
 
 /** Owns asynchronous candidate installation, publication, and rollback semantics. */
@@ -92,47 +94,13 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     this.#port.setActiveBatch(batch)
     try {
       for (const entry of entries) {
-        const { plugin, name } = entry
-        failedName = name
-        const registration: IRegistration<TDomainCore, TValue> = {
-          name,
-          plugin,
-          config: copyConfig(plugin.config),
-          extensions: [],
-          pipelineDisposers: [],
-          pipelineOwnerKey: {},
-          resourceDisposers: [],
-          shared: [],
-          installed: false,
-          lifecycle: PluginHostRegistrationLifecycle.install,
-          lifecycleController: createAbortController(),
-          scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler }),
-          featureExposeValid: true,
-          featurePending: createPendingTracker()
-        }
+        failedName = entry.name
+        const registration = this.#createRegistration(entry)
         installed.push(registration)
         try {
-          this.#port.beginOperation(registration)
-          registration.provisional = createProvisionalScope({
-            parentSignal: registration.operation?.signal
-          })
-          this.#port.setHookRegistration(registration)
-          const core = this.#initializeFeatureCore(registration, batch)
-          const installResult = this.#invokeInstall(registration, core)
-          if (
-            installResult &&
-            typeof installResult === 'object' &&
-            Reflect.ownKeys(installResult).includes('then')
-          )
-            throw new PluginHostError(
-              PluginHostErrorCode.extensionReserved,
-              ERROR_TEXT.EXTENSION_RESERVED(registration.name, 'then')
-            )
-          const installThen =
-            installResult &&
-            (typeof installResult === 'object' || typeof installResult === 'function')
-              ? (installResult as { then?: unknown }).then
-              : undefined
+          const installResult = this.#startInstall(registration, batch, true)
+          if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
+          const installThen = this.#readThen(installResult)
           const installedValue = await this.#port.awaitOperation(
             typeof installThen === 'function'
               ? assimilateCapturedThen(installThen as (...args: unknown[]) => void, installResult)
@@ -140,38 +108,8 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
             registration
           )
           this.#port.assertOperationCurrent(registration)
-          const extensions = this.#mergeDescriptorExpose(registration, installedValue)
-          if (this.#sharedHook(registration)) {
-            this.#port.setHookRegistration(registration)
-            let sharedValue: unknown
-            try {
-              sharedValue = this.#invokeShared(registration, batch)
-            } finally {
-              this.#port.setHookRegistration(undefined)
-            }
-            const shared = readPlainDataRecord(sharedValue, 'plugin shared', false)
-            for (const key of Reflect.ownKeys(shared)) {
-              if (batch.shared.has(key))
-                throw new PluginHostError(
-                  PluginHostErrorCode.sharedDuplicate,
-                  ERROR_TEXT.SHARED_DUPLICATE(key)
-                )
-              batch.shared.set(key, { owner: registration, value: shared[key] })
-              registration.shared.push(key)
-            }
-          }
-          mountPluginExtensions(
-            registration,
-            extensions,
-            batch.extensionOwners,
-            this.#port.diagnostic
-          )
-          if (!registration.scope || !registration.provisional)
-            throw new PluginHostError(
-              PluginHostErrorCode.resourceOutsideInstall,
-              ERROR_TEXT.RESOURCE_OUTSIDE_INSTALL
-            )
-          await registration.provisional.commitTo(registration.scope)
+          this.#prepareInstallResult(registration, batch, installedValue)
+          await registration.provisional!.commitTo(registration.scope!)
           registration.provisional = undefined
           registration.installed = true
         } finally {
@@ -186,15 +124,10 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       for (const registration of [...installed].reverse())
         rollbackErrors.push(...(await this.#port.disposeRegistration(registration, true)))
       this.#reportRollbackFailure(failedName, rollbackErrors)
-      const failureDetail = Object.freeze({
+      throw this.#installFailure(failedName, error, {
         failedName,
         rollbackErrors: Object.freeze([...rollbackErrors])
       })
-      throw new PluginHostError<IPluginInstallFailureDetail>(
-        PluginHostErrorCode.pluginInstallFailed,
-        `${ERROR_TEXT.PLUGIN_INSTALL_FAILED(failedName)}: ${error instanceof Error ? error.message : String(error)}`,
-        { cause: error, detail: failureDetail }
-      )
     } finally {
       this.#port.setActiveBatch(undefined)
     }
@@ -208,75 +141,26 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     this.#port.setActiveBatch(batch)
     try {
       for (const entry of entries) {
-        const { plugin, name } = entry
-        failedName = name
-        const registration: IRegistration<TDomainCore, TValue> = {
-          name,
-          plugin,
-          config: copyConfig(plugin.config),
-          extensions: [],
-          pipelineDisposers: [],
-          pipelineOwnerKey: {},
-          resourceDisposers: [],
-          shared: [],
-          installed: false,
-          lifecycle: PluginHostRegistrationLifecycle.install,
-          lifecycleController: createAbortController(),
-          scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler }),
-          featureExposeValid: true,
-          featurePending: createPendingTracker()
-        }
+        failedName = entry.name
+        const registration = this.#createRegistration(entry)
         installed.push(registration)
         try {
-          this.#port.beginOperation(registration)
-          this.#port.setHookRegistration(registration)
-          const core = this.#initializeFeatureCore(registration, batch)
           let installedValue: unknown
           try {
-            installedValue = this.#invokeInstall(registration, core)
+            installedValue = this.#startInstall(registration, batch, false)
           } finally {
             this.#port.setHookRegistration(undefined)
           }
-          const installedThen =
-            installedValue &&
-            (typeof installedValue === 'object' || typeof installedValue === 'function')
-              ? (installedValue as { then?: unknown }).then
-              : undefined
-          if (typeof installedThen === 'function') {
-            void assimilateCapturedThen(
-              installedThen as (...args: unknown[]) => void,
-              installedValue
-            ).catch(() => undefined)
-            throw createPluginHostTypeError(
-              `plugin ${registration.name} returned an awaitable during synchronous installation`
-            )
+          if (installedValue instanceof Promise || this.#hasOwnThen(installedValue)) {
+            const installedThen = this.#readThen(installedValue)
+            if (typeof installedThen === 'function')
+              void assimilateCapturedThen(
+                installedThen as (...args: unknown[]) => void,
+                installedValue
+              ).catch(() => undefined)
+            throw this.#installResultThenable(registration.name)
           }
-          const extensions = this.#mergeDescriptorExpose(registration, installedValue)
-          if (this.#sharedHook(registration)) {
-            this.#port.setHookRegistration(registration)
-            let sharedValue: unknown
-            try {
-              sharedValue = this.#invokeShared(registration, batch)
-            } finally {
-              this.#port.setHookRegistration(undefined)
-            }
-            const shared = readPlainDataRecord(sharedValue, 'plugin shared', false)
-            for (const key of Reflect.ownKeys(shared)) {
-              if (batch.shared.has(key))
-                throw new PluginHostError(
-                  PluginHostErrorCode.sharedDuplicate,
-                  ERROR_TEXT.SHARED_DUPLICATE(key)
-                )
-              batch.shared.set(key, { owner: registration, value: shared[key] })
-              registration.shared.push(key)
-            }
-          }
-          mountPluginExtensions(
-            registration,
-            extensions,
-            batch.extensionOwners,
-            this.#port.diagnostic
-          )
+          this.#prepareInstallResult(registration, batch, installedValue)
           registration.installed = true
         } finally {
           registration.lifecycle = PluginHostRegistrationLifecycle.idle
@@ -302,19 +186,120 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           })
         }
       )
-      const failureDetail: IPluginInstallFailureDetail = Object.freeze({
+      const failureDetail = {
         failedName,
         rollbackErrors: publishedErrors,
         completion
-      })
-      throw new PluginHostError<IPluginInstallFailureDetail>(
-        PluginHostErrorCode.pluginInstallFailed,
-        `${ERROR_TEXT.PLUGIN_INSTALL_FAILED(failedName)}: ${cause instanceof Error ? cause.message : String(cause)}`,
-        { cause, detail: failureDetail }
-      )
+      }
+      throw this.#installFailure(failedName, cause, failureDetail)
     } finally {
       this.#port.setActiveBatch(undefined)
     }
+  }
+
+  /** Allocates one registration shape shared by asynchronous and synchronous install transactions. */
+  #createRegistration(
+    entry: IInstallEntry<TDomainCore, TValue>
+  ): IRegistration<TDomainCore, TValue> {
+    const { name, plugin } = entry
+    return {
+      name,
+      plugin,
+      config: copyConfig(plugin.config),
+      extensions: [],
+      pipelineDisposers: [],
+      pipelineOwnerKey: {},
+      resourceDisposers: [],
+      shared: [],
+      installed: false,
+      enabled: true,
+      lifecycle: PluginHostRegistrationLifecycle.install,
+      lifecycleController: createAbortController(),
+      scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler }),
+      featureExposeValid: true,
+      featurePending: createPendingTracker()
+    }
+  }
+
+  /** Begins one owned install invocation only after its registration is rollback-visible. */
+  #startInstall(
+    registration: IRegistration<TDomainCore, TValue>,
+    batch: IInstallBatchContext<TDomainCore, TValue>,
+    provisional: boolean
+  ): unknown {
+    this.#port.beginOperation(registration)
+    if (provisional)
+      registration.provisional = createProvisionalScope({
+        parentSignal: registration.operation?.signal
+      })
+    this.#port.setHookRegistration(registration)
+    return this.#invokeInstall(registration, this.#initializeFeatureCore(registration, batch))
+  }
+
+  /** Commits common shared and extension preparation after each path resolves its install result. */
+  #prepareInstallResult(
+    registration: IRegistration<TDomainCore, TValue>,
+    batch: IInstallBatchContext<TDomainCore, TValue>,
+    installedValue: unknown
+  ): void {
+    const extensions = this.#mergeDescriptorExpose(registration, installedValue)
+    if (this.#sharedHook(registration)) {
+      this.#port.setHookRegistration(registration)
+      let sharedValue: unknown
+      try {
+        sharedValue = this.#invokeShared(registration, batch)
+      } finally {
+        this.#port.setHookRegistration(undefined)
+      }
+      const shared = readPlainDataRecord(sharedValue, 'plugin shared', false)
+      for (const key of Reflect.ownKeys(shared)) {
+        if (batch.shared.has(key))
+          throw new PluginHostError(
+            PluginHostErrorCode.sharedDuplicate,
+            ERROR_TEXT.SHARED_DUPLICATE(key)
+          )
+        batch.shared.set(key, { owner: registration, value: shared[key] })
+        registration.shared.push(key)
+      }
+    }
+    mountPluginExtensions(registration, extensions, batch.extensionOwners, this.#port.diagnostic)
+  }
+
+  /** Detects an own then key before async assimilation can turn an extension result into a promise. */
+  #hasOwnThen(value: unknown): boolean {
+    return !!value && typeof value === 'object' && Reflect.ownKeys(value).includes('then')
+  }
+
+  /** Reads a captured then once without assimilating the extension result early. */
+  #readThen(value: unknown): unknown {
+    return value && (typeof value === 'object' || typeof value === 'function')
+      ? (value as { then?: unknown }).then
+      : undefined
+  }
+
+  /** Creates the one declared semantic failure for thenable install results in both public paths. */
+  #installResultThenable(name: string): PluginHostError {
+    return new PluginHostError(
+      PluginHostErrorCode.installResultThenable,
+      ERROR_TEXT.INSTALL_RESULT_THENABLE(name)
+    )
+  }
+
+  /** Wraps either install path without replacing the primary cause or detail ownership. */
+  #installFailure(
+    failedName: string,
+    cause: unknown,
+    detail: IPluginInstallFailureDetail
+  ): PluginHostError<IPluginInstallFailureDetail> {
+    const error = this.#port.decorateError(
+      new PluginHostError(
+        PluginHostErrorCode.pluginInstallFailed,
+        `${ERROR_TEXT.PLUGIN_INSTALL_FAILED(failedName)}: ${cause instanceof Error ? cause.message : String(cause)}`,
+        { cause, detail }
+      )
+    )
+    Object.freeze(detail)
+    return error
   }
 
   /** Initializes the one registration-local Feature surface shared by async and sync installation. */
@@ -458,7 +443,9 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       void assimilateCapturedThen(thenable.thenFn, value).catch((error) => {
         try {
           Object.defineProperty(rejection, 'cause', { value: error })
-        } catch {}
+        } catch (attachFailure) {
+          this.#reportThenableRejection(ERROR_TEXT.CAUSE_ATTACH_FAILED(String(attachFailure)))
+        }
         this.#reportThenableRejection(error)
       })
       throw rejection
