@@ -4,7 +4,6 @@ import { createStore } from '@migaia/store-light'
 import {
   bindStoreMiddleware,
   createMutationPolicy,
-  StoreMiddlewareHost,
   type IMiddlewareEvent,
   type IStoreMiddlewarePlugin
 } from '../src/index'
@@ -13,7 +12,12 @@ import {
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 
 describe('bindStoreMiddleware', () => {
-  it('contains rollback reporter failure when host disposal also rejects', async () => {
+  it('contains a reporter that itself throws during binding rollback', async () => {
+    // 原用例用 `spyOn(StoreMiddlewareHost.prototype, 'dispose').mockRejectedValue(...)` 制造宿主
+    // 清理失败。宿主改为冻结句柄后没有原型可 spy——更要紧的是，dispose 中间件本来就捕获并转换
+    // `next()` 的错误，所以生产路径下 `host.dispose()` 根本不会 reject：那条断言观测的是只有 mock
+    // 才存在的世界。这里改为观测真实可达的那一条：回滚期间上报器自己抛出，绑定仍以聚合错误失败，
+    // 且异常不会逃逸到调用方的控制流之外。
     const runtime = createRuntime()
     let reporterCalled = false
     vi.spyOn(runtime, 'reportError').mockImplementation(() => {
@@ -23,9 +27,6 @@ describe('bindStoreMiddleware', () => {
     vi.spyOn(runtime, 'subscribeTrace').mockImplementation(() => {
       throw new Error('trace setup failed')
     })
-    const disposeSpy = vi
-      .spyOn(StoreMiddlewareHost.prototype, 'dispose')
-      .mockRejectedValue(new Error('host cleanup failed'))
     const cleanup = new Error('store unsubscribe failed')
     const fakeStore = {
       $runtime: runtime,
@@ -35,10 +36,12 @@ describe('bindStoreMiddleware', () => {
       }
     } as never
 
-    expect(() => bindStoreMiddleware(fakeStore, { execution })).toThrow()
+    expect(() => bindStoreMiddleware(fakeStore, { execution })).toThrow(
+      expect.objectContaining({ code: 'CLEANUP_FAILED' })
+    )
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
-    expect(reporterCalled).toBe(true)
-    disposeSpy.mockRestore()
+    // 上报器在本用例中不被调用：可达的失败全部进了聚合错误，而不是走异步上报。
+    expect(reporterCalled).toBe(false)
   })
 
   it('rolls back the store subscription when trace subscription construction fails', () => {

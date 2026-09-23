@@ -102,7 +102,7 @@ if (false) view.extensions.send('hidden')
 if (observedCalls() !== 3 || literal !== 'rpc' || generic.id !== 1 || 'send' in view.extensions) throw new Error('rpc runtime')
 await host.dispose()
 `,
-  native: String.raw`import { PluginHost, defineFeature, definePlugin, setupHost } from '@migaia/plugin-host'
+  native: String.raw`import { PluginHost, defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
 import type { IFeatureCore } from '@migaia/plugin-host'
 type IExpose = Readonly<{ add(value: number): number }>
 const feature = defineFeature((core: IFeatureCore<IExpose>) => ({ run: <T,>(value: T) => value, add: core.featureExpose.add }))
@@ -146,13 +146,11 @@ if (false) {
   // @ts-expect-error dynamic views retain the required domain core.
   await emptyHost.getCurrentView().use(domainPlugin)
   await domainHost.use(domainPlugin)
-  // @ts-expect-error setup requires the domain core for its plugin tuple.
-  await setupHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }, setupTimeoutMs: false, core: () => ({}), plugins: [domainPlugin] })
-  const emptySetup = await setupHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }, setupTimeoutMs: false, core: () => ({}) })
-  // @ts-expect-error setup publications retain each plugin core requirement.
-  await emptySetup.use(domainPlugin)
-  // @ts-expect-error setup hosts retain each plugin core requirement.
-  await emptySetup.host.use(domainPlugin)
+  const emptyHandle = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }, domainCore: () => ({}) })
+  // @ts-expect-error functional hosts retain each plugin core requirement.
+  await emptyHandle.use(domainPlugin)
+  const domainHandle = defineHost<{ domain: number }>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }, domainCore: () => ({ domain: 1 }) })
+  await domainHandle.use(domainPlugin)
 }
 class Host extends PluginHost<Record<never, never>> { constructor() { super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
 const host = new Host()
@@ -332,8 +330,6 @@ runDeclarationMutation(
     '// @ts-expect-error host core cannot satisfy a domain-required definition.',
     '// @ts-expect-error accumulated views retain the required domain core.',
     '// @ts-expect-error dynamic views retain the required domain core.',
-    '// @ts-expect-error setup requires the domain core for its plugin tuple.',
-    '// @ts-expect-error setup publications retain each plugin core requirement.',
-    '// @ts-expect-error setup hosts retain each plugin core requirement.'
+    '// @ts-expect-error functional hosts retain each plugin core requirement.'
   ]
 )

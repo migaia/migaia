@@ -53,13 +53,6 @@ export const PluginHostErrorCode = {
   pluginDisposeFailed: 'PLUGIN_DISPOSE_FAILED',
 
   /**
-   * Host 整体 `dispose()` 过程中有 disposer 失败。
-   *
-   * 与 `PLUGIN_DISPOSE_FAILED` 的区别是作用域：这条覆盖全 Host 的收敛结果。无论失败与否 Host 都会到达 terminal。
-   */
-  hostDisposeFailed: 'HOST_DISPOSE_FAILED',
-
-  /**
    * 插件 `install()` 返回的扩展属性名与 Host 上已存在的属性冲突。
    *
    * 扩展挂载是独占的；调用方需改扩展名或调整插件安装顺序。冲突在挂载前检测，不会产生半挂载状态。
@@ -86,6 +79,18 @@ export const PluginHostErrorCode = {
    * Shared key 是 Host 内的唯一命名空间，先注册者持有所有权；后来者必须改键名。
    */
   sharedDuplicate: 'SHARED_DUPLICATE',
+
+  /**
+   * A shared prerequisite exists but its owner is temporarily disabled under R1 BZ26. The caller
+   * may enable that owner and retry the same lookup.
+   */
+  prerequisiteDisabled: 'PREREQUISITE_DISABLED',
+
+  /**
+   * A previously published shared prerequisite lost its owner through removal under R1 BZ26. The
+   * caller must install a provider again; retrying the unchanged lookup cannot recover it.
+   */
+  prerequisiteRemoved: 'PREREQUISITE_REMOVED',
 
   /**
    * 在插件 `install()` 生命周期之外调用 `onDispose()` 注册资源。
@@ -191,25 +196,33 @@ export const PluginHostErrorCode = {
    * 输入后重试；这是编程错误，不是运行时状态问题。
    */
   invalidOption: 'INVALID_OPTION',
+  /** Config value violates the admitted plain-data grammar; caller must supply an allowed value. */
+  invalidConfigValue: 'INVALID_CONFIG_VALUE',
+  /** Config input contains a reference cycle; caller must supply an acyclic value graph. */
+  configCycleRejected: 'CONFIG_CYCLE_REJECTED',
   /** A lifecycle hook exceeded the admitted mutation budget and lost commit authority. */
   mutationExecutionTimeout: 'MUTATION_EXECUTION_TIMEOUT',
 
   /** A previously published view was logically revoked by removal or disposal. */
   viewRevoked: 'VIEW_REVOKED',
 
+  /** Plugin install returned an own `then` key, which is never a publishable extension result. */
+  installResultThenable: 'INSTALL_RESULT_THENABLE',
+
   /** Active pipeline work did not drain before the explicit disposal budget elapsed. */
   pipelineDrainTimeout: 'PIPELINE_DRAIN_TIMEOUT',
 
   /** Logical disposal completed while one or more physical cleanup tasks remain unsettled. */
   cleanupIncomplete: 'CLEANUP_INCOMPLETE',
-  /** Core factory rejected or resolved to an invalid value during setup; caller must fix Core. */
-  hostCoreSetupFailed: 'HOST_CORE_SETUP_FAILED',
-  /** Setup wall-clock deadline elapsed; caller must retry with a larger bounded budget. */
-  hostSetupTimeout: 'HOST_SETUP_TIMEOUT',
-  /** Caller-owned setup signal won; caller should inspect the abort reason and retry if desired. */
-  hostSetupAborted: 'HOST_SETUP_ABORTED',
-  /** Setup primary failure and cleanup both failed; inspect AggregateError cause/errors. */
-  hostSetupRollbackFailed: 'HOST_SETUP_ROLLBACK_FAILED'
+  /**
+   * `openComposition` was given a target this package never registered as a managed host.
+   *
+   * The managed protocol is reached through the composition entry rather than off the host
+   * instance, so the only admissible targets are the ones the host registers at construction. A
+   * caller that gets this has an object that is not a host of this package — a plain object, a host
+   * from a different copy of the package, or a value that was never constructed at all.
+   */
+  compositionTargetUnmanaged: 'COMPOSITION_TARGET_UNMANAGED'
 } as const
 
 export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode]

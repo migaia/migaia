@@ -36,6 +36,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       readonly config: unknown
       readonly install: unknown
       readonly update: unknown
+      readonly onEnable: unknown
+      readonly onDisable: unknown
       readonly dispose: unknown
       readonly shared: unknown
       readonly features: unknown
@@ -48,6 +50,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
         config: plugin?.config,
         install: plugin?.install,
         update: plugin?.update,
+        onEnable: plugin?.onEnable,
+        onDisable: plugin?.onDisable,
         dispose: plugin?.dispose,
         shared: plugin?.shared,
         features: plugin?.features,
@@ -62,6 +66,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       config: rawConfig,
       install,
       update,
+      onEnable,
+      onDisable,
       dispose,
       shared,
       features,
@@ -75,6 +81,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       throw createPluginHostTypeError('plugin install must be a function')
     for (const [key, hook] of [
       ['update', update],
+      ['onEnable', onEnable],
+      ['onDisable', onDisable],
       ['dispose', dispose],
       ['shared', shared]
     ] as const)
@@ -97,6 +105,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       config: copyConfig((rawConfig ?? {}) as IPluginConfig, 'plugin config'),
       install: install as IPluginConstraint<any>['install'],
       update: update as IPluginConstraint<any>['update'],
+      onEnable: onEnable as IPluginConstraint<any>['onEnable'],
+      onDisable: onDisable as IPluginConstraint<any>['onDisable'],
       dispose: dispose as IPluginConstraint<any>['dispose'],
       shared: shared as IPluginConstraint<any>['shared'],
       disposer: disposer.disposer,

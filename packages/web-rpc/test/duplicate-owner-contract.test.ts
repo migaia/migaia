@@ -10,7 +10,7 @@ import { createEndpointProjection } from '../src/internal/endpoint-projection.js
 import { WebRpcErrorCode, WebRpcLifecycleError } from '../src/errors.js'
 import { connect } from '../src/middleware/connect.js'
 import { createConstructionControl } from '../src/internal/construction-install.js'
-import { WebRpcPluginHost } from '../src/internal/web-rpc-plugin-host.js'
+import { createWebRpcPluginHost } from '../src/internal/web-rpc-plugin-host.js'
 import { ReplayWindow } from '../src/internal/replay.js'
 import { PeerRegistry } from '../src/internal/peers.js'
 import { ProviderAdmissionRegistry } from '../src/internal/provider-admission.js'
@@ -174,7 +174,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     const extension = () => 'extension'
     const primary = new Error('candidate-007 failure')
     let cleanupCalls = 0
-    const host = new WebRpcPluginHost(
+    const host = createWebRpcPluginHost(
       'candidate-007',
       transport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
@@ -208,7 +208,9 @@ describe('candidate-specific duplicate-owner contracts', () => {
 
   it('proves MET-RED-008 leaves generic pipeline ownership in PluginHost', async () => {
     const endpoint = await createClientEndpoint(createConfig(() => undefined))
-    expect(source('../src/internal/web-rpc-plugin-host.ts')).toContain('extends PluginHost')
+    // 宿主壳层已从「继承 PluginHost」改为「defineHost 产出句柄」；这条断言要观测的是
+    // 「通用 pipeline 所有权留在 plugin-host 里」，用宿主入口而不是继承关系来表达。
+    expect(source('../src/internal/web-rpc-plugin-host.ts')).toContain('defineHost')
     expect(Object.values(SOURCES).join('\n')).not.toContain('@migaia/middleware-pipeline')
     expect('usePipeline' in endpoint).toBe(false)
     await endpoint.dispose()
@@ -344,14 +346,14 @@ describe('candidate-specific duplicate-owner contracts', () => {
   it('proves MET-RED-019 keeps shared ports endpoint-local and symbol-keyed', async () => {
     const [firstTransport, secondTransport] = createMemoryTransportPair()
     const sharedKey = Symbol('candidate-019')
-    const firstHost = new WebRpcPluginHost(
+    const firstHost = createWebRpcPluginHost(
       'candidate-019-first',
       firstTransport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
-    const secondHost = new WebRpcPluginHost(
+    const secondHost = createWebRpcPluginHost(
       'candidate-019-second',
       secondTransport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
@@ -535,7 +537,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
   it('proves MET-RED-032 keeps diagnostic cleanup at the Host disposal boundary', async () => {
     const cleanup = new Error('candidate-032 cleanup')
     const [transport] = createMemoryTransportPair()
-    const host = new WebRpcPluginHost(
+    const host = createWebRpcPluginHost(
       'candidate-032',
       transport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
@@ -564,7 +566,12 @@ describe('candidate-specific duplicate-owner contracts', () => {
 describe('MET-RED-022/035 projection and public lifecycle surface', () => {
   it('proves MET-RED-022/035 projection avoids last-write-wins merge and returns the exact Host Promise', async () => {
     const projectionSource = source('../src/internal/endpoint-projection.ts')
-    const host = { send: () => undefined }
+    let sendCalls = 0
+    const host = {
+      send: () => {
+        sendCalls += 1
+      }
+    }
     const hostPromise = Promise.resolve()
     const projection = createEndpointProjection({
       host,
@@ -578,7 +585,11 @@ describe('MET-RED-022/035 projection and public lifecycle surface', () => {
     expect(projectionSource).not.toContain('Object.assign')
     expect(Object.getPrototypeOf(projection)).toBeNull()
     expect(Object.isFrozen(projection)).toBe(true)
-    expect(projection.send).toBe(host.send)
+    // 投影把可调用成员包一层，用来把宿主的 `VIEW_REVOKED` 翻译成本包的 ENDPOINT_DISPOSED；保证从
+    // 「同一个引用」放宽为「同一个实现」——调用投影出的成员，被调到的必须还是原来那一个函数。
+    expect(projection.send).toBe(projection.send)
+    projection.send()
+    expect(sendCalls).toBe(1)
     const firstDispose = projection.dispose()
     expect(projection.dispose()).toBe(firstDispose)
     expect(firstDispose).toBe(hostPromise)
@@ -586,7 +597,7 @@ describe('MET-RED-022/035 projection and public lifecycle surface', () => {
 
     const cleanup = new Error('duplicate-owner disposal cleanup')
     const [hostTransport] = createMemoryTransportPair()
-    const webRpcHost = new WebRpcPluginHost(
+    const webRpcHost = createWebRpcPluginHost(
       'duplicate-owner-disposal',
       hostTransport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),

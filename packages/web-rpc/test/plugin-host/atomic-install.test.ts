@@ -37,7 +37,10 @@ import type {
   IWebRpcEndpoint,
   IWebRpcProvider
 } from '../../src/typing.js'
-import { WebRpcPluginHost } from '../../src/internal/web-rpc-plugin-host.js'
+import {
+  createWebRpcPluginHost,
+  type IWebRpcPluginHost
+} from '../../src/internal/web-rpc-plugin-host.js'
 import { definePlugin } from '@migaia/plugin-host'
 import {
   createConstructionControl,
@@ -143,7 +146,7 @@ function composedConfig(
 }
 
 type IProductionBatch = {
-  readonly host: WebRpcPluginHost
+  readonly host: IWebRpcPluginHost
   readonly kernel: ReturnType<typeof createEndpointKernel>
   /** Fixture transport used to verify the kernel retains the production transport owner. */
   readonly transport: IWebRpcCoreConfig['transport']
@@ -374,11 +377,11 @@ async function createProductionBatch(
     timeoutMs: options.construction?.timeoutMs
   })
   const hookEvents: IWebRpcHookEvent[] = []
-  const host = new WebRpcPluginHost(
+  const host = createWebRpcPluginHost(
     deferred.id,
     deferred.transport,
     construction,
-    (event) => hookEvents.push(event),
+    (event: IWebRpcHookEvent) => hookEvents.push(event),
     { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   )
   let prepared: IPreparedEndpoint<string> | undefined
@@ -1175,7 +1178,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       const primary = new Error(`${failedRole} primary`)
       const rollback = roles.map((role) => new Error(`${role} rollback`))
       const [transport] = createMemoryTransportPair()
-      const host = new WebRpcPluginHost(
+      const host = createWebRpcPluginHost(
         failedRole,
         transport,
         createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
@@ -5122,16 +5125,12 @@ describe('B12a atomic middleware and claim contracts', () => {
       const beforeDispose = readEndpointDebugSnapshot(endpoint)
       expect(beforeDispose).toBeDefined()
       expect(beforeDispose?.phase).toBe('active')
-      const hostDisposeSpy = vi.spyOn(WebRpcPluginHost.prototype, 'dispose')
+      // 宿主由 `defineHost` 产出，没有原型可以监视；等价的观测是它对外的保证：dispose 链恰好执行
+      // 一次（重复调用返回同一个 Promise 引用），且端点暴露的失败就是宿主那条链的失败。
       const endpointDispose = endpoint.dispose()
-      expect(hostDisposeSpy).toHaveBeenCalledTimes(1)
-      const hostDisposePromise = hostDisposeSpy.mock.results[0]?.value as Promise<void>
-      hostDisposeSpy.mockRestore()
       expect(endpoint.dispose()).toBe(endpointDispose)
       const failure = await endpointDispose.catch((error: unknown) => error)
-      const hostFailure = await hostDisposePromise.catch((error: unknown) => error)
       expect(failure).toBeInstanceOf(WebRpcLifecycleError)
-      expect(hostFailure).toBe(failure)
       expect(failure).toMatchObject({
         source: WEBRPC_SOURCE,
         code: 'ENDPOINT_DISPOSED',

@@ -1,8 +1,11 @@
 import ERROR_TEXT, {
+  attachPluginHostIdentity,
+  formatPluginHostDiagnostic,
   PluginHostError,
   createPluginHostTypeError,
   tagPluginHostError
 } from './error-text.js'
+import { issueHostIdentity, type IPluginHostIdentity } from './host-identity.js'
 import {
   preflightPluginDefinitions,
   snapshotPluginDefinitions,
@@ -10,15 +13,22 @@ import {
 } from './admission-runtime.js'
 import { PluginHostInstallRuntime, type IInstallBatchContext } from './install-runtime.js'
 import { PluginHostErrorCode } from './error-code.js'
+import { buildManagedPort, registerManagedHost } from './composition-entry.js'
+import { PluginHostState } from './host-state.js'
+import type { IHostCoreConstructionRequest } from './define-host.js'
+import { reportQueueWait, translateQueueRejection } from './host-queue.js'
+import {
+  createPluginHostPipelineViolationHandler,
+  drainPipelineLeases
+} from './pipeline-runtime.js'
+import { assertRequiredTimeoutOption, assertTimeoutOption } from './host-options.js'
 import { asyncDisposeKey } from './disposal.js'
 import {
   createMutationQueue,
-  boundedWait,
   createAbortController,
   createPendingTracker,
   createQuiescenceTracker,
   createTerminalController,
-  LifecycleErrorCode,
   snapshotScheduler,
   systemScheduler,
   type ILifecycleScheduler,
@@ -38,12 +48,8 @@ export {
   type IPluginHostDisposalNodeKind,
   type IPluginHostDisposalProvenance
 } from './cleanup-runtime.js'
-import {
-  adaptSyncStageToAsync,
-  adaptSyncStageToAsyncGenerator,
-  adaptSyncStageToGenerator
-} from './pipeline.js'
-import { executePluginHostPipeline, registerPluginHostStage } from './pipeline-runtime.js'
+import { adaptSyncStageForMode } from './pipeline.js'
+import { executePluginHostPipeline } from './pipeline-runtime.js'
 import { PluginHostRemovalRuntime } from './removal-runtime.js'
 import { PluginHostOperationRuntime } from './operation-runtime.js'
 import type { IMiddlewarePipelineAbortSignal } from '@migaia/middleware-pipeline'
@@ -51,14 +57,13 @@ import { PluginHostCoreRuntime } from './core-runtime.js'
 import { PluginHostConfigRuntime } from './config-runtime.js'
 import { PluginHostDisposalRuntime } from './host-disposal-runtime.js'
 import { PluginHostCompositionRuntime } from './composition-runtime.js'
-import { type IDataOrderSlotState } from './composition.js'
-import { createPluginHostPublication } from './publication.js'
 import {
-  PluginHostPipelineMode,
-  PluginHostPipelineViolation,
-  PluginHostRegistrationLifecycle
-} from './state-constants.js'
-import type { IRegistration, ISharedEntry } from './registry.js'
+  PluginHostEnablementRuntime,
+  createPluginHostEnablementFacade
+} from './enablement-runtime.js'
+import { createPluginHostPublication } from './publication.js'
+import { PluginHostPipelineMode, PluginHostRegistrationLifecycle } from './state-constants.js'
+import type { IRegistration } from './registry.js'
 import type {
   IAsyncGeneratorPipelineStage,
   IAsyncPipelineStage,
@@ -70,16 +75,11 @@ import type {
   IPluginHostErrorCode,
   IPluginHostView,
   IPluginHostDynamicView,
+  IPluginHostCompositionIntegration,
   IPluginRemovalResult,
   IMergePluginShared,
   IPluginHostOptions,
-  IPluginAdmissionRequest,
-  IPluginPreparedAdmissions,
-  IPluginPreparedRemovalBatch,
-  IPluginRegistrationReceipt,
-  IPluginBatchRemovalOptions,
-  IPluginBatchRemovalResult,
-  IPluginHostPhysicalCleanupResult,
+  IPluginEnablement,
   IPipelineMode,
   ISyncPipelineStage
 } from './typing.js'
@@ -118,22 +118,6 @@ export type IPluginHostInstalledPlugins<THost extends PluginHost<any, any, any>>
  * `diagnostic`。`message` 仅用于保持与注入版相同的签名。
  */
 const defaultDiagnostic = (_message: string): void => {}
-/** 校验可配置超时：`undefined`/`false` 合法；number 必须有限非负（AF-10）。 */
-const assertTimeoutOption = (value: number | false | undefined, label: string): void => {
-  if (value === undefined || value === false) return
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    throw createPluginHostTypeError(`${label} must be false or a non-negative finite number`)
-  }
-}
-/** Rejects an omitted mandatory execution budget before any unrelated option is observed. */
-const assertRequiredTimeoutOption = (value: number | false | undefined, label: string): void => {
-  if (value === undefined)
-    throw createPluginHostTypeError(
-      `${label} must be provided as false or a non-negative finite number`
-    )
-  assertTimeoutOption(value, label)
-}
-
 /**
  * Default queue-admission diagnostic threshold; `queueAdmissionTimeoutMs` defaults to
  * `undefined`（只诊断不拒绝）。
@@ -151,6 +135,8 @@ export abstract class PluginHost<
   TValue = never,
   TInstalled extends readonly IPluginConstraint<any>[] = readonly []
 > {
+  /** Immutable process-local identity used by Host errors and diagnostics. */
+  readonly identity: IPluginHostIdentity
   /** Type-only baseline tuple marker; no runtime property is emitted. */
   declare readonly [installedPluginsBrand]: TInstalled
   #terminal: ITerminalController = createTerminalController()
@@ -159,15 +145,9 @@ export abstract class PluginHost<
   #pipelineLeases: IQuiescenceTracker<object> = createQuiescenceTracker<object>()
   #pending: IPendingTracker = createPendingTracker()
   #pipelineKey: object = {}
-  /** Stable quiescence keys allow removal to drain only the revoked plugin's stages. */
-  #pipelineOwnerKeys = new Map<string, object>()
   /**
-   * Serial FIFO admission queue for every external mutation, ported off the hand-rolled
-   * `#mutationQueue`/`#armQueueWatchdog` onto `@migaia/lifecycle`'s `createMutationQueue`. No
-   * `owner` tag is passed to `enqueue()` — an earlier adversarial pass (see hardening-regressions
-   * `#4`/PH-R3-1) found no reliable per-call owner identity here that would let self-dependency
-   * detection reject a genuine self-await without also risking a legitimate queued mutation; the
-   * queue's owner-self-dependency guard is therefore intentionally unused at this call site.
+   * Serial FIFO mutation queue. No owner tag is passed because this boundary has no reliable
+   * per-call owner identity for lifecycle's self-dependency guard.
    */
   #queue: IMutationQueue
   #scheduler: ILifecycleScheduler
@@ -179,38 +159,16 @@ export abstract class PluginHost<
   /** Records disposer steps detached by a bounded timeout until the current host disposal settles. */
   #cleanupAbandoned = false
   #queueAdmissionTimeoutMs: number | false | undefined
-  #registrations = new Map<string, IRegistration<TDomainCore, TValue>>()
-  #shared = new Map<PropertyKey, ISharedEntry<TDomainCore, TValue>>()
-  /** Registration owner for each immutable extension view slot. */
-  #extensionOwners = new Map<PropertyKey, IRegistration<TDomainCore, TValue>>()
+  /**
+   * Every piece of shared mutable state, in one holder.
+   *
+   * It is constructed before any runtime, so the ports below carry a reference instead of a closure
+   * over a field that may not exist yet — which is what forced the old deferred assignments.
+   */
+  #state = new PluginHostState<TDomainCore, TValue>()
   #hookRegistration: IRegistration<TDomainCore, TValue> | undefined
   #pipelineMode: IPipelineMode
   #diagnostic: (message: string, code?: IPluginHostErrorCode) => void
-  #syncStages: ISyncPipelineStage<TValue>[] = []
-  #asyncStages: IAsyncPipelineStage<TValue>[] = []
-  #generatorStages: IGeneratorPipelineStage<TValue>[] = []
-  #asyncGeneratorStages: IAsyncGeneratorPipelineStage<TValue>[] = []
-  /** Live definition lanes; replacement/restart retain the handle while delete retires it. */
-  #stageSlots = new Map<string, IDataOrderSlotState>()
-  /** Next Host-owned slot for a never-before-seen plugin name. */
-  #nextStageSlot = 0n
-  /** Owner provenance for committed and candidate stage functions. */
-  #stageOwners = new WeakMap<Function, string>()
-  /**
-   * Structural abort signal reflecting host disposal state, used only to give async-generator
-   * pipeline runs the same "stop if the host died mid-flight" protection that async mode gets via
-   * `assertActive`. Middleware-pipeline's async-generator runner only polls `aborted`/`reason` — it
-   * never calls `addEventListener`, so those two methods are never actually invoked.
-   *
-   * `reason` returns the same `PluginHostError('HOST_DISPOSING' | 'HOST_DISPOSED', ...)` that
-   * `#assertActive()` would throw: middleware-pipeline's abort error factory returns an `Error`
-   * reason as-is (unwrapped) rather than re-tagging it, so surfacing this reason gives
-   * async-generator mode the exact same error identity async mode gets from `assertActive` — even
-   * though the underlying runner only accepts a signal, not a callback, for this mode.
-   *
-   * Both getters are `Object.defineProperty`-based (not object-literal `get` shorthand) so they are
-   * lexically-scoped arrow functions bound to this host instance, not to the signal object itself.
-   */
   /** Real lifecycle signal shared by active pipeline stages and disposal cancellation. */
   #liveSignal: IMiddlewarePipelineAbortSignal = this.#executionController
     .signal as unknown as IMiddlewarePipelineAbortSignal
@@ -219,8 +177,9 @@ export abstract class PluginHost<
   #configRuntime: PluginHostConfigRuntime<TDomainCore, TValue, TInstalled>
   #hostDisposalRuntime: PluginHostDisposalRuntime<IRegistration<TDomainCore, TValue>>
   #compositionRuntime: PluginHostCompositionRuntime<TDomainCore, TValue>
-  /** Monotonic committed mutation receipt used by composition owners to detect raw bypass. */
-  #revision = 0
+  #enablementRuntime: PluginHostEnablementRuntime<TDomainCore, TValue>
+  /** Readonly enablement facade over the same runtime that owns this Host's registrations. */
+  readonly plugin: IPluginEnablement<this, TInstalled, TDomainCore, TValue>
   /** Candidate publication context used to keep plugin-owned stages off the live pipeline. */
   #activeInstallBatch: IInstallBatchContext<TDomainCore, TValue> | undefined
   /** Functional-entry reader for trusted definitions; absent in the structural entry. */
@@ -237,10 +196,26 @@ export abstract class PluginHost<
     const pipelineDrainTimeoutMs = execution.pipelineDrainTimeoutMs
     assertRequiredTimeoutOption(mutationTimeoutMs, 'mutationTimeoutMs')
     assertRequiredTimeoutOption(pipelineDrainTimeoutMs, 'pipelineDrainTimeoutMs')
+    this.identity = issueHostIdentity(this, options.identity?.name)
     this.#pipelineMode = options.pipeline?.mode ?? PluginHostPipelineMode.sync
     if (options.diagnostic !== undefined && typeof options.diagnostic !== 'function')
       throw createPluginHostTypeError('diagnostic must be a function')
-    this.#diagnostic = options.diagnostic ?? defaultDiagnostic
+    const diagnostic = options.diagnostic ?? defaultDiagnostic
+    this.#diagnostic = (message, code) =>
+      diagnostic(formatPluginHostDiagnostic(this, message), code)
+    this.#enablementRuntime = new PluginHostEnablementRuntime({
+      state: this.#state,
+      diagnostic: this.#diagnostic
+    })
+    this.plugin = createPluginHostEnablementFacade<this, TInstalled, TDomainCore, TValue>(
+      this.#enablementRuntime,
+      {
+        assertActive: () => this.#assertActive(),
+        assertMutationAllowed: () => this.#assertMutationAllowed(),
+        enqueue: (task) => this.#enqueue(task),
+        createView: () => this.#createView() as IPluginHostDynamicView<this, TDomainCore, TValue>
+      }
+    )
     if (
       ![
         PluginHostPipelineMode.sync,
@@ -249,9 +224,12 @@ export abstract class PluginHost<
         PluginHostPipelineMode.asyncGenerator
       ].includes(this.#pipelineMode)
     )
-      throw new PluginHostError(
-        PluginHostErrorCode.invalidPipelineMode,
-        ERROR_TEXT.INVALID_PIPELINE_MODE
+      throw attachPluginHostIdentity(
+        new PluginHostError(
+          PluginHostErrorCode.invalidPipelineMode,
+          ERROR_TEXT.INVALID_PIPELINE_MODE
+        ),
+        this
       )
     // 时间策略统一走 lifecycle scheduler / 可配置阈值（AF-10）。负数/NaN/Infinity 立即 INVALID_OPTION。
     for (const [label, value] of [
@@ -287,7 +265,8 @@ export abstract class PluginHost<
       parentSignal: this.#executionController.signal,
       scheduler: this.#scheduler,
       timeoutMs: mutationTimeoutMs,
-      isHostOpen: () => this.#terminal.lifecycle === 'open'
+      isHostOpen: () => this.#terminal.lifecycle === 'open',
+      diagnostic: (message) => this.#diagnostic(message)
     })
     this.#cleanupRuntime = new PluginHostCleanupRuntime({
       scheduler: this.#scheduler,
@@ -311,12 +290,9 @@ export abstract class PluginHost<
     this.#installRuntime = new PluginHostInstallRuntime({
       scheduler: this.#scheduler,
       snapshotBatch: () => ({
-        shared: new Map(this.#shared),
-        extensionOwners: new Map(this.#extensionOwners),
-        syncStages: [...this.#syncStages],
-        asyncStages: [...this.#asyncStages],
-        generatorStages: [...this.#generatorStages],
-        asyncGeneratorStages: [...this.#asyncGeneratorStages],
+        shared: new Map(this.#state.shared),
+        extensionOwners: new Map(this.#state.extensionOwners),
+        ...this.#state.lanes.copy(),
         committed: false
       }),
       setActiveBatch: (batch) => {
@@ -336,14 +312,19 @@ export abstract class PluginHost<
         this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity),
       closeRegistrationSync: (registration, rollbackErrors) =>
         this.#closeRegistrationSync(registration, rollbackErrors),
-      diagnostic: this.#diagnostic
+      diagnostic: this.#diagnostic,
+      decorateError: (error) => attachPluginHostIdentity(error, this)
     })
     this.#removalRuntime = new PluginHostRemovalRuntime({
-      registrations: this.#registrations,
-      shared: this.#shared,
-      extensionOwners: this.#extensionOwners,
+      registrations: this.#state.registrations,
+      shared: this.#state.shared,
+      retiredShared: this.#state.retiredShared,
+      extensionOwners: this.#state.extensionOwners,
       pipelineLeases: this.#pipelineLeases,
-      pipelineOwnerKeys: this.#pipelineOwnerKeys,
+      pipelineOwnerKeys: this.#state.lanes.pipelineOwnerKeys,
+      stageSlots: this.#state.stageSlots,
+      removePipelineOwner: (name) => this.#state.lanes.removeOwner(name),
+      host: this,
       executionSignal: this.#executionController.signal,
       cleanupRuntime: this.#cleanupRuntime,
       setHookRegistration: (registration) => {
@@ -351,9 +332,12 @@ export abstract class PluginHost<
       }
     })
     this.#coreRuntime = new PluginHostCoreRuntime({
-      createDomainCore: () => this.createPluginDomainCore(),
-      assertRegistrationValid: (registration) => this.#assertRegistrationValid(registration),
-      committedShared: this.#shared,
+      createDomainCore: (request) => this.createPluginDomainCore(request),
+      assertRegistrationValid: (registration) =>
+        this.#state.assertRegistrationValid(registration, (current) =>
+          this.#operationRuntime.assertCurrent(current)
+        ),
+      committedShared: this.#state.shared,
       executionSignal: this.#executionController.signal,
       pipelineMode: () => this.#pipelineMode,
       onPipelineViolation: this.#onPipelineViolation,
@@ -361,7 +345,7 @@ export abstract class PluginHost<
       cleanupRuntime: this.#cleanupRuntime
     })
     this.#configRuntime = new PluginHostConfigRuntime({
-      registrations: this.#registrations,
+      registrations: this.#state.registrations,
       assertActive: () => this.#assertActive(),
       enqueue: (task) => this.#enqueue(task),
       beginOperation: (registration) => {
@@ -374,7 +358,7 @@ export abstract class PluginHost<
       },
       createCore: (registration) => this.#coreRuntime.create(registration),
       commitRevision: () => {
-        this.#revision += 1
+        this.#state.commit()
       }
     })
     this.#hostDisposalRuntime = new PluginHostDisposalRuntime({
@@ -386,22 +370,19 @@ export abstract class PluginHost<
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
       enqueueTerminal: (task) => this.#enqueue(task, true),
-      registrationsInReverse: () => [...this.#registrations.values()].reverse(),
+      registrationsInReverse: () => [...this.#state.registrations.values()].reverse(),
       disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
       clearPipelineState: () => {
-        this.#syncStages.length = 0
-        this.#asyncStages.length = 0
-        this.#generatorStages.length = 0
-        this.#asyncGeneratorStages.length = 0
-        for (const slot of this.#stageSlots.values()) slot.retired = true
-        this.#stageSlots.clear()
+        this.#state.lanes.clear()
+        for (const slot of this.#state.stageSlots.values()) slot.retired = true
+        this.#state.stageSlots.clear()
       },
       resetCleanupAbandoned: () => {
         this.#cleanupAbandoned = false
       },
       isCleanupAbandoned: () => this.#cleanupAbandoned,
       commitRevision: () => {
-        this.#revision += 1
+        this.#state.commit()
       },
       diagnostic: this.#diagnostic
     })
@@ -409,21 +390,21 @@ export abstract class PluginHost<
       host: this,
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
-      registrations: this.#registrations,
-      stageSlots: this.#stageSlots,
-      allocateStageSlot: () => this.#nextStageSlot++,
+      registrations: this.#state.registrations,
+      stageSlots: this.#state.stageSlots,
+      allocateStageSlot: () => this.#state.allocateStageSlot(),
       assertActive: () => this.#assertActive(),
       assertMutationAllowed: () => this.#assertMutationAllowed(),
       snapshotPlugins: (plugins) =>
         snapshotPluginDefinitions<TDomainCore, TValue>(plugins, this.#trustedDefinitionReader),
       preflight: (definitions) =>
-        preflightPluginDefinitions(definitions, (name) => this.#registrations.has(name)),
+        preflightPluginDefinitions(definitions, (name) => this.#state.registrations.has(name)),
       enqueue: (task) => this.#enqueue(task),
       installBatch: (entries, publish) => this.#installRuntime.installBatch(entries, publish),
       publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
-      revision: () => this.#revision,
+      revision: () => this.#state.revision,
       commitRevision: () => {
-        this.#revision += 1
+        this.#state.commit()
       },
       disposeRegistration: (registration, preserveErrorIdentity) =>
         this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity),
@@ -445,8 +426,18 @@ export abstract class PluginHost<
       onAdmissionDiagnostic:
         options.queueAdmissionDiagnosticMs === false
           ? undefined
-          : (info) => this.#reportQueueWait(info)
+          : (info) => reportQueueWait(this.#diagnostic, info)
     })
+    // 托管协议不再挂在 Host 实例表面：它是组合方专用的出口，放在实例上会让每个普通消费者都看见
+    // 八个它永远不该调用的方法。登记发生在构造函数末尾，此时 Host 已完整。
+    registerManagedHost(
+      this,
+      buildManagedPort(
+        this.#compositionRuntime as unknown as IPluginHostCompositionIntegration<object>,
+        () => this.revision,
+        () => this.getCurrentView()
+      )
+    )
   }
 
   get pipelineMode(): IPipelineMode {
@@ -456,7 +447,7 @@ export abstract class PluginHost<
 
   /** Current committed Host mutation receipt; it changes only at publication boundaries. */
   get revision(): number {
-    return this.#revision
+    return this.#state.revision
   }
 
   /** Returns a fresh dynamic view over the currently committed registrations. */
@@ -467,70 +458,34 @@ export abstract class PluginHost<
 
   #assertActive(): void {
     if (this.#terminal.lifecycle === 'terminal')
-      throw new PluginHostError(PluginHostErrorCode.hostDisposed, ERROR_TEXT.HOST_DISPOSED)
+      throw attachPluginHostIdentity(
+        new PluginHostError(PluginHostErrorCode.hostDisposed, ERROR_TEXT.HOST_DISPOSED),
+        this
+      )
     if (this.#terminal.lifecycle === 'closing')
-      throw new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
+      throw attachPluginHostIdentity(
+        new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING),
+        this
+      )
   }
 
   /** Retains global and owner leases for the exact stage snapshot about to execute. */
   #retainPipelineLease(stages: readonly Function[]): () => void {
     this.#assertActive()
-    const releases = [this.#pipelineLeases.retain(this.#pipelineKey)]
-    const owners = new Set<string>()
-    for (const stage of stages) {
-      const owner = this.#stageOwners.get(stage)
-      if (owner !== undefined) owners.add(owner)
-    }
-    for (const owner of owners) {
-      const key = this.#pipelineOwnerKeys.get(owner)
-      if (key !== undefined) releases.push(this.#pipelineLeases.retain(key))
-    }
-    return () => {
-      for (const release of releases) release()
-    }
-  }
-
-  /** Waits for the currently snapshotted pipeline work before releasing stage owners. */
-  async #drainPipelineOwners(owner?: IRegistration<TDomainCore, TValue>): Promise<{
-    readonly complete: boolean
-    readonly physicalCompletion?: Promise<import('./typing.js').IPluginHostPhysicalCleanupResult>
-  }> {
-    const ownerKey = owner?.pipelineOwnerKey
-    const pending = this.#pipelineLeases.whenZeroOnce(ownerKey ?? this.#pipelineKey)
-    if (this.#pipelineDrainTimeoutMs === false) {
-      await pending
-      return { complete: true }
-    }
-    const complete = await boundedWait(
-      pending,
-      this.#scheduler.now() + this.#pipelineDrainTimeoutMs,
-      { scheduler: this.#scheduler }
-    )
-    if (complete) return { complete: true }
-    const physicalCompletion = pending.then(
-      () => Object.freeze({ cleanupErrors: Object.freeze([]) }),
-      (error: unknown) => Object.freeze({ cleanupErrors: Object.freeze([error]) })
-    )
-    return { complete: false, physicalCompletion }
+    return this.#state.lanes.retainLeases(this.#pipelineLeases, this.#pipelineKey, stages)
   }
 
   #assertMutationAllowed(): void {
     if (this.#hookRegistration)
-      throw new PluginHostError(
-        PluginHostErrorCode.lifecycleMutation,
-        ERROR_TEXT.LIFECYCLE_MUTATION
+      throw attachPluginHostIdentity(
+        new PluginHostError(PluginHostErrorCode.lifecycleMutation, ERROR_TEXT.LIFECYCLE_MUTATION),
+        this
       )
   }
 
-  /** 队列 admission 诊断（未配置 reject 阈值时）：只观测，不出队、不 reject，且**不携带错误码**（非拒绝事件）。 */
-  #reportQueueWait(info: { readonly owner: string | undefined; readonly waitedMs: number }): void {
-    try {
-      this.#diagnostic(
-        `[plugin-host] mutation waited in the queue for ${info.waitedMs}ms${info.owner ? ` (owner: ${info.owner})` : ''}`
-      )
-    } catch {
-      // Diagnostics must never alter control flow.
-    }
+  /** Rethrows a synchronous package error after attributing it to this exact Host. */
+  #rethrowWithIdentity(error: unknown): never {
+    throw error instanceof PluginHostError ? attachPluginHostIdentity(error, this) : error
   }
 
   /**
@@ -542,33 +497,18 @@ export abstract class PluginHost<
     return this.#queue
       .enqueue(task, terminal ? { queueAdmissionTimeoutMs: false } : undefined)
       .catch((error: unknown) => {
-        if (
-          error &&
-          typeof error === 'object' &&
-          (error as { code?: unknown }).code === LifecycleErrorCode.queueAdmissionTimeout
-        ) {
-          // 文案报告配置阈值；实际 waitedMs 只放 detail（owner 一并从 lifecycle 错误透传）。
-          const lifecycleDetail = (error as { detail?: { owner?: unknown; waitedMs?: number } })
-            .detail
-          const threshold =
-            typeof this.#queueAdmissionTimeoutMs === 'number' ? this.#queueAdmissionTimeoutMs : 0
-          throw new PluginHostError(
-            PluginHostErrorCode.mutationQueueTimeout,
-            ERROR_TEXT.MUTATION_QUEUE_TIMEOUT(threshold),
-            {
-              cause: error,
-              detail: {
-                owner: lifecycleDetail?.owner,
-                waitedMs: lifecycleDetail?.waitedMs ?? 0
-              }
-            }
-          )
-        }
-        throw error
+        const translated = translateQueueRejection(error, this.#queueAdmissionTimeoutMs)
+        throw translated instanceof PluginHostError
+          ? attachPluginHostIdentity(translated, this)
+          : translated
       })
   }
 
-  protected createPluginDomainCore(): TDomainCore {
+  /**
+   * Builds one registration's domain core. The request names the registration it is for; the class
+   * entry may ignore it, and the functional entry needs it to tell one batch member from another.
+   */
+  protected createPluginDomainCore(_request?: IHostCoreConstructionRequest): TDomainCore {
     return {} as TDomainCore
   }
 
@@ -581,139 +521,97 @@ export abstract class PluginHost<
     return error
   }
 
-  #assertRegistrationValid(registration: IRegistration<TDomainCore, TValue>): void {
-    if (registration.lifecycle === PluginHostRegistrationLifecycle.install) {
-      this.#operationRuntime.assertCurrent(registration)
-      return
-    }
-    if (this.#registrations.get(registration.name) === registration) return
-    throw new PluginHostError(
-      PluginHostErrorCode.pluginNotInstalled,
-      ERROR_TEXT.PLUGIN_NOT_INSTALLED(registration.name)
-    )
-  }
-
-  #onPipelineViolation = (
-    kind: (typeof PluginHostPipelineViolation)[keyof typeof PluginHostPipelineViolation]
-  ): void => {
-    if (kind === PluginHostPipelineViolation.late) {
-      try {
-        this.#diagnostic(ERROR_TEXT.PIPELINE_NEXT_CALLED_LATE, PluginHostErrorCode.pipelineNextLate)
-      } catch {
-        // Diagnostics must never alter pipeline control flow.
-      }
-      return
-    }
-    throw new PluginHostError(
-      PluginHostErrorCode.pipelineNextDuplicate,
-      ERROR_TEXT.PIPELINE_NEXT_ALREADY_CALLED
-    )
-  }
+  /** Preserves this host's identity and diagnostic sink for pipeline contract failures. */
+  #onPipelineViolation = createPluginHostPipelineViolationHandler(this, (message, code) =>
+    this.#diagnostic(message, code)
+  )
 
   #registerStage(
     stage: Function,
     owner: IRegistration<TDomainCore, TValue> | undefined,
     kind: IPipelineMode
   ): void {
-    registerPluginHostStage({
-      host: this,
-      hostMode: this.#pipelineMode,
-      kind,
-      depth: this.#pipelineDepth,
-      stage,
-      owner,
-      activeBatch: this.#activeInstallBatch,
-      syncStages: this.#syncStages,
-      asyncStages: this.#asyncStages,
-      generatorStages: this.#generatorStages,
-      asyncGeneratorStages: this.#asyncGeneratorStages,
-      stageSlots: this.#stageSlots,
-      stageOwners: this.#stageOwners,
-      pipelineOwnerKeys: this.#pipelineOwnerKeys,
-      allocateSlot: () => this.#nextStageSlot++,
-      readLiveStages: () => [
-        this.#syncStages,
-        this.#asyncStages,
-        this.#generatorStages,
-        this.#asyncGeneratorStages
-      ]
-    })
+    try {
+      this.#state.lanes.register({
+        host: this,
+        hostMode: this.#pipelineMode,
+        kind,
+        depth: this.#pipelineDepth,
+        stage,
+        owner,
+        activeBatch: this.#activeInstallBatch,
+        stageSlots: this.#state.stageSlots,
+        allocateSlot: () => this.#state.allocateStageSlot()
+      })
+    } catch (error) {
+      this.#rethrowWithIdentity(error)
+    }
   }
 
   protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void> {
-    return executePluginHostPipeline({
-      mode: this.#pipelineMode,
-      syncStages: this.#syncStages,
-      asyncStages: this.#asyncStages,
-      generatorStages: this.#generatorStages,
-      asyncGeneratorStages: this.#asyncGeneratorStages,
-      value,
-      done,
-      onViolation: this.#onPipelineViolation,
-      assertActive: () => this.#assertActive(),
-      retainLease: (stages) => this.#retainPipelineLease(stages),
-      enter: () => {
-        this.#pipelineDepth += 1
-      },
-      leave: () => {
-        this.#pipelineDepth -= 1
-      },
-      pending: this.#pending,
-      liveSignal: this.#liveSignal
-    })
+    try {
+      return executePluginHostPipeline({
+        mode: this.#pipelineMode,
+        ...this.#state.lanes.lanes,
+        value,
+        done,
+        onViolation: this.#onPipelineViolation,
+        assertActive: () => this.#assertActive(),
+        retainLease: (stages) => this.#retainPipelineLease(stages),
+        enter: () => {
+          this.#pipelineDepth += 1
+        },
+        leave: () => {
+          this.#pipelineDepth -= 1
+        },
+        pending: this.#pending,
+        liveSignal: this.#liveSignal
+      })
+    } catch (error) {
+      this.#rethrowWithIdentity(error)
+    }
   }
 
   /** Host-side pipeline registration for application composition. */
   usePipeline(stage: ISyncPipelineStage<TValue>): this {
     this.#assertActive()
-    if (this.#pipelineMode === PluginHostPipelineMode.sync)
-      this.#registerStage(stage, undefined, PluginHostPipelineMode.sync)
-    else if (this.#pipelineMode === PluginHostPipelineMode.async)
-      this.#registerStage(
-        adaptSyncStageToAsync(stage, this.#onPipelineViolation),
-        undefined,
-        PluginHostPipelineMode.async
-      )
-    else if (this.#pipelineMode === PluginHostPipelineMode.generator)
-      this.#registerStage(
-        adaptSyncStageToGenerator(stage, this.#onPipelineViolation),
-        undefined,
-        PluginHostPipelineMode.generator
-      )
-    else
-      this.#registerStage(
-        adaptSyncStageToAsyncGenerator(stage, this.#onPipelineViolation),
-        undefined,
-        PluginHostPipelineMode.asyncGenerator
-      )
-    this.#revision += 1
+    this.#registerStage(
+      adaptSyncStageForMode(stage, this.#pipelineMode, this.#onPipelineViolation),
+      undefined,
+      this.#pipelineMode
+    )
+    this.#state.commit()
     return this
   }
 
   useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this {
     this.#assertActive()
     this.#registerStage(stage, undefined, PluginHostPipelineMode.async)
-    this.#revision += 1
+    this.#state.commit()
     return this
   }
 
   useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this {
     this.#assertActive()
     this.#registerStage(stage, undefined, PluginHostPipelineMode.generator)
-    this.#revision += 1
+    this.#state.commit()
     return this
   }
 
   useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this {
     this.#assertActive()
     this.#registerStage(stage, undefined, PluginHostPipelineMode.asyncGenerator)
-    this.#revision += 1
+    this.#state.commit()
     return this
   }
 
   getShared<T = unknown>(key: PropertyKey): T | undefined {
     this.#assertActive()
-    return this.#shared.get(key)?.value as T | undefined
+    try {
+      return this.#state.getShared<T>(key)
+    } catch (error) {
+      this.#rethrowWithIdentity(error)
+    }
   }
 
   use<const TPlugins extends readonly IPluginConstraint<any>[]>(
@@ -731,79 +629,32 @@ export abstract class PluginHost<
     )
     return this.#enqueue(async () => {
       const entries = preflightPluginDefinitions(definitions, (name) =>
-        this.#registrations.has(name)
+        this.#state.registrations.has(name)
       )
       await this.#installRuntime.installBatch(entries)
       return this.#createView<[...TInstalled, ...TPlugins]>()
     })
   }
 
-  /** Creates one immutable admission snapshot through the canonical Host validator. */
-  createPluginAdmission<TPlugin extends IPluginConstraint<any>>(
-    plugin: TPlugin
-  ): import('./typing.js').IPluginAdmission<TPlugin> {
-    return this.#compositionRuntime.createPluginAdmission(plugin)
-  }
-
-  /** Reserves a Host-owned opaque ordering slot for one composition definition name. */
-  createDataOrderSlot(name: string): import('./typing.js').IPluginDataOrderSlot {
-    return this.#compositionRuntime.createDataOrderSlot(name)
-  }
-
-  /** Permanently retires the exact definition ordering lane after definition deletion. */
-  retireDataOrderSlot(slot: import('./typing.js').IPluginDataOrderSlot): void {
-    this.#compositionRuntime.retireDataOrderSlot(slot)
-  }
-
-  /** Prepares an admission batch for a composition owner without publishing candidate state. */
-  async prepareAdmissions(
-    requestsInPublicationOrder: readonly IPluginAdmissionRequest[]
-  ): Promise<IPluginPreparedAdmissions> {
-    return this.#compositionRuntime.prepareAdmissions(requestsInPublicationOrder)
-  }
-
-  /** Commits a prepared admission in one synchronous publication point. */
-  commitPreparedAdmissions(
-    prepared: IPluginPreparedAdmissions
-  ): readonly IPluginRegistrationReceipt[] {
-    return this.#compositionRuntime.commitPreparedAdmissions(prepared)
-  }
-
-  /** Discards a prepared candidate and resolves with exact rollback observations. */
-  async discardPreparedAdmissions(
-    prepared: IPluginPreparedAdmissions
-  ): Promise<IPluginHostPhysicalCleanupResult> {
-    return this.#compositionRuntime.discardPreparedAdmissions(prepared)
-  }
-
-  /** Validates exact live receipts before a composition removal critical section. */
-  prepareUnUseBatch(
-    receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]
-  ): IPluginPreparedRemovalBatch {
-    return this.#compositionRuntime.prepareUnUseBatch(receiptsInCleanupOrder)
-  }
-
-  /** Revokes a prepared receipt batch synchronously, then drains its cleanup fence. */
-  async commitPreparedUnUseBatch<TView>(
-    prepared: IPluginPreparedRemovalBatch,
-    options: IPluginBatchRemovalOptions
-  ): Promise<IPluginBatchRemovalResult<TView>> {
-    return this.#compositionRuntime.commitPreparedUnUseBatch<TView>(prepared, options)
-  }
-
   /** Installs constructor-time plugins synchronously or throws before the host escapes. */
   protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(
     plugins: readonly IPluginConstraint<any>[]
   ): IPluginHostView<this, TViewPlugins, TDomainCore, TValue> {
-    this.#assertActive()
-    this.#assertMutationAllowed()
-    const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
-      plugins,
-      this.#trustedDefinitionReader
-    )
-    const entries = preflightPluginDefinitions(definitions, (name) => this.#registrations.has(name))
-    this.#installRuntime.installBatchSync(entries)
-    return this.#createView<TViewPlugins>()
+    try {
+      this.#assertActive()
+      this.#assertMutationAllowed()
+      const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
+        plugins,
+        this.#trustedDefinitionReader
+      )
+      const entries = preflightPluginDefinitions(definitions, (name) =>
+        this.#state.registrations.has(name)
+      )
+      this.#installRuntime.installBatchSync(entries)
+      return this.#createView<TViewPlugins>()
+    } catch (error) {
+      this.#rethrowWithIdentity(error)
+    }
   }
 
   /** Publishes a fully prepared candidate without invoking user code or allocating state. */
@@ -811,35 +662,21 @@ export abstract class PluginHost<
     installed: readonly IRegistration<TDomainCore, TValue>[],
     batch: IInstallBatchContext<TDomainCore, TValue>
   ): void {
-    for (const registration of installed) this.#registrations.set(registration.name, registration)
-    for (const [key, entry] of batch.shared) this.#shared.set(key, entry)
-    for (const [key, registration] of batch.extensionOwners)
-      this.#extensionOwners.set(key, registration)
-    this.#syncStages = batch.syncStages
-    this.#asyncStages = batch.asyncStages
-    this.#generatorStages = batch.generatorStages
-    this.#asyncGeneratorStages = batch.asyncGeneratorStages
-    batch.committed = true
-    this.#revision += 1
+    this.#state.publishInstallBatch(installed, batch)
+    for (const registration of installed) this.#enablementRuntime.notifyInstalled(registration)
   }
 
   /**
    * Synchronous half of useSync rollback: detaches a registration from all host-visible state
-   * (shared keys, mounted extensions, the registrations map) without running any user disposer code
-   * — matches `LifecycleScope.close()`'s "synchronous, idempotent, never calls user code".
-   * Extension-removal failures are reported via diagnostic immediately (synchronously) since they
-   * are themselves synchronous, unlike the disposers handled by `#rollbackDisposersAsync`.
+   * without running any user disposer code — matches `LifecycleScope.close()`'s "synchronous,
+   * idempotent, never calls user code". The table bookkeeping belongs to `PluginHostState`; what
+   * stays here is the part that touches the registration's own scope and lifecycle.
    */
   #closeRegistrationSync(
     registration: IRegistration<TDomainCore, TValue>,
     _rollbackErrors: unknown[] = []
   ): void {
-    for (const key of registration.shared)
-      if (this.#shared.get(key)?.owner === registration) this.#shared.delete(key)
-    for (const { key } of [...registration.extensions].reverse())
-      if (this.#extensionOwners.get(key) === registration) this.#extensionOwners.delete(key)
-    if (this.#registrations.get(registration.name) === registration)
-      this.#registrations.delete(registration.name)
+    this.#state.closeRegistration(registration)
     registration.scope?.close()
     registration.lifecycle = PluginHostRegistrationLifecycle.dispose
   }
@@ -847,15 +684,21 @@ export abstract class PluginHost<
   /** Rejects access through a stale view after any captured registration is revoked. */
   #assertViewLive(registrations: readonly IRegistration<TDomainCore, TValue>[]): void {
     for (const registration of registrations)
-      if (!registration.installed || this.#registrations.get(registration.name) !== registration)
-        throw new PluginHostError(PluginHostErrorCode.viewRevoked, ERROR_TEXT.VIEW_REVOKED)
+      if (!this.#state.isLive(registration))
+        throw attachPluginHostIdentity(
+          new PluginHostError(PluginHostErrorCode.viewRevoked, ERROR_TEXT.VIEW_REVOKED),
+          this
+        )
   }
 
   /** Materializes a null-prototype, frozen view over the current committed registrations. */
   #createView<TViewPlugins extends readonly IPluginConstraint<any>[]>(
-    registrations: readonly IRegistration<TDomainCore, TValue>[] = [...this.#registrations.values()]
+    registrations: readonly IRegistration<TDomainCore, TValue>[] = [
+      ...this.#state.registrations.values()
+    ]
   ): IPluginHostView<this, TViewPlugins, TDomainCore, TValue> {
-    return createPluginHostPublication<this, TDomainCore, TValue, TViewPlugins>(registrations, {
+    const enabled = registrations.filter((registration) => registration.enabled)
+    return createPluginHostPublication<this, TDomainCore, TValue, TViewPlugins>(enabled, {
       host: this,
       assertLive: (captured) => this.#assertViewLive(captured),
       readConfig: (path) => this.config.get(path),
@@ -874,7 +717,7 @@ export abstract class PluginHost<
     this.#assertActive()
     this.#assertMutationAllowed()
     return this.#enqueue(async () => {
-      const registration = this.#registrations.get(name)
+      const registration = this.#state.registrations.get(name)
       if (!registration)
         return Object.freeze({
           ok: true,
@@ -883,9 +726,16 @@ export abstract class PluginHost<
           cleanupComplete: true,
           cleanupErrors: Object.freeze([])
         })
-      const drain = await this.#drainPipelineOwners(registration)
+      this.#pipelineLeases.seal(registration.pipelineOwnerKey)
+      const drain = await drainPipelineLeases({
+        leases: this.#pipelineLeases,
+        key: registration.pipelineOwnerKey,
+        drainTimeoutMs: this.#pipelineDrainTimeoutMs,
+        scheduler: this.#scheduler
+      })
       const errors = await this.#removalRuntime.disposeRegistration(registration)
-      this.#revision += 1
+      this.#enablementRuntime.forget(name)
+      this.#state.commit()
       const view = this.#createView() as IPluginHostDynamicView<this>
       const cleanupErrors = Object.freeze([...errors])
       const cleanupComplete = drain.complete && errors.length === 0
@@ -899,13 +749,16 @@ export abstract class PluginHost<
           ...(drain.physicalCompletion ? { physicalCompletion: drain.physicalCompletion } : {})
         })
       const error = registerPluginHostDisposalNode(
-        new PluginHostError(
-          PluginHostErrorCode.pluginDisposeFailed,
-          ERROR_TEXT.PLUGIN_DISPOSE_FAILED(name),
-          {
-            cause: errors[0],
-            detail: { errors: Object.freeze([...errors]) }
-          }
+        attachPluginHostIdentity(
+          new PluginHostError(
+            PluginHostErrorCode.pluginDisposeFailed,
+            ERROR_TEXT.PLUGIN_DISPOSE_FAILED(name),
+            {
+              cause: errors[0],
+              detail: { errors: Object.freeze([...errors]) }
+            }
+          ),
+          this
         ),
         { kind: PluginHostDisposalNodeKind.hostError, phase: 'plugin disposal' }
       )

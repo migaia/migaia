@@ -1,6 +1,8 @@
 import {
-  PluginHost,
+  defineHost,
   invokeCaptured,
+  type IHostHandle,
+  type IPluginHostOptions,
   type IPlugin,
   type IPluginConstraint,
   type IPluginHostCore,
@@ -62,40 +64,75 @@ type IStorageNativeRegistrationContext = {
   readonly registerStore: (store: IKeyValueStore, core: IStorageInstallCore) => void
 }
 
-/** Canonical lifecycle owner used by the R02 facade shell. */
-class StoragePluginHost extends PluginHost<IStorageHostCore> {
-  /** Registration-order bridge used only while PluginHost initializes one Storage-native batch. */
-  #nativeContexts: Array<IStorageNativeRegistrationContext | undefined> = []
+/**
+ * Canonical lifecycle owner used by the R02 facade shell.
+ *
+ * Built with `defineHost` rather than by extending `PluginHost`: the shell needed one domain-core
+ * hook and one extra setter, and inheritance handed it the host's entire surface as well.
+ */
+type IStoragePluginHost = IHostHandle<IStorageHostCore, never, readonly []> &
+  Readonly<{
+    setNativeContexts(
+      contexts: Array<IStorageNativeRegistrationContext | undefined>,
+      expectedEntries: number
+    ): void
+  }>
 
-  /** Queues one optional Storage bridge for every immediately following PluginHost registration. */
-  setNativeContexts(contexts: Array<IStorageNativeRegistrationContext | undefined>): void {
-    this.#nativeContexts = contexts
-  }
-
-  /** Supplies the otherwise-private Store bridge only to the matching native plugin registration. */
-  protected override createPluginDomainCore(): IStorageHostCore {
-    const context = this.#nativeContexts.shift()
-    if (context === undefined) return {}
-    let registrationCore: IStorageInstallCore | undefined
-    return {
-      setStorageRegistrationCore: (core: IStorageInstallCore) => {
-        registrationCore = core
-      },
-      getStore: context.storeCell.get,
-      getBackendId: () => context.id,
-      runStorageInstall: context.runInstall,
-      isStorageInstallExpired: context.isInstallExpired,
-      registerStore: (store: IKeyValueStore) => {
-        if (registrationCore === undefined)
-          throw new StorageError(
-            StorageErrorCode.backendPluginInvalid,
-            {},
-            StorageErrorText.backendPluginInvalid
-          )
-        context.registerStore(store, registrationCore)
+export function createStoragePluginHost(options: IPluginHostOptions): IStoragePluginHost {
+  /** Registration-order bridge, used only while one Storage-native batch initializes. */
+  let nativeContexts: Array<IStorageNativeRegistrationContext | undefined> = []
+  const host = defineHost<IStorageHostCore>({
+    host: options,
+    /** Supplies the otherwise-private Store bridge only to the matching native registration. */
+    domainCore: () => {
+      // 队列耗尽是正常的：一个批次除了 entry 插件之外还会装 reactive service 与 adapter，它们不需要
+      // bridge。数量不匹配在 `setNativeContexts` 处判定——那里同时知道两个数，这里不知道。
+      const context = nativeContexts.shift()
+      if (context === undefined) return {}
+      let registrationCore: IStorageInstallCore | undefined
+      return {
+        setStorageRegistrationCore: (core: IStorageInstallCore) => {
+          registrationCore = core
+        },
+        getStore: context.storeCell.get,
+        getBackendId: () => context.id,
+        runStorageInstall: context.runInstall,
+        isStorageInstallExpired: context.isInstallExpired,
+        registerStore: (store: IKeyValueStore) => {
+          if (registrationCore === undefined)
+            throw new StorageError(
+              StorageErrorCode.backendPluginInvalid,
+              {},
+              StorageErrorText.backendPluginInvalid
+            )
+          context.registerStore(store, registrationCore)
+        }
       }
     }
-  }
+  })
+  return Object.freeze({
+    ...host,
+    /**
+     * Queues one optional Storage bridge for every entry registration of the next batch.
+     *
+     * `expectedEntries` is the batch's entry count, and a queue that does not cover it exactly is
+     * rejected here rather than becoming an empty core later: `shift()` returning `undefined` reads
+     * identically to "this registration needs no bridge", so a short queue would otherwise surface
+     * as a backend that silently never registered its store.
+     */
+    setNativeContexts: (
+      contexts: Array<IStorageNativeRegistrationContext | undefined>,
+      expectedEntries: number
+    ): void => {
+      if (contexts.length !== expectedEntries)
+        throw new StorageError(
+          StorageErrorCode.backendPluginInvalid,
+          {},
+          StorageErrorText.backendPluginInvalid
+        )
+      nativeContexts = contexts
+    }
+  }) as IStoragePluginHost
 }
 
 /** Internal facade state used to enforce one in-flight storage batch. */
@@ -157,7 +194,7 @@ export class StorageHostFacade<
   TReactiveIds extends keyof TStores & string = never
 > {
   /** Canonical PluginHost owns lifecycle and eventual mutation queue semantics. */
-  readonly #inner: StoragePluginHost
+  readonly #inner: IStoragePluginHost
   /** Registry is swapped only after the complete inner batch has committed. */
   #registry: IStorageRegistry = new Map()
   /** Native PluginHost extension projection published only with the matching Store registry. */
@@ -213,7 +250,7 @@ export class StorageHostFacade<
         // Reporter failure is containment-only and cannot replace an install/dispose primary.
       }
     }
-    this.#inner = new StoragePluginHost({
+    this.#inner = createStoragePluginHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       scheduler: this.#scheduler,
       diagnostic: (_message) => {}
@@ -409,7 +446,10 @@ export class StorageHostFacade<
         ...(servicePlugin === undefined ? [] : [servicePlugin]),
         ...adapters
       ]
-      this.#inner.setNativeContexts(entries.map((_, index) => nativeContexts.get(index)))
+      this.#inner.setNativeContexts(
+        entries.map((_, index) => nativeContexts.get(index)),
+        entries.length
+      )
       const innerView = await this.#inner.use(
         ...(materialized as IPluginConstraint<IStorageHostCore>[])
       )

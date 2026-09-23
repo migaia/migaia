@@ -1,5 +1,6 @@
 import { invokeCaptured } from './invocation.js'
-import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, { createPluginHostTypeError, PluginHostError } from './error-text.js'
+import { PluginHostErrorCode } from './error-code.js'
 import { readDefinedFeature, snapshotFeatureRecord } from './define-feature.js'
 import type { IFeature, IFeatureInspection, IFeatureRecord } from './feature-types.js'
 import { buildCapabilityTopology } from '@migaia/capability/graph/topology'
@@ -20,8 +21,7 @@ export const compileFeatures = (roots: Readonly<Record<string, object>>): IFeatu
   for (let index = 0; index < pending.length; index += 1) {
     const feature = pending[index]!
     if (identifiers.has(feature)) continue
-    const definition = readDefinedFeature(feature)
-    if (!definition) throw createPluginHostTypeError(ERROR_TEXT.FEATURE_DEPENDENCIES_DEFINED)
+    const definition = readDefinedFeature(feature)!
     const identifier = `feature-${identifiers.size}`
     identifiers.set(feature, identifier)
     dependencies.set(feature, definition.dependencies)
@@ -82,7 +82,8 @@ export const snapshotFeatureExpose = (value: object, isValid: () => boolean): ob
       throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_FEATURE_EXPOSE_DATA)
     Object.defineProperty(snapshot, key, {
       value: (...args: unknown[]) => {
-        if (!isValid()) throw createPluginHostTypeError(ERROR_TEXT.HOST_DISPOSED)
+        if (!isValid())
+          throw new PluginHostError(PluginHostErrorCode.viewRevoked, ERROR_TEXT.VIEW_REVOKED)
         return invokeCaptured(descriptor.value as Function, value, args)
       },
       enumerable: true,
@@ -109,8 +110,7 @@ export const instantiateFeatures = (
   }
   const outputs = new Map<object, object>()
   for (const feature of plan.ordered) {
-    const definition = readDefinedFeature(feature)
-    if (!definition) throw createPluginHostTypeError(ERROR_TEXT.FEATURE_DEPENDENCIES_DEFINED)
+    const definition = readDefinedFeature(feature)!
     const dependencies: Record<string, object> = Object.create(null)
     for (const [name, dependency] of Object.entries(plan.dependencies.get(feature) ?? {}))
       dependencies[name] = outputs.get(dependency)!
@@ -134,7 +134,9 @@ export const instantiateFeatures = (
         void assimilateCapturedThen(thenable.thenFn, output).catch((error) => {
           try {
             Object.defineProperty(rejection, 'cause', { value: error })
-          } catch {}
+          } catch (attachFailure) {
+            reportRejection(ERROR_TEXT.CAUSE_ATTACH_FAILED(String(attachFailure)))
+          }
           reportRejection(error)
         })
       throw rejection

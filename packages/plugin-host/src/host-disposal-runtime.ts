@@ -42,12 +42,6 @@ export class PluginHostDisposalRuntime<TRegistration> {
   /** Starts logical terminal transition once and returns its stable physical result promise. */
   dispose(): Promise<IPluginHostDisposalResult> {
     if (this.#promise) return this.#promise
-    if (this.#port.terminal.lifecycle !== 'open')
-      return Promise.resolve({
-        logicalTerminal: true,
-        cleanupComplete: true,
-        cleanupErrors: Object.freeze([])
-      })
     this.#port.terminal.close()
     this.#port.resetCleanupAbandoned()
     this.#port.pipelineLeases.seal(this.#port.pipelineKey)

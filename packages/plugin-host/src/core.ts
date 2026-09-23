@@ -12,7 +12,6 @@ import type {
   IPipelineMode,
   ISyncPipelineStage
 } from './typing.js'
-import { readonlyConfig } from './config.js'
 import {
   adaptSyncStageToAsync,
   adaptSyncStageToAsyncGenerator,
@@ -72,7 +71,7 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
   define('config', {
     get: <T extends IPluginConfig = IPluginConfig>() => {
       context.assertRegistrationValid()
-      return readonlyConfig(context.registration.config) as IReadonlyConfig<T>
+      return context.registration.config as IReadonlyConfig<T>
     }
   })
   Object.defineProperty(facade, 'operation', {

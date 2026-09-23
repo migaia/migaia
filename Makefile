@@ -23,7 +23,8 @@ PUBLISH_TARGETS := $(addsuffix -publish,$(PUBLISHABLE_PACKAGES))
 	ship-ci ship-cd \
 	store-ship store-ship-dry-run store-ship-preflight store-ship-ci store-ship-pack-check \
 	store-ship-cd store-release-plan-check \
-	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish
+	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish \
+	coverage-custody-report
 
 # Ship has one visible direction: prove the whole plan, prove every package,
 # then enter the irreversible release loop. No package is versioned before all
@@ -55,6 +56,10 @@ dependencies-check:
 	@test -x node_modules/.bin/oxlint || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 	@test -x node_modules/.bin/tsc || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 	@test -x node_modules/.bin/vitest || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
+
+# Reports current custody against its installed baseline; baseline replacement stays an explicit command.
+coverage-custody-report:
+	@node scripts/coverage-custody.mjs
 
 ship-ci:
 	@set -eu; \

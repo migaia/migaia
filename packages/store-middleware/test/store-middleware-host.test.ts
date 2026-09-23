@@ -26,7 +26,7 @@ function makeRuntime() {
   return { runtime, errors }
 }
 
-describe('StoreMiddlewareHost construction', () => {
+describe('IStoreMiddlewareHost construction', () => {
   it('rejects an invalid DevTools adapter before plugin installation', async () => {
     const { runtime } = makeRuntime()
     const host = createStoreMiddlewareHost({
@@ -139,7 +139,7 @@ it('snapshots accessor-backed host options before construction reuses them', asy
   await host.dispose()
 })
 
-describe('StoreMiddlewareHost.emit', () => {
+describe('IStoreMiddlewareHost.emit', () => {
   it('reports a trace-listener error when a pipeline stage never calls next()', async () => {
     const { runtime, errors } = makeRuntime()
     const host = createStoreMiddlewareHost<IState>({
@@ -218,7 +218,7 @@ describe('StoreMiddlewareHost.emit', () => {
   })
 })
 
-describe('StoreMiddlewareHost.runAction', () => {
+describe('IStoreMiddlewareHost.runAction', () => {
   it('dispatches action:start then action:end with a numeric durationMs, and returns fn result', async () => {
     const { runtime } = makeRuntime()
     const host = createStoreMiddlewareHost<IState>({
@@ -295,7 +295,7 @@ describe('StoreMiddlewareHost.runAction', () => {
   })
 })
 
-describe('StoreMiddlewareHost.recordState / recordError', () => {
+describe('IStoreMiddlewareHost.recordState / recordError', () => {
   it('recordState dispatches a "state" event with previous/next verbatim', async () => {
     const { runtime } = makeRuntime()
     const host = createStoreMiddlewareHost<IState>({
@@ -381,7 +381,7 @@ describe('StoreMiddlewareHost.recordState / recordError', () => {
   })
 })
 
-describe('StoreMiddlewareHost.attachBindingDisposer / dispose', () => {
+describe('IStoreMiddlewareHost.attachBindingDisposer / dispose', () => {
   it('is single-flight and replays binding cleanup failure to every caller', async () => {
     const { runtime } = makeRuntime()
     const host = createStoreMiddlewareHost<IState>({
@@ -453,7 +453,7 @@ describe('loggerMiddleware', () => {
   })
 
   it('sync pipeline is flat, not onion: sink() runs (and reads getState()) before any downstream stage executes', async () => {
-    // StoreMiddlewareHost forces pipeline mode 'sync', which the USEGUIDE documents as a flat
+    // IStoreMiddlewareHost forces pipeline mode 'sync', which the USEGUIDE documents as a flat
     // transform pipe: calling next(event) inside a stage only records the value to hand the next
     // stage — it does not synchronously run that next stage. The next stage only runs after the
     // current stage's function fully returns. So loggerMiddleware's sink(), even though it is
@@ -489,7 +489,7 @@ describe('loggerMiddleware', () => {
   })
 })
 
-describe('StoreMiddlewareHost.connectDevTools', () => {
+describe('IStoreMiddlewareHost.connectDevTools', () => {
   it('contains revoked adapter proxies as tagged configuration errors', async () => {
     const { runtime } = makeRuntime()
     const host = createStoreMiddlewareHost<IState>({

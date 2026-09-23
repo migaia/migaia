@@ -1,5 +1,6 @@
 import {
-  PluginHost,
+  defineHost,
+  type IHostHandle,
   PluginHostPipelineMode,
   type IPlugin,
   type IPluginHostOptions
@@ -108,73 +109,121 @@ function snapshotHostOptions<T>(
   }
 }
 
-/** Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 PluginHost 提供。 */
-export class StoreMiddlewareHost<S> extends PluginHost<
+/**
+ * Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 plugin-host 提供。
+ *
+ * 由 `defineHost` 组合而成而不是继承 `PluginHost`：这个壳层真正需要基类的只有一个 domain core 钩子 和一条 dispose
+ * 前置，继承却把宿主的整个表面一并交了出去。句柄只带 Store 自己的成员加宿主的公开面。
+ */
+export type IStoreMiddlewareHost<S> = IHostHandle<
   IStoreMiddlewareCore<S>,
-  IMiddlewareEvent<S>
-> {
-  readonly mutationPolicy: MutationPolicy
-  readonly #runtime: IRuntime
-  readonly #getState: () => S
-  readonly #applyState?: (state: S) => void
-  #reportingError = false
-  #bindingDisposers: IDisposer[] = []
-  /** Stable disposal completion shared by concurrent and repeated callers. */
-  #disposePromise: Promise<IPluginHostDisposalResult> | undefined
+  IMiddlewareEvent<S>,
+  readonly []
+> &
+  Readonly<{
+    readonly mutationPolicy: MutationPolicy
+    emit(event: IMiddlewareEvent<S>): void
+    runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T
+    recordState(
+      name: string,
+      previous: S,
+      next: S,
+      metadata?: Readonly<Record<string, unknown>>
+    ): void
+    recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void
+    connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>
+    attachBindingDisposer(disposer: IDisposer): void
+  }>
 
-  constructor(options: IStoreMiddlewareHostOptions<S>) {
-    super((options = snapshotHostOptions(options)))
-    this.#runtime = options.runtime
-    this.#getState = options.getState
-    this.#applyState = options.applyState
-    this.mutationPolicy = options.mutationPolicy ?? createMutationPolicy('off')
-  }
+export function createStoreMiddlewareHost<S>(
+  options: IStoreMiddlewareHostOptions<S>
+): IStoreMiddlewareHost<S> {
+  const settled = snapshotHostOptions(options)
+  const runtime = settled.runtime
+  const getState = settled.getState
+  const applyState = settled.applyState
+  const mutationPolicy = settled.mutationPolicy ?? createMutationPolicy('off')
+  /** Store 绑定的卸载器；在委托 plugin-host 清理之前按后进先出释放。 */
+  const bindingDisposers: IDisposer[] = []
+  /** 防止 recordError 在上报自身失败时递归。 */
+  let reportingError = false
 
-  protected createPluginDomainCore(): IStoreMiddlewareCore<S> {
-    return {
-      runtime: this.#runtime,
-      getState: () => this.#getState(),
+  const host = defineHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>>({
+    host: settled,
+    domainCore: () => ({
+      runtime,
+      getState: () => getState(),
       applyState: (state) => {
-        if (!this.#applyState)
+        if (!applyState)
           throw createStoreMiddlewareError(
             StoreMiddlewareErrorCode.devtoolsCapability,
             StoreMiddlewareErrorText.applyState
           )
-        this.#applyState(state)
+        applyState(state)
       },
       reportError: (error, phase) =>
-        reportMiddlewareFailure(this.#runtime, error, phase as IRuntimeErrorPhase)
+        reportMiddlewareFailure(runtime, error, phase as IRuntimeErrorPhase)
+    }),
+    // Store 绑定先释放，再委托 plugin-host 清理；`next()` 由句柄保证恰好执行一次。
+    dispose: async (next) => {
+      const errors: unknown[] = []
+      for (const disposer of bindingDisposers.splice(0).reverse()) {
+        try {
+          disposer()
+        } catch (error) {
+          errors.push(error)
+        }
+      }
+      let pluginResult: IPluginHostDisposalResult
+      try {
+        pluginResult = await next()
+      } catch (error) {
+        pluginResult = {
+          logicalTerminal: true,
+          cleanupComplete: false,
+          cleanupErrors: Object.freeze([error])
+        }
+      }
+      return Object.freeze({
+        ...pluginResult,
+        // 同步的绑定失败是已落定的观测，不是未完成的物理清理。
+        cleanupComplete: pluginResult.cleanupComplete,
+        cleanupErrors: Object.freeze([...errors, ...pluginResult.cleanupErrors])
+      })
     }
-  }
+  })
 
-  emit(event: IMiddlewareEvent<S>): void {
+  const emit = (event: IMiddlewareEvent<S>): void => {
     let completed = false
-    this.runPipeline(event, () => {
+    host.runPipeline(event, () => {
       completed = true
     })
-    if (!completed) {
+    if (!completed)
       reportMiddlewareFailure(
-        this.#runtime,
+        runtime,
         createStoreMiddlewareError(
           StoreMiddlewareErrorCode.middlewareNotChained,
           StoreMiddlewareErrorText.missingNext
         ),
         ReactiveErrorPhase.traceListener
       )
-    }
   }
-
-  #emitIsolated(event: IMiddlewareEvent<S>): void {
+  /** 事件发射永不向业务路径抛出；失败经 runtime 上报。 */
+  const emitIsolated = (event: IMiddlewareEvent<S>): void => {
     try {
-      this.emit(event)
+      emit(event)
     } catch (error) {
-      reportMiddlewareFailure(this.#runtime, error, ReactiveErrorPhase.traceListener)
+      reportMiddlewareFailure(runtime, error, ReactiveErrorPhase.traceListener)
     }
   }
 
-  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T {
+  const runAction = <T>(
+    name: string,
+    fn: () => T,
+    metadata?: Readonly<Record<string, unknown>>
+  ): T => {
     const startedAt = globalThis.performance?.now() ?? Date.now()
-    this.#emitIsolated({
+    emitIsolated({
       type: MiddlewareEventType.action,
       phase: MiddlewareEventPhase.start,
       name,
@@ -182,8 +231,8 @@ export class StoreMiddlewareHost<S> extends PluginHost<
       metadata
     })
     try {
-      const result = this.mutationPolicy.runInAction(() => this.#runtime.batch(fn))
-      this.#emitIsolated({
+      const result = mutationPolicy.runInAction(() => runtime.batch(fn))
+      emitIsolated({
         type: MiddlewareEventType.action,
         phase: MiddlewareEventPhase.end,
         name,
@@ -193,7 +242,7 @@ export class StoreMiddlewareHost<S> extends PluginHost<
       })
       return result
     } catch (error) {
-      this.#emitIsolated({
+      emitIsolated({
         type: MiddlewareEventType.action,
         phase: MiddlewareEventPhase.error,
         name,
@@ -206,129 +255,89 @@ export class StoreMiddlewareHost<S> extends PluginHost<
     }
   }
 
-  recordState(
-    name: string,
-    previous: S,
-    next: S,
-    metadata?: Readonly<Record<string, unknown>>
-  ): void {
-    this.#emitIsolated({
-      type: MiddlewareEventType.state,
-      name,
-      timestamp: Date.now(),
-      previous,
-      next,
-      metadata
-    })
-  }
-
-  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void {
-    if (this.#reportingError) {
-      reportMiddlewareFailure(this.#runtime, error, ReactiveErrorPhase.traceListener)
-      return
-    }
-    this.#reportingError = true
-    try {
-      this.#emitIsolated({
-        type: MiddlewareEventType.error,
-        phase,
+  const handle: IStoreMiddlewareHost<S> = Object.freeze({
+    ...host,
+    mutationPolicy,
+    emit,
+    runAction,
+    recordState: (
+      name: string,
+      previous: S,
+      next: S,
+      metadata?: Readonly<Record<string, unknown>>
+    ) => {
+      emitIsolated({
+        type: MiddlewareEventType.state,
+        name,
         timestamp: Date.now(),
-        error,
+        previous,
+        next,
         metadata
       })
-    } finally {
-      this.#reportingError = false
-    }
-  }
-
-  async connectDevTools(adapter: IDevToolsAdapter<S>, name = 'store-devtools'): Promise<void> {
-    try {
-      if (
-        adapter === null ||
-        typeof adapter !== 'object' ||
-        typeof adapter.init !== 'function' ||
-        typeof adapter.send !== 'function' ||
-        (adapter.subscribe !== undefined && typeof adapter.subscribe !== 'function')
-      ) {
+    },
+    recordError: (phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>) => {
+      if (reportingError) {
+        reportMiddlewareFailure(runtime, error, ReactiveErrorPhase.traceListener)
+        return
+      }
+      reportingError = true
+      try {
+        emitIsolated({
+          type: MiddlewareEventType.error,
+          phase,
+          timestamp: Date.now(),
+          error,
+          metadata
+        })
+      } finally {
+        reportingError = false
+      }
+    },
+    connectDevTools: async (adapter: IDevToolsAdapter<S>, name = 'store-devtools') => {
+      try {
+        if (
+          adapter === null ||
+          typeof adapter !== 'object' ||
+          typeof adapter.init !== 'function' ||
+          typeof adapter.send !== 'function' ||
+          (adapter.subscribe !== undefined && typeof adapter.subscribe !== 'function')
+        )
+          throw createStoreMiddlewareError(
+            StoreMiddlewareErrorCode.invalidOption,
+            StoreMiddlewareErrorText.adapterInvalid
+          )
+      } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error) throw error
         throw createStoreMiddlewareError(
           StoreMiddlewareErrorCode.invalidOption,
-          StoreMiddlewareErrorText.adapterInvalid
+          StoreMiddlewareErrorText.adapterInvalid,
+          { cause: error }
         )
       }
-    } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) throw error
-      throw createStoreMiddlewareError(
-        StoreMiddlewareErrorCode.invalidOption,
-        StoreMiddlewareErrorText.adapterInvalid,
-        { cause: error }
-      )
-    }
-    const plugin: IStoreMiddlewarePlugin<S> = {
-      name,
-      install: (core) => {
-        adapter.init(core.getState())
-        core.usePipeline((event, next) => {
-          next(event)
-          adapter.send(event, core.getState())
-        })
-        core.onDispose(
-          adapter.subscribe?.((command) => {
-            if (command.type === 'commit') {
-              adapter.init(core.getState())
-            } else {
-              this.runAction(`devtools:${command.type}`, () => core.applyState(command.state))
-            }
-          }) ?? (() => undefined)
-        )
-        return {}
+      const plugin: IStoreMiddlewarePlugin<S> = {
+        name,
+        install: (core) => {
+          adapter.init(core.getState())
+          core.usePipeline((event, next) => {
+            next(event)
+            adapter.send(event, core.getState())
+          })
+          core.onDispose(
+            adapter.subscribe?.((command) => {
+              if (command.type === 'commit') adapter.init(core.getState())
+              else runAction(`devtools:${command.type}`, () => core.applyState(command.state))
+            }) ?? (() => undefined)
+          )
+          return {}
+        }
       }
+      await host.use(plugin as never)
+    },
+    attachBindingDisposer: (disposer: IDisposer) => {
+      bindingDisposers.push(disposer)
     }
-    await this.use(plugin)
-  }
-
-  attachBindingDisposer(disposer: IDisposer): void {
-    this.#bindingDisposers.push(disposer)
-  }
-
-  override dispose(): Promise<IPluginHostDisposalResult> {
-    this.#disposePromise ??= this.#disposeOnce()
-    return this.#disposePromise
-  }
-
-  /** Releases Store bindings before delegating to PluginHost cleanup. */
-  async #disposeOnce(): Promise<IPluginHostDisposalResult> {
-    const errors: unknown[] = []
-    for (const disposer of this.#bindingDisposers.splice(0).reverse()) {
-      try {
-        disposer()
-      } catch (error) {
-        errors.push(error)
-      }
-    }
-    let pluginResult: IPluginHostDisposalResult
-    try {
-      pluginResult = await super.dispose()
-    } catch (error) {
-      pluginResult = {
-        logicalTerminal: true,
-        cleanupComplete: false,
-        cleanupErrors: Object.freeze([error])
-      }
-    }
-    const cleanupErrors = Object.freeze([...errors, ...pluginResult.cleanupErrors])
-    return Object.freeze({
-      ...pluginResult,
-      // Synchronous binding failures are settled observations, not unfinished physical cleanup.
-      cleanupComplete: pluginResult.cleanupComplete,
-      cleanupErrors
-    })
-  }
-}
-
-export function createStoreMiddlewareHost<S>(
-  options: IStoreMiddlewareHostOptions<S>
-): StoreMiddlewareHost<S> {
-  return new StoreMiddlewareHost(options)
+  }) as IStoreMiddlewareHost<S>
+  return handle
 }
 
 export function middlewarePlugin<S>(
@@ -376,7 +385,7 @@ export type IStoreMiddlewareBindingOptions = {
   readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>
 }
 
-export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<
+export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<
   Record<string, unknown>
 > & {
   readonly store: IReactiveStore<S>
@@ -388,11 +397,11 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
 ): IStoreMiddlewareBinding<S> {
   const clone = options.clone ?? ((state) => ClonePolicy.diagnostic(state))
   let previous = clone(store.$plain())
-  const host = new StoreMiddlewareHost<Record<string, unknown>>({
+  const host = createStoreMiddlewareHost<Record<string, unknown>>({
     execution: options.execution,
     runtime: store.$runtime,
     getState: () => clone(store.$plain()),
-    applyState: (state) => store.$hydrate(state),
+    applyState: (state: Record<string, unknown>) => store.$hydrate(state),
     mutationPolicy: options.mutationPolicy
   })
   let unsubscribeStore: IDisposer | undefined
@@ -460,5 +469,6 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
     }
     throw error
   }
-  return Object.assign(host, { store })
+  // 句柄是冻结的，不能被就地扩展；绑定是一个新对象，宿主成员照原样带过来。
+  return Object.freeze({ ...host, store }) as IStoreMiddlewareBinding<S>
 }

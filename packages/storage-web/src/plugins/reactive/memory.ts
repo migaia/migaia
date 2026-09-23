@@ -1,5 +1,6 @@
 import { memoryStorageHost } from '../../backends/memory.js'
-import { defineBuiltInReactivePlugin, defineNativeReactiveFeature } from '../../host/contracts.js'
+import { defineNativeReactiveFeature } from '../../host/contracts.js'
+import { createBuiltInBackendPlugin } from '../builtin-factory.js'
 import {
   memoryBackendKind,
   type IBuiltInPluginId,
@@ -14,21 +15,14 @@ const memoryReactiveFeature = defineNativeReactiveFeature(
 )
 
 /** Creates the canonical memory reactive fast-path plugin with exact store identity. */
-export function memoryReactive<const TId extends string = 'memory'>(
-  options: IBuiltInPluginId<TId> = {}
-): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true> {
-  const id = (options.id ?? 'memory') as TId
-  return defineBuiltInReactivePlugin(
-    memoryBackendKind,
-    id,
-    (core) => ({
-      install: () => {
-        core.registerStore(memoryStorageHost())
-        return {}
-      }
-    }),
-    { reactive: memoryReactiveFeature }
-  )
-}
-
-Object.defineProperty(memoryReactive, 'name', { value: 'memoryReactive' })
+export const memoryReactive = {
+  memoryReactive: <const TId extends string = 'memory'>(
+    options: IBuiltInPluginId<TId> = {}
+  ): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true> =>
+    createBuiltInBackendPlugin(
+      memoryBackendKind,
+      (options.id ?? 'memory') as TId,
+      () => memoryStorageHost(),
+      { reactive: memoryReactiveFeature }
+    )
+}.memoryReactive

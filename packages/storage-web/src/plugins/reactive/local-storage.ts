@@ -1,5 +1,6 @@
 import { localStorageHost, type ILocalStorageOptions } from '../../backends/local-storage.js'
-import { defineBuiltInReactivePlugin, defineNativeReactiveFeature } from '../../host/contracts.js'
+import { defineNativeReactiveFeature } from '../../host/contracts.js'
+import { createBuiltInBackendPlugin } from '../builtin-factory.js'
 import {
   localStorageBackendKind,
   type IBuiltInPluginId,
@@ -17,20 +18,14 @@ const localStorageReactiveFeature = defineNativeReactiveFeature(
 )
 
 /** Creates the canonical localStorageHost reactive fast-path plugin. */
-export function localStorageReactive<const TId extends string = 'local'>(
-  options: ILocalStorageOptions & IBuiltInPluginId<TId> = {}
-): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true> {
-  return defineBuiltInReactivePlugin(
-    localStorageBackendKind,
-    (options.id ?? 'local') as TId,
-    (core) => ({
-      install: () => {
-        core.registerStore(localStorageHost(options))
-        return {}
-      }
-    }),
-    { reactive: localStorageReactiveFeature }
-  )
-}
-
-Object.defineProperty(localStorageReactive, 'name', { value: 'localStorageReactive' })
+export const localStorageReactive = {
+  localStorageReactive: <const TId extends string = 'local'>(
+    options: ILocalStorageOptions & IBuiltInPluginId<TId> = {}
+  ): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true> =>
+    createBuiltInBackendPlugin(
+      localStorageBackendKind,
+      (options.id ?? 'local') as TId,
+      () => localStorageHost(options),
+      { reactive: localStorageReactiveFeature }
+    )
+}.localStorageReactive

@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { PluginHost } from '../src/host-runtime'
 import { PluginHostError } from '../src/error-text'
+import { PluginHostErrorCode } from '../src/error-code'
 import {
   defineFeature,
   definePlugin,
@@ -21,6 +22,8 @@ import {
   GENERATOR_UNDEFINED as hostUndefined
 } from '../src/typing'
 import { runAsyncPipeline } from '../src/pipeline.js'
+import { PluginHostRemovalRuntime } from '../src/removal-runtime.js'
+import { createManualScheduler } from '@migaia/lifecycle'
 
 type IExt = { marker?: string } & Pick<
   IPluginHostCore<number>,
@@ -69,6 +72,24 @@ const plugin = (
   install: (core: IExt) => unknown,
   extra: Record<string, unknown> = {}
 ) => ({ name, install, ...extra }) as never
+
+/** Moved from round30.test.ts (BZ05): overrides disposal error translation for PH-R41. */
+class TranslatingHost extends PluginHost<Record<string, never>> {
+  readonly translations = vi.fn()
+
+  /** Supplies an explicit unbounded test policy while preserving test overrides. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+
+  protected override translateDisposalError(error: PluginHostError): Error {
+    this.translations(error)
+    return new Error('translated disposal', { cause: error })
+  }
+}
 
 describe('PluginHost', () => {
   it('YS23: keeps object extension members named install and expose while rejecting the legacy function sentinel', async () => {
@@ -667,7 +688,9 @@ describe('PluginHost', () => {
     )
     await host.unUse('dispose-shared')
     expect(observed).toBeUndefined()
-    expect(host.getShared('handle')).toBeUndefined()
+    expect(() => host.getShared('handle')).toThrowError(
+      expect.objectContaining({ code: PluginHostErrorCode.prerequisiteRemoved })
+    )
   })
 
   it('rejects pipeline and resource registration during update', async () => {
@@ -848,13 +871,8 @@ describe('PluginHost', () => {
     expect(() => host.use({ name: 'invalid-hook', install: 1 } as never)).toThrow(TypeError)
   })
 
-  it('rejects symbol config keys but preserves symbol shared keys', async () => {
+  it('preserves symbol shared keys', async () => {
     const host = new Host()
-    const configKey = Symbol('config')
-    const config = { enabled: true } as Record<PropertyKey, unknown>
-    Object.defineProperty(config, configKey, { value: 1, enumerable: true })
-    expect(() => host.use(plugin('symbol-config', () => ({}), { config }))).toThrow(TypeError)
-
     const sharedKey = Symbol('shared')
     await host.use(
       plugin('symbol-shared', () => ({}), {
@@ -997,13 +1015,13 @@ describe('PluginHost', () => {
     expect(host.config.get('cow.options.retries')).toBe(3)
     expect(() => {
       ;(host.config.get('cow.options') as { retries: number }).retries = 4
-    }).toThrow(/readonly/)
+    }).toThrow(TypeError)
 
     const patch = { options: { retries: 5 } }
     await host.config.update('cow', (previous) => {
       expect(() => {
         ;(previous.options as { retries: number }).retries = 4
-      }).toThrow(/readonly/)
+      }).toThrow(TypeError)
       return patch
     })
     const updated = host.config.get('cow.options') as { retries: number }
@@ -1076,6 +1094,218 @@ describe('PluginHost', () => {
       removed: true,
       error: { code: 'PLUGIN_DISPOSE_FAILED' }
     })
+  })
+
+  it('revoked extension closure rejects a callable captured before unUse', async () => {
+    const host = new Host()
+    const view = await host.use(plugin('revoked-closure', () => ({ read: () => 7 })))
+    const read = (view.extensions as { read: () => number }).read
+    expect(read()).toBe(7)
+    await host.unUse('revoked-closure')
+    expect(() => read()).toThrow(expect.objectContaining({ code: 'VIEW_REVOKED' }))
+  })
+
+  it('feature expose invalidation revokes a captured Feature output immediately after unUse', async () => {
+    const feature = defineFeature<{ readonly read: () => number }>((core) => ({
+      read: core.featureExpose.read as () => number
+    }))
+    let output!: { readonly read: () => number }
+    const host = new FeatureHost()
+    await host.use(
+      definePlugin(
+        'feature-invalidation',
+        (core) => {
+          return {
+            featureExpose: () => ({ read: () => 7 }),
+            install: () => {
+              output = core.features.feature as { readonly read: () => number }
+              return {}
+            }
+          }
+        },
+        { feature }
+      )
+    )
+    expect(output.read()).toBe(7)
+    await host.unUse('feature-invalidation')
+    expect(() => output.read()).toThrow(
+      expect.objectContaining({
+        code: 'VIEW_REVOKED',
+        message: expect.stringContaining('plugin-host view has been revoked')
+      })
+    )
+  })
+
+  it('feature expose invalidation is synchronous even when pending drain never settles', () => {
+    /** A stalled drain distinguishes revocation from a later microtask. */
+    const registration: any = {
+      name: 'pending-feature',
+      shared: [],
+      extensions: [],
+      pipelineDisposers: [],
+      pipelineOwnerKey: {},
+      installed: true,
+      lifecycle: 'install',
+      featureExposeValid: true,
+      featurePending: { drain: () => new Promise<void>(() => undefined) }
+    }
+    const runtime = new PluginHostRemovalRuntime({
+      host: {},
+      registrations: new Map([[registration.name, registration]]),
+      shared: new Map(),
+      retiredShared: new Map(),
+      extensionOwners: new Map(),
+      pipelineLeases: { seal: () => undefined } as any,
+      pipelineOwnerKeys: new Map([[registration.name, registration.pipelineOwnerKey]]),
+      stageSlots: new Map(),
+      removePipelineOwner: () => undefined,
+      executionSignal: {} as any,
+      cleanupRuntime: {} as any,
+      setHookRegistration: () => undefined
+    })
+    runtime.revokeRegistration(registration)
+    expect(registration.featureExposeValid).toBe(false)
+  })
+
+  it('YS11 cause chain: captured Feature expose revocation keeps declared code and text', async () => {
+    const feature = defineFeature<{ readonly read: () => number }>((core) => ({
+      read: core.featureExpose.read as () => number
+    }))
+    let output!: { readonly read: () => number }
+    const host = new FeatureHost()
+    await host.use(
+      definePlugin(
+        'feature-revoked-cause-chain',
+        (core) => ({
+          featureExpose: () => ({ read: () => 7 }),
+          install: () => {
+            output = core.features.feature as { readonly read: () => number }
+            return {}
+          }
+        }),
+        { feature }
+      )
+    )
+    await host.unUse('feature-revoked-cause-chain')
+    expect(() => output.read()).toThrow(
+      expect.objectContaining({
+        code: 'VIEW_REVOKED',
+        message: expect.stringContaining('plugin-host view has been revoked')
+      })
+    )
+  })
+
+  it('YS12 thenable install result: async path reports INSTALL_RESULT_THENABLE', async () => {
+    // oxlint-disable-next-line unicorn/no-thenable -- contract requires an own then install result.
+    const thenable = Object.defineProperty({}, 'then', {
+      value: (resolve: (value: unknown) => void) => resolve({})
+    })
+    await expect(
+      new FeatureHost().use(
+        definePlugin('async-install-thenable', () => ({ install: () => thenable as never }))
+      )
+    ).rejects.toMatchObject({ cause: { code: 'INSTALL_RESULT_THENABLE' } })
+  })
+
+  it('YS12 thenable install result: sync path reports INSTALL_RESULT_THENABLE', () => {
+    // oxlint-disable-next-line unicorn/no-thenable -- contract requires an own then install result.
+    const thenable = Object.defineProperty({}, 'then', {
+      value: (resolve: (value: unknown) => void) => resolve({})
+    })
+    const host = new FeatureHost()
+    expect(() =>
+      host.installSync([
+        definePlugin('sync-install-thenable', () => ({ install: () => thenable as never }))
+      ])
+    ).toThrow(
+      expect.objectContaining({
+        cause: expect.objectContaining({ code: 'INSTALL_RESULT_THENABLE' })
+      })
+    )
+  })
+
+  it('feature expose invalidation precedes a never-settling owned resource cleanup timeout', async () => {
+    const feature = defineFeature<{ readonly read: () => number }>((core) => ({
+      read: core.featureExpose.read as () => number
+    }))
+    let output!: { readonly read: () => number }
+    const scheduler = createManualScheduler()
+    let entered!: () => void
+    const enteredGate = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const host = new FeatureHost({ scheduler, disposeStepTimeoutMs: 10 } as any)
+    await host.use(
+      definePlugin(
+        'feature-invalidation-complete',
+        (core) => {
+          return {
+            featureExpose: () => ({ read: () => 7 }),
+            install: () => {
+              output = core.features.feature as { readonly read: () => number }
+              core.onDispose(() => {
+                entered()
+                return new Promise<void>(() => {})
+              })
+              return {}
+            }
+          }
+        },
+        { feature }
+      )
+    )
+    const removal = host.unUse('feature-invalidation-complete')
+    await enteredGate
+    expect(() => output.read()).toThrow(
+      expect.objectContaining({
+        code: 'VIEW_REVOKED',
+        message: expect.stringContaining('plugin-host view has been revoked')
+      })
+    )
+    scheduler.advance(10)
+    await expect(removal).resolves.toMatchObject({ removed: true, cleanupComplete: false })
+  })
+
+  it('stage slot retention keeps exact ordinal and clears registration-owned references', () => {
+    const host = {}
+    const registration: any = {
+      name: 'slot-reclaim',
+      shared: [],
+      extensions: [{ key: 'owned', descriptor: { value: () => undefined } }],
+      pipelineDisposers: [],
+      pipelineOwnerKey: {},
+      installed: true,
+      lifecycle: 'install',
+      featureExpose: {},
+      featureOutputs: {},
+      featureExposeValid: true
+    }
+    const stage = { host, name: registration.name, ordinal: 0n, retired: false }
+    const stageSlots = new Map([[registration.name, stage]])
+    const registrations = new Map([[registration.name, registration]])
+    const extensionOwners = new Map([['owned', registration]])
+    const runtime = new PluginHostRemovalRuntime({
+      host,
+      registrations,
+      shared: new Map(),
+      retiredShared: new Map(),
+      extensionOwners,
+      pipelineLeases: { seal: () => undefined } as any,
+      pipelineOwnerKeys: new Map([[registration.name, registration.pipelineOwnerKey]]),
+      stageSlots,
+      removePipelineOwner: () => undefined,
+      executionSignal: {} as any,
+      cleanupRuntime: {} as any,
+      setHookRegistration: () => undefined
+    })
+    runtime.revokeRegistration(registration)
+    expect(stage.retired).toBe(false)
+    expect(stageSlots.get(registration.name)).toBe(stage)
+    expect(registrations.has(registration.name)).toBe(false)
+    expect(extensionOwners.has('owned')).toBe(false)
+    expect(registration.extensions).toEqual([])
+    expect(registration.featureExpose).toBeUndefined()
+    expect(registration.featureOutputs).toBeUndefined()
   })
 
   it('makes dispose idempotent and rejects terminal mutations', async () => {
@@ -1240,7 +1470,9 @@ describe('PluginHost', () => {
         return true
       }
     })
-    expect(() => host.use(plugin('config-getter', () => ({}), { config }))).toThrow(TypeError)
+    expect(() => host.use(plugin('config-getter', () => ({}), { config }))).toThrow(
+      expect.objectContaining({ code: PluginHostErrorCode.invalidConfigValue })
+    )
     expect(configRead).toBe(false)
     let sharedRead = false
     const shared = {}
@@ -1663,7 +1895,7 @@ describe('PluginHost', () => {
           received = next
           expect(() => {
             next.enabled = 'plugin-local-mutation'
-          }).toThrow(/readonly/)
+          }).toThrow(TypeError)
         }
       })
     )
@@ -1672,62 +1904,6 @@ describe('PluginHost', () => {
       host.config.update('config-snapshot', () => ({ enabled: true }))
     ).resolves.toBeUndefined()
     expect(received).toEqual({ enabled: true })
-  })
-
-  it('preserves nested references without cloning config recursively', async () => {
-    const nested: Record<string, unknown> = { value: 1 }
-    const config: Record<string, unknown> = { nested, alias: nested }
-    config.self = config
-    let observed: Record<string, unknown> | undefined
-    const host = new Host()
-    await host.use(
-      plugin(
-        'cyclic-config',
-        (core) => {
-          observed = (
-            core as unknown as { config: { get: () => Record<string, unknown> } }
-          ).config.get()
-          return {}
-        },
-        { config }
-      )
-    )
-    expect(observed?.self).toBe(observed)
-    expect(observed?.nested).not.toBe(nested)
-    expect(observed?.nested).toBe(observed?.alias)
-  })
-
-  it('does not admit non-enumerable config properties', async () => {
-    const config = {} as Record<string, unknown>
-    Object.defineProperty(config, 'hidden', { value: 1, enumerable: false })
-    let observed: Record<string, unknown> | undefined
-    const host = new Host()
-    await host.use(
-      plugin(
-        'enumerable-config',
-        (core) => {
-          observed = (
-            core as unknown as { config: { get: () => Record<string, unknown> } }
-          ).config.get()
-          return {}
-        },
-        { config }
-      )
-    )
-    expect(observed).not.toHaveProperty('hidden')
-  })
-
-  it('preserves nested config values without inspecting them', async () => {
-    const nested = {}
-    Object.defineProperty(nested, 'value', {
-      configurable: true,
-      enumerable: true,
-      get: () => 1
-    })
-    const host = new Host()
-    await expect(
-      host.use(plugin('nested-config-getter', () => ({}), { config: { nested } }))
-    ).resolves.toMatchObject({ host })
   })
 
   it('applies top-level config patches and preserves undefined keys', async () => {
@@ -1832,7 +2008,9 @@ describe('PluginHost', () => {
     expect(host.getShared('owned')).toBe(shared)
     await host.unUse('owned')
     expect(host.run(1)).toBe(1)
-    expect(host.getShared('owned')).toBeUndefined()
+    expect(() => host.getShared('owned')).toThrowError(
+      expect.objectContaining({ code: PluginHostErrorCode.prerequisiteRemoved })
+    )
     await host.use(owned)
     expect(host.run(1)).toBe(99)
   })
@@ -1851,5 +2029,33 @@ describe('PluginHost', () => {
       'install'
     )
     expect(host.run(1)).toBe(1)
+  })
+})
+
+describe('PH-R41: canonical disposal error transformation', () => {
+  it('preserves the base error identity and transforms only at the sole disposal Promise', async () => {
+    const raw = new Error('round41 disposer')
+    const install = (core: { onDispose: (dispose: () => void) => void }) => {
+      core.onDispose(() => {
+        throw raw
+      })
+      return {}
+    }
+
+    const base = new Host()
+    await base.use({ name: 'round41-base', install } as never)
+    const baseResult = await base.dispose()
+    expect(baseResult.logicalTerminal).toBe(true)
+    expect(baseResult.cleanupComplete).toBe(true)
+    expect((baseResult.cleanupErrors[0] as { readonly cause?: unknown }).cause).toBe(raw)
+
+    const translating = new TranslatingHost()
+    await translating.use({ name: 'round41-translating', install } as never)
+    const first = translating.dispose()
+    expect(translating.dispose()).toBe(first)
+    const translated = await first
+    expect(translating.translations).toHaveBeenCalledTimes(0)
+    expect(translated.cleanupComplete).toBe(true)
+    expect((translated.cleanupErrors[0] as { readonly cause?: unknown }).cause).toBe(raw)
   })
 })

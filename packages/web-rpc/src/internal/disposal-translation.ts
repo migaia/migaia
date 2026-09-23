@@ -1,27 +1,10 @@
-import {
-  PluginHostDisposalNodeKind,
-  PluginHostErrorCode,
-  readPluginHostDisposalProvenance
-} from '@migaia/plugin-host'
-import type { PluginHostError } from '@migaia/plugin-host'
+import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '@migaia/plugin-host'
 import { WebRpcLifecycleError } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
 import type { IWebRpcCleanupError } from '../errors.js'
 
 /** Stable PluginHost cleanup-group label retained in the endpoint diagnostic contract. */
 const HOST_RESOURCE_DISPOSER_LABEL = 'resource disposer'
-const PLUGIN_HOST_SOURCE = '@migaia/plugin-host'
-
-/** Recognizes only the stable PluginHost disposal wrapper, never an arbitrary Error message. */
-const isPluginHostDisposalError = (value: unknown): value is PluginHostError =>
-  Boolean(
-    value &&
-    typeof value === 'object' &&
-    readPluginHostDisposalProvenance(value)?.kind === PluginHostDisposalNodeKind.hostError &&
-    (value as { readonly name?: unknown }).name === 'PluginHostError' &&
-    (value as { readonly source?: unknown }).source === PLUGIN_HOST_SOURCE &&
-    (value as { readonly code?: unknown }).code === PluginHostErrorCode.hostDisposeFailed
-  )
 
 /** Reads an explicit resource record without treating arbitrary error causes as containers. */
 const isCleanupRecord = (
@@ -64,7 +47,6 @@ const findLifecycleError = (
       const lifecycleError = findLifecycleError(child, seen)
       if (lifecycleError) return lifecycleError
     }
-  if (isPluginHostDisposalError(value)) return findLifecycleError(value.cause, seen)
   if (isPluginHostAggregateContainer(value)) return findLifecycleError(value.cause, seen)
   if (isPluginHostResourceWrapper(value)) return findLifecycleError(value.cause, seen)
   return undefined
@@ -93,7 +75,6 @@ const flattenHostCleanupErrors = (
   if (value instanceof AggregateError) {
     return value.errors.flatMap((child) => flattenHostCleanupErrors(child, seen))
   }
-  if (isPluginHostDisposalError(value)) return flattenHostCleanupErrors(value.cause, seen)
   if (isPluginHostAggregateContainer(value)) return flattenHostCleanupErrors(value.cause, seen)
   if (isPluginHostResourceWrapper(value)) return flattenHostCleanupErrors(value.cause, seen)
   return [{ resource: HOST_RESOURCE_DISPOSER_LABEL, error: value }]

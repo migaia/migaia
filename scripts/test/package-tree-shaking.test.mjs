@@ -75,7 +75,9 @@ test('package effect metadata is explicit for each admitted root', () => {
     const manifest = JSON.parse(
       readFileSync(new URL(`../../packages/${packageName}/package.json`, import.meta.url), 'utf8')
     )
-    assert.equal(manifest.sideEffects, false, `${packageName} must declare sideEffects:false`)
+    if (packageName === 'plugin-host')
+      assert.deepEqual(manifest.sideEffects, ['./dist/host-runtime.js'])
+    else assert.equal(manifest.sideEffects, false, `${packageName} must declare sideEffects:false`)
   }
 })
 
@@ -362,7 +364,8 @@ test('root consumer exercises actual packed package matrix', async () => {
   try {
     for (const packageCase of cases) {
       const bare = await buildConsumer(fixture.consumer, `import '${packageCase.name}'`)
-      assert.doesNotMatch(bare.code, new RegExp(packageCase.fullMarker))
+      if (packageCase.name !== '@migaia/plugin-host')
+        assert.doesNotMatch(bare.code, new RegExp(packageCase.fullMarker))
       const minimal = await buildConsumer(
         fixture.consumer,
         `import { ${packageCase.minimal} } from '${packageCase.name}'; export { ${packageCase.minimal} }`
@@ -411,6 +414,13 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
         fixture.consumer,
         `import { ${packageCase.full} } from '@migaia/${packageCase.name}'; export { ${packageCase.full} }`
       )
+      const definition =
+        packageCase.name === 'plugin-host'
+          ? await buildConsumer(
+              fixture.consumer,
+              "import { definePlugin } from '@migaia/plugin-host'; export { definePlugin }"
+            )
+          : undefined
       const b00 = measureConsumer(full)
       const repeatFull = await buildConsumer(
         fixture.consumer,
@@ -421,6 +431,7 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
         bare,
         minimal,
         full,
+        definition,
         repeatFull,
         b00
       })
@@ -443,8 +454,9 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
           }))
         )
       )
-    for (const { packageCase, bare, minimal, repeatFull } of observations) {
-      assert.equal(packageModules(bare, packageCase.name).length, 0)
+    for (const { packageCase, bare, minimal, definition, repeatFull } of observations) {
+      if (packageCase.name !== 'plugin-host')
+        assert.equal(packageModules(bare, packageCase.name).length, 0)
       const minimalModules = packageModules(minimal, packageCase.name)
       assert.ok(minimalModules.length > 0)
       if (packageCase.name === 'plugin-host' || packageCase.name === 'logger')
@@ -463,6 +475,13 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
         const minimalSize = measureConsumer(minimal)
         assert.ok(minimalSize.rawBytes <= b00Ledger[packageCase.name].rawBytes * 0.1)
         assert.ok(minimalSize.gzipBytes <= b00Ledger[packageCase.name].gzipBytes * 0.1)
+        assert.ok(definition)
+        assert.ok(packageModules(definition, packageCase.name).length > 0)
+        assert.ok(
+          packageModules(definition, packageCase.name).every(
+            (module) => !module.endsWith('host-runtime.js')
+          )
+        )
       }
       if (packageCase.name === 'wasm') {
         assert.match(minimal.code, /byte_len_of/)

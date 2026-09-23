@@ -6,14 +6,19 @@ import { invokeCaptured } from './invocation.js'
 import type { IRegistration, ISharedEntry } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import { markRegistrationRevoked } from './composition.js'
+import type { IDataOrderSlotState } from './composition.js'
 import type { IPluginDisposalContext } from './typing.js'
 
 export type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly shared: Map<PropertyKey, ISharedEntry<TDomainCore, TValue>>
+  readonly retiredShared: Map<PropertyKey, string>
   readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
   readonly pipelineLeases: IQuiescenceTracker<object>
   readonly pipelineOwnerKeys: Map<string, object>
+  readonly stageSlots: Map<string, IDataOrderSlotState>
+  readonly removePipelineOwner: (name: string) => void
+  readonly host: object
   readonly executionSignal: IAbortSignal
   readonly cleanupRuntime: PluginHostCleanupRuntime
   readonly setHookRegistration: (
@@ -35,6 +40,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     const errors: unknown[] = []
     markRegistrationRevoked(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.dispose
+    registration.featureExposeValid = false
     for (const detach of [...registration.pipelineDisposers].reverse()) {
       try {
         detach()
@@ -46,9 +52,15 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     this.#port.pipelineLeases.seal(registration.pipelineOwnerKey)
     if (this.#port.pipelineOwnerKeys.get(registration.name) === registration.pipelineOwnerKey)
       this.#port.pipelineOwnerKeys.delete(registration.name)
+    this.#port.removePipelineOwner(registration.name)
     if (this.#port.registrations.get(registration.name) === registration)
       this.#port.registrations.delete(registration.name)
     this.#removeOwnedPublication(registration)
+    // The name-keyed slot retains its ordinal across a same-name reinstall. Composition-issued
+    // tokens remain under their holder's explicit retireDataOrderSlot authority.
+    registration.extensions = []
+    registration.featureExpose = undefined
+    registration.featureOutputs = undefined
     try {
       registration.lifecycleController?.abort(
         new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
@@ -88,7 +100,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     registration.scope?.close()
     this.#removeOwnedPublication(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.idle
-    registration.featureExposeValid = false
+    void registration.featurePending?.drain()
     return errors
   }
 
@@ -98,13 +110,6 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     preserveErrorIdentity = false
   ): Promise<unknown[]> {
     const errors = this.revokeRegistration(registration)
-    errors.push(
-      ...(await this.#port.cleanupRuntime.disposeGroup(
-        registration.pipelineDisposers,
-        'pipeline disposer',
-        preserveErrorIdentity
-      ))
-    )
     const pluginDispose = this.#resolvePluginDispose(registration)
     if (registration.installed && pluginDispose)
       errors.push(
@@ -142,9 +147,6 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     }
     this.#removeOwnedPublication(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.idle
-    void registration.featurePending?.drain().then(() => {
-      registration.featureExposeValid = false
-    })
     return errors
   }
 
@@ -166,7 +168,10 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
   /** Removes shared and extension capabilities still owned by the exact registration. */
   #removeOwnedPublication(registration: IRegistration<TDomainCore, TValue>): void {
     for (const key of registration.shared)
-      if (this.#port.shared.get(key)?.owner === registration) this.#port.shared.delete(key)
+      if (this.#port.shared.get(key)?.owner === registration) {
+        this.#port.shared.delete(key)
+        this.#port.retiredShared.set(key, registration.name)
+      }
     for (const { key } of [...registration.extensions].reverse())
       if (this.#port.extensionOwners.get(key) === registration)
         this.#port.extensionOwners.delete(key)

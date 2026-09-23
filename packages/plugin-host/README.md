@@ -53,8 +53,7 @@ Tray 一次安装多个插件时，先让 PluginHost 完成插件的 `setup`，�
 ## 核心心智模型：五分钟上手
 
 ```ts
-import { definePlugin } from '@migaia/plugin-host/defined'
-import { PluginHost } from '@migaia/plugin-host/structural'
+import { definePlugin, PluginHost } from '@migaia/plugin-host'
 
 // 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能
 type ICore = { emit(value: string): void }
@@ -89,6 +88,12 @@ await host.dispose()
 `definePlugin()` 有两种写法。上面是函数形 `definePlugin(name, descriptorFactory)`：每次安装先同步创建一个 descriptor，再由其 `install`、`expose`、`featureExpose`、`shared` hooks 提供这次安装的能力。需要 `config`、`update`、`dispose` 等长期定义字段时使用保留对象形：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 descriptor 或 `install()`；真正的安装发生在 `host.use(plugin)`。
 
 `PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后返回不可变 view，业务代码从 `view.extensions` 调用这些方法；`view.unUse()` 卸载插件，`host.dispose()` 关闭整个宿主。
+
+### 禁用不是卸载
+
+`host.plugin.disable(name)` 暂时关闭该插件的 extension、Feature expose、pipeline stage 和 shared 能力，返回收缩后的 view 与可精确还原类型的 `token`。`await token.enable()` 恢复原插件与 stage 顺序；按字符串操作时可用 `host.plugin.enable(name)`，当前禁用列表由 `host.plugin.disabled()` 返回。class 宿主与 `defineHost()` handle 使用同一套入口。
+
+禁用保留资源与插件注册，不调用 `dispose` 或资源 disposer。`onDisable`/`onEnable` 只是通知：安装成功后先发一次 `onEnable`，之后每次真实状态切换各发一次；钩子失败只进入诊断，不回滚已提交状态。需要释放资源时调用 `unUse(name)`。被禁用插件拥有的 shared 键抛 `PREREQUISITE_DISABLED`（可启用恢复），卸载后抛 `PREREQUISITE_REMOVED`（需重装），从未发布的键仍返回 `undefined`。
 
 ---
 
@@ -236,8 +241,8 @@ import {
 ```
 
 - **`PluginHostError`**：本包语义化错误的基类，`extends Error`，携带只读 `source`（恒为 `'@migaia/plugin-host'`）、`code: IPluginHostErrorCode`、可选 `detail`（结构化诊断字段，如队列超时的 `owner`/`waitedMs`）。除此之外，插件名/配置路径/pipeline stage/extension/domain core/资源 disposer 等**入参校验失败一律用原生 `TypeError`**（挂 `code: 'INVALID_OPTION'`）表达，不是 `PluginHostError`——判断输入错误用 `error instanceof TypeError`，判断协议/状态错误用 `error instanceof PluginHostError` 或按 `error.code` 分支。
-- **`PluginHostErrorCode`**：32 个稳定错误码常量对象，取值见 [USEGUIDE §9](./USEGUIDE.md#9-错误码完整参考)。
-- 导出的稳定码包括：`HOST_DISPOSED`、`HOST_DISPOSING`、`HOST_CORE_SETUP_FAILED`、`HOST_SETUP_TIMEOUT`、`HOST_SETUP_ABORTED`、`HOST_SETUP_ROLLBACK_FAILED`、`PLUGIN_DUPLICATE`、`PLUGIN_NOT_INSTALLED`、`PLUGIN_INSTALL_FAILED`、`PLUGIN_DISPOSE_FAILED`、`HOST_DISPOSE_FAILED`、`EXTENSION_DUPLICATE`、`EXTENSION_OBJECT_PROTOTYPE`、`EXTENSION_RESERVED`、`SHARED_DUPLICATE`、`RESOURCE_OUTSIDE_INSTALL`、`LIFECYCLE_MUTATION`、`INVALID_PIPELINE_MODE`、`PIPELINE_MODE_MISMATCH`、`PIPELINE_NEXT_DUPLICATE`、`PIPELINE_NEXT_LATE`、`PIPELINE_EXECUTING`、`PIPELINE_FAILED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`MUTATION_QUEUE_TIMEOUT`、`DISPOSE_STEP_TIMEOUT`、`INVALID_OPTION`、`MUTATION_EXECUTION_TIMEOUT`、`VIEW_REVOKED`、`PIPELINE_DRAIN_TIMEOUT`、`CLEANUP_INCOMPLETE`。完整触发条件与处理建议见 [USEGUIDE §9](./USEGUIDE.md#9-错误码完整参考)。
+- **`PluginHostErrorCode`**：33 个稳定错误码常量对象，取值见 [USEGUIDE §9](./USEGUIDE.md#9-错误码完整参考)。
+- 导出的稳定码包括：`HOST_DISPOSED`、`HOST_DISPOSING`、`PLUGIN_DUPLICATE`、`PLUGIN_NOT_INSTALLED`、`PLUGIN_INSTALL_FAILED`、`PLUGIN_DISPOSE_FAILED`、`EXTENSION_DUPLICATE`、`EXTENSION_OBJECT_PROTOTYPE`、`EXTENSION_RESERVED`、`SHARED_DUPLICATE`、`PREREQUISITE_DISABLED`、`PREREQUISITE_REMOVED`、`RESOURCE_OUTSIDE_INSTALL`、`LIFECYCLE_MUTATION`、`INVALID_PIPELINE_MODE`、`PIPELINE_MODE_MISMATCH`、`PIPELINE_NEXT_DUPLICATE`、`PIPELINE_NEXT_LATE`、`PIPELINE_EXECUTING`、`PIPELINE_FAILED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`、`INSTALL_RESULT_THENABLE`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`MUTATION_QUEUE_TIMEOUT`、`DISPOSE_STEP_TIMEOUT`、`INVALID_OPTION`、`INVALID_CONFIG_VALUE`、`CONFIG_CYCLE_REJECTED`、`MUTATION_EXECUTION_TIMEOUT`、`VIEW_REVOKED`、`PIPELINE_DRAIN_TIMEOUT`、`CLEANUP_INCOMPLETE`、`COMPOSITION_TARGET_UNMANAGED`。完整触发条件与处理建议见 [USEGUIDE §9](./USEGUIDE.md#9-错误码完整参考)。
 - **`ERROR_TEXT`**（默认导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。
 - **`PluginHost.setLocale(locale: ILocaleKey)`**：静态方法，`ILocaleKey = 'en' | 'zh'`，切换 `ERROR_TEXT` 与后续抛出错误的默认语言，默认 `'zh'`，全局生效（不是每个 Host 实例独立）。
 - **`PluginHostStatus`**：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。

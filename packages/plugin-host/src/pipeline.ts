@@ -15,7 +15,7 @@ import {
   type IMiddlewarePipelineViolationHandler,
   type ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
-import ERROR_TEXT, { createPluginHostTypeError, tagPluginHostError } from './error-text.js'
+import ERROR_TEXT, { tagPluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type {
   IAsyncGeneratorPipelineStage,
@@ -74,6 +74,19 @@ export const adaptSyncStageToAsyncGenerator = <TValue>(
     stage as ISyncMiddlewareStage<TValue>,
     onViolation
   ) as IAsyncGeneratorPipelineStage<TValue>
+
+/** Promotes one Host-owned synchronous stage to the Host's selected execution algebra. */
+export const adaptSyncStageForMode = <TValue>(
+  stage: ISyncPipelineStage<TValue>,
+  mode: IPipelineMode,
+  onViolation: IMiddlewarePipelineViolationHandler
+): Function => {
+  if (mode === PluginHostPipelineMode.sync) return stage
+  if (mode === PluginHostPipelineMode.async) return adaptSyncStageToAsync(stage, onViolation)
+  if (mode === PluginHostPipelineMode.generator)
+    return adaptSyncStageToGenerator(stage, onViolation)
+  return adaptSyncStageToAsyncGenerator(stage, onViolation)
+}
 
 export const runSyncPipeline = <TValue>(
   stages: readonly ISyncPipelineStage<TValue>[],
@@ -191,8 +204,6 @@ export const registerStage = <TStage>(
   stage: TStage,
   track: (dispose: () => void) => void
 ): void => {
-  if (typeof stage !== 'function')
-    throw createPluginHostTypeError(ERROR_TEXT.PIPELINE_STAGE_MUST_BE_FUNCTION)
   stages.push(stage)
   const registrationIndex = stages.length - 1
   track(() => {

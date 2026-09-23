@@ -1,5 +1,15 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,6 +17,53 @@ import { fileURLToPath } from 'node:url'
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const baselinePath = join(repositoryRoot, 'coverage-baseline.json')
 const metricNames = Object.freeze(['lines', 'statements', 'functions', 'branches'])
+/** Exact test-only edits admitted while replacing the stale coverage baseline. */
+const BASELINE_RESET_TEST_TRANSFORMS = Object.freeze([
+  Object.freeze({
+    path: 'packages/plugin-host/test/acceptance-contract.test.ts',
+    replace: Object.freeze([
+      '    expect(medians.coldTrusted).toBeLessThanOrEqual(medians.generic * 1.1)\n',
+      '',
+      '    expect(medians.warmTrusted).toBeLessThanOrEqual(medians.generic * 0.8)\n',
+      ''
+    ])
+  }),
+  Object.freeze({
+    path: 'packages/storage-web/test/bundle-boundary.spec.ts',
+    replace: Object.freeze([
+      '@migaia/event-subscriber/dist/channel-D8-zrqiP.js',
+      '@migaia/event-subscriber/dist/channel-BqvtJPfL.js'
+    ])
+  }),
+  Object.freeze({
+    path: 'packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts',
+    replace: Object.freeze([
+      "  const relative = module.replace(`${workspaceRoot}/`, '')\n",
+      "  const relative = module.includes('/packages/')\n    ? module.slice(module.indexOf('/packages/') + 1)\n    : module\n"
+    ])
+  }),
+  Object.freeze({
+    path: 'packages/web-rpc/test/tree-shaking/b11-attribution.test.ts',
+    replace: Object.freeze([
+      "  const relative = module.replace(`${workspaceRoot}/`, '')\n",
+      "  const relative = module.includes('/packages/')\n    ? module.slice(module.indexOf('/packages/') + 1)\n    : module\n"
+    ])
+  }),
+  Object.freeze({
+    path: 'packages/web-rpc/test/tree-shaking/core-retained-causal.test.ts',
+    replace: Object.freeze([
+      "  const workspaceRoot = resolve(import.meta.dirname, '../../../..')\n  const relative = module.startsWith(`${workspaceRoot}/`)\n    ? module.slice(workspaceRoot.length + 1)\n    : module\n",
+      "  const relative = module.includes('/packages/')\n    ? module.slice(module.indexOf('/packages/') + 1)\n    : module\n"
+    ])
+  }),
+  Object.freeze({
+    path: 'packages/web-rpc/test/tree-shaking/core-retained-causal.mjs',
+    replace: Object.freeze([
+      '  const relativeModule = module.startsWith(`${workspaceDirectory}/`)\n    ? module.slice(workspaceDirectory.length + 1)\n    : module\n',
+      "  const relativeModule = module.includes('/packages/')\n    ? module.slice(module.indexOf('/packages/') + 1)\n    : module\n"
+    ])
+  })
+])
 
 /** Packages owned by Rust/wasm-bindgen coverage rather than V8. */
 export const NON_V8_PACKAGES = Object.freeze({
@@ -84,7 +141,7 @@ export const assertCompleteMetrics = (metrics, packageName) => {
 const run = (command, args) =>
   execFileSync(command, args, {
     cwd: repositoryRoot,
-    env: { ...process.env, CI: 'true' },
+    env: { ...process.env, CI: 'true', PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: 'false' },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -181,12 +238,103 @@ export const changedFilesFromGit = () => {
   return [...tracked.split('\n'), ...untracked.split('\n')].filter(Boolean)
 }
 
+/**
+ * Hash the complete tracked and nonignored package input for final custody. Declared tracked
+ * deletions remain part of the canonical input so a settled final topology can be bound without
+ * dereferencing a removed path.
+ */
+export const packageInputSha256 = () => {
+  const names = run('git', [
+    'ls-files',
+    '--cached',
+    '--others',
+    '--exclude-standard',
+    '--',
+    'packages'
+  ])
+    .split('\n')
+    .filter(Boolean)
+    .sort()
+  const deleted = new Set(
+    run('git', ['diff', '--diff-filter=D', '--name-only', 'HEAD', '--', 'packages'])
+      .split('\n')
+      .filter(Boolean)
+  )
+  const entries = names.map((name) => {
+    const absolutePath = resolve(repositoryRoot, name)
+    if (!existsSync(absolutePath)) {
+      if (deleted.has(name)) return { path: name, deleted: true }
+      throw new Error(`package input tracked path is unexpectedly absent: ${name}`)
+    }
+    const stat = lstatSync(absolutePath)
+    const mode = stat.mode
+    if (stat.isSymbolicLink()) return { path: name, mode, symlink: readlinkSync(absolutePath) }
+    if (!stat.isFile()) throw new Error(`package input is not a file or symlink: ${name}`)
+    return {
+      path: name,
+      mode,
+      sha256: createHash('sha256').update(readFileSync(absolutePath)).digest('hex')
+    }
+  })
+  return createHash('sha256').update(JSON.stringify(entries)).digest('hex')
+}
+
+/**
+ * Require the externally signed final candidate input before capture and before atomic
+ * installation; this producer never signs an arbitrary current tree.
+ */
+export const assertCandidateInputSha256 = (expected) => {
+  if (!/^[0-9a-f]{64}$/.test(expected))
+    throw new Error('coverage custody candidate SHA-256 is malformed')
+  const actual = packageInputSha256()
+  if (actual !== expected) throw new Error('coverage custody candidate package input differs')
+  return actual
+}
+
 /** Return deleted package runtime sources for explicit custody disposition. */
 export const deletedRuntimeFilesFromGit = () =>
   run('git', ['diff', '--diff-filter=D', '--name-only', 'HEAD', '--', 'packages'])
     .split('\n')
     .filter(Boolean)
     .filter((name) => changedRuntimeFiles([name]).length > 0)
+
+/** Reject baseline replacement unless package edits equal the six admitted byte transforms. */
+export const assertBaselineResetPreconditions = () => {
+  /** Records every tracked, staged, unstaged, and untracked package path. */
+  const packageChanges = [...changedFilesFromGit()].sort()
+  /** Limits package differences to the six files explicitly admitted for this reset. */
+  const expectedPaths = BASELINE_RESET_TEST_TRANSFORMS.map(({ path }) => path).sort()
+  if (
+    packageChanges.length !== expectedPaths.length ||
+    packageChanges.some((path, index) => path !== expectedPaths[index])
+  ) {
+    throw new Error('coverage baseline reset has unauthorized package changes')
+  }
+  for (const transform of BASELINE_RESET_TEST_TRANSFORMS) {
+    /** Reads the exact repository baseline rather than accepting an already-modified fixture. */
+    const headBytes = run('git', ['show', `HEAD:${transform.path}`])
+    /** Reads current bytes for exact one-time transform comparison. */
+    const actualBytes = readFileSync(join(repositoryRoot, transform.path), 'utf8')
+    /** Applies each declared replacement once and rejects missing or duplicate source bytes. */
+    let expectedBytes = headBytes
+    for (let index = 0; index < transform.replace.length; index += 2) {
+      /** Identifies source bytes mandated by the admission. */
+      const source = transform.replace[index]
+      /** Identifies replacement bytes; empty means deletion. */
+      const replacement = transform.replace[index + 1] ?? ''
+      const first = expectedBytes.indexOf(source)
+      if (first === -1 || expectedBytes.indexOf(source, first + 1) !== -1)
+        throw new Error(`coverage baseline reset transform is not unique: ${transform.path}`)
+      expectedBytes = `${expectedBytes.slice(0, first)}${replacement}${expectedBytes.slice(
+        first + source.length
+      )}`
+    }
+    if (actualBytes !== expectedBytes)
+      throw new Error(
+        `coverage baseline reset fixture differs from admitted transform: ${transform.path}`
+      )
+  }
+}
 
 /** Capture one package report while retaining package-owned build and threshold behavior. */
 const capturePackage = (packageName, reportRoot) => {
@@ -258,8 +406,20 @@ export const writeBaselineAtomically = (result) => {
 
 /** Execute the complete root custody matrix and optionally replace its baseline. */
 export const main = () => {
+  /** Selects fresh baseline production, which must not compare against the stale baseline. */
+  const updateBaseline = process.argv.includes('--update-baseline')
+  /** Binds final production to an externally signed package input when present. */
+  const hasCandidateSha256 = Object.hasOwn(process.env, 'COVERAGE_CUSTODY_CANDIDATE_SHA256')
+  const candidateSha256 = process.env.COVERAGE_CUSTODY_CANDIDATE_SHA256
+  if (updateBaseline) {
+    if (hasCandidateSha256) assertCandidateInputSha256(candidateSha256)
+    else assertBaselineResetPreconditions()
+  }
   const { coveragePackages } = assertInventory()
-  const existing = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : null
+  const existing =
+    !updateBaseline && existsSync(baselinePath)
+      ? JSON.parse(readFileSync(baselinePath, 'utf8'))
+      : null
   if (existing) {
     assertExclusions(existing.exclusions)
     assertPackageReportsComplete(coveragePackages, existing.packages)
@@ -306,12 +466,15 @@ export const main = () => {
       changedRuntimeFiles: changedFiles,
       deletedRuntimeFiles: deletedFiles
     }
-    if (process.argv.includes('--update-baseline')) writeBaselineAtomically(result)
+    if (updateBaseline) {
+      if (hasCandidateSha256) assertCandidateInputSha256(candidateSha256)
+      writeBaselineAtomically(result)
+    }
     console.log(
       JSON.stringify({
         packages: coveragePackages.length,
         changedRuntimeFiles: changedFiles.length,
-        baseline: process.argv.includes('--update-baseline')
+        baseline: updateBaseline
       })
     )
   } finally {

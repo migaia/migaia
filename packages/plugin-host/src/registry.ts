@@ -18,6 +18,8 @@ export type IPluginDefinition<TCore> = {
   readonly config: IPluginConfig
   readonly install: IPluginConstraint<TCore>['install']
   readonly update?: IPluginConstraint<TCore>['update']
+  readonly onEnable?: IPluginConstraint<TCore>['onEnable']
+  readonly onDisable?: IPluginConstraint<TCore>['onDisable']
   readonly dispose?: IPluginConstraint<TCore>['dispose']
   readonly shared?: IPluginConstraint<TCore>['shared']
   /** Symbol disposer captured with the plugin admission snapshot; never re-probe owner at cleanup. */
@@ -55,6 +57,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   >
   shared: PropertyKey[]
   installed: boolean
+  /** Orthogonal reachability state; disabling never changes lifecycle or releases resources. */
+  enabled: boolean
   lifecycle: (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]
   lifecycleController?: IAbortController
   operation?: IGenerationRequest

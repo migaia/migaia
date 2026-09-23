@@ -176,6 +176,10 @@ export type IPlugin<
       IPluginLifecycleCore<TConfig> &
       Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
   ) => IPluginAwaitable<void>
+  /** Notification fired after installation and each later transition into the enabled state. */
+  onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>
+  /** Notification fired after a transition into the disabled state; it owns no cleanup. */
+  onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>
   dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
@@ -207,6 +211,8 @@ export type IPluginConstraint<
       IPluginLifecycleCore<any> &
       Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
   ) => IPluginAwaitable<void>
+  onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>
+  onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>
   dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
@@ -286,61 +292,6 @@ export type IDefinedPluginConstraint<
     readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue }
   }>
 
-/** Functional setup context supplied only while Core construction is current. */
-export type IHostSetupContext = Readonly<{
-  readonly signal: IAbortSignal
-  readonly deadlineAt: number | undefined
-  onDispose(resource: IPluginResource): void
-}>
-
-/** Public structural view returned by asynchronous setup. */
-export type ISetupHostOptions<
-  TCore extends object,
-  TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[],
-  TValue = never
-> = Readonly<{
-  readonly host: IPluginHostOptions
-  readonly setupTimeoutMs: number | false
-  readonly signal?: IAbortSignal
-  readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>
-  readonly plugins?: TPlugins &
-    IPluginConstraintTuple<NoInfer<TCore> & IPluginHostCore<TValue>, TPlugins>
-}>
-
-/** Structural Host surface exposed by setupHost; concrete runtime class stays private. */
-export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{
-  readonly pipelineMode: IPipelineMode
-  readonly revision: number
-  getShared(key: PropertyKey): unknown
-  getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>, TCore, TValue>
-  use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(
-    ...plugins: TPlugins & IPluginConstraintTuple<TCore & IPluginHostCore<TValue>, TPlugins>
-  ): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins, TCore, TValue>>
-  usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
-  useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
-  useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
-  useAsyncGeneratorPipeline(
-    stage: IAsyncGeneratorPipelineStage<TValue>
-  ): ISetupPluginHost<TCore, TValue>
-  dispose(): Promise<IPluginHostDisposalResult>
-}>
-
-/** Fully active immutable setup publication with explicit and ERM disposal. */
-export type ISetupHostView<
-  THost,
-  _TCore extends object = object,
-  _TValue = never,
-  TPlugins extends readonly IPluginConstraint<any>[] = readonly []
-> = Readonly<{
-  readonly host: THost
-  readonly extensions: Readonly<Record<PropertyKey, unknown>>
-  readonly config: IPluginHostConfigFor<TPlugins>
-  getShared(key: PropertyKey): unknown
-  dispose(): Promise<IPluginHostDisposalResult>
-  [asyncDisposeKey](): Promise<void>
-}> &
-  IPluginHostView<THost, TPlugins, _TCore, _TValue>
-
 export type IExtractPluginExt<TPlugin> =
   TPlugin extends IPlugin<infer _TCore, infer TExt, infer _TConfig, infer _TShared>
     ? TExt
@@ -356,6 +307,71 @@ type IPluginByName<TPlugins extends readonly unknown[], TName extends string> = 
   TPlugins[number],
   { readonly name: TName }
 >
+
+/** Removes every plugin with one name from a compile-time installed tuple. */
+export type IExcludePluginByName<
+  TPlugins extends readonly IPluginConstraint<any>[],
+  TName extends string
+> = TPlugins extends readonly [infer THead, ...infer TTail]
+  ? TTail extends readonly IPluginConstraint<any>[]
+    ? THead extends { readonly name: TName }
+      ? IExcludePluginByName<TTail, TName>
+      : THead extends IPluginConstraint<any>
+        ? readonly [THead, ...IExcludePluginByName<TTail, TName>]
+        : IExcludePluginByName<TTail, TName>
+    : readonly []
+  : readonly []
+
+/** Exact-registration token returned by disable; enabling restores the original tuple type. */
+export type IPluginDisableToken<
+  THost,
+  TPlugin extends IPluginConstraint<any>,
+  TInstalled extends readonly IPluginConstraint<any>[],
+  TDomainCore extends object,
+  TValue
+> = Readonly<{
+  readonly name: TPlugin['name']
+  enable(): Promise<IPluginHostView<THost, TInstalled, TDomainCore, TValue>>
+}>
+
+/** Host-side enablement surface; string enablement keeps a dynamic view type. */
+export type IPluginEnablement<
+  THost,
+  TInstalled extends readonly IPluginConstraint<any>[],
+  TDomainCore extends object,
+  TValue
+> = Readonly<{
+  disable<TName extends IInstalledPluginName<TInstalled>>(
+    name: TName
+  ): Promise<
+    Readonly<{
+      readonly token: IPluginDisableToken<
+        THost,
+        IPluginByName<TInstalled, TName>,
+        TInstalled,
+        TDomainCore,
+        TValue
+      >
+      readonly view: IPluginHostView<
+        THost,
+        IExcludePluginByName<TInstalled, TName>,
+        TDomainCore,
+        TValue
+      >
+    }>
+  >
+  disable(name: string): Promise<
+    Readonly<{
+      readonly token: Readonly<{
+        readonly name: string
+        enable(): Promise<IPluginHostDynamicView<THost, TDomainCore, TValue>>
+      }>
+      readonly view: IPluginHostDynamicView<THost, TDomainCore, TValue>
+    }>
+  >
+  enable(name: string): Promise<IPluginHostDynamicView<THost, TDomainCore, TValue>>
+  disabled(): readonly string[]
+}>
 
 export type IPluginHostConfigFor<TPlugins extends readonly unknown[]> = {
   get(path: string): unknown | undefined
@@ -418,6 +434,8 @@ export interface IPluginHostCore<
 }
 
 export type IPluginHostOptions = {
+  /** Optional human-readable Host identity label; uniqueness is supplied by the runtime id. */
+  readonly identity?: Readonly<{ readonly name?: string }>
   /** Explicit operation and pipeline drain budgets; `false` opts into unbounded waiting. */
   readonly execution: {
     /**

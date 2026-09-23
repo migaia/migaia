@@ -1,5 +1,6 @@
 import { indexedDbHost, type IIndexedDbOptions } from '../../backends/indexed-db.js'
-import { defineBuiltInReactivePlugin, defineNativeReactiveFeature } from '../../host/contracts.js'
+import { defineNativeReactiveFeature } from '../../host/contracts.js'
+import { createBuiltInBackendPlugin } from '../builtin-factory.js'
 import {
   indexedDbBackendKind,
   type IBuiltInPluginId,
@@ -18,22 +19,14 @@ const indexedDbReactiveFeature = defineNativeReactiveFeature(
 )
 
 /** Creates the canonical IndexedDB reactive fast-path plugin with private preparation. */
-export function indexedDbReactive<const TId extends string = 'indexed-db'>(
-  options: IIndexedDbOptions & IBuiltInPluginId<TId> = {}
-): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true> {
-  return defineBuiltInReactivePlugin(
-    indexedDbBackendKind,
-    (options.id ?? 'indexed-db') as TId,
-    (core) => ({
-      install: async () => {
-        const store = indexedDbHost(options)
-        core.registerStore(store)
-        await prepareIndexedDbStore(store)
-        return {}
-      }
-    }),
-    { reactive: indexedDbReactiveFeature }
-  )
-}
-
-Object.defineProperty(indexedDbReactive, 'name', { value: 'indexedDbReactive' })
+export const indexedDbReactive = {
+  indexedDbReactive: <const TId extends string = 'indexed-db'>(
+    options: IIndexedDbOptions & IBuiltInPluginId<TId> = {}
+  ): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true> =>
+    createBuiltInBackendPlugin(
+      indexedDbBackendKind,
+      (options.id ?? 'indexed-db') as TId,
+      () => indexedDbHost(options),
+      { reactive: indexedDbReactiveFeature, prepare: prepareIndexedDbStore }
+    )
+}.indexedDbReactive

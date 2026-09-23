@@ -1,5 +1,6 @@
 import { sessionStorageHost, type ISessionStorageOptions } from '../../backends/session-storage.js'
-import { defineBuiltInReactivePlugin, defineNativeReactiveFeature } from '../../host/contracts.js'
+import { defineNativeReactiveFeature } from '../../host/contracts.js'
+import { createBuiltInBackendPlugin } from '../builtin-factory.js'
 import {
   sessionStorageBackendKind,
   type IBuiltInPluginId,
@@ -17,20 +18,19 @@ const sessionStorageReactiveFeature = defineNativeReactiveFeature(
 )
 
 /** Creates the canonical sessionStorageHost reactive fast-path plugin. */
-export function sessionStorageReactive<const TId extends string = 'session'>(
-  options: ISessionStorageOptions & IBuiltInPluginId<TId> = {}
-): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true> {
-  return defineBuiltInReactivePlugin(
-    sessionStorageBackendKind,
-    (options.id ?? 'session') as TId,
-    (core) => ({
-      install: () => {
-        core.registerStore(sessionStorageHost(options))
-        return {}
-      }
-    }),
-    { reactive: sessionStorageReactiveFeature }
-  )
-}
-
-Object.defineProperty(sessionStorageReactive, 'name', { value: 'sessionStorageReactive' })
+export const sessionStorageReactive = {
+  sessionStorageReactive: <const TId extends string = 'session'>(
+    options: ISessionStorageOptions & IBuiltInPluginId<TId> = {}
+  ): IStorageBackendPlugin<
+    ISessionStorageBackendStore,
+    typeof sessionStorageBackendKind,
+    TId,
+    true
+  > =>
+    createBuiltInBackendPlugin(
+      sessionStorageBackendKind,
+      (options.id ?? 'session') as TId,
+      () => sessionStorageHost(options),
+      { reactive: sessionStorageReactiveFeature }
+    )
+}.sessionStorageReactive

@@ -1,10 +1,4 @@
-import {
-  copyConfigWithPatch,
-  parseConfigPath,
-  readConfigPath,
-  readPlainDataRecord,
-  readonlyConfig
-} from './config.js'
+import { copyConfigWithPatch, parseConfigPath, readConfigPath } from './config.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { invokeCaptured } from './invocation.js'
@@ -91,8 +85,8 @@ export class PluginHostConfigRuntime<
           PluginHostErrorCode.pluginNotInstalled,
           ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
         )
-      const previous = readonlyConfig(registration.config)
-      const patch = readPlainDataRecord(recipe(previous as Readonly<T>), 'config patch', true, true)
+      const previous = registration.config
+      const patch = recipe(previous as Readonly<T>)
       const next = copyConfigWithPatch(registration.config, patch)
       try {
         if (registration.plugin.update) {
@@ -101,7 +95,7 @@ export class PluginHostConfigRuntime<
           const updateResult = invokeCaptured(
             registration.plugin.update,
             registration.plugin.owner,
-            [readonlyConfig(next) as never, this.#port.createCore(registration)]
+            [next as never, this.#port.createCore(registration)]
           )
           await this.#port.awaitOperation(updateResult, registration)
           this.#port.assertOperationCurrent(registration)

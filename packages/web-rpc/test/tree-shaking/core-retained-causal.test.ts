@@ -70,9 +70,8 @@ function readLiveRootModules(): readonly string[] {
 
 /** Converts canonical build paths to the frozen root-module identity. */
 function normalizeRootModule(module: string): string {
-  const workspaceRoot = resolve(import.meta.dirname, '../../../..')
-  const relative = module.startsWith(`${workspaceRoot}/`)
-    ? module.slice(workspaceRoot.length + 1)
+  const relative = module.includes('/packages/')
+    ? module.slice(module.indexOf('/packages/') + 1)
     : module
   return relative.startsWith('packages/web-rpc/')
     ? relative

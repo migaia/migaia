@@ -4302,9 +4302,9 @@
           "metric": "MET-RED",
           "owner": ["@migaia/web-rpc"],
           "state": "implemented",
-          "implementation": "current-owner:packages/web-rpc/test/continuation-sdd.test.ts::executes direct T65 and T68 process invariants",
+          "implementation": "current-owner:packages/web-rpc/test/control-plane/continuation-sdd.test.ts::executes direct T65 and T68 process invariants",
           "tests": [
-            "packages/web-rpc/test/continuation-sdd.test.ts::executes direct T65 and T68 process invariants"
+            "packages/web-rpc/test/control-plane/continuation-sdd.test.ts::executes direct T65 and T68 process invariants"
           ],
           "evidence": [
             "fresh-pass:packages/web-rpc/test/continuation-sdd.test.ts::executes direct T65 and T68 process invariants:2026-08-26 SDD-v47/R6-v2 candidate-specific focused matrix PASS"
@@ -4325,9 +4325,9 @@
           "metric": "MET-RED",
           "owner": ["@migaia/web-rpc"],
           "state": "implemented",
-          "implementation": "current-owner:packages/web-rpc/test/continuation-sdd.test.ts::executes direct T65 and T68 process invariants",
+          "implementation": "current-owner:packages/web-rpc/test/control-plane/continuation-sdd.test.ts::executes direct T65 and T68 process invariants",
           "tests": [
-            "packages/web-rpc/test/continuation-sdd.test.ts::executes direct T65 and T68 process invariants"
+            "packages/web-rpc/test/control-plane/continuation-sdd.test.ts::executes direct T65 and T68 process invariants"
           ],
           "evidence": [
             "fresh-pass:packages/web-rpc/test/continuation-sdd.test.ts::executes direct T65 and T68 process invariants:2026-08-26 SDD-v47/R6-v2 candidate-specific focused matrix PASS"

@@ -202,7 +202,9 @@ function readCanonicalEnvironment(): NodeJS.ProcessEnv {
 
 /** Converts absolute canonical-build paths to the retained-inventory identity. */
 function normalizeRootModule(module: string): string {
-  const relative = module.replace(`${workspaceRoot}/`, '')
+  const relative = module.includes('/packages/')
+    ? module.slice(module.indexOf('/packages/') + 1)
+    : module
   return relative.startsWith('packages/web-rpc/')
     ? relative
     : relative.startsWith('packages/')

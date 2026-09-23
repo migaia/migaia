@@ -1,9 +1,9 @@
+import { openComposition, registerManagedHost } from '@migaia/plugin-host/composition'
 import { describe, expect, it } from 'vitest'
 import {
   PluginHost,
   type IPluginHostCore,
-  type IPluginPreparedAdmissions,
-  type IPluginRegistrationReceipt
+  type IPluginPreparedAdmissions
 } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/lifecycle'
 import { createHost } from '../src/host/index.js'
@@ -19,15 +19,39 @@ class AsyncTestHost extends PluginHost<ITestCore, string> {
   }
 }
 
+/**
+ * 在发布点插一个观察者。
+ *
+ * 托管协议已不在宿主实例表面，覆写方法只会得到一段永不被调用的死代码。改为重新登记一个包装过的 协议出口：`registerManagedHost`
+ * 覆盖同一个宿主的条目，`openComposition` 之后取到的就是包装版。 `revision` 必须重新声明为 getter——展开对象会把它变成一次性求值的快照。
+ */
 class PublicationBarrierHost extends TestHost {
   observeCommit: (() => void) | undefined
 
-  override commitPreparedAdmissions(
-    prepared: IPluginPreparedAdmissions
-  ): readonly IPluginRegistrationReceipt[] {
-    const receipts = super.commitPreparedAdmissions(prepared)
-    this.observeCommit?.()
-    return receipts
+  constructor(options: ConstructorParameters<typeof TestHost>[0]) {
+    super(options)
+    const port = openComposition(this)
+    registerManagedHost(
+      this,
+      Object.freeze({
+        createPluginAdmission: port.createPluginAdmission,
+        createDataOrderSlot: port.createDataOrderSlot,
+        retireDataOrderSlot: port.retireDataOrderSlot,
+        prepareAdmissions: port.prepareAdmissions,
+        discardPreparedAdmissions: port.discardPreparedAdmissions,
+        prepareUnUseBatch: port.prepareUnUseBatch,
+        commitPreparedUnUseBatch: port.commitPreparedUnUseBatch,
+        getCurrentView: port.getCurrentView,
+        get revision() {
+          return port.revision
+        },
+        commitPreparedAdmissions: (prepared: IPluginPreparedAdmissions) => {
+          const receipts = port.commitPreparedAdmissions(prepared)
+          this.observeCommit?.()
+          return receipts
+        }
+      })
+    )
   }
 }
 

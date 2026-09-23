@@ -1,19 +1,55 @@
-import type { IPendingTracker } from '@migaia/lifecycle'
-import type { IMiddlewarePipelineAbortSignal } from '@migaia/middleware-pipeline'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import { boundedWait, type ILifecycleScheduler, type IPendingTracker } from '@migaia/lifecycle'
+import type {
+  IMiddlewarePipelineAbortSignal,
+  IMiddlewarePipelineViolationHandler
+} from '@migaia/middleware-pipeline'
+import ERROR_TEXT, {
+  PluginHostError,
+  attachPluginHostIdentity,
+  createPluginHostTypeError
+} from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import { registerStage, runPipeline } from './pipeline.js'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IRegistration } from './registry.js'
-import { PluginHostPipelineMode, PluginHostRegistrationLifecycle } from './state-constants.js'
+import {
+  PluginHostPipelineMode,
+  PluginHostPipelineViolation,
+  PluginHostRegistrationLifecycle
+} from './state-constants.js'
 import type {
   IAsyncGeneratorPipelineStage,
   IAsyncPipelineStage,
   IGeneratorPipelineStage,
+  IPluginHostErrorCode,
   IPipelineMode,
   ISyncPipelineStage
 } from './typing.js'
+
+/** Maps runner violations onto the Host's diagnostic and coded-error policy. */
+export const createPluginHostPipelineViolationHandler =
+  (
+    host: object,
+    diagnostic: (message: string, code?: IPluginHostErrorCode) => void
+  ): IMiddlewarePipelineViolationHandler =>
+  (kind) => {
+    if (kind === PluginHostPipelineViolation.late) {
+      try {
+        diagnostic(ERROR_TEXT.PIPELINE_NEXT_CALLED_LATE, PluginHostErrorCode.pipelineNextLate)
+      } catch {
+        // Diagnostics must never alter pipeline control flow.
+      }
+      return
+    }
+    throw attachPluginHostIdentity(
+      new PluginHostError(
+        PluginHostErrorCode.pipelineNextDuplicate,
+        ERROR_TEXT.PIPELINE_NEXT_ALREADY_CALLED
+      ),
+      host
+    )
+  }
 
 export type IPluginHostPipelineExecutionOptions<TValue> = Readonly<{
   readonly mode: IPipelineMode
@@ -128,12 +164,14 @@ export const executePluginHostPipeline = <TValue>(
   options: IPluginHostPipelineExecutionOptions<TValue>
 ): void | Promise<void> => {
   const { mode, value, done, onViolation } = options
+  // 每次执行都在自己的副本上遍历：stage 在执行中注册或移除 stage，不会改变它所处的这一轮的序列。
+  // 此前 sync 与 generator 直接传活动数组，async 两路才复制,同一个程序按配置的代数给出两种答案。
   if (mode === PluginHostPipelineMode.sync) {
     options.assertActive()
     const release = options.retainLease(options.syncStages)
     options.enter()
     try {
-      return runPipeline(mode, options.syncStages, value, done, onViolation)
+      return runPipeline(mode, [...options.syncStages], value, done, onViolation)
     } finally {
       options.leave()
       release()
@@ -167,7 +205,7 @@ export const executePluginHostPipeline = <TValue>(
     const release = options.retainLease(options.generatorStages)
     options.enter()
     try {
-      return runPipeline(mode, options.generatorStages, value, done, onViolation)
+      return runPipeline(mode, [...options.generatorStages], value, done, onViolation)
     } finally {
       options.leave()
       release()
@@ -195,4 +233,39 @@ export const executePluginHostPipeline = <TValue>(
     release()
   })
   return options.pending.track(task)
+}
+
+/**
+ * Waits for the stages currently in flight, bounded by the host's drain budget.
+ *
+ * Lives with pipeline execution rather than on the host: what it waits for is a pipeline lease, and
+ * the host's part is only choosing which key and which budget. A timeout does not abandon the work
+ * — it hands the caller back control and returns the still-pending completion as
+ * `physicalCompletion`, so the drain stays observable instead of silently continuing unwatched.
+ */
+export const drainPipelineLeases = async (context: {
+  readonly leases: { whenZeroOnce(key: object): Promise<void> }
+  readonly key: object
+  readonly drainTimeoutMs: number | false
+  readonly scheduler: ILifecycleScheduler
+}): Promise<{
+  readonly complete: boolean
+  readonly physicalCompletion?: Promise<{ readonly cleanupErrors: readonly unknown[] }>
+}> => {
+  const pending = context.leases.whenZeroOnce(context.key)
+  if (context.drainTimeoutMs === false) {
+    await pending
+    return { complete: true }
+  }
+  const complete = await boundedWait(pending, context.scheduler.now() + context.drainTimeoutMs, {
+    scheduler: context.scheduler
+  })
+  if (complete) return { complete: true }
+  return {
+    complete: false,
+    physicalCompletion: pending.then(
+      () => Object.freeze({ cleanupErrors: Object.freeze([]) }),
+      (error: unknown) => Object.freeze({ cleanupErrors: Object.freeze([error]) })
+    )
+  }
 }

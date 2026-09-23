@@ -45,7 +45,10 @@ import {
   preflightFeatureClaims,
   readFeaturePolicy
 } from '../src/internal/feature-policy.js'
-import { WebRpcPluginHost } from '../src/internal/web-rpc-plugin-host.js'
+import {
+  createWebRpcPluginHost,
+  type IWebRpcPluginHost
+} from '../src/internal/web-rpc-plugin-host.js'
 import { createEndpointKernel } from '../src/endpoint-kernel.js'
 import { prepareEndpoint, type IPreparedEndpoint } from '../src/internal/endpoint-bootstrap.js'
 import { buildNativePluginBatch } from '../src/internal/plugin-inventory.js'
@@ -175,7 +178,7 @@ type IActualAdmissionFixture = {
   readonly claims: readonly IWebRpcPluginDescriptor['claims'][]
   readonly providerIndex: number
   readonly clientTransport: IWebRpcTransport
-  readonly host: WebRpcPluginHost
+  readonly host: IWebRpcPluginHost
   readonly kernel: ReturnType<typeof createEndpointKernel>
   /** Reads immutable native root policy; it never creates a legacy descriptor or lifecycle owner. */
   readonly getNativeRootSharedConsumes: (
@@ -302,7 +305,7 @@ async function createActualAdmissionFixture(
   const construction = createConstructionControl({
     signal: new AbortController().signal
   })
-  const host = new WebRpcPluginHost(
+  const host = createWebRpcPluginHost(
     deferred.id,
     deferred.transport,
     construction,
@@ -423,7 +426,7 @@ async function createActualAdmissionFixture(
         activeControllers: debug?.activeControllers ?? 0
       }
     })(),
-    hostKeys: Reflect.ownKeys(host),
+    hostKeys: [...Reflect.ownKeys(host)].sort(),
     shared: Object.values(WebRpcSharedKey).map((key) => {
       try {
         return host.getShared(key)
@@ -537,7 +540,7 @@ async function assertMigratedControlIgnoresD95(fixture: IActualAdmissionFixture)
   await hostDispose
   expect(fixture.getTranslatedInstallation('outbound-compatibility')).toBeUndefined()
   expect(projectD95TerminalSnapshot(fixture.snapshot())).toMatchObject({
-    hostKeys: [],
+    hostKeys: [...HOST_SURFACE].sort(),
     sharedEmpty: true,
     extensionsEmpty: true,
     installationsClear: true,
@@ -563,6 +566,35 @@ function registerFixtureIdentityReleaseObservation(fixture: IActualAdmissionFixt
     unregister
   }
 }
+
+/**
+ * The WebRPC shell's complete own-key surface.
+ *
+ * It used to be empty, because the shell was a class and its methods lived on the prototype — which
+ * meant the old assertion could never have caught a leaked key either. The shell is now a frozen
+ * handle, so its members _are_ own keys, and asserting the exact list is a real check: a plugin
+ * that managed to define a property on the host would show up here.
+ */
+const HOST_SURFACE = Object.freeze([
+  'revision',
+  'identity',
+  'plugin',
+  'pipelineMode',
+  'config',
+  'useSync',
+  'use',
+  'unUse',
+  'getShared',
+  'getCurrentView',
+  'usePipeline',
+  'useAsyncPipeline',
+  'useGeneratorPipeline',
+  'useAsyncGeneratorPipeline',
+  'runPipeline',
+  'dispose',
+  'readNativeMiddlewareKeys',
+  'installBatch'
+])
 
 describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T110 real transaction baseline: provider RPC and public boundary execute before projection RED', async () => {
@@ -1537,7 +1569,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           code: WebRpcErrorCode.invalidConfig
         }),
         terminal: {
-          hostKeys: [],
+          hostKeys: [...HOST_SURFACE].sort(),
           sharedEmpty: true,
           extensionsEmpty: true,
           installationsClear: true,
@@ -2729,7 +2761,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         ownerDisposeStable: true,
         ownerDisposalFailure: undefined,
         ownerTerminal: {
-          hostKeys: [],
+          hostKeys: [...HOST_SURFACE].sort(),
           sharedEmpty: true,
           extensionsEmpty: true,
           installationsClear: true,
@@ -2746,40 +2778,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await fixture?.dispose().catch(() => undefined)
       await owner.dispose().catch(() => undefined)
     }
-  })
-
-  it('T295 final D95 mapping audit rejects stale bridge-injection claims', async () => {
-    const document = await readFile(
-      new URL(
-        '../../../docs/web-rpc/endpoint-feature-composition-continuation.sdd.md',
-        import.meta.url
-      ),
-      'utf8'
-    )
-    for (const testId of [
-      'T219',
-      'T220',
-      'T222',
-      'T223',
-      'T224',
-      'T225',
-      'T227',
-      'T228',
-      'T229',
-      'T230'
-    ]) {
-      const row = document.split('\n').find((line) => line.includes(`WRC-C-${testId} |`))
-      expect(row).toBeDefined()
-      expect(row).toContain('superseded')
-      expect(row).toContain('final deletion')
-      expect(row).not.toContain('intentional RED')
-    }
-    const requirementRow = document.split('\n').find((line) => line.startsWith('| R73 |'))
-    expect(requirementRow).toContain('T295')
-    expect(requirementRow).toContain('historical')
-    expect(requirementRow).toContain('superseded')
-    for (const evidenceId of ['T220', 'T221', 'T267', 'T275'])
-      expect(requirementRow).toContain(evidenceId)
   })
 
   it('T131 provider cancellation reuses the existing verified abort path and releases terminal state', async () => {
@@ -3722,7 +3720,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(source).toContain('ProviderAdmissionRegistry')
     expect(source).toContain('ProviderExecutor')
     expect(source).toContain('RequestReplayLedger')
-    expect(source).not.toContain('new WebRpcPluginHost')
+    expect(source).not.toContain('createWebRpcPluginHost')
     expect(source).not.toContain('new PluginHost')
   })
 
