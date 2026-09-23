@@ -1,4 +1,4 @@
-import { PluginHost } from '@migaia/plugin-host'
+import { defineHost } from '@migaia/plugin-host'
 import {
   createEventChannel,
   invokeEachLive,
@@ -9,7 +9,11 @@ import type {
   IPluginHostDisposalResult,
   IPluginHostOptions,
   IPipelineMode,
-  ISyncPipelineStage
+  ISyncPipelineStage,
+  IAsyncPipelineStage,
+  IGeneratorPipelineStage,
+  IAsyncGeneratorPipelineStage,
+  IHostHandle
 } from '@migaia/plugin-host'
 import { createLoggerError, createLoggerTypeError, LoggerErrorCode } from './errors.js'
 import type {
@@ -138,7 +142,7 @@ function snapshotLoggerOptions(options: unknown): ILoggerConstructorSnapshot {
  * 所有内部状态一律用真正的 `#` 私有字段（ECMAScript 私有字段，运行时由 引擎强制隔离，不是 TS 的 `private` 那种编译期约定、运行时其实还能被
  * 外部代码用类型断言绕过去的"假私有"）。方法能不写在 class 里的， 一律不写在 class 外面。
  */
-class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry> {
+class LoggerCore {
   static #entrySeq = 0
 
   // 用 "!" 告诉 TS："这个字段确实会在构造函数里被赋值"——只是赋值方式是下面
@@ -161,6 +165,10 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #extendTargets: ILoggerExtendsTarget<IPipelineMode>[] = []
   /** 单调时钟源（R-9）；`flush`/`shutdown`/`#drain` 的 deadline 与 `boundedWait` 共用。 */
   #scheduler: ILifecycleScheduler
+  /** Functional Host owns plugin admission, config, pipeline, and disposal for this facade. */
+  #handle: IHostHandle<ILoggerDomainCore<IPipelineMode>, ILogEntry, readonly []>
+  /** Config facade is fixed after the functional Host has been created. */
+  readonly config!: IHostHandle<ILoggerDomainCore<IPipelineMode>, ILogEntry, readonly []>['config']
 
   get scheduler(): ILifecycleScheduler {
     return this.#scheduler
@@ -174,7 +182,6 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     plugins: readonly ILoggerPluginConstraint[] = [],
     scheduler: ILifecycleScheduler = systemScheduler
   ) {
-    super({ ...hostOptions, scheduler })
     this.#scheduler = scheduler
     // Freeze the top-level context containers. Nested option values and Date remain
     // identity-preserving and mutable by contract; callers own that trade-off.
@@ -201,14 +208,18 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       configurable: false,
       enumerable: true
     })
+    this.#handle = defineHost({
+      host: { ...hostOptions, scheduler },
+      domainCore: () => this.createPluginDomainCore()
+    })
     Object.defineProperty(this, 'config', {
-      value: super.config,
+      value: this.#handle.config,
       writable: false,
       configurable: false,
       enumerable: true
     })
     /** Materialized consumer facade; PluginHost V2 keeps extension publication off its engine. */
-    const view = this.useSync(plugins)
+    const view = this.#handle.useSync(...(plugins as [ILoggerPluginConstraint]))
     for (const key of Reflect.ownKeys(view.extensions)) {
       const descriptor = Object.getOwnPropertyDescriptor(view.extensions, key)
       if (!descriptor || !('value' in descriptor)) continue
@@ -221,7 +232,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     }
   }
 
-  protected createPluginDomainCore(): ILoggerDomainCore<IPipelineMode> {
+  createPluginDomainCore(): ILoggerDomainCore<IPipelineMode> {
     const domainCore: ILoggerDomainCore<IPipelineMode> = {
       ctx: this.ctx,
       scheduler: this.scheduler,
@@ -255,7 +266,46 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   }
 
   usePipeline(stage: IPipelineStage): this {
-    return super.usePipeline(stage as ISyncPipelineStage<ILogEntry>)
+    this.#handle.usePipeline(stage as ISyncPipelineStage<ILogEntry>)
+    return this
+  }
+
+  /** Delegates async stage registration to the functional Host. */
+  useAsyncPipeline(stage: IAsyncPipelineStage<ILogEntry>): this {
+    this.#handle.useAsyncPipeline(stage)
+    return this
+  }
+
+  /** Delegates generator stage registration to the functional Host. */
+  useGeneratorPipeline(stage: IGeneratorPipelineStage<ILogEntry>): this {
+    this.#handle.useGeneratorPipeline(stage)
+    return this
+  }
+
+  /** Delegates async-generator stage registration to the functional Host. */
+  useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<ILogEntry>): this {
+    this.#handle.useAsyncGeneratorPipeline(stage)
+    return this
+  }
+
+  /** Delegates dynamic plugin admission to the single functional Host. */
+  use(...plugins: readonly ILoggerPluginConstraint[]) {
+    return this.#handle.use(...(plugins as [ILoggerPluginConstraint]))
+  }
+
+  /** Delegates removal to the same Host that admitted the plugin. */
+  unUse(name: string) {
+    return this.#handle.unUse(name)
+  }
+
+  /** Reads one shared capability from the Host's current publication. */
+  getShared<T = unknown>(key: PropertyKey): T | undefined {
+    return this.#handle.getShared<T>(key)
+  }
+
+  /** Delegates one pipeline traversal while retaining logger-specific dispatch ownership. */
+  runPipeline(value: ILogEntry, done: (value: ILogEntry) => void): void | Promise<void> {
+    return this.#handle.runPipeline(value, done)
   }
 
   useSink(sink: ISink): () => void {
@@ -553,7 +603,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       this.#dispatchAdmissionOpen = false
       // Extension edges are owned by this core and must not retain live targets after shutdown.
       this.#extendTargets = []
-      const result = (await super.dispose()) as IPluginHostDisposalResult
+      const result = (await this.#handle.dispose()) as IPluginHostDisposalResult
       this.#status = LoggerStatus.closed
       return result
     })().then(

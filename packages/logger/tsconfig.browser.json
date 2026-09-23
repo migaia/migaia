@@ -5,5 +5,5 @@
     "types": []
   },
   "include": ["src"],
-  "exclude": ["src/plugins/process.ts"]
+  "exclude": ["src/plugins/process.ts", "src/plugins/file.ts"]
 }

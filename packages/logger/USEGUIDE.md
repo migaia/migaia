@@ -222,6 +222,23 @@ Batcher 的 `push(item)` 收集条目，`flush()` 发送剩余条目并等待正
 
 4xx 错误（429 除外）会直接失败、不重试；429 优先读取响应的 `Retry-After` 头部作为等待时间，没有该头部时退回指数退避。`shutdown()` 会主动 abort 尚未完成的 HTTP 请求，失败结果可以通过 `onFailure()` 观察到。**需要批量发送必须保证插件顺序是 `plugins: [batch(), http(...)]`**——顺序反了批处理不会生效。
 
+### 文件插件（独立子路径）
+
+`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。
+
+```ts
+import { Logger } from '@migaia/logger'
+import { file } from '@migaia/logger/plugins/file'
+
+const logger = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]
+})
+logger.log('info', 'ready')
+await logger.flush()
+await logger.shutdown('manual')
+```
+
 ### 9.5 `process(config?)`
 
 Node/Bun 风格的进程适配器，运行时环境没有 `process` 全局对象时自动变成 no-op，不会报错。
@@ -349,6 +366,7 @@ await log.flush();
 | `extendsSelf` | `EXTENDS_SELF` | logger 转发给自身；移除自引用 |
 | `extendsCycle` | `EXTENDS_CYCLE` | 新 extends 边形成环；拆除环路 |
 | `batchOverflow` | `BATCH_OVERFLOW` | pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃 |
+| `fileSinkUnavailable` | `FILE_SINK_UNAVAILABLE` | file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件 |
 
 ## 13. 构建、测试与常见问题排查
 

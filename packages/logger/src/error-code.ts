@@ -110,7 +110,12 @@ export const LoggerErrorCode = {
    * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer
    * must stop or retry after quiescence; entries are never silently dropped or spilled.
    */
-  batchOverflow: 'BATCH_OVERFLOW'
+  batchOverflow: 'BATCH_OVERFLOW',
+  /**
+   * File plugin installation found neither an injected file-system capability nor the supported
+   * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition.
+   */
+  fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'
 } as const
 
 export type ILoggerErrorCode = (typeof LoggerErrorCode)[keyof typeof LoggerErrorCode]

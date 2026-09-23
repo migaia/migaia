@@ -88,6 +88,7 @@ log.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, 
 | `color(config?)`     | `config?: IColorPluginConfig`             | 同步      | 控制台输出，支持 pretty/JSON 格式和 ANSI 颜色               |
 | `batch(config?)`     | `config?: IBatchPluginConfig`             | 同步      | 提供批处理调度能力（被 `http()` 复用，也可单独用）          |
 | `http(config)`       | `config: IHttpPluginConfig`（`url` 必填） | 同步      | 把 entry 批量 POST 到 HTTP endpoint，内置重试/超时/429 退避 |
+| `file(config)`       | `config: IFilePluginConfig`（`path` 必填） | 同步      | 批量写入逐行 JSON；仅从 `@migaia/logger/plugins/file` 导入 |
 | `process(config?)`   | `config?: IProcessPluginConfig`           | 同步      | Node/Bun 风格的进程信号与优雅退出适配                       |
 | `reasoning(config?)` | `config?: IReasoningPluginConfig`         | 同步      | 流式 thinking/response 输出，适合展示 AI 生成过程           |
 | `uuid(config?)`      | `config?: IUuidPluginConfig`              | 同步      | 给每条 entry 附加唯一 id                                    |
