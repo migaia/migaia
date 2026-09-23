@@ -361,7 +361,14 @@ export function createBatcherForCore<T>(
   core: ILoggerPluginCore,
   defaultConfig: IBatchPluginConfig,
   perCallConfig: IBatchPluginConfig,
-  onBatch: (items: T[]) => void | Promise<void>
-): IBatcher<T> {
-  return new BatchPlugin({}).buildBatcher(core, defaultConfig, perCallConfig, onBatch, true)
+  onBatch: (items: T[]) => void | Promise<void>,
+  propagateErrors = true
+): IBatchController<T> {
+  return new BatchPlugin({}).buildBatcher(
+    core,
+    defaultConfig,
+    perCallConfig,
+    onBatch,
+    propagateErrors
+  )
 }

@@ -11,6 +11,11 @@ export type ILoggerProcess = {
 
 export type ILoggerRuntimeManager = {
   readonly process?: ILoggerProcess
+  /** Optional injected file sink; absent by default in every runtime. */
+  readonly fs?: {
+    append(path: string, text: string): Promise<void>
+    rotate?(path: string): Promise<void>
+  }
   /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */
   readonly createAbortController?: () => AbortController
   randomUUID(): string

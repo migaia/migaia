@@ -22,6 +22,14 @@
     "./plugins": {
       "types": "./dist/plugins/index.d.ts",
       "default": "./dist/plugins/index.js"
+    },
+    "./plugins/file": {
+      "types": "./dist/plugins/file.d.ts",
+      "node": "./dist/plugins/file.js",
+      "bun": "./dist/plugins/file.js",
+      "deno": "./dist/plugins/file.js",
+      "browser": "./dist/plugins/file.browser.js",
+      "default": "./dist/plugins/file.browser.js"
     }
   },
   "publishConfig": {

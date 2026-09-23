@@ -846,13 +846,21 @@ describe('logger plugin host integration', () => {
       install: async () => ({ ready: true })
     }
 
-    expect(
-      () =>
-        new Logger({
-          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-          plugins: [plugin]
-        })
-    ).toThrow('returned an awaitable during synchronous installation')
+    // 同步安装路径拒绝 thenable 返回值的方式已收敛到带码的 `INSTALL_RESULT_THENABLE`——它此前抛的是
+    // 不带码的裸 TypeError。按错误码契约断言码而不是文案：码是公开 API，文案不是。
+    let failure: unknown
+    try {
+      new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [plugin]
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as { code?: unknown }).code).toBe('PLUGIN_INSTALL_FAILED')
+    const cause = (failure as { cause?: { code?: unknown } }).cause
+    expect(cause?.code).toBe('INSTALL_RESULT_THENABLE')
   })
 
   it('colors first message content when colorMessage is head', async () => {
