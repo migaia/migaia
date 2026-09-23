@@ -1,6 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config';
+import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs';
 
-export default defineConfig({
+export default defineConfig(withDistFreshness({
   test: {
     environment: 'jsdom',
     setupFiles: ['test/setup.ts'],
@@ -51,4 +52,4 @@ export default defineConfig({
       }
     }
   }
-});
+}));

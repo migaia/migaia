@@ -9,6 +9,7 @@
     "typecheck:consumers": "bun scripts/typecheck-consumers.ts",
     "coverage:custody": "node scripts/coverage-custody.mjs",
     "test:coverage-custody": "node --test scripts/test/coverage-custody.test.mjs",
+    "test:dist-stamp": "node --test scripts/test/dist-stamp.test.mjs",
     "test:tree-shaking": "node scripts/test/package-tree-shaking.test.mjs",
     "audit:storage-v2": "node --no-warnings scripts/storage-v2-architecture-audit.ts",
     "test:storage-v2-tools": "pnpm --dir scripts install --ignore-workspace --frozen-lockfile --prefer-offline && vitest run scripts/test/storage-v2-*.spec.ts",

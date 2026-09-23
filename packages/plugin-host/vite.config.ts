@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
+import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 
 /** Runtime dependencies that must stay external to preserve one owner per package boundary. */
 const runtimeExternals = [
@@ -14,7 +15,7 @@ const isRuntimeExternal = (id: string): boolean =>
   runtimeExternals.some((dependency) => id === dependency || id.startsWith(`${dependency}/`))
 
 /** Produces one runtime-neutral ESM entry; declarations are emitted by TypeScript. */
-export default defineConfig({
+export default defineConfig(withDistFreshness({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/plugin-host', import.meta.url)),
   build: {
     target: 'es2020',
@@ -37,4 +38,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

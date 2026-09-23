@@ -25,7 +25,7 @@
   },
   "scripts": {
     "fmt": "oxfmt src test e2e",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test e2e",

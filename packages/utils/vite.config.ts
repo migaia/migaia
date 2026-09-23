@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs';
 
 /** Builds all stable public subpath entries as runtime-neutral ESM. */
-export default defineConfig({
+export default defineConfig(withDistFreshness({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/utils', import.meta.url)),
   build: {
     target: 'es2022',
@@ -26,4 +27,4 @@ export default defineConfig({
     },
     sourcemap: true
   }
-});
+}));
