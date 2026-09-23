@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-wasm",
     "description": "Optional WASM-backed fields for Store light.",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "exports": ["."],
     "documentation": {
       "readme": {

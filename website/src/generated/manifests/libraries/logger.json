@@ -3,8 +3,8 @@
   "library": {
     "slug": "logger",
     "description": null,
-    "version": "0.0.6",
-    "exports": [".", "./plugins"],
+    "version": "0.0.7",
+    "exports": [".", "./plugins", "./plugins/file"],
     "documentation": {
       "readme": {
         "sections": [
@@ -175,6 +175,12 @@
                     "`config: IHttpPluginConfig`（`url` 必填）",
                     "同步",
                     "把 entry 批量 POST 到 HTTP endpoint，内置重试/超时/429 退避"
+                  ],
+                  [
+                    "`file(config)`",
+                    "`config: IFilePluginConfig`（`path` 必填）",
+                    "同步",
+                    "批量写入逐行 JSON；仅从 `@migaia/logger/plugins/file` 导入"
                   ],
                   [
                     "`process(config?)`",
@@ -927,6 +933,21 @@
             ]
           },
           {
+            "id": "文件插件-独立子路径",
+            "heading": "文件插件（独立子路径）",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')"
+              }
+            ]
+          },
+          {
             "id": "9-5-process-config",
             "heading": "9.5 process(config?)",
             "blocks": [
@@ -1156,6 +1177,11 @@
                     "`batchOverflow`",
                     "`BATCH_OVERFLOW`",
                     "pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃"
+                  ],
+                  [
+                    "`fileSinkUnavailable`",
+                    "`FILE_SINK_UNAVAILABLE`",
+                    "file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件"
                   ]
                 ]
               }
@@ -1225,7 +1251,7 @@
           "name": "getLoggerRuntimeManager",
           "kind": "const",
           "signature": "export declare const getLoggerRuntimeManager: () => ILoggerRuntimeManager;",
-          "declarationLine": 37,
+          "declarationLine": 42,
           "source": "packages/logger/dist/runtime-manager.d.ts",
           "purpose": "Returns the active host capability manager.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getLoggerRuntimeManager.",
@@ -2221,7 +2247,7 @@
           "name": "ILoggerErrorCode",
           "kind": "type",
           "signature": "export type ILoggerErrorCode = (typeof LoggerErrorCode)[keyof typeof LoggerErrorCode];",
-          "declarationLine": 101,
+          "declarationLine": 106,
           "source": "packages/logger/dist/error-code.d.ts",
           "purpose": "ILoggerErrorCode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerErrorCode.",
@@ -2732,7 +2758,7 @@
         {
           "name": "ILoggerRuntimeManager",
           "kind": "type",
-          "signature": "export type ILoggerRuntimeManager = { readonly process?: ILoggerProcess; /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */ readonly createAbortController?: () => AbortController; randomUUID(): string; defer(task: () => void): void; write(text: string): void; readonly console?: { log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; }; fetch?: (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal; }) => Promise<{ readonly ok: boolean; readonly status: number; readonly headers: { get(name: string): string | null; }; }>; };",
+          "signature": "export type ILoggerRuntimeManager = { readonly process?: ILoggerProcess; /** Optional injected file sink; absent by default in every runtime. */ readonly fs?: { append(path: string, text: string): Promise<void>; rotate?(path: string): Promise<void>; }; /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */ readonly createAbortController?: () => AbortController; randomUUID(): string; defer(task: () => void): void; write(text: string): void; readonly console?: { log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; }; fetch?: (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal; }) => Promise<{ readonly ok: boolean; readonly status: number; readonly headers: { get(name: string): string | null; }; }>; };",
           "declarationLine": 11,
           "source": "packages/logger/dist/runtime-manager.d.ts",
           "purpose": "ILoggerRuntimeManager is part of this module's public type contract.",
@@ -2748,7 +2774,7 @@
           "aliasOf": "ILoggerRuntimeManager",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ILoggerRuntimeManager = { readonly process?: ILoggerProcess; /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */ readonly createAbortController?: () => AbortController; randomUUID(): string; defer(task: () => void): void; write(text: string): void; readonly console?: { log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; }; fetch?: (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal; }) => Promise<{ readonly ok: boolean; readonly status: number; readonly headers: { get(name: string): string | null; }; }>; };"
+            "export type ILoggerRuntimeManager = { readonly process?: ILoggerProcess; /** Optional injected file sink; absent by default in every runtime. */ readonly fs?: { append(path: string, text: string): Promise<void>; rotate?(path: string): Promise<void>; }; /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */ readonly createAbortController?: () => AbortController; randomUUID(): string; defer(task: () => void): void; write(text: string): void; readonly console?: { log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; }; fetch?: (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal; }) => Promise<{ readonly ok: boolean; readonly status: number; readonly headers: { get(name: string): string | null; }; }>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2787,7 +2813,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/runtime-manager.d.ts:ILoggerRuntimeManager:export type ILoggerRuntimeManager = { readonly process?: ILoggerProcess; /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */ readonly createAbortController?: () => AbortController; randomUUID(): string; defer(task: () => void): void; write(text: string): void; readonly console?: { log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; }; fetch?: (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal; }) => Promise<{ readonly ok: boolean; readonly status: number; readonly headers: { get(name: string): string | null; }; }>; };",
+          "identity": "packages/logger/dist/runtime-manager.d.ts:ILoggerRuntimeManager:export type ILoggerRuntimeManager = { readonly process?: ILoggerProcess; /** Optional injected file sink; absent by default in every runtime. */ readonly fs?: { append(path: string, text: string): Promise<void>; rotate?(path: string): Promise<void>; }; /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */ readonly createAbortController?: () => AbortController; randomUUID(): string; defer(task: () => void): void; write(text: string): void; readonly console?: { log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; }; fetch?: (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal; }) => Promise<{ readonly ok: boolean; readonly status: number; readonly headers: { get(name: string): string | null; }; }>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3444,6 +3470,7 @@
           "examples": [
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
             "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n});",
+            "import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')",
             "const audit = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'audit' });\naudit.useSink((entry) => sendToAuditSystem(entry));\n\nconst api = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'api' });\napi.extends(audit);\n\napi.info('user created'); // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit",
             "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger';\n\nconst previous = getLoggerRuntimeManager();\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n});\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore(); // 恢复到替换之前的 runtime manager\n}",
             "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
@@ -3621,6 +3648,11 @@
                       "`batchOverflow`",
                       "`BATCH_OVERFLOW`",
                       "pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃"
+                    ],
+                    [
+                      "`fileSinkUnavailable`",
+                      "`FILE_SINK_UNAVAILABLE`",
+                      "file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件"
                     ]
                   ]
                 }
@@ -3641,7 +3673,7 @@
               ]
             }
           ],
-          "usageScore": 168,
+          "usageScore": 182,
           "configuration": [],
           "fragment": "logger-index--Logger"
         },
@@ -3774,7 +3806,7 @@
         {
           "name": "LoggerErrorCode",
           "kind": "const",
-          "signature": "export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Process 插件被以不同的配置重复安装。 * * 调用方统一配置，或先卸载再重装。 */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * 宿主运行时没有可用的 HTTP transport（`fetch`）。 * * 调用方提供 `runtimeFetch` 或在支持 fetch 的运行时使用 http 插件。 */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Http 日志序列化失败。 * * 原始序列化错误挂在 `cause`；调用方检查被记录的载荷。 */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * 诊断码，不抛出。failure hook 自身抛错时由 reporter 边界上报。 * * 仅经 `runtime.console.error`/`runtime.write` 上报，保证失败上报通道自身不会递归失败。 */ readonly hookFailed: \"HOOK_FAILED\"; /** * `extends()` 传入自身（自引用）。 * * 调用方不要把自己加入自己的 extends 目标列表。 */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * `extends()` 会形成循环转发链（目标 logger 已能沿其 extends 链转发回当前 logger）。 * * 调用方检查 extends 拓扑，拆除环路。 */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer * must stop or retry after quiescence; entries are never silently dropped or spilled. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; };",
+          "signature": "export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Process 插件被以不同的配置重复安装。 * * 调用方统一配置，或先卸载再重装。 */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * 宿主运行时没有可用的 HTTP transport（`fetch`）。 * * 调用方提供 `runtimeFetch` 或在支持 fetch 的运行时使用 http 插件。 */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Http 日志序列化失败。 * * 原始序列化错误挂在 `cause`；调用方检查被记录的载荷。 */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * 诊断码，不抛出。failure hook 自身抛错时由 reporter 边界上报。 * * 仅经 `runtime.console.error`/`runtime.write` 上报，保证失败上报通道自身不会递归失败。 */ readonly hookFailed: \"HOOK_FAILED\"; /** * `extends()` 传入自身（自引用）。 * * 调用方不要把自己加入自己的 extends 目标列表。 */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * `extends()` 会形成循环转发链（目标 logger 已能沿其 extends 链转发回当前 logger）。 * * 调用方检查 extends 拓扑，拆除环路。 */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer * must stop or retry after quiescence; entries are never silently dropped or spilled. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: \"FILE_SINK_UNAVAILABLE\"; };",
           "declarationLine": 9,
           "source": "packages/logger/dist/error-code.d.ts",
           "purpose": "`@migaia/logger` 错误码的唯一声明处。 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为 `'@migaia/logger'`。抛出点必须引用本文件的常量，不得内联字面量。 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。",
@@ -3790,7 +3822,7 @@
           "aliasOf": "LoggerErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Process 插件被以不同的配置重复安装。 * * 调用方统一配置，或先卸载再重装。 */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * 宿主运行时没有可用的 HTTP transport（`fetch`）。 * * 调用方提供 `runtimeFetch` 或在支持 fetch 的运行时使用 http 插件。 */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Http 日志序列化失败。 * * 原始序列化错误挂在 `cause`；调用方检查被记录的载荷。 */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * 诊断码，不抛出。failure hook 自身抛错时由 reporter 边界上报。 * * 仅经 `runtime.console.error`/`runtime.write` 上报，保证失败上报通道自身不会递归失败。 */ readonly hookFailed: \"HOOK_FAILED\"; /** * `extends()` 传入自身（自引用）。 * * 调用方不要把自己加入自己的 extends 目标列表。 */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * `extends()` 会形成循环转发链（目标 logger 已能沿其 extends 链转发回当前 logger）。 * * 调用方检查 extends 拓扑，拆除环路。 */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer * must stop or retry after quiescence; entries are never silently dropped or spilled. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; };"
+            "export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Process 插件被以不同的配置重复安装。 * * 调用方统一配置，或先卸载再重装。 */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * 宿主运行时没有可用的 HTTP transport（`fetch`）。 * * 调用方提供 `runtimeFetch` 或在支持 fetch 的运行时使用 http 插件。 */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Http 日志序列化失败。 * * 原始序列化错误挂在 `cause`；调用方检查被记录的载荷。 */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * 诊断码，不抛出。failure hook 自身抛错时由 reporter 边界上报。 * * 仅经 `runtime.console.error`/`runtime.write` 上报，保证失败上报通道自身不会递归失败。 */ readonly hookFailed: \"HOOK_FAILED\"; /** * `extends()` 传入自身（自引用）。 * * 调用方不要把自己加入自己的 extends 目标列表。 */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * `extends()` 会形成循环转发链（目标 logger 已能沿其 extends 链转发回当前 logger）。 * * 调用方检查 extends 拓扑，拆除环路。 */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer * must stop or retry after quiescence; entries are never silently dropped or spilled. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: \"FILE_SINK_UNAVAILABLE\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3829,7 +3861,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/error-code.d.ts:LoggerErrorCode:export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Process 插件被以不同的配置重复安装。 * * 调用方统一配置，或先卸载再重装。 */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * 宿主运行时没有可用的 HTTP transport（`fetch`）。 * * 调用方提供 `runtimeFetch` 或在支持 fetch 的运行时使用 http 插件。 */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Http 日志序列化失败。 * * 原始序列化错误挂在 `cause`；调用方检查被记录的载荷。 */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * 诊断码，不抛出。failure hook 自身抛错时由 reporter 边界上报。 * * 仅经 `runtime.console.error`/`runtime.write` 上报，保证失败上报通道自身不会递归失败。 */ readonly hookFailed: \"HOOK_FAILED\"; /** * `extends()` 传入自身（自引用）。 * * 调用方不要把自己加入自己的 extends 目标列表。 */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * `extends()` 会形成循环转发链（目标 logger 已能沿其 extends 链转发回当前 logger）。 * * 调用方检查 extends 拓扑，拆除环路。 */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer * must stop or retry after quiescence; entries are never silently dropped or spilled. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; };",
+          "identity": "packages/logger/dist/error-code.d.ts:LoggerErrorCode:export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Process 插件被以不同的配置重复安装。 * * 调用方统一配置，或先卸载再重装。 */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * 宿主运行时没有可用的 HTTP transport（`fetch`）。 * * 调用方提供 `runtimeFetch` 或在支持 fetch 的运行时使用 http 插件。 */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Http 日志序列化失败。 * * 原始序列化错误挂在 `cause`；调用方检查被记录的载荷。 */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * 诊断码，不抛出。failure hook 自身抛错时由 reporter 边界上报。 * * 仅经 `runtime.console.error`/`runtime.write` 上报，保证失败上报通道自身不会递归失败。 */ readonly hookFailed: \"HOOK_FAILED\"; /** * `extends()` 传入自身（自引用）。 * * 调用方不要把自己加入自己的 extends 目标列表。 */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * `extends()` 会形成循环转发链（目标 logger 已能沿其 extends 链转发回当前 logger）。 * * 调用方检查 extends 拓扑，拆除环路。 */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer * must stop or retry after quiescence; entries are never silently dropped or spilled. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: \"FILE_SINK_UNAVAILABLE\"; };",
           "guidance": [
             {
               "id": "错误码速查",
@@ -3909,6 +3941,11 @@
                       "`batchOverflow`",
                       "`BATCH_OVERFLOW`",
                       "pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃"
+                    ],
+                    [
+                      "`fileSinkUnavailable`",
+                      "`FILE_SINK_UNAVAILABLE`",
+                      "file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件"
                     ]
                   ]
                 }
@@ -4115,7 +4152,7 @@
           "name": "setLoggerRuntimeManager",
           "kind": "function",
           "signature": "export declare function setLoggerRuntimeManager(manager: ILoggerRuntimeManager): () => void;",
-          "declarationLine": 39,
+          "declarationLine": 44,
           "source": "packages/logger/dist/runtime-manager.d.ts",
           "purpose": "Replaces host capabilities and returns a restoration callback.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for setLoggerRuntimeManager.",
@@ -4187,7 +4224,7 @@
           "declaredConfiguration": [],
           "identity": "packages/logger/dist/runtime-manager.d.ts:setLoggerRuntimeManager:export declare function setLoggerRuntimeManager(manager: ILoggerRuntimeManager): () => void;",
           "guidance": [],
-          "usageScore": 28,
+          "usageScore": 32,
           "configuration": [],
           "fragment": "logger-index--setLoggerRuntimeManager"
         }
@@ -4288,6 +4325,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for batch.",
           "examples": [
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
+            "import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')",
             "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
@@ -4539,6 +4577,11 @@
                       "`batchOverflow`",
                       "`BATCH_OVERFLOW`",
                       "pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃"
+                    ],
+                    [
+                      "`fileSinkUnavailable`",
+                      "`FILE_SINK_UNAVAILABLE`",
+                      "file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件"
                     ]
                   ]
                 }
@@ -4559,7 +4602,7 @@
               ]
             }
           ],
-          "usageScore": 96,
+          "usageScore": 110,
           "configuration": [
             {
               "name": "maxSize",
@@ -5238,6 +5281,11 @@
                       "`batchOverflow`",
                       "`BATCH_OVERFLOW`",
                       "pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃"
+                    ],
+                    [
+                      "`fileSinkUnavailable`",
+                      "`FILE_SINK_UNAVAILABLE`",
+                      "file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件"
                     ]
                   ]
                 }
@@ -5346,7 +5394,7 @@
               "optional": true,
               "description": "Schedules size-triggered output asynchronously instead of running it in the caller stack.",
               "descriptionEn": "Schedules size-triggered output asynchronously instead of running it in the caller stack.",
-              "descriptionZh": ""
+              "descriptionZh": "批次满时是否异步调度回调；默认 true。定时触发本身已是异步。"
             },
             {
               "name": "maxRetryAfterMs",
@@ -6875,6 +6923,11 @@
                       "`batchOverflow`",
                       "`BATCH_OVERFLOW`",
                       "pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃"
+                    ],
+                    [
+                      "`fileSinkUnavailable`",
+                      "`FILE_SINK_UNAVAILABLE`",
+                      "file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件"
                     ]
                   ]
                 }
@@ -7362,6 +7415,447 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "logger-plugins--UUID_PLUGIN_NAME"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "logger:plugins/file",
+      "library": "logger",
+      "module": "plugins/file",
+      "exportPath": "./plugins/file",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/logger/getting-started",
+      "architecturePath": "/en/architecture/logger",
+      "symbols": [
+        {
+          "name": "file",
+          "kind": "const",
+          "signature": "export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/plugin-host\").IPipelineMode, {}, Partial<import(\"./batch.js\").IBatchShared>>;",
+          "declarationLine": 5,
+          "source": "packages/logger/dist/plugins/file.d.ts",
+          "purpose": "Creates a file plugin that prefers injected fs and otherwise uses the Node default.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for file.",
+          "advanced": "No additional advanced behavior is declared for file.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for file."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for file.",
+          "examples": [
+            "import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')"
+          ],
+          "members": [],
+          "exportPath": "./plugins/file",
+          "overloadSignatures": [
+            "export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/plugin-host\").IPipelineMode, {}, Partial<import(\"./batch.js\").IBatchShared>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use file when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when file does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a file plugin that prefers injected fs and otherwise uses the Node default."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import file from @migaia/logger/plugins/file, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use file when its const contract and declared inputs match the result you need. Choose a different public symbol when file does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for file."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for file."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "path",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "batch",
+              "type": "IBatchPluginConfig",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "rotate",
+              "type": "{ readonly maxBytes?: number; readonly maxEntries?: number; }",
+              "optional": true,
+              "description": "Per-batch rotation threshold; injected fs supplies the rotation operation."
+            },
+            {
+              "name": "rotate.maxBytes",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "rotate.maxEntries",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "batch.maxSize",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "batch.maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "batch.maxConcurrentBatches",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum number of batches executing at once. Defaults to one for lossless delivery."
+            },
+            {
+              "name": "batch.maxPendingBatches",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum number of queued or executing batches. Defaults to 1024."
+            },
+            {
+              "name": "batch.asyncOutput",
+              "type": "boolean",
+              "optional": true,
+              "description": "批次满时是否异步调度回调；默认 true。定时触发本身已是异步。"
+            }
+          ],
+          "identity": "packages/logger/dist/plugins/file.d.ts:file:export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/plugin-host\").IPipelineMode, {}, Partial<import(\"./batch.js\").IBatchShared>>;",
+          "guidance": [
+            {
+              "id": "错误码速查",
+              "heading": "错误码速查",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "所有 Logger 自有错误都带 `source: '@migaia/logger'` 与下列稳定 `code`；业务日志入口通常不直接抛出 sink/plugin 失败，应通过 `onFailure()` 观察。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["`LoggerErrorCode`", "码值", "触发条件 / 处理"],
+                  "rows": [
+                    [
+                      "`invalidOption`",
+                      "`INVALID_OPTION`",
+                      "公开配置不可读或结构非法；修正配置，getter 原错误保留在 `cause`"
+                    ],
+                    [
+                      "`runtimeShuttingDown`",
+                      "`RUNTIME_SHUTTING_DOWN`",
+                      "runtime 已进入 shutdown 后仍安装 process/logger；等待终结或不要安装 process plugin"
+                    ],
+                    [
+                      "`pluginConfigConflict`",
+                      "`PLUGIN_CONFIG_CONFLICT`",
+                      "process plugin 以不同配置重复安装；统一配置或卸载后重装"
+                    ],
+                    [
+                      "`transportUnavailable`",
+                      "`TRANSPORT_UNAVAILABLE`",
+                      "http plugin 找不到 `fetch`；注入 runtime fetch 或换宿主"
+                    ],
+                    [
+                      "`serializeFailed`",
+                      "`SERIALIZE_FAILED`",
+                      "HTTP payload 序列化失败；检查 `cause` 与待记录数据"
+                    ],
+                    [
+                      "`deliveryFailed`",
+                      "`DELIVERY_FAILED`",
+                      "非成功响应或可重试传输耗尽；检查 endpoint/网络并由业务决定补偿"
+                    ],
+                    [
+                      "`invalidRetryCount`",
+                      "`INVALID_RETRY_COUNT`",
+                      "retries 不是有限非负整数；构造前修正"
+                    ],
+                    [
+                      "`lifecycleDeadline`",
+                      "`LIFECYCLE_DEADLINE`",
+                      "flush/shutdown 到达绝对截止时间仍有工作；按降级交付处理，不要假设全部送达"
+                    ],
+                    [
+                      "`processInstallRollbackFailed`",
+                      "`PROCESS_INSTALL_ROLLBACK_FAILED`",
+                      "process 安装失败且 listener 回滚也失败；展开 `AggregateError.errors`"
+                    ],
+                    [
+                      "`pluginUninstallCleanupFailed`",
+                      "`PLUGIN_UNINSTALL_CLEANUP_FAILED`",
+                      "plugin 最终卸载清理失败；检查 `cause`/`errors`，实例视为终结"
+                    ],
+                    [
+                      "`pluginShutdownCleanupFailed`",
+                      "`PLUGIN_SHUTDOWN_CLEANUP_FAILED`",
+                      "shutdown 的 deadline task 或退出清理失败；保留 primary 与 cleanup 错误"
+                    ],
+                    [
+                      "`hookFailed`",
+                      "`HOOK_FAILED`",
+                      "failure hook 自身失败的诊断码；只走 runtime reporter，不递归抛给业务入口"
+                    ],
+                    ["`extendsSelf`", "`EXTENDS_SELF`", "logger 转发给自身；移除自引用"],
+                    ["`extendsCycle`", "`EXTENDS_CYCLE`", "新 extends 边形成环；拆除环路"],
+                    [
+                      "`batchOverflow`",
+                      "`BATCH_OVERFLOW`",
+                      "pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃"
+                    ],
+                    [
+                      "`fileSinkUnavailable`",
+                      "`FILE_SINK_UNAVAILABLE`",
+                      "file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "usageScore": 34,
+          "configuration": [
+            {
+              "name": "path",
+              "type": "string",
+              "optional": false,
+              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
+              "descriptionEn": "",
+              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+            },
+            {
+              "name": "batch",
+              "type": "IBatchPluginConfig",
+              "optional": true,
+              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
+              "descriptionEn": "",
+              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+            },
+            {
+              "name": "rotate",
+              "type": "{ readonly maxBytes?: number; readonly maxEntries?: number; }",
+              "optional": true,
+              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
+              "descriptionEn": "Per-batch rotation threshold; injected fs supplies the rotation operation.",
+              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+            },
+            {
+              "name": "rotate.maxBytes",
+              "type": "number",
+              "optional": true,
+              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
+              "descriptionEn": "",
+              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+            },
+            {
+              "name": "rotate.maxEntries",
+              "type": "number",
+              "optional": true,
+              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
+              "descriptionEn": "",
+              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+            },
+            {
+              "name": "batch.maxSize",
+              "type": "number",
+              "optional": true,
+              "description": "Flushes a batch when it reaches this many entries.",
+              "descriptionEn": "Flushes a batch when it reaches this many entries.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "batch.maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "Flushes a non-empty batch after this many milliseconds.",
+              "descriptionEn": "Flushes a non-empty batch after this many milliseconds.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "batch.maxConcurrentBatches",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum number of batches executing at once. Defaults to one for lossless delivery.",
+              "descriptionEn": "Maximum number of batches executing at once. Defaults to one for lossless delivery.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "batch.maxPendingBatches",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum number of queued or executing batches. Defaults to 1024.",
+              "descriptionEn": "Maximum number of queued or executing batches. Defaults to 1024.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "batch.asyncOutput",
+              "type": "boolean",
+              "optional": true,
+              "description": "批次满时是否异步调度回调；默认 true。定时触发本身已是异步。",
+              "descriptionEn": "Schedules size-triggered output asynchronously instead of running it in the caller stack.",
+              "descriptionZh": "批次满时是否异步调度回调；默认 true。定时触发本身已是异步。"
+            }
+          ],
+          "fragment": "logger-plugins/file--file"
+        },
+        {
+          "name": "FILE_PLUGIN_NAME",
+          "kind": "const",
+          "signature": "export declare const FILE_PLUGIN_NAME: \"file\";",
+          "declarationLine": 14,
+          "source": "packages/logger/dist/plugins/file-core.d.ts",
+          "purpose": "FILE_PLUGIN_NAME is part of this module's public const contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for FILE_PLUGIN_NAME.",
+          "advanced": "No additional advanced behavior is declared for FILE_PLUGIN_NAME.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for FILE_PLUGIN_NAME."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for FILE_PLUGIN_NAME.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "FILE_PLUGIN_NAME",
+          "exportPath": "./plugins/file",
+          "overloadSignatures": ["export declare const FILE_PLUGIN_NAME: \"file\";"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use FILE_PLUGIN_NAME when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when FILE_PLUGIN_NAME does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "FILE_PLUGIN_NAME is part of this module's public const contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import FILE_PLUGIN_NAME from @migaia/logger/plugins/file, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use FILE_PLUGIN_NAME when its const contract and declared inputs match the result you need. Choose a different public symbol when FILE_PLUGIN_NAME does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for FILE_PLUGIN_NAME."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for FILE_PLUGIN_NAME."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/logger/dist/plugins/file-core.d.ts:FILE_PLUGIN_NAME:export declare const FILE_PLUGIN_NAME: \"file\";",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "logger-plugins/file--FILE_PLUGIN_NAME"
+        },
+        {
+          "name": "IFilePluginConfig",
+          "kind": "type",
+          "signature": "export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { readonly maxBytes?: number; readonly maxEntries?: number; }; };",
+          "declarationLine": 5,
+          "source": "packages/logger/dist/plugins/file-core.d.ts",
+          "purpose": "IFilePluginConfig is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFilePluginConfig.",
+          "advanced": "No additional advanced behavior is declared for IFilePluginConfig.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFilePluginConfig."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFilePluginConfig.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IFilePluginConfig",
+          "exportPath": "./plugins/file",
+          "overloadSignatures": [
+            "export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { readonly maxBytes?: number; readonly maxEntries?: number; }; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFilePluginConfig when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFilePluginConfig does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IFilePluginConfig is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFilePluginConfig from @migaia/logger/plugins/file, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFilePluginConfig when its type contract and declared inputs match the result you need. Choose a different public symbol when IFilePluginConfig does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFilePluginConfig."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFilePluginConfig."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/logger/dist/plugins/file-core.d.ts:IFilePluginConfig:export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { readonly maxBytes?: number; readonly maxEntries?: number; }; };",
+          "guidance": [],
+          "usageScore": 2,
+          "configuration": [],
+          "fragment": "logger-plugins/file--IFilePluginConfig"
         }
       ],
       "aliases": []

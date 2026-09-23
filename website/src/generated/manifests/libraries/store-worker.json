@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-worker",
     "description": "Worker adapters and worker-backed Resource/serialization integrations.",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "exports": [".", "./serialize/*"],
     "documentation": {
       "readme": {

@@ -3,7 +3,7 @@
   "library": {
     "slug": "web-rpc",
     "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
-    "version": "0.0.4",
+    "version": "0.0.7",
     "exports": [
       ".",
       "./adapters/broadcast-channel",
@@ -3523,7 +3523,7 @@
           "name": "createEndpoint",
           "kind": "const",
           "signature": "export declare const createEndpoint: IPublicCallable;",
-          "declarationLine": 23,
+          "declarationLine": 24,
           "source": "packages/web-rpc/dist/full.d.ts",
           "purpose": "Checked public boundary delegates to the original runtime without a second lifecycle path.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createEndpoint.",
@@ -13800,6 +13800,16 @@
           "ownerFragment": "web-rpc-full--createFullEndpoint"
         },
         {
+          "identity": "packages/web-rpc/dist/full.d.ts:createFullOneWayEndpoint:export declare const createFullOneWayEndpoint: IPublicCallable<IOneWaySurface>;",
+          "name": "createFullOneWayEndpoint",
+          "signature": "export declare const createFullOneWayEndpoint: IPublicCallable<IOneWaySurface>;",
+          "source": "packages/web-rpc/dist/full.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./full",
+          "ownerModule": "full",
+          "ownerFragment": "web-rpc-full--createFullOneWayEndpoint"
+        },
+        {
           "identity": "packages/web-rpc/dist/transport-constants.d.ts:IWebRpcCandidateStatus:export type IWebRpcCandidateStatus = (typeof WebRpcCandidateStatus)[keyof typeof WebRpcCandidateStatus];",
           "name": "IWebRpcCandidateStatus",
           "signature": "export type IWebRpcCandidateStatus = (typeof WebRpcCandidateStatus)[keyof typeof WebRpcCandidateStatus];",
@@ -16948,7 +16958,7 @@
           "signature": "export type IOneWaySurface = Readonly<{ sendOneWay: (targetId: string, method: string, data: unknown, options?: IWebRpcOneWayOptions) => Promise<void>; }>;",
           "declarationLine": 12,
           "source": "packages/web-rpc/dist/features/one-way.d.ts",
-          "purpose": "Public surface added only when callers explicitly select {@link oneWay}.",
+          "purpose": "Public surface added only when callers select the one-way endpoint preset.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IOneWaySurface.",
           "advanced": "No additional advanced behavior is declared for IOneWaySurface.",
           "parameters": ["This type declaration has no parameters."],
@@ -16970,7 +16980,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Public surface added only when callers explicitly select {@link oneWay}."
+              "content": "Public surface added only when callers select the one-way endpoint preset."
             },
             {
               "id": "getting-started",
@@ -17444,7 +17454,7 @@
           "name": "createFullEndpoint",
           "kind": "const",
           "signature": "export declare const createFullEndpoint: IPublicCallable;",
-          "declarationLine": 23,
+          "declarationLine": 24,
           "source": "packages/web-rpc/dist/full.d.ts",
           "purpose": "Checked public boundary delegates to the original runtime without a second lifecycle path.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createFullEndpoint.",
@@ -17503,6 +17513,69 @@
           "usageScore": 46,
           "configuration": [],
           "fragment": "web-rpc-full--createFullEndpoint"
+        },
+        {
+          "name": "createFullOneWayEndpoint",
+          "kind": "const",
+          "signature": "export declare const createFullOneWayEndpoint: IPublicCallable<IOneWaySurface>;",
+          "declarationLine": 26,
+          "source": "packages/web-rpc/dist/full.d.ts",
+          "purpose": "Creates the full endpoint preset with physical one-way delivery.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createFullOneWayEndpoint.",
+          "advanced": "No additional advanced behavior is declared for createFullOneWayEndpoint.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for createFullOneWayEndpoint."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createFullOneWayEndpoint.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./full",
+          "overloadSignatures": [
+            "export declare const createFullOneWayEndpoint: IPublicCallable<IOneWaySurface>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use createFullOneWayEndpoint when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createFullOneWayEndpoint does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates the full endpoint preset with physical one-way delivery."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createFullOneWayEndpoint from @migaia/web-rpc/full, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createFullOneWayEndpoint when its const contract and declared inputs match the result you need. Choose a different public symbol when createFullOneWayEndpoint does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createFullOneWayEndpoint."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createFullOneWayEndpoint."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/web-rpc/dist/full.d.ts:createFullOneWayEndpoint:export declare const createFullOneWayEndpoint: IPublicCallable<IOneWaySurface>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "web-rpc-full--createFullOneWayEndpoint"
         }
       ],
       "aliases": []

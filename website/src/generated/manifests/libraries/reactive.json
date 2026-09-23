@@ -3,7 +3,7 @@
   "library": {
     "slug": "reactive",
     "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "exports": [
       ".",
       "./copy-check",

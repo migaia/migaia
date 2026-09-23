@@ -95,8 +95,8 @@ function nodeFieldGuide(input: {
  * One coherent provider-to-consumer scenario kept separate from the descriptor and short-form
  * examples.
  */
-const definePluginSharedExampleCode = `import { definePlugin, setupHost } from '@migaia/plugin-host/defined'
-import type { IPluginHostCore } from '@migaia/plugin-host/structural'
+const definePluginSharedExampleCode = `import { definePlugin, defineHost } from '@migaia/plugin-host'
+import type { IPluginHostCore } from '@migaia/plugin-host'
 
 type ICacheShared = { readProduct(id: string): number | undefined }
 
@@ -121,16 +121,15 @@ const productReader = definePlugin<Record<string, never>, { loadProduct(id: stri
   }
 )
 
-const app = await setupHost({
+const host = defineHost({
   host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },
-  setupTimeoutMs: 10_000,
-  core: () => ({}),
-  // provider 必须排在 consumer 前面；整批成功后才一起对外可见。
-  plugins: [cacheProvider, productReader] as const
+  domainCore: () => ({})
 })
+// provider 必须排在 consumer 前面；整批成功后才一起对外可见。
+const app = await host.use(cacheProvider, productReader)
 
 console.log(app.extensions.loadProduct('sku-42')) // 199
-await app.dispose()`
+await host.dispose()`
 
 /** Complete guides for public operations added after the original website inventory. */
 export const completionApiGuides: Readonly<
@@ -143,7 +142,7 @@ export const completionApiGuides: Readonly<
       '定义一项同步且不透明的 Feature 能力；它不会创建 Host、安装 Plugin、启动资源或发布方法。Plugin 在静态 record 中声明 Feature；安装时 factory 只能收到 featureExpose 与直接依赖的输出。异步工作和清理必须放在 Plugin 的 install hook 中。',
     quickStart: `import { defineFeature } from '@migaia/plugin-host'
 import type { IFeatureCore } from '@migaia/plugin-host'
-import { definePlugin, setupHost } from '@migaia/plugin-host/defined'
+import { definePlugin, defineHost } from '@migaia/plugin-host'
 
 const values = [10, 20, 30]
 const metrics = defineFeature((core: IFeatureCore<{ readCount(): number }>) => ({
@@ -161,13 +160,12 @@ const counter = definePlugin('counter', (core) => ({
   }
 }), { metrics })
 
-const host = await setupHost({
+const host = defineHost({
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
-  setupTimeoutMs: false,
-  core: () => ({}),
-  plugins: [counter] as const
+  domainCore: () => ({})
 })
-console.log(host.extensions.readMetric(), host.extensions.sumMetric())
+const view = await host.use(counter)
+console.log(view.extensions.readMetric(), view.extensions.sumMetric())
 await host.dispose()`,
     scenariosEn: [
       'Define a reusable synchronous capability with explicitly declared direct dependencies.',
@@ -218,15 +216,15 @@ console.log(factoryCalls) // 0: inspection never invokes factories`,
       '需要校验不可信对象时；准入会拒绝伪造 Feature。'
     ]
   }),
-  'plugin-host:defined:definePlugin': guide({
+  'plugin-host:index:definePlugin': guide({
     purposeEn:
-      'Defines and validates a reusable plugin descriptor; it does not install the plugin. Installation through setupHost() or host.use() gives the plugin a core, publishes shared capabilities for later plugins, and merges the object returned by install() into the Host extensions view. The full descriptor also owns configuration updates and cleanup, so one definition describes the complete install-to-dispose lifecycle.',
+      'Defines and validates a reusable plugin descriptor; it does not install the plugin. Installation through a Host handle or class instance gives the plugin a core, publishes shared capabilities for later plugins, and merges the object returned by install() into the Host extensions view. The full descriptor also owns configuration updates and cleanup, so one definition describes the complete install-to-dispose lifecycle.',
     purposeZh:
-      '定义并校验一个可复用的插件描述，但不会立刻安装。通过 setupHost() 或 host.use() 安装后，插件获得 core；shared 能力会提供给后续插件；install() 返回的 extension 会合并到宿主的 extensions 视图。完整描述还可声明配置更新与清理，因此一个定义覆盖从安装到卸载的完整生命周期。core = 插件可以使用的宿主能力，shared = 插件之间复用的能力，extension = 业务代码从宿主上调用的能力。',
+      '定义并校验一个可复用的插件描述，但不会立刻安装。通过函数式 Host handle 或 class 实例的 use() 安装后，插件获得 core；shared 能力会提供给后续插件；install() 返回的 extension 会合并到宿主的 extensions 视图。完整描述还可声明配置更新与清理，因此一个定义覆盖从安装到卸载的完整生命周期。core = 插件可以使用的宿主能力，shared = 插件之间复用的能力，extension = 业务代码从宿主上调用的能力。',
     quickStart: `import {
   definePlugin,
-  setupHost
-} from '@migaia/plugin-host/defined'
+  defineHost
+} from '@migaia/plugin-host'
 
 type IAppCore = {
   reportCacheSize(size: number): void
@@ -270,23 +268,22 @@ const productCache = definePlugin<
   dispose: () => cache.clear()
 })
 
-const app = await setupHost({
+const host = defineHost({
   host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },
-  setupTimeoutMs: 10_000,
-  core: () => ({ reportCacheSize: (size: number) => console.log(size) }),
-  plugins: [productCache] as const
+  domainCore: () => ({ reportCacheSize: (size: number) => console.log(size) })
 })
+const app = await host.use(productCache)
 
 app.extensions.clearProductCache()
 await app.config.update('product-cache', () => ({ ttlMs: 60_000 }))
-await app.dispose()`,
+await host.dispose()`,
     examplesEn: [
       {
         id: 'short-form',
         title: 'Short form: definePlugin(name, descriptorFactory)',
         description:
           'Use this form when a stable name and per-install descriptor are enough. Its install hook returns the typed Host extension; use core.onDispose() for resources created inside install. Use the retained object form for config, shared, update, metadata, or a top-level disposer.',
-        code: `import { definePlugin, setupHost } from '@migaia/plugin-host/defined'
+        code: `import { definePlugin, defineHost } from '@migaia/plugin-host'
 
 type IAppCore = { audit(message: string): void }
 
@@ -301,15 +298,14 @@ const greeting = definePlugin<IAppCore, { greet(name: string): string }>(
   })
 )
 
-const app = await setupHost({
+const host = defineHost({
   host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },
-  setupTimeoutMs: 10_000,
-  core: () => ({ audit: (message: string) => console.log(message) }),
-  plugins: [greeting] as const
+  domainCore: () => ({ audit: (message: string) => console.log(message) })
 })
+const app = await host.use(greeting)
 
 console.log(app.extensions.greet('Migaia'))
-await app.dispose()`
+await host.dispose()`
       },
       {
         id: 'shared-collaboration',
@@ -325,7 +321,7 @@ await app.dispose()`
         title: '短写法：definePlugin(name, descriptorFactory)',
         description:
           '只有稳定名称与逐安装 descriptor 时使用这个形式。其 install hook 返回的对象成为有类型的 Host extension；install 内创建的资源可用 core.onDispose() 登记。需要 config、shared、update、metadata 或顶层 disposer 时使用保留对象形。',
-        code: `import { definePlugin, setupHost } from '@migaia/plugin-host/defined'
+        code: `import { definePlugin, defineHost } from '@migaia/plugin-host'
 
 type IAppCore = { audit(message: string): void }
 
@@ -340,15 +336,14 @@ const greeting = definePlugin<IAppCore, { greet(name: string): string }>(
   })
 )
 
-const app = await setupHost({
+const host = defineHost({
   host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },
-  setupTimeoutMs: 10_000,
-  core: () => ({ audit: (message: string) => console.log(message) }),
-  plugins: [greeting] as const
+  domainCore: () => ({ audit: (message: string) => console.log(message) })
 })
+const app = await host.use(greeting)
 
 console.log(app.extensions.greet('Migaia'))
-await app.dispose()`
+await host.dispose()`
       },
       {
         id: 'shared-collaboration',
@@ -372,12 +367,12 @@ await app.dispose()`
     ],
     avoidEn: [
       'The behavior is a one-off call and owns no install-time state or cleanup; use a normal function.',
-      'The capability belongs to the application core and every plugin needs it; provide it from setupHost().core instead.',
+      'The capability belongs to the application core and every plugin needs it; provide it from defineHost().domainCore instead.',
       'Do not read a shared capability from a plugin installed later, or publish duplicate shared/extension keys; the batch is rejected and rolled back.'
     ],
     avoidZh: [
       '行为只是一次性调用，不持有安装态资源，也无需清理；应使用普通函数。',
-      '能力属于应用 core 且所有插件都需要；应改由 setupHost().core 提供。',
+      '能力属于应用 core 且所有插件都需要；应改由 defineHost().domainCore 提供。',
       '不要读取后安装插件的 shared，也不要发布重复的 shared/extension 键；整批安装会被拒绝并回滚。'
     ],
     optionsEn: [
@@ -476,37 +471,37 @@ await app.dispose()`
       }
     ]
   }),
-  'plugin-host:defined:setupHost': guide({
+  'plugin-host:index:defineHost': guide({
     purposeEn:
-      'Creates the domain core, installs the initial plugin list as one transaction, and returns a ready-to-use immutable view. Cancellation or failure removes resources created by both the core and plugins before rejecting.',
+      'Creates a frozen functional Host handle over the canonical PluginHost engine. The domainCore callback replaces subclassing, while use() keeps plugin batches atomic and dispose() remains the single terminal cleanup authority.',
     purposeZh:
-      '先创建领域 core，再把首批插件作为一个事务安装，最后返回可直接使用的不可变视图。取消或失败时，会先清理 core 与插件已经创建的资源再 reject。',
+      '基于规范 PluginHost 引擎创建冻结的函数式 Host handle。domainCore 回调替代继承；use() 仍保证插件批次原子提交，dispose() 仍是唯一终态清理入口。',
     quickStart:
-      "import { definePlugin, setupHost } from '@migaia/plugin-host/defined'\n\nconst greeting = definePlugin('greeting', (core: { prefix: string }) => ({\n  install: () => ({\n    greet: (name: string) => `${core.prefix}, ${name}`\n  })\n}))\n\nconst app = await setupHost({\n  host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },\n  setupTimeoutMs: 10_000,\n  core: () => ({ prefix: 'Hello' }),\n  plugins: [greeting]\n})\n\nconsole.log(app.extensions.greet('Ada'))\nawait app.dispose()",
+      "import { definePlugin, defineHost } from '@migaia/plugin-host'\n\nconst greeting = definePlugin('greeting', (core: { prefix: string }) => ({\n  install: () => ({\n    greet: (name: string) => `${core.prefix}, ${name}`\n  })\n}))\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },\n  domainCore: () => ({ prefix: 'Hello' })\n})\nconst app = await host.use(greeting)\n\nconsole.log(app.extensions.greet('Ada'))\nawait host.dispose()",
     scenariosEn: [
-      'Application startup needs a core and plugins to become visible only after all setup succeeds.',
-      'Core resources and plugin resources require one disposal authority.'
+      'A package needs a Host value without exposing an inheritance hierarchy.',
+      'Each plugin registration needs domain capabilities derived from its name or batch position.'
     ],
     scenariosZh: [
-      '应用启动时只有 core 与全部插件都成功后才能对外可见。',
-      'core 资源与插件资源需要由同一个 dispose 入口统一清理。'
+      '包需要持有 Host 值，但不希望公开继承层次。',
+      '每个插件 registration 需要按插件名或批次位置构造领域能力。'
     ],
     avoidEn: [
       'A long-lived subclass must expose custom protected pipeline methods; extend PluginHost instead.',
-      'The caller cannot provide finite setup and mutation budgets or explicitly choose false.'
+      'Do not put application startup work in domainCore; install resources through a plugin so rollback and cleanup stay owned.'
     ],
     avoidZh: [
       '长期存在的子类需要公开自定义 protected pipeline 方法；此时应继承 PluginHost。',
-      '调用方无法提供有限的 setup、mutation 预算，也没有明确选择 false。'
+      '不要在 domainCore 中执行应用启动工作；资源应由插件安装，以保持回滚与清理所有权。'
     ]
   }),
-  'plugin-host:defined:PluginHostError': guide({
+  'plugin-host:index:PluginHostError': guide({
     purposeEn:
       'Represents recoverable Plugin Host state and protocol failures with stable source and code fields. Input-shape failures remain native TypeError values, so callers can distinguish bad input from host lifecycle failures.',
     purposeZh:
       '用稳定的 source 与 code 表示可处理的 Plugin Host 状态或协议失败。原始失败通过 cause 保持可达，不可变结构化诊断放入 detail；输入形状错误仍保持原生 TypeError，因此调用方能区分错误输入与 Host 生命周期失败。',
     quickStart:
-      "import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host/defined'\n\nconst reportInstallFailure = (cause: unknown) => console.error('plugin install failed', cause)\nconst host = { use: async (_plugin: unknown) => { throw new PluginHostError(PluginHostErrorCode.pluginInstallFailed, 'plugin install failed', { cause: new Error('backend unavailable') }) } }\nconst plugin = { name: 'analytics' }\n\ntry {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed) {\n    reportInstallFailure(error.cause)\n  }\n}",
+      "import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nconst reportInstallFailure = (cause: unknown) => console.error('plugin install failed', cause)\nconst host = { use: async (_plugin: unknown) => { throw new PluginHostError(PluginHostErrorCode.pluginInstallFailed, 'plugin install failed', { cause: new Error('backend unavailable') }) } }\nconst plugin = { name: 'analytics' }\n\ntry {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed) {\n    reportInstallFailure(error.cause)\n  }\n}",
     scenariosEn: [
       'A caller can recover, report, or retry based on a stable Plugin Host error code.',
       'Structured detail is needed without parsing the human-readable message.'
@@ -577,13 +572,13 @@ await app.dispose()`
     ],
     avoidZh: ['不要用它表示正常 Host 状态。', '不要用它表示参数形状错误；该类错误属于 TypeError。']
   }),
-  'plugin-host:structural:PluginHost': guide({
+  'plugin-host:index:PluginHost': guide({
     purposeEn:
       'Abstract base class for a long-lived domain Host. It owns atomic plugin installation and rollback, immutable revocable views, extensions, shared capabilities, configuration updates, four pipeline models, serialized mutations, bounded logical removal with observable physical cleanup, and terminal disposal. Subclasses supply the domain core and expose business methods that run the protected pipeline; graph/composition owners can additionally use its two-phase admission and removal boundary.',
     purposeZh:
       '面向长期运行领域宿主的抽象基类。它统一拥有：插件整批原子安装与失败回滚、不可变且可撤销的 view、extension、shared、配置更新、四种 pipeline、mutation 串行队列、先逻辑撤销再观察物理清理，以及 Host 最终 dispose。子类负责提供领域 core，并把 protected runPipeline() 包装成业务方法；依赖图或组合器还可使用两阶段 admission/removal 集成边界。',
-    quickStart: `import { PluginHost } from '@migaia/plugin-host/structural'
-import { definePlugin } from '@migaia/plugin-host/defined'
+    quickStart: `import { PluginHost } from '@migaia/plugin-host'
+import { definePlugin } from '@migaia/plugin-host'
 
 type IAppCore = { write(message: string): void }
 type IGreetingConfig = { prefix: string }
@@ -675,13 +670,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       '依赖图或 loader 需要 prepare/commit/discard 两阶段集成，且不能提前发布候选状态。'
     ],
     avoidEn: [
-      'Startup only needs a functional core and one initial plugin list; setupHost() is smaller and does not require subclassing.',
+      'The Host only needs callback-based domain-core construction and no protected subclass surface; use defineHost() instead.',
       'Features are static and own no resources, configuration, shared state, or pipeline stages; compose plain objects or functions.',
       'Plugins require dependency ordering or cross-process isolation; PluginHost executes an already ordered in-realm composition and does not solve either concern.',
       'Application code should not call the admission, ordering-slot, or prepared-removal methods; those are framework integration boundaries.'
     ],
     avoidZh: [
-      '启动阶段只需要函数式 core 和一组初始插件；setupHost() 更小，也不需要继承。',
+      'Host 只需要回调式 domain core 构造，不需要 protected 子类表面；此时使用 defineHost()。',
       '功能固定且不拥有资源、配置、shared 或 pipeline stage；直接组合普通对象或函数。',
       '插件需要自动依赖排序或跨进程隔离；PluginHost 只执行已经排好序的当前 realm 组合，不解决这两件事。',
       '普通业务代码不要调用 admission、ordering slot 或 prepared removal 方法；它们属于框架集成边界。'
@@ -902,7 +897,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       guide({
         purposeEn: `Adapts an existing Plugin Host pipeline stage to the execution shape named by ${name}, while preserving value flow, terminal signals, next-call violations, and thrown error identity.`,
         purposeZh: `把现有${sourceZh}转换为${targetZh}，同时保留 value 流、终止信号、next 调用违规和抛出错误的身份。`,
-        quickStart: `import { ${name}, setupHost } from '@migaia/plugin-host'\n\nconst stage = (value: number, next: (value: number) => number) => next(value + 1)\nconst adaptedStage = ${name}(stage${needsViolationHandler ? ', (violation) => console.warn(violation)' : ''})\nconst host = await setupHost({ plugins: [] })\nconst installedHost = host.${installMethod}(adaptedStage)\nconsole.log(installedHost === host) // true\nawait host.dispose()`,
+        quickStart: `import { ${name}, defineHost } from '@migaia/plugin-host'\n\nconst stage = (value: number, next: (value: number) => number) => next(value + 1)\nconst adaptedStage = ${name}(stage${needsViolationHandler ? ', (violation) => console.warn(violation)' : ''})\nconst host = defineHost<Record<string, never>, number>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\nconst installedHost = host.${installMethod}(adaptedStage)\nconsole.log(installedHost === host) // true\nawait host.dispose()`,
         scenariosEn: [
           'A host selected one pipeline execution mode but an existing stage uses another supported shape.',
           'Migration must preserve the canonical middleware violation policy.'
@@ -991,13 +986,106 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       '调用方需要修改注册状态或查看 Host 内部数据。'
     ]
   }),
-  'plugin-host:structural:readPluginHostDisposalProvenance': guide({
+  'plugin-host:composition:buildManagedPort': guide({
+    purposeEn:
+      'Builds the frozen managed-composition port for a PluginHost-owned runtime. Its revision and current-view readers stay live across commits; this is infrastructure wiring, not an application extension API.',
+    purposeZh:
+      '为 PluginHost 持有的运行时构造冻结的受管组合端口。revision 与当前视图的读取函数在提交后仍读取实时状态；这是宿主基础设施接线，不是应用扩展 API。',
+    quickStart:
+      "import { buildManagedPort } from '@migaia/plugin-host/composition'\n\nexport function createHostPort(\n  runtime: Parameters<typeof buildManagedPort>[0],\n  readRevision: () => number,\n  readCurrentView: () => unknown\n) {\n  return buildManagedPort(runtime, readRevision, readCurrentView)\n}",
+    scenariosEn: [
+      'PluginHost infrastructure exposes its existing composition runtime through one protocol port.',
+      'A composition consumer must read the current revision and committed view after each change.'
+    ],
+    scenariosZh: [
+      'PluginHost 基础设施需要通过单一协议端口公开已有组合运行时。',
+      '组合层使用方需要在每次变更后读取最新代次和已提交视图。'
+    ],
+    avoidEn: [
+      'Application code only installs plugins; use defineHost or PluginHost instead.',
+      'Do not build a second runtime or snapshot the revision in an adapter.'
+    ],
+    avoidZh: [
+      '应用代码只需安装插件时；应使用 defineHost 或 PluginHost。',
+      '不要在适配层另建运行时，也不要把 revision 固定为快照。'
+    ]
+  }),
+  'plugin-host:composition:registerManagedHost': guide({
+    purposeEn:
+      'Associates a PluginHost-created host with its managed protocol port after construction. The registration belongs to host infrastructure and lets composition consumers discover the exact port without exposing mutable internals.',
+    purposeZh:
+      '在构造完成后，将 PluginHost 创建的宿主与其受管协议端口关联。登记由宿主基础设施负责，让组合层找到准确端口，同时不公开可变内部状态。',
+    quickStart:
+      "import { registerManagedHost } from '@migaia/plugin-host/composition'\n\nexport function finishHostConstruction(\n  host: object,\n  port: Parameters<typeof registerManagedHost>[1]\n) {\n  registerManagedHost(host, port)\n  return host\n}",
+    scenariosEn: [
+      'A host constructor has finished wiring its own composition runtime and port.',
+      'The composition adapter needs a package-owned association for a constructed host.'
+    ],
+    scenariosZh: [
+      '宿主构造器已完成自身组合运行时与端口的接线。',
+      '组合适配层需要由包自身维护已构造宿主的端口关联。'
+    ],
+    avoidEn: [
+      'Do not register arbitrary application objects as managed hosts.',
+      'Application consumers should install plugins through the host API, not register ports.'
+    ],
+    avoidZh: [
+      '不要把任意应用对象登记为受管宿主。',
+      '应用使用方应通过宿主 API 安装插件，而不是登记端口。'
+    ]
+  }),
+  'plugin-host:composition:isManagedHost': guide({
+    purposeEn:
+      'Checks whether a value is a host registered by this PluginHost package, including function-form hosts. Composition adapters use this predicate instead of an instanceof check before opening the managed port.',
+    purposeZh:
+      '检查一个值是否为本 PluginHost 包登记的宿主，也支持函数式宿主。组合适配层在打开受管端口前使用此判定，不依赖 instanceof。',
+    quickStart:
+      "import { isManagedHost, openComposition } from '@migaia/plugin-host/composition'\n\nexport function readManagedPort(value: unknown) {\n  if (!isManagedHost(value)) return undefined\n  return openComposition(value as object)\n}",
+    scenariosEn: [
+      'A composition adapter receives an unknown target and must recognize managed hosts.',
+      'A function-form host cannot be identified reliably with a class-only check.'
+    ],
+    scenariosZh: [
+      '组合适配层收到未知目标，需要识别受管宿主。',
+      '函数式宿主无法可靠地通过只针对 class 的判定识别。'
+    ],
+    avoidEn: [
+      'Do not use this predicate as general plugin-descriptor validation.',
+      'Application code that already owns a host handle does not need protocol discovery.'
+    ],
+    avoidZh: [
+      '不要把此判定当作通用插件描述校验。',
+      '已经持有宿主 handle 的应用代码不需要发现内部协议。'
+    ]
+  }),
+  'plugin-host:composition:openComposition': guide({
+    purposeEn:
+      'Returns the managed composition port registered for a host, or throws COMPOSITION_TARGET_UNMANAGED for an unregistered target. The port delegates admission and commit work to the host-owned runtime.',
+    purposeZh:
+      '返回已登记宿主的受管组合端口；目标未登记时抛出 COMPOSITION_TARGET_UNMANAGED。端口把准入与提交工作委托给宿主持有的运行时。',
+    quickStart:
+      "import { isManagedHost, openComposition } from '@migaia/plugin-host/composition'\n\nexport function currentManagedView(target: unknown) {\n  if (!isManagedHost(target)) return undefined\n  return openComposition(target as object).getCurrentView()\n}",
+    scenariosEn: [
+      'A composition adapter needs the live protocol of a recognized PluginHost host.',
+      'The adapter needs the committed current view rather than a stale construction snapshot.'
+    ],
+    scenariosZh: [
+      '组合适配层需要访问已识别 PluginHost 宿主的实时协议。',
+      '适配层需要已提交的当前视图，而不是构造时留下的旧快照。'
+    ],
+    avoidEn: [
+      'Do not open an arbitrary object without checking host ownership first.',
+      'Application code should consume the public host view instead of the composition protocol.'
+    ],
+    avoidZh: ['不要在确认宿主归属前打开任意对象。', '应用代码应使用公开宿主视图，而不是组合协议。']
+  }),
+  'plugin-host:index:readPluginHostDisposalProvenance': guide({
     purposeEn:
       'Reads disposal provenance attached by this exact Plugin Host module instance. It returns undefined for ordinary values and foreign module copies instead of trusting structural lookalikes.',
     purposeZh:
       '读取由当前 Plugin Host 模块实例附加的 dispose 来源信息。普通值和其他模块副本创建的值返回 undefined，不会信任仅结构相似的对象。',
     quickStart:
-      "import { readPluginHostDisposalProvenance } from '@migaia/plugin-host/structural'\n\nexport function describeResourceOwnership(resource: unknown) {\n  const provenance = readPluginHostDisposalProvenance(resource)\n  if (provenance) console.log(provenance.kind)\n  return provenance\n}",
+      "import { readPluginHostDisposalProvenance } from '@migaia/plugin-host'\n\nexport function describeResourceOwnership(resource: unknown) {\n  const provenance = readPluginHostDisposalProvenance(resource)\n  if (provenance) console.log(provenance.kind)\n  return provenance\n}",
     scenariosEn: [
       'Cleanup diagnostics need to identify which Host node owns a resource.',
       'A test verifies physical cleanup without exposing mutable disposal state.'

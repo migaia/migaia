@@ -3,7 +3,7 @@
   "library": {
     "slug": "event-subscriber",
     "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "exports": [".", "./subscriber"],
     "documentation": {
       "readme": {
@@ -1468,6 +1468,12 @@
               "description": "Maximum listener invocations in one top-level synchronous publish transaction."
             },
             {
+              "name": "throwOnAborted",
+              "type": "boolean",
+              "optional": true,
+              "description": "Makes already-aborted canonical-channel admission fail after owned cleanup completes."
+            },
+            {
               "name": "style",
               "type": "IEventApiStyleOption<S>",
               "optional": true,
@@ -1777,6 +1783,14 @@
               "description": "`publishBudget` 默认 `100_000`，必须是正安全整数。它限制一次顶层同步发布事务内实际调用的 listener 总数（包括 nested publish 展开的调用）；预算耗尽时停止继续展开，并以 `PUBLISH_FAILED` 抛出且在 `error.detail` 中记录已处理数量，避免递归或重入发布无限占用线程。",
               "descriptionEn": "Maximum listener invocations in one top-level synchronous publish transaction.",
               "descriptionZh": "`publishBudget` 默认 `100_000`，必须是正安全整数。它限制一次顶层同步发布事务内实际调用的 listener 总数（包括 nested publish 展开的调用）；预算耗尽时停止继续展开，并以 `PUBLISH_FAILED` 抛出且在 `error.detail` 中记录已处理数量，避免递归或重入发布无限占用线程。"
+            },
+            {
+              "name": "throwOnAborted",
+              "type": "boolean",
+              "optional": true,
+              "description": "Makes already-aborted canonical-channel admission fail after owned cleanup completes.",
+              "descriptionEn": "Makes already-aborted canonical-channel admission fail after owned cleanup completes.",
+              "descriptionZh": ""
             },
             {
               "name": "style",
@@ -2656,7 +2670,7 @@
         {
           "name": "EventSubscriberErrorCode",
           "kind": "const",
-          "signature": "export declare const EventSubscriberErrorCode: { /** Invalid listener/reporter or terminal reporter input; caller must pass a function. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** One or more listeners failed after the full target snapshot was processed. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; };",
+          "signature": "export declare const EventSubscriberErrorCode: { /** Invalid listener/reporter or terminal reporter input; caller must pass a function. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: \"ABORTED\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** One or more listeners failed after the full target snapshot was processed. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; };",
           "declarationLine": 4,
           "source": "packages/event-subscriber/dist/error-code.d.ts",
           "purpose": "The module-local error code declaration site.",
@@ -2676,7 +2690,7 @@
           "aliasOf": "EventSubscriberErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const EventSubscriberErrorCode: { /** Invalid listener/reporter or terminal reporter input; caller must pass a function. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** One or more listeners failed after the full target snapshot was processed. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; };"
+            "export declare const EventSubscriberErrorCode: { /** Invalid listener/reporter or terminal reporter input; caller must pass a function. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: \"ABORTED\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** One or more listeners failed after the full target snapshot was processed. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2715,7 +2729,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/error-code.d.ts:EventSubscriberErrorCode:export declare const EventSubscriberErrorCode: { /** Invalid listener/reporter or terminal reporter input; caller must pass a function. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** One or more listeners failed after the full target snapshot was processed. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the package rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; };",
+          "identity": "packages/event-subscriber/dist/error-code.d.ts:EventSubscriberErrorCode:export declare const EventSubscriberErrorCode: { /** Invalid listener/reporter or terminal reporter input; caller must pass a function. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: \"ABORTED\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** One or more listeners failed after the full target snapshot was processed. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the package rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the package rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; };",
           "guidance": [
             {
               "id": "错误码",
@@ -2979,7 +2993,7 @@
           "name": "ICanonicalEventChannel",
           "kind": "type",
           "signature": "export type ICanonicalEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventChannel<T, R, S, V> & { readonly [canonicalChannelBrand]: true; };",
-          "declarationLine": 141,
+          "declarationLine": 136,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "ICanonicalEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICanonicalEventChannel.",
@@ -3181,7 +3195,7 @@
           "name": "IEventChannel",
           "kind": "type",
           "signature": "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
-          "declarationLine": 116,
+          "declarationLine": 111,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannel.",
@@ -3248,8 +3262,8 @@
         {
           "name": "IEventChannelOptions",
           "kind": "type",
-          "signature": "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
-          "declarationLine": 183,
+          "signature": "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** Makes already-aborted canonical-channel admission fail after owned cleanup completes. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
+          "declarationLine": 178,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelOptions.",
@@ -3267,7 +3281,7 @@
           "aliasOf": "IEventChannelOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };"
+            "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** Makes already-aborted canonical-channel admission fail after owned cleanup completes. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3306,7 +3320,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannelOptions:export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannelOptions:export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** Makes already-aborted canonical-channel admission fail after owned cleanup completes. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
           "guidance": [],
           "usageScore": 26,
           "configuration": [],
@@ -3316,7 +3330,7 @@
           "name": "IEventChannelSubscription",
           "kind": "type",
           "signature": "export type IEventChannelSubscription<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = IUnsubscribe & { readonly unsubscribe: IEventChannelSubscription<T, R, S, V>; readonly subscribe: (listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IEventChannelSubscription<T, R, S, V>; } & IEventChannelSubscriptionStyleProjection<T, R, S, V>;",
-          "declarationLine": 22,
+          "declarationLine": 23,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelSubscription is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelSubscription.",
@@ -3447,7 +3461,7 @@
           "name": "IEventHub",
           "kind": "type",
           "signature": "export type IEventHub<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S, V>; publish<K extends keyof C>(key: K, value: C[K]): void; clear(key?: keyof C): void; size(key?: keyof C): number; };",
-          "declarationLine": 158,
+          "declarationLine": 153,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHub is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHub.",
@@ -3516,7 +3530,7 @@
           "name": "IEventHubOptions",
           "kind": "type",
           "signature": "export type IEventHubOptions<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventHubReport<C, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<C[keyof C], V>; };",
-          "declarationLine": 152,
+          "declarationLine": 147,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubOptions.",
@@ -3584,7 +3598,7 @@
           "name": "IEventHubReport",
           "kind": "type",
           "signature": "export type IEventHubReport<C extends IEventMap, V = undefined> = { [K in keyof C]: { readonly key: K; readonly event: IProjectedEventContext<C[K], IEventValueForKey<C[K], V>>; readonly error: unknown; }; }[keyof C];",
-          "declarationLine": 145,
+          "declarationLine": 140,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubReport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubReport.",
@@ -3651,7 +3665,7 @@
           "name": "IEventHubSubscription",
           "kind": "type",
           "signature": "export type IEventHubSubscription<C extends IEventMap, UsedKeys = never, S extends IEventApiStyle | undefined = undefined, V = undefined> = IUnsubscribe & { readonly unsubscribe: IEventHubSubscription<C, UsedKeys, S, V>; readonly subscribe: <K extends IEventHubAvailableKey<C, UsedKeys>>(key: K, listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>) => IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>; } & IEventHubSubscriptionStyleProjection<C, UsedKeys, S, V>;",
-          "declarationLine": 28,
+          "declarationLine": 29,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubSubscription is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubSubscription.",
@@ -3718,7 +3732,7 @@
           "name": "IEventInvocation",
           "kind": "type",
           "signature": "export type IEventInvocation<R> = { readonly taskId: string | undefined; invoke(): R | PromiseLike<R>; };",
-          "declarationLine": 66,
+          "declarationLine": 61,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Opaque invocation entry used by consumers that must not receive listener ownership.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventInvocation.",
@@ -3782,7 +3796,7 @@
           "name": "IEventInvocationVisitor",
           "kind": "type",
           "signature": "export type IEventInvocationVisitor<R> = (entries: readonly IEventInvocation<R>[]) => void | PromiseLike<void>;",
-          "declarationLine": 71,
+          "declarationLine": 66,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Callback supplied to the module-owned invocation scope.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventInvocationVisitor.",
@@ -3846,7 +3860,7 @@
           "name": "IEventMap",
           "kind": "type",
           "signature": "export type IEventMap = object;",
-          "declarationLine": 144,
+          "declarationLine": 139,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventMap is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventMap.",
@@ -3912,7 +3926,7 @@
           "name": "IEventReport",
           "kind": "type",
           "signature": "export type IEventReport<T, V = undefined> = { readonly event: IProjectedEventContext<T, V>; readonly error: unknown; };",
-          "declarationLine": 76,
+          "declarationLine": 71,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventReport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventReport.",
@@ -3978,7 +3992,7 @@
           "name": "IEventSubscriberErrorCode",
           "kind": "type",
           "signature": "export type IEventSubscriberErrorCode = (typeof EventSubscriberErrorCode)[keyof typeof EventSubscriberErrorCode];",
-          "declarationLine": 49,
+          "declarationLine": 56,
           "source": "packages/event-subscriber/dist/error-code.d.ts",
           "purpose": "IEventSubscriberErrorCode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventSubscriberErrorCode.",
@@ -4184,7 +4198,7 @@
           "name": "IEventValueConfig",
           "kind": "type",
           "signature": "export type IEventValueConfig<T> = { readonly readPath: IObjectPath<T> | ''; readonly alias: string; };",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventValueConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventValueConfig.",
@@ -4248,7 +4262,7 @@
           "name": "IFilteredEventChannel",
           "kind": "type",
           "signature": "export type IFilteredEventChannel<T, R = void, V = undefined> = { readonly [filteredChannelBrand]: { readonly value: T; readonly result: R; readonly config: V; }; };",
-          "declarationLine": 134,
+          "declarationLine": 129,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IFilteredEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFilteredEventChannel.",
@@ -4317,7 +4331,7 @@
           "name": "IListenerResult",
           "kind": "type",
           "signature": "export type IListenerResult<R> = { readonly status: typeof EventSubscriberState.fulfilled; readonly value: Awaited<R>; } | { readonly status: typeof EventSubscriberState.rejected; readonly reason: unknown; };",
-          "declarationLine": 80,
+          "declarationLine": 75,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IListenerResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IListenerResult.",
@@ -5250,7 +5264,7 @@
           "name": "IStyledEventChannel",
           "kind": "type",
           "signature": "export type IStyledEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventChannel<T, R, S, V> & IEventChannelStyleProjection<T, R, S, V>;",
-          "declarationLine": 131,
+          "declarationLine": 126,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IStyledEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStyledEventChannel.",
@@ -5314,7 +5328,7 @@
           "name": "IStyledEventHub",
           "kind": "type",
           "signature": "export type IStyledEventHub<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventHub<C, S, V> & IEventHubStyleProjection<C, S, V>;",
-          "declarationLine": 182,
+          "declarationLine": 177,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IStyledEventHub is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStyledEventHub.",
@@ -5454,9 +5468,9 @@
       ],
       "aliases": [
         {
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventAbortSignal:export type IEventAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: IEventSubscriberAbortType, listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: IEventSubscriberAbortType, listener: () => void): void; };",
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventAbortSignal:export type IEventAbortSignal = IAbortSignal;",
           "name": "IEventAbortSignal",
-          "signature": "export type IEventAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: IEventSubscriberAbortType, listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: IEventSubscriberAbortType, listener: () => void): void; };",
+          "signature": "export type IEventAbortSignal = IAbortSignal;",
           "source": "packages/event-subscriber/dist/types.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./subscriber",
@@ -5564,10 +5578,10 @@
         {
           "name": "IEventAbortSignal",
           "kind": "type",
-          "signature": "export type IEventAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: IEventSubscriberAbortType, listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: IEventSubscriberAbortType, listener: () => void): void; };",
-          "declarationLine": 37,
+          "signature": "export type IEventAbortSignal = IAbortSignal;",
+          "declarationLine": 39,
           "source": "packages/event-subscriber/dist/types.d.ts",
-          "purpose": "IEventAbortSignal is part of this module's public type contract.",
+          "purpose": "Public compatibility name for utils-owned structural abort-signal admission.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventAbortSignal.",
           "advanced": "No additional advanced behavior is declared for IEventAbortSignal.",
           "parameters": ["This type declaration has no parameters."],
@@ -5583,9 +5597,7 @@
           "members": [],
           "aliasOf": "IEventAbortSignal",
           "exportPath": "./subscriber",
-          "overloadSignatures": [
-            "export type IEventAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: IEventSubscriberAbortType, listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: IEventSubscriberAbortType, listener: () => void): void; };"
-          ],
+          "overloadSignatures": ["export type IEventAbortSignal = IAbortSignal;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use IEventAbortSignal when its type contract and declared inputs match the result you need.",
@@ -5594,7 +5606,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IEventAbortSignal is part of this module's public type contract."
+              "content": "Public compatibility name for utils-owned structural abort-signal admission."
             },
             {
               "id": "getting-started",
@@ -5623,7 +5635,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventAbortSignal:export type IEventAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: IEventSubscriberAbortType, listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: IEventSubscriberAbortType, listener: () => void): void; };",
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventAbortSignal:export type IEventAbortSignal = IAbortSignal;",
           "guidance": [],
           "usageScore": 36,
           "configuration": [],
@@ -5633,7 +5645,7 @@
           "name": "IEventChannelLike",
           "kind": "type",
           "signature": "export type IEventChannelLike<T, R = void, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; };",
-          "declarationLine": 87,
+          "declarationLine": 82,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelLike is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelLike.",
@@ -5702,7 +5714,7 @@
           "name": "IEventContext",
           "kind": "type",
           "signature": "export type IEventContext<T> = { readonly value: T; readonly aborted: boolean; readonly abortReason: unknown; readonly taskId: string | undefined; abort(reason?: unknown): void; setTaskId(taskId: string | undefined): void; };",
-          "declarationLine": 45,
+          "declarationLine": 40,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventContext.",
@@ -5773,7 +5785,7 @@
           "name": "IEventListener",
           "kind": "type",
           "signature": "export type IEventListener<T, R = void, V = undefined> = (event: IProjectedEventContext<T, V>) => R | PromiseLike<R>;",
-          "declarationLine": 72,
+          "declarationLine": 67,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventListener is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventListener.",
@@ -5843,7 +5855,7 @@
           "name": "IEventSubscriber",
           "kind": "type",
           "signature": "export type IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R>; };",
-          "declarationLine": 73,
+          "declarationLine": 68,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventSubscriber is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventSubscriber.",
@@ -6050,7 +6062,7 @@
           "name": "IUnsubscribe",
           "kind": "type",
           "signature": "export type IUnsubscribe = () => void;",
-          "declarationLine": 5,
+          "declarationLine": 6,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IUnsubscribe is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUnsubscribe.",

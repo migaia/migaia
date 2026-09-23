@@ -18832,7 +18832,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: '快速开始', path: 'getting-started' },
         { label: '安装与组合', path: 'install-and-compose' },
-        { label: 'PluginHost API', path: 'docs/plugin-host/structural/PluginHost' }
+        { label: 'PluginHost API', path: 'docs/plugin-host/PluginHost' }
       ]
     },
     en: {
@@ -18897,7 +18897,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: 'Getting started', path: 'getting-started' },
         { label: 'Install and compose', path: 'install-and-compose' },
-        { label: 'PluginHost API', path: 'docs/plugin-host/structural/PluginHost' }
+        { label: 'PluginHost API', path: 'docs/plugin-host/PluginHost' }
       ]
     }
   },
@@ -19017,7 +19017,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '安装多个插件', path: 'install-and-compose' },
-        { label: '理解所有构造配置', path: 'docs/plugin-host/structural/PluginHost' }
+        { label: '理解所有构造配置', path: 'docs/plugin-host/PluginHost' }
       ]
     },
     en: {
@@ -19138,7 +19138,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         { label: 'Install multiple plugins', path: 'install-and-compose' },
         {
           label: 'Understand every constructor option',
-          path: 'docs/plugin-host/structural/PluginHost'
+          path: 'docs/plugin-host/PluginHost'
         }
       ]
     }
@@ -19272,7 +19272,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '构建 pipeline', path: 'pipelines' },
-        { label: 'PluginHost 配置参考', path: 'docs/plugin-host/structural/PluginHost' }
+        { label: 'PluginHost 配置参考', path: 'docs/plugin-host/PluginHost' }
       ]
     },
     en: {
@@ -19321,7 +19321,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         { label: 'Build a pipeline', path: 'pipelines' },
         {
           label: 'PluginHost configuration reference',
-          path: 'docs/plugin-host/structural/PluginHost'
+          path: 'docs/plugin-host/PluginHost'
         }
       ]
     }
@@ -19381,7 +19381,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '卸载与 drain', path: 'removal-and-rollback' },
-        { label: 'PluginHost API', path: 'docs/plugin-host/structural/PluginHost' }
+        { label: 'PluginHost API', path: 'docs/plugin-host/PluginHost' }
       ]
     },
     en: {
@@ -19454,7 +19454,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Removal and drain', path: 'removal-and-rollback' },
-        { label: 'PluginHost API', path: 'docs/plugin-host/structural/PluginHost' }
+        { label: 'PluginHost API', path: 'docs/plugin-host/PluginHost' }
       ]
     }
   },
@@ -19497,7 +19497,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '重新查看完整路径', path: 'index' },
-        { label: '错误码参考', path: 'docs/plugin-host/defined/PluginHostErrorCode' }
+        { label: '错误码参考', path: 'docs/plugin-host/PluginHostErrorCode' }
       ]
     },
     en: {
@@ -19538,7 +19538,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Review the complete path', path: 'index' },
-        { label: 'Error-code reference', path: 'docs/plugin-host/defined/PluginHostErrorCode' }
+        { label: 'Error-code reference', path: 'docs/plugin-host/PluginHostErrorCode' }
       ]
     }
   },

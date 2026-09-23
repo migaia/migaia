@@ -433,10 +433,10 @@ test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contr
     }
   }
   assert.equal(configuredApiCount, 97)
-  assert.equal(configurationFieldCount, 357)
+  assert.equal(configurationFieldCount, 362)
 
   const pluginHost = generatedApis
-    .find((api) => api.id === 'plugin-host:structural')
+    .find((api) => api.id === 'plugin-host:index')
     ?.symbols.find((symbol) => symbol.name === 'PluginHost')
   assert.ok(pluginHost)
   assert.ok(pluginHost.configuration.some((field) => field.name === 'execution.mutationTimeoutMs'))
@@ -458,7 +458,7 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
         .map((symbol) => ({ api, symbol }))
     )
 
-  assert.equal(runtimeSymbols.length, 59)
+  assert.equal(runtimeSymbols.length, 60)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
@@ -818,6 +818,7 @@ test('SITE-T-LOGGER-RUNTIME-GUIDE documents host replacement and restoration', (
     'defer',
     'write',
     'console',
+    'fs',
     'fetch'
   ]
   for (const locale of ['en', 'zh'] as const) {
@@ -847,6 +848,7 @@ test('SITE-T-LOGGER-PRIMARY-GUIDES documents the Logger and every user-facing pl
     ['index', 'getLoggerRuntimeManager'],
     ['plugins', 'batch'],
     ['plugins', 'color'],
+    ['plugins/file', 'file'],
     ['plugins', 'http'],
     ['plugins', 'level'],
     ['plugins', 'process'],

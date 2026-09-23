@@ -2574,6 +2574,16 @@
       ],
       "aliases": [
         {
+          "identity": "packages/utils/dist/promise.d.ts:admitAbortSignal:export declare function admitAbortSignal(candidate: unknown): IAbortSignalAdmission;",
+          "name": "admitAbortSignal",
+          "signature": "export declare function admitAbortSignal(candidate: unknown): IAbortSignalAdmission;",
+          "source": "packages/utils/dist/promise.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./promise",
+          "ownerModule": "promise",
+          "ownerFragment": "utils-promise--admitAbortSignal"
+        },
+        {
           "identity": "packages/utils/dist/function.d.ts:assimilateCapturedThen:export declare function assimilateCapturedThen<T>(thenFn: (resolve: unknown, reject: unknown) => void, thenable: unknown): Promise<T>;",
           "name": "assimilateCapturedThen",
           "signature": "export declare function assimilateCapturedThen<T>(thenFn: (resolve: unknown, reject: unknown) => void, thenable: unknown): Promise<T>;",
@@ -2584,9 +2594,9 @@
           "ownerFragment": "utils-function--assimilateCapturedThen"
         },
         {
-          "identity": "packages/utils/dist/error.d.ts:attachErrorIdentity:export declare function attachErrorIdentity<T extends Error>(error: T, identity: { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }): T;",
+          "identity": "packages/utils/dist/error.d.ts:attachErrorIdentity:export declare function attachErrorIdentity<T extends object>(error: T, identity: IErrorIdentity, hooks?: IErrorIdentityHooks<T>): T;",
           "name": "attachErrorIdentity",
-          "signature": "export declare function attachErrorIdentity<T extends Error>(error: T, identity: { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }): T;",
+          "signature": "export declare function attachErrorIdentity<T extends object>(error: T, identity: IErrorIdentity, hooks?: IErrorIdentityHooks<T>): T;",
           "source": "packages/utils/dist/error.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./error",
@@ -2834,6 +2844,16 @@
           "ownerFragment": "utils-promise--hostRethrowReporter"
         },
         {
+          "identity": "packages/utils/dist/promise.d.ts:IAbortControllerLike:export type IAbortControllerLike = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
+          "name": "IAbortControllerLike",
+          "signature": "export type IAbortControllerLike = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
+          "source": "packages/utils/dist/promise.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./promise",
+          "ownerModule": "promise",
+          "ownerFragment": "utils-promise--IAbortControllerLike"
+        },
+        {
           "identity": "packages/utils/dist/promise.d.ts:IAbortOperation:export type IAbortOperation<T> = ITimeoutOperation<T>;",
           "name": "IAbortOperation",
           "signature": "export type IAbortOperation<T> = ITimeoutOperation<T>;",
@@ -2852,6 +2872,26 @@
           "ownerExportPath": "./promise",
           "ownerModule": "promise",
           "ownerFragment": "utils-promise--IAbortSignal"
+        },
+        {
+          "identity": "packages/utils/dist/promise.d.ts:IAbortSignalAdmission:export type IAbortSignalAdmission = { readonly kind: 'valid'; readonly signal: IAbortSignal; readonly aborted: boolean; } | { readonly kind: 'invalid'; readonly reason: IAbortSignalRejection; readonly cause?: unknown; };",
+          "name": "IAbortSignalAdmission",
+          "signature": "export type IAbortSignalAdmission = { readonly kind: 'valid'; readonly signal: IAbortSignal; readonly aborted: boolean; } | { readonly kind: 'invalid'; readonly reason: IAbortSignalRejection; readonly cause?: unknown; };",
+          "source": "packages/utils/dist/promise.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./promise",
+          "ownerModule": "promise",
+          "ownerFragment": "utils-promise--IAbortSignalAdmission"
+        },
+        {
+          "identity": "packages/utils/dist/promise.d.ts:IAbortSignalRejection:export type IAbortSignalRejection = 'not-object' | 'aborted-not-boolean' | 'aborted-threw' | 'listener-not-function';",
+          "name": "IAbortSignalRejection",
+          "signature": "export type IAbortSignalRejection = 'not-object' | 'aborted-not-boolean' | 'aborted-threw' | 'listener-not-function';",
+          "source": "packages/utils/dist/promise.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./promise",
+          "ownerModule": "promise",
+          "ownerFragment": "utils-promise--IAbortSignalRejection"
         },
         {
           "identity": "packages/utils/dist/promise.d.ts:IAbortTimeoutSignal:export type IAbortTimeoutSignal = { readonly signal: IAbortSignal | undefined; readonly dispose: () => void; };",
@@ -3032,6 +3072,26 @@
           "ownerExportPath": "./object",
           "ownerModule": "object",
           "ownerFragment": "utils-object--IDiagnosticSnapshot"
+        },
+        {
+          "identity": "packages/utils/dist/error.d.ts:IErrorIdentity:export type IErrorIdentity = { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; };",
+          "name": "IErrorIdentity",
+          "signature": "export type IErrorIdentity = { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; };",
+          "source": "packages/utils/dist/error.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./error",
+          "ownerModule": "error",
+          "ownerFragment": "utils-error--IErrorIdentity"
+        },
+        {
+          "identity": "packages/utils/dist/error.d.ts:IErrorIdentityHooks:export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
+          "name": "IErrorIdentityHooks",
+          "signature": "export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
+          "source": "packages/utils/dist/error.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./error",
+          "ownerModule": "error",
+          "ownerFragment": "utils-error--IErrorIdentityHooks"
         },
         {
           "identity": "packages/utils/dist/string.d.ts:IFormatOptions:export type IFormatOptions = { readonly placeholder?: IFormatPlaceholder; readonly missing?: 'preserve' | 'empty' | 'throw'; readonly nullish?: 'empty' | 'stringify'; };",
@@ -3522,6 +3582,16 @@
           "ownerExportPath": "./promise",
           "ownerModule": "promise",
           "ownerFragment": "utils-promise--IUtilsScheduler"
+        },
+        {
+          "identity": "packages/utils/dist/function.d.ts:MAX_NATIVE_RECURSION_DEPTH:export declare const MAX_NATIVE_RECURSION_DEPTH = 256;",
+          "name": "MAX_NATIVE_RECURSION_DEPTH",
+          "signature": "export declare const MAX_NATIVE_RECURSION_DEPTH = 256;",
+          "source": "packages/utils/dist/function.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./function",
+          "ownerModule": "function",
+          "ownerFragment": "utils-function--MAX_NATIVE_RECURSION_DEPTH"
         },
         {
           "identity": "packages/utils/dist/function.d.ts:noop:export declare const noop: () => undefined;",
@@ -10302,15 +10372,16 @@
         {
           "name": "attachErrorIdentity",
           "kind": "function",
-          "signature": "export declare function attachErrorIdentity<T extends Error>(error: T, identity: { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }): T;",
-          "declarationLine": 23,
+          "signature": "export declare function attachErrorIdentity<T extends object>(error: T, identity: IErrorIdentity, hooks?: IErrorIdentityHooks<T>): T;",
+          "declarationLine": 51,
           "source": "packages/utils/dist/error.d.ts",
-          "purpose": "Attaches stable error identity without replacing the original error object.",
+          "purpose": "Attaches stable identity without replacing the original object. Optional hooks let a module preserve its own fallback semantics for conflicts and non-extensible targets.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for attachErrorIdentity.",
           "advanced": "No additional advanced behavior is declared for attachErrorIdentity.",
           "parameters": [
             "error: T",
-            "identity: { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }"
+            "identity: IErrorIdentity",
+            "hooks: IErrorIdentityHooks<T> (optional)"
           ],
           "parameterDetails": [
             {
@@ -10320,8 +10391,13 @@
             },
             {
               "name": "identity",
-              "type": "{ readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }",
+              "type": "IErrorIdentity",
               "optional": false
+            },
+            {
+              "name": "hooks",
+              "type": "IErrorIdentityHooks<T>",
+              "optional": true
             }
           ],
           "returns": "T",
@@ -10335,7 +10411,7 @@
           "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
-            "export declare function attachErrorIdentity<T extends Error>(error: T, identity: { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }): T;"
+            "export declare function attachErrorIdentity<T extends object>(error: T, identity: IErrorIdentity, hooks?: IErrorIdentityHooks<T>): T;"
           ],
           "overloadParameterDetails": [
             [
@@ -10346,8 +10422,13 @@
               },
               {
                 "name": "identity",
-                "type": "{ readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }",
+                "type": "IErrorIdentity",
                 "optional": false
+              },
+              {
+                "name": "hooks",
+                "type": "IErrorIdentityHooks<T>",
+                "optional": true
               }
             ]
           ],
@@ -10358,7 +10439,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Attaches stable error identity without replacing the original error object."
+              "content": "Attaches stable identity without replacing the original object. Optional hooks let a module preserve its own fallback semantics for conflicts and non-extensible targets."
             },
             {
               "id": "getting-started",
@@ -10387,7 +10468,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/utils/dist/error.d.ts:attachErrorIdentity:export declare function attachErrorIdentity<T extends Error>(error: T, identity: { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }): T;",
+          "identity": "packages/utils/dist/error.d.ts:attachErrorIdentity:export declare function attachErrorIdentity<T extends object>(error: T, identity: IErrorIdentity, hooks?: IErrorIdentityHooks<T>): T;",
           "guidance": [
             {
               "id": "error-模块",
@@ -10602,7 +10683,7 @@
           "name": "attachSecondaryErrors",
           "kind": "function",
           "signature": "export declare function attachSecondaryErrors(primary: unknown, secondaryErrors: readonly unknown[]): unknown;",
-          "declarationLine": 33,
+          "declarationLine": 56,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Appends secondary failures to a primary without changing primary identity. A hostile or non-extensible primary receives an `AggregateError` fallback whose first entry is the primary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for attachSecondaryErrors.",
@@ -10689,7 +10770,7 @@
           "name": "combineErrors",
           "kind": "function",
           "signature": "export declare function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined;",
-          "declarationLine": 45,
+          "declarationLine": 68,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Combines zero, one, or many errors while preserving iteration failures.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for combineErrors.",
@@ -10981,10 +11062,136 @@
           "fragment": "utils-error--combineErrors"
         },
         {
+          "name": "IErrorIdentity",
+          "kind": "type",
+          "signature": "export type IErrorIdentity = { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; };",
+          "declarationLine": 23,
+          "source": "packages/utils/dist/error.d.ts",
+          "purpose": "Stable identity fields shared by module-boundary native errors.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IErrorIdentity.",
+          "advanced": "No additional advanced behavior is declared for IErrorIdentity.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IErrorIdentity."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IErrorIdentity.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./error",
+          "overloadSignatures": [
+            "export type IErrorIdentity = { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IErrorIdentity when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IErrorIdentity does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable identity fields shared by module-boundary native errors."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IErrorIdentity from @migaia/utils/error, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IErrorIdentity when its type contract and declared inputs match the result you need. Choose a different public symbol when IErrorIdentity does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IErrorIdentity."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IErrorIdentity."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/error.d.ts:IErrorIdentity:export type IErrorIdentity = { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-error--IErrorIdentity"
+        },
+        {
+          "name": "IErrorIdentityHooks",
+          "kind": "type",
+          "signature": "export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
+          "declarationLine": 33,
+          "source": "packages/utils/dist/error.d.ts",
+          "purpose": "Caller-owned recovery for an identity attachment conflict or descriptor write failure. Each hook returns the target that receives any remaining identity fields.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IErrorIdentityHooks.",
+          "advanced": "No additional advanced behavior is declared for IErrorIdentityHooks.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IErrorIdentityHooks."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IErrorIdentityHooks.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./error",
+          "overloadSignatures": [
+            "export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IErrorIdentityHooks when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IErrorIdentityHooks does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Caller-owned recovery for an identity attachment conflict or descriptor write failure. Each hook returns the target that receives any remaining identity fields."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IErrorIdentityHooks from @migaia/utils/error, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IErrorIdentityHooks when its type contract and declared inputs match the result you need. Choose a different public symbol when IErrorIdentityHooks does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IErrorIdentityHooks."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IErrorIdentityHooks."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/error.d.ts:IErrorIdentityHooks:export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-error--IErrorIdentityHooks"
+        },
+        {
           "name": "isUtilsAbortError",
           "kind": "function",
           "signature": "export declare function isUtilsAbortError(value: unknown): value is UtilsAbortError;",
-          "declarationLine": 47,
+          "declarationLine": 70,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "isUtilsAbortError is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUtilsAbortError.",
@@ -11255,7 +11462,7 @@
           "name": "isUtilsError",
           "kind": "function",
           "signature": "export declare function isUtilsError(value: unknown): value is UtilsError;",
-          "declarationLine": 46,
+          "declarationLine": 69,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "isUtilsError is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUtilsError.",
@@ -11526,7 +11733,7 @@
           "name": "isUtilsTimeoutError",
           "kind": "function",
           "signature": "export declare function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;",
-          "declarationLine": 48,
+          "declarationLine": 71,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "isUtilsTimeoutError is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUtilsTimeoutError.",
@@ -11799,7 +12006,7 @@
           "name": "safeErrorReason",
           "kind": "function",
           "signature": "export declare function safeErrorReason(error: unknown, fallback: string): string;",
-          "declarationLine": 35,
+          "declarationLine": 58,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Reads an arbitrary failure's diagnostic reason once, returning a caller-owned safe fallback.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for safeErrorReason.",
@@ -11886,7 +12093,7 @@
           "name": "toError",
           "kind": "function",
           "signature": "export declare function toError(value: unknown, options?: { readonly message?: string; }): Error;",
-          "declarationLine": 37,
+          "declarationLine": 60,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Converts arbitrary thrown values while preserving the original as cause.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for toError.",
@@ -13168,7 +13375,7 @@
           "name": "walkErrorCauses",
           "kind": "function",
           "signature": "export declare function walkErrorCauses(error: unknown, options?: { readonly maxDepth?: number; }): readonly unknown[];",
-          "declarationLine": 41,
+          "declarationLine": 64,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Walks cause and AggregateError chains with bounded identity deduplication.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for walkErrorCauses.",
@@ -13471,7 +13678,7 @@
           "name": "assimilateCapturedThen",
           "kind": "function",
           "signature": "export declare function assimilateCapturedThen<T>(thenFn: (resolve: unknown, reject: unknown) => void, thenable: unknown): Promise<T>;",
-          "declarationLine": 37,
+          "declarationLine": 42,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Invokes an already-captured then method once with its original thenable receiver.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assimilateCapturedThen.",
@@ -13561,7 +13768,7 @@
           "name": "inspectThenable",
           "kind": "function",
           "signature": "export declare function inspectThenable(value: unknown): IThenableInspection;",
-          "declarationLine": 39,
+          "declarationLine": 44,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Reads a callback result's then property once for synchronous-contract enforcement.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for inspectThenable.",
@@ -13638,7 +13845,7 @@
           "name": "IThenableInspection",
           "kind": "type",
           "signature": "export type IThenableInspection = { readonly then: undefined; } | { readonly then: (resolve: unknown, reject: unknown) => void; } | { readonly error: unknown; };",
-          "declarationLine": 22,
+          "declarationLine": 27,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Result shape used when synchronous callers need to reject or observe a captured thenable.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThenableInspection.",
@@ -13701,7 +13908,7 @@
           "name": "IThenableProbe",
           "kind": "type",
           "signature": "export type IThenableProbe = { readonly kind: typeof ThenableProbeKind.notThenable; } | { readonly kind: typeof ThenableProbeKind.thenable; readonly thenFn: (resolve: unknown, reject: unknown) => void; } | { readonly kind: typeof ThenableProbeKind.failed; readonly error: unknown; };",
-          "declarationLine": 12,
+          "declarationLine": 17,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Result of a single, failure-contained thenable inspection.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThenableProbe.",
@@ -13764,7 +13971,7 @@
           "name": "IThenableProbeKind",
           "kind": "type",
           "signature": "export type IThenableProbeKind = (typeof ThenableProbeKind)[keyof typeof ThenableProbeKind];",
-          "declarationLine": 10,
+          "declarationLine": 15,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "IThenableProbeKind is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThenableProbeKind.",
@@ -13824,10 +14031,71 @@
           "fragment": "utils-function--IThenableProbeKind"
         },
         {
+          "name": "MAX_NATIVE_RECURSION_DEPTH",
+          "kind": "const",
+          "signature": "export declare const MAX_NATIVE_RECURSION_DEPTH = 256;",
+          "declarationLine": 5,
+          "source": "packages/utils/dist/function.d.ts",
+          "purpose": "Maximum synchronous reentrancy before consumers spill work from the native stack. Event-subscriber dispatch and middleware-pipeline invocation share this stable boundary.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MAX_NATIVE_RECURSION_DEPTH.",
+          "advanced": "No additional advanced behavior is declared for MAX_NATIVE_RECURSION_DEPTH.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for MAX_NATIVE_RECURSION_DEPTH."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MAX_NATIVE_RECURSION_DEPTH.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./function",
+          "overloadSignatures": ["export declare const MAX_NATIVE_RECURSION_DEPTH = 256;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use MAX_NATIVE_RECURSION_DEPTH when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when MAX_NATIVE_RECURSION_DEPTH does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Maximum synchronous reentrancy before consumers spill work from the native stack. Event-subscriber dispatch and middleware-pipeline invocation share this stable boundary."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import MAX_NATIVE_RECURSION_DEPTH from @migaia/utils/function, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use MAX_NATIVE_RECURSION_DEPTH when its const contract and declared inputs match the result you need. Choose a different public symbol when MAX_NATIVE_RECURSION_DEPTH does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MAX_NATIVE_RECURSION_DEPTH."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for MAX_NATIVE_RECURSION_DEPTH."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/function.d.ts:MAX_NATIVE_RECURSION_DEPTH:export declare const MAX_NATIVE_RECURSION_DEPTH = 256;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-function--MAX_NATIVE_RECURSION_DEPTH"
+        },
+        {
           "name": "noop",
           "kind": "const",
           "signature": "export declare const noop: () => undefined;",
-          "declarationLine": 30,
+          "declarationLine": 35,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Returns a function that always returns the same stable value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for noop.",
@@ -13892,7 +14160,7 @@
           "name": "observeThenableRejection",
           "kind": "function",
           "signature": "export declare function observeThenableRejection(value: unknown, inspection: IThenableInspection, onRejected: (error: unknown) => void): void;",
-          "declarationLine": 41,
+          "declarationLine": 46,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Observes a captured thenable rejection while containing reporter failures at the boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observeThenableRejection.",
@@ -13993,7 +14261,7 @@
           "name": "once",
           "kind": "function",
           "signature": "export declare function once<T extends (...args: never[]) => unknown>(functionValue: T): T;",
-          "declarationLine": 43,
+          "declarationLine": 48,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Memoizes a synchronous function, including its first thrown result.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for once.",
@@ -14085,7 +14353,7 @@
           "name": "onceAsync",
           "kind": "function",
           "signature": "export declare function onceAsync<T>(functionValue: () => Promise<T>): () => Promise<T>;",
-          "declarationLine": 45,
+          "declarationLine": 50,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Memoizes one asynchronous invocation and preserves exact Promise identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for onceAsync.",
@@ -14165,7 +14433,7 @@
           "name": "probeThenable",
           "kind": "function",
           "signature": "export declare function probeThenable(value: unknown): IThenableProbe;",
-          "declarationLine": 35,
+          "declarationLine": 40,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Reads `value.then` once and returns an explicit discriminant. Getter failures stay in the result, allowing callers to apply their own module error policy without a second read.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for probeThenable.",
@@ -14242,7 +14510,7 @@
           "name": "ThenableProbeKind",
           "kind": "const",
           "signature": "export declare const ThenableProbeKind: { readonly notThenable: \"not-thenable\"; readonly thenable: \"thenable\"; readonly failed: \"failed\"; };",
-          "declarationLine": 5,
+          "declarationLine": 10,
           "source": "packages/utils/dist/function.d.ts",
           "purpose": "Stable outcomes for one `.then` admission read. Consumers must branch on this value instead of probing a thenable again, which preserves hostile getter and receiver semantics.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ThenableProbeKind.",
@@ -18540,10 +18808,87 @@
       "architecturePath": "/en/architecture/utils",
       "symbols": [
         {
+          "name": "admitAbortSignal",
+          "kind": "function",
+          "signature": "export declare function admitAbortSignal(candidate: unknown): IAbortSignalAdmission;",
+          "declarationLine": 39,
+          "source": "packages/utils/dist/promise.d.ts",
+          "purpose": "Admits an abort signal shape through one `aborted` read without probing `reason` or subscribing. Getter and proxy failures remain data so the owning caller can apply its own error policy.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for admitAbortSignal.",
+          "advanced": "No additional advanced behavior is declared for admitAbortSignal.",
+          "parameters": ["candidate: unknown"],
+          "parameterDetails": [
+            {
+              "name": "candidate",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "IAbortSignalAdmission",
+          "errors": ["No documented errors are declared for admitAbortSignal."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for admitAbortSignal.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./promise",
+          "overloadSignatures": [
+            "export declare function admitAbortSignal(candidate: unknown): IAbortSignalAdmission;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "candidate",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IAbortSignalAdmission"],
+          "whenToUse": "Use admitAbortSignal when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when admitAbortSignal does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Admits an abort signal shape through one `aborted` read without probing `reason` or subscribing. Getter and proxy failures remain data so the owning caller can apply its own error policy."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import admitAbortSignal from @migaia/utils/promise, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use admitAbortSignal when its function contract and declared inputs match the result you need. Choose a different public symbol when admitAbortSignal does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for admitAbortSignal."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for admitAbortSignal."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/promise.d.ts:admitAbortSignal:export declare function admitAbortSignal(candidate: unknown): IAbortSignalAdmission;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-promise--admitAbortSignal"
+        },
+        {
           "name": "createAbortTimeoutSignal",
           "kind": "function",
           "signature": "export declare function createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal;",
-          "declarationLine": 65,
+          "declarationLine": 95,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Creates the canonical merged signal used by adapters that need timeout plus external abort.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAbortTimeoutSignal.",
@@ -18720,7 +19065,7 @@
           "name": "createConcurrencyLimiter",
           "kind": "function",
           "signature": "export declare function createConcurrencyLimiter(options: { readonly concurrency: number; readonly report?: IUtilsReporter; }): IConcurrencyLimiter;",
-          "declarationLine": 125,
+          "declarationLine": 155,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Limits active tasks with FIFO admission and cooperative queued cancellation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createConcurrencyLimiter.",
@@ -18849,7 +19194,7 @@
           "name": "createManualScheduler",
           "kind": "function",
           "signature": "export declare function createManualScheduler(): IManualScheduler;",
-          "declarationLine": 90,
+          "declarationLine": 120,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Creates a deterministic FIFO scheduler for unit tests and adapters.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createManualScheduler.",
@@ -18952,7 +19297,7 @@
           "name": "deferred",
           "kind": "function",
           "signature": "export declare function deferred<T>(): IDeferred<T>;",
-          "declarationLine": 83,
+          "declarationLine": 113,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Creates a native Promise deferred without exposing mutable settlement state.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deferred.",
@@ -19050,7 +19395,7 @@
           "name": "hostRethrowReporter",
           "kind": "const",
           "signature": "export declare const hostRethrowReporter: IUtilsReporter;",
-          "declarationLine": 47,
+          "declarationLine": 77,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Reports a diagnostic to the host without creating an unhandled rejected Promise.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for hostRethrowReporter.",
@@ -19111,10 +19456,73 @@
           "fragment": "utils-promise--hostRethrowReporter"
         },
         {
+          "name": "IAbortControllerLike",
+          "kind": "type",
+          "signature": "export type IAbortControllerLike = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
+          "declarationLine": 19,
+          "source": "packages/utils/dist/promise.d.ts",
+          "purpose": "IAbortControllerLike is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortControllerLike.",
+          "advanced": "No additional advanced behavior is declared for IAbortControllerLike.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IAbortControllerLike."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAbortControllerLike.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./promise",
+          "overloadSignatures": [
+            "export type IAbortControllerLike = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IAbortControllerLike when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IAbortControllerLike does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IAbortControllerLike is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IAbortControllerLike from @migaia/utils/promise, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IAbortControllerLike when its type contract and declared inputs match the result you need. Choose a different public symbol when IAbortControllerLike does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortControllerLike."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IAbortControllerLike."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/promise.d.ts:IAbortControllerLike:export type IAbortControllerLike = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-promise--IAbortControllerLike"
+        },
+        {
           "name": "IAbortOperation",
           "kind": "type",
           "signature": "export type IAbortOperation<T> = ITimeoutOperation<T>;",
-          "declarationLine": 67,
+          "declarationLine": 97,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Describes a lazy operation whose cooperative cancellation observes the supplied signal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortOperation.",
@@ -19244,10 +19652,136 @@
           "fragment": "utils-promise--IAbortSignal"
         },
         {
+          "name": "IAbortSignalAdmission",
+          "kind": "type",
+          "signature": "export type IAbortSignalAdmission = { readonly kind: 'valid'; readonly signal: IAbortSignal; readonly aborted: boolean; } | { readonly kind: 'invalid'; readonly reason: IAbortSignalRejection; readonly cause?: unknown; };",
+          "declarationLine": 26,
+          "source": "packages/utils/dist/promise.d.ts",
+          "purpose": "Result of one structural signal admission read; callers retain all error and abort policy.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortSignalAdmission.",
+          "advanced": "No additional advanced behavior is declared for IAbortSignalAdmission.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IAbortSignalAdmission."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAbortSignalAdmission.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./promise",
+          "overloadSignatures": [
+            "export type IAbortSignalAdmission = { readonly kind: 'valid'; readonly signal: IAbortSignal; readonly aborted: boolean; } | { readonly kind: 'invalid'; readonly reason: IAbortSignalRejection; readonly cause?: unknown; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IAbortSignalAdmission when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IAbortSignalAdmission does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Result of one structural signal admission read; callers retain all error and abort policy."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IAbortSignalAdmission from @migaia/utils/promise, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IAbortSignalAdmission when its type contract and declared inputs match the result you need. Choose a different public symbol when IAbortSignalAdmission does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortSignalAdmission."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IAbortSignalAdmission."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/promise.d.ts:IAbortSignalAdmission:export type IAbortSignalAdmission = { readonly kind: 'valid'; readonly signal: IAbortSignal; readonly aborted: boolean; } | { readonly kind: 'invalid'; readonly reason: IAbortSignalRejection; readonly cause?: unknown; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-promise--IAbortSignalAdmission"
+        },
+        {
+          "name": "IAbortSignalRejection",
+          "kind": "type",
+          "signature": "export type IAbortSignalRejection = 'not-object' | 'aborted-not-boolean' | 'aborted-threw' | 'listener-not-function';",
+          "declarationLine": 24,
+          "source": "packages/utils/dist/promise.d.ts",
+          "purpose": "Stable reasons for rejecting an untrusted abort-signal-shaped value without throwing.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortSignalRejection.",
+          "advanced": "No additional advanced behavior is declared for IAbortSignalRejection.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IAbortSignalRejection."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAbortSignalRejection.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./promise",
+          "overloadSignatures": [
+            "export type IAbortSignalRejection = 'not-object' | 'aborted-not-boolean' | 'aborted-threw' | 'listener-not-function';"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IAbortSignalRejection when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IAbortSignalRejection does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable reasons for rejecting an untrusted abort-signal-shaped value without throwing."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IAbortSignalRejection from @migaia/utils/promise, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IAbortSignalRejection when its type contract and declared inputs match the result you need. Choose a different public symbol when IAbortSignalRejection does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortSignalRejection."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IAbortSignalRejection."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/promise.d.ts:IAbortSignalRejection:export type IAbortSignalRejection = 'not-object' | 'aborted-not-boolean' | 'aborted-threw' | 'listener-not-function';",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-promise--IAbortSignalRejection"
+        },
+        {
           "name": "IAbortTimeoutSignal",
           "kind": "type",
           "signature": "export type IAbortTimeoutSignal = { readonly signal: IAbortSignal | undefined; readonly dispose: () => void; };",
-          "declarationLine": 60,
+          "declarationLine": 90,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IAbortTimeoutSignal is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortTimeoutSignal.",
@@ -19312,7 +19846,7 @@
           "name": "IAbortTimeoutSignalOptions",
           "kind": "type",
           "signature": "export type IAbortTimeoutSignalOptions = { readonly signal?: IAbortSignal; readonly timeoutMs?: number; readonly scheduler?: IUtilsScheduler; readonly timeoutReason?: () => unknown; readonly report?: IUtilsReporter; };",
-          "declarationLine": 53,
+          "declarationLine": 83,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IAbortTimeoutSignalOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortTimeoutSignalOptions.",
@@ -19377,7 +19911,7 @@
           "name": "IAsyncControls",
           "kind": "type",
           "signature": "export type IAsyncControls = { readonly signal?: IAbortSignal; readonly signals?: readonly IAbortSignal[]; readonly scheduler?: IUtilsScheduler; readonly unref?: boolean; };",
-          "declarationLine": 27,
+          "declarationLine": 57,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IAsyncControls is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncControls.",
@@ -19445,7 +19979,7 @@
           "name": "IConcurrencyLimiter",
           "kind": "type",
           "signature": "export type IConcurrencyLimiter = { run<T>(task: (context: { readonly signal?: IAbortSignal; }) => T | PromiseLike<T>, options?: { readonly signal?: IAbortSignal; }): Promise<T>; readonly activeCount: number; readonly pendingCount: number; whenIdle(): Promise<void>; close(reason?: unknown): void; dispose(reason?: unknown): Promise<void>; };",
-          "declarationLine": 68,
+          "declarationLine": 98,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IConcurrencyLimiter is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IConcurrencyLimiter.",
@@ -19510,7 +20044,7 @@
           "name": "IDeferred",
           "kind": "type",
           "signature": "export type IDeferred<T> = { readonly promise: Promise<T>; readonly resolve: (value: T | PromiseLike<T>) => void; readonly reject: (reason?: unknown) => void; };",
-          "declarationLine": 22,
+          "declarationLine": 52,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IDeferred is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDeferred.",
@@ -19576,7 +20110,7 @@
           "name": "IManualScheduler",
           "kind": "type",
           "signature": "export type IManualScheduler = IUtilsScheduler & { advance(ms: number): void; readonly pendingCount: number; };",
-          "declarationLine": 18,
+          "declarationLine": 48,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IManualScheduler is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IManualScheduler.",
@@ -19642,7 +20176,7 @@
           "name": "IRetryContext",
           "kind": "type",
           "signature": "export type IRetryContext = { readonly attempt: number; readonly signal: IAbortSignal; readonly remainingMs?: number; };",
-          "declarationLine": 33,
+          "declarationLine": 63,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IRetryContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRetryContext.",
@@ -19707,7 +20241,7 @@
           "name": "IRetryFailureContext",
           "kind": "type",
           "signature": "export type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number; };",
-          "declarationLine": 38,
+          "declarationLine": 68,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IRetryFailureContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRetryFailureContext.",
@@ -19772,7 +20306,7 @@
           "name": "IScheduledTask",
           "kind": "type",
           "signature": "export type IScheduledTask = { cancel(): void; unref?(): void; };",
-          "declarationLine": 10,
+          "declarationLine": 40,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IScheduledTask is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IScheduledTask.",
@@ -19837,7 +20371,7 @@
           "name": "ITimeoutOperation",
           "kind": "type",
           "signature": "export type ITimeoutOperation<T> = (context: { readonly signal: IAbortSignal; }) => T | PromiseLike<T>;",
-          "declarationLine": 48,
+          "declarationLine": 78,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "ITimeoutOperation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITimeoutOperation.",
@@ -19903,7 +20437,7 @@
           "name": "IUtilsReporter",
           "kind": "type",
           "signature": "export type IUtilsReporter = (error: unknown, context: { readonly operation: 'abort-timeout-signal' | 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter'; readonly phase: 'late-rejection' | 'cleanup' | 'reporter'; readonly attempt?: number; }) => void;",
-          "declarationLine": 41,
+          "declarationLine": 71,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IUtilsReporter is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUtilsReporter.",
@@ -19973,7 +20507,7 @@
           "name": "IUtilsScheduler",
           "kind": "type",
           "signature": "export type IUtilsScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };",
-          "declarationLine": 14,
+          "declarationLine": 44,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "IUtilsScheduler is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUtilsScheduler.",
@@ -20042,7 +20576,7 @@
           "name": "raceWithAbort",
           "kind": "function",
           "signature": "export declare function raceWithAbort<T>(operation: IAbortOperation<T>, options?: Pick<IAsyncControls, 'signal' | 'signals'> & { readonly report?: IUtilsReporter; readonly cleanupPolicy?: 'reject' | 'report'; }): Promise<T>;",
-          "declarationLine": 104,
+          "declarationLine": 134,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Races a lazy operation against one or more external abort signals without creating a timer.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for raceWithAbort.",
@@ -20156,7 +20690,7 @@
           "name": "retry",
           "kind": "function",
           "signature": "export declare function retry<T>(operation: (context: IRetryContext) => T | PromiseLike<T>, options: Parameters<typeof retryCore<T>>[1]): Promise<T>;",
-          "declarationLine": 123,
+          "declarationLine": 153,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Enforces the retry task's outer deadline, including policy and backoff admission work.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for retry.",
@@ -20459,7 +20993,7 @@
           "name": "sleep",
           "kind": "function",
           "signature": "export declare function sleep(delayMs: number, options?: IAsyncControls): Promise<void>;",
-          "declarationLine": 92,
+          "declarationLine": 122,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Resolves after a scheduler delay or rejects on cooperative abort.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sleep.",
@@ -20579,7 +21113,7 @@
           "name": "systemScheduler",
           "kind": "const",
           "signature": "export declare const systemScheduler: IUtilsScheduler;",
-          "declarationLine": 81,
+          "declarationLine": 111,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Schedules callbacks with native timers while forwarding optional unref hints.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for systemScheduler.",
@@ -20644,7 +21178,7 @@
           "name": "toPromise",
           "kind": "function",
           "signature": "export declare function toPromise<T>(run: () => T): Promise<Awaited<T>>;",
-          "declarationLine": 88,
+          "declarationLine": 118,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Runs one synchronous computation immediately while normalizing its value or thrown reason to a native Promise settlement.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for toPromise.",
@@ -20761,7 +21295,7 @@
           "name": "withTimeout",
           "kind": "function",
           "signature": "export declare function withTimeout<T>(operation: ITimeoutOperation<T>, options: IWithTimeoutOptions): Promise<T>;",
-          "declarationLine": 102,
+          "declarationLine": 132,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Races a lazy operation against an abort-aware deadline.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for withTimeout.",

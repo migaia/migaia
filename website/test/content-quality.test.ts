@@ -128,7 +128,7 @@ test('storage-web feature guide explains the Host effect in plain language', () 
 })
 
 test('plugin-host definePlugin explains core, shared, extension, Host use, and cleanup', () => {
-  const guide = findApiGuide('plugin-host', 'defined', 'definePlugin', 'zh')
+  const guide = findApiGuide('plugin-host', 'index', 'definePlugin', 'zh')
   assert.ok(guide?.quickStart)
   assert.match(guide.purpose, /core = 插件可以使用的宿主能力/)
   assert.match(guide.purpose, /shared = 插件之间复用的能力/)
@@ -137,7 +137,7 @@ test('plugin-host definePlugin explains core, shared, extension, Host use, and c
   assert.match(guide.quickStart, /core\.onDispose\(/)
   assert.doesNotMatch(guide.quickStart, /core\.getShared\(|productReader|loadProduct/)
   assert.match(guide.quickStart, /app\.config\.update\('product-cache'/)
-  assert.match(guide.quickStart, /await app\.dispose\(\)/)
+  assert.match(guide.quickStart, /await host\.dispose\(\)/)
   assert.doesNotMatch(guide.quickStart, /\.\.\.|\bfetchConfig\b|\brun[A-Z]\w*\(\)/)
   const shortForm = guide.examples?.find((example) => example.id === 'short-form')
   assert.ok(shortForm, 'definePlugin must document its name + descriptor factory form')
@@ -146,12 +146,12 @@ test('plugin-host definePlugin explains core, shared, extension, Host use, and c
   assert.match(shortForm.code, /definePlugin<IAppCore, \{ greet\(name: string\): string \}>\(/)
   assert.match(shortForm.code, /'greeting',\n  \(core\) => \(\{/)
   assert.match(shortForm.code, /app\.extensions\.greet\('Migaia'\)/)
-  assert.match(shortForm.code, /await app\.dispose\(\)/)
+  assert.match(shortForm.code, /await host\.dispose\(\)/)
   const shared = guide.examples?.find((example) => example.id === 'shared-collaboration')
   assert.ok(shared, 'definePlugin must isolate shared collaboration in its own example')
   assert.match(shared.code, /shared: \(\) => \(\{ readProduct:/)
   assert.match(shared.code, /core\.getShared\('readProduct'\)/)
-  assert.match(shared.code, /plugins: \[cacheProvider, productReader\] as const/)
+  assert.match(shared.code, /host\.use\(cacheProvider, productReader\)/)
   assert.match(shared.code, /app\.extensions\.loadProduct\('sku-42'\)/)
   assert.deepEqual(
     guide.examples?.map((example) => example.id),
@@ -190,26 +190,17 @@ test('plugin-host PluginHost documents its complete runtime and composition surf
   assert.match(guide.quickStart, /const greetingPlugin = definePlugin/)
   assert.match(guide.quickStart, /await host\.use\(greetingPlugin\)/)
   assert.match(guide.quickStart, /view\.extensions\.greet\('Migaia'\)/)
-  assert.match(guide.quickStart, /view\.getShared\('formatGreeting'\)/)
-  assert.match(guide.quickStart, /view\.config\.update\('greeting'/)
-  assert.match(guide.quickStart, /await host\.publish\('order-created'\)/)
-  assert.match(guide.quickStart, /host\.getCurrentView\(\)/)
-  assert.match(guide.quickStart, /current\.unUse\('greeting'\)/)
+  assert.match(guide.quickStart, /await view\.unUse\('greeting'\)/)
+  assert.match(guide.quickStart, /removal\.physicalCompletion/)
   assert.match(guide.quickStart, /await host\.dispose\(\)/)
   const reference = guide.options.map((option) => option.name).join(' ')
   for (const capability of [
-    'createPluginDomainCore',
-    'use(...plugins)',
-    'getCurrentView',
-    'extensions',
-    'config.update',
-    'usePipeline',
-    'runPipeline',
-    'unUse',
-    'revision',
-    'dispose',
-    'composition API',
-    'useSync'
+    'execution',
+    'execution.mutationTimeoutMs',
+    'execution.pipelineDrainTimeoutMs',
+    'pipeline.mode',
+    'diagnostic',
+    'scheduler'
   ]) {
     assert.match(reference, new RegExp(capability.replace(/[().]/g, '\\$&')))
   }

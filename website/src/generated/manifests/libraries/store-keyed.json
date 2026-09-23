@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-keyed",
     "description": "Definition-based keyed Store state, AtomStore, family, and optics.",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "exports": [".", "./atom/definition", "./atom/store", "./reactive/atom"],
     "documentation": {
       "readme": {
