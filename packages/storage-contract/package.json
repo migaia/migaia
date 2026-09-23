@@ -21,7 +21,7 @@
   },
   "scripts": {
     "fmt": "oxfmt src test",
-    "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test",

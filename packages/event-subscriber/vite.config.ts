@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs';
 
 /** Builds runtime-neutral root and focused subscription-helper entries. */
-export default defineConfig({
+export default defineConfig(withDistFreshness({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/event-subscriber', import.meta.url)),
   build: {
     target: 'es2020',
@@ -20,4 +21,4 @@ export default defineConfig({
       preserveEntrySignatures: 'strict'
     }
   }
-});
+}));

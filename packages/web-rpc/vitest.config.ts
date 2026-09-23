@@ -1,6 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config'
+import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 
-export default defineConfig({
+export default defineConfig(withDistFreshness({
   test: {
     exclude: [...configDefaults.exclude, 'test/control-plane/**'],
     coverage: {
@@ -30,4 +31,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

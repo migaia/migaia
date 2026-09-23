@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertAllFresh, isStampable, workspacePackages } from './dist-stamp.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const baselinePath = join(repositoryRoot, 'coverage-baseline.json')
@@ -336,13 +337,24 @@ export const assertBaselineResetPreconditions = () => {
   }
 }
 
-/** Capture one package report while retaining package-owned build and threshold behavior. */
+/**
+ * Builds every package that publishes `dist/`, in workspace topological order, before any capture.
+ * Tests import sibling packages through their `dist/`, so capturing against output built from older
+ * sources would measure code that is no longer in the candidate. Packages without `dist/` (the
+ * wasm-pack package) are not built here, matching their own test scripts.
+ */
+export const buildWorkspaceOutput = () => {
+  /** pnpm filters naming each stampable package; pnpm orders them topologically. */
+  const filters = [...workspacePackages().entries()]
+    .filter(([, directory]) => isStampable(directory))
+    .flatMap(([name]) => ['--filter', `./packages/${name}`])
+  run('pnpm', ['-r', ...filters, 'run', 'build'])
+}
+
+/** Capture one package report against output already built and asserted fresh by `main`. */
 const capturePackage = (packageName, reportRoot) => {
   const packageReport = join(reportRoot, packageName)
   try {
-    const manifest = readPackageManifest(packageName)
-    if (manifest.scripts?.test?.includes('pnpm run build'))
-      run('pnpm', ['--dir', `packages/${packageName}`, 'run', 'build'])
     run('pnpm', [
       '--dir',
       `packages/${packageName}`,
@@ -416,6 +428,8 @@ export const main = () => {
     else assertBaselineResetPreconditions()
   }
   const { coveragePackages } = assertInventory()
+  buildWorkspaceOutput()
+  assertAllFresh()
   const existing =
     !updateBaseline && existsSync(baselinePath)
       ? JSON.parse(readFileSync(baselinePath, 'utf8'))
@@ -468,6 +482,7 @@ export const main = () => {
     }
     if (updateBaseline) {
       if (hasCandidateSha256) assertCandidateInputSha256(candidateSha256)
+      assertAllFresh()
       writeBaselineAtomically(result)
     }
     console.log(

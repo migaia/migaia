@@ -110,7 +110,7 @@
   },
   "scripts": {
     "fmt": "oxfmt src test e2e",
-    "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",

@@ -4,10 +4,10 @@ packages:
   - website
 
 allowBuilds:
-  cbor-extract: set this to true or false
+  cbor-extract: true
   esbuild: true
   fsevents: true
-  msgpackr-extract: set this to true or false
+  msgpackr-extract: true
 
 minimumReleaseAgeExclude:
   - '@astrojs/internal-helpers@0.10.4'

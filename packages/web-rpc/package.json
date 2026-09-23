@@ -105,7 +105,7 @@
   },
   "scripts": {
     "fmt": "oxfmt src test e2e",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:core": "tsc --noEmit -p tsconfig.core.json",
     "typecheck:node-adapter": "tsc --noEmit -p tsconfig.node-adapter.json",

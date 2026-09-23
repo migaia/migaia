@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
+import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 
 /** Produces one runtime-neutral ESM entry; declarations are emitted by TypeScript. */
-export default defineConfig({
+export default defineConfig(withDistFreshness({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/storage-contract', import.meta.url)),
   build: {
     target: 'es2022',
@@ -16,4 +17,4 @@ export default defineConfig({
       external: ['@migaia/lifecycle', '@migaia/utils', '@migaia/utils/bytes']
     }
   }
-})
+}))
