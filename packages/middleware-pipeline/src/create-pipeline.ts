@@ -17,7 +17,8 @@ import {
   type IMiddlewarePipelineContext,
   type IMiddlewarePipelineControlOptions,
   type ISyncMiddlewareStage
-} from './index.js'
+} from './runtime.js'
+import { MiddlewarePipelineSignalText } from './signal-text.js'
 import {
   MiddlewarePipelineGeneratorSignals,
   MiddlewarePipelineMode,
@@ -117,7 +118,7 @@ const isPipelineMode = (value: unknown): value is IMiddlewarePipelineMode =>
 /** Rejects one malformed optional callback before runner construction. */
 const readCallback = <TCallback extends Function>(value: unknown): TCallback | undefined => {
   if (value === undefined) return undefined
-  if (typeof value !== 'function') throw invalidOption(MiddlewarePipelineErrorText.invalidMode)
+  if (typeof value !== 'function') throw invalidOption(MiddlewarePipelineSignalText.invalidOption)
   return value as TCallback
 }
 
@@ -131,7 +132,7 @@ const readSignals = (value: unknown): IGeneratorMiddlewareSignals => {
     typeof (value as { readonly halt?: unknown }).halt !== 'symbol' ||
     typeof (value as { readonly continue?: unknown }).continue !== 'symbol'
   )
-    throw invalidOption(MiddlewarePipelineErrorText.invalidMode)
+    throw invalidOption(MiddlewarePipelineSignalText.invalidOption)
   return value as IGeneratorMiddlewareSignals
 }
 
@@ -203,7 +204,8 @@ const runForMode = (
       value,
       done as (value: unknown, context?: IMiddlewarePipelineContext) => void,
       options.onViolation,
-      effectiveControl
+      effectiveControl,
+      options.assertActive
     )
   if (mode === MiddlewarePipelineMode.async)
     return runAsyncMiddleware(
@@ -223,14 +225,16 @@ const runForMode = (
       value,
       done as (value: unknown, context?: IMiddlewarePipelineContext) => void,
       options.signals,
-      effectiveControl
+      effectiveControl,
+      options.assertActive
     )
   return runAsyncGeneratorMiddleware(
     stages as readonly IAsyncGeneratorMiddlewareStage<unknown>[],
     value,
     done as (value: unknown, context?: IMiddlewarePipelineContext) => void | Promise<void>,
     options.signals,
-    effectiveControl
+    effectiveControl,
+    options.assertActive
   )
 }
 
