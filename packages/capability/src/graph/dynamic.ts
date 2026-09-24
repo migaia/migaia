@@ -2,6 +2,20 @@ import type { ICapabilityGraphNodeState, ICapabilityGraphState } from './state-c
 import { CapabilityGraphNodeState, CapabilityGraphState } from './state-constants.js'
 import { CapabilityGraphErrorCode } from './error-code.js'
 import { graphFailure, graphMessageFor } from './errors.js'
+import {
+  DependencyMutationKind,
+  DependencyNodeStatus,
+  DependencyPolicy,
+  planDependencyMutation,
+  planRestart
+} from './dependency.js'
+import {
+  createTopologyIndex,
+  TopologyInvalidReason,
+  type IGraphDependents,
+  type ITopologyIndex,
+  type ITopologyIndexMetrics
+} from './topology.js'
 import type {
   IGraphNodeDefinition,
   IGraphNodeDiagnostic,
@@ -31,11 +45,7 @@ export type IGraphMutationResult = Readonly<{
 /** Policy used when a node still has required dependents. */
 export type IGraphDependencyMutationPolicy = 'reject' | 'cascade'
 
-/** Direct consumers of one provider, separated by dependency strength. */
-export type IGraphDependents = Readonly<{
-  readonly required: readonly IGraphNodeId[]
-  readonly optional: readonly IGraphNodeId[]
-}>
+export type { IGraphDependents } from './topology.js'
 
 /** Options for removal and suspension. */
 export type IGraphDependencyMutationOptions = Readonly<{
@@ -144,8 +154,6 @@ export type IDynamicCapabilityGraph<TBinding = unknown> = Readonly<{
 type IStoredNode<TBinding> = {
   definition: IDynamicGraphNodeDefinition<unknown>
   readonly ordinal: number
-  rank: number
-  level: number
   binding?: TBinding
   state: ICapabilityGraphNodeState
   value?: unknown
@@ -170,10 +178,6 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   options: IDynamicCapabilityGraphOptions<TBinding> = {}
 ): IDynamicCapabilityGraph<TBinding> {
   const definitions = new Map<string, IStoredNode<TBinding>>()
-  /** Reverse adjacency is the sole incremental frontier index for dynamic reconciliation. */
-  const consumersByProvider = new Map<string, Set<string>>()
-  /** Forward adjacency supports O(1) changed-edge replacement and exact edge rollback. */
-  const providersByConsumer = new Map<string, Set<string>>()
   let serial = Promise.resolve()
   let graphState: ICapabilityGraphState = CapabilityGraphState.open
   let graphGeneration = 0
@@ -188,9 +192,12 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     startedAt: Date.now(),
     queueTimeMs: 0
   }
+  /** Cumulative index counters captured at the start of the current mutation. */
+  let topologyMetricBaseline: ITopologyIndexMetrics = { visitedNodes: 0, visitedEdges: 0 }
 
   /** Starts deterministic per-mutation instrumentation without changing graph semantics. */
   const beginMetrics = (queueTimeMs = 0): void => {
+    topologyMetricBaseline = topologyIndex.metrics()
     traversalMetrics = {
       visitedNodes: 0,
       visitedEdges: 0,
@@ -204,9 +211,9 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   /** Freezes traversal counters for acceptance evidence and diagnostics. */
   const readMetrics = (): IGraphTraversalMetrics =>
     Object.freeze({
-      visitedNodes: traversalMetrics.visitedNodes,
-      visitedEdges: traversalMetrics.visitedEdges,
-      queueOperations: traversalMetrics.queueOperations,
+      visitedNodes: topologyIndex.metrics().visitedNodes - topologyMetricBaseline.visitedNodes,
+      visitedEdges: topologyIndex.metrics().visitedEdges - topologyMetricBaseline.visitedEdges,
+      queueOperations: topologyIndex.metrics().visitedNodes - topologyMetricBaseline.visitedNodes,
       queueTimeMs: traversalMetrics.queueTimeMs,
       fullScan: traversalMetrics.fullScan,
       wallTimeMs: Math.max(0, Date.now() - traversalMetrics.startedAt)
@@ -224,6 +231,20 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   /** Constructs a canonical graph error while retaining the package-owned message. */
   const fail = (code: (typeof CapabilityGraphErrorCode)[keyof typeof CapabilityGraphErrorCode]) =>
     graphFailure(code, graphMessageFor(code))
+
+  /** Canonical incremental owner for adjacency, closure, ordering, and cycle admission. */
+  const topologyIndex: ITopologyIndex = createTopologyIndex({
+    onCycle: () => {
+      throw fail(CapabilityGraphErrorCode.dependencyCycle)
+    },
+    onInvalid: (reason) => {
+      if (reason === TopologyInvalidReason.duplicateNode)
+        throw fail(CapabilityGraphErrorCode.duplicateNode)
+      if (reason === TopologyInvalidReason.unknownNode)
+        throw fail(CapabilityGraphErrorCode.unknownNode)
+      throw fail(CapabilityGraphErrorCode.invalidNode)
+    }
+  })
 
   if (
     options.mutationAdmissionMs !== undefined &&
@@ -272,146 +293,44 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     }
   }
 
-  /** Produces a deterministic heap-ordered topology without rescanning the whole frontier. */
-  const topology = (subset?: ReadonlySet<string>): IStoredNode<TBinding>[] => {
-    if (!subset) traversalMetrics.fullScan = true
-    const ids = subset ? [...subset] : [...definitions.keys()]
-    traversalMetrics.visitedNodes += ids.length
-    const indegree = new Map<string, number>()
-    for (const id of ids) {
-      const providers = providersByConsumer.get(id) ?? new Set<string>()
-      traversalMetrics.visitedEdges += providers.size
-      indegree.set(
-        id,
-        [...providers].filter((provider) =>
-          subset ? subset.has(provider) : definitions.has(provider)
-        ).length
-      )
-    }
-    const ordered: IStoredNode<TBinding>[] = []
-    const available: IStoredNode<TBinding>[] = []
-    const push = (entry: IStoredNode<TBinding>): void => {
-      available.push(entry)
-      traversalMetrics.queueOperations += 1
-      let index = available.length - 1
-      while (index > 0) {
-        const parent = Math.floor((index - 1) / 2)
-        if (available[parent]!.ordinal <= entry.ordinal) break
-        available[index] = available[parent]!
-        index = parent
-      }
-      available[index] = entry
-    }
-    const pop = (): IStoredNode<TBinding> | undefined => {
-      const first = available[0]
-      const last = available.pop()
-      if (!first || !last || available.length === 0) return first
-      let index = 0
-      while (true) {
-        const left = index * 2 + 1
-        if (left >= available.length) break
-        const right = left + 1
-        const child =
-          right < available.length && available[right]!.ordinal < available[left]!.ordinal
-            ? right
-            : left
-        if (available[child]!.ordinal >= last.ordinal) break
-        available[index] = available[child]!
-        index = child
-      }
-      available[index] = last
-      return first
-    }
-    for (const id of ids) if ((indegree.get(id) ?? 0) === 0) push(definitions.get(id)!)
-    for (let entry = pop(); entry; entry = pop()) {
-      ordered.push(entry)
-      for (const consumer of consumersByProvider.get(entry.definition.id) ?? []) {
-        traversalMetrics.visitedEdges += 1
-        if (!indegree.has(consumer)) continue
-        const next = indegree.get(consumer)! - 1
-        indegree.set(consumer, next)
-        if (next === 0) push(definitions.get(consumer)!)
-      }
-    }
-    if (ordered.length !== ids.length) throw fail(CapabilityGraphErrorCode.dependencyCycle)
-    return ordered
+  /** Resolves one canonical index order into lifecycle entries. */
+  const readOrderedEntries = (ids?: Iterable<string>): IStoredNode<TBinding>[] => {
+    if (!ids) traversalMetrics.fullScan = true
+    return topologyIndex.order(ids).map((id) => definitions.get(id)!)
   }
 
-  /** Returns the transitive consumer closure in topology order. */
-  const collectClosure = (roots: readonly string[]): Set<string> => {
-    const affected = new Set(roots)
-    const queue = [...roots]
-    traversalMetrics.queueOperations += queue.length
-    for (const id of queue) {
-      for (const consumer of consumersByProvider.get(id) ?? []) {
-        const edge = definitions
-          .get(consumer)
-          ?.definition.dependencies.find((dependency) => dependency.provider === id)
-        if (!edge?.required) continue
-        if (!affected.has(consumer)) {
-          affected.add(consumer)
-          queue.push(consumer)
-          traversalMetrics.queueOperations += 1
-        }
-      }
-    }
-    return affected
+  /** Resolves the required dependent closure in canonical provider-first order. */
+  const readClosureEntries = (roots: readonly string[]): IStoredNode<TBinding>[] =>
+    readOrderedEntries(topologyIndex.closure(roots))
+
+  /** Projects runtime node state into the pure planner's status vocabulary. */
+  const readDependencyStatus = (id: string): DependencyNodeStatus => {
+    const state = definitions.get(id)?.state
+    if (state === CapabilityGraphNodeState.ready) return DependencyNodeStatus.active
+    if (state === CapabilityGraphNodeState.suspended) return DependencyNodeStatus.suspended
+    return DependencyNodeStatus.inactive
   }
 
-  /** Reads direct dependents without exposing mutable adjacency state. */
-  const readDependents = (id: string): IGraphDependents => {
-    const required: IGraphNodeId[] = []
-    const optional: IGraphNodeId[] = []
-    for (const consumer of consumersByProvider.get(id) ?? []) {
-      const edge = definitions
-        .get(consumer)
-        ?.definition.dependencies.find((dependency) => dependency.provider === id)
-      const target = edge?.required ? required : optional
-      target.push(consumer as IGraphNodeId)
-    }
-    return Object.freeze({ required: Object.freeze(required), optional: Object.freeze(optional) })
-  }
-
-  /** Rejects a dependency mutation before any graph state changes. */
-  const assertDependencyPolicy = (
+  /** Plans a remove or suspend frontier and preserves the dynamic reject error payload. */
+  const planMutation = (
     id: string,
     options: IGraphDependencyMutationOptions | undefined
-  ): void => {
-    const policy = options?.policy ?? 'cascade'
-    if (policy !== 'reject' && policy !== 'cascade')
+  ): readonly string[] => {
+    const policy = options?.policy ?? DependencyPolicy.cascade
+    if (policy !== DependencyPolicy.reject && policy !== DependencyPolicy.cascade)
       throw fail(CapabilityGraphErrorCode.invalidOption)
-    const dependents = readDependents(id).required
-    if (policy === 'reject' && dependents.length > 0)
+    const plan = planDependencyMutation(topologyIndex, readDependencyStatus, {
+      roots: [id],
+      kind: DependencyMutationKind.remove,
+      policy
+    })
+    if (plan.blockedBy.length > 0)
       throw graphFailure(
         CapabilityGraphErrorCode.nodeHasDependents,
         graphMessageFor(CapabilityGraphErrorCode.nodeHasDependents),
-        { dependents }
+        { dependents: topologyIndex.dependents(id).required }
       )
-  }
-
-  /** Returns a deterministic topological affected frontier. */
-  const closure = (roots: readonly string[]): IStoredNode<TBinding>[] => {
-    const affected = collectClosure(roots)
-    return topology(affected)
-  }
-
-  /** Updates forward and reverse adjacency for one admitted definition. */
-  const setEdges = (id: string, dependencies: readonly { readonly provider: string }[]): void => {
-    for (const provider of providersByConsumer.get(id) ?? []) {
-      const consumers = consumersByProvider.get(provider)
-      consumers?.delete(id)
-      if (consumers?.size === 0) consumersByProvider.delete(provider)
-    }
-    const providers = new Set(dependencies.map((edge) => edge.provider))
-    providersByConsumer.set(id, providers)
-    for (const provider of providers) {
-      let consumers = consumersByProvider.get(provider)
-      if (!consumers) {
-        consumers = new Set()
-        consumersByProvider.set(provider, consumers)
-      }
-      consumers.add(id)
-    }
+    return plan.order
   }
 
   /** Releases a frontier in inverse dependency order and reports secondary failures. */
@@ -643,29 +562,12 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           binding,
           state: CapabilityGraphNodeState.registered,
           generation: graphGeneration,
-          rank: definitions.size,
-          level: node.dependencies.length,
           leaseKey: {}
         }
+        topologyIndex.add({ id: node.id, dependencies: node.dependencies })
         definitions.set(node.id, entry)
-        setEdges(node.id, node.dependencies)
-        try {
-          const affected = collectClosure([node.id])
-          if (node.dependencies.some((edge) => affected.has(String(edge.provider))))
-            throw fail(CapabilityGraphErrorCode.dependencyCycle)
-          topology(affected)
-        } catch (error) {
-          for (const provider of providersByConsumer.get(node.id) ?? []) {
-            const consumers = consumersByProvider.get(provider)
-            consumers?.delete(node.id)
-            if (consumers?.size === 0) consumersByProvider.delete(provider)
-          }
-          providersByConsumer.delete(node.id)
-          definitions.delete(node.id)
-          throw error
-        }
         graphGeneration += 1
-        const affected = closure([node.id])
+        const affected = readClosureEntries([node.id])
         await start(affected)
         return {
           affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
@@ -679,15 +581,9 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       return mutate(async () => {
         const target = definitions.get(id)
         if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
-        assertDependencyPolicy(id, options)
-        const affected = closure([id])
+        const affected = readOrderedEntries(planMutation(id, options))
         await release(affected, new Set([id]), 'remove')
-        for (const provider of providersByConsumer.get(id) ?? []) {
-          const consumers = consumersByProvider.get(provider)
-          consumers?.delete(id)
-          if (consumers?.size === 0) consumersByProvider.delete(provider)
-        }
-        providersByConsumer.delete(id)
+        topologyIndex.remove(id)
         definitions.delete(id)
         const affectedIds = new Set(affected.map((entry) => entry.definition.id))
         for (const entry of definitions.values())
@@ -709,8 +605,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       return mutate(async () => {
         const target = definitions.get(id)
         if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
-        assertDependencyPolicy(id, options)
-        const affected = closure([id])
+        const affected = readOrderedEntries(planMutation(id, options))
         target.state = CapabilityGraphNodeState.suspended
         target.blockedReason = undefined
         for (const entry of affected) {
@@ -733,7 +628,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
         if (target.state !== CapabilityGraphNodeState.suspended)
           throw fail(CapabilityGraphErrorCode.invalidOption)
-        const affected = closure([id])
+        const affected = readClosureEntries([id])
         target.state = CapabilityGraphNodeState.ready
         target.blockedReason = undefined
         // Topological order lets each retained instance observe its providers' resumed state; a
@@ -765,38 +660,28 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     },
     dependentsOf(id) {
       if (!definitions.has(id)) throw fail(CapabilityGraphErrorCode.unknownNode)
-      return readDependents(id)
+      return topologyIndex.dependents(id)
     },
     replace(node, binding, options) {
       return mutate(async () => {
         validateNode(node)
         const previous = definitions.get(node.id)
         if (!previous) throw fail(CapabilityGraphErrorCode.unknownNode)
-        const oldDefinition = previous.definition
-        const oldAffected = collectClosure([node.id])
-        const oldProviders = providersByConsumer.get(node.id) ?? new Set<string>()
-        const nextProviders = new Set<string>(
-          node.dependencies.map((edge) => String(edge.provider))
-        )
+        const oldDependencies = previous.definition.dependencies
+        const oldAffected = topologyIndex.closure([node.id])
         const sameTopology =
-          oldProviders.size === nextProviders.size &&
-          [...oldProviders].every((provider) => nextProviders.has(provider))
+          oldDependencies.length === node.dependencies.length &&
+          oldDependencies.every(
+            (edge, index) =>
+              edge.provider === node.dependencies[index]?.provider &&
+              edge.required === node.dependencies[index]?.required
+          )
+        if (!sameTopology) topologyIndex.setDependencies(node.id, node.dependencies)
         previous.definition = node
-        if (!sameTopology) {
-          setEdges(node.id, node.dependencies)
-          try {
-            const nextAffected = collectClosure([node.id])
-            if (node.dependencies.some((edge) => nextAffected.has(String(edge.provider))))
-              throw fail(CapabilityGraphErrorCode.dependencyCycle)
-            topology(nextAffected)
-          } catch (error) {
-            previous.definition = oldDefinition
-            setEdges(node.id, oldDefinition.dependencies)
-            throw error
-          }
-        }
-        const affected = topology(
-          sameTopology ? oldAffected : new Set([...oldAffected, ...collectClosure([node.id])])
+        const affected = readOrderedEntries(
+          sameTopology
+            ? oldAffected
+            : new Set([...oldAffected, ...topologyIndex.closure([node.id])])
         )
         if (options?.restartDependents === false) {
           const targetOnly = [previous]
@@ -809,20 +694,24 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           await start(targetOnly)
           /** Dependents whose rebind is absent or failed; they restart with their own closure. */
           const restart = new Set<string>()
-          for (const dependent of readDependents(node.id).required) {
+          for (const dependent of topologyIndex.dependents(node.id).required) {
             if (!options.onReplaced) {
-              for (const item of collectClosure([dependent])) restart.add(item)
+              for (const item of planRestart(topologyIndex, readDependencyStatus, [dependent])
+                .order)
+                restart.add(item)
               continue
             }
             try {
-              await options.onReplaced(dependent, binding)
+              await options.onReplaced(dependent as IGraphNodeId, binding)
             } catch (error) {
               report(error)
-              for (const item of collectClosure([dependent])) restart.add(item)
+              for (const item of planRestart(topologyIndex, readDependencyStatus, [dependent])
+                .order)
+                restart.add(item)
             }
           }
           if (restart.size > 0) {
-            const restartEntries = topology(restart)
+            const restartEntries = readOrderedEntries(restart)
             await release(restartEntries, new Set(), 'replace')
             await start(restartEntries)
           }
@@ -849,13 +738,15 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     },
     ready() {
       return mutate(async () => {
-        await start(topology())
+        await start(readOrderedEntries())
         graphState = CapabilityGraphState.ready
       })
     },
     nodeState(id) {
       const entry = definitions.get(id)
       if (!entry) throw fail(CapabilityGraphErrorCode.unknownNode)
+      /** Current canonical snapshot supplies derived rank and level diagnostics. */
+      const snapshot = topologyIndex.snapshot()
       return {
         id,
         kind: entry.definition.kind,
@@ -866,8 +757,8 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         binding: entry.binding,
         generation: entry.generation,
         ordinal: entry.ordinal,
-        rank: entry.rank,
-        level: entry.level
+        rank: snapshot.ordered.findIndex((node) => node.id === id),
+        level: snapshot.level.get(id) ?? 0
       }
     },
     getBinding<T = TBinding>(id: IGraphNodeId): T | undefined {
@@ -887,12 +778,11 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       graphState = CapabilityGraphState.quiescing
       disposePromise = schedule(async () => {
         try {
-          const entries = topology()
+          const entries = readOrderedEntries()
           await release(entries, new Set(entries.map((entry) => entry.definition.id)), 'dispose')
         } finally {
           definitions.clear()
-          consumersByProvider.clear()
-          providersByConsumer.clear()
+          for (const id of topologyIndex.order()) topologyIndex.remove(id)
           graphState = CapabilityGraphState.terminal
           graphGeneration += 1
         }
