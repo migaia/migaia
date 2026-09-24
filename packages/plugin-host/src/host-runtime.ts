@@ -315,7 +315,7 @@ export class PluginHost<
     })
     this.#installRuntime = new PluginHostInstallRuntime({
       scheduler: this.#scheduler,
-      committedRegistrations: this.#state.registrations,
+      state: this.#state,
       snapshotBatch: () => ({
         registrations: new Map(this.#state.registrations),
         extensionOwners: new Map(this.#state.extensionOwners),
@@ -339,12 +339,12 @@ export class PluginHost<
         this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity),
       closeRegistrationSync: (registration, rollbackErrors) =>
         this.#closeRegistrationSync(registration, rollbackErrors),
-      removedNames: this.#state.removedNames,
       diagnostic: this.#diagnostic,
       decorateError: (error) => attachPluginHostIdentity(error, this)
     })
     this.#removalRuntime = new PluginHostRemovalRuntime({
       registrations: this.#state.registrations,
+      removeRegistration: (registration) => this.#state.closeRegistration(registration),
       extensionOwners: this.#state.extensionOwners,
       pipelineLeases: this.#pipelineLeases,
       pipelineOwnerKeys: this.#state.lanes.pipelineOwnerKeys,

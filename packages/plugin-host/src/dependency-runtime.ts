@@ -100,7 +100,12 @@ export const validateInstallBatch = <TDomainCore extends object, TValue>(
   /** Isolated projected topology used only for validation and planning. */
   const transaction = state.dependencyIndex().begin()
   try {
-    for (const entry of entries) transaction.add(toIndexNode(entry.name, entry.plugin))
+    for (const entry of entries) {
+      /** Candidate node projected into the transaction without disturbing the base index. */
+      const node = toIndexNode(entry.name, entry.plugin)
+      if (transaction.has(entry.name)) transaction.setDependencies(entry.name, node.dependencies)
+      else transaction.add(node)
+    }
     /** Batch member names used to bound lazy-install traversal. */
     const members = entries.map((entry) => entry.name)
     /** Members whose install hooks execute in this transaction. */
