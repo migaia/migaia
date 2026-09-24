@@ -4,10 +4,13 @@ import { readDefinedPluginDefinition } from './define-plugin.js'
 import type { PluginHostError } from './error-text.js'
 import { issueHostIdentity, type IPluginHostIdentity } from './host-identity.js'
 import type {
-  IAsyncGeneratorPipelineStage,
-  IAsyncPipelineStage,
-  IGeneratorPipelineStage,
-  IPipelineMode,
+  IAsyncGeneratorMiddlewareStage,
+  IAsyncMiddlewareStage,
+  IGeneratorMiddlewareStage,
+  IMiddlewarePipelineMode,
+  ISyncMiddlewareStage
+} from '@migaia/middleware-pipeline'
+import type {
   IPluginConstraint,
   IPluginConstraintTuple,
   IPluginHostCore,
@@ -19,8 +22,7 @@ import type {
   IPluginHostDisposalResult,
   IPluginHostConfigFor,
   IPluginEnablement,
-  IPluginHostOptions,
-  ISyncPipelineStage
+  IPluginHostOptions
 } from './typing.js'
 
 /**
@@ -84,7 +86,7 @@ export type IHostHandle<
     TDomainCore,
     TValue
   >
-  readonly pipelineMode: IPipelineMode
+  readonly pipelineMode: IMiddlewarePipelineMode
   readonly revision: number
   readonly config: IPluginHostConfigFor<TInstalled>
   useSync<const TPlugins extends readonly IPluginConstraint<any>[]>(
@@ -102,13 +104,15 @@ export type IHostHandle<
     name: string,
     next: TPlugin
   ): Promise<IPluginHandle<TPlugin>>
-  usePipeline(stage: ISyncPipelineStage<TValue>): IHostHandle<TDomainCore, TValue, TInstalled>
-  useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): IHostHandle<TDomainCore, TValue, TInstalled>
+  usePipeline(stage: ISyncMiddlewareStage<TValue>): IHostHandle<TDomainCore, TValue, TInstalled>
+  useAsyncPipeline(
+    stage: IAsyncMiddlewareStage<TValue>
+  ): IHostHandle<TDomainCore, TValue, TInstalled>
   useGeneratorPipeline(
-    stage: IGeneratorPipelineStage<TValue>
+    stage: IGeneratorMiddlewareStage<TValue>
   ): IHostHandle<TDomainCore, TValue, TInstalled>
   useAsyncGeneratorPipeline(
-    stage: IAsyncGeneratorPipelineStage<TValue>
+    stage: IAsyncGeneratorMiddlewareStage<TValue>
   ): IHostHandle<TDomainCore, TValue, TInstalled>
   /** Replaces the `protected runPipeline`; only the handle's holder can reach it. */
   runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
@@ -180,19 +184,19 @@ export function defineHost<TDomainCore extends object = Record<string, never>, T
         : runtime.unUse(name, { ...mutationOptions, dryRun: false }),
     activate: (name: string) => runtime.activate(name),
     replace: (name: string, next: IPluginConstraint<any>) => runtime.replace(name, next),
-    usePipeline: (stage: ISyncPipelineStage<TValue>) => {
+    usePipeline: (stage: ISyncMiddlewareStage<TValue>) => {
       runtime.usePipeline(stage)
       return handle
     },
-    useAsyncPipeline: (stage: IAsyncPipelineStage<TValue>) => {
+    useAsyncPipeline: (stage: IAsyncMiddlewareStage<TValue>) => {
       runtime.useAsyncPipeline(stage)
       return handle
     },
-    useGeneratorPipeline: (stage: IGeneratorPipelineStage<TValue>) => {
+    useGeneratorPipeline: (stage: IGeneratorMiddlewareStage<TValue>) => {
       runtime.useGeneratorPipeline(stage)
       return handle
     },
-    useAsyncGeneratorPipeline: (stage: IAsyncGeneratorPipelineStage<TValue>) => {
+    useAsyncGeneratorPipeline: (stage: IAsyncGeneratorMiddlewareStage<TValue>) => {
       runtime.useAsyncGeneratorPipeline(stage)
       return handle
     },

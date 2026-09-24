@@ -19,13 +19,10 @@ import { isFeatureReference } from './define-feature.js'
 import type { PluginHostState } from './host-state.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IInstallEntry, IPluginDescriptor, IRegistration } from './registry.js'
+import type { IMiddlewarePipelineMode, IMiddlewarePipelineStage } from '@migaia/middleware-pipeline'
 import type {
-  IAsyncGeneratorPipelineStage,
-  IAsyncPipelineStage,
-  IGeneratorPipelineStage,
   IPluginHostCore,
   IPluginInstallFailureDetail,
-  ISyncPipelineStage,
   IPluginHostDiagnostic
 } from './typing.js'
 
@@ -33,10 +30,7 @@ import type {
 export type IInstallBatchContext<TDomainCore extends object, TValue> = {
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
-  readonly syncStages: ISyncPipelineStage<TValue>[]
-  readonly asyncStages: IAsyncPipelineStage<TValue>[]
-  readonly generatorStages: IGeneratorPipelineStage<TValue>[]
-  readonly asyncGeneratorStages: IAsyncGeneratorPipelineStage<TValue>[]
+  readonly stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[]
   committed: boolean
 }
 

@@ -48,13 +48,22 @@ export {
   type IPluginHostDisposalNodeKind,
   type IPluginHostDisposalProvenance
 } from './cleanup-runtime.js'
-import { adaptSyncStageForMode } from './pipeline.js'
 import { executePluginHostPipeline } from './pipeline-runtime.js'
 import { PluginHostRemovalRuntime } from './removal-runtime.js'
 import { PluginHostReplaceRuntime } from './replace-runtime.js'
 import { bindTerminalSink, reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostOperationRuntime } from './operation-runtime.js'
-import type { IMiddlewarePipelineAbortSignal } from '@migaia/middleware-pipeline'
+import {
+  createPipeline,
+  MiddlewarePipelineMode,
+  type IAsyncGeneratorMiddlewareStage,
+  type IAsyncMiddlewareStage,
+  type IGeneratorMiddlewareStage,
+  type IMiddlewarePipeline,
+  type IMiddlewarePipelineAbortSignal,
+  type IMiddlewarePipelineMode,
+  type ISyncMiddlewareStage
+} from '@migaia/middleware-pipeline'
 import {
   DependencyAction,
   DependencyMutationKind,
@@ -77,12 +86,9 @@ import {
   toPluginPlan,
   validateInstallBatch
 } from './dependency-runtime.js'
-import { PluginHostPipelineMode, PluginHostRegistrationLifecycle } from './state-constants.js'
+import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IRegistration } from './registry.js'
 import type {
-  IAsyncGeneratorPipelineStage,
-  IAsyncPipelineStage,
-  IGeneratorPipelineStage,
   IPluginConstraint,
   IPluginConstraintTuple,
   IPluginHostCore,
@@ -97,9 +103,7 @@ import type {
   IPluginHostCompositionSnapshot,
   IPluginHostCompositionIntegration,
   IPluginHostOptions,
-  IPluginEnablement,
-  IPipelineMode,
-  ISyncPipelineStage
+  IPluginEnablement
 } from './typing.js'
 
 /** Type-only invariant marker that preserves constructor-installed tuples through subclasses. */
@@ -187,7 +191,9 @@ export class PluginHost<
    */
   #state = new PluginHostState<TDomainCore, TValue>()
   #hookRegistration: IRegistration<TDomainCore, TValue> | undefined
-  #pipelineMode: IPipelineMode
+  #pipelineMode: IMiddlewarePipelineMode
+  /** Canonical stateless runner that owns mode dispatch, lifting, and violation semantics. */
+  #pipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
   #diagnostic: IPluginHostDiagnostic
   /** Real lifecycle signal shared by active pipeline stages and disposal cancellation. */
   #liveSignal: IMiddlewarePipelineAbortSignal = this.#executionController
@@ -219,7 +225,7 @@ export class PluginHost<
     assertRequiredTimeoutOption(mutationTimeoutMs, 'mutationTimeoutMs')
     assertRequiredTimeoutOption(pipelineDrainTimeoutMs, 'pipelineDrainTimeoutMs')
     this.identity = issueHostIdentity(this, options.identity?.name)
-    this.#pipelineMode = options.pipeline?.mode ?? PluginHostPipelineMode.sync
+    this.#pipelineMode = options.pipeline?.mode ?? MiddlewarePipelineMode.sync
     if (options.diagnostic !== undefined && typeof options.diagnostic !== 'function')
       throw createPluginHostTypeError(ERROR_TEXT.DIAGNOSTIC_OPTION)
     const onDiagnosticFailure = options.onDiagnosticFailure
@@ -248,10 +254,10 @@ export class PluginHost<
     )
     if (
       ![
-        PluginHostPipelineMode.sync,
-        PluginHostPipelineMode.async,
-        PluginHostPipelineMode.generator,
-        PluginHostPipelineMode.asyncGenerator
+        MiddlewarePipelineMode.sync,
+        MiddlewarePipelineMode.async,
+        MiddlewarePipelineMode.generator,
+        MiddlewarePipelineMode.asyncGenerator
       ].includes(this.#pipelineMode)
     )
       throw attachPluginHostIdentity(
@@ -261,6 +267,20 @@ export class PluginHost<
         ),
         this
       )
+    this.#pipeline = createPipeline<TValue, IMiddlewarePipelineMode>({
+      mode: this.#pipelineMode,
+      onViolation: this.#onPipelineViolation,
+      assertActive: () => this.#assertActive(),
+      signal: this.#liveSignal,
+      combineStageAndDownstreamError: (stageError, downstreamError) =>
+        tagPluginHostError(
+          new AggregateError(
+            [stageError, downstreamError],
+            ERROR_TEXT.PIPELINE_STAGE_AND_DOWNSTREAM_FAILED
+          ),
+          PluginHostErrorCode.pipelineFailed
+        )
+    })
     // 时间策略统一走 lifecycle scheduler / 可配置阈值（AF-10）。负数/NaN/Infinity 立即 INVALID_OPTION。
     for (const [label, value] of [
       ['queueAdmissionTimeoutMs', options.queueAdmissionTimeoutMs],
@@ -391,8 +411,6 @@ export class PluginHost<
           this.#operationRuntime.assertCurrent(current)
         ),
       executionSignal: this.#executionController.signal,
-      pipelineMode: () => this.#pipelineMode,
-      onPipelineViolation: this.#onPipelineViolation,
       registerStage: (stage, registration, kind) => this.#registerStage(stage, registration, kind),
       cleanupRuntime: this.#cleanupRuntime
     })
@@ -516,7 +534,7 @@ export class PluginHost<
     )
   }
 
-  get pipelineMode(): IPipelineMode {
+  get pipelineMode(): IMiddlewarePipelineMode {
     this.#assertActive()
     return this.#pipelineMode
   }
@@ -605,17 +623,17 @@ export class PluginHost<
   #registerStage(
     stage: Function,
     owner: IRegistration<TDomainCore, TValue> | undefined,
-    kind: IPipelineMode
+    kind: IMiddlewarePipelineMode
   ): void {
     try {
       this.#state.lanes.register({
         host: this,
-        hostMode: this.#pipelineMode,
         kind,
         depth: this.#pipelineDepth,
         stage,
         owner,
         activeBatch: this.#activeInstallBatch,
+        lift: (candidate, source) => this.#pipeline.lift(candidate as never, source as never),
         stageSlots: this.#state.stageSlots,
         allocateSlot: () => this.#state.allocateStageSlot()
       })
@@ -628,10 +646,10 @@ export class PluginHost<
     try {
       return executePluginHostPipeline({
         mode: this.#pipelineMode,
-        ...this.#state.lanes.lanes,
+        stages: this.#state.lanes.snapshot(),
         value,
         done,
-        onViolation: this.#onPipelineViolation,
+        runner: this.#pipeline,
         assertActive: () => this.#assertActive(),
         retainLease: (stages) => this.#retainPipelineLease(stages),
         enter: () => {
@@ -640,8 +658,7 @@ export class PluginHost<
         leave: () => {
           this.#pipelineDepth -= 1
         },
-        pending: this.#pending,
-        liveSignal: this.#liveSignal
+        pending: this.#pending
       })
     } catch (error) {
       this.#rethrowWithIdentity(error)
@@ -649,34 +666,30 @@ export class PluginHost<
   }
 
   /** Host-side pipeline registration for application composition. */
-  usePipeline(stage: ISyncPipelineStage<TValue>): this {
+  usePipeline(stage: ISyncMiddlewareStage<TValue>): this {
     this.#assertActive()
-    this.#registerStage(
-      adaptSyncStageForMode(stage, this.#pipelineMode, this.#onPipelineViolation),
-      undefined,
-      this.#pipelineMode
-    )
+    this.#registerStage(stage, undefined, MiddlewarePipelineMode.sync)
     this.#state.commit()
     return this
   }
 
-  useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this {
+  useAsyncPipeline(stage: IAsyncMiddlewareStage<TValue>): this {
     this.#assertActive()
-    this.#registerStage(stage, undefined, PluginHostPipelineMode.async)
+    this.#registerStage(stage, undefined, MiddlewarePipelineMode.async)
     this.#state.commit()
     return this
   }
 
-  useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this {
+  useGeneratorPipeline(stage: IGeneratorMiddlewareStage<TValue>): this {
     this.#assertActive()
-    this.#registerStage(stage, undefined, PluginHostPipelineMode.generator)
+    this.#registerStage(stage, undefined, MiddlewarePipelineMode.generator)
     this.#state.commit()
     return this
   }
 
-  useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this {
+  useAsyncGeneratorPipeline(stage: IAsyncGeneratorMiddlewareStage<TValue>): this {
     this.#assertActive()
-    this.#registerStage(stage, undefined, PluginHostPipelineMode.asyncGenerator)
+    this.#registerStage(stage, undefined, MiddlewarePipelineMode.asyncGenerator)
     this.#state.commit()
     return this
   }
