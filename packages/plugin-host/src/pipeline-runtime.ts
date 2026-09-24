@@ -1,3 +1,4 @@
+import { reportDiagnostic } from './diagnostic-report.js'
 import { boundedWait, type ILifecycleScheduler, type IPendingTracker } from '@migaia/lifecycle'
 import type {
   IMiddlewarePipelineAbortSignal,
@@ -35,11 +36,11 @@ export const createPluginHostPipelineViolationHandler =
   ): IMiddlewarePipelineViolationHandler =>
   (kind) => {
     if (kind === PluginHostPipelineViolation.late) {
-      try {
-        diagnostic(ERROR_TEXT.PIPELINE_NEXT_CALLED_LATE, PluginHostErrorCode.pipelineNextLate)
-      } catch {
-        // Diagnostics must never alter pipeline control flow.
-      }
+      reportDiagnostic(
+        diagnostic,
+        ERROR_TEXT.PIPELINE_NEXT_CALLED_LATE,
+        PluginHostErrorCode.pipelineNextLate
+      )
       return
     }
     throw attachPluginHostIdentity(

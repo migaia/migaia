@@ -38,7 +38,7 @@ export function framer<TDescriptor extends IFramerDescriptor>(
     }),
     install: (): IWebRpcPluginInstallResult => ({
       extension: Object.freeze({ framer: descriptor }),
-      shared: Object.freeze({})
+      ports: Object.freeze({})
     })
   })
 }

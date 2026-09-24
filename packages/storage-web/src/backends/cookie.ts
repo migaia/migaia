@@ -17,7 +17,8 @@ import {
   serializeCookieAssignment,
   serializeCookieRemoval
 } from '../utils/cookie-string.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { StorageErrorText } from '../error-text.js'
 import { normalizeStorageException } from '../utils/quota.js'
 import { StorageBackend, StorageOperation } from '../constants.js'
 import type {
@@ -244,7 +245,10 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
     try {
       const value: unknown = doc.cookie
       if (typeof value !== 'string')
-        throw new TypeError('cookie document must continue exposing a string cookie property')
+        throw createStorageTypeError(
+          StorageErrorCode.unavailable,
+          StorageErrorText.cookieDocumentBecameInvalid
+        )
       return value
     } catch (cause) {
       throw new StorageError(StorageErrorCode.unavailable, {

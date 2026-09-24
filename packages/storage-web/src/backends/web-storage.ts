@@ -9,7 +9,8 @@ import {
 import type { INamespaceCodec } from '../utils/key.js'
 import { probeWebStorage } from '../utils/availability.js'
 import { normalizeStorageException } from '../utils/quota.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { StorageErrorText } from '../error-text.js'
 import type { IKeyValueStore, ISyncKeyValueStore, IWebStorageLike } from '../types/storage.js'
 import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.js'
 import {
@@ -84,7 +85,10 @@ const assertWebStorageInjection: (
       !Number.isSafeInteger(length) ||
       length < 0
     )
-      throw new TypeError('web storage injection must implement the Storage surface')
+      throw createStorageTypeError(
+        StorageErrorCode.invalidConfig,
+        StorageErrorText.webStorageInjectionInvalid
+      )
   } catch (cause) {
     throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause })
   }
@@ -150,13 +154,22 @@ export const createWebStorageBackend = (
     const seenPhysicalKeys = new Set<string>()
     const length = live.length
     if (!Number.isSafeInteger(length) || length < 0)
-      throw new TypeError('web storage length must remain a non-negative safe integer')
+      throw createStorageTypeError(
+        StorageErrorCode.unavailable,
+        StorageErrorText.webStorageLengthInvalid
+      )
     for (let index = 0; index < length; index += 1) {
       const rawKey = live.key(index)
       if (typeof rawKey !== 'string')
-        throw new TypeError('web storage key enumeration must return one unique string per index')
+        throw createStorageTypeError(
+          StorageErrorCode.unavailable,
+          StorageErrorText.webStorageKeyInvalid
+        )
       if (seenPhysicalKeys.has(rawKey))
-        throw new TypeError('web storage key enumeration returned a duplicate physical key')
+        throw createStorageTypeError(
+          StorageErrorCode.unavailable,
+          StorageErrorText.webStorageKeyDuplicate
+        )
       seenPhysicalKeys.add(rawKey)
       const stripped = stripNamespace(namespace, rawKey, namespaceCodec, backend)
       if (stripped !== undefined) collected.push({ physicalKey: rawKey, logicalKey: stripped })

@@ -10,8 +10,9 @@ import { WebRpcConfigurationError, WebRpcError, WebRpcErrorCode } from './errors
 import { WebRpcErrorText } from './error-text.js'
 import { runConstructionInstall } from './internal/construction-install.js'
 import { assertPluginInstallResult, freezePlugin } from './internal/plugin-descriptor.js'
-import type { IWebRpcPlugin, IWebRpcPluginInstallResult, IWebRpcPluginMetadata } from './typing.js'
+import type { IWebRpcPlugin, IWebRpcPluginMetadata } from './typing.js'
 import type { IWebRpcPluginCore, IWebRpcPluginInstallScope } from './internal/plugin-contract.js'
+import { createWebRpcPortFeatureSet } from './internal/port-feature.js'
 
 /**
  * Marker recognizes only definitions created here; PluginHost still owns trusted definition
@@ -41,14 +42,13 @@ export type IWebRpcNativeMiddleware<
   TExtension extends Record<string, unknown> = Record<never, never>,
   TPublic extends object = Record<never, never>,
   TFeatureExpose extends object = Record<never, never>,
-  TShared extends object = Record<never, never>,
   TFeatures extends IFeatureRecord = Record<never, never>
 > = IDefinedPluginConstraint<
   IWebRpcPluginCore,
   never,
   TExtension & TPublic,
   IPluginConfig,
-  TShared,
+  Record<never, never>,
   string,
   TFeatures,
   TFeatureExpose
@@ -58,14 +58,12 @@ export type IWebRpcNativeMiddleware<
 export type IWebRpcMiddlewareDescriptor<
   TExtension extends Record<string, unknown> = Record<never, never>,
   TPublic extends object = Record<never, never>,
-  TFeatureExpose extends object = Record<never, never>,
-  TShared extends object = Record<never, never>
+  TFeatureExpose extends object = Record<never, never>
 > = Readonly<{
   readonly install?: () => TExtension | PromiseLike<TExtension>
   readonly expose?: () => TPublic & (TPublic extends PromiseLike<unknown> ? never : unknown)
   readonly featureExpose?: () => TFeatureExpose &
     (TFeatureExpose extends PromiseLike<unknown> ? never : unknown)
-  readonly shared?: () => TShared & (TShared extends PromiseLike<unknown> ? never : unknown)
 }>
 
 /**
@@ -80,7 +78,6 @@ export type IWebRpcMiddlewareCore<
   readonly transport: IWebRpcPluginCore['transport']
   readonly signal: IWebRpcPluginCore['signal']
   readonly hooks: IWebRpcPluginCore['hooks']
-  readonly getShared: (key: PropertyKey) => unknown
   readonly own: IWebRpcPluginInstallScope['own']
   readonly features: IFeatureOutputs<TFeatures>
   readonly featureExpose: TFeatureExpose
@@ -104,66 +101,88 @@ export function defineMiddleware<
   TPublic extends object = Record<never, never>,
   TFeatures extends IFeatureRecord = Record<never, never>,
   TFeatureExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object &
-    IFeatureRecordRequiredExpose<TFeatures>,
-  TShared extends object = Record<never, never>
+    IFeatureRecordRequiredExpose<TFeatures>
 >(
   name: string,
   descriptorFactory: (
     core: IWebRpcMiddlewareCore<TFeatures, TFeatureExpose>
-  ) => IWebRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose, TShared> &
+  ) => IWebRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose> &
     (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
       ? unknown
       : { readonly featureExpose: () => TFeatureExpose }),
   featureRecord?: TFeatures
-): IWebRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TShared, TFeatures>
+): IWebRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>
 export function defineMiddleware<
   TExtension extends Record<string, unknown> = Record<never, never>,
   TPublic extends object = Record<never, never>,
   TFeatures extends IFeatureRecord = Record<never, never>,
   TFeatureExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object &
-    IFeatureRecordRequiredExpose<TFeatures>,
-  TShared extends object = Record<never, never>
+    IFeatureRecordRequiredExpose<TFeatures>
 >(
   name: string | IWebRpcPlugin,
   descriptorFactory?: (
     core: IWebRpcMiddlewareCore<TFeatures, TFeatureExpose>
-  ) => IWebRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose, TShared> &
+  ) => IWebRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose> &
     (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
       ? unknown
       : { readonly featureExpose: () => TFeatureExpose }),
   featureRecord?: TFeatures
-): IWebRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TShared, TFeatures> {
+): IWebRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures> {
   if (typeof name === 'object' && name !== null) {
     const legacy = freezePlugin(name)
     const policy = snapshotMiddlewarePolicy(legacy.metadata)
+    /** Each declared port is a registration-local Feature owned by this middleware. */
+    const portFeatures = createWebRpcPortFeatureSet(policy.sharedProvides)
     /**
      * Capture validated legacy hooks once so later caller mutation cannot alter native
      * installation.
      */
-    const middleware = defineMiddleware(legacy.name, (core) => {
-      let installation: IWebRpcPluginInstallResult | undefined
-      return {
-        install: async () => {
-          const result = await legacy.install({
-            id: core.id,
-            transport: core.transport,
-            signal: core.signal,
-            hooks: core.hooks,
-            getShared: core.getShared,
-            own: core.own
-          })
-          assertPluginInstallResult(result)
-          assertDeclaredKeys(policy.claims.publicKeys, result.extension)
-          installation = result
-          return result.extension
-        },
-        shared: () => {
-          const shared = installation?.shared ?? {}
-          if (policy.sharedProvides !== undefined) assertDeclaredKeys(policy.sharedProvides, shared)
-          return shared
+    const middleware = definePlugin<IWebRpcPluginCore, Record<string, unknown>>(
+      legacy.name,
+      (core) => {
+        const portRuntime = portFeatures.createRuntime()
+        return {
+          featureExpose: () => portRuntime.expose,
+          install: async () => {
+            const result = await runConstructionInstall(
+              {
+                id: core.id,
+                transport: core.transport,
+                control: core.construction,
+                hooks: core.hooks,
+                getPort: core.getPort,
+                report: (error) => {
+                  core.hooks({
+                    name: 'failure',
+                    at: core.construction.time.now(),
+                    localId: core.id,
+                    code: WebRpcErrorCode.internal,
+                    error
+                  })
+                },
+                registerScope: (_scope, close, awaitClose) => {
+                  core.onDispose(async () => {
+                    close()
+                    await awaitClose()
+                  })
+                }
+              },
+              (scope) => legacy.install(scope)
+            )
+            assertPluginInstallResult(result)
+            assertDeclaredKeys(policy.claims.publicKeys, result.extension)
+            if (policy.sharedProvides !== undefined)
+              assertDeclaredKeys(policy.sharedProvides, result.ports)
+            portRuntime.publish(result.ports)
+            core.publishPortFeatures(portRuntime.outputs)
+            core.registerNativeMiddlewareKeys(legacy.name, Object.keys(result.extension))
+            return result.extension
+          }
         }
-      }
-    })
+      },
+      portFeatures.features
+    )
+    nativeMiddlewares.add(middleware)
     nativeMiddlewarePolicies.set(middleware, policy)
     const components: Pick<
       IWebRpcPlugin,
@@ -181,13 +200,7 @@ export function defineMiddleware<
       if (property && 'value' in property) Object.assign(components, { [key]: property.value })
     }
     nativeMiddlewareComponents.set(middleware, Object.freeze(components))
-    return middleware as IWebRpcNativeMiddleware<
-      TExtension,
-      TPublic,
-      TFeatureExpose,
-      TShared,
-      TFeatures
-    >
+    return middleware as IWebRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>
   }
   if (!descriptorFactory)
     throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
@@ -201,7 +214,7 @@ export function defineMiddleware<
     TFeatures,
     TFeatureExpose,
     TPublic,
-    TShared
+    Record<never, never>
   >(
     name,
     (core) => {
@@ -216,7 +229,6 @@ export function defineMiddleware<
         transport: core.transport,
         signal: core.signal,
         hooks: core.hooks,
-        getShared: (key: PropertyKey) => requireInstallScope().getShared(key),
         own: <T>(resource: T, release: () => void | Promise<void>) =>
           requireInstallScope().own(resource, release),
         get features(): IFeatureOutputs<TFeatures> {
@@ -241,7 +253,7 @@ export function defineMiddleware<
                     transport: core.transport,
                     control: core.construction,
                     hooks: core.hooks,
-                    getShared: (key) => core.getShared(key),
+                    getPort: () => undefined,
                     report: (error) => {
                       core.hooks({
                         name: 'failure',
@@ -292,7 +304,6 @@ export function defineMiddleware<
     TExtension,
     TPublic,
     TFeatureExpose,
-    TShared,
     TFeatures
   >
 }

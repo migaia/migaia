@@ -1,5 +1,5 @@
 import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
-import type { IPipelineMode } from '@migaia/plugin-host'
+import { defineFeature, definePlugin, type IPipelineMode } from '@migaia/plugin-host'
 import { boundedWait, type IScheduledTask } from '@migaia/lifecycle'
 import {
   createLoggerCleanupError,
@@ -33,30 +33,35 @@ export type ICreateBatcher = <T>(
 
 export type IBatchShared = { createBatcher: ICreateBatcher }
 
+/** Feature output carrying the plugin-owned batcher factory. */
+export const loggerBatchFeature = defineFeature<IBatchShared, Record<never, never>, IBatchShared>(
+  (core) => core.featureExpose
+)
+
 export type IBatchController<T> = IBatcher<T> & {
   dispose(): readonly unknown[] | Promise<readonly unknown[]>
 }
 
 export const BATCH_PLUGIN_NAME = 'batch' as const
 
-/**
- * Batch 插件本身不假设"被批量处理的对象一定是日志 entry"—— 它只是把"攒够数量或者攒够时间就触发一次回调"这件事抽象成一个通用能力， 通过 shared() 暴露
- * createBatcher，消费插件用 getShared("createBatcher") 获取。 这也是为什么它对实例本身不附加任何方法（IEmptyPluginExt）。
- */
+/** Batch 插件本身不假设"被批量处理的对象一定是日志 entry"——它只提供批量回调能力，消费插件通过可选 Feature 依赖取得工厂。 */
 class BatchPlugin implements ILoggerPlugin<
   IEmptyPluginExt,
   IBatchPluginConfig,
   IPipelineMode,
+  { readonly batch: typeof loggerBatchFeature },
   IBatchShared
 > {
   readonly name = BATCH_PLUGIN_NAME
+  /** Declared batch capability consumed through PluginHost feature references. */
+  readonly features = Object.freeze({ batch: loggerBatchFeature })
   readonly config: IBatchPluginConfig
 
   constructor(config: IBatchPluginConfig) {
     this.config = config
   }
 
-  shared(core: ILoggerPluginCore): IBatchShared {
+  featureExpose(core: ILoggerPluginCore): IBatchShared {
     // 不读 this.config——统一通过 core.config.get() 读取
     const defaultConfig = core.config.get<IBatchPluginConfig>() ?? {}
     /** Keeps every batcher created from this plugin-owned shared factory. */
@@ -351,10 +356,26 @@ class BatchPlugin implements ILoggerPlugin<
   }
 }
 
+/** Definition-only reference authority for consumers that do not own the batch implementation. */
+const batchFeatureContract = definePlugin({
+  name: BATCH_PLUGIN_NAME,
+  features: { batch: loggerBatchFeature },
+  featureExpose: {} as IBatchShared,
+  install: () => ({})
+})
+
+/** Optional batch dependency shared by delivery plugins. */
+export const optionalBatchFeature = batchFeatureContract.getFeature('batch', { optional: true })
+
 export const batch = (
   config: IBatchPluginConfig = {}
-): ILoggerPlugin<IEmptyPluginExt, IBatchPluginConfig, IPipelineMode, IBatchShared> =>
-  new BatchPlugin(config)
+): ILoggerPlugin<
+  IEmptyPluginExt,
+  IBatchPluginConfig,
+  IPipelineMode,
+  { readonly batch: typeof loggerBatchFeature },
+  IBatchShared
+> => new BatchPlugin(config)
 
 /** Builds the canonical bounded delivery queue for a direct HTTP sink without another owner. */
 export function createBatcherForCore<T>(

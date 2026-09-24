@@ -10,8 +10,8 @@ import {
 } from '@migaia/storage-contract'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import { isRecordStore } from '../types/storage.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
-import { indexBackfillFailureText } from '../error-text.js'
+import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { indexBackfillFailureText, StorageErrorText } from '../error-text.js'
 import { runMigrationsWithRuntime } from '../schema/migrate.js'
 import { selectCodec } from '../serialize/registry.js'
 import { jsonCodec } from '../serialize/json.js'
@@ -801,7 +801,10 @@ export const createRepository = <
       records.sort((left, right) => {
         const result = comparator(left, right)
         if (typeof result !== 'number' || Number.isNaN(result))
-          throw new TypeError('entity orderBy comparator must return a number')
+          throw createStorageTypeError(
+            StorageErrorCode.extensionFailed,
+            StorageErrorText.entityComparatorInvalid
+          )
         return direction === 'prev' ? -result : result
       })
     } catch (cause) {
@@ -1035,7 +1038,10 @@ export const createRepository = <
             matches.sort((left, right) => {
               const result = comparator(left.value, right.value)
               if (typeof result !== 'number' || Number.isNaN(result))
-                throw new TypeError('entity orderBy comparator must return a number')
+                throw createStorageTypeError(
+                  StorageErrorCode.extensionFailed,
+                  StorageErrorText.entityComparatorInvalid
+                )
               if (result !== 0) return normalized?.direction === 'prev' ? -result : result
               const byIndex = compareStorageKeys(left.indexKey, right.indexKey)
               const ordered = byIndex === 0 ? compareStorageKeys(left.id, right.id) : byIndex
@@ -1076,7 +1082,10 @@ export const createRepository = <
         matches.sort((left, right) => {
           const result = comparator(left.value, right.value)
           if (typeof result !== 'number' || Number.isNaN(result))
-            throw new TypeError('entity orderBy comparator must return a number')
+            throw createStorageTypeError(
+              StorageErrorCode.extensionFailed,
+              StorageErrorText.entityComparatorInvalid
+            )
           if (result !== 0) return normalized?.direction === 'prev' ? -result : result
           const byIndex = compareStorageKeys(left.indexKey, right.indexKey)
           const ordered = byIndex === 0 ? compareStorageKeys(left.id, right.id) : byIndex

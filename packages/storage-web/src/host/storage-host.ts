@@ -1,11 +1,13 @@
 import {
+  defineFeature as defineHostFeature,
   defineHost,
+  definePlugin as defineHostPlugin,
   invokeCaptured,
   type IHostHandle,
   type IPluginHostOptions,
   type IPlugin,
   type IPluginConstraint,
-  type IPluginHostCore,
+  type IFeatureReference,
   type IPluginResource
 } from '@migaia/plugin-host'
 import {
@@ -23,8 +25,6 @@ import { reactiveAdapterNameFromBackendId, STORAGE_LIVE_QUERY_SERVICE_NAME } fro
 import {
   createStorageReactiveService,
   createStorageStoreCell,
-  registerReactiveAdapter,
-  storageReactiveServiceCellKey,
   type IStorageReactiveAdapter,
   type IStorageReactiveService,
   type IStorageStoreCell
@@ -42,8 +42,7 @@ import type {
   IRejectInstalledOrDuplicateIds,
   IReactiveBackendHandle,
   ILiveQuery,
-  ILiveQueryOptions,
-  IStorageReactiveFeatureMetadata
+  ILiveQueryOptions
 } from './types.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
@@ -55,10 +54,8 @@ type IStorageInstallCore = { readonly onDispose: (resource: IPluginResource) => 
 /** One native registration's single-assignment store bridge into its PluginHost core. */
 type IStorageNativeRegistrationContext = {
   readonly id: string
-  readonly storeKey: symbol
   readonly storeCell: IStorageStoreCell
   readonly reactive: boolean
-  readonly reactiveBundleKey: symbol | undefined
   readonly runInstall: <T>(operation: () => Promise<T>) => Promise<T>
   readonly isInstallExpired: () => boolean
   readonly registerStore: (store: IKeyValueStore, core: IStorageInstallCore) => void
@@ -141,8 +138,33 @@ type IStorageHostState = 'open' | 'installing' | 'closing' | 'closed'
 /** Internal registry snapshot containing exact stores after a committed PluginHost batch. */
 type IStorageRegistry = ReadonlyMap<string, IKeyValueStore>
 
-/** Private extension shape used only during one successful materialization batch. */
-type IStorageStoreExtension = { readonly [key: symbol]: IKeyValueStore }
+/** Registration-local exposure used to construct the singleton service Feature. */
+type IStorageReactiveServiceExpose = Readonly<{
+  readonly getService: () => IStorageReactiveService
+}>
+
+/** Host-owned service output injected into backend adapter plugins. */
+type IStorageReactiveServiceOutput = Readonly<{
+  readonly service: IStorageReactiveService
+}>
+
+/** Canonical service Feature; its output retains the original service object. */
+const storageReactiveServiceFeature = defineHostFeature<
+  IStorageReactiveServiceExpose,
+  Record<never, never>,
+  IStorageReactiveServiceOutput
+>((core) => ({ service: core.featureExpose.getService() }))
+
+/** Definition-only authority used by adapter dependency declarations. */
+const storageReactiveServiceContract = defineHostPlugin({
+  name: STORAGE_LIVE_QUERY_SERVICE_NAME,
+  features: { service: storageReactiveServiceFeature },
+  featureExpose: {} as IStorageReactiveServiceExpose,
+  install: () => ({})
+})
+
+/** Required singleton service reference for every reactive adapter. */
+const storageReactiveServiceReference = storageReactiveServiceContract.getFeature('service')
 
 /** One facade-owned batch controller and its immutable start time. */
 type IStorageBatchToken = {
@@ -199,8 +221,6 @@ export class StorageHostFacade<
   #registry: IStorageRegistry = new Map()
   /** Native PluginHost extension projection published only with the matching Store registry. */
   #extensions: Readonly<Record<PropertyKey, unknown>> = Object.freeze({})
-  /** Every committed private native Store key, retained so later batches cannot leak old internals. */
-  #nativeStoreKeys = new Set<symbol>()
   /** Exact reactive adapters published only after their enclosing PluginHost batch commits. */
   #reactiveRegistry = new Map<string, IStorageReactiveAdapter>()
   /** One Host-wide service instance, created only when the first reactive feature is admitted. */
@@ -337,7 +357,6 @@ export class StorageHostFacade<
           )
       }
       assertBatchOwner()
-      const trustedStores = new Map<symbol, IKeyValueStore>()
       const nativeContexts = new Map<number, IStorageNativeRegistrationContext>()
       const entries = plugins.map((plugin, index) => {
         const native = nativeMetadata[index]!
@@ -345,10 +364,8 @@ export class StorageHostFacade<
         let installExpired = false
         const context: IStorageNativeRegistrationContext = {
           id: native.id,
-          storeKey: native.storeKey,
           storeCell,
           reactive: native.reactiveFeatureName !== undefined,
-          reactiveBundleKey: native.reactiveBundleKey,
           runInstall: async <T>(operation: () => Promise<T>): Promise<T> => {
             const elapsed = Math.max(0, this.#scheduler.now() - batchToken.startedAt)
             const pending = operation()
@@ -398,7 +415,6 @@ export class StorageHostFacade<
               throw error
             }
             storeCell.set(snapshot.store)
-            trustedStores.set(native.storeKey, snapshot.store)
           }
         }
         nativeContexts.set(index, context)
@@ -410,13 +426,10 @@ export class StorageHostFacade<
             StorageErrorText.backendPluginInvalid
           )
         return {
-          plugin: definition as IPlugin<IStorageInstallCore, IStorageStoreExtension>,
+          plugin: definition as IPlugin<IStorageInstallCore, Record<string, unknown>>,
           storeCell,
           reactive: context.reactive,
-          reactiveMetadata: context.reactive
-            ? ({ mode: 'push', visibility: 'instance' } as IStorageReactiveFeatureMetadata)
-            : undefined,
-          reactiveAttach: undefined
+          reactiveReference: native.reactiveFeatureReference
         }
       })
       const pendingReactive = new Map<string, IStorageReactiveAdapter>()
@@ -430,13 +443,8 @@ export class StorageHostFacade<
           ? [
               this.#createReactiveAdapterPlugin(
                 nativeContexts.get(index)?.id ?? plugins[index]!.id,
-                entry.storeCell,
-                entry.reactiveMetadata,
                 pendingReactive,
-                entry.reactiveAttach,
-                nativeContexts.get(index)?.reactiveBundleKey,
-                nativeContexts.get(index)?.storeKey,
-                trustedStores
+                entry.reactiveReference!
               )
             ]
           : []
@@ -450,22 +458,19 @@ export class StorageHostFacade<
         entries.map((_, index) => nativeContexts.get(index)),
         entries.length
       )
-      const innerView = await this.#inner.use(
+      const innerHandles = await this.#inner.use(
         ...(materialized as IPluginConstraint<IStorageHostCore>[])
       )
       assertBatchOwner()
       const nextRegistry = new Map(this.#registry)
-      const internalExtensionKeys = new Set(this.#nativeStoreKeys)
-      for (const context of nativeContexts.values()) internalExtensionKeys.add(context.storeKey)
       const nextExtensions = Object.create(null) as Record<PropertyKey, unknown>
-      for (const source of [this.#extensions, innerView.extensions])
+      for (const source of [this.#extensions, ...innerHandles.map((handle) => handle.extensions)])
         for (const key of Reflect.ownKeys(source)) {
-          if (internalExtensionKeys.has(key as symbol)) continue
           Object.defineProperty(nextExtensions, key, Object.getOwnPropertyDescriptor(source, key)!)
         }
       for (const [index] of plugins.entries()) {
         const native = nativeContexts.get(index)
-        nextRegistry.set(native!.id, trustedStores.get(native!.storeKey)!)
+        nextRegistry.set(native!.id, entries[index]!.storeCell.get())
       }
       const nextReactiveRegistry = new Map(this.#reactiveRegistry)
       for (const [index] of plugins.entries()) {
@@ -478,7 +483,6 @@ export class StorageHostFacade<
       this.#registry = new Map(nextRegistry)
       this.#extensions = Object.freeze(nextExtensions)
       this.#reactiveRegistry = nextReactiveRegistry
-      this.#nativeStoreKeys = internalExtensionKeys
       if (servicePlugin !== undefined) this.#reactiveServiceInstalled = true
     })
     this.#installing = batch
@@ -595,7 +599,6 @@ export class StorageHostFacade<
     if (this.#installing !== undefined) this.#installing = undefined
     this.#registry = new Map()
     this.#extensions = Object.freeze({})
-    this.#nativeStoreKeys.clear()
     this.#reactiveRegistry.clear()
     this.#disposePromise = this.#inner.dispose().then(async () => {
       this.#state = 'closed'
@@ -703,29 +706,18 @@ export class StorageHostFacade<
   }
 
   /** Materializes the Host-wide singleton service in the same PluginHost batch. */
-  #createReactiveServicePlugin(): IPlugin<
-    IStorageHostCore & IPluginHostCore<IStorageHostCore>,
-    Record<string, never>
-  > {
-    let service: IStorageReactiveService | undefined
-    return {
+  #createReactiveServicePlugin(): IPlugin<IStorageHostCore, Record<string, never>> {
+    const service = createStorageReactiveService(this.#scheduler)
+    return defineHostPlugin({
       name: STORAGE_LIVE_QUERY_SERVICE_NAME,
-      shared: () => {
-        if (service === undefined)
-          throw new StorageError(
-            StorageErrorCode.reactiveFeatureInvalid,
-            {},
-            StorageErrorText.reactiveFeatureInvalid
-          )
-        return { [storageReactiveServiceCellKey]: service }
-      },
+      features: { service: storageReactiveServiceFeature },
+      featureExpose: { getService: () => service },
       install: (core) => {
-        service = createStorageReactiveService(this.#scheduler)
         this.#reactiveService = service
         try {
           core.onDispose(async () => {
             try {
-              await service!.dispose()
+              await service.dispose()
             } catch (error) {
               this.#report(error)
               throw error
@@ -740,79 +732,62 @@ export class StorageHostFacade<
         }
         return {}
       }
-    }
+    })
   }
 
   /** Materializes one backend-bound adapter with one synchronous controller subscription. */
   #createReactiveAdapterPlugin(
     backendId: string,
-    storeCell: IStorageStoreCell,
-    entryMetadata: IStorageReactiveFeatureMetadata | undefined,
     pending: Map<string, IStorageReactiveAdapter>,
-    attach:
-      | ((
+    reactiveReference: IFeatureReference<
+      {
+        readonly attach: (
           service: IStorageReactiveService,
           report: (error: unknown) => void
-        ) => IStorageReactiveAdapter)
-      | undefined,
-    bundleKey: symbol | undefined,
-    storeKey: symbol | undefined,
-    trustedStores: ReadonlyMap<symbol, IKeyValueStore>
-  ): IPlugin<IStorageHostCore & IPluginHostCore<IStorageHostCore>, Record<string, never>> {
-    return {
+        ) => IStorageReactiveAdapter
+      },
+      false
+    >
+  ): IPlugin<IStorageHostCore, Record<string, never>> {
+    /** Resolves both required providers before adapter installation. */
+    const dependenciesFeature = defineHostFeature<
+      Record<never, never>,
+      {
+        readonly service: typeof storageReactiveServiceReference
+        readonly reactive: typeof reactiveReference
+      },
+      {
+        readonly service: IStorageReactiveService
+        readonly attach: (
+          service: IStorageReactiveService,
+          report: (error: unknown) => void
+        ) => IStorageReactiveAdapter
+      }
+    >(
+      (_core, dependencies) => ({
+        service: dependencies.service.service,
+        attach: dependencies.reactive.attach
+      }),
+      { service: storageReactiveServiceReference, reactive: reactiveReference }
+    )
+    return defineHostPlugin({
       name: reactiveAdapterNameFromBackendId(backendId),
+      features: { dependencies: dependenciesFeature },
       install: (core) => {
-        const sharedService = core.getShared(storageReactiveServiceCellKey)
-        if (sharedService !== this.#reactiveService)
+        const { service, attach } = core.features.dependencies
+        if (service !== this.#reactiveService || typeof attach !== 'function')
           throw new StorageError(
             StorageErrorCode.reactiveFeatureInvalid,
             {},
             StorageErrorText.reactiveFeatureInvalid
           )
-        const store = storeCell.get()
-        const reactiveMetadata = entryMetadata
-        if (reactiveMetadata === undefined)
-          throw new StorageError(
-            StorageErrorCode.reactiveFeatureInvalid,
-            {},
-            StorageErrorText.reactiveFeatureInvalid
-          )
-        const bundle =
-          bundleKey === undefined
-            ? undefined
-            : (core.getShared(bundleKey) as
-                | { readonly store?: unknown; readonly attach?: unknown }
-                | undefined)
-        const trustedStore = storeKey === undefined ? undefined : trustedStores.get(storeKey)
-        if (
-          bundleKey !== undefined &&
-          (bundle?.store !== store || trustedStore !== store || typeof bundle.attach !== 'function')
-        ) {
-          throw new StorageError(
-            StorageErrorCode.reactiveFeatureInvalid,
-            {},
-            StorageErrorText.reactiveFeatureInvalid
-          )
-        }
-        const featureAttach =
-          bundleKey === undefined ? attach : (bundle!.attach as NonNullable<typeof attach>)
-        const adapter =
-          featureAttach === undefined
-            ? registerReactiveAdapter(
-                sharedService as IStorageReactiveService,
-                backendId,
-                store,
-                this.#report,
-                reactiveMetadata,
-                reactiveMetadata.subscribe
-              )
-            : featureAttach(sharedService as IStorageReactiveService, this.#report)
+        const adapter = attach(service, this.#report)
         pending.set(backendId, adapter)
         core.onDispose(adapter.dispose)
         adapter.startSource()
         return {}
       }
-    }
+    })
   }
 
   /** Best-effort cleanup for a factory value that lost publication ownership. */

@@ -7,6 +7,8 @@ import {
 import { isPlainObject } from '@migaia/utils/object'
 import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
 import { safeJsonPayloadByteLength } from '../utils/json.js'
+import { StorageErrorText } from '../error-text.js'
+import { StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 
 /** Versioned metadata-only message shape used by admitted IndexedDB transports. */
 type IIndexedDbWireHint = {
@@ -175,7 +177,11 @@ const decodeWireHint = (
     if (encodedKeys !== undefined) {
       decodedKeys = encodedKeys.map((encoded) => {
         const decoded = decodeFlatStorageKey(encoded)
-        if (decoded === undefined) throw new TypeError('invalid IndexedDB change hint key')
+        if (decoded === undefined)
+          throw createStorageTypeError(
+            StorageErrorCode.deserializeFailed,
+            StorageErrorText.indexedDbChangeHintKeyInvalid
+          )
         return decoded
       })
     }

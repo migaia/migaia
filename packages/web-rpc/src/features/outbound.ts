@@ -13,7 +13,7 @@ import type {
 } from '../internal/feature-contract.js'
 import type { IWebRpcEndpoint } from '../typing.js'
 import {
-  WebRpcSharedKey,
+  WebRpcPortName,
   type IWebRpcDiscoveryResolverPort,
   type IWebRpcInboundIdentityPort,
   type IWebRpcIdentityCommand,
@@ -102,23 +102,23 @@ export const createOutboundFeature = (
           registerEndpointDebugSnapshot(publicSurface, () => attachment!.debugSnapshot())
           installation = Object.freeze({
             public: publicSurface,
-            inboundIdentity: ports[WebRpcSharedKey.inboundIdentity] as IWebRpcInboundIdentityPort,
+            inboundIdentity: ports[WebRpcPortName.inboundIdentity] as IWebRpcInboundIdentityPort,
             outboundOperations: ports[
-              WebRpcSharedKey.outboundOperations
+              WebRpcPortName.outboundOperations
             ] as IWebRpcOutboundOperationsPort,
             variationCoordinator: ports[
-              WebRpcSharedKey.variationCoordinator
+              WebRpcPortName.variationCoordinator
             ] as IWebRpcVariationCoordinatorPort,
             activate: () => attachment!.activate()
           })
           return installation
         }
-        const shared = (): Readonly<Record<PropertyKey, unknown>> =>
+        const ports = (): Readonly<Record<PropertyKey, unknown>> =>
           createOutboundSharedPorts(requireAttachment(), core.featureExpose.observeOutboundCommand)
         return Object.freeze({
           prepare,
           activate: () => requireAttachment().activate(),
-          shared,
+          ports,
           getHooks: () => requireAttachment().hooks,
           connectResolver: (port: IWebRpcDiscoveryResolverPort) => {
             resolver = port
@@ -211,13 +211,13 @@ function createOutboundSharedPorts(
     }
   }
   return Object.freeze({
-    [WebRpcSharedKey.inboundIdentity]: Object.freeze({
+    [WebRpcPortName.inboundIdentity]: Object.freeze({
       verify
     } satisfies IWebRpcInboundIdentityPort),
-    [WebRpcSharedKey.variationCoordinator]: Object.freeze({
+    [WebRpcPortName.variationCoordinator]: Object.freeze({
       admit
     } satisfies IWebRpcVariationCoordinatorPort),
-    [WebRpcSharedKey.outboundOperations]: Object.freeze({
+    [WebRpcPortName.outboundOperations]: Object.freeze({
       send: send as IWebRpcOutboundSend
     } satisfies IWebRpcOutboundOperationsPort)
   })

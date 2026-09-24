@@ -7,7 +7,7 @@ import type {
 } from '../typing.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 
 const protocolClaims: IWebRpcPluginClaims = {
   routes: [],
@@ -20,7 +20,7 @@ const protocolClaims: IWebRpcPluginClaims = {
 
 const protocolMetadata: IWebRpcPluginMetadata = Object.freeze({
   claims: protocolClaims,
-  sharedProvides: Object.freeze([WebRpcSharedKey.protocol])
+  sharedProvides: Object.freeze([WebRpcPortName.protocol])
 })
 
 /** Creates the canonical default protocol plugin without permitting a forged generic identity. */
@@ -46,7 +46,7 @@ export function canonicalProtocol(
     install: (): IWebRpcPluginInstallResult => {
       return {
         extension: Object.freeze({}),
-        shared: Object.freeze({ [WebRpcSharedKey.protocol]: descriptor })
+        ports: Object.freeze({ [WebRpcPortName.protocol]: descriptor })
       }
     }
   })

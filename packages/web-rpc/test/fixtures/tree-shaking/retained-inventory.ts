@@ -91,7 +91,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/plugin-host/dist/state-constants.js',
       'workspace:packages/plugin-host/dist/symbols.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-Cw8rxmXe.js',
+      'workspace:packages/utils/dist/error-text-[chunk].js',
       'workspace:packages/utils/dist/error.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js'
@@ -202,7 +202,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/plugin-host/dist/symbols.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-Cw8rxmXe.js',
+      'workspace:packages/utils/dist/error-text-[chunk].js',
       'workspace:packages/utils/dist/error.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js'
@@ -319,7 +319,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/plugin-host/dist/symbols.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-Cw8rxmXe.js',
+      'workspace:packages/utils/dist/error-text-[chunk].js',
       'workspace:packages/utils/dist/error.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js'
@@ -441,7 +441,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/plugin-host/dist/symbols.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-Cw8rxmXe.js',
+      'workspace:packages/utils/dist/error-text-[chunk].js',
       'workspace:packages/utils/dist/error.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js'
@@ -565,7 +565,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/plugin-host/dist/symbols.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-Cw8rxmXe.js',
+      'workspace:packages/utils/dist/error-text-[chunk].js',
       'workspace:packages/utils/dist/error.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js'

@@ -13,10 +13,10 @@ export const TopologyInvalidReason = {
 export type ITopologyInvalidReason =
   (typeof TopologyInvalidReason)[keyof typeof TopologyInvalidReason]
 
-/** One required provider edge consumed by the pure topology admission primitive. */
+/** One provider edge consumed by the pure topology admission primitive. */
 export type ITopologyDependency = {
   readonly provider: string
-  readonly required: true
+  readonly required: boolean
 }
 
 /** Minimal admitted node shape consumed by the static and future dynamic topology owners. */
@@ -116,10 +116,10 @@ function snapshotTopologyNode(
     }
     if (typeof providerValue !== 'string' || providerValue.length === 0)
       onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-    if (requiredValue !== true) onInvalid(TopologyInvalidReason.invalidNode, nodeId)
+    if (typeof requiredValue !== 'boolean') onInvalid(TopologyInvalidReason.invalidNode, nodeId)
     if (edgeProviders.has(providerValue)) onInvalid(TopologyInvalidReason.duplicateEdge, nodeId)
     edgeProviders.add(providerValue)
-    return Object.freeze({ provider: providerValue, required: true as const })
+    return Object.freeze({ provider: providerValue, required: requiredValue })
   })
   return Object.freeze({
     id: idValue,
@@ -216,14 +216,22 @@ export function buildCapabilityTopology(
   for (const node of snapshots) {
     providersByConsumer.set(node.id, node.dependencies)
     for (const edge of node.dependencies) {
-      if (!nodesById.has(edge.provider)) onUnknownProvider(node.id, edge.provider)
+      if (!nodesById.has(edge.provider)) {
+        if (edge.required) onUnknownProvider(node.id, edge.provider)
+        continue
+      }
       const consumers = consumersByProvider.get(edge.provider)
       if (consumers) consumers.push(node)
       else consumersByProvider.set(edge.provider, [node])
     }
   }
   /** Mutable Kahn cursor; all returned facts are copied behind read-only facades. */
-  const indegree = new Map(snapshots.map((node) => [node.id, node.dependencies.length]))
+  const indegree = new Map(
+    snapshots.map((node) => [
+      node.id,
+      node.dependencies.filter((dependency) => nodesById.has(dependency.provider)).length
+    ])
+  )
   const initialIndegree = new Map(indegree)
   const level = new Map(snapshots.map((node) => [node.id, 0]))
   const queue = ordinalOrder.filter((node) => indegree.get(node.id) === 0)

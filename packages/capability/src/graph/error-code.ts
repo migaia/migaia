@@ -27,7 +27,9 @@ export const CapabilityGraphErrorCode = {
   /** A lifecycle callback synchronously re-enters the same graph operation. */
   reentrantOperation: 'GRAPH_REENTRANT_OPERATION',
   /** Factory options or their accessors fail admission. */
-  invalidOption: 'GRAPH_INVALID_OPTION'
+  invalidOption: 'GRAPH_INVALID_OPTION',
+  /** A reject-policy mutation targets a node that still has required dependents. */
+  nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS'
 } as const
 
 export type ICapabilityGraphErrorCode =

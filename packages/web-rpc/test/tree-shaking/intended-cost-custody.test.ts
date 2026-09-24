@@ -32,7 +32,7 @@ type ICustodyResult = {
 }
 
 const packageRoot = resolve(import.meta.dirname, '../..')
-const validator = resolve(packageRoot, 'test/tree-shaking/f004-custody.mjs')
+const validator = resolve(packageRoot, 'test/tree-shaking/intended-cost-custody.mjs')
 
 /**
  * Executes the package-local custody validator as a fresh process. The process may read only its

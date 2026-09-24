@@ -1,3 +1,4 @@
+import { reportDiagnostic } from './diagnostic-report.js'
 import {
   boundedWait,
   type IAbortController,
@@ -8,7 +9,7 @@ import {
 } from '@migaia/lifecycle'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
-import type { IPluginHostDisposalResult, IPluginHostErrorCode } from './typing.js'
+import type { IPluginHostDiagnostic, IPluginHostDisposalResult } from './typing.js'
 
 export type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly terminal: ITerminalController
@@ -25,7 +26,7 @@ export type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly resetCleanupAbandoned: () => void
   readonly isCleanupAbandoned: () => boolean
   readonly commitRevision: () => void
-  readonly diagnostic: (message: string, code?: IPluginHostErrorCode) => void
+  readonly diagnostic: IPluginHostDiagnostic
 }>
 
 /** Owns the Host's unique terminal promise and global physical-cleanup orchestration. */
@@ -49,12 +50,14 @@ export class PluginHostDisposalRuntime<TRegistration> {
       this.#port.executionController.abort(
         new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
       )
-    } catch {
-      try {
-        this.#port.diagnostic(ERROR_TEXT.HOST_DISPOSING, PluginHostErrorCode.hostDisposing)
-      } catch {
-        // Diagnostics cannot alter terminal authority.
-      }
+    } catch (abortFailure) {
+      // A hostile abort listener cannot alter terminal authority; its failure is reported.
+      reportDiagnostic(
+        this.#port.diagnostic,
+        ERROR_TEXT.HOST_DISPOSING,
+        PluginHostErrorCode.hostDisposing,
+        abortFailure
+      )
     }
     this.#promise = this.#port.enqueueTerminal(async () => {
       const errors: unknown[] = []
@@ -79,14 +82,12 @@ export class PluginHostDisposalRuntime<TRegistration> {
       this.#port.terminal.forceTerminal()
       this.#port.commitRevision()
       for (const error of errors) {
-        try {
-          this.#port.diagnostic(
-            error instanceof Error ? error.message : String(error),
-            PluginHostErrorCode.cleanupIncomplete
-          )
-        } catch {
-          // Diagnostics are report-only and cannot change terminal state.
-        }
+        reportDiagnostic(
+          this.#port.diagnostic,
+          error instanceof Error ? error.message : String(error),
+          PluginHostErrorCode.cleanupIncomplete,
+          error
+        )
       }
       const cleanupComplete =
         drained && this.#port.pending.size === 0 && !this.#port.isCleanupAbandoned()

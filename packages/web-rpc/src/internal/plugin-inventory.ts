@@ -14,7 +14,7 @@ import type {
 import { runConstructionInstall } from './construction-install.js'
 import { assertPluginInstallResult } from './plugin-descriptor.js'
 import {
-  WebRpcSharedKey,
+  WebRpcPortName,
   type IWebRpcHooksPort,
   type IWebRpcTimePort
 } from './plugin-shared-keys.js'
@@ -23,6 +23,8 @@ import type { IWebRpcCleanupError } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
 import type { IWebRpcHookEvent } from '../typing.js'
 import type { IWebRpcClaimAdmission } from './feature-policy.js'
+import { definePlugin } from '@migaia/plugin-host'
+import { createWebRpcPortFeatureSet } from './port-feature.js'
 
 /** Fixed production batch positions exposed only to bounded internal failure injection tests. */
 export type IWebRpcPluginRole =
@@ -65,7 +67,7 @@ export type IWebRpcNativePluginBatchOptions = {
   readonly onRootDisposalErrors?: (errors: readonly IWebRpcCleanupError[]) => void
   readonly onActivationPreflight?: (
     state: IWebRpcComposedRuntimeState,
-    getShared: (key: PropertyKey) => unknown
+    getPort: (key: PropertyKey) => unknown
   ) => void | Promise<void>
   /** Bounded test seam wraps one middleware body inside its existing construction scope. */
   readonly transformMiddlewareInstall?: (
@@ -120,7 +122,7 @@ export function buildNativePluginBatch(
     nativeDefinition(
       'kernel',
       emptyClaims,
-      [WebRpcSharedKey.time],
+      [WebRpcPortName.time],
       [],
       async (core) => {
         core.onDispose(async () => {
@@ -145,14 +147,14 @@ export function buildNativePluginBatch(
         return {}
       },
       () => ({
-        [WebRpcSharedKey.time]: Object.freeze({
+        [WebRpcPortName.time]: Object.freeze({
           now: () => options.kernel.time.now(),
           setTimeout: options.kernel.time.setTimeout,
           clearTimeout: options.kernel.time.clearTimeout
         } satisfies IWebRpcTimePort)
       })
     ),
-    { name: 'kernel', claims: emptyClaims, sharedProvides: [WebRpcSharedKey.time] }
+    { name: 'kernel', claims: emptyClaims, sharedProvides: [WebRpcPortName.time] }
   )
   options.middlewareSnapshots.forEach((snapshot, index) => {
     const role = {
@@ -187,7 +189,7 @@ export function buildNativePluginBatch(
         middleware.metadata.sharedProvides ?? [],
         middleware.metadata.sharedConsumes ?? [],
         async (core) => {
-          const hooksPort = core.getShared(WebRpcSharedKey.hooks) as IWebRpcHooksPort | undefined
+          const hooksPort = core.getPort(WebRpcPortName.hooks) as IWebRpcHooksPort | undefined
           const constructionReporter = hooksPort?.reportConstructionDiagnostic
           const installed = await runConstructionInstall(
             {
@@ -195,7 +197,7 @@ export function buildNativePluginBatch(
               transport: core.transport,
               control: core.construction,
               hooks: core.hooks,
-              getShared: (key) => core.getShared(key),
+              getPort: (key) => core.getPort(key),
               report: constructionReporter
                 ? (error) =>
                     constructionReporter({
@@ -237,7 +239,7 @@ export function buildNativePluginBatch(
           result = installed
           return copyExtensionOutput(installed.extension, middleware.metadata.claims.publicKeys)
         },
-        () => result?.shared ?? {}
+        () => result?.ports ?? {}
       ),
       {
         name: middleware.name,
@@ -254,12 +256,12 @@ export function buildNativePluginBatch(
       'middleware-finalize',
       emptyClaims,
       [],
-      [WebRpcSharedKey.connect],
+      [WebRpcPortName.connect],
       async (core) => {
         const prepared = await options.deferred.finalize(
           options.hookEvents,
           (operation) => Promise.resolve(operation()),
-          core.getShared
+          core.getPort
         )
         options.onPrepared(prepared)
         return {}
@@ -269,16 +271,16 @@ export function buildNativePluginBatch(
       name: 'middleware-finalize',
       claims: emptyClaims,
       sharedProvides: [],
-      sharedConsumes: [WebRpcSharedKey.connect],
+      sharedConsumes: [WebRpcPortName.connect],
       sharedOptionalConsumes: [
-        WebRpcSharedKey.protocol,
-        WebRpcSharedKey.contract,
-        WebRpcSharedKey.authentication,
-        WebRpcSharedKey.timeout,
-        WebRpcSharedKey.abort,
-        WebRpcSharedKey.hooks,
-        WebRpcSharedKey.ping,
-        WebRpcSharedKey.uuid
+        WebRpcPortName.protocol,
+        WebRpcPortName.contract,
+        WebRpcPortName.authentication,
+        WebRpcPortName.timeout,
+        WebRpcPortName.abort,
+        WebRpcPortName.hooks,
+        WebRpcPortName.ping,
+        WebRpcPortName.uuid
       ]
     }
   )
@@ -306,7 +308,7 @@ export function buildNativePluginBatch(
         }
       })
       const state = { routeKeys: options.kernel.routeKeys, activated: true }
-      await options.onActivationPreflight?.(state, core.getShared)
+      await options.onActivationPreflight?.(state, core.getPort)
       options.onNativeFeatureActivate?.()
       options.onActivationCommitted()
       return {}
@@ -323,15 +325,32 @@ function nativeDefinition(
   sharedProvides: readonly PropertyKey[],
   sharedConsumes: readonly PropertyKey[],
   install: (core: IWebRpcPluginCore & IWebRpcPluginHostCore) => unknown | Promise<unknown>,
-  shared?: () => Record<PropertyKey, unknown>
+  ports?: () => Record<PropertyKey, unknown>
 ): IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims } {
-  return Object.freeze({
+  /** Feature declarations are immutable; their cells are allocated per registration below. */
+  const portFeatures = createWebRpcPortFeatureSet(sharedProvides)
+  const runtimes = new WeakMap<object, ReturnType<typeof portFeatures.createRuntime>>()
+  const runtimeFor = (core: object): ReturnType<typeof portFeatures.createRuntime> => {
+    const current = runtimes.get(core)
+    if (current) return current
+    const created = portFeatures.createRuntime()
+    runtimes.set(core, created)
+    return created
+  }
+  return definePlugin({
     name,
     claims,
     sharedProvides,
     sharedConsumes,
-    install,
-    ...(shared === undefined ? {} : { shared })
+    features: portFeatures.features,
+    featureExpose: (core: IWebRpcPluginCore & IWebRpcPluginHostCore) => runtimeFor(core).expose,
+    install: async (core: IWebRpcPluginCore & IWebRpcPluginHostCore) => {
+      const output = await install(core)
+      const runtime = runtimeFor(core)
+      runtime.publish(ports?.() ?? {})
+      core.publishPortFeatures(runtime.outputs)
+      return output as Record<string, unknown>
+    }
   }) as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
 }
 

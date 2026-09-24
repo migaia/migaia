@@ -43,9 +43,19 @@ const findLoggerError = (value: unknown, code: string): (Error & { code?: string
       if (found) return found
     }
     if (candidate && typeof candidate === 'object') {
-      const result = candidate as { readonly cleanupErrors?: unknown; readonly error?: unknown }
+      const result = candidate as {
+        readonly cleanupErrors?: unknown
+        readonly errors?: unknown
+        readonly error?: unknown
+      }
       if (Array.isArray(result.cleanupErrors)) {
         for (const nested of result.cleanupErrors) {
+          const found = visit(nested)
+          if (found) return found
+        }
+      }
+      if (Array.isArray(result.errors)) {
+        for (const nested of result.errors) {
           const found = visit(nested)
           if (found) return found
         }
@@ -511,10 +521,10 @@ describe('second adversarial pass', () => {
     vi.useFakeTimers()
     try {
       const log: any = new Logger({
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-        plugins: [batch()]
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
       })
-      const createBatcher = log.getShared('createBatcher')
+      const [batchHandle] = await log.use(batch())
+      const { createBatcher } = batchHandle.getFeature('batch')
       const batcher = createBatcher({ maxSize: 1 }, () => new Promise<void>(() => undefined))
       batcher.push('stuck')
       const pending = batcher.flush()
@@ -879,7 +889,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
         plugins: [processPlugin({ interceptProcessExit: true })]
       })
       const uninstall = await first.unUse('process')
-      expect(uninstall).toMatchObject({ ok: false, removed: true })
+      expect(uninstall).toMatchObject({ ok: false })
       expect(removeAttempts).toEqual([
         'SIGINT',
         'SIGTERM',
@@ -984,10 +994,10 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
     try {
       const batchLogger: any = new Logger({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-        scheduler,
-        plugins: [batch()]
+        scheduler
       })
-      const createBatcher = batchLogger.getShared('createBatcher')
+      const [batchHandle] = await batchLogger.use(batch())
+      const { createBatcher } = batchHandle.getFeature('batch')
       const batcher = createBatcher({ maxSize: 2, maxWaitMs: 10 }, (items: string[]) => {
         batches.push(items)
       })
@@ -1467,10 +1477,10 @@ describe('Round20 logger uninstall isolation', () => {
     try {
       const logger: any = new Logger({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-        scheduler,
-        plugins: [batch()]
+        scheduler
       })
-      const oldFactory = logger.getShared('createBatcher')
+      const [oldBatchHandle] = await logger.use(batch())
+      const { createBatcher: oldFactory } = oldBatchHandle.getFeature('batch')
       const oldBatcher = oldFactory({ maxSize: 3, maxWaitMs: 10 }, (items: string[]) =>
         oldBatches.push(items)
       )
@@ -1505,16 +1515,17 @@ describe('Round20 logger uninstall isolation', () => {
       expect(deferCalls).toBe(deferredBeforeLateCallbacks)
       expect(scheduled).toHaveLength(2)
 
-      const inertBatcher = oldFactory({ maxSize: 1 }, (items: string[]) => oldBatches.push(items))
-      inertBatcher.push('retained-factory')
+      expect(() => oldFactory({ maxSize: 1 }, (items: string[]) => oldBatches.push(items))).toThrow(
+        expect.objectContaining({ code: 'REGISTRATION_REVOKED' })
+      )
       expect(scheduled).toHaveLength(2)
 
       const reinstalled: any = new Logger({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-        scheduler,
-        plugins: [batch()]
+        scheduler
       })
-      const newFactory = reinstalled.getShared('createBatcher')
+      const [newBatchHandle] = await reinstalled.use(batch())
+      const { createBatcher: newFactory } = newBatchHandle.getFeature('batch')
       const newBatcher = newFactory({ maxSize: 2, maxWaitMs: 10 }, (items: string[]) =>
         newBatches.push(items)
       )
@@ -1537,11 +1548,11 @@ describe('Round20 logger uninstall isolation', () => {
     const callbackError = new Error('batch-callback-failed')
     const failures: Array<{ source: string; error: unknown }> = []
     const logger: any = new Logger({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [batch()]
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     logger.onFailure((failure: { source: string; error: unknown }) => failures.push(failure))
-    const createBatcher = logger.getShared('createBatcher')
+    const [batchHandle] = await logger.use(batch())
+    const { createBatcher } = batchHandle.getFeature('batch')
     const batcher = createBatcher({ maxSize: 1, asyncOutput: false }, () => {
       throw callbackError
     })

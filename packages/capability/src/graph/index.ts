@@ -47,7 +47,7 @@ export {
 /** Nominal node identity accepted by a graph registration. */
 export type IGraphNodeId = string & { readonly __graphNodeId: unique symbol }
 
-/** A required static provider edge. Optional/notification edges belong to later SDDs. */
+/** A required provider edge consumed by the static graph. */
 export type IGraphDependency = { readonly provider: IGraphNodeId; readonly required: true }
 
 /** The primary resource returned by a node start. Its release is owned exactly once by Graph. */
@@ -88,6 +88,8 @@ export type IGraphNodeDiagnostic = {
   readonly state: ICapabilityGraphNodeState
   readonly value: unknown
   readonly error: unknown
+  /** Cause for a blocked node when dependency availability is responsible. */
+  readonly reason?: 'missing' | 'suspended' | 'removed' | 'failed'
   /** Optional composition binding retained by the dynamic owner. */
   readonly binding?: unknown
   /** Monotonic lifecycle generation for this node. */

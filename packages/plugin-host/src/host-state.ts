@@ -4,7 +4,7 @@ import { PluginHostErrorCode } from './error-code.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IInstallBatchContext } from './install-runtime.js'
-import type { IRegistration, ISharedEntry } from './registry.js'
+import type { IRegistration } from './registry.js'
 
 /**
  * Every piece of mutable state a host shares with its runtimes, in one owner.
@@ -22,16 +22,17 @@ import type { IRegistration, ISharedEntry } from './registry.js'
 export class PluginHostState<TDomainCore extends object, TValue> {
   /** Installed registrations by plugin name. */
   readonly registrations = new Map<string, IRegistration<TDomainCore, TValue>>()
-  /** Published shared entries by key, with their owning registration. */
-  readonly shared = new Map<PropertyKey, ISharedEntry<TDomainCore, TValue>>()
-  /** Last owner name for shared keys removed from the active table. */
-  readonly retiredShared = new Map<PropertyKey, string>()
   /** Registration owner for each immutable extension view slot. */
   readonly extensionOwners = new Map<PropertyKey, IRegistration<TDomainCore, TValue>>()
   /** Live definition lanes, written only through the composition entry. */
   readonly stageSlots = new Map<string, IDataOrderSlotState>()
   /** The four pipeline lanes and the snapshot rule that governs reading them. */
   readonly lanes = new StageLanes<TValue>()
+  /**
+   * Names whose registration left through removal (not replacement) and has not been reinstalled.
+   * It lets dependency validation tell `PREREQUISITE_REMOVED` apart from `PREREQUISITE_MISSING`.
+   */
+  readonly removedNames = new Set<string>()
   /** Next host-owned slot ordinal for a never-before-seen plugin name. */
   #nextStageSlot = 0n
   /** Monotonic view generation; every committed mutation advances it by one. */
@@ -51,37 +52,14 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     this.#revision += 1
   }
 
-  /** Reads a committed shared key, distinguishing disabled, removed and never-registered owners. */
-  getShared<T = unknown>(key: PropertyKey): T | undefined {
-    const entry = this.shared.get(key)
-    if (entry) {
-      if (!entry.owner.enabled)
-        throw new PluginHostError(
-          PluginHostErrorCode.prerequisiteDisabled,
-          ERROR_TEXT.PREREQUISITE_DISABLED(key, entry.owner.name),
-          { detail: { key, owner: entry.owner.name, recoverable: true } }
-        )
-      return entry.value as T
-    }
-    const retiredOwner = this.retiredShared.get(key)
-    if (retiredOwner !== undefined)
-      throw new PluginHostError(
-        PluginHostErrorCode.prerequisiteRemoved,
-        ERROR_TEXT.PREREQUISITE_REMOVED(key, retiredOwner),
-        { detail: { key, owner: retiredOwner, recoverable: false } }
-      )
-    return undefined
-  }
-
   /** Publishes one prepared install batch atomically into the tables owned by this state. */
   publishInstallBatch(
     installed: readonly IRegistration<TDomainCore, TValue>[],
     batch: IInstallBatchContext<TDomainCore, TValue>
   ): void {
-    for (const registration of installed) this.registrations.set(registration.name, registration)
-    for (const [key, entry] of batch.shared) {
-      this.shared.set(key, entry)
-      this.retiredShared.delete(key)
+    for (const registration of installed) {
+      this.registrations.set(registration.name, registration)
+      this.removedNames.delete(registration.name)
     }
     for (const [key, registration] of batch.extensionOwners)
       this.extensionOwners.set(key, registration)
@@ -99,11 +77,6 @@ export class PluginHostState<TDomainCore extends object, TValue> {
    * nothing belonging to whoever claimed the key next.
    */
   closeRegistration(registration: IRegistration<TDomainCore, TValue>): void {
-    for (const key of registration.shared)
-      if (this.shared.get(key)?.owner === registration) {
-        this.shared.delete(key)
-        this.retiredShared.set(key, registration.name)
-      }
     for (const { key } of [...registration.extensions].reverse())
       if (this.extensionOwners.get(key) === registration) this.extensionOwners.delete(key)
     if (this.registrations.get(registration.name) === registration)

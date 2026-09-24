@@ -136,8 +136,8 @@ function snapshotLoggerOptions(options: unknown): ILoggerConstructorSnapshot {
  */
 /**
  * 核心引擎：不认识"级别""颜色""批量"这些概念，只提供 pipeline（entry 加工链）、sink（entry 落地）、hook（生命周期）、
- * flush/shutdown（收尾）、shared/getShared（插件间共享能力）、 config（插件配置的统一读写入口）、defer（按来源插件配置启用的异步调度）、
- * extends（多 logger 组合转发）、use/unUse （动态装卸插件）这几个原语。所有具体能力都通过插件注入，核心本身保持"薄"。
+ * flush/shutdown（收尾）、Feature 依赖、config（插件配置的统一读写入口）、defer（按来源插件配置启用的异步调度）、 extends（多 logger
+ * 组合转发）、use/unUse （动态装卸插件）这几个原语。所有具体能力都通过插件注入，核心本身保持"薄"。
  *
  * 所有内部状态一律用真正的 `#` 私有字段（ECMAScript 私有字段，运行时由 引擎强制隔离，不是 TS 的 `private` 那种编译期约定、运行时其实还能被
  * 外部代码用类型断言绕过去的"假私有"）。方法能不写在 class 里的， 一律不写在 class 外面。
@@ -219,17 +219,18 @@ class LoggerCore {
       enumerable: true
     })
     /** Materialized consumer facade; PluginHost V2 keeps extension publication off its engine. */
-    const view = this.#handle.useSync(...(plugins as [ILoggerPluginConstraint]))
-    for (const key of Reflect.ownKeys(view.extensions)) {
-      const descriptor = Object.getOwnPropertyDescriptor(view.extensions, key)
-      if (!descriptor || !('value' in descriptor)) continue
-      Object.defineProperty(this, key, {
-        value: descriptor.value,
-        enumerable: true,
-        configurable: false,
-        writable: false
-      })
-    }
+    const handles = this.#handle.useSync(...(plugins as [ILoggerPluginConstraint]))
+    for (const handle of handles)
+      for (const key of Reflect.ownKeys(handle.extensions)) {
+        const descriptor = Object.getOwnPropertyDescriptor(handle.extensions, key)
+        if (!descriptor || !('value' in descriptor)) continue
+        Object.defineProperty(this, key, {
+          value: descriptor.value,
+          enumerable: true,
+          configurable: false,
+          writable: false
+        })
+      }
   }
 
   createPluginDomainCore(): ILoggerDomainCore<IPipelineMode> {
@@ -296,11 +297,6 @@ class LoggerCore {
   /** Delegates removal to the same Host that admitted the plugin. */
   unUse(name: string) {
     return this.#handle.unUse(name)
-  }
-
-  /** Reads one shared capability from the Host's current publication. */
-  getShared<T = unknown>(key: PropertyKey): T | undefined {
-    return this.#handle.getShared<T>(key)
   }
 
   /** Delegates one pipeline traversal while retaining logger-specific dispatch ownership. */

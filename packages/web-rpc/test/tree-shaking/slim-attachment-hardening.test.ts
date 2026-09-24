@@ -294,7 +294,7 @@ describe('slim attachment hostile equivalence', () => {
       install: ({ hooks: emit }: { hooks: (event: never) => void }) => {
         emit({ name: 'first', at: 1, localId: 'hook-client' } as never)
         emit({ name: 'second', at: 2, localId: 'hook-client' } as never)
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     }
     const endpoint = await createClientEndpoint({

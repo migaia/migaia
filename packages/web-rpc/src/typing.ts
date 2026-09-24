@@ -267,14 +267,14 @@ export type IWebRpcPluginInstallScope = {
   readonly transport: IWebRpcTransport
   readonly signal: IWebRpcAbortSignal
   readonly hooks: (event: IWebRpcHookEvent) => void
-  readonly getShared: (key: PropertyKey) => unknown
+  readonly getPort: (key: PropertyKey) => unknown
   own<T>(resource: T, release: () => void | Promise<void>): T
 }
 
 /** Immutable extension/shared result returned by a WebRPC plugin install. */
 export type IWebRpcPluginInstallResult = {
   readonly extension: Readonly<Record<string, unknown>>
-  readonly shared: Readonly<Record<PropertyKey, unknown>>
+  readonly ports: Readonly<Record<PropertyKey, unknown>>
 }
 
 /** Public item contract used by migrated middleware without widening its component contribution. */

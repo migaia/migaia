@@ -29,30 +29,31 @@ const extensionPlugin = (name: string) =>
 describe('plugin enablement', () => {
   it('class and handle share one enablement runtime through the functional Host', async () => {
     const handle = defineHost({ host: { execution } })
-    const view = await handle.use(extensionPlugin('bridge'))
+    const [pluginHandle] = await handle.use(extensionPlugin('bridge'))
     await handle.plugin.disable('bridge')
-    expect(view.host.plugin.disabled()).toEqual(['bridge'])
-    await view.host.plugin.enable('bridge')
+    expect(handle.plugin.disabled()).toEqual(['bridge'])
+    expect(pluginHandle.name).toBe('bridge')
+    await handle.plugin.enable('bridge')
     expect(handle.plugin.disabled()).toEqual([])
-    expect(view.host.plugin).toBe(handle.plugin)
     await handle.dispose()
   })
   it('disabled plugin is absent from the next view', async () => {
     const host = new Host({ execution })
-    const view = await host.use(extensionPlugin('alpha'))
-    expect(view.extensions.alphaExtension()).toBe('alpha')
-    const disabled = await host.plugin.disable('alpha')
-    expect(disabled.view.extensions.alphaExtension).toBeUndefined()
-    expect(Reflect.ownKeys(disabled.view.extensions)).not.toContain('alphaExtension')
+    const [handle] = await host.use(extensionPlugin('alpha'))
+    expect(handle.extensions.alphaExtension()).toBe('alpha')
+    await host.plugin.disable('alpha')
+    expect(() => handle.extensions).toThrowError(
+      expect.objectContaining({ code: PluginHostErrorCode.pluginDisabled })
+    )
     await host.dispose()
   })
 
   it('disable revokes previously published references: extension calls fail immediately', async () => {
     const host = new Host({ execution })
-    const view = await host.use(extensionPlugin('alpha'))
-    const call = view.extensions.alphaExtension
+    const [handle] = await host.use(extensionPlugin('alpha'))
+    const call = handle.extensions.alphaExtension
     await host.plugin.disable('alpha')
-    expect(call).toThrowError(expect.objectContaining({ code: PluginHostErrorCode.viewRevoked }))
+    expect(call).toThrowError(expect.objectContaining({ code: PluginHostErrorCode.pluginDisabled }))
     await host.dispose()
   })
 
@@ -77,7 +78,7 @@ describe('plugin enablement', () => {
     const disabling = host.plugin.disable('feature-owner')
     await disabling
     expect(() => output!.read()).toThrowError(
-      expect.objectContaining({ code: PluginHostErrorCode.viewRevoked })
+      expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
     )
     await host.dispose()
   })
@@ -161,35 +162,14 @@ describe('plugin enablement', () => {
   it('disable notifies without releasing resources: round trip retains extension identity', async () => {
     const onEnable = vi.fn()
     const host = new Host({ execution })
-    const first = await host.use(
+    const [first] = await host.use(
       definePlugin({ name: 'round-trip', onEnable, install: () => ({ action: () => 1 }) })
     )
     const action = first.extensions.action
     const { token } = await host.plugin.disable('round-trip')
-    const restored = await token.enable()
-    expect(restored.extensions.action).toBe(action)
+    await token.enable()
+    expect(first.extensions.action).toBe(action)
     expect(onEnable).toHaveBeenCalledTimes(2)
-    await host.dispose()
-  })
-
-  it('shared owned by a disabled plugin is unreachable: error is recoverable', async () => {
-    const host = new Host({ execution })
-    await host.use(
-      definePlugin({ name: 'provider', shared: () => ({ bus: 1 }), install: () => ({}) })
-    )
-    await host.plugin.disable('provider')
-    expect(() => host.getShared('bus')).toThrowError(
-      expect.objectContaining({
-        code: PluginHostErrorCode.prerequisiteDisabled,
-        detail: expect.objectContaining({ key: 'bus', owner: 'provider', recoverable: true })
-      })
-    )
-    await host.dispose()
-  })
-
-  it('shared owned by a disabled plugin is unreachable: an unknown key remains undefined', async () => {
-    const host = new Host({ execution })
-    expect(host.getShared('never')).toBeUndefined()
     await host.dispose()
   })
 
@@ -203,51 +183,4 @@ describe('plugin enablement', () => {
       await host.dispose()
     }
   )
-
-  it('prerequisite unreachability distinguishes its three causes: disabled is recoverable', async () => {
-    const host = new Host({ execution })
-    await host.use(
-      definePlugin({ name: 'provider', shared: () => ({ bus: 1 }), install: () => ({}) })
-    )
-    await host.plugin.disable('provider')
-    expect(() => host.getShared('bus')).toThrowError(
-      expect.objectContaining({
-        code: PluginHostErrorCode.prerequisiteDisabled,
-        detail: expect.objectContaining({ recoverable: true })
-      })
-    )
-    await host.dispose()
-  })
-
-  it('prerequisite unreachability distinguishes its three causes: removed is permanent', async () => {
-    const host = new Host({ execution })
-    await host.use(
-      definePlugin({ name: 'provider', shared: () => ({ bus: 1 }), install: () => ({}) })
-    )
-    await host.unUse('provider')
-    expect(() => host.getShared('bus')).toThrowError(
-      expect.objectContaining({
-        code: PluginHostErrorCode.prerequisiteRemoved,
-        detail: expect.objectContaining({ owner: 'provider', recoverable: false })
-      })
-    )
-    await host.dispose()
-  })
-
-  it('prerequisite unreachability distinguishes its three causes: never published is undefined', async () => {
-    const host = new Host({ execution })
-    expect(host.getShared('bus')).toBeUndefined()
-    await host.dispose()
-  })
-
-  it('prerequisite unreachability distinguishes its three causes: a new owner clears the tombstone', async () => {
-    const host = new Host({ execution })
-    const provider = (name: string, value: number) =>
-      definePlugin({ name, shared: () => ({ bus: value }), install: () => ({}) })
-    await host.use(provider('first', 1))
-    await host.unUse('first')
-    await host.use(provider('second', 2))
-    expect(host.getShared('bus')).toBe(2)
-    await host.dispose()
-  })
 })

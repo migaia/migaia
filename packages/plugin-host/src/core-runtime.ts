@@ -6,7 +6,7 @@ import { resolveDisposer } from './disposal.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IInstallBatchContext } from './install-runtime.js'
-import type { IRegistration, ISharedEntry } from './registry.js'
+import type { IRegistration } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IPluginHostCore, IPluginResource, IPipelineMode } from './typing.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
@@ -21,7 +21,6 @@ export type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Rea
    */
   readonly createDomainCore: (request: IHostCoreConstructionRequest) => TDomainCore
   readonly assertRegistrationValid: (registration: IRegistration<TDomainCore, TValue>) => void
-  readonly committedShared: Map<PropertyKey, ISharedEntry<TDomainCore, TValue>>
   readonly executionSignal: IAbortSignal
   readonly pipelineMode: () => IPipelineMode
   readonly onPipelineViolation: IMiddlewarePipelineViolationHandler
@@ -53,12 +52,6 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
       createDomainCore: () =>
         this.#port.createDomainCore({ pluginName: registration.name, batch: batch ?? this }),
       assertRegistrationValid: () => this.#port.assertRegistrationValid(registration),
-      getShared: (key) => {
-        const shared = batch?.committed
-          ? this.#port.committedShared
-          : (batch?.shared ?? this.#port.committedShared)
-        return shared.get(key)?.value
-      },
       operation: () => {
         if (!registration.operation)
           throw new PluginHostError(

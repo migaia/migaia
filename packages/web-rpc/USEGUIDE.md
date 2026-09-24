@@ -140,15 +140,15 @@ contract({
 
 ### 2.1 应该从哪里导入
 
-| 入口                                   | 工厂/定义                | endpoint 根对象的公开能力                         | 适用场景                     |
-| -------------------------------------- | ------------------------ | ------------------------------------------------- | ---------------------------- |
-| `@migaia/web-rpc`                      | `createEndpoint`         | 完整预设；等同 `createFullEndpoint`               | 兼容性入口、需要全部一等能力 |
-| `@migaia/web-rpc/full`                 | `createFullEndpoint`     | outbound + provider + discovery + control + chunk | 显式完整端点                 |
-| `@migaia/web-rpc/client`               | `createClientEndpoint`   | kernel + outbound                                 | 只发请求/事件                |
-| `@migaia/web-rpc/provider`             | `createProviderEndpoint` | kernel + outbound + `provide`                     | 暴露方法且可能回调对端       |
-| `@migaia/web-rpc/core`                 | `createComposedEndpoint` | kernel + 显式原生 Feature 的根投影                | 自定义最小能力集合           |
-| `@migaia/web-rpc`                      | `defineFeature` / `defineMiddleware` | 定义返回的 surface 决定            | 原生扩展                     |
-| `@migaia/web-rpc/adapters/<transport>` | transport factory        | 不改变 endpoint 表面                              | 按宿主环境选择传输           |
+| 入口                                   | 工厂/定义                            | endpoint 根对象的公开能力                         | 适用场景                     |
+| -------------------------------------- | ------------------------------------ | ------------------------------------------------- | ---------------------------- |
+| `@migaia/web-rpc`                      | `createEndpoint`                     | 完整预设；等同 `createFullEndpoint`               | 兼容性入口、需要全部一等能力 |
+| `@migaia/web-rpc/full`                 | `createFullEndpoint`                 | outbound + provider + discovery + control + chunk | 显式完整端点                 |
+| `@migaia/web-rpc/client`               | `createClientEndpoint`               | kernel + outbound                                 | 只发请求/事件                |
+| `@migaia/web-rpc/provider`             | `createProviderEndpoint`             | kernel + outbound + `provide`                     | 暴露方法且可能回调对端       |
+| `@migaia/web-rpc/core`                 | `createComposedEndpoint`             | kernel + 显式原生 Feature 的根投影                | 自定义最小能力集合           |
+| `@migaia/web-rpc`                      | `defineFeature` / `defineMiddleware` | 定义返回的 surface 决定                           | 原生扩展                     |
+| `@migaia/web-rpc/adapters/<transport>` | transport factory                    | 不改变 endpoint 表面                              | 按宿主环境选择传输           |
 
 所有 endpoint 都有 kernel 表面：`on()`、`hooks.on()`、`dispose()`。只有完整预设或显式选择的 Feature 才增加其他方法。要获得可靠 tree-shaking，应直接导入最窄预设或 `/core` 与单独 Feature 子路径，不要从根入口导入完整预设后再只使用其中一部分。
 
@@ -243,7 +243,7 @@ type IWebRpcFactoryConfig<TTargetId extends string = string> = {
 - **`id`**：整个通信拓扑里必须唯一。它出现在每一条消息的 `senderId` 字段里，但**不是身份凭证**——见 [§11](#11-安全注意事项)。
 - **`targetIds`**：只是"我已知这些 id"的预声明，不是必需的。自动发现模式下，第一次对未知 `targetId` 调用 `send`/`dispatch`/`ping` 会触发一次懒查询并缓存结果；`endpoint.discovery` 暴露的远端快照永远不包含 endpoint 自己。
 - **`transport`**：可以在工厂配置或 `connect({ transport })` 中提供；两处都提供时必须是同一个对象。没有可解析出的 transport、或出现冲突，会在订阅消息前以 `INVALID_CONFIG` 失败。
-- **中间件迁移**：`middlewares` 接受 `defineMiddleware` 或首方工厂返回的原生定义，并在同一个 PluginHost 批次中安装。旧版 `IWebRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义定义通过 `core.getShared()` 读取依赖，并用 `core.own()` 归属清理。
+- **中间件迁移**：`middlewares` 接受 `defineMiddleware` 或首方工厂返回的原生定义，并在同一个 PluginHost 批次中安装。旧版 `IWebRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义定义在第三个参数声明 Feature 引用，通过 `core.features` 读取依赖，并用 `core.own()` 归属清理。
 - **`provider`**：等价于在 `createEndpoint` 返回前，对每一项调用一次 `endpoint.provide(method, fn)`；纯粹是"少写几行"的便利写法。
 - **`replay`**：出站请求/消息 id 会在一个有界窗口内保留，防止重放攻击复用同一个 id 让已完成的请求再跑一次 provider。普通请求的 id 在整个 TTL 内都不释放（哪怕响应已经收到）——这是有意为之，防止晚到的重复响应复活一个"看起来还在等"的旧请求；dispatch-only（单向通知）的 id 在发送结算后立即释放，因为它天生不会有响应需要防重放。默认容量 4096、TTL 310 秒；高频单向通知场景一般不需要调大，持续的双向请求量很大时可以按需调整。
 - **`construction.signal` / `construction.timeoutMs`**：构造 `createEndpoint()` 本身也是异步的（要跑完全部中间件的 `install()`），可以用这两个字段取消或限时。取消会 reject 构造过程，并且仍然会清理已经安装成功的中间件（不会留下半初始化的资源）。中间件的 `install(context)` 会收到同一个 `signal`，如果中间件自己的初始化工作是可取消的，应该监听它。
@@ -607,8 +607,8 @@ try {
 | `INVALID_CONFIG`                                      | `createEndpoint()` 配置本身不合法（含读取配置字段时抛出的异常）   | 修配置；这类错误在任何中间件产生副作用**之前**抛出                                       |
 | `PROVIDER_DUPLICATED`                                 | 同一个方法名被 `provide()` 注册了两次                             | 检查方法名是否冲突                                                                       |
 | `UUID_UNAVAILABLE` / `UUID_INVALID` / `UUID_CONFLICT` | 自定义 `uuid()` 中间件生成的 id 不合法或冲突                      | 检查自定义生成函数的实现                                                                 |
-| `PROTOCOL_INVALID`                                    | 协议编解码失败                                                    | 检查 codec descriptor 的 `encode`/`decode` 实现或对端协议是否一致                       |
-| `PROTOCOL_UNSUPPORTED`                                | 协议输出类型和传输要求的 `encodedType` 不匹配                     | 调整 codec descriptor/`encodedType` 配置                                                  |
+| `PROTOCOL_INVALID`                                    | 协议编解码失败                                                    | 检查 codec descriptor 的 `encode`/`decode` 实现或对端协议是否一致                        |
+| `PROTOCOL_UNSUPPORTED`                                | 协议输出类型和传输要求的 `encodedType` 不匹配                     | 调整 codec descriptor/`encodedType` 配置                                                 |
 | `PROTOCOL_DECRYPT_FAILED`                             | `authentication()` 的解密/验签失败                                | 通常代表消息被篡改或密钥不匹配，不建议重试                                               |
 | `CONTRACT_INVALID`                                    | 契约配置本身不合法                                                | 检查 `contract()` 配置                                                                   |
 | `CONTRACT_VERSION_UNSUPPORTED`                        | 对端协议版本不在可接受范围                                        | 升级/降级到兼容版本                                                                      |
@@ -632,7 +632,7 @@ try {
 | `CAPABILITY_CONFLICT`                                 | 多个中间件/配置之间的能力声明冲突                                 | 检查中间件组合是否合理                                                                   |
 | `OVERLOADED`                                          | 出站 id 账本、并发限制等资源预算耗尽                              | 降低发送频率或调大对应限制（如 `replay.maxEntries`）                                     |
 | `CHUNK_INVALID`                                       | 分片帧不合法                                                      | 检查 framer descriptor 自定义 `split`/`byteLength` 实现                                  |
-| `CHUNK_TOO_LARGE`                                     | 单条消息或单个分片超过配置上限                                    | 调整 framer descriptor 限制                                                               |
+| `CHUNK_TOO_LARGE`                                     | 单条消息或单个分片超过配置上限                                    | 调整 framer descriptor 限制                                                              |
 | `CHUNK_CAPACITY_EXCEEDED`                             | 并发重组数量/缓冲区超限                                           | 降低并发大消息发送量或调大限制                                                           |
 | `CHUNK_RECEIVE_TIMEOUT`                               | 分片重组在 `assemblyTimeoutMs` 内未收全                           | 检查网络稳定性，或调大超时                                                               |
 | `CHUNK_ACK_TIMEOUT`                                   | 分片确认超时（预留字段，当前分片层不做确认应答）                  | 见 framer descriptor 说明——分片层是尽力而为传递                                          |
@@ -766,7 +766,11 @@ const transport = createWebWorkerTransport(self as unknown as Worker)
 const endpoint = await createProviderEndpoint({
   id: 'worker',
   transport,
-  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]
+  middlewares: [
+    contract({ version: '1' }),
+    codec({ encode: (value) => value, decode: (value) => value }),
+    connect({ transport })
+  ]
 })
 endpoint.provide('heavyCompute', (ctx) => {
   const result = doHeavyWork(ctx.data as number[])
@@ -839,7 +843,11 @@ const transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync
 const endpoint = await createClientEndpoint({
   id: `tab-${crypto.randomUUID()}`,
   transport,
-  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]
+  middlewares: [
+    contract({ version: '1' }),
+    codec({ encode: (value) => value, decode: (value) => value }),
+    connect({ transport })
+  ]
 })
 
 endpoint.on('cache-invalidated', (ctx) => {
@@ -941,19 +949,19 @@ const transport = {
 
 公开常量与用途：
 
-| 常量                        | 用途                                                 |
-| --------------------------- | ---------------------------------------------------- |
-| `WebRpcPlatform`            | adapter 平台标签                                     |
-| `WebRpcTransportTopology`   | exclusive/multiplexed/broadcast 信任拓扑             |
-| `WebRpcTransportOwnership`  | owned/borrowed 资源释放契约                          |
-| `WebRpcTransportEncoding`   | any/string/uint8array 编码声明                       |
-| `WebRpcOperation`           | send/dispatch/ping 接收端选择操作                    |
-| `WebRpcControlKind`         | request/dispatch/ping/discovery 资源准入类别         |
-| `WebRpcCandidateStatus`     | active/stale/unregistered 发现候选状态               |
-| `WebRpcEndpointStatus`      | 发现元数据中的 endpoint 准入状态                     |
-| `WebRpcDebugPhase`          | 测试/诊断快照的 active/disposed 生命周期阶段         |
-| `WebRpcContractFailureKind` | schema 校验诊断分类                                  |
-| `WebRpcChunkEvent`          | chunk.rejected/chunk.expired hook 名                 |
+| 常量                        | 用途                                         |
+| --------------------------- | -------------------------------------------- |
+| `WebRpcPlatform`            | adapter 平台标签                             |
+| `WebRpcTransportTopology`   | exclusive/multiplexed/broadcast 信任拓扑     |
+| `WebRpcTransportOwnership`  | owned/borrowed 资源释放契约                  |
+| `WebRpcTransportEncoding`   | any/string/uint8array 编码声明               |
+| `WebRpcOperation`           | send/dispatch/ping 接收端选择操作            |
+| `WebRpcControlKind`         | request/dispatch/ping/discovery 资源准入类别 |
+| `WebRpcCandidateStatus`     | active/stale/unregistered 发现候选状态       |
+| `WebRpcEndpointStatus`      | 发现元数据中的 endpoint 准入状态             |
+| `WebRpcDebugPhase`          | 测试/诊断快照的 active/disposed 生命周期阶段 |
+| `WebRpcContractFailureKind` | schema 校验诊断分类                          |
+| `WebRpcChunkEvent`          | chunk.rejected/chunk.expired hook 名         |
 
 类型通过根入口统一导出，包括 `IWebRpcFactoryConfig`、`IWebRpcEndpoint`、`IWebRpcTransport`、`IWebRpcProvider`、`IWebRpcContext`、`IWebRpcHookEvent` 和各常量对应的值联合类型。Adapter 自己的宿主形状类型从对应 adapter 子路径导入，避免让根入口承担 DOM/Node 类型。
 

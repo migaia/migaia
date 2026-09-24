@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { WebRpcErrorCode } from '../../src/errors'
 import { contract } from '../../src/middleware/contract'
-import { WebRpcSharedKey } from '../../src/internal/plugin-shared-keys'
+import { WebRpcPortName } from '../../src/internal/plugin-shared-keys'
 import type {
   IWebRpcContractConfig,
   IWebRpcPluginInstallResult,
@@ -15,14 +15,14 @@ function scope(): IWebRpcPluginInstallScope {
     transport,
     signal: { aborted: false, addEventListener() {}, removeEventListener() {} },
     hooks: () => undefined,
-    getShared: () => undefined,
+    getPort: () => undefined,
     own: <T>(resource: T): T => resource
   }
 }
 
 function install(config: IWebRpcContractConfig) {
   const result = contract(config).install(scope()) as IWebRpcPluginInstallResult
-  return result.shared[WebRpcSharedKey.contract] as {
+  return result.ports[WebRpcPortName.contract] as {
     validateData: (method: string, side: 'params' | 'result', data: unknown) => void
   }
 }

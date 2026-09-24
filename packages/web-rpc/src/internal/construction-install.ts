@@ -84,7 +84,7 @@ export type IWebRpcConstructionInstallOptions = {
   readonly transport: IWebRpcTransport
   readonly control: IWebRpcConstructionControl
   readonly hooks: (event: IWebRpcHookEvent) => void
-  readonly getShared?: (key: PropertyKey) => unknown
+  readonly getPort?: (key: PropertyKey) => unknown
   readonly report?: (error: unknown) => void
   readonly registerScope: (
     scope: ILifecycleScope,
@@ -145,7 +145,7 @@ export function runConstructionInstall<T>(
           transport: options.transport,
           signal: options.control.signal,
           hooks: options.hooks,
-          getShared: options.getShared ?? (() => undefined),
+          getPort: options.getPort ?? (() => undefined),
           own
         })
       )

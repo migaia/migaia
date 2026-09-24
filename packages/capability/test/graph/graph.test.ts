@@ -13,6 +13,7 @@ import {
 import { CapabilityGraphErrorText } from '../../src/graph/error-text.js'
 import { CAPABILITY_GRAPH_SOURCE } from '../../src/graph/errors.js'
 import { buildCapabilityTopology, type ITopologyNode } from '../../src/graph/topology.js'
+import { createDynamicCapabilityGraph } from '../../src/graph/dynamic.js'
 
 const id = (value: string): IGraphNodeId => value as IGraphNodeId
 
@@ -1133,6 +1134,25 @@ describe('capability graph core', () => {
     } catch (error) {
       assertCode(error, CapabilityGraphErrorCode.invalidOption)
     }
+    const dependentPolicy = createDynamicCapabilityGraph()
+    await dependentPolicy.register({
+      id: id('policy-provider'),
+      kind: 'test',
+      dependencies: [],
+      start: () => instance(1)
+    })
+    await dependentPolicy.register({
+      id: id('policy-consumer'),
+      kind: 'test',
+      dependencies: [{ provider: id('policy-provider'), required: true }],
+      start: () => instance(2)
+    })
+    try {
+      await dependentPolicy.remove(id('policy-provider'), { policy: 'reject' })
+    } catch (error) {
+      assertCode(error, CapabilityGraphErrorCode.nodeHasDependents)
+    }
+    await dependentPolicy.dispose()
     expect([...seenCodes].sort()).toEqual(Object.values(CapabilityGraphErrorCode).sort())
   })
 

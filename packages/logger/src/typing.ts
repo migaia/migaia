@@ -1,14 +1,15 @@
 import type {
   IAsyncGeneratorPipelineStage,
   IAsyncPipelineStage,
+  IFeatureRecord,
   IGeneratorPipelineStage,
   IMergePluginExts,
-  IMergePluginShared,
   IPlugin,
   IPluginConfig,
   IPluginConstraint,
   IPluginHostOptions,
   IPluginHostDisposalResult,
+  IPluginHandleTuple,
   IPipelineConfig,
   IPipelineMode
 } from '@migaia/plugin-host'
@@ -140,7 +141,7 @@ export type ILoggerContext = {
 
 /**
  * 插件通过 install(core) 拿到的核心能力集合，这就是"log 插件规范"本身—— 任何插件只要基于这几个原语实现，就能和其它插件组合使用，互相之间不需要
- * 知道对方的具体实现，只通过插件 shared() 与 core.getShared() 交换能力。
+ * 知道对方的具体实现；跨插件能力通过声明式 Feature 依赖注入。
  */
 export type ILoggerCore<
   TMode extends IPipelineConfig['mode'] = 'sync',
@@ -219,19 +220,15 @@ export type ILoggerCore<
 
   use<const NewP extends readonly ILoggerPluginConstraint[]>(
     ...plugins: NewP
-  ): ILoggerCoreWithShared<TMode, TShared & IResolvedPluginShared<NewP>> & IMergePluginExts<NewP>
+  ): Promise<IPluginHandleTuple<NewP>>
   unUse(name: string): Promise<void>
-  getShared<TKey extends Extract<keyof TShared, string>>(key: TKey): TShared[TKey] | undefined
 
-  /**
-   * 轻量依赖注入：插件之间通过约定的字符串 key 交换能力，避免插件互相硬编码 依赖对方的具体类型（例如 http 插件按需注入 batch 插件提供的批量能力）。 同一个 shared
-   * key 被两个插件声明会直接抛异常——这是"插件之间不能互相冲突" 这条要求在依赖注入这一层的具体落地：冲突在装配阶段就暴露出来， 而不是让后装的插件悄悄覆盖先装的插件却没人知道。
-   */
+  /** Feature 名由提供方插件声明；重复插件名和依赖环在装配阶段拒绝。 */
 
   /**
    * 读取某个插件的配置。插件不应该在 install() 里直接读 `this.config`—— 应该统一通过 `core.config.get<TConfig>(name)`
-   * 读取（`name` 通常传插件自己 导出的名字常量，例如 LEVEL_PLUGIN_NAME，而不是手写字符串字面量，减少打错的风险）。 这样配置的读取路径和 shared 一样统一走
-   * core 这一层， 而不是插件各自把配置攥在自己手里——好处是配置对 core 是"可见的"， 比如未来想做一个调试面板列出"每个插件当前的配置"，不需要挨个改插件代码。
+   * 读取（`name` 通常传插件自己 导出的名字常量，例如 LEVEL_PLUGIN_NAME，而不是手写字符串字面量，减少打错的风险）。 这样配置的读取路径统一走 core 这一层，
+   * 而不是插件各自把配置攥在自己手里——好处是配置对 core 是"可见的"， 比如未来想做一个调试面板列出"每个插件当前的配置"，不需要挨个改插件代码。
    */
 
   /**
@@ -265,12 +262,10 @@ export type ILoggerCore<
    * log.use(reasoning())`）；原变量本身不会自动变宽。
    */
   /**
-   * 动态移除一个已经安装的插件，按插件名字移除。会把这个插件当初通过 usePipeline/useSink/hook/onFlush/onShutdown/shared 注册的东西全部撤销，
+   * 动态移除一个已经安装的插件，按插件名字移除。会把这个插件当初通过 usePipeline/useSink/hook/onFlush/onShutdown 注册的东西全部撤销，
    * 也会把它贡献的实例方法（比如 level 插件的 .info()）从实例上删掉。返回 Promise<void>；名字不存在时静默完成。
    *
-   * 有一个无法彻底撤销的边界情况，如实说明：如果插件 A shared 的能力 已经被插件 B 在自己的 install() 里 getShared 并保存进了闭包变量，移除 A 不会让 B
-   * 手里已经拿到的那个函数引用失效——这不是这里的 bug，是"依赖注入"这种模式本身的天然限制：注入发生在某个时间点，撤销注册只能防止未来的 getShared
-   * 再拿到它，但改变不了过去已经取得的函数引用。
+   * 必需 Feature 依赖会阻止单独移除；调用方可显式选择级联移除。
    */
 }
 
@@ -285,7 +280,6 @@ export type ILoggerDomainCore<
   | 'useAsyncPipeline'
   | 'useGeneratorPipeline'
   | 'useAsyncGeneratorPipeline'
-  | 'getShared'
   | 'use'
   | 'unUse'
 >
@@ -301,10 +295,6 @@ export type IEmptyPluginExt = Record<string, never>
 export type IPaintFn = (tag: string, text: string) => string
 export type IDimFn = (text: string) => string
 
-export type ISharedReader<TShared extends Record<string, unknown>> = {
-  getShared<TKey extends keyof TShared>(key: TKey): TShared[TKey] | undefined
-}
-
 export type ILoggerCoreWithShared<
   TMode extends IPipelineConfig['mode'],
   TShared extends Record<string, unknown>
@@ -318,23 +308,20 @@ export type ILoggerPluginCore<
   onDispose(resource: import('@migaia/plugin-host').IPluginResource): void
 }
 
-export type IResolvedPluginShared<TPlugins extends readonly unknown[]> =
-  IMergePluginShared<TPlugins> extends Record<string, unknown>
-    ? IMergePluginShared<TPlugins>
-    : Record<string, never>
+export type IResolvedPluginShared<_TPlugins extends readonly unknown[]> = Record<string, never>
 
 export type ILoggerPlugin<
   TExt extends Record<string, unknown> = IEmptyPluginExt,
   TConfig extends IPluginConfig = IPluginConfig,
   TMode extends IPipelineMode = IPipelineMode,
-  TShared extends Record<string, unknown> = IEmptyPluginExt,
-  TRequires extends Record<string, unknown> = IEmptyPluginExt
-> = IPlugin<ILoggerPluginCore<TMode, TRequires>, TExt, TConfig, TShared>
+  TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object = Record<never, never>
+> = IPlugin<ILoggerPluginCore<TMode>, TExt, TConfig, Record<never, never>, TFeatures, TExpose>
 
 /** Constraint collection keeps plugin-specific core types; host admission validates runtime hooks. */
 export type ILoggerPluginConstraint = IPluginConstraint<any>
 
-export type { IMergePluginExts, IMergePluginShared }
+export type { IMergePluginExts }
 
 export type ILoggerOptions<
   P extends readonly ILoggerPluginConstraint[] = [],

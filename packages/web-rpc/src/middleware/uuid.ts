@@ -1,7 +1,7 @@
 import type { IWebRpcPlugin, IWebRpcPluginInstallResult, IWebRpcUuidConfig } from '../typing.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import { WebRpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 
 const emptyClaims = Object.freeze({
@@ -36,7 +36,7 @@ function createUuidPlugin(config: IWebRpcUuidConfig): IWebRpcPlugin {
         throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'uuid generate must be a function')
       return {
         extension: Object.freeze({}),
-        shared: Object.freeze({ [WebRpcSharedKey.uuid]: Object.freeze({ generate }) })
+        ports: Object.freeze({ [WebRpcPortName.uuid]: Object.freeze({ generate }) })
       }
     }
   })

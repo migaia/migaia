@@ -5,7 +5,11 @@ import {
   definePlugin,
   type IStoragePluginCore
 } from '../../src/host/index.js'
-import { defineBuiltInPlugin, defineNativeReactiveFeature } from '../../src/host/contracts.js'
+import {
+  defineBuiltInPlugin,
+  defineNativeReactiveFeature,
+  readStorageNativePluginDefinition
+} from '../../src/host/contracts.js'
 import { localStorageBackendKind, memoryBackendKind } from '../../src/host/builtin-kinds.js'
 import { memoryReactive } from '../../src/plugins/reactive/memory.js'
 import { localStorageReactive } from '../../src/plugins/reactive/local-storage.js'
@@ -17,6 +21,7 @@ import * as reactiveModule from '../../src/host/reactive.js'
 import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
 import { memoryStorageHost } from '../../src/backends/memory.js'
 import { defineReactiveAdapterFeature } from '../../src/reactive-adapter.js'
+import type { IFeatureReference } from '@migaia/plugin-host'
 
 /** R10 proves the Host installs one exact adapter for each canonical fast-path plugin. */
 describe('SWV4-B05 R10 reactive adapters', () => {
@@ -201,9 +206,9 @@ describe('SWV4-B05 R10 reactive adapters', () => {
         ] as const
       })
       expect(trace).toEqual([
+        'create:service',
         'install:store-a',
         'install:store-b',
-        'create:service',
         'attach:trace-a',
         'start:adapter-trace-a',
         'attach:trace-b',
@@ -211,9 +216,9 @@ describe('SWV4-B05 R10 reactive adapters', () => {
       ])
       await host.dispose()
       expect(trace).toEqual([
+        'create:service',
         'install:store-a',
         'install:store-b',
-        'create:service',
         'attach:trace-a',
         'start:adapter-trace-a',
         'attach:trace-b',
@@ -529,39 +534,56 @@ describe('SWV4-B05 R10 reactive adapters', () => {
     expect(disposeSecond).not.toHaveBeenCalled()
   })
 
-  it('forwards native shared capability only to a later Plugin install', async () => {
+  it('forwards a native feature capability only to a declared later dependency', async () => {
     const producerStore = memoryStorageHost()
     const consumerStore = memoryStorageHost()
-    const producer = definePlugin('shared-producer', (core) => ({
-      install: () => {
-        core.registerStore(producerStore)
-        return {}
-      },
-      shared: () => ({ storageSharedCapability: { read: () => 'shared' } })
-    }))
-    const consumer = definePlugin('shared-consumer', (core) => ({
-      install: () => {
-        const shared = core.getShared('storageSharedCapability')
-        expect(shared).toMatchObject({ read: expect.any(Function) })
-        core.registerStore(consumerStore)
-        return { readShared: () => (shared as { readonly read: () => string }).read() }
-      }
-    }))
+    const capability = defineFeature(() => ({ read: () => 'feature' }))
+    const producer = definePlugin(
+      'feature-producer',
+      (core) => ({
+        install: () => {
+          core.registerStore(producerStore)
+          return {}
+        }
+      }),
+      { capability }
+    )
+    const producerDefinition = readStorageNativePluginDefinition(producer)! as {
+      getFeature(name: 'capability'): IFeatureReference<{ readonly read: () => string }, false>
+    }
+    const dependency = defineFeature((_core, dependencies) => dependencies.capability, {
+      capability: producerDefinition.getFeature('capability')
+    })
+    const consumer = definePlugin(
+      'feature-consumer',
+      (core) => ({
+        install: () => {
+          core.registerStore(consumerStore)
+          return { readFeature: () => core.features.dependency.read() }
+        }
+      }),
+      { dependency }
+    )
     const host = await createStorageHost({ plugins: [producer, consumer] as const })
-    expect(host.extensions.readShared()).toBe('shared')
+    expect(host.extensions.readFeature()).toBe('feature')
     await host.dispose()
   })
 
-  it('preserves a rejected shared Promise for PluginHost synchronous rejection', async () => {
-    const original = new Error('storage shared rejection')
-    const rejected = Promise.reject(original)
-    const plugin = definePlugin('shared-promise', (core) => ({
-      install: () => {
-        core.registerStore(memoryStorageHost())
-        return {}
-      },
-      shared: () => rejected as never
-    }))
+  it('preserves a rejected feature factory error through Host installation', async () => {
+    const original = new Error('storage feature rejection')
+    const rejected = defineFeature(() => {
+      throw original
+    })
+    const plugin = definePlugin(
+      'feature-rejection',
+      (core) => ({
+        install: () => {
+          core.registerStore(memoryStorageHost())
+          return {}
+        }
+      }),
+      { rejected }
+    )
     let failure: unknown
     try {
       await createStorageHost({ plugins: [plugin] as const })
@@ -573,103 +595,109 @@ describe('SWV4-B05 R10 reactive adapters', () => {
     expect(failure).toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
     const pluginFailure = (failure as Error).cause as Error
     expect(pluginFailure).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
-    expect(pluginFailure.cause).toMatchObject({ cause: original })
+    expect(pluginFailure.cause).toBe(original)
   })
 
-  it('keeps a non-callable shared then data property while injecting Storage capabilities', async () => {
-    const producerStore = memoryStorageHost()
-    const consumerStore = memoryStorageHost()
+  it('keeps a non-callable feature then data property while injecting Storage capabilities', async () => {
+    const store = memoryStorageHost()
     const thenKey = ['t', 'h', 'e', 'n'].join('')
-    const shared = Object.freeze(
-      Object.defineProperty({ storageSharedCapability: { read: () => 'shared-data' } }, thenKey, {
+    const output = Object.freeze(
+      Object.defineProperty({ read: () => 'feature-data' }, thenKey, {
         value: false,
         enumerable: true
       })
     )
-    const producer = definePlugin('shared-data-then', (core) => ({
-      install: () => {
-        core.registerStore(producerStore)
-        return {}
-      },
-      shared: () => shared
-    }))
-    const consumer = definePlugin('shared-data-consumer', (core) => ({
-      install: () => {
-        const shared = core.getShared('storageSharedCapability') as { readonly read: () => string }
-        core.registerStore(consumerStore)
-        return { readShared: shared.read }
-      }
-    }))
-    const host = await createStorageHost({ plugins: [producer, consumer] as const })
-    expect(host.extensions.readShared()).toBe('shared-data')
-    expect(host.backends().get('shared-data-then')).toBe(producerStore)
-    await host.dispose()
-  })
-
-  it('normalizes an undefined shared result before injecting Storage capabilities', async () => {
-    const store = memoryStorageHost()
-    const plugin = definePlugin('shared-undefined', (core) => ({
-      install: () => {
-        core.registerStore(store)
-        return {}
-      },
-      shared: () => undefined as never
-    }))
+    const capability = defineFeature(() => output)
+    const plugin = definePlugin(
+      'feature-data-then',
+      (core) => ({
+        install: () => {
+          core.registerStore(store)
+          return { readFeature: core.features.capability.read }
+        }
+      }),
+      { capability }
+    )
     const host = await createStorageHost({ plugins: [plugin] as const })
-    expect(host.backends().get('shared-undefined')).toBe(store)
+    expect(host.extensions.readFeature()).toBe('feature-data')
+    expect(host.backends().get('feature-data-then')).toBe(store)
     await host.dispose()
   })
 
-  it('leaves a shared then accessor unread until PluginHost observes it once', async () => {
-    const original = new Error('storage shared accessor rejection')
-    let thenReads = 0
-    const thenKey = ['t', 'h', 'e', 'n'].join('')
-    const shared = Object.defineProperty({}, thenKey, {
-      enumerable: true,
-      get: () => {
-        thenReads += 1
-        return (_resolve: unknown, reject: (error: unknown) => void) => reject(original)
-      }
-    })
-    const plugin = definePlugin('shared-then-accessor', (core) => ({
-      install: () => {
-        core.registerStore(memoryStorageHost())
-        return {}
-      },
-      shared: () => shared as never
-    }))
+  it('rejects an undefined feature result before injecting Storage capabilities', async () => {
+    const store = memoryStorageHost()
+    const invalid = defineFeature(() => undefined as never)
+    const plugin = definePlugin(
+      'feature-undefined',
+      (core) => ({
+        install: () => {
+          core.registerStore(store)
+          return {}
+        }
+      }),
+      { invalid }
+    )
     await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
     })
-    await Promise.resolve()
-    expect(thenReads).toBe(1)
   })
 
-  it('forwards a dynamic shared Proxy then getter to PluginHost once', async () => {
-    const original = new Error('storage dynamic shared rejection')
+  it('leaves a feature then accessor unread until the output is consumed', async () => {
     let thenReads = 0
-    const shared = new Proxy(
-      {},
+    const thenKey = ['t', 'h', 'e', 'n'].join('')
+    const output = Object.defineProperty({ read: () => 'accessor' }, thenKey, {
+      enumerable: true,
+      get: () => {
+        thenReads += 1
+        return false
+      }
+    })
+    const capability = defineFeature(() => output)
+    const plugin = definePlugin(
+      'feature-then-accessor',
+      (core) => ({
+        install: () => {
+          core.registerStore(memoryStorageHost())
+          return { readThen: () => (core.features.capability as Record<string, unknown>)[thenKey] }
+        }
+      }),
+      { capability }
+    )
+    const host = await createStorageHost({ plugins: [plugin] as const })
+    expect(thenReads).toBe(1)
+    expect(host.extensions.readThen()).toBe(false)
+    expect(thenReads).toBe(2)
+    await host.dispose()
+  })
+
+  it('forwards a dynamic feature Proxy getter only when the output is consumed', async () => {
+    let thenReads = 0
+    const output = new Proxy(
+      { read: () => 'proxy' },
       {
         get: (_target, key) => {
           if (key !== 'then') return undefined
           thenReads += 1
-          return (_resolve: unknown, reject: (error: unknown) => void) => reject(original)
+          return false
         }
       }
     )
-    const plugin = definePlugin('shared-dynamic-then', (core) => ({
-      install: () => {
-        core.registerStore(memoryStorageHost())
-        return {}
-      },
-      shared: () => shared
-    }))
-    await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
-      code: 'BACKEND_INSTALL_FAILED'
-    })
-    await Promise.resolve()
+    const capability = defineFeature(() => output)
+    const plugin = definePlugin(
+      'feature-dynamic-then',
+      (core) => ({
+        install: () => {
+          core.registerStore(memoryStorageHost())
+          return { readThen: () => (core.features.capability as Record<string, unknown>).then }
+        }
+      }),
+      { capability }
+    )
+    const host = await createStorageHost({ plugins: [plugin] as const })
     expect(thenReads).toBe(1)
+    expect(host.extensions.readThen()).toBe(false)
+    expect(thenReads).toBe(2)
+    await host.dispose()
   })
 
   it('keeps the original featureExpose receiver through the native projection', async () => {

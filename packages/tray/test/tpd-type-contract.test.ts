@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PluginHost, type IPlugin } from '@migaia/plugin-host'
+import { defineFeature, PluginHost, type IPlugin } from '@migaia/plugin-host'
 import {
   createHost,
   type IHostBaselinePlugins,
@@ -14,7 +14,6 @@ import type { IRuntime } from '../src/runtime/typing.js'
 
 type ITestCore = Record<string, never>
 type IReadyConfig = Readonly<{ readonly enabled: boolean }>
-type IReadyShared = Readonly<{ readonly readyValue: number }>
 
 class TypeHost extends PluginHost<ITestCore, string> {}
 
@@ -44,9 +43,9 @@ void widenedUnknownExtension
 const readyPlugin = {
   name: 'ready',
   config: { enabled: true },
-  shared: () => ({ readyValue: 42 }),
+  features: { ready: defineFeature(() => ({ readyValue: 42 })) },
   install: (_core: TypeHost) => ({ readyExtension: true })
-} satisfies IPlugin<TypeHost, { readonly readyExtension: boolean }, IReadyConfig, IReadyShared> & {
+} satisfies IPlugin<TypeHost, { readonly readyExtension: boolean }, IReadyConfig> & {
   readonly name: 'ready'
 }
 
@@ -305,7 +304,7 @@ describe('TPD-T45 through TPD-T49 managed Host declaration contract', () => {
     const host = await createHost(hostOptions)
     expect(host.extensions).toBeDefined()
     expect(host.config.get('ready.enabled')).toBe(true)
-    expect(host.getShared('readyValue')).toBe(42)
+    expect(host.extensions.readyExtension).toBe(true)
     await host.dispose()
     await expect(
       createHost({ ...hostOptions, plugins: [cycleA, cycleB] as const })
@@ -315,13 +314,13 @@ describe('TPD-T45 through TPD-T49 managed Host declaration contract', () => {
   it('TPD-T46 preserves a safe dynamic baseline surface', async () => {
     const host = await createHost(hostOptions)
     expect(host.config.get('ready.enabled')).toBe(true)
-    expect(host.getShared('readyValue')).toBe(42)
+    expect(host.extensions.readyExtension).toBe(true)
     const added = await host.use({
       ...latePlugin
     } as never)
     if (added.ok) {
-      expect(added.view.getShared('readyValue')).toBe(42)
-      expect(added.view.getShared('unknown')).toBeUndefined()
+      expect(added.view.extensions.readyExtension).toBe(true)
+      expect(added.view.extensions.lateExtension).toBe(true)
     }
     await host.dispose()
   })
@@ -334,7 +333,7 @@ describe('TPD-T45 through TPD-T49 managed Host declaration contract', () => {
     } as never)
     if (result.ok) {
       expect(result.committed).toBe(true)
-      expect(result.view.getShared('unknown')).toBeUndefined()
+      expect(result.view.extensions.branchExtension).toBe(true)
     } else if (result.committed) {
       expect(result.view.pluginState('branch')).toBeDefined()
     } else {
@@ -353,12 +352,12 @@ describe('TPD-T45 through TPD-T49 managed Host declaration contract', () => {
     expect(literalRemoval.affected).toEqual(['provider', 'dependent'])
     expect(host.pluginState('provider')).toBe('blocked')
     expect(host.pluginState('dependent')).toBe('blocked')
-    expect(literalRemoval.view.getShared('providerExtension')).toBeUndefined()
-    expect(literalRemoval.view.getShared('dependentExtension')).toBeUndefined()
+    expect(literalRemoval.view.extensions.providerExtension).toBeUndefined()
+    expect(literalRemoval.view.extensions.dependentExtension).toBeUndefined()
     const widenedName: string = 'missing'
     const noCommit = await host.unUse(widenedName)
     expect(noCommit.committed).toBe(false)
-    expect(noCommit.view.getShared('unknown')).toBeUndefined()
+    expect(noCommit.view.extensions.unknown).toBeUndefined()
     await host.dispose()
   })
 

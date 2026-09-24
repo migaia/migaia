@@ -291,18 +291,18 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
   const sharedKeysSource = sharedKeys.toString('utf8')
   const roleSchemaSource = roleSchema.toString('utf8')
   /** Stable anchors that ensure this probe changes only the retired owner contract. */
-  const sharedAnchor = "outboundAttachment: Symbol('web-rpc.shared.outbound-attachment')"
+  const sharedAnchor = "outboundAttachment: Symbol('web-rpc.ports.outbound-attachment')"
   const roleAnchor = "'middleware-finalize': Object.freeze({"
   if (!sharedKeysSource.includes(sharedAnchor) || !roleSchemaSource.includes(roleAnchor))
     throw new Error('Packed root-alias restoration anchors are unavailable')
   /** Derived packed metadata used solely for the temporary retired-owner restoration. */
   const restoredSharedKeys = sharedKeysSource.replace(
     sharedAnchor,
-    `${sharedAnchor},\n    chunk: Symbol('web-rpc.shared.chunk')`
+    `${sharedAnchor},\n    chunk: Symbol('web-rpc.ports.chunk')`
   )
   const restoredRoleSchema = roleSchemaSource.replace(
     roleAnchor,
-    `chunk: Object.freeze({\n        sharedProvides: Object.freeze([WebRpcSharedKey.chunk]),\n        sharedConsumes: Object.freeze([]),\n        sharedOptionalConsumes: Object.freeze([])\n    }),\n    ${roleAnchor}`
+    `chunk: Object.freeze({\n        sharedProvides: Object.freeze([WebRpcPortName.chunk]),\n        sharedConsumes: Object.freeze([]),\n        sharedOptionalConsumes: Object.freeze([])\n    }),\n    ${roleAnchor}`
   )
   /** Child-process entry that observes root exports without sharing the parent ESM cache. */
   const probe = join(consumerDirectory, 'legacy-root-alias-probe.mjs')
@@ -347,9 +347,9 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
       probe,
       [
         `import * as root from ${JSON.stringify(`${pathToFileURL(rootPath).href}?${probeVersion}`)}`,
-        `import { WebRpcSharedKey } from ${JSON.stringify(pathToFileURL(sharedKeysPath).href)}`,
+        `import { WebRpcPortName } from ${JSON.stringify(pathToFileURL(sharedKeysPath).href)}`,
         'const installed = root.chunk({ chunkSize: 4 }).install()',
-        'const chunk = installed.shared[WebRpcSharedKey.chunk]',
+        'const chunk = installed.ports[WebRpcPortName.chunk]',
         "if (JSON.stringify(chunk.split('abcdefgh', 4)) !== JSON.stringify(['abcd', 'efgh']))",
         "  throw new Error('Restored root chunk export did not install the exact split capability')"
       ].join('\n'),

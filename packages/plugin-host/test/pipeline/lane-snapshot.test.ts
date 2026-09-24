@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createAbortController, createPendingTracker } from '@migaia/lifecycle'
 import { executePluginHostPipeline } from '../../src/pipeline-runtime.js'
 import { PluginHostPipelineMode } from '../../src/state-constants.js'
+import { StageLanes } from '../../src/stage-lanes.js'
 
 /**
  * Every mode traverses a copy of its lane.
@@ -24,6 +25,24 @@ const baseOptions = {
 }
 
 describe('pipeline lane snapshot', () => {
+  it('reuses one frozen snapshot until a lane mutation commits', () => {
+    const lanes = new StageLanes<number>()
+    const first = lanes.snapshot(PluginHostPipelineMode.sync)
+    const second = lanes.snapshot(PluginHostPipelineMode.sync)
+    expect(first).toBe(second)
+    expect(Object.isFrozen(first)).toBe(true)
+
+    lanes.replace({
+      syncStages: [(value, next) => next(value)],
+      asyncStages: [],
+      generatorStages: [],
+      asyncGeneratorStages: []
+    })
+    const changed = lanes.snapshot(PluginHostPipelineMode.sync)
+    expect(changed).not.toBe(first)
+    expect(Object.isFrozen(changed)).toBe(true)
+  })
+
   it('sync mode does not run a stage appended during the run', () => {
     const seen: string[] = []
     const lane: ((value: number, next: (value: number) => void) => void)[] = []

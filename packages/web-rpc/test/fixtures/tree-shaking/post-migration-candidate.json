@@ -160,7 +160,7 @@
     "workspace:packages/plugin-host/dist/symbols.js",
     "workspace:packages/utils/dist/bytes.js",
     "workspace:packages/utils/dist/config.js",
-    "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+    "workspace:packages/utils/dist/error-text-[chunk].js",
     "workspace:packages/utils/dist/error.js",
     "workspace:packages/utils/dist/function.js",
     "workspace:packages/utils/dist/object-path.js"
@@ -258,7 +258,7 @@
         "workspace:packages/plugin-host/dist/state-constants.js",
         "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/config.js",
-        "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+        "workspace:packages/utils/dist/error-text-[chunk].js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/function.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -378,7 +378,7 @@
         "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/bytes.js",
         "workspace:packages/utils/dist/config.js",
-        "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+        "workspace:packages/utils/dist/error-text-[chunk].js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/function.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -504,7 +504,7 @@
         "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/bytes.js",
         "workspace:packages/utils/dist/config.js",
-        "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+        "workspace:packages/utils/dist/error-text-[chunk].js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/function.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -638,7 +638,7 @@
         "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/bytes.js",
         "workspace:packages/utils/dist/config.js",
-        "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+        "workspace:packages/utils/dist/error-text-[chunk].js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/function.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -771,7 +771,7 @@
         "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/bytes.js",
         "workspace:packages/utils/dist/config.js",
-        "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+        "workspace:packages/utils/dist/error-text-[chunk].js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/function.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -2830,7 +2830,7 @@
       }
     },
     {
-      "module": "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+      "module": "workspace:packages/utils/dist/error-text-[chunk].js",
       "owner": "@migaia/utils",
       "requirements": ["WRC-C-R07"],
       "rationale": "The canonical retained graph attributes this selected runtime module to @migaia/utils.",
@@ -2843,7 +2843,7 @@
       "provenance": {
         "kind": "generated-artifact",
         "locator": {
-          "artifact": "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+          "artifact": "workspace:packages/utils/dist/error-text-[chunk].js",
           "artifactSha256": "3ea61a2db99b76b0f78b878a6cfe13b41b4c49e250f5a3896e17db9e4c46493b",
           "generator": "canonical package build output",
           "source": "packages/utils/src/error-text.ts",

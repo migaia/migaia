@@ -24,7 +24,6 @@ export type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly registration: IRegistration<TDomainCore, TValue>
   readonly createDomainCore: () => TDomainCore
   readonly assertRegistrationValid: () => void
-  readonly getShared: (key: PropertyKey) => unknown
   readonly pipelineMode: () => IPipelineMode
   readonly onPipelineViolation: (kind: IPluginHostPipelineViolation) => void
   readonly registerResource: (resource: IPluginResource) => void
@@ -44,7 +43,6 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
     'config',
     'operation',
     'lifecycle',
-    'getShared',
     'onDispose',
     'usePipeline',
     'useAsyncPipeline',
@@ -83,10 +81,6 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
     enumerable: true,
     configurable: false,
     get: () => Object.freeze(context.lifecycle())
-  })
-  define('getShared', (key: PropertyKey) => {
-    context.assertRegistrationValid()
-    return context.getShared(key)
   })
   define('onDispose', (resource: IPluginResource) => context.registerResource(resource))
   define('usePipeline', (stage: ISyncPipelineStage<TValue>) => {

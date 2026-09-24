@@ -96,7 +96,8 @@ export function graphMessageFor(code: ICapabilityGraphErrorCode): string {
     [CapabilityGraphErrorCode.admissionClosed]: CapabilityGraphErrorText.admissionClosed,
     [CapabilityGraphErrorCode.unknownNode]: CapabilityGraphErrorText.unknownNode,
     [CapabilityGraphErrorCode.reentrantOperation]: CapabilityGraphErrorText.reentrantOperation,
-    [CapabilityGraphErrorCode.invalidOption]: CapabilityGraphErrorText.invalidOption
+    [CapabilityGraphErrorCode.invalidOption]: CapabilityGraphErrorText.invalidOption,
+    [CapabilityGraphErrorCode.nodeHasDependents]: CapabilityGraphErrorText.nodeHasDependents
   }
   return messages[code]
 }

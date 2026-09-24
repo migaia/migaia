@@ -1,5 +1,5 @@
 import { Ansis } from 'ansis'
-import type { IPipelineMode } from '@migaia/plugin-host'
+import { defineFeature, definePlugin, type IPipelineMode } from '@migaia/plugin-host'
 
 import type {
   IEmptyPluginExt,
@@ -28,6 +28,11 @@ export type IColorPluginConfig = {
 
 export type IColorShared = { paint: IPaintFn; dim: IDimFn }
 
+/** Feature output carrying the color renderer functions as one original object. */
+export const loggerColorFeature = defineFeature<IColorShared, Record<never, never>, IColorShared>(
+  (core) => core.featureExpose
+)
+
 // IPaintFn / IDimFn 这两个类型定义在 typing.ts（公共约定），这里只是使用方之一，
 // 不是定义方——其它插件（比如 reasoning）要用同样的能力，也从 typing.ts 导入
 // 这两个类型，而不是从这个文件导入，避免插件之间产生直接的文件依赖。
@@ -38,9 +43,12 @@ class ColorPlugin implements ILoggerPlugin<
   IEmptyPluginExt,
   IColorPluginConfig,
   IPipelineMode,
+  { readonly color: typeof loggerColorFeature },
   IColorShared
 > {
   readonly name = ANSIS_PLUGIN_NAME
+  /** Declared color capability consumed through PluginHost feature references. */
+  readonly features = Object.freeze({ color: loggerColorFeature })
   /**
    * 只是把构造时收到的配置原样交给框架登记，下面所有方法都不读这个字段，统一读 install() 里从 core.config.get() 拿到、 存进 #resolvedConfig
    * 的那份——见 install() 里的说明。
@@ -65,7 +73,7 @@ class ColorPlugin implements ILoggerPlugin<
     this.config = config
   }
 
-  shared(core: ILoggerPluginCore): IColorShared {
+  featureExpose(core: ILoggerPluginCore): IColorShared {
     // 不读 this.config——统一通过 core.config.get() 读取
     this.#resolvedConfig = core.config.get<IColorPluginConfig>() ?? {}
     this.#instance = new Ansis(this.#isColorEnabled() ? 3 : 0)
@@ -216,7 +224,23 @@ class ColorPlugin implements ILoggerPlugin<
   }
 }
 
+/** Definition-only reference authority for consumers that do not own the color implementation. */
+const colorFeatureContract = definePlugin({
+  name: ANSIS_PLUGIN_NAME,
+  features: { color: loggerColorFeature },
+  featureExpose: {} as IColorShared,
+  install: () => ({})
+})
+
+/** Optional color dependency shared by reasoning plugins. */
+export const optionalColorFeature = colorFeatureContract.getFeature('color', { optional: true })
+
 export const color = (
   config: IColorPluginConfig = {}
-): ILoggerPlugin<IEmptyPluginExt, IColorPluginConfig, IPipelineMode, IColorShared> =>
-  new ColorPlugin(config)
+): ILoggerPlugin<
+  IEmptyPluginExt,
+  IColorPluginConfig,
+  IPipelineMode,
+  { readonly color: typeof loggerColorFeature },
+  IColorShared
+> => new ColorPlugin(config)

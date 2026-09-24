@@ -200,7 +200,10 @@ export const createRegistrationView = (
     !registration.installed ||
     registration.lifecycle === 'dispose'
   )
-    throw new PluginHostError(PluginHostErrorCode.viewRevoked, ERROR_TEXT.VIEW_REVOKED)
+    throw new PluginHostError(
+      PluginHostErrorCode.registrationRevoked,
+      ERROR_TEXT.REGISTRATION_REVOKED
+    )
   return createPluginHostExtensionPublication(
     [registration] as never,
     resolved.host,
@@ -211,7 +214,10 @@ export const createRegistrationView = (
         !captured[0].installed ||
         captured[0].lifecycle === 'dispose'
       )
-        throw new PluginHostError(PluginHostErrorCode.viewRevoked, ERROR_TEXT.VIEW_REVOKED)
+        throw new PluginHostError(
+          PluginHostErrorCode.registrationRevoked,
+          ERROR_TEXT.REGISTRATION_REVOKED
+        )
     }
   ) as Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>> }>
 }

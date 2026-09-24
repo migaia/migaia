@@ -1,8 +1,22 @@
-/** Opaque Feature identity; only `defineFeature` can construct it. */
-export declare const featureBrand: unique symbol
-
 /** A named root/dependency map of trusted Feature definitions. */
 export type IFeatureRecord = Readonly<Record<string, IFeature<any, any, any>>>
+
+/** Opaque reference to one named feature owned by another plugin definition. */
+export type IFeatureReference<
+  TOutput extends object,
+  TOptional extends boolean = false
+> = Readonly<{
+  readonly plugin: string
+  readonly feature: string
+  readonly optional: TOptional
+  readonly __output?: TOutput
+}>
+
+/** Local feature identity or cross-plugin reference accepted as a factory dependency. */
+export type IFeatureDependency = IFeature<any, any, any> | IFeatureReference<object, boolean>
+
+/** Dependency map accepted by one feature factory. */
+export type IFeatureDependencyRecord = Readonly<Record<string, IFeatureDependency>>
 
 /** Read-only capability surface available to one synchronous Feature factory. */
 export type IFeatureCore<TExpose extends object> = Readonly<{
@@ -10,17 +24,25 @@ export type IFeatureCore<TExpose extends object> = Readonly<{
 }>
 
 /** Exact outputs for declared direct dependency aliases. */
-export type IFeatureOutputs<TDependencies extends IFeatureRecord> = Readonly<{
-  readonly [K in keyof TDependencies]: IFeatureOutput<TDependencies[K]>
+export type IFeatureOutputs<TDependencies extends IFeatureDependencyRecord> = Readonly<{
+  readonly [K in keyof TDependencies]: TDependencies[K] extends IFeatureReference<
+    infer TOutput,
+    infer TOptional
+  >
+    ? TOptional extends true
+      ? TOutput | undefined
+      : TOutput
+    : IFeatureOutput<TDependencies[K]>
 }>
 
 /** A trusted synchronous Feature definition with its expose requirement and direct dependencies. */
 export type IFeature<
   TExpose extends object,
   TOutput extends object,
-  TDependencies extends IFeatureRecord = Record<never, never>
+  TDependencies extends IFeatureDependencyRecord = Record<never, never>
 > = Readonly<{
-  readonly [featureBrand]: {
+  /** Type-only metadata; runtime identity is authorized exclusively by defineFeature's WeakMap. */
+  readonly __feature: {
     readonly expose: TExpose
     readonly output: TOutput
     readonly dependencies: TDependencies
@@ -46,7 +68,12 @@ export type IFeatureRequiredExpose<TFeature> =
   TFeature extends IFeature<infer TExpose, any, infer TDependencies>
     ? IIsAny<TDependencies> extends true
       ? TExpose
-      : TExpose & IFeatureRecordRequiredExpose<TDependencies>
+      : TExpose &
+          IFeatureRecordRequiredExpose<{
+            readonly [K in keyof TDependencies as TDependencies[K] extends IFeature<any, any, any>
+              ? K
+              : never]: Extract<TDependencies[K], IFeature<any, any, any>>
+          }>
     : never
 
 /** Intersects every selected root's required expose contract. */
@@ -58,7 +85,7 @@ export type IFeatureRecordRequiredExpose<TFeatures extends IFeatureRecord> =
 /** Factory contract: construction is synchronous while returned methods may remain asynchronous. */
 export type IFeatureFactory<
   TExpose extends object,
-  TDependencies extends IFeatureRecord,
+  TDependencies extends IFeatureDependencyRecord,
   TOutput extends object
 > = (
   core: IFeatureCore<TExpose>,

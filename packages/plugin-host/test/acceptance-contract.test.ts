@@ -26,8 +26,8 @@ describe('PHV3 acceptance contract', () => {
     const short = definePlugin('short', () => ({ install: () => ({ short: true }) }))
     const full = definePlugin({ name: 'full', install: () => ({ full: true }) })
     const host = new AcceptanceHost(hostOptions)
-    const view = await host.use(short, full)
-    expect(view.extensions).toMatchObject({ short: true, full: true })
+    const handles = await host.use(short, full)
+    expect(handles.map((handle) => handle.extensions)).toEqual([{ short: true }, { full: true }])
     await host.dispose()
   })
 
@@ -53,22 +53,15 @@ describe('PHV3 acceptance contract', () => {
 
   it('YS26: rejects equal install and expose keys without publishing the candidate', async () => {
     const host = new AcceptanceHost(hostOptions)
-    /** Detects whether collision validation runs before the Plugin-only shared hook. */
-    let sharedCalls = 0
     // @ts-expect-error YS26 forbids every overlapping Host extension key.
     const collision = definePlugin('ys26-collision', () => ({
       install: () => ({ duplicate: 1 }),
-      expose: () => ({ duplicate: 1 }),
-      shared: () => {
-        sharedCalls += 1
-        return { shouldNotPublish: true }
-      }
+      expose: () => ({ duplicate: 1 })
     }))
     await expect(host.use(collision)).rejects.toMatchObject({
       cause: { code: PluginHostErrorCode.extensionDuplicate }
     })
-    expect(host.getCurrentView().extensions).not.toHaveProperty('duplicate')
-    expect(sharedCalls).toBe(0)
+    expect(openComposition(host).getCurrentSnapshot().extensions).not.toHaveProperty('duplicate')
     await host.dispose()
   })
 
@@ -81,12 +74,14 @@ describe('PHV3 acceptance contract', () => {
     await expect(host.use(descriptor)).rejects.toMatchObject({
       code: PluginHostErrorCode.pluginInstallFailed
     })
-    expect(host.getCurrentView().extensions).not.toHaveProperty('shouldNotMount')
+    expect(openComposition(host).getCurrentSnapshot().extensions).not.toHaveProperty(
+      'shouldNotMount'
+    )
     await host.dispose()
   })
 
   it('YS26: contains every late descriptor-hook rejection when diagnostics throw', async () => {
-    for (const hook of ['descriptor', 'featureExpose', 'expose', 'shared'] as const) {
+    for (const hook of ['descriptor', 'featureExpose', 'expose'] as const) {
       const original = new Error(`late-${hook}`)
       const rejected = Promise.reject(original)
       let installCalls = 0
@@ -103,8 +98,7 @@ describe('PHV3 acceptance contract', () => {
                     return { retained: true }
                   },
                   ...(hook === 'featureExpose' ? { featureExpose: () => rejected as never } : {}),
-                  ...(hook === 'expose' ? { expose: () => rejected as never } : {}),
-                  ...(hook === 'shared' ? { shared: () => rejected as never } : {})
+                  ...(hook === 'expose' ? { expose: () => rejected as never } : {})
                 }) as never
             )
       const host = new AcceptanceHost({
@@ -131,13 +125,13 @@ describe('PHV3 acceptance contract', () => {
       }
       expect(causes).toContain(original)
       expect(diagnosticCalls).toBe(1)
-      expect(installCalls).toBe(hook === 'expose' || hook === 'shared' ? 1 : 0)
-      expect(host.getCurrentView().extensions).not.toHaveProperty('retained')
+      expect(installCalls).toBe(hook === 'expose' ? 1 : 0)
+      expect(openComposition(host).getCurrentSnapshot().extensions).not.toHaveProperty('retained')
       await host.dispose()
     }
   })
 
-  it('YS27: injects only featureExpose into Feature factories and preserves Plugin shared for a later Plugin', async () => {
+  it('YS27: injects only featureExpose and declared dependencies into Feature factories', async () => {
     /**
      * Captures the exact Feature core surface without masking assertion failures in Host lifecycle
      * wrapping.
@@ -158,17 +152,23 @@ describe('PHV3 acceptance contract', () => {
       name: 'ys27-provider',
       features: { feature },
       featureExpose: { read: () => 7 },
-      shared: () => ({ pluginOnly: true }),
       install: (core) => ({ read: core.features.feature.read() })
     })
+    const dependentFeature = defineFeature(
+      (_core, dependencies) => ({
+        observed: dependencies.provider.read() === 7
+      }),
+      { provider: provider.getFeature('feature') }
+    )
     const consumer = definePlugin({
       name: 'ys27-consumer',
-      install: (core) => ({ observed: core.getShared('pluginOnly') === true })
+      features: { dependentFeature },
+      install: (core) => ({ observed: core.features.dependentFeature.observed })
     })
     const host = new AcceptanceHost(hostOptions)
-    await expect(host.use(provider, consumer)).resolves.toMatchObject({
-      extensions: { read: 7, observed: true }
-    })
+    const handles = await host.use(provider, consumer)
+    expect(handles[0].extensions.read).toBe(7)
+    expect(handles[1].extensions.observed).toBe(true)
     expect(observedCoreKeys).toEqual(['featureExpose'])
     expect(observedForbiddenCapabilities).toBe(false)
     await host.dispose()
@@ -197,10 +197,6 @@ describe('PHV3 acceptance contract', () => {
         calls.push('install')
         return {}
       },
-      shared: () => {
-        calls.push('shared')
-        return {}
-      },
       dispose: () => {
         calls.push('dispose')
       }
@@ -213,8 +209,8 @@ describe('PHV3 acceptance contract', () => {
     const trusted = definePlugin({ name: 'trusted', install: () => ({ trusted: true }) })
     const clone = { ...trusted }
     const host = new AcceptanceHost(hostOptions)
-    const view = await host.use(clone as never)
-    expect((view.extensions as Record<string, unknown>).trusted).toBe(true)
+    const [handle] = await host.use(clone as never)
+    expect((handle.extensions as Record<string, unknown>).trusted).toBe(true)
     await host.dispose()
   })
 
@@ -239,8 +235,8 @@ describe('PHV3 acceptance contract', () => {
       }
     }
     const host = new AcceptanceHost(hostOptions)
-    const view = await host.use(raw)
-    expect((view.extensions as { readonly value: number }).value).toBe(42)
+    const [handle] = await host.use(raw)
+    expect((handle.extensions as { readonly value: number }).value).toBe(42)
     expect(factoryCalls).toBe(1)
     await host.dispose()
   })
@@ -248,17 +244,17 @@ describe('PHV3 acceptance contract', () => {
   it('PHV3-T06: preserves mixed admission order and duplicate atomicity', async () => {
     const first = definePlugin('first', () => ({ install: () => ({ first: true }) }))
     const host = new AcceptanceHost(hostOptions)
-    const view = await host.use(first, {
+    const handles = await host.use(first, {
       name: 'second',
       install: () => ({ second: true })
     } as never)
-    expect(Object.keys(view.extensions)).toEqual(['first', 'second'])
+    expect(handles.flatMap((handle) => Object.keys(handle.extensions))).toEqual(['first', 'second'])
     await expect(
       host.use({ name: 'first', install: () => ({ replacement: true }) } as never)
     ).rejects.toMatchObject({
       code: PluginHostErrorCode.pluginDuplicate
     })
-    expect(host.getCurrentView().extensions.second).toBe(true)
+    expect(openComposition(host).getCurrentSnapshot().extensions.second).toBe(true)
     await host.dispose()
   })
 
@@ -293,7 +289,7 @@ describe('PHV3 acceptance contract', () => {
 
   it('PHV3-T08: has one canonical Host runtime owner', () => {
     const source = readFileSync(new URL('../src/host-runtime.ts', import.meta.url), 'utf8')
-    expect((source.match(/export abstract class PluginHost/g) ?? []).length).toBe(1)
+    expect((source.match(/export class PluginHost/g) ?? []).length).toBe(1)
     expect(readFileSync(new URL('../src/define-plugin.ts', import.meta.url), 'utf8')).toContain(
       'const definitions = new WeakMap'
     )
@@ -312,7 +308,6 @@ describe('PHV3 acceptance contract', () => {
         config: { index },
         install: () => ({}),
         update: () => {},
-        shared: () => ({}),
         dispose: () => {},
         marker: `generic-${index}`
       }

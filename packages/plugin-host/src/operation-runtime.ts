@@ -1,3 +1,4 @@
+import { reportDiagnostic } from './diagnostic-report.js'
 import {
   boundedWait,
   createGenerationController,
@@ -73,11 +74,11 @@ export class PluginHostOperationRuntime {
           configurable: true
         })
       } catch (attachFailure) {
-        try {
-          this.#options.diagnostic(ERROR_TEXT.CAUSE_ATTACH_FAILED(String(attachFailure)))
-        } catch {
-          // The timeout primary remains authoritative when diagnostic delivery is hostile.
-        }
+        // The timeout primary remains authoritative; the attach failure is reported instead.
+        reportDiagnostic(
+          this.#options.diagnostic,
+          ERROR_TEXT.CAUSE_ATTACH_FAILED(String(attachFailure))
+        )
       }
     }
     throw timeout

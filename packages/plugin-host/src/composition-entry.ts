@@ -35,7 +35,7 @@ const managedHosts = new WeakMap<object, IPluginHostCompositionIntegration<objec
 export const buildManagedPort = <TRuntime extends IPluginHostCompositionIntegration<object>>(
   runtime: TRuntime,
   readRevision: () => number,
-  readCurrentView: () => unknown
+  readCurrentSnapshot: () => unknown
 ): IPluginHostCompositionIntegration<object> =>
   Object.freeze({
     createPluginAdmission: (plugin) => runtime.createPluginAdmission(plugin),
@@ -51,8 +51,10 @@ export const buildManagedPort = <TRuntime extends IPluginHostCompositionIntegrat
     get revision(): number {
       return readRevision()
     },
-    getCurrentView: () =>
-      readCurrentView() as ReturnType<IPluginHostCompositionIntegration<object>['getCurrentView']>
+    getCurrentSnapshot: () =>
+      readCurrentSnapshot() as ReturnType<
+        IPluginHostCompositionIntegration<object>['getCurrentSnapshot']
+      >
   })
 
 /** Records a host's managed-protocol port. Called once, at the end of host construction. */
@@ -88,3 +90,4 @@ export const openComposition = (target: object): IPluginHostCompositionIntegrati
 
 export type { IRegistrationToken, IRegistrationView } from './typing.js'
 export type { IPluginHostCompositionIntegration } from './typing.js'
+export type { IPluginHostCompositionSnapshot } from './typing.js'

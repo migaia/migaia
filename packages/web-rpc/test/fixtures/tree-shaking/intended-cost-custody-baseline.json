@@ -645,7 +645,7 @@
       "successorContentSha256": "25937a905e880f6958611aca5ab5792f4fb9982b6b4d2a21b08be7b7ecf9863f"
     },
     {
-      "module": "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+      "module": "workspace:packages/utils/dist/error-text-[chunk].js",
       "predecessorContentSha256": "3ea61a2db99b76b0f78b878a6cfe13b41b4c49e250f5a3896e17db9e4c46493b",
       "successorContentSha256": "3ea61a2db99b76b0f78b878a6cfe13b41b4c49e250f5a3896e17db9e4c46493b"
     },

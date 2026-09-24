@@ -1,5 +1,35 @@
 /** Stable diagnostic text for an IndexedDB sidecar row without an authoritative record. */
 export const StorageErrorText = Object.freeze({
+  /** Standard Schema issue arrays must contain object entries with string messages. */
+  standardSchemaIssuesInvalid: 'Standard Schema returned invalid issues',
+  /** Namespace codecs must encode a physical key as a string. */
+  namespaceCodecEncodeInvalid: 'namespace codec encode must return a string',
+  /** Namespace codecs may decode only a string key or an absent foreign namespace. */
+  namespaceCodecDecodeInvalid: 'namespace codec decode must return string or undefined',
+  /** Injected Web Storage values must implement the complete Storage surface. */
+  webStorageInjectionInvalid: 'web storage injection must implement the Storage surface',
+  /** Live Web Storage length must remain a usable enumeration bound. */
+  webStorageLengthInvalid: 'web storage length must remain a non-negative safe integer',
+  /** Live Web Storage enumeration must return a string key for every visible index. */
+  webStorageKeyInvalid: 'web storage key enumeration must return one unique string per index',
+  /** Live Web Storage enumeration must not repeat the same physical key. */
+  webStorageKeyDuplicate: 'web storage key enumeration returned a duplicate physical key',
+  /** IndexedDB coordination hints must contain decodable storage keys. */
+  indexedDbChangeHintKeyInvalid: 'invalid IndexedDB change hint key',
+  /** IndexedDB upgrade events require the transaction supplied by the platform. */
+  indexedDbUpgradeTransactionMissing: 'IndexedDB upgrade event is missing its transaction',
+  /** A cookie document must keep exposing its string cookie property after admission. */
+  cookieDocumentBecameInvalid: 'cookie document must continue exposing a string cookie property',
+  /** Entity ordering extensions must return a finite comparable number. */
+  entityComparatorInvalid: 'entity orderBy comparator must return a number',
+  /** Encoded storage keys are bounded to the contract depth and node limits. */
+  storageKeyDecodeLimitExceeded: 'storage key exceeds decode limits',
+  /** Encoded storage keys must use the canonical two-slot wire tuple. */
+  storageKeyWireInvalid: 'invalid storage key wire',
+  /** Encoded binary storage keys must remain within the public key-size limit. */
+  storageKeyBinaryTooLarge: 'key too large',
+  /** Encoded storage keys must use one of the registered wire tags. */
+  storageKeyWireTagInvalid: 'invalid storage key wire tag',
   /** Stable text for rejecting malformed backend identifiers before host mutation. */
   backendIdInvalid: 'storage backend id is invalid',
   /** Stable text for duplicate backend registration or install-batch identifiers. */

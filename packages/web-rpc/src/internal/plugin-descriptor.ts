@@ -11,7 +11,7 @@ export type IWebRpcPluginDescriptor<TInstallation = unknown> = {
   readonly sharedConsumes?: readonly PropertyKey[]
   readonly sharedOptionalConsumes?: readonly PropertyKey[]
   readonly install: (scope: IWebRpcPluginInstallScope) => TInstallation | Promise<TInstallation>
-  readonly shared?: (installation: TInstallation) => Record<PropertyKey, unknown>
+  readonly ports?: (installation: TInstallation) => Record<PropertyKey, unknown>
 }
 
 /** Freezes a fresh descriptor snapshot so each factory call has independent identity. */
@@ -26,7 +26,7 @@ export function assertPluginInstallResult(
   if (!value || typeof value !== 'object')
     throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'plugin install result is invalid')
   const extension = safeRead<unknown>(value, 'extension')
-  const shared = safeRead<unknown>(value, 'shared')
-  if (!extension || typeof extension !== 'object' || !shared || typeof shared !== 'object')
+  const ports = safeRead<unknown>(value, 'ports')
+  if (!extension || typeof extension !== 'object' || !ports || typeof ports !== 'object')
     throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'plugin install result is invalid')
 }

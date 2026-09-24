@@ -1,4 +1,4 @@
-import { WebRpcSharedKey } from './plugin-shared-keys.js'
+import { WebRpcPortName } from './plugin-shared-keys.js'
 import {
   rpcProtocolV1,
   type IRpcEnvelope,
@@ -86,7 +86,7 @@ export type IDeferredPreparedEndpoint<TTargetId extends string = string> = {
   readonly finalize: (
     hookEvents: IWebRpcHookEvent[],
     runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
-    getShared: (key: PropertyKey) => unknown
+    getPort: (key: PropertyKey) => unknown
   ) => Promise<IPreparedEndpoint<TTargetId>>
 }
 
@@ -104,27 +104,23 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   components: IWebRpcSelectedComponents,
   installHookEvents: IWebRpcHookEvent[],
   runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
-  getShared: (key: PropertyKey) => unknown
+  getPort: (key: PropertyKey) => unknown
 ): Promise<IPreparedEndpoint<TTargetId>> {
-  const installedConnect = getShared(WebRpcSharedKey.connect) as
-    | IWebRpcConnectCapability
-    | undefined
+  const installedConnect = getPort(WebRpcPortName.connect) as IWebRpcConnectCapability | undefined
   if (!installedConnect)
     throw new WebRpcError(WebRpcErrorCode.middlewareMissing, 'connect middleware is required')
   let connectCapability = installedConnect
-  const authenticationCapability = getShared(WebRpcSharedKey.authentication) as
+  const authenticationCapability = getPort(WebRpcPortName.authentication) as
     | IWebRpcAuthenticationCapability
     | undefined
-  const contractCapability = getShared(WebRpcSharedKey.contract) as
+  const contractCapability = getPort(WebRpcPortName.contract) as
     | { readonly maxIdentifierLength?: number }
     | undefined
-  const timeoutCapability = getShared(WebRpcSharedKey.timeout) as
-    | IWebRpcTimeoutCapability
-    | undefined
-  const abortCapability = getShared(WebRpcSharedKey.abort) as IWebRpcAbortCapability | undefined
-  const pingCapability = getShared(WebRpcSharedKey.ping) as IWebRpcPingCapability | undefined
-  const uuidCapability = getShared(WebRpcSharedKey.uuid) as IWebRpcUuidConfig | undefined
-  const hooksPort = getShared(WebRpcSharedKey.hooks) as IWebRpcHooksPort | undefined
+  const timeoutCapability = getPort(WebRpcPortName.timeout) as IWebRpcTimeoutCapability | undefined
+  const abortCapability = getPort(WebRpcPortName.abort) as IWebRpcAbortCapability | undefined
+  const pingCapability = getPort(WebRpcPortName.ping) as IWebRpcPingCapability | undefined
+  const uuidCapability = getPort(WebRpcPortName.uuid) as IWebRpcUuidConfig | undefined
+  const hooksPort = getPort(WebRpcPortName.hooks) as IWebRpcHooksPort | undefined
   const hooksCapability: IWebRpcHooksConfig | undefined = hooksPort
     ? Object.freeze({
         listeners: hooksPort.listeners,
@@ -203,9 +199,9 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
     providers: factoryProvider,
     providerLimits: factoryProviderLimits,
     options: {
-      contract: getShared(WebRpcSharedKey.contract) as IWebRpcContractCapability | undefined,
+      contract: getPort(WebRpcPortName.contract) as IWebRpcContractCapability | undefined,
       uuid: uuidCapability,
-      protocol: getShared(WebRpcSharedKey.protocol) as IWebRpcProtocolCapability | undefined,
+      protocol: getPort(WebRpcPortName.protocol) as IWebRpcProtocolCapability | undefined,
       authentication: authenticationCapability,
       timeout: timeoutCapability,
       hooks: hooksCapability,
@@ -439,7 +435,7 @@ export async function prepareEndpoint<
     providerLimits: factoryProviderLimits as IWebRpcFactoryConfig<TTargetId>['providerLimits'],
     construction,
     middlewareSnapshots: Object.freeze(middlewareSnapshots.map((item) => Object.freeze(item))),
-    finalize: async (installHookEvents, runConstruction, getShared) => {
+    finalize: async (installHookEvents, runConstruction, getPort) => {
       const prepared = await finalizePreparedEndpoint(
         factoryId as string,
         factoryTargetIds as readonly TTargetId[] | undefined,
@@ -453,7 +449,7 @@ export async function prepareEndpoint<
         components,
         installHookEvents,
         runConstruction,
-        getShared
+        getPort
       )
       return {
         ...prepared,

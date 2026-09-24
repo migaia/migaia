@@ -54,7 +54,7 @@ describe('canonical endpoint projection', () => {
   const hostileHosts: readonly (readonly [string, Record<string, unknown>])[] = [
     ['missing', {}],
     ['extra', { send: () => undefined, provide: () => undefined, forged: true }],
-    ['reserved', { send: () => undefined, provide: () => undefined, getShared: () => undefined }]
+    ['reserved', { send: () => undefined, provide: () => undefined, getPort: () => undefined }]
   ]
   it.each(hostileHosts)('rejects %s host projection before publish', (_name, host) => {
     expect(() => createEndpointProjection(options(host))).toThrow(

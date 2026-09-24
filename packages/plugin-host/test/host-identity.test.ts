@@ -6,6 +6,7 @@ import {
   PluginHostError,
   PluginHostErrorCode
 } from '../src/index.js'
+import { openComposition } from '../src/composition-entry.js'
 
 /** Explicit unbounded lifecycle policy keeps identity tests independent of wall-clock timing. */
 const execution = { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
@@ -29,7 +30,7 @@ describe('host identity', () => {
     await host.dispose()
     let thrown: unknown
     try {
-      host.getCurrentView()
+      openComposition(host).getCurrentSnapshot()
     } catch (error) {
       thrown = error
     }
@@ -45,11 +46,10 @@ describe('host identity', () => {
       config: { enabled: true },
       install: () => ({})
     })
-    const view = await host.use(plugin)
-    expect(view.config.get('plain.enabled')).toBe(true)
+    const [handle] = await host.use(plugin)
+    expect(handle.config.get()).toEqual({ enabled: true })
     const removal = await host.unUse('plain')
-    expect(removal.ok).toBe(true)
-    expect(removal.removed).toBe(true)
+    expect(removal).toEqual({ ok: true })
     await host.dispose()
   })
 

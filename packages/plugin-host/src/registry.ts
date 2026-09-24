@@ -20,8 +20,9 @@ export type IPluginDefinition<TCore> = {
   readonly update?: IPluginConstraint<TCore>['update']
   readonly onEnable?: IPluginConstraint<TCore>['onEnable']
   readonly onDisable?: IPluginConstraint<TCore>['onDisable']
+  readonly onDependencyReplaced?: IPluginConstraint<TCore>['onDependencyReplaced']
+  readonly activation: 'eager' | 'lazy'
   readonly dispose?: IPluginConstraint<TCore>['dispose']
-  readonly shared?: IPluginConstraint<TCore>['shared']
   /** Symbol disposer captured with the plugin admission snapshot; never re-probe owner at cleanup. */
   readonly disposer?: IPluginDisposer
   readonly features: Readonly<Record<string, object>>
@@ -35,13 +36,13 @@ export type IPluginDescriptor<
   TExtension extends Record<string, unknown> = Record<string, never>,
   TPublic extends object = Record<never, never>,
   TExpose extends object = Record<never, never>,
-  TShared extends object = Record<never, never>
+  TLegacyShared extends object = Record<never, never>
 > = Readonly<{
   readonly install?: () => TExtension | PromiseLike<TExtension>
   readonly expose?: () => TPublic & (TPublic extends PromiseLike<unknown> ? never : unknown)
   readonly featureExpose?: () => TExpose & (TExpose extends PromiseLike<unknown> ? never : unknown)
-  readonly shared?: () => TShared & (TShared extends PromiseLike<unknown> ? never : unknown)
-}>
+}> &
+  (TLegacyShared extends object ? unknown : never)
 
 export type IRegistration<TDomainCore extends object, TValue> = {
   readonly name: string
@@ -55,7 +56,6 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   resourceDisposers: Array<
     Readonly<{ readonly resource: unknown; readonly dispose: IPluginDisposer }>
   >
-  shared: PropertyKey[]
   installed: boolean
   /** Orthogonal reachability state; disabling never changes lifecycle or releases resources. */
   enabled: boolean
@@ -70,6 +70,10 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   featureExpose?: object
   featureExposeValid?: boolean
   featurePending?: import('@migaia/lifecycle').IPendingTracker
+  /** Whether lazy/eager installation has completed for this registration. */
+  activated: boolean
+  /** Shared activation Promise returned to concurrent callers. */
+  activationPromise?: Promise<void>
   /** Captured function-form descriptor; it is never shared across registrations. */
   descriptor?: IPluginDescriptor
 }
@@ -82,9 +86,9 @@ export type IExtensionOwnership = {
 export type IInstallEntry<TDomainCore extends object, TValue> = {
   readonly plugin: IPluginDefinition<TDomainCore & IPluginHostCore<TValue>>
   readonly name: string
-}
-
-export type ISharedEntry<TDomainCore extends object, TValue> = {
-  readonly owner: IRegistration<TDomainCore, TValue>
-  readonly value: unknown
+  /**
+   * Host-owned runtime config carried over when a registration is re-instantiated (replace
+   * restart). Absent for first installs, which start from the definition's `config`.
+   */
+  readonly config?: IPluginConfig
 }

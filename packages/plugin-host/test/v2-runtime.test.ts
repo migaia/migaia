@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PluginHost } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
+import { openComposition } from '../src/composition-entry.js'
 
 class V2Host extends PluginHost<Record<string, never>, string> {}
 
@@ -49,30 +50,33 @@ describe('PluginHost V2 runtime contract', () => {
     const host = new V2Host({
       execution: { mutationTimeoutMs: 1000, pipelineDrainTimeoutMs: 1000 }
     })
-    const batch = host.use(
-      {
-        name: 'first',
-        shared: () => ({ staged: 'visible-inside-batch' }),
-        install: () => ({ firstExtension: true })
+    const staged = defineFeature(() => ({ value: 'visible-inside-batch' }))
+    const first = definePlugin({
+      name: 'first',
+      features: { staged },
+      install: () => ({ firstExtension: true })
+    })
+    const second = definePlugin({
+      name: 'second',
+      features: {
+        observed: defineFeature((_core, dependencies) => dependencies.staged, {
+          staged: first.getFeature('staged')
+        })
       },
-      {
-        name: 'second',
-        install: async (core) => {
-          expect(core.getShared('staged')).toBe('visible-inside-batch')
-          secondInstallStarted()
-          await batchGate
-          return { secondExtension: true }
-        }
+      install: async (core) => {
+        expect(core.features.observed.value).toBe('visible-inside-batch')
+        secondInstallStarted()
+        await batchGate
+        return { secondExtension: true }
       }
-    )
+    })
+    const batch = host.use(first, second)
 
     await secondStarted
-    expect(host.getShared('staged')).toBeUndefined()
-    expect(Object.hasOwn(host, 'firstExtension')).toBe(false)
+    expect(openComposition(host).getCurrentSnapshot().extensions.firstExtension).toBeUndefined()
     releaseBatch()
-    const view = await batch
-    expect(view.getShared('staged')).toBe('visible-inside-batch')
-    expect(view.extensions.firstExtension).toBe(true)
+    const handles = await batch
+    expect(handles[0].extensions.firstExtension).toBe(true)
     await host.dispose()
   })
 
@@ -102,7 +106,7 @@ describe('PluginHost V2 runtime contract', () => {
       execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: 100 }
     })
     /** Materialized V2 view returned by composition. */
-    const view = await host.use({
+    const [handle] = await host.use({
       name: 'extension',
       install: () => ({
         invoke(this: unknown): void {
@@ -111,19 +115,18 @@ describe('PluginHost V2 runtime contract', () => {
       })
     })
 
-    expect(view.host).toBe(host)
-    expect(Object.getPrototypeOf(view)).toBeNull()
-    expect(Object.isFrozen(view)).toBe(true)
-    expect(Object.isFrozen(view.extensions)).toBe(true)
+    expect(Object.isFrozen(handle)).toBe(true)
+    expect(Object.isFrozen(handle.extensions)).toBe(true)
     expect((host as unknown as Record<string, unknown>).invoke).toBeUndefined()
 
-    view.extensions.invoke()
+    const invoke = handle.extensions.invoke
+    invoke()
 
     /** Result of the logical revoke and cleanup transaction. */
-    const removal = await view.unUse('extension')
-    expect(removal.ok).toBe(true)
-    expect(removal.removed).toBe(true)
-    expect(() => view.extensions.invoke).toThrow(/view has been revoked/)
+    expect(await host.unUse('extension')).toEqual({ ok: true })
+    expect(() => invoke()).toThrowError(
+      expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
+    )
   })
 
   it('keeps operation and registration signals distinct', async () => {

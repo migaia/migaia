@@ -9,7 +9,7 @@ import {
 import { raceWithAsyncControl } from '../../src/internal/async-control.js'
 import { createEndpointTimePort } from '../../src/internal/time-port.js'
 import type { IWebRpcPluginConstraint } from '../../src/internal/plugin-contract.js'
-import { WebRpcSharedKey, type IWebRpcProtocolPort } from '../../src/internal/plugin-shared-keys.js'
+import { WebRpcPortName, type IWebRpcProtocolPort } from '../../src/internal/plugin-shared-keys.js'
 import {
   createWebRpcPluginHost,
   type IWebRpcPluginHost
@@ -48,17 +48,19 @@ describe('B12a WebRPC PluginHost shell', () => {
     const provider: IWebRpcPluginConstraint = {
       name: 'provider',
       install: (core) => {
+        core.publishPortFeatures({
+          [WebRpcPortName.protocol]: { get: () => protocolPort }
+        })
         core.onDispose(() => {
           disposed += 1
         })
         return {}
-      },
-      shared: () => ({ [WebRpcSharedKey.protocol]: protocolPort })
+      }
     }
     const consumer: IWebRpcPluginConstraint = {
       name: 'consumer',
       install: (core) => {
-        observed = core.getShared(WebRpcSharedKey.protocol)
+        observed = core.getPort(WebRpcPortName.protocol) as IWebRpcProtocolPort | undefined
         return {}
       }
     }
