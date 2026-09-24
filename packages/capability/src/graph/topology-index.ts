@@ -59,12 +59,94 @@ type IStoredTopologyNode = Readonly<{
   readonly dependencies: readonly ITopologyDependency[]
 }>
 
-type ITopologyIndexState = {
-  nodes: Map<string, IStoredTopologyNode>
-  consumers: Map<string, Set<string>>
-  nextOrdinal: number
-  visitedNodes: number
-  visitedEdges: number
+/** The keyed-store subset the index uses, satisfied by a `Map` and by a transaction overlay. */
+type IKeyedStore<K, V> = {
+  readonly size: number
+  get(key: K): V | undefined
+  has(key: K): boolean
+  set(key: K, value: V): unknown
+  delete(key: K): boolean
+  keys(): IterableIterator<K>
+  values(): IterableIterator<V>
+}
+
+/** Marks a key an overlay removed from its base store. */
+const REMOVED: unique symbol = Symbol('topology-index.removed')
+
+/**
+ * Copy-on-write view over a base store: reads fall through to the base, writes stay in the overlay.
+ * Opening it costs nothing and committing it costs the number of keys written, which keeps a
+ * transaction proportional to the change instead of to the whole index.
+ */
+class OverlayStore<K, V> implements IKeyedStore<K, V> {
+  /** Store observed until this overlay is committed; never written by the overlay. */
+  readonly #base: IKeyedStore<K, V>
+  /** Keys written in this overlay: a replacement value or the removal marker. */
+  readonly #own = new Map<K, V | typeof REMOVED>()
+  /** Merged-view size, maintained on every write so `size` stays O(1). */
+  #size: number
+
+  /** Wraps `base` without copying it. */
+  constructor(base: IKeyedStore<K, V>) {
+    this.#base = base
+    this.#size = base.size
+  }
+
+  /** Number of keys in the merged view. */
+  get size(): number {
+    return this.#size
+  }
+
+  /** Reads the overlay value, falling back to the base for untouched keys. */
+  get(key: K): V | undefined {
+    if (!this.#own.has(key)) return this.#base.get(key)
+    const own = this.#own.get(key)
+    return own === REMOVED ? undefined : own
+  }
+
+  /** Reports membership in the merged view. */
+  has(key: K): boolean {
+    if (this.#own.has(key)) return this.#own.get(key) !== REMOVED
+    return this.#base.has(key)
+  }
+
+  /** Whether `key` was written by this overlay (its value is not shared with the base). */
+  owns(key: K): boolean {
+    return this.#own.has(key) && this.#own.get(key) !== REMOVED
+  }
+
+  /** Writes one value into the overlay. */
+  set(key: K, value: V): this {
+    if (!this.has(key)) this.#size += 1
+    this.#own.set(key, value)
+    return this
+  }
+
+  /** Removes one key from the merged view. */
+  delete(key: K): boolean {
+    if (!this.has(key)) return false
+    this.#size -= 1
+    this.#own.set(key, REMOVED)
+    return true
+  }
+
+  /** Iterates merged keys: untouched base keys first, then keys the overlay added. */
+  *keys(): IterableIterator<K> {
+    for (const key of this.#base.keys()) if (this.has(key)) yield key
+    for (const [key, value] of this.#own) if (value !== REMOVED && !this.#base.has(key)) yield key
+  }
+
+  /** Iterates merged values in `keys()` order. */
+  *values(): IterableIterator<V> {
+    for (const key of this.keys()) yield this.get(key)!
+  }
+
+  /** Applies every overlay write to `target`; costs the number of written keys. */
+  applyTo(target: IKeyedStore<K, V>): void {
+    for (const [key, value] of this.#own)
+      if (value === REMOVED) target.delete(key)
+      else target.set(key, value)
+  }
 }
 
 /** Creates a mutation-incapable map facade over an immutable entry snapshot. */
@@ -146,29 +228,16 @@ function snapshotIndexNode(
   })
 }
 
-/** Clones mutable index state for one isolated transaction view. */
-function cloneState(state: ITopologyIndexState): ITopologyIndexState {
-  return {
-    nodes: new Map(state.nodes),
-    consumers: new Map(
-      [...state.consumers].map(([provider, consumers]) => [provider, new Set(consumers)])
-    ),
-    nextOrdinal: state.nextOrdinal,
-    visitedNodes: state.visitedNodes,
-    visitedEdges: state.visitedEdges
-  }
-}
-
 /** Mutable topology owner; all public values leave through frozen snapshots. */
 class TopologyIndex implements ITopologyIndex {
   /** Caller-owned error policy retained for structural failures. */
   readonly #adapter: ITopologyIndexAdapter
 
   /** Nodes indexed by stable ID, including monotonic ordinal and current level. */
-  #nodes: Map<string, IStoredTopologyNode>
+  readonly #nodes: IKeyedStore<string, IStoredTopologyNode>
 
   /** Reverse adjacency for present and dangling provider IDs. */
-  #consumers: Map<string, Set<string>>
+  readonly #consumers: IKeyedStore<string, Set<string>>
 
   /** Next monotonic registration ordinal; removals never reclaim it. */
   #nextOrdinal: number
@@ -182,14 +251,24 @@ class TopologyIndex implements ITopologyIndex {
   /** Whether one isolated transaction currently owns mutation authority. */
   #transactionOpen = false
 
-  /** Creates an empty index or an isolated transaction copy. */
-  constructor(adapter: ITopologyIndexAdapter, state?: ITopologyIndexState) {
-    this.#adapter = Object.freeze({ ...adapter })
-    this.#nodes = state?.nodes ?? new Map()
-    this.#consumers = state?.consumers ?? new Map()
-    this.#nextOrdinal = state?.nextOrdinal ?? 0
-    this.#visitedNodes = state?.visitedNodes ?? 0
-    this.#visitedEdges = state?.visitedEdges ?? 0
+  /**
+   * Counter values this view started from. A transaction view reports only its own visits on
+   * commit, so base reads made while the transaction was open are not overwritten.
+   */
+  readonly #visitBaseline: ITopologyIndexMetrics
+
+  /**
+   * Creates an empty index, or — given `parent` — a transaction working view whose stores overlay
+   * the parent's without copying them.
+   */
+  constructor(adapter: ITopologyIndexAdapter, parent?: TopologyIndex) {
+    this.#adapter = parent ? parent.#adapter : Object.freeze({ ...adapter })
+    this.#nodes = parent ? new OverlayStore(parent.#nodes) : new Map()
+    this.#consumers = parent ? new OverlayStore(parent.#consumers) : new Map()
+    this.#nextOrdinal = parent ? parent.#nextOrdinal : 0
+    this.#visitedNodes = parent ? parent.#visitedNodes : 0
+    this.#visitedEdges = parent ? parent.#visitedEdges : 0
+    this.#visitBaseline = { visitedNodes: this.#visitedNodes, visitedEdges: this.#visitedEdges }
   }
 
   /** Number of currently present nodes. */
@@ -416,42 +495,33 @@ class TopologyIndex implements ITopologyIndex {
     this.#recomputeLevels([node.id])
   }
 
-  /** Opens one isolated transaction while base readers retain pre-transaction state. */
+  /**
+   * Opens one isolated transaction while base readers retain pre-transaction state. Opening costs
+   * O(1); commit costs the keys the transaction wrote; rollback drops the overlay.
+   */
   begin(): ITopologyTransaction {
     if (this.#transactionOpen) this.#adapter.onInvalid(TopologyInvalidReason.transactionOpen)
     this.#transactionOpen = true
-    return new TopologyTransaction(this, new TopologyIndex(this.#adapter, this.copyState()))
+    /** Working view whose stores overlay this index. */
+    const working = new TopologyIndex(this.#adapter, this)
+    return new TopologyTransaction(
+      working,
+      () => this.#adopt(working),
+      () => {
+        this.#transactionOpen = false
+      },
+      () => this.#adapter.onInvalid(TopologyInvalidReason.transactionClosed)
+    )
   }
 
-  /** Copies internal state for an isolated transaction or atomic commit. */
-  copyState(): ITopologyIndexState {
-    return cloneState({
-      nodes: this.#nodes,
-      consumers: this.#consumers,
-      nextOrdinal: this.#nextOrdinal,
-      visitedNodes: this.#visitedNodes,
-      visitedEdges: this.#visitedEdges
-    })
-  }
-
-  /** Atomically adopts committed state and releases transaction ownership. */
-  commitState(state: ITopologyIndexState): void {
-    this.#nodes = state.nodes
-    this.#consumers = state.consumers
-    this.#nextOrdinal = state.nextOrdinal
-    this.#visitedNodes = state.visitedNodes
-    this.#visitedEdges = state.visitedEdges
+  /** Applies a transaction view's overlay writes and its own visit counts, then releases ownership. */
+  #adopt(working: TopologyIndex): void {
+    ;(working.#nodes as OverlayStore<string, IStoredTopologyNode>).applyTo(this.#nodes)
+    ;(working.#consumers as OverlayStore<string, Set<string>>).applyTo(this.#consumers)
+    this.#nextOrdinal = working.#nextOrdinal
+    this.#visitedNodes += working.#visitedNodes - working.#visitBaseline.visitedNodes
+    this.#visitedEdges += working.#visitedEdges - working.#visitBaseline.visitedEdges
     this.#transactionOpen = false
-  }
-
-  /** Releases transaction ownership without changing base state. */
-  rollbackState(): void {
-    this.#transactionOpen = false
-  }
-
-  /** Routes settled-transaction use through the caller-owned invalid-state adapter. */
-  rejectClosedTransaction(): never {
-    return this.#adapter.onInvalid(TopologyInvalidReason.transactionClosed)
   }
 
   /** Rejects base mutation while a transaction owns the writer. */
@@ -466,16 +536,30 @@ class TopologyIndex implements ITopologyIndex {
     return node
   }
 
+  /**
+   * Returns the consumer set of `provider` that this view may mutate. In a transaction view a set
+   * still shared with the base is copied first, so base readers never observe transaction edges.
+   */
+  #writableConsumers(provider: string): Set<string> | undefined {
+    const consumers = this.#consumers.get(provider)
+    if (!consumers || !(this.#consumers instanceof OverlayStore) || this.#consumers.owns(provider))
+      return consumers
+    /** Transaction-owned copy of a base bucket. */
+    const copy = new Set(consumers)
+    this.#consumers.set(provider, copy)
+    return copy
+  }
+
   /** Adds one reverse edge without disturbing an existing consumer's ordinal semantics. */
   #addReverseEdge(provider: string, consumer: string): void {
-    const consumers = this.#consumers.get(provider)
+    const consumers = this.#writableConsumers(provider)
     if (consumers) consumers.add(consumer)
     else this.#consumers.set(provider, new Set([consumer]))
   }
 
   /** Removes one reverse edge and prunes empty provider buckets. */
   #removeReverseEdge(provider: string, consumer: string): void {
-    const consumers = this.#consumers.get(provider)
+    const consumers = this.#writableConsumers(provider)
     if (!consumers) return
     consumers.delete(consumer)
     if (consumers.size === 0) this.#consumers.delete(provider)
@@ -573,19 +657,35 @@ class TopologyIndex implements ITopologyIndex {
 
 /** Transaction facade that invalidates every operation after settlement. */
 class TopologyTransaction implements ITopologyTransaction {
-  /** Parent index receiving committed state and retaining pre-transaction reads. */
-  readonly #parent: TopologyIndex
-
-  /** Isolated mutable index used by transaction reads and writes. */
+  /** Overlay index used by transaction reads and writes. */
   readonly #working: TopologyIndex
+
+  /** Parent-owned commit: applies the overlay and releases the parent's writer. */
+  readonly #commit: () => void
+
+  /** Parent-owned rollback: releases the parent's writer and drops the overlay. */
+  readonly #rollback: () => void
+
+  /** Parent-owned rejection for any use after settlement. */
+  readonly #rejectClosed: () => never
 
   /** Whether commit or rollback has permanently settled this transaction. */
   #closed = false
 
-  /** Creates a transaction over one isolated working index. */
-  constructor(parent: TopologyIndex, working: TopologyIndex) {
-    this.#parent = parent
+  /**
+   * Creates a transaction over one overlay view. The parent passes its authority as closures, so no
+   * commit or rollback entry point exists on the index object itself.
+   */
+  constructor(
+    working: TopologyIndex,
+    commit: () => void,
+    rollback: () => void,
+    rejectClosed: () => never
+  ) {
     this.#working = working
+    this.#commit = commit
+    this.#rollback = rollback
+    this.#rejectClosed = rejectClosed
   }
 
   /** Number of nodes in the transaction view. */
@@ -663,20 +763,20 @@ class TopologyTransaction implements ITopologyTransaction {
   /** Publishes all isolated changes atomically and closes the transaction. */
   commit(): void {
     this.#assertOpen()
-    this.#parent.commitState(this.#working.copyState())
+    this.#commit()
     this.#closed = true
   }
 
   /** Discards all isolated changes and closes the transaction. */
   rollback(): void {
     this.#assertOpen()
-    this.#parent.rollbackState()
+    this.#rollback()
     this.#closed = true
   }
 
   /** Rejects every operation after transaction settlement. */
   #assertOpen(): void {
-    if (this.#closed) this.#parent.rejectClosedTransaction()
+    if (this.#closed) this.#rejectClosed()
   }
 }
 

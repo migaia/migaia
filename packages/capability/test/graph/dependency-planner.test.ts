@@ -244,4 +244,32 @@ describe('dependency planner', () => {
     }).toThrow(TypeError)
     expect(projectSnapshot(index.snapshot())).toEqual(before)
   })
+
+  it('A7 plans a leaf mutation without reading nodes outside its neighbourhood', () => {
+    /** Metric deltas of one leaf plan per background size. */
+    const deltas: Array<readonly [number, number]> = []
+    for (const background of [1_000, 8_000]) {
+      const index = createTestIndex()
+      index.add({ id: 'p', dependencies: [] })
+      index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+      index.add({ id: 'c', dependencies: [{ provider: 'p', required: false }] })
+      for (let position = 0; position < background; position += 1)
+        index.add({ id: `unrelated-${position}`, dependencies: [] })
+      const before = index.metrics()
+      const plan = planDependencyMutation(index, statuses({}), {
+        roots: ['a'],
+        kind: DependencyMutationKind.remove,
+        policy: DependencyPolicy.cascade
+      })
+      const after = index.metrics()
+      expect(plan.order).toEqual(['a'])
+      deltas.push([
+        after.visitedNodes - before.visitedNodes,
+        after.visitedEdges - before.visitedEdges
+      ])
+    }
+    // An O(nodes) edge scan would grow with the background; the neighbourhood read does not.
+    expect(deltas[1]).toEqual(deltas[0])
+    expect(deltas[0]![0]).toBeLessThanOrEqual(8)
+  })
 })

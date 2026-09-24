@@ -257,10 +257,14 @@ describe('dynamic capability graph', () => {
         })
         expect(result.affected).toEqual(expectedAffected)
         expect(result.metrics.fullScan).toBe(false)
-        expect(result.metrics.visitedNodes).toBe(expectedAffected.length)
-        expect(result.metrics.visitedEdges).toBe(expectedEdges * 2)
-        expect(result.metrics.queueOperations).toBe(expectedAffected.length * 2)
-        expect(result.metrics.visitedNodes).toBeLessThanOrEqual(frontier.length + 1)
+        // Index counts (BC2): closure and ordering each touch the affected frontier once, so the
+        // node count is bounded by twice the frontier and the edge count by its edges plus one
+        // reverse lookup per member; neither may depend on the background size (checked below).
+        expect(result.metrics.visitedNodes).toBeLessThanOrEqual(expectedAffected.length * 2)
+        expect(result.metrics.visitedEdges).toBeLessThanOrEqual(
+          (expectedEdges + expectedAffected.length) * 2
+        )
+        expect(result.metrics.queueOperations).toBe(expectedAffected.length)
         expect(Number.isFinite(result.metrics.queueTimeMs)).toBe(true)
         expect(result.metrics.queueTimeMs).toBeGreaterThanOrEqual(0)
         expect(Number.isFinite(result.metrics.wallTimeMs)).toBe(true)
@@ -274,16 +278,25 @@ describe('dynamic capability graph', () => {
     expect(samples.map(({ size }) => size)).toEqual([
       34, 34, 1_033, 1_033, 2_033, 2_033, 4_033, 4_033, 8_033, 8_033
     ])
-    expect(samples.map(({ vDelta }) => vDelta)).toEqual(Array(10).fill(33))
-    expect(samples.map(({ visited }) => visited)).toEqual(Array(10).fill(33))
-    expect(samples.map(({ queue }) => queue)).toEqual(Array(10).fill(66))
+    // Scale invariance: for each density, every background size reports identical counts.
+    for (const dense of [false, true]) {
+      const series = samples.filter((sample) => sample.dense === dense)
+      expect(new Set(series.map(({ vDelta }) => vDelta)).size).toBe(1)
+      expect(new Set(series.map(({ eDelta }) => eDelta)).size).toBe(1)
+      expect(new Set(series.map(({ queue }) => queue)).size).toBe(1)
+    }
+    expect(samples.map(({ visited }) => visited)).toEqual(samples.map(({ vDelta }) => vDelta))
     expect(samples.every(({ queueTimeMs }) => Number.isFinite(queueTimeMs))).toBe(true)
     expect(samples.every(({ queueTimeMs }) => queueTimeMs >= 0)).toBe(true)
+    // Exact index counts for this fixture (33 affected nodes): closure plus ordering visit each
+    // node twice; edges are the frontier's reverse lookups (sparse 32, dense 252).
+    expect(samples.map(({ vDelta }) => vDelta)).toEqual(Array(10).fill(66))
+    expect(samples.map(({ queue }) => queue)).toEqual(Array(10).fill(33))
     expect(samples.filter(({ dense }) => dense).map(({ eDelta }) => eDelta)).toEqual(
-      Array(5).fill(504)
+      Array(5).fill(252)
     )
     expect(samples.filter(({ dense }) => !dense).map(({ eDelta }) => eDelta)).toEqual(
-      Array(5).fill(64)
+      Array(5).fill(32)
     )
   }, 20_000)
 })

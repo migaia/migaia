@@ -311,4 +311,63 @@ describe('incremental topology index', () => {
     )
     expect(existing.dependencies('p')).toEqual([])
   })
+
+  it('A4 keeps base buckets untouched while a transaction rewires a shared provider', () => {
+    const index = createTestIndex()
+    index.add({ id: 'p', dependencies: [] })
+    index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+    const transaction = index.begin()
+    transaction.add({ id: 'b', dependencies: [{ provider: 'p', required: true }] })
+    transaction.remove('a')
+    // The base still reads its own bucket for p while the transaction owns a copy.
+    expect(index.dependents('p').required).toEqual(['a'])
+    expect(transaction.dependents('p').required).toEqual(['b'])
+    transaction.rollback()
+    expect(index.dependents('p').required).toEqual(['a'])
+    const second = index.begin()
+    second.add({ id: 'b', dependencies: [{ provider: 'p', required: true }] })
+    second.commit()
+    expect(index.dependents('p').required).toEqual(['a', 'b'])
+    expect(index.order()).toEqual(['p', 'a', 'b'])
+  })
+
+  it('A4 keeps base read visits made while a transaction is open after commit', () => {
+    const index = createTestIndex()
+    index.add({ id: 'p', dependencies: [] })
+    const transaction = index.begin()
+    const beforeRead = index.metrics()
+    index.order()
+    const afterRead = index.metrics()
+    transaction.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+    const transactionOwn = transaction.metrics()
+    transaction.commit()
+    // Base reads during the transaction plus the transaction's own visits, neither overwriting the other.
+    expect(index.metrics().visitedNodes).toBe(
+      afterRead.visitedNodes + (transactionOwn.visitedNodes - beforeRead.visitedNodes)
+    )
+    expect(afterRead.visitedNodes).toBeGreaterThan(beforeRead.visitedNodes)
+  })
+
+  it('A4 opens and rolls back a transaction without copying the index', () => {
+    /** Median wall time of begin() plus one add and rollback() for one index size. */
+    const measure = (size: number): number => {
+      const index = createTestIndex()
+      for (let position = 0; position < size; position += 1)
+        index.add({ id: `n-${position}`, dependencies: [] })
+      const samples: number[] = []
+      for (let round = 0; round < 15; round += 1) {
+        const started = performance.now()
+        const transaction = index.begin()
+        transaction.add({ id: 'probe', dependencies: [{ provider: 'n-0', required: true }] })
+        transaction.rollback()
+        samples.push(performance.now() - started)
+      }
+      return samples.sort((left, right) => left - right)[7]!
+    }
+    const small = measure(200)
+    const large = measure(50_000)
+    // Copying the stores would make the large case roughly 250 times slower; an overlay keeps it
+    // flat. The generous bound absorbs timer noise without admitting an O(nodes) copy.
+    expect(large).toBeLessThan(Math.max(small, 0.05) * 25)
+  })
 })
