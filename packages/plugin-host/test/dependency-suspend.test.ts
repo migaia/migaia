@@ -1,12 +1,34 @@
 import { describe, expect, it, vi } from 'vitest'
+import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
 
 /** A4, A5, A6 and A7 cover suspended access, recovery, failure containment and teardown. */
+type IRecoveryDiagnostic = { code?: string; error?: unknown }
+
 /** Sync pipeline host used to observe suspended-stage exclusion. */
 class SuspendHost extends PluginHost<Record<string, never>, number> {
   run(value: number): number {
     let result = value
     this.runPipeline(value, (next) => {
+      result = next
+    })
+    return result
+  }
+}
+
+/** Async pipeline host used by the program-level recovery integration acceptance. */
+class RecoveryHost extends PluginHost<Record<string, never>, number> {
+  constructor(diagnostics: IRecoveryDiagnostic[]) {
+    super({
+      execution,
+      pipeline: { mode: MiddlewarePipelineMode.async },
+      diagnostic: (_message, code, error) => diagnostics.push({ code, error })
+    })
+  }
+
+  async run(value: number): Promise<number> {
+    let result = value
+    await this.runPipeline(value, (next) => {
       result = next
     })
     return result
@@ -177,11 +199,9 @@ describe('dependency suspension and recovery', () => {
   })
 
   it('uses the upstream resume plan after a provider generation changes', async () => {
-    const diagnostics: Array<{ code?: string; error?: unknown }> = []
-    const host = new PluginHost<Record<string, never>>({
-      execution,
-      diagnostic: (_message, code, error) => diagnostics.push({ code, error })
-    })
+    const diagnostics: IRecoveryDiagnostic[] = []
+    const stages: string[] = []
+    const host = new RecoveryHost(diagnostics)
     const pValue = defineFeature(() => ({ value: 1 }))
     const p = definePlugin({ name: 'p', features: { value: pValue }, install: () => ({}) })
     const hook = vi.fn()
@@ -196,8 +216,12 @@ describe('dependency suspension and recovery', () => {
         })
       },
       onDependencyReplaced: hook,
-      install: () => {
+      install: (core: any) => {
         installs.a += 1
+        core.usePipeline((value: number, next: (value: number) => void) => {
+          stages.push('a')
+          next(value + 1)
+        })
         return {}
       },
       dispose: disposeA
@@ -209,8 +233,12 @@ describe('dependency suspension and recovery', () => {
           a: a.getFeature('value')
         })
       },
-      install: () => {
+      install: (core: any) => {
         installs.b += 1
+        core.usePipeline((value: number, next: (value: number) => void) => {
+          stages.push('b')
+          next(value * 2)
+        })
         return {}
       },
       dispose: disposeB
@@ -230,6 +258,8 @@ describe('dependency suspension and recovery', () => {
     expect(disposeB).not.toHaveBeenCalled()
     expect(handleA.name).toBe('a')
     expect(handleB.name).toBe('b')
+    await expect(host.run(1)).resolves.toBe(4)
+    expect(stages).toEqual(['a', 'b'])
     expect(diagnostics).toEqual([])
     await host.dispose()
   })
