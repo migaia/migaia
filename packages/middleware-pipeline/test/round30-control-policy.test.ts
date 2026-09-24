@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runAsyncMiddleware } from '../src/index.js'
+import { runAsyncForTest } from './pipeline-test-helpers.js'
 
 describe('Round30 active-control policy', () => {
   it('keeps caught-and-rethrown active control exact and uncombined', async () => {
@@ -12,7 +12,7 @@ describe('Round30 active-control policy', () => {
 
     // `await next()` propagation and catch/rethrow of the same value are observationally
     // equivalent to the runner; preserve exact active control instead of guessing provenance.
-    const run = runAsyncMiddleware(
+    const run = runAsyncForTest(
       [
         async (_value: number, next: (value: number) => Promise<void>) => {
           try {

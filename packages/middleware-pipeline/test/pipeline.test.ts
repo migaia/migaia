@@ -5,15 +5,17 @@ import {
   GENERATOR_UNDEFINED,
   MIDDLEWARE_PIPELINE_SOURCE,
   MiddlewarePipelineErrorCode,
-  adaptSyncStageToAsync,
-  adaptSyncStageToGenerator,
-  runAsyncMiddleware,
-  runGeneratorMiddleware,
-  runSyncMiddleware,
   type IAsyncMiddlewareStage,
   type IGeneratorMiddlewareStage,
   type ISyncMiddlewareStage
 } from '../src/index.js'
+import {
+  liftSyncToAsyncForTest,
+  liftSyncToGeneratorForTest,
+  runAsyncForTest,
+  runGeneratorForTest,
+  runSyncForTest
+} from './pipeline-test-helpers.js'
 
 /** Minimal process surface used to assert that downstream rejection is owned immediately. */
 type IRejectionHost = {
@@ -51,7 +53,7 @@ const assertNestedControlDoesNotEraseStageError = async (
     const inner: IAsyncMiddlewareStage<number> = async () => {
       if (guard === 'post-stage') active = false
     }
-    const run = runAsyncMiddleware([outer, middle, inner], 1, () => undefined, {
+    const run = runAsyncForTest([outer, middle, inner], 1, () => undefined, {
       onViolation: () => undefined,
       assertActive: () => {
         if (!active) throw activeError
@@ -105,7 +107,7 @@ describe('runSyncMiddleware', () => {
       }
     )
     const values: number[] = []
-    runSyncMiddleware(
+    runSyncForTest(
       stages,
       1,
       (value) => values.push(value),
@@ -123,7 +125,7 @@ describe('runSyncMiddleware', () => {
 
   it('short-circuits when a stage does not call next', () => {
     const values: number[] = []
-    runSyncMiddleware(
+    runSyncForTest(
       [(value) => value],
       1,
       (value) => values.push(value),
@@ -136,7 +138,7 @@ describe('runSyncMiddleware', () => {
     const violations: string[] = []
     let lateNext!: (value: number) => void
     const values: number[] = []
-    runSyncMiddleware(
+    runSyncForTest(
       [
         (_value, next) => {
           next(2)
@@ -157,7 +159,7 @@ describe('runSyncMiddleware', () => {
 describe('runAsyncMiddleware', () => {
   it('enters shallow downstream synchronously while preserving the returned Promise', () => {
     const trace: string[] = []
-    const run = runAsyncMiddleware(
+    const run = runAsyncForTest(
       [
         (value, next) => {
           trace.push(`outer:${value}`)
@@ -188,7 +190,7 @@ describe('runAsyncMiddleware', () => {
       () => (value, next) => next(value + 1)
     )
     let result = 0
-    await runAsyncMiddleware(
+    await runAsyncForTest(
       stages,
       0,
       (value) => {
@@ -223,7 +225,7 @@ describe('runAsyncMiddleware', () => {
     const downstreamError = new Error('downstream exact failure')
     rejectionHost.on('unhandledRejection', onUnhandled)
     try {
-      const run = runAsyncMiddleware(
+      const run = runAsyncForTest(
         [
           async (_value, next) => {
             void next(2)
@@ -277,7 +279,7 @@ describe('runAsyncMiddleware', () => {
     )
 
     let result = 0
-    const run = runAsyncMiddleware(
+    const run = runAsyncForTest(
       stages,
       1,
       (value) => {
@@ -310,7 +312,7 @@ describe('runAsyncMiddleware', () => {
       () => (value: number, next: (nextValue: number) => Promise<void>) => next(value + 1)
     )
     let result = 0
-    await runAsyncMiddleware(
+    await runAsyncForTest(
       stages,
       0,
       (value) => {
@@ -324,7 +326,7 @@ describe('runAsyncMiddleware', () => {
   it('combines upstream and downstream failures through the injected policy', async () => {
     const combinations: unknown[][] = []
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             void next(2)
@@ -366,7 +368,7 @@ describe('runAsyncMiddleware', () => {
         }
       }
       await expect(
-        runAsyncMiddleware([stage, async () => Promise.reject(sharedError)], 1, () => undefined, {
+        runAsyncForTest([stage, async () => Promise.reject(sharedError)], 1, () => undefined, {
           onViolation: () => undefined,
           combineStageAndDownstreamError: (stageError, downstreamError) => {
             combinations.push([stageError, downstreamError])
@@ -383,7 +385,7 @@ describe('runAsyncMiddleware', () => {
     const downstreamError = new Error('handled downstream failure')
     const combinations: unknown[][] = []
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             await next(2).catch(() => undefined)
@@ -429,7 +431,7 @@ describe('runAsyncMiddleware', () => {
         return result.finally(() => undefined)
       }
       await expect(
-        runAsyncMiddleware([stage, async () => Promise.reject(sharedError)], 1, () => undefined, {
+        runAsyncForTest([stage, async () => Promise.reject(sharedError)], 1, () => undefined, {
           onViolation: () => undefined,
           combineStageAndDownstreamError: (stageError, downstreamError) => {
             combinations.push([stageError, downstreamError])
@@ -453,7 +455,7 @@ describe('runAsyncMiddleware', () => {
       return result
     }
     await expect(
-      runAsyncMiddleware([stage, async () => Promise.reject(sharedError)], 1, () => undefined, {
+      runAsyncForTest([stage, async () => Promise.reject(sharedError)], 1, () => undefined, {
         onViolation: () => undefined,
         combineStageAndDownstreamError: (stageError, downstreamError) => {
           combinations.push([stageError, downstreamError])
@@ -468,7 +470,7 @@ describe('runAsyncMiddleware', () => {
     const stageError = new Error('stage failure')
     const downstreamError = new Error('downstream failure')
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             void next(2)
@@ -497,7 +499,7 @@ describe('runAsyncMiddleware', () => {
       throw stageError
     }
     await expect(
-      runAsyncMiddleware([stage, async () => Promise.reject(downstreamError)], 1, () => undefined, {
+      runAsyncForTest([stage, async () => Promise.reject(downstreamError)], 1, () => undefined, {
         onViolation: () => undefined,
         combineStageAndDownstreamError: (upstream, downstream) => {
           combinations.push([upstream, downstream])
@@ -511,7 +513,7 @@ describe('runAsyncMiddleware', () => {
   it('combines independent equal primitive failures instead of deduplicating by value', async () => {
     const combinations: unknown[][] = []
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             void next(2)
@@ -537,7 +539,7 @@ describe('runAsyncMiddleware', () => {
     const violations: string[] = []
     let downstreamRuns = 0
     let lateNext!: (value: number) => Promise<void>
-    await runAsyncMiddleware(
+    await runAsyncForTest(
       [
         async (value, next) => {
           lateNext = next
@@ -560,7 +562,7 @@ describe('runAsyncMiddleware', () => {
   it('codes the default aggregate while preserving both original failures', async () => {
     const stageError = new Error('default upstream')
     const downstreamError = new Error('default downstream')
-    const rejected = runAsyncMiddleware(
+    const rejected = runAsyncForTest(
       [
         async (_value, next) => {
           void next(2)
@@ -589,7 +591,7 @@ describe('runAsyncMiddleware', () => {
 
   it('preserves undefined throws and rejections as failures', async () => {
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async () => {
             throw undefined
@@ -603,7 +605,7 @@ describe('runAsyncMiddleware', () => {
       )
     ).rejects.toBeUndefined()
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             void next(2)
@@ -622,7 +624,7 @@ describe('runAsyncMiddleware', () => {
     const activeError = new Error('host is closing')
     let active = true
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async () => {
             active = false
@@ -647,7 +649,7 @@ describe('runAsyncMiddleware', () => {
     let active = true
     let activeChecks = 0
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             active = false
@@ -678,7 +680,7 @@ describe('runAsyncMiddleware', () => {
     let active = true
     let activeChecks = 0
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             active = false
@@ -711,7 +713,7 @@ describe('runAsyncMiddleware', () => {
     const activeError = new Error('host is closing')
     let active = true
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async () => {
             active = false
@@ -741,7 +743,7 @@ describe('runAsyncMiddleware', () => {
         else return downstream
       }
       await expect(
-        runAsyncMiddleware(
+        runAsyncForTest(
           [
             stage,
             async () => {
@@ -787,7 +789,7 @@ describe('runAsyncMiddleware', () => {
         code: 'PIPELINE_FAILED'
       }
       await expect(
-        runAsyncMiddleware([stage, async () => undefined], 1, () => undefined, {
+        runAsyncForTest([stage, async () => undefined], 1, () => undefined, {
           onViolation: () => undefined,
           assertActive: () => {
             if (!active) throw activeError
@@ -811,7 +813,7 @@ describe('runAsyncMiddleware', () => {
     const combinations: unknown[][] = []
     let active = true
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             await next(2)
@@ -846,7 +848,7 @@ describe('runAsyncMiddleware', () => {
     const combinations: unknown[][] = []
     let active = true
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             void next(2)
@@ -878,7 +880,7 @@ describe('runAsyncMiddleware', () => {
     let active = true
     let doneCalled = false
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [async (value, next) => next(value + 1)],
         1,
         () => {
@@ -900,7 +902,7 @@ describe('runAsyncMiddleware', () => {
     let active = true
     const activeError = new Error('inactive')
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value) => {
             active = false
@@ -920,7 +922,7 @@ describe('runAsyncMiddleware', () => {
 
   it('runs the completion callback for an empty stage list', async () => {
     const values: number[] = []
-    await runAsyncMiddleware(
+    await runAsyncForTest(
       [],
       3,
       (value) => {
@@ -932,11 +934,11 @@ describe('runAsyncMiddleware', () => {
   })
 })
 
-describe('adaptSyncStageToAsync', () => {
+describe('liftSyncToAsyncForTest', () => {
   it('reports duplicate next and starts only the first downstream', async () => {
     const violations: string[] = []
     let downstreamRuns = 0
-    const adapted = adaptSyncStageToAsync(
+    const adapted = liftSyncToAsyncForTest(
       (_, next: (value: number) => void) => {
         next(2)
         next(3)
@@ -955,7 +957,7 @@ describe('adaptSyncStageToAsync', () => {
     const violations: string[] = []
     let storedNext!: (value: number) => void
     let downstreamRuns = 0
-    const adapted = adaptSyncStageToAsync(
+    const adapted = liftSyncToAsyncForTest(
       (_value, next: (value: number) => void) => {
         storedNext = next
       },
@@ -972,7 +974,7 @@ describe('adaptSyncStageToAsync', () => {
   })
 
   it('observes the first downstream rejection', async () => {
-    const adapted = adaptSyncStageToAsync((_value, next: (value: number) => void) => {
+    const adapted = liftSyncToAsyncForTest((_value, next: (value: number) => void) => {
       next(2)
       next(3)
     })
@@ -982,11 +984,11 @@ describe('adaptSyncStageToAsync', () => {
   })
 })
 
-describe('adaptSyncStageToGenerator', () => {
+describe('liftSyncToGeneratorForTest', () => {
   it('converts next into a yielded value and reports duplicate/late calls', () => {
     const violations: string[] = []
     let lateNext!: (value: number) => void
-    const adapted = adaptSyncStageToGenerator(
+    const adapted = liftSyncToGeneratorForTest(
       (_value, next) => {
         lateNext = next
         next(2)
@@ -1036,7 +1038,7 @@ describe('runGeneratorMiddleware', () => {
     )
     const values: number[] = []
 
-    runGeneratorMiddleware(stages, 1, (value) => values.push(value))
+    runGeneratorForTest(stages, 1, (value) => values.push(value))
 
     expect(values).toEqual([4])
     expect(originalSecondCalls).toBe(1)
@@ -1047,7 +1049,7 @@ describe('runGeneratorMiddleware', () => {
 
   it('uses final return value and last yield fallback', () => {
     const values: number[] = []
-    runGeneratorMiddleware<number>(
+    runGeneratorForTest<number>(
       [
         function* (value) {
           yield value + 1
@@ -1066,7 +1068,7 @@ describe('runGeneratorMiddleware', () => {
 
   it('supports explicit undefined and halt after yielding', () => {
     const undefinedValues: unknown[] = []
-    runGeneratorMiddleware<string | undefined>(
+    runGeneratorForTest<string | undefined>(
       [
         function* () {
           return GENERATOR_UNDEFINED
@@ -1077,7 +1079,7 @@ describe('runGeneratorMiddleware', () => {
     )
     expect(undefinedValues).toEqual([undefined])
     const halted: number[] = []
-    runGeneratorMiddleware(
+    runGeneratorForTest(
       [
         function* () {
           yield 2
@@ -1093,7 +1095,7 @@ describe('runGeneratorMiddleware', () => {
   it('accepts host-owned sentinel identities for compatibility wrappers', () => {
     const hostContinue = Symbol('host.continue')
     const values: number[] = []
-    runGeneratorMiddleware(
+    runGeneratorForTest(
       [
         function* (value) {
           yield value + 1
@@ -1115,7 +1117,7 @@ it('standalone adapter observes downstream failure but preserves stage error ide
   const stage = new Error('stage')
   const downstream = new Error('downstream')
   await expect(
-    adaptSyncStageToAsync((value, next) => {
+    liftSyncToAsyncForTest((value, next) => {
       next(value)
       throw stage
     })(1, async () => Promise.reject(downstream))
@@ -1126,13 +1128,13 @@ it('runner combines adapted stage and downstream failures exactly once', async (
   const stage = new Error('stage')
   const downstream = new Error('downstream')
   const combinations: unknown[][] = []
-  const adapted = adaptSyncStageToAsync((value, next) => {
+  const adapted = liftSyncToAsyncForTest((value, next) => {
     next(value)
     throw stage
   })
   const combined = new Error('combined')
   await expect(
-    runAsyncMiddleware(
+    runAsyncForTest(
       [adapted],
       1,
       () => {

@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  adaptGeneratorStageToAsyncGenerator,
-  adaptSyncStageToAsyncGenerator,
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
   GENERATOR_UNDEFINED,
-  MiddlewarePipelineMode,
-  runAsyncGeneratorMiddleware
+  MiddlewarePipelineMode
 } from '../src/index.js'
 import type { IAsyncGeneratorMiddlewareStage, IMiddlewarePipelineMode } from '../src/index.js'
+import {
+  liftGeneratorToAsyncGeneratorForTest,
+  liftSyncToAsyncGeneratorForTest,
+  runAsyncGeneratorForTest
+} from './pipeline-test-helpers.js'
 
 describe('runAsyncGeneratorMiddleware', () => {
   it('exports the additive async-generator mode without changing existing identities', () => {
@@ -41,7 +43,7 @@ describe('runAsyncGeneratorMiddleware', () => {
       return value * 2
     }
 
-    await runAsyncGeneratorMiddleware([first, second], 1, async (value) => {
+    await runAsyncGeneratorForTest([first, second], 1, async (value) => {
       events.push(`done:${value}:start`)
       await Promise.resolve()
       events.push('done:end')
@@ -60,7 +62,7 @@ describe('runAsyncGeneratorMiddleware', () => {
   it('supports zero-yield CONTINUE and ordinary terminal values', async () => {
     /** Values delivered after zero-yield continuation and a normal return. */
     const values: number[] = []
-    await runAsyncGeneratorMiddleware<number>(
+    await runAsyncGeneratorForTest<number>(
       [
         async function* () {
           return GENERATOR_CONTINUE
@@ -80,7 +82,7 @@ describe('runAsyncGeneratorMiddleware', () => {
   it('distinguishes HALT, implicit return, and an explicit undefined payload', async () => {
     /** Done values across three independent terminal-signal executions. */
     const values: (string | undefined)[] = []
-    await runAsyncGeneratorMiddleware<string>(
+    await runAsyncGeneratorForTest<string>(
       [
         async function* () {
           return GENERATOR_HALT
@@ -91,7 +93,7 @@ describe('runAsyncGeneratorMiddleware', () => {
         values.push(value)
       }
     )
-    await runAsyncGeneratorMiddleware<string>(
+    await runAsyncGeneratorForTest<string>(
       [
         async function* () {
           return undefined
@@ -102,7 +104,7 @@ describe('runAsyncGeneratorMiddleware', () => {
         values.push(value)
       }
     )
-    await runAsyncGeneratorMiddleware<string | undefined>(
+    await runAsyncGeneratorForTest<string | undefined>(
       [
         async function* () {
           return GENERATOR_UNDEFINED
@@ -125,7 +127,7 @@ describe('runAsyncGeneratorMiddleware', () => {
     }
     /** Final value selected through the host-owned continue signal. */
     const values: (number | symbol)[] = []
-    await runAsyncGeneratorMiddleware<number | symbol>(
+    await runAsyncGeneratorForTest<number | symbol>(
       [
         async function* (value) {
           yield (value as number) + 1
@@ -175,7 +177,7 @@ describe('runAsyncGeneratorMiddleware', () => {
     }
     stages.push(first, second, third)
 
-    await runAsyncGeneratorMiddleware(stages, 0, (value) => {
+    await runAsyncGeneratorForTest(stages, 0, (value) => {
       calls.push(`done:${value}`)
     })
 
@@ -201,11 +203,11 @@ describe('runAsyncGeneratorMiddleware', () => {
     /** Downstream observation must remain empty after iterator rejection. */
     const downstream: number[] = []
 
-    await expect(runAsyncGeneratorMiddleware([factoryFailure], 1, () => undefined)).rejects.toBe(
+    await expect(runAsyncGeneratorForTest([factoryFailure], 1, () => undefined)).rejects.toBe(
       factoryError
     )
     await expect(
-      runAsyncGeneratorMiddleware(
+      runAsyncGeneratorForTest(
         [
           iteratorFailure,
           async function* (value) {
@@ -218,7 +220,7 @@ describe('runAsyncGeneratorMiddleware', () => {
       )
     ).rejects.toBe(iteratorError)
     await expect(
-      runAsyncGeneratorMiddleware([], 1, () => {
+      runAsyncGeneratorForTest([], 1, () => {
         throw doneError
       })
     ).rejects.toBe(doneError)
@@ -239,7 +241,7 @@ describe('async-generator adapters', () => {
     }
     /** Values delivered by the promoted stage. */
     const values: number[] = []
-    await runAsyncGeneratorMiddleware([adaptGeneratorStageToAsyncGenerator(stage)], 1, (value) => {
+    await runAsyncGeneratorForTest([liftGeneratorToAsyncGeneratorForTest(stage)], 1, (value) => {
       values.push(value)
     })
     expect(values).toEqual([3])
@@ -247,9 +249,9 @@ describe('async-generator adapters', () => {
 
     /** Terminal outcomes delivered across ordinary, halt, and undefined promotion paths. */
     const terminalValues: (number | undefined)[] = []
-    await runAsyncGeneratorMiddleware(
+    await runAsyncGeneratorForTest(
       [
-        adaptGeneratorStageToAsyncGenerator<number>(function* () {
+        liftGeneratorToAsyncGeneratorForTest<number>(function* () {
           return 4
         })
       ],
@@ -258,9 +260,9 @@ describe('async-generator adapters', () => {
         terminalValues.push(value)
       }
     )
-    await runAsyncGeneratorMiddleware(
+    await runAsyncGeneratorForTest(
       [
-        adaptGeneratorStageToAsyncGenerator<number>(function* () {
+        liftGeneratorToAsyncGeneratorForTest<number>(function* () {
           return GENERATOR_HALT
         })
       ],
@@ -269,9 +271,9 @@ describe('async-generator adapters', () => {
         terminalValues.push(value)
       }
     )
-    await runAsyncGeneratorMiddleware<number | undefined>(
+    await runAsyncGeneratorForTest<number | undefined>(
       [
-        adaptGeneratorStageToAsyncGenerator<number | undefined>(function* () {
+        liftGeneratorToAsyncGeneratorForTest<number | undefined>(function* () {
           return GENERATOR_UNDEFINED
         })
       ],
@@ -285,9 +287,9 @@ describe('async-generator adapters', () => {
     /** Exact error thrown by a promoted synchronous iterator. */
     const error = new Error('generator failed')
     await expect(
-      runAsyncGeneratorMiddleware(
+      runAsyncGeneratorForTest(
         [
-          adaptGeneratorStageToAsyncGenerator<number>(function* () {
+          liftGeneratorToAsyncGeneratorForTest<number>(function* () {
             throw error
           })
         ],
@@ -303,7 +305,7 @@ describe('async-generator adapters', () => {
     /** Stored next callback used to verify late reporting after the first yield. */
     let savedNext: ((value: number) => void) | undefined
     /** Adapted sync stage intentionally invokes next twice. */
-    const adapted = adaptSyncStageToAsyncGenerator(
+    const adapted = liftSyncToAsyncGeneratorForTest(
       (value: number, next) => {
         savedNext = next
         next(value + 1)
@@ -320,7 +322,7 @@ describe('async-generator adapters', () => {
     /** Exact reporter failure preserved through the composed adapter path. */
     const reporterError = new Error('reporter failed')
     await expect(
-      adaptSyncStageToAsyncGenerator(
+      liftSyncToAsyncGeneratorForTest(
         (value: number, next) => {
           next(value)
           next(value)
@@ -333,9 +335,9 @@ describe('async-generator adapters', () => {
 
     /** Done values proving a sync stage that omits next still short-circuits. */
     const values: number[] = []
-    await runAsyncGeneratorMiddleware(
+    await runAsyncGeneratorForTest(
       [
-        adaptSyncStageToAsyncGenerator(
+        liftSyncToAsyncGeneratorForTest(
           () => undefined,
           () => undefined
         )
@@ -350,9 +352,9 @@ describe('async-generator adapters', () => {
     /** Exact synchronous error preserved through both adapter layers. */
     const error = new Error('sync failed')
     await expect(
-      runAsyncGeneratorMiddleware(
+      runAsyncGeneratorForTest(
         [
-          adaptSyncStageToAsyncGenerator(
+          liftSyncToAsyncGeneratorForTest(
             () => {
               throw error
             },
