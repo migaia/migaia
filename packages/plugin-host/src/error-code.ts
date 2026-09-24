@@ -42,6 +42,13 @@ export const PluginHostErrorCode = {
    */
   pluginDisabled: 'PLUGIN_DISABLED',
   /**
+   * A dependent plugin is temporarily suspended because one of its required providers is inactive.
+   * The caller must restore or reinstall the provider and wait for automatic resume before
+   * retrying. Enforces the R3 suspend dependency policy without treating the registration as
+   * removed.
+   */
+  pluginSuspended: 'PLUGIN_SUSPENDED',
+  /**
    * A lazy plugin is accessed synchronously before activation, or a synchronous install needs an
    * inactive lazy provider. Activation is an explicit async step (R9); the caller should `await
    * host.activate(name)` or install through the async `use()` path.
