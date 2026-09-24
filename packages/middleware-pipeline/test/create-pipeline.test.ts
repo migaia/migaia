@@ -247,14 +247,19 @@ describe('createPipeline', () => {
 
     /** Sync target rejects an async source even when runtime input bypasses type safety. */
     const sync = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
-    expect(() => sync.lift(asyncStage, MiddlewarePipelineMode.async as never)).toThrow(
-      expect.objectContaining({
-        name: 'TypeError',
-        code: MiddlewarePipelineErrorCode.invalidOption,
-        source: MIDDLEWARE_PIPELINE_SOURCE,
-        cause: undefined
-      })
-    )
+    /** Captured unsupported-lift failure for native-type and identity assertions. */
+    let unsupportedFailure: unknown
+    try {
+      sync.lift(asyncStage, MiddlewarePipelineMode.async as never)
+    } catch (error) {
+      unsupportedFailure = error
+    }
+    expect(unsupportedFailure).toBeInstanceOf(TypeError)
+    expect(unsupportedFailure).toMatchObject({
+      code: MiddlewarePipelineErrorCode.invalidOption,
+      source: MIDDLEWARE_PIPELINE_SOURCE
+    })
+    expect((unsupportedFailure as Error).cause).toBeUndefined()
 
     /** Generator stage proves canonical generator-to-async-generator promotion. */
     const generatorStage: IGeneratorMiddlewareStage<number> = function* (value) {
@@ -289,13 +294,16 @@ describe('createPipeline', () => {
     ]
 
     for (const invoke of invalidCalls) {
-      expect(invoke).toThrow(
-        expect.objectContaining({
-          name: 'TypeError',
-          code: MiddlewarePipelineErrorCode.invalidOption,
-          cause: undefined
-        })
-      )
+      /** Captured admission failure for native-type and no-cause assertions. */
+      let invalidFailure: unknown
+      try {
+        invoke()
+      } catch (error) {
+        invalidFailure = error
+      }
+      expect(invalidFailure).toBeInstanceOf(TypeError)
+      expect(invalidFailure).toMatchObject({ code: MiddlewarePipelineErrorCode.invalidOption })
+      expect((invalidFailure as Error).cause).toBeUndefined()
     }
   })
 })
