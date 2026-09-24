@@ -20,10 +20,26 @@
       ],
       "./graph/topology": [
         "TopologyInvalidReason",
-        "buildCapabilityTopology"
+        "buildCapabilityTopology",
+        "createTopologyIndex"
       ],
       "./graph/dynamic": [
         "createDynamicCapabilityGraph"
+      ],
+      "./graph/dependency": [
+        "DependencyAction",
+        "DependencyEdgeStatus",
+        "DependencyMutationKind",
+        "DependencyNodeStatus",
+        "DependencyPolicy",
+        "collectPlanEdges",
+        "planActivation",
+        "planDependencyMutation",
+        "planReplacement",
+        "planRestart",
+        "planResume",
+        "planTeardown",
+        "resolveInstallSet"
       ]
     },
     "@migaia/event-subscriber": {
@@ -182,14 +198,7 @@
         "MiddlewarePipelineGeneratorSignals",
         "MiddlewarePipelineMode",
         "MiddlewarePipelineViolation",
-        "adaptGeneratorStageToAsyncGenerator",
-        "adaptSyncStageToAsync",
-        "adaptSyncStageToAsyncGenerator",
-        "adaptSyncStageToGenerator",
-        "runAsyncGeneratorMiddleware",
-        "runAsyncMiddleware",
-        "runGeneratorMiddleware",
-        "runSyncMiddleware"
+        "createPipeline"
       ]
     },
     "@migaia/plugin-host": {
@@ -198,18 +207,14 @@
         "GENERATOR_CONTINUE",
         "GENERATOR_HALT",
         "GENERATOR_UNDEFINED",
+        "MiddlewarePipelineMode",
+        "MiddlewarePipelineViolation",
         "PluginHost",
         "PluginHostDisposalNodeKind",
         "PluginHostError",
         "PluginHostErrorCode",
-        "PluginHostPipelineMode",
-        "PluginHostPipelineViolation",
         "PluginHostRegistrationLifecycle",
         "PluginHostStatus",
-        "adaptGeneratorStageToAsyncGenerator",
-        "adaptSyncStageToAsync",
-        "adaptSyncStageToAsyncGenerator",
-        "adaptSyncStageToGenerator",
         "asyncDisposeKey",
         "createRegistrationView",
         "defineFeature",
