@@ -44,7 +44,7 @@ describe('dependency suspension and recovery', () => {
     const b = definePlugin({
       name: 'b',
       features: { value: bValue },
-      install: () => ({ read: () => 'b' }),
+      install: () => ({ readB: () => 'b' }),
       dispose: disposeB
     })
     const cValue = defineFeature(

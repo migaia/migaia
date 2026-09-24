@@ -28,8 +28,15 @@ const filesUnderModule = async (name: string): Promise<string[]> => {
 describe('architecture boundaries', () => {
   it('keeps dependency planning in capability and removes the retired host planners', async () => {
     const files = await filesUnder(sourceRoot)
-    const source = (await Promise.all(files.map((file) => readFile(file, 'utf8')))).join('\n')
-    expect(source.match(/buildCapabilityTopology/g)).toHaveLength(1)
+    const sources = await Promise.all(
+      files.map(async (file) => ({ file, content: await readFile(file, 'utf8') }))
+    )
+    const source = sources.map(({ content }) => content).join('\n')
+    expect(
+      sources
+        .filter(({ content }) => content.includes('buildCapabilityTopology'))
+        .map(({ file }) => file)
+    ).toEqual([join(sourceRoot, 'feature-runtime.ts')])
     for (const retired of [
       'planPluginDependencyMutation',
       'readPluginBlockers',
