@@ -333,6 +333,9 @@ const ERROR_TEXT = {
   /** Handle access is rejected while the named registration is disabled. */
   PLUGIN_DISABLED: (name: string) =>
     localize(`插件 "${name}" 已禁用`, `plugin "${name}" is disabled`),
+  /** Handle access uses this stable text while dependency policy has suspended a registration. */
+  PLUGIN_SUSPENDED: (name: string) =>
+    localize(`插件 "${name}" 已挂起`, `plugin "${name}" is suspended`),
   /** Lazy registration requires explicit activation before synchronous access. */
   PLUGIN_NOT_ACTIVATED: (name: string) =>
     localize(`插件 "${name}" 尚未激活`, `plugin "${name}" is not activated`),
