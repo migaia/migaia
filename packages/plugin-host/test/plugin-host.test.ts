@@ -1309,13 +1309,16 @@ describe('PluginHost', () => {
     await expect(host.run(1)).resolves.toBe(1)
   })
 
-  it('rejects a generator stage registered against an async-generator host', () => {
+  it('lifts a generator stage registered against an async-generator host', async () => {
     const host = new Host({ pipeline: { mode: 'async-generator' } })
-    expect(() =>
-      host.useGeneratorPipeline(function* (value) {
-        return value
-      })
-    ).toThrow(PluginHostError)
+    host.useGeneratorPipeline(function* (value) {
+      yield value + 1
+      return hostContinue
+    })
+    host.useAsyncGeneratorPipeline(async function* (value) {
+      return value * 2
+    })
+    await expect(host.run(1)).resolves.toBe(4)
   })
 
   it('stops an in-flight async-generator pipeline once the host is disposed mid-run', async () => {
