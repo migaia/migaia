@@ -7,7 +7,13 @@ export const TopologyInvalidReason = {
   /** A node repeats one required provider edge. */
   duplicateEdge: 'duplicate-edge',
   /** Two node descriptors use the same registration ordinal. */
-  duplicateOrdinal: 'duplicate-ordinal'
+  duplicateOrdinal: 'duplicate-ordinal',
+  /** A topology operation references a node that is not currently present. */
+  unknownNode: 'unknown-node',
+  /** A nested transaction or base-index mutation is attempted while a transaction is open. */
+  transactionOpen: 'transaction-open',
+  /** A settled transaction is used after commit or rollback. */
+  transactionClosed: 'transaction-closed'
 } as const
 
 export type ITopologyInvalidReason =
