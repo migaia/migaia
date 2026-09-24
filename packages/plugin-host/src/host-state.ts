@@ -7,6 +7,7 @@ import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IRegistration } from './registry.js'
+import { toIndexNode } from './dependency-runtime.js'
 
 /** Creates the host-owned dependency index and translates structural failures at its boundary. */
 const createDependencyIndex = (): ITopologyIndex =>
@@ -91,6 +92,13 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     batch: IInstallBatchContext<TDomainCore, TValue>
   ): void {
     for (const registration of installed) {
+      /** Registration currently owning this name before candidate publication, if any. */
+      const previous = this.registrations.get(registration.name)
+      /** Canonical dependency node derived from the admitted plugin snapshot. */
+      const node = toIndexNode(registration.name, registration.plugin)
+      if (!previous) this.#index.add(node)
+      else if (previous !== registration)
+        this.#index.setDependencies(registration.name, node.dependencies)
       this.registrations.set(registration.name, registration)
       this.removedNames.delete(registration.name)
     }
@@ -112,8 +120,10 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   closeRegistration(registration: IRegistration<TDomainCore, TValue>): void {
     for (const { key } of [...registration.extensions].reverse())
       if (this.extensionOwners.get(key) === registration) this.extensionOwners.delete(key)
-    if (this.registrations.get(registration.name) === registration)
+    if (this.registrations.get(registration.name) === registration) {
       this.registrations.delete(registration.name)
+      this.#index.remove(registration.name)
+    }
   }
 
   /**

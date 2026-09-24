@@ -14,8 +14,9 @@ import { mountPluginExtensions } from './extension.js'
 import { invokeCaptured } from './invocation.js'
 import { reportDiagnostic, reportTerminalFailure } from './diagnostic-report.js'
 import { compileFeatures, instantiateFeatures, snapshotFeatureExpose } from './feature-runtime.js'
-import { resolveBatchInstallSet, orderPluginInstallBatch } from './dependency-runtime.js'
+import { validateInstallBatch } from './dependency-runtime.js'
 import { isFeatureReference } from './define-feature.js'
+import type { PluginHostState } from './host-state.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IInstallEntry, IPluginDescriptor, IRegistration } from './registry.js'
 import type {
@@ -41,7 +42,8 @@ export type IInstallBatchContext<TDomainCore extends object, TValue> = {
 
 export type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly scheduler: ILifecycleScheduler
-  readonly committedRegistrations: ReadonlyMap<string, IRegistration<TDomainCore, TValue>>
+  /** Shared host state owning dependency facts and committed registration status. */
+  readonly state: PluginHostState<TDomainCore, TValue>
   readonly snapshotBatch: () => IInstallBatchContext<TDomainCore, TValue>
   readonly setActiveBatch: (batch: IInstallBatchContext<TDomainCore, TValue> | undefined) => void
   readonly beginOperation: (registration: IRegistration<TDomainCore, TValue>) => void
@@ -69,8 +71,6 @@ export type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = 
     registration: IRegistration<TDomainCore, TValue>,
     rollbackErrors: unknown[]
   ) => void
-  /** Names removed from this host and not reinstalled; distinguishes removed from missing. */
-  readonly removedNames: ReadonlySet<string>
   readonly diagnostic: IPluginHostDiagnostic
   /** Attributes a Host boundary error before its structured detail is frozen. */
   readonly decorateError: <TError extends PluginHostError>(error: TError) => TError
@@ -139,8 +139,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
   }> {
     const installed: IRegistration<TDomainCore, TValue>[] = []
     // Dependency validation runs before the transaction: its codes are thrown as-is, not wrapped.
-    const ordered = this.#orderBatch(entries)
-    const installSet = resolveBatchInstallSet(ordered)
+    const { order: ordered, installSet } = this.#validateBatch(entries)
     const batch = this.#port.snapshotBatch()
     prepareBatch?.(batch)
     let failedName = entries[0]?.name ?? 'unknown'
@@ -195,8 +194,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
   /** Runs constructor-time installation without allowing an awaitable extension to escape. */
   installBatchSync(entries: readonly IInstallEntry<TDomainCore, TValue>[]): void {
     const installed: IRegistration<TDomainCore, TValue>[] = []
-    const ordered = this.#orderBatch(entries)
-    const installSet = resolveBatchInstallSet(ordered)
+    const { order: ordered, installSet } = this.#validateBatch(entries)
     const batch = this.#port.snapshotBatch()
     let failedName = entries[0]?.name ?? 'unknown'
     this.#port.setActiveBatch(batch)
@@ -269,15 +267,12 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
    * be active here: the async Host path activates them before calling in, and the synchronous path
    * cannot await an activation.
    */
-  #orderBatch(
-    entries: readonly IInstallEntry<TDomainCore, TValue>[]
-  ): readonly IInstallEntry<TDomainCore, TValue>[] {
+  #validateBatch(entries: readonly IInstallEntry<TDomainCore, TValue>[]): Readonly<{
+    readonly order: readonly IInstallEntry<TDomainCore, TValue>[]
+    readonly installSet: ReadonlySet<string>
+  }> {
     try {
-      return orderPluginInstallBatch(
-        entries,
-        this.#port.committedRegistrations,
-        this.#port.removedNames
-      )
+      return validateInstallBatch(entries, this.#port.state)
     } catch (error) {
       throw error instanceof PluginHostError ? this.#port.decorateError(error) : error
     }
@@ -299,6 +294,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       installed: false,
       activated: false,
       enabled: true,
+      suspended: false,
       lifecycle: PluginHostRegistrationLifecycle.install,
       lifecycleController: createAbortController(),
       scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler }),
