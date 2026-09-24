@@ -1,4 +1,4 @@
-import { defineFeature, type IPipelineMode } from '@migaia/plugin-host'
+import { defineFeature, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
 import { createLoggerError, LoggerErrorCode } from '../errors.js'
 import { LoggerErrorText } from '../error-text.js'
 import { getLoggerRuntimeManager, type ILoggerRuntimeManager } from '../runtime-manager.js'
@@ -37,7 +37,7 @@ export const createFilePlugin = (
 ): ILoggerPlugin<
   IEmptyPluginExt,
   IFilePluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly dependencies: typeof fileDependenciesFeature }
 > => {
   if (typeof config.path !== 'string' || config.path.length === 0)
@@ -51,7 +51,7 @@ export const createFilePlugin = (
     config,
     features: Object.freeze({ dependencies: fileDependenciesFeature }),
     install: (
-      core: ILoggerPluginCore<IPipelineMode> &
+      core: ILoggerPluginCore<IMiddlewarePipelineMode> &
         Readonly<{ readonly features: { readonly dependencies: IFileFeatureDependencies } }>
     ) => {
       const resolved = core.config.get<IFilePluginConfig>() ?? config

@@ -1,7 +1,7 @@
 import {
   defineHost,
   type IHostHandle,
-  PluginHostPipelineMode,
+  MiddlewarePipelineMode,
   type IPlugin,
   type IPluginHostOptions
 } from '@migaia/plugin-host'
@@ -98,7 +98,7 @@ function snapshotHostOptions<T>(
   try {
     return {
       ...options,
-      pipeline: { ...options.pipeline, mode: PluginHostPipelineMode.sync }
+      pipeline: { ...options.pipeline, mode: MiddlewarePipelineMode.sync }
     }
   } catch (error) {
     throw createStoreMiddlewareError(

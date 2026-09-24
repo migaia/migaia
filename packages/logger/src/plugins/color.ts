@@ -1,5 +1,5 @@
 import { Ansis } from 'ansis'
-import { defineFeature, definePlugin, type IPipelineMode } from '@migaia/plugin-host'
+import { defineFeature, definePlugin, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
 
 import type {
   IEmptyPluginExt,
@@ -42,7 +42,7 @@ export const ANSIS_PLUGIN_NAME = 'ansis' as const
 class ColorPlugin implements ILoggerPlugin<
   IEmptyPluginExt,
   IColorPluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly color: typeof loggerColorFeature },
   IColorShared
 > {
@@ -240,7 +240,7 @@ export const color = (
 ): ILoggerPlugin<
   IEmptyPluginExt,
   IColorPluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly color: typeof loggerColorFeature },
   IColorShared
 > => new ColorPlugin(config)

@@ -1245,11 +1245,7 @@ describe('logger plugin host integration', () => {
       pipeline: { mode: 'async' }
     })
     expect(() => asyncLogger.useAsyncPipeline(async (entry, next) => next(entry))).not.toThrow()
-    // oxlint-disable-next-line no-constant-condition
-    if (false) {
-      // @ts-expect-error async mode only exposes async pipeline registration
-      asyncLogger.usePipeline((entry, next) => next(entry))
-    }
+    expect(() => asyncLogger.usePipeline((entry, next) => next(entry))).not.toThrow()
     const generatorLogger = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode: 'generator' }
@@ -1265,6 +1261,16 @@ describe('logger plugin host integration', () => {
       // @ts-expect-error generator mode only exposes generator pipeline registration
       generatorLogger.useAsyncPipeline(async (entry, next) => next(entry))
     }
+    const asyncGeneratorLogger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      pipeline: { mode: 'async-generator' }
+    })
+    expect(() =>
+      asyncGeneratorLogger.useGeneratorPipeline(function* (entry) {
+        yield entry
+        return undefined
+      })
+    ).not.toThrow()
   })
 
   it('rejects nested plugin mutation during install', async () => {

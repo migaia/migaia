@@ -8,11 +8,11 @@ import {
 import type {
   IPluginHostDisposalResult,
   IPluginHostOptions,
-  IPipelineMode,
-  ISyncPipelineStage,
-  IAsyncPipelineStage,
-  IGeneratorPipelineStage,
-  IAsyncGeneratorPipelineStage,
+  IMiddlewarePipelineMode,
+  ISyncMiddlewareStage,
+  IAsyncMiddlewareStage,
+  IGeneratorMiddlewareStage,
+  IAsyncGeneratorMiddlewareStage,
   IHostHandle
 } from '@migaia/plugin-host'
 import { createLoggerError, createLoggerTypeError, LoggerErrorCode } from './errors.js'
@@ -37,7 +37,7 @@ import type {
   IStaticLoggerCtor
 } from './typing.js'
 
-type ILoggerExtendsTarget<TMode extends IPipelineMode> = Omit<
+type ILoggerExtendsTarget<TMode extends IMiddlewarePipelineMode> = Omit<
   ILoggerCore<TMode>,
   'config' | 'onDispose'
 >
@@ -162,13 +162,17 @@ class LoggerCore {
   #flushPromise: Promise<void> | undefined
   #shutdownPromise: Promise<IPluginHostDisposalResult> | undefined
   /** Extends() 注册的转发目标 */
-  #extendTargets: ILoggerExtendsTarget<IPipelineMode>[] = []
+  #extendTargets: ILoggerExtendsTarget<IMiddlewarePipelineMode>[] = []
   /** 单调时钟源（R-9）；`flush`/`shutdown`/`#drain` 的 deadline 与 `boundedWait` 共用。 */
   #scheduler: ILifecycleScheduler
   /** Functional Host owns plugin admission, config, pipeline, and disposal for this facade. */
-  #handle: IHostHandle<ILoggerDomainCore<IPipelineMode>, ILogEntry, readonly []>
+  #handle: IHostHandle<ILoggerDomainCore<IMiddlewarePipelineMode>, ILogEntry, readonly []>
   /** Config facade is fixed after the functional Host has been created. */
-  readonly config!: IHostHandle<ILoggerDomainCore<IPipelineMode>, ILogEntry, readonly []>['config']
+  readonly config!: IHostHandle<
+    ILoggerDomainCore<IMiddlewarePipelineMode>,
+    ILogEntry,
+    readonly []
+  >['config']
 
   get scheduler(): ILifecycleScheduler {
     return this.#scheduler
@@ -233,8 +237,8 @@ class LoggerCore {
       }
   }
 
-  createPluginDomainCore(): ILoggerDomainCore<IPipelineMode> {
-    const domainCore: ILoggerDomainCore<IPipelineMode> = {
+  createPluginDomainCore(): ILoggerDomainCore<IMiddlewarePipelineMode> {
+    const domainCore: ILoggerDomainCore<IMiddlewarePipelineMode> = {
       ctx: this.ctx,
       scheduler: this.scheduler,
       log: (tag, message, ...args) => this.log(tag, message, ...args),
@@ -249,7 +253,8 @@ class LoggerCore {
       flush: () => this.flush(),
       onShutdown: (fn) => this.onShutdown(fn),
       shutdown: (reason) => this.shutdown(reason),
-      extends: (...others) => this.extends(...others) as unknown as ILoggerCore<IPipelineMode>,
+      extends: (...others) =>
+        this.extends(...others) as unknown as ILoggerCore<IMiddlewarePipelineMode>,
       unextend: (...others) => this.unextend(...others)
     }
     return domainCore
@@ -267,24 +272,24 @@ class LoggerCore {
   }
 
   usePipeline(stage: IPipelineStage): this {
-    this.#handle.usePipeline(stage as ISyncPipelineStage<ILogEntry>)
+    this.#handle.usePipeline(stage as ISyncMiddlewareStage<ILogEntry>)
     return this
   }
 
   /** Delegates async stage registration to the functional Host. */
-  useAsyncPipeline(stage: IAsyncPipelineStage<ILogEntry>): this {
+  useAsyncPipeline(stage: IAsyncMiddlewareStage<ILogEntry>): this {
     this.#handle.useAsyncPipeline(stage)
     return this
   }
 
   /** Delegates generator stage registration to the functional Host. */
-  useGeneratorPipeline(stage: IGeneratorPipelineStage<ILogEntry>): this {
+  useGeneratorPipeline(stage: IGeneratorMiddlewareStage<ILogEntry>): this {
     this.#handle.useGeneratorPipeline(stage)
     return this
   }
 
   /** Delegates async-generator stage registration to the functional Host. */
-  useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<ILogEntry>): this {
+  useAsyncGeneratorPipeline(stage: IAsyncGeneratorMiddlewareStage<ILogEntry>): this {
     this.#handle.useAsyncGeneratorPipeline(stage)
     return this
   }
@@ -628,7 +633,7 @@ class LoggerCore {
     else write()
   }
 
-  extends(...others: readonly ILoggerExtendsTarget<IPipelineMode>[]): this {
+  extends(...others: readonly ILoggerExtendsTarget<IMiddlewarePipelineMode>[]): this {
     for (const other of others) {
       if (this.#extendTargets.some((target) => target.ctx.id === other.ctx.id)) continue
       if (other === (this as unknown as ILoggerCore)) {
@@ -652,7 +657,7 @@ class LoggerCore {
   }
 
   /** Removes extension edges by stable logger context identity and remains idempotent. */
-  unextend(...others: readonly ILoggerExtendsTarget<IPipelineMode>[]): boolean {
+  unextend(...others: readonly ILoggerExtendsTarget<IMiddlewarePipelineMode>[]): boolean {
     const ids = new Set(others.map((other) => other.ctx.id))
     const before = this.#extendTargets.length
     this.#extendTargets = this.#extendTargets.filter((target) => !ids.has(target.ctx.id))

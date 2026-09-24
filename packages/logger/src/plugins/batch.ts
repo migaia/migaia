@@ -1,5 +1,5 @@
 import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
-import { defineFeature, definePlugin, type IPipelineMode } from '@migaia/plugin-host'
+import { defineFeature, definePlugin, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
 import { boundedWait, type IScheduledTask } from '@migaia/lifecycle'
 import {
   createLoggerCleanupError,
@@ -48,7 +48,7 @@ export const BATCH_PLUGIN_NAME = 'batch' as const
 class BatchPlugin implements ILoggerPlugin<
   IEmptyPluginExt,
   IBatchPluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly batch: typeof loggerBatchFeature },
   IBatchShared
 > {
@@ -372,7 +372,7 @@ export const batch = (
 ): ILoggerPlugin<
   IEmptyPluginExt,
   IBatchPluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly batch: typeof loggerBatchFeature },
   IBatchShared
 > => new BatchPlugin(config)
