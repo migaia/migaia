@@ -171,7 +171,18 @@ export function collectPlanEdges(
 ): readonly IDependencyPlanEdge[] {
   /** Edges emitted in canonical consumer and declaration order. */
   const edges: IDependencyPlanEdge[] = []
-  for (const consumer of index.order()) {
+  /**
+   * Consumers whose edges can qualify: the affected nodes themselves plus the optional dependents
+   * of affected providers. Reading only this neighbourhood keeps a plan proportional to what it
+   * changes; scanning `order()` made every plan O(nodes + edges).
+   */
+  const candidates = new Set<string>()
+  for (const id of affected) {
+    if (!index.has(id)) continue
+    candidates.add(id)
+    for (const consumer of index.dependents(id).optional) candidates.add(consumer)
+  }
+  for (const consumer of index.order(candidates)) {
     for (const dependency of index.dependencies(consumer)) {
       if (dependency.required) {
         if (affected.has(consumer) && affected.has(dependency.provider))
@@ -314,10 +325,12 @@ export function planResume(
     if (request.canRebind(id)) rebind.add(id)
     else restartRoots.push(id)
   }
+  /** Eligible IDs as a set, so the restart closure test is O(1) per member. */
+  const eligibleSet = new Set(eligible)
   /** Eligible nodes reached from non-rebindable direct consumers. */
   const restart = new Set<string>()
   for (const root of restartRoots)
-    for (const id of index.closure([root])) if (eligible.includes(id)) restart.add(id)
+    for (const id of index.closure([root])) if (eligibleSet.has(id)) restart.add(id)
 
   const steps = eligible.map((id) => ({
     id,

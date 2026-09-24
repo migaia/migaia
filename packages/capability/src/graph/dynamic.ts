@@ -212,14 +212,14 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   const readMetrics = (): IGraphTraversalMetrics => {
     /** Raw topology-index counters for the accepted mutation. */
     const current = topologyIndex.metrics()
-    /** Closure plus canonical ordering each visit the same affected node frontier. */
+    /** Index node visits made by this mutation (closure, ordering, level upkeep). */
     const visitedNodes = current.visitedNodes - topologyMetricBaseline.visitedNodes
-    /** Reverse-edge traversal is the index source for compatibility edge work. */
+    /** Index edge visits made by this mutation. */
     const visitedEdges = current.visitedEdges - topologyMetricBaseline.visitedEdges
     return Object.freeze({
-      visitedNodes: Math.ceil(visitedNodes / 2),
-      visitedEdges: visitedEdges * 2,
-      queueOperations: visitedNodes,
+      visitedNodes,
+      visitedEdges,
+      queueOperations: traversalMetrics.queueOperations,
       queueTimeMs: traversalMetrics.queueTimeMs,
       fullScan: traversalMetrics.fullScan,
       wallTimeMs: Math.max(0, Date.now() - traversalMetrics.startedAt)
@@ -303,7 +303,31 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   /** Resolves one canonical index order into lifecycle entries. */
   const readOrderedEntries = (ids?: Iterable<string>): IStoredNode<TBinding>[] => {
     if (!ids) traversalMetrics.fullScan = true
-    return topologyIndex.order(ids).map((id) => definitions.get(id)!)
+    /** Frontier entries handed to the start or release owner. */
+    const entries = topologyIndex.order(ids).map((id) => definitions.get(id)!)
+    traversalMetrics.queueOperations += entries.length
+    return entries
+  }
+
+  /**
+   * Canonical rank and level per node for `nodeState`, rebuilt at most once per topology change.
+   * Deriving them per call built a full snapshot each time, which made a loop over `nodes` calling
+   * `nodeState` quadratic.
+   */
+  let diagnosticCache: { rank: Map<string, number>; level: ReadonlyMap<string, number> } | undefined
+  /** Drops the cached ranks after any topology mutation. */
+  const invalidateDiagnostics = (): void => {
+    diagnosticCache = undefined
+  }
+  /** Returns the cached ranks, rebuilding them from one snapshot when stale. */
+  const readDiagnostics = (): { rank: Map<string, number>; level: ReadonlyMap<string, number> } => {
+    if (diagnosticCache) return diagnosticCache
+    const snapshot = topologyIndex.snapshot()
+    diagnosticCache = {
+      rank: new Map(snapshot.ordered.map((node, position) => [node.id, position])),
+      level: snapshot.level
+    }
+    return diagnosticCache
   }
 
   /** Resolves the required dependent closure in canonical provider-first order. */
@@ -572,6 +596,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           leaseKey: {}
         }
         topologyIndex.add({ id: node.id, dependencies: node.dependencies })
+        invalidateDiagnostics()
         definitions.set(node.id, entry)
         graphGeneration += 1
         const affected = readClosureEntries([node.id])
@@ -591,6 +616,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         const affected = readOrderedEntries(planMutation(id, options))
         await release(affected, new Set([id]), 'remove')
         topologyIndex.remove(id)
+        invalidateDiagnostics()
         definitions.delete(id)
         const affectedIds = new Set(affected.map((entry) => entry.definition.id))
         for (const entry of definitions.values())
@@ -683,7 +709,10 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
               edge.provider === node.dependencies[index]?.provider &&
               edge.required === node.dependencies[index]?.required
           )
-        if (!sameTopology) topologyIndex.setDependencies(node.id, node.dependencies)
+        if (!sameTopology) {
+          topologyIndex.setDependencies(node.id, node.dependencies)
+          invalidateDiagnostics()
+        }
         previous.definition = node
         const affected = readOrderedEntries(
           sameTopology
@@ -752,8 +781,8 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     nodeState(id) {
       const entry = definitions.get(id)
       if (!entry) throw fail(CapabilityGraphErrorCode.unknownNode)
-      /** Current canonical snapshot supplies derived rank and level diagnostics. */
-      const snapshot = topologyIndex.snapshot()
+      /** Cached canonical rank and level diagnostics. */
+      const diagnostics = readDiagnostics()
       return {
         id,
         kind: entry.definition.kind,
@@ -764,8 +793,8 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         binding: entry.binding,
         generation: entry.generation,
         ordinal: entry.ordinal,
-        rank: snapshot.ordered.findIndex((node) => node.id === id),
-        level: snapshot.level.get(id) ?? 0
+        rank: diagnostics.rank.get(id) ?? -1,
+        level: diagnostics.level.get(id) ?? 0
       }
     },
     getBinding<T = TBinding>(id: IGraphNodeId): T | undefined {
@@ -790,6 +819,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         } finally {
           definitions.clear()
           for (const id of topologyIndex.order()) topologyIndex.remove(id)
+          invalidateDiagnostics()
           graphState = CapabilityGraphState.terminal
           graphGeneration += 1
         }
