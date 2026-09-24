@@ -51,6 +51,7 @@ export {
 import { executePluginHostPipeline } from './pipeline-runtime.js'
 import { PluginHostRemovalRuntime } from './removal-runtime.js'
 import { PluginHostReplaceRuntime } from './replace-runtime.js'
+import { PluginHostResumeRuntime } from './resume-runtime.js'
 import { bindTerminalSink, reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostOperationRuntime } from './operation-runtime.js'
 import {
@@ -178,6 +179,8 @@ export class PluginHost<
   #removalRuntime: PluginHostRemovalRuntime<TDomainCore, TValue>
   /** Owns hot replacement orchestration over the install and removal runtimes. */
   #replaceRuntime: PluginHostReplaceRuntime<TDomainCore, TValue>
+  /** Coordinates suspended-dependent recovery when providers return. */
+  #resumeRuntime: PluginHostResumeRuntime<TDomainCore, TValue>
   #coreRuntime: PluginHostCoreRuntime<TDomainCore, TValue>
   #pipelineDrainTimeoutMs: number | false
   /** Records disposer steps detached by a bounded timeout until the current host disposal settles. */
@@ -249,7 +252,9 @@ export class PluginHost<
       {
         assertActive: () => this.#assertActive(),
         assertMutationAllowed: () => this.#assertMutationAllowed(),
-        enqueue: (task) => this.#enqueue(task)
+        enqueue: (task) => this.#enqueue(task),
+        resumeAfterProvider: (provider, generationChanged) =>
+          this.#resumeRuntime.resumeAfterProvider(provider, generationChanged)
       }
     )
     if (
@@ -403,6 +408,25 @@ export class PluginHost<
       },
       diagnostic: this.#diagnostic,
       decorateError: (error) => attachPluginHostIdentity(error, this)
+    })
+    this.#resumeRuntime = new PluginHostResumeRuntime({
+      state: this.#state,
+      drainLeases: (registration) => this.#drainRegistrationLeases(registration),
+      disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
+      installBatch: (entries) => this.#installRuntime.installBatch(entries),
+      activate: (registration) => this.#installRuntime.activate(registration),
+      disable: (registration) => {
+        this.#enablementRuntime.disable(registration)
+      },
+      markRemoved: (name) => {
+        this.#state.removedNames.add(name)
+      },
+      forget: (name) => this.#enablementRuntime.forget(name),
+      settle: () => {
+        this.#state.lanes.rebuild(this.#state.enabledRegistrations(), this.#state.stageSlots)
+        this.#state.commit()
+      },
+      diagnostic: this.#diagnostic
     })
     this.#coreRuntime = new PluginHostCoreRuntime({
       createDomainCore: (request) => this.createPluginDomainCore(request),
@@ -719,6 +743,7 @@ export class PluginHost<
       // the lifecycle-mutation guard observes the running hook synchronously.
       if (activation.length > 0) await this.#activateInOrder(activation)
       await this.#installRuntime.installBatch(entries)
+      for (const entry of entries) await this.#resumeRuntime.resumeAfterProvider(entry.name, true)
       return Object.freeze(
         entries.map((entry) => this.#createHandle(entry.name))
       ) as IPluginHandleTuple<TPlugins>
@@ -815,6 +840,17 @@ export class PluginHost<
         this.#state.registrations.has(name)
       )
       this.#installRuntime.installBatchSync(entries)
+      for (const entry of entries) {
+        const task = this.#resumeRuntime.resumeAfterProvider(entry.name, true).catch((error) => {
+          reportDiagnostic(
+            this.#diagnostic,
+            ERROR_TEXT.DEPENDENT_RESTART_FAILED(entry.name, []),
+            PluginHostErrorCode.dependentRestartFailed,
+            error
+          )
+        })
+        this.#pending.track(task)
+      }
       return Object.freeze(
         entries.map((entry) => this.#createHandle(entry.name))
       ) as IPluginHandleTuple<TViewPlugins>

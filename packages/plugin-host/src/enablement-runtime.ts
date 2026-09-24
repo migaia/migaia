@@ -39,6 +39,7 @@ export type IPluginHostEnablementFacadePort<
   readonly assertActive: () => void
   readonly assertMutationAllowed: () => void
   readonly enqueue: <T>(task: () => Promise<T>) => Promise<T>
+  readonly resumeAfterProvider: (provider: string, generationChanged: boolean) => Promise<void>
 }>
 
 /** Owns reversible plugin reachability without taking over resource lifecycle ownership. */
@@ -229,7 +230,10 @@ export const createPluginHostEnablementFacade = <
                 // Check the whole restore set first so a rejected token enables nothing.
                 const enabling = new Set(disabled.map((item) => item.name))
                 for (const item of disabled) runtime.assertProvidersAvailable(item, enabling)
-                for (const item of [...disabled].reverse()) runtime.enable(item)
+                for (const item of [...disabled].reverse()) {
+                  runtime.enable(item)
+                  await port.resumeAfterProvider(item.name, false)
+                }
               })
             }
           })
@@ -242,6 +246,7 @@ export const createPluginHostEnablementFacade = <
         const registration = runtime.requireInstalled(name)
         runtime.assertProvidersAvailable(registration)
         runtime.enable(registration)
+        await port.resumeAfterProvider(name, false)
       })
     },
     disabled: () => runtime.disabled()
