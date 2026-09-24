@@ -71,10 +71,7 @@ export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Read
 }>
 
 /** Stateless runner returned by `createPipeline`. */
-export type IMiddlewarePipeline<
-  TMode extends IMiddlewarePipelineMode,
-  TValue
-> = Readonly<{
+export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue> = Readonly<{
   readonly mode: TMode
   lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(
     stage: IMiddlewarePipelineStage<TFrom, TValue>,
@@ -150,9 +147,9 @@ const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
     assertActive: readCallback<() => void>(candidate.assertActive),
     signal: candidate.signal as IMiddlewarePipelineAbortSignal | undefined,
     signals: readSignals(candidate.signals),
-    combineStageAndDownstreamError: readCallback<
-      (stage: unknown, downstream: unknown) => unknown
-    >(candidate.combineStageAndDownstreamError)
+    combineStageAndDownstreamError: readCallback<(stage: unknown, downstream: unknown) => unknown>(
+      candidate.combineStageAndDownstreamError
+    )
   })
 }
 
@@ -296,7 +293,6 @@ export function createPipeline(
       value: unknown,
       done: unknown,
       control?: IMiddlewarePipelineControlOptions
-    ): void | Promise<void> =>
-      runForMode(normalized.mode, normalized, stages, value, done, control)
+    ): void | Promise<void> => runForMode(normalized.mode, normalized, stages, value, done, control)
   }) as IMiddlewarePipeline<IMiddlewarePipelineMode, unknown>
 }
