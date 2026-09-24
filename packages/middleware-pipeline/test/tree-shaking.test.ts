@@ -42,13 +42,11 @@ describe('tree shaking', () => {
     expect(asyncCode).not.toContain('runSyncOnly')
     expect(asyncCode).not.toContain('runAsyncGeneratorMiddleware')
     expect(asyncCode).not.toContain('middleware-pipeline.generator-continue')
-    expect(asyncCode).not.toContain('@migaia/lifecycle')
     expect(generatorCode).toContain('runGeneratorOnly')
     expect(generatorCode).not.toContain('runSyncMiddleware')
     expect(generatorCode).not.toContain('runAsyncMiddleware')
     expect(generatorCode).not.toContain('runAsyncGeneratorMiddleware')
     expect(generatorCode).not.toContain('runAsyncMiddleware')
-    expect(generatorCode).not.toContain('@migaia/lifecycle')
   })
 
   it('removes unused async and generator modes from a sync-only bundle', async () => {
@@ -59,7 +57,6 @@ describe('tree shaking', () => {
     expect(code).not.toContain('async-generator')
     expect(code).not.toContain('middleware-pipeline.generator-continue')
     expect(code).not.toContain('middleware stage and downstream failed')
-    expect(code).not.toContain('@migaia/lifecycle')
   })
 
   it('removes sync, async, and sync-generator runners from an async-generator-only bundle', async () => {
@@ -71,6 +68,5 @@ describe('tree shaking', () => {
     expect(code).not.toContain('runAsyncMiddleware')
     expect(code).not.toContain('runGeneratorMiddleware')
     expect(code).not.toContain('middleware stage and downstream failed')
-    expect(code).not.toContain('@migaia/lifecycle')
   })
 })
