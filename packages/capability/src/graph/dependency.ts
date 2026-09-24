@@ -24,19 +24,11 @@ export const DependencyAction = {
   resume: 'resume',
   rebind: 'rebind',
   restart: 'restart',
-  activate: 'activate'
+  activate: 'activate',
+  invalidate: 'invalidate'
 } as const
 
 export type DependencyAction = keyof typeof DependencyAction
-
-export const DependencyNodeStatus = {
-  active: 'active',
-  inactive: 'inactive',
-  disabled: 'disabled',
-  suspended: 'suspended'
-} as const
-
-export type DependencyNodeStatus = keyof typeof DependencyNodeStatus
 
 export const DependencyEdgeStatus = {
   optionalAbsent: 'optional-absent'
@@ -44,7 +36,14 @@ export const DependencyEdgeStatus = {
 
 export type IDependencyEdgeStatus = (typeof DependencyEdgeStatus)[keyof typeof DependencyEdgeStatus]
 
-export type IDependencyStatusReader = (id: string) => DependencyNodeStatus
+export type IDependencyNodeState = Readonly<{
+  readonly activated: boolean
+  readonly enabled: boolean
+  readonly suspended: boolean
+  readonly stale: boolean
+}>
+
+export type IDependencyStateReader = (id: string) => IDependencyNodeState
 
 export type IDependencyPlanStep = Readonly<{
   readonly id: string
@@ -143,6 +142,11 @@ function isDependencyMutationKind(value: unknown): value is DependencyMutationKi
   return value === DependencyMutationKind.remove || value === DependencyMutationKind.disable
 }
 
+/** Returns whether one activated node currently provides service to its dependents. */
+function isServing(state: IDependencyNodeState): boolean {
+  return state.activated && state.enabled && !state.suspended
+}
+
 /** Converts one canonical affected set to dependent-first order. */
 function dependentFirst(index: ITopologyIndexReader, affected: ReadonlySet<string>): string[] {
   return [...index.order(affected)].reverse()
@@ -151,7 +155,7 @@ function dependentFirst(index: ITopologyIndexReader, affected: ReadonlySet<strin
 /** Returns whether every required provider is present and usable in the projected recovery state. */
 function requiredProvidersAvailable(
   index: ITopologyIndexReader,
-  status: IDependencyStatusReader,
+  state: IDependencyStateReader,
   available: ReadonlySet<string>,
   dependencies: readonly ITopologyDependency[]
 ): boolean {
@@ -159,7 +163,7 @@ function requiredProvidersAvailable(
     if (!dependency.required) continue
     if (!index.has(dependency.provider)) return false
     if (available.has(dependency.provider)) continue
-    if (status(dependency.provider) !== DependencyNodeStatus.active) return false
+    if (!isServing(state(dependency.provider))) return false
   }
   return true
 }
@@ -207,7 +211,7 @@ export function collectPlanEdges(
 /** Plans reject, cascade, or suspend semantics without mutating the topology index. */
 export function planDependencyMutation(
   index: ITopologyIndexReader,
-  status: IDependencyStatusReader,
+  state: IDependencyStateReader,
   request: IDependencyMutationRequest
 ): IDependencyPlan {
   if (!isDependencyPolicy(request.policy) || !isDependencyMutationKind(request.kind))
@@ -243,8 +247,8 @@ export function planDependencyMutation(
       steps.push({ id, action: rootAction })
       continue
     }
-    const nodeStatus = status(id)
-    if (nodeStatus === DependencyNodeStatus.active || nodeStatus === DependencyNodeStatus.disabled)
+    const nodeState = state(id)
+    if (nodeState.activated && !nodeState.suspended)
       steps.push({ id, action: DependencyAction.suspend })
   }
   return createPlan(steps, edges)
@@ -253,15 +257,22 @@ export function planDependencyMutation(
 /** Plans one dependent-first restart closure, excluding inactive nodes. */
 export function planRestart(
   index: ITopologyIndexReader,
-  status: IDependencyStatusReader,
+  state: IDependencyStateReader,
   roots: readonly string[]
 ): IDependencyPlan {
   /** Full required closure reached from restart roots. */
   const affected = new Set(index.closure(roots))
   /** Restart steps skip nodes that have never activated. */
-  const steps = dependentFirst(index, affected)
-    .filter((id) => status(id) !== DependencyNodeStatus.inactive)
-    .map((id) => ({ id, action: DependencyAction.restart }) as const)
+  const steps = dependentFirst(index, affected).flatMap((id) => {
+    const nodeState = state(id)
+    if (!nodeState.activated) return []
+    return [
+      {
+        id,
+        action: nodeState.suspended ? DependencyAction.invalidate : DependencyAction.restart
+      }
+    ]
+  })
   /** Edge projection covers only nodes participating in restart. */
   const planned = new Set(steps.map((step) => step.id))
   return createPlan(steps, collectPlanEdges(index, planned))
@@ -270,30 +281,45 @@ export function planRestart(
 /** Plans direct rebinds first, then dependent-first restart closures. */
 export function planReplacement(
   index: ITopologyIndexReader,
-  status: IDependencyStatusReader,
+  state: IDependencyStateReader,
   request: IDependencyReplacementRequest
 ): IDependencyPlan {
-  /** Direct active consumers that can accept the replacement in place. */
+  /** Direct activated consumers that can accept the replacement in place. */
   const rebinds: IDependencyPlanStep[] = []
-  /** Direct active consumers that require restart closure. */
+  /** Direct suspended consumers whose retained binding becomes stale. */
+  const invalidations: IDependencyPlanStep[] = []
+  /** Direct activated consumers that require restart closure. */
   const restartRoots: string[] = []
   for (const dependent of index.dependents(request.target).required) {
-    if (status(dependent) !== DependencyNodeStatus.active) continue
+    const nodeState = state(dependent)
+    if (!nodeState.activated) continue
+    if (nodeState.suspended) {
+      invalidations.push({ id: dependent, action: DependencyAction.invalidate })
+      continue
+    }
     if (request.canRebind(dependent))
       rebinds.push({ id: dependent, action: DependencyAction.rebind })
     else restartRoots.push(dependent)
   }
   const restarts =
-    restartRoots.length === 0 ? createPlan([], []) : planRestart(index, status, restartRoots)
+    restartRoots.length === 0 ? createPlan([], []) : planRestart(index, state, restartRoots)
   /** Target is affected even though replacement execution is consumer-owned. */
-  const affected = new Set([request.target, ...rebinds.map((step) => step.id), ...restarts.order])
-  return createPlan([...rebinds, ...restarts.steps], collectPlanEdges(index, affected))
+  const affected = new Set([
+    request.target,
+    ...rebinds.map((step) => step.id),
+    ...invalidations.map((step) => step.id),
+    ...restarts.order
+  ])
+  return createPlan(
+    [...rebinds, ...invalidations, ...restarts.steps],
+    collectPlanEdges(index, affected)
+  )
 }
 
 /** Plans recovery of satisfiable suspended dependents in provider-first canonical order. */
 export function planResume(
   index: ITopologyIndexReader,
-  status: IDependencyStatusReader,
+  state: IDependencyStateReader,
   request: IDependencyResumeRequest
 ): IDependencyPlan {
   /** Required dependent closure after provider availability returns. */
@@ -303,8 +329,8 @@ export function planResume(
   /** Suspended nodes whose full required provider set is satisfiable. */
   const eligible: string[] = []
   for (const id of closure) {
-    if (id === request.provider || status(id) !== DependencyNodeStatus.suspended) continue
-    if (!requiredProvidersAvailable(index, status, available, index.dependencies(id))) continue
+    if (id === request.provider || !state(id).suspended) continue
+    if (!requiredProvidersAvailable(index, state, available, index.dependencies(id))) continue
     available.add(id)
     eligible.push(id)
   }
@@ -346,7 +372,7 @@ export function planResume(
 /** Plans inactive required providers before the requested activation roots. */
 export function planActivation(
   index: ITopologyIndexReader,
-  status: IDependencyStatusReader,
+  state: IDependencyStateReader,
   roots: readonly string[]
 ): IDependencyPlan {
   /** Required providers reached upstream from the requested roots. */
@@ -365,7 +391,7 @@ export function planActivation(
   /** Inactive providers emitted in canonical provider-first order. */
   const activating = index
     .order(reached)
-    .filter((id) => !roots.includes(id) && status(id) === DependencyNodeStatus.inactive)
+    .filter((id) => !roots.includes(id) && !state(id).activated)
   return createPlan(
     activating.map((id) => ({ id, action: DependencyAction.activate })),
     collectPlanEdges(index, new Set(activating))
