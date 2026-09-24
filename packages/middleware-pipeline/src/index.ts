@@ -8,14 +8,26 @@ import {
   createMiddlewarePipelineInvalidOptionError
 } from './signal-errors.js'
 
-const invokeSync = <TValue>(
-  stage: ISyncMiddlewareStage<TValue>,
-  value: TValue,
-  next: (value: TValue) => void,
+/** Invokes a one-argument optional-context callback. */
+function invokeWithContext<TFirst, TResult>(
+  callback: (first: TFirst, context?: IMiddlewarePipelineContext) => TResult,
+  args: readonly [TFirst],
   context: IMiddlewarePipelineContext | undefined
-): void => {
-  if (context) stage(value, next, context)
-  else stage(value, next)
+): TResult
+/** Invokes a two-argument optional-context callback. */
+function invokeWithContext<TFirst, TSecond, TResult>(
+  callback: (first: TFirst, second: TSecond, context?: IMiddlewarePipelineContext) => TResult,
+  args: readonly [TFirst, TSecond],
+  context: IMiddlewarePipelineContext | undefined
+): TResult
+/** Implements both supported callback arities without reflective invocation. */
+function invokeWithContext(
+  callback: Function,
+  args: readonly [unknown] | readonly [unknown, unknown],
+  context: IMiddlewarePipelineContext | undefined
+): unknown {
+  if (args.length === 1) return context ? callback(args[0], context) : callback(args[0])
+  return context ? callback(args[0], args[1], context) : callback(args[0], args[1])
 }
 import {
   GENERATOR_CONTINUE,
@@ -97,6 +109,38 @@ export type IMiddlewarePipelineOptions = {
   /** Host-owned error construction for the stage+downstream failure case. */
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown
   readonly signal?: IMiddlewarePipelineAbortSignal
+}
+
+/** One reusable next-call protocol shared by adapters and runners. */
+const createNextGuard = <TValue, TResult>(
+  onViolation: IMiddlewarePipelineViolationHandler,
+  reject: () => TResult,
+  accept: (value: TValue) => TResult
+): Readonly<{
+  readonly next: (value: TValue) => TResult
+  readonly called: () => boolean
+  readonly returned: () => void
+}> => {
+  let called = false
+  let returned = false
+  return Object.freeze({
+    next: (value: TValue): TResult => {
+      if (returned) {
+        onViolation(MiddlewarePipelineViolation.late)
+        return reject()
+      }
+      if (called) {
+        onViolation(MiddlewarePipelineViolation.duplicate)
+        return reject()
+      }
+      called = true
+      return accept(value)
+    },
+    called: () => called,
+    returned: () => {
+      returned = true
+    }
+  })
 }
 
 const invalidSignal = (cause?: unknown): TypeError =>
@@ -195,24 +239,22 @@ export const adaptSyncStageToAsync =
   ): IAsyncMiddlewareStage<TValue> =>
   async (value, next, context) => {
     let downstream: Promise<void> | undefined
-    let called = false
-    let returned = false
+    const guard = createNextGuard<TValue, void>(
+      onViolation,
+      () => undefined,
+      (nextValue) => {
+        downstream = next(nextValue)
+      }
+    )
     let stageError: unknown
     let hasStageError = false
     try {
-      const nextHandler = (nextValue: TValue): void => {
-        if (returned) return onViolation(MiddlewarePipelineViolation.late)
-        if (called) return onViolation(MiddlewarePipelineViolation.duplicate)
-        called = true
-        downstream = next(nextValue)
-      }
-      if (context) stage(value, nextHandler, context)
-      else stage(value, nextHandler)
+      invokeWithContext(stage, [value, guard.next], context)
     } catch (error) {
       stageError = error
       hasStageError = true
     }
-    returned = true
+    guard.returned()
     let downstreamError: unknown
     let hasDownstreamError = false
     if (downstream) {
@@ -236,18 +278,17 @@ export const adaptSyncStageToGenerator = <TValue>(
   onViolation: IMiddlewarePipelineViolationHandler
 ): IGeneratorMiddlewareStage<TValue> =>
   function* (value, context) {
-    let passed = false
-    let returned = false
     let nextValue = value
-    const nextHandler = (candidate: TValue): void => {
-      if (returned) return onViolation(MiddlewarePipelineViolation.late)
-      if (passed) return onViolation(MiddlewarePipelineViolation.duplicate)
-      passed = true
-      nextValue = candidate
-    }
-    invokeSync(stage, value, nextHandler, context)
-    returned = true
-    if (!passed) return GENERATOR_HALT
+    const guard = createNextGuard<TValue, void>(
+      onViolation,
+      () => undefined,
+      (candidate) => {
+        nextValue = candidate
+      }
+    )
+    invokeWithContext(stage, [value, guard.next], context)
+    guard.returned()
+    if (!guard.called()) return GENERATOR_HALT
     yield nextValue
     return GENERATOR_CONTINUE
   }
@@ -257,7 +298,7 @@ export const adaptGeneratorStageToAsyncGenerator = <TValue>(
   stage: IGeneratorMiddlewareStage<TValue>
 ): IAsyncGeneratorMiddlewareStage<TValue> =>
   async function* (value, context) {
-    return yield* context ? stage(value, context) : stage(value)
+    return yield* invokeWithContext(stage, [value], context)
   }
 
 /** Promotes a sync next-style stage through the canonical sync-to-generator violation guard. */
@@ -280,26 +321,23 @@ export const runSyncMiddleware = <TValue>(
   let current = value
   for (let index = 0; index < stageSnapshot.length; index += 1) {
     const stage = stageSnapshot[index]
-    let called = false
-    let returned = false
     let nextValue = current
-    const next = (valueAfter: TValue): void => {
-      if (returned) return onViolation(MiddlewarePipelineViolation.late)
-      if (called) return onViolation(MiddlewarePipelineViolation.duplicate)
-      called = true
-      nextValue = valueAfter
-    }
+    const guard = createNextGuard<TValue, void>(
+      onViolation,
+      () => undefined,
+      (valueAfter) => {
+        nextValue = valueAfter
+      }
+    )
     check(context)
-    if (context) stage(current, next, context)
-    else stage(current, next)
-    returned = true
+    invokeWithContext(stage, [current, guard.next], context)
+    guard.returned()
     check(context)
-    if (!called) return
+    if (!guard.called()) return
     current = nextValue
   }
   check(context)
-  if (context) done(current, context)
-  else done(current)
+  invokeWithContext(done, [current], context)
 }
 
 export const runAsyncMiddleware = async <TValue>(
@@ -343,11 +381,9 @@ export const runAsyncMiddleware = async <TValue>(
     if (index >= stageSnapshot.length) {
       completed = true
       check(context)
-      return context ? done(current, context) : done(current)
+      return invokeWithContext(done, [current], context)
     }
     let pending: Promise<void> | undefined
-    let called = false
-    let returned = false
     /** Control metadata owned by this frame for its directly started downstream step. */
     const downstreamControlPath: IAsyncControlPath = {
       hasActiveError: false,
@@ -356,35 +392,29 @@ export const runAsyncMiddleware = async <TValue>(
     /** Captured downstream rejection; observation starts before the stage settles. */
     let downstreamError: unknown
     let hasDownstreamError = false
-    const next = (nextValue: TValue): Promise<void> => {
-      if (returned) {
-        options.onViolation(MiddlewarePipelineViolation.late)
-        return Promise.resolve()
+    const guard = createNextGuard<TValue, Promise<void>>(
+      options.onViolation,
+      () => Promise.resolve(),
+      (nextValue) => {
+        /** Internal downstream Promise retained for independent failure observation. */
+        const downstreamPromise = invokeStep(nextValue, downstreamControlPath)
+        pending = downstreamPromise
+        void downstreamPromise.then(undefined, (error) => {
+          downstreamError = error
+          hasDownstreamError = true
+        })
+        return downstreamPromise
       }
-      if (called) {
-        options.onViolation(MiddlewarePipelineViolation.duplicate)
-        return Promise.resolve()
-      }
-      called = true
-      /** Internal downstream Promise retained for independent failure observation. */
-      const downstreamPromise = invokeStep(nextValue, downstreamControlPath)
-      pending = downstreamPromise
-      void downstreamPromise.then(undefined, (error) => {
-        downstreamError = error
-        hasDownstreamError = true
-      })
-      return downstreamPromise
-    }
+    )
     let stageError: unknown
     let hasStageError = false
     try {
-      if (context) await stage(current, next, context)
-      else await stage(current, next)
+      await invokeWithContext(stage, [current, guard.next], context)
     } catch (error) {
       stageError = error
       hasStageError = true
     }
-    returned = true
+    guard.returned()
     if (pending) {
       try {
         await pending
@@ -443,12 +473,8 @@ export const runAsyncMiddleware = async <TValue>(
     drainingSpill = true
     while (spill.length > 0) {
       const request = spill.shift()!
-      try {
-        const result = step(request.value, request.parentControlPath)
-        void result.then(request.resolve, request.reject)
-      } catch (error) {
-        request.reject(error)
-      }
+      const result = step(request.value, request.parentControlPath)
+      void result.then(request.resolve, request.reject)
     }
     drainingSpill = false
   }
@@ -487,7 +513,7 @@ export const runGeneratorMiddleware = <TValue>(
   let current = value
   for (const stage of stageSnapshot) {
     check(context)
-    const iterator = context ? stage(current, context) : stage(current)
+    const iterator = invokeWithContext(stage, [current], context)
     let last = current
     let step = iterator.next()
     while (!step.done) {
@@ -506,8 +532,7 @@ export const runGeneratorMiddleware = <TValue>(
     current = reduction.value
   }
   check(context)
-  if (context) done(current, context)
-  else done(current)
+  invokeWithContext(done, [current], context)
 }
 
 /** Serially drains asynchronous generator stages and commits only each terminal transition. */
@@ -525,7 +550,7 @@ export const runAsyncGeneratorMiddleware = async <TValue>(
   for (const stage of stageSnapshot) {
     /** Iterator is driven with its native receiver through direct method syntax. */
     check(context)
-    const iterator = context ? stage(current, context) : stage(current)
+    const iterator = invokeWithContext(stage, [current], context)
     let last = current
     let step = await iterator.next()
     while (!step.done) {
@@ -544,6 +569,5 @@ export const runAsyncGeneratorMiddleware = async <TValue>(
     current = reduction.value
   }
   check(context)
-  if (context) await done(current, context)
-  else await done(current)
+  await invokeWithContext(done, [current], context)
 }
