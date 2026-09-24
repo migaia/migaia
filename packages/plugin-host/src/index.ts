@@ -32,14 +32,19 @@ export type { IPluginHostInstalledPlugins } from './host-runtime.js'
 export type { IPluginHostIdentity } from './host-identity.js'
 export {
   PluginHostStatus,
-  PluginHostPipelineMode,
   PluginHostRegistrationLifecycle,
-  PluginHostPipelineViolation,
   type IPluginHostStatus,
-  type IPluginHostPipelineMode,
-  type IPluginHostRegistrationLifecycle,
-  type IPluginHostPipelineViolation
+  type IPluginHostRegistrationLifecycle
 } from './state-constants.js'
+export {
+  MiddlewarePipelineMode,
+  MiddlewarePipelineViolation,
+  type IMiddlewarePipelineMode,
+  type ISyncMiddlewareStage,
+  type IAsyncMiddlewareStage,
+  type IGeneratorMiddlewareStage,
+  type IAsyncGeneratorMiddlewareStage
+} from '@migaia/middleware-pipeline'
 export { PluginHostErrorCode } from './typing.js'
 export { default as ERROR_TEXT, PluginHostError } from './error-text.js'
 export type { ILocaleKey } from './error-text.js'
@@ -91,12 +96,7 @@ export type {
   IPluginBatchRemovalOptions,
   IPluginBatchRemovalResult,
   IPluginBatchRemovalLeaf,
-  IPipelineMode,
-  IPipelineConfig,
-  ISyncPipelineStage,
-  IAsyncPipelineStage,
-  IGeneratorPipelineStage,
-  IAsyncGeneratorPipelineStage
+  IPipelineConfig
 } from './typing.js'
 export type {
   IFeature,
@@ -113,12 +113,6 @@ export type {
   IFeatureRecordRequiredExpose
 } from './feature-types.js'
 export { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED } from './typing.js'
-export {
-  adaptGeneratorStageToAsyncGenerator,
-  adaptSyncStageToAsync,
-  adaptSyncStageToAsyncGenerator,
-  adaptSyncStageToGenerator
-} from './pipeline.js'
 export { disposeKey, asyncDisposeKey } from './symbols.js'
 export { invokeCaptured } from './invocation.js'
 export { createRegistrationView } from './composition.js'

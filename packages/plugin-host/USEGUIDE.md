@@ -90,11 +90,13 @@ const host = new Host({
 | `host.config.get(path)`                 | `path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`        | `unknown \| undefined`                                  | 同步读取；对象/数组返回 Readonly 懒代理；未知插件或路径返回 `undefined`。         |
 | `host.config.update(name, recipe)`      | `name: string`；`recipe(previous) => Partial<patch>`（须同步返回） | `Promise<void>`                                         | Copy-on-Write 合并 patch，跑 `plugin.update(next, core)` 成功才提交。             |
 | `host.pipelineMode`                     | 无（只读属性）                                                     | `'sync' \| 'async' \| 'generator' \| 'async-generator'` | 构造时固定的 pipeline 模式。                                                      |
-| `host.usePipeline(stage)`               | `stage: (value, next) => void`                                     | `this`                                                  | 按当前 mode 注册；async/generator/async-generator mode 会自动适配这个 sync 签名。 |
-| `host.useAsyncPipeline(stage)`          | `stage: (value, next) => void \| Promise<void>`                    | `this`                                                  | 仅 async mode 可用，否则抛 `PIPELINE_MODE_MISMATCH`；`next()` 返回 Promise。      |
-| `host.useGeneratorPipeline(stage)`      | `stage: (value) => Generator<...>`                                 | `this`                                                  | 仅 generator mode 可用，否则抛 `PIPELINE_MODE_MISMATCH`。                         |
-| `host.useAsyncGeneratorPipeline(stage)` | `stage: (value) => AsyncGenerator<...>`                            | `this`                                                  | 仅 async-generator mode 可用，否则抛 `PIPELINE_MODE_MISMATCH`。                   |
+| `host.usePipeline(stage)`               | `stage: (value, next) => void`                                     | `this`                                                  | sync stage 可提升到任意 Host mode。                                                |
+| `host.useAsyncPipeline(stage)`          | `stage: (value, next) => void \| Promise<void>`                    | `this`                                                  | 仅 async mode 可用；`next()` 返回 Promise。                                       |
+| `host.useGeneratorPipeline(stage)`      | `stage: (value) => Generator<...>`                                 | `this`                                                  | 可用于 generator 与 async-generator mode，后者由 runner 提升。                   |
+| `host.useAsyncGeneratorPipeline(stage)` | `stage: (value) => AsyncGenerator<...>`                            | `this`                                                  | 仅 async-generator mode 可用。                                                    |
 | `PluginHost.setLocale(locale)`          | `locale: 'en' \| 'zh'`（静态方法）                                 | `void`                                                  | 切换内置错误文案语言，默认 `'zh'`，影响全局、全部 Host 实例（非按实例隔离）。     |
+
+无法提升的组合会同步抛顶层 `PluginHostError`，`code === 'PIPELINE_MODE_MISMATCH'`；其 `cause` 是 middleware-pipeline 原始 `TypeError`，携带 `code === 'INVALID_OPTION'` 与 `source === '@migaia/middleware-pipeline'`。
 
 `host.config.get(path)` 与 `host.config.update()` 都要求 Host 处于 `active` 状态，否则前者同步抛 `HOST_DISPOSING`/`HOST_DISPOSED`，后者在其内部队列任务中以同样的错误 reject。两者的"找不到插件"语义不对称：`get(path)` 对不存在的插件或缺失路径返回 `undefined`（读取是探测性操作）；`update(name, ...)` 对不存在的插件抛出 `PLUGIN_NOT_INSTALLED`（写入是明确的意图表达）。`host.config` facade 本身在重复访问时保持同一引用（懒加载单例）。
 
@@ -170,9 +172,9 @@ const configurable = definePlugin({
 | --------------------------------------- | -------------------------------------------------------------------- | --------------- | -------------------- | --------- | ------------------------------------------------------------------------------------ |
 | `core.config.get<T>()`                  | 可选泛型 `T`，通常由插件 `config` 推导                               | 无运行时参数    | `IReadonlyConfig<T>` | 同步      | 当前插件已提交配置的只读懒代理；嵌套对象/数组按访问路径缓存代理，不允许修改。        |
 | `core.onDispose(resource)`              | `IPluginResource`（函数 / `Symbol.dispose` / `Symbol.asyncDispose`） | `resource` 必填 | `void`               | 同步      | **仅 `install()` 期间可调用**；否则抛 `RESOURCE_OUTSIDE_INSTALL`；卸载时按逆序执行。 |
-| `core.usePipeline(stage)`               | `stage: (value, next) => void`                                       | `stage` 必填    | `core`               | 同步      | 同 Host 侧 `usePipeline`；仅 install 期间可注册，pipeline 执行期间也拒绝。           |
+| `core.usePipeline(stage)`               | `stage: (value, next) => void`                                       | `stage` 必填    | `core`               | 同步      | 仅 install 期间注册；sync stage 可提升到任意 Host mode。                            |
 | `core.useAsyncPipeline(stage)`          | `stage: (value, next) => void \| Promise<void>`                      | `stage` 必填    | `core`               | 同步      | 仅 install 期间、且 Host mode 为 `async` 时可用。                                    |
-| `core.useGeneratorPipeline(stage)`      | `stage: (value) => Generator`                                        | `stage` 必填    | `core`               | 同步      | 仅 install 期间、且 Host mode 为 `generator` 时可用。                                |
+| `core.useGeneratorPipeline(stage)`      | `stage: (value) => Generator`                                        | `stage` 必填    | `core`               | 同步      | 仅 install 期间，可用于 `generator` 与 `async-generator` mode。                      |
 | `core.useAsyncGeneratorPipeline(stage)` | `stage: (value) => AsyncGenerator`                                   | `stage` 必填    | `core`               | 同步      | 仅 install 期间、且 Host mode 为 `async-generator` 时可用。                          |
 
 `core.config`/`core.onDispose`/`core.usePipeline`/`core.useAsyncPipeline`/`core.useGeneratorPipeline`/`core.useAsyncGeneratorPipeline` 是 core facade 的**保留键**：领域 core（`createPluginDomainCore()` 的返回值）若定义了同名字段，会在构造 core 时抛 `TypeError`（`INVALID_OPTION`）。
@@ -318,7 +320,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 安装依赖者时，必需 Feature provider 被禁用抛 `PREREQUISITE_DISABLED`，被卸载抛 `PREREQUISITE_REMOVED`，从未安装抛 `PREREQUISITE_MISSING`，批内成环抛 `DEPENDENCY_CYCLE`；它们都在任何 install 执行前、以顶层错误抛出。provider 仍被禁用时单独 `enable` 依赖者抛 `PREREQUISITE_DISABLED`；`token.enable()` 会先检查整组恢复集合，不满足则一个都不启用。
 
-依赖感知的 `disable`/`unUse` 默认拒绝破坏必需依赖，`detail.blockedBy` 按级联处理顺序列出**全部**传递依赖者；可显式使用 `cascade`，或先 `dryRun` 取得 `{ order, edges }` 计划。`edges` 中可选边标 `optional: true`，可选 provider 缺席的边额外带 `status: 'optional-absent'`。托管组合协议的 `prepareUnUseBatch`/`commitPreparedUnUseBatch` 同样拒绝留下必需依赖者，并按依赖者优先的顺序清理；`host.dispose()` 也按依赖者优先的顺序释放。
+依赖感知的 `disable`/`unUse` 接受 `{ policy?: 'reject' | 'cascade' | 'suspend'; dryRun?: boolean }`，默认 `reject`；`detail.blockedBy` 按级联处理顺序列出**全部**传递依赖者。`policy: 'cascade'` 连同依赖者一起处理；`policy: 'suspend'` 保留已激活依赖者的实例与资源，但句柄和已取出的 extension 抛 `PLUGIN_SUSPENDED`，stage 暂时离开 pipeline。`dryRun` 返回 `{ policy, order, steps, edges }`。旧 `{ cascade: true }` 被拒绝为 `INVALID_OPTION`。同一 provider 重新启用时直接恢复；同名新 provider 安装后按 capability `planResume` 对直接依赖者 rebind/restart，其余可满足的传递依赖者 resume。托管组合协议仍拒绝留下必需依赖者，并按依赖者优先顺序清理；`host.dispose()` 也按依赖者优先顺序释放，包括挂起注册。
 
 ## 热替换与惰性激活
 
@@ -334,7 +336,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 ## 9. 错误码完整参考
 
-`PluginHostErrorCode` 导出以下 41 个稳定错误码，均可通过 `error.code` 分支处理：
+`PluginHostErrorCode` 导出以下稳定错误码，均可通过 `error.code` 分支处理：
 
 | code                               | 含义                                                                                                                                                                                                                                                                             |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -343,11 +345,12 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 | `PLUGIN_DUPLICATE`                 | 插件已安装，或同一批次中出现重复名字。                                                                                                                                                                                                                                           |
 | `PLUGIN_NOT_INSTALLED`             | 目标插件未安装（`unUse`/`config.update` 找不到对应插件）。                                                                                                                                                                                                                       |
 | `PLUGIN_DISABLED`                  | 句柄所指插件当前已禁用；先启用该插件再访问。                                                                                                                                                                                                                                     |
+| `PLUGIN_SUSPENDED`                 | 插件因必需 provider 不可用而挂起；恢复 provider，或显式卸载该插件。                                                                                                                                                                                                               |
 | `PLUGIN_NOT_ACTIVATED`             | 惰性插件尚未激活；先执行 `await host.activate(name)`。                                                                                                                                                                                                                           |
 | `FEATURE_NOT_DECLARED`             | `getFeature(name)` 请求了插件未声明的 feature。                                                                                                                                                                                                                                  |
 | `PREREQUISITE_MISSING`             | 必需 feature provider 尚未安装。                                                                                                                                                                                                                                                 |
 | `DEPENDENCY_CYCLE`                 | feature 引用形成依赖环；本批次不会执行任何 install。                                                                                                                                                                                                                             |
-| `DEPENDENCY_BLOCKED`               | 卸载或禁用 provider 时仍有必需依赖者；查看 `detail.blockedBy`，或显式使用 `cascade`/`dryRun`。                                                                                                                                                                                   |
+| `DEPENDENCY_BLOCKED`               | 卸载或禁用 provider 时仍有必需依赖者；查看 `detail.blockedBy`，或使用 `policy: 'cascade'`、`policy: 'suspend'` 或 `dryRun`。                                                                                                                                                    |
 | `REPLACE_NAME_MISMATCH`            | `replace(name, next)` 的两个插件名不一致。                                                                                                                                                                                                                                       |
 | `DEPENDENT_RESTART_FAILED`         | `replace()` 已提交新实现，但需要重启的依赖者重装失败；它们保持卸载。`cause` 为 `AggregateError`（首项为重装失败），`detail.dependents` 列出受影响插件；修复后重新安装它们。 |
 | `PLUGIN_DEFINITION_INVALID`        | 插件定义含已退役或不受支持的字段（例如 `shared`）。                                                                                                                                                                                                                              |
@@ -365,7 +368,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 | `RESOURCE_OUTSIDE_INSTALL`         | 在允许的插件生命周期之外注册资源或 pipeline stage。                                                                                                                                                                                                                              |
 | `LIFECYCLE_MUTATION`               | 插件生命周期钩子内尝试变更 Host，见 [§8](#8-生命周期与错误)。                                                                                                                                                                                                                    |
 | `INVALID_PIPELINE_MODE`            | 构造时传入的 pipeline mode 无效。                                                                                                                                                                                                                                                |
-| `PIPELINE_MODE_MISMATCH`           | Host mode 合法，但调用了与当前 mode 不匹配的 stage 注册方法（比如 sync 模式下调用了 `useAsyncPipeline`）。                                                                                                                                                                       |
+| `PIPELINE_MODE_MISMATCH`           | stage 不能由 middleware-pipeline runner 提升到 Host mode；顶层为带 Host 身份的 `PluginHostError`，`cause` 保留上游 `TypeError`（`INVALID_OPTION`，source 为 `@migaia/middleware-pipeline`）。                                                                                       |
 | `PIPELINE_NEXT_DUPLICATE`          | 同一次 stage 调用里重复调用了 `next()`。                                                                                                                                                                                                                                         |
 | `PIPELINE_NEXT_LATE`               | 诊断（非抛出）：stage 已经返回/完成之后才调用 `next()`；通过 `diagnostic` 回调上报，该次调用被忽略。                                                                                                                                                                             |
 | `PIPELINE_EXECUTING`               | pipeline 执行期间尝试注册新 stage。                                                                                                                                                                                                                                              |
@@ -404,14 +407,17 @@ core.onDispose({ [Symbol.asyncDispose]: async () => await cleanup() }) // 异步
 
 ---
 
-## 11. 底层适配器与信号量
+## 11. Pipeline 类型与信号量
 
 ```ts
 import {
-  adaptSyncStageToAsync,
-  adaptSyncStageToGenerator,
-  adaptGeneratorStageToAsyncGenerator,
-  adaptSyncStageToAsyncGenerator,
+  MiddlewarePipelineMode,
+  MiddlewarePipelineViolation,
+  type IMiddlewarePipelineMode,
+  type ISyncMiddlewareStage,
+  type IAsyncMiddlewareStage,
+  type IGeneratorMiddlewareStage,
+  type IAsyncGeneratorMiddlewareStage,
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
   GENERATOR_UNDEFINED,
@@ -423,23 +429,11 @@ import {
 } from '@migaia/plugin-host'
 ```
 
-这一组导出面向**自己动手拼装 pipeline 执行、或直接对接 `@migaia/middleware-pipeline`** 的场景，日常使用 `host.use()`/`usePipeline()` 不需要它们。
-
-- **`adaptSyncStageToAsync<TValue>(stage: ISyncPipelineStage<TValue>, onViolation?: (kind) => void): IAsyncPipelineStage<TValue>`**——把一个 `(value, next) => void` 形状的 sync stage 包装成 async stage（`(value, next) => Promise<void> | void`），语义与 Host 内部把 `usePipeline()` 注册的 stage 适配进 async/generator/async-generator mode 时完全一致。`onViolation` 默认空函数。
-- **`adaptSyncStageToGenerator<TValue>(stage: ISyncPipelineStage<TValue>, onViolation: (kind) => void): IGeneratorPipelineStage<TValue>`**——同上，适配成 generator stage；`onViolation` **必填**（没有默认值）。
-- **`adaptGeneratorStageToAsyncGenerator<TValue>(stage: IGeneratorPipelineStage<TValue>): IAsyncGeneratorPipelineStage<TValue>`**——把一个已有的 generator stage 提升为 async-generator stage，通过 `yield*` 委托，原样保留每次 yield、terminal sentinel、调用次数与 throw identity，不改变任何行为。
-- **`adaptSyncStageToAsyncGenerator<TValue>(stage: ISyncPipelineStage<TValue>, onViolation: (kind) => void): IAsyncGeneratorPipelineStage<TValue>`**——组合前两个适配器：先用 `adaptSyncStageToGenerator` 的短路/duplicate/late 检测把 sync stage 变成 generator stage，再用 `adaptGeneratorStageToAsyncGenerator` 提升为 async-generator stage；`onViolation` **必填**。没有 `adaptAsyncStageToAsyncGenerator`——async 的递归 `next()` 洋葱模型（含双失败合并、active 控制路径）无法无损映射为 stage-local 的 yield 序列，这不是遗漏，是两种模型结构不兼容。
+mode、violation 与四种 stage 类型都从 `@migaia/middleware-pipeline` **原名转发**。plugin-host 不再维护重复的 mode/stage 声明或公开适配器；宿主在注册 stage 时通过其唯一的 `createPipeline` runner 执行提升。需要手工提升或直接执行 pipeline 时使用 `@migaia/middleware-pipeline` 的 `createPipeline`。
 - **`GENERATOR_CONTINUE` / `GENERATOR_HALT` / `GENERATOR_UNDEFINED`**——generator/async-generator pipeline 共用的哨兵值（`unique symbol`，从 `@migaia/middleware-pipeline` 转发，保持跨包同一身份）：stage 的 `return` 可以返回它们中的一个来表达"继续/终止/显式 undefined"，语义见 [§7](#7-pipeline-处理管线) 表格。
 - **`disposeKey: unique symbol` / `asyncDisposeKey: unique symbol`**——本包自声明的 symbol（不依赖 `ESNext.Disposable` lib，因此不强制要求该 lib 的类型声明）。插件/资源可以用这两个 key 之一声明清理方法，运行时会把自声明 symbol 与宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`（若当前运行时提供）都识别为等价键；宿主不提供原生 symbol 时，只有自声明 symbol 生效。
 - **`invokeCaptured(callable, receiver, args)`**——框架适配器用于保留 JavaScript receiver、参数顺序和抛出值身份的低层调用边界。业务插件应直接调用自己的函数；只有已经独立完成 callable/receiver/args 准入的适配器才应使用它。
 - **`PluginHostDisposalNodeKind` / `readPluginHostDisposalProvenance(error)`**——清理诊断协议。前者区分 host error、aggregate 和 disposer wrapper；后者只读取本物理包实例登记的 provenance，未知错误或另一份重复安装的包实例会返回 `undefined`，不会按对象外形猜测。它用于日志与审计，不应代替 `source`/`code`/`cause` 错误处理。
-
-```ts
-import { adaptSyncStageToAsync } from '@migaia/plugin-host'
-
-// 直接对接 @migaia/middleware-pipeline 的 async runner，复用同一个 sync stage 实现
-const asyncStage = adaptSyncStageToAsync<string>((value, next) => next(value.trim()))
-```
 
 ---
 
