@@ -1,5 +1,5 @@
 import type { IAbortSignal, ILifecycleScope, IProvisionalScope } from '@migaia/lifecycle'
-import type { IMiddlewarePipelineViolationHandler } from '@migaia/middleware-pipeline'
+import type { IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
 import { createPluginCore } from './core.js'
 import { resolveDisposer } from './disposal.js'
@@ -8,7 +8,7 @@ import { PluginHostErrorCode } from './error-code.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IRegistration } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IPluginHostCore, IPluginResource, IPipelineMode } from './typing.js'
+import type { IPluginHostCore, IPluginResource } from './typing.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 
 export type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
@@ -22,12 +22,10 @@ export type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Rea
   readonly createDomainCore: (request: IHostCoreConstructionRequest) => TDomainCore
   readonly assertRegistrationValid: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly executionSignal: IAbortSignal
-  readonly pipelineMode: () => IPipelineMode
-  readonly onPipelineViolation: IMiddlewarePipelineViolationHandler
   readonly registerStage: (
     stage: Function,
     registration: IRegistration<TDomainCore, TValue>,
-    kind: IPipelineMode
+    kind: IMiddlewarePipelineMode
   ) => void
   readonly cleanupRuntime: PluginHostCleanupRuntime
 }>
@@ -66,8 +64,6 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
       lifecycle: () => ({
         signal: registration.lifecycleController?.signal ?? this.#port.executionSignal
       }),
-      pipelineMode: this.#port.pipelineMode,
-      onPipelineViolation: this.#port.onPipelineViolation,
       registerResource: (resource) => this.#registerResource(registration, resource),
       registerStage: (stage, kind) => this.#port.registerStage(stage, registration, kind)
     })

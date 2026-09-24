@@ -1,144 +1,99 @@
-import { PluginHostPipelineMode } from './state-constants.js'
+import type { IMiddlewarePipelineMode, IMiddlewarePipelineStage } from '@migaia/middleware-pipeline'
 import { registerPluginHostStage } from './pipeline-runtime.js'
 import type { IQuiescenceTracker } from '@migaia/lifecycle'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IRegistration } from './registry.js'
-import type {
-  IAsyncGeneratorPipelineStage,
-  IAsyncPipelineStage,
-  IGeneratorPipelineStage,
-  IPipelineMode,
-  ISyncPipelineStage
-} from './typing.js'
 
-/** One lane per execution algebra; a host runs exactly one of them but holds all four. */
+/** The one canonical lane already lifted into the host execution mode. */
 export type ILaneSet<TValue> = {
-  syncStages: ISyncPipelineStage<TValue>[]
-  asyncStages: IAsyncPipelineStage<TValue>[]
-  generatorStages: IGeneratorPipelineStage<TValue>[]
-  asyncGeneratorStages: IAsyncGeneratorPipelineStage<TValue>[]
+  stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[]
 }
 
 /** One retained plugin stage with its original within-owner registration sequence. */
-type IOwnedStage = Readonly<{
-  readonly kind: IPipelineMode
+type IOwnedStage<TValue> = Readonly<{
   readonly owner: object
   readonly ownerName: string
-  readonly stage: Function
+  readonly stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
   readonly sequence: number
 }>
 
-/**
- * The four stage lanes, and the one rule about how execution reads them.
- *
- * `snapshot()` is the whole point: every mode runs over a copy, so a stage that registers or
- * removes another stage cannot change the sequence of the run it is inside. Two of the four modes
- * used to pass the live array straight to the runner, which meant the same program had two
- * different answers depending on which algebra it was configured with — a divergence with no design
- * behind it.
- */
+/** Owns the single host-mode stage lane and immutable execution snapshots. */
 export class StageLanes<TValue> {
-  /** Sync lane; empty until a plugin registers into it. */
-  #sync: ISyncPipelineStage<TValue>[] = []
-  /** Async lane; empty until a plugin registers into it. */
-  #async: IAsyncPipelineStage<TValue>[] = []
-  /** Generator lane; empty until a plugin registers into it. */
-  #generator: IGeneratorPipelineStage<TValue>[] = []
-  /** Async-generator lane; empty until a plugin registers into it. */
-  #asyncGenerator: IAsyncGeneratorPipelineStage<TValue>[] = []
+  /** Stages already lifted into the exact host mode. */
+  #stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[] = []
   /** Owner provenance for committed and candidate stage functions. */
   readonly stageOwners = new WeakMap<Function, string>()
-  /** Stable quiescence keys, so removal drains only the revoked plugin's stages. */
+  /** Stable quiescence keys, so removal drains only the revoked plugin stages. */
   readonly pipelineOwnerKeys = new Map<string, object>()
-  /** Canonical plugin-owned stages retained while an owner is temporarily disabled. */
-  #owned: IOwnedStage[] = []
-  /** Monotonic within-owner registration order used when rebuilding lanes. */
+  /** Canonical plugin-owned stages retained while an owner is temporarily inactive. */
+  #owned: IOwnedStage<TValue>[] = []
+  /** Monotonic within-owner registration order used when rebuilding the lane. */
   #nextSequence = 0
-  /** Frozen execution snapshots reused until a committed lane mutation invalidates them. */
-  #snapshots = new Map<IPipelineMode, readonly unknown[]>()
+  /** Frozen execution snapshot reused until a committed lane mutation. */
+  #snapshot: readonly IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[] | undefined
 
-  /** Invalidates execution snapshots after a lane mutation. */
+  /** Invalidates the execution snapshot after a lane mutation. */
   #invalidate(): void {
-    this.#snapshots.clear()
+    this.#snapshot = undefined
   }
 
-  /**
-   * Registers one stage into its lane.
-   *
-   * The lanes, the slot table and the two ownership ledgers are all read by this one operation, and
-   * they now live together — the host used to hand twelve separate references to it, which meant
-   * the host had to keep holding all twelve for no other reason.
-   */
+  /** Registers one stage after the host runner has lifted it into the host mode. */
   register<TDomainCore extends object>(context: {
     readonly host: object
-    readonly hostMode: IPipelineMode
-    readonly kind: IPipelineMode
+    readonly kind: IMiddlewarePipelineMode
     readonly depth: number
     readonly stage: Function
+    readonly lift: (
+      stage: Function,
+      kind: IMiddlewarePipelineMode
+    ) => IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
     readonly owner: IRegistration<TDomainCore, TValue> | undefined
     readonly activeBatch: unknown
     readonly stageSlots: Map<string, IDataOrderSlotState>
     readonly allocateSlot: () => bigint
   }): void {
+    const lifted = context.lift(context.stage, context.kind)
     this.#invalidate()
     registerPluginHostStage({
-      ...context,
-      ...this.lanes,
+      host: context.host,
+      depth: context.depth,
+      stage: lifted,
+      owner: context.owner,
+      activeBatch: context.activeBatch,
+      stages: this.#stages,
+      stageSlots: context.stageSlots,
       stageOwners: this.stageOwners,
       pipelineOwnerKeys: this.pipelineOwnerKeys,
-      readLiveStages: () => Object.values(this.lanes)
+      allocateSlot: context.allocateSlot,
+      readLiveStages: () => [this.#stages]
     } as never)
     if (context.owner)
       this.#owned.push({
-        kind: context.kind,
         owner: context.owner,
         ownerName: context.owner.name,
-        stage: context.stage,
+        stage: lifted,
         sequence: this.#nextSequence++
       })
   }
 
-  /** Rebuilds plugin-owned lanes from enabled registrations without reallocating their slots. */
+  /** Rebuilds plugin-owned stages from enabled registrations without reallocating slots. */
   rebuild<TDomainCore extends object>(
     registrations: readonly IRegistration<TDomainCore, TValue>[],
     stageSlots: ReadonlyMap<string, IDataOrderSlotState>
   ): void {
     this.#invalidate()
     const enabled = new Set<object>(registrations)
-    const compare = (left: IOwnedStage, right: IOwnedStage) => {
+    const compare = (left: IOwnedStage<TValue>, right: IOwnedStage<TValue>) => {
       const leftSlot = stageSlots.get(left.ownerName)?.ordinal ?? 1n << 100n
       const rightSlot = stageSlots.get(right.ownerName)?.ordinal ?? 1n << 100n
       return leftSlot === rightSlot ? left.sequence - right.sequence : leftSlot < rightSlot ? -1 : 1
     }
-    const select = (kind: IPipelineMode): Function[] =>
-      this.#owned
-        .filter((entry) => entry.kind === kind && enabled.has(entry.owner))
-        .sort(compare)
-        .map((entry) => entry.stage)
-    const hostSync = this.#sync.filter((stage) => this.stageOwners.get(stage) === undefined)
-    const hostAsync = this.#async.filter((stage) => this.stageOwners.get(stage) === undefined)
-    const hostGenerator = this.#generator.filter(
-      (stage) => this.stageOwners.get(stage) === undefined
-    )
-    const hostAsyncGenerator = this.#asyncGenerator.filter(
-      (stage) => this.stageOwners.get(stage) === undefined
-    )
-    this.#sync = [
-      ...hostSync,
-      ...(select(PluginHostPipelineMode.sync) as ISyncPipelineStage<TValue>[])
-    ]
-    this.#async = [
-      ...hostAsync,
-      ...(select(PluginHostPipelineMode.async) as IAsyncPipelineStage<TValue>[])
-    ]
-    this.#generator = [
-      ...hostGenerator,
-      ...(select(PluginHostPipelineMode.generator) as IGeneratorPipelineStage<TValue>[])
-    ]
-    this.#asyncGenerator = [
-      ...hostAsyncGenerator,
-      ...(select(PluginHostPipelineMode.asyncGenerator) as IAsyncGeneratorPipelineStage<TValue>[])
-    ]
+    const hostStages = this.#stages.filter((stage) => this.stageOwners.get(stage) === undefined)
+    const pluginStages = this.#owned
+      .filter((entry) => enabled.has(entry.owner))
+      .sort(compare)
+      .map((entry) => entry.stage)
+    this.#stages = [...hostStages, ...pluginStages]
   }
 
   /** Forgets canonical stages only when their owner is actually removed. */
@@ -173,59 +128,33 @@ export class StageLanes<TValue> {
     }
   }
 
-  /** The live arrays, for the runtimes that own registration and removal. */
+  /** The live lane used by candidate batches. */
   get lanes(): ILaneSet<TValue> {
-    return {
-      syncStages: this.#sync,
-      asyncStages: this.#async,
-      generatorStages: this.#generator,
-      asyncGeneratorStages: this.#asyncGenerator
-    }
+    return { stages: this.#stages }
   }
 
-  /** The stages one execution will traverse, as a copy taken at its start. */
-  snapshot(mode: IPipelineMode): readonly unknown[] {
-    const cached = this.#snapshots.get(mode)
-    if (cached) return cached
-    const lane =
-      mode === PluginHostPipelineMode.sync
-        ? this.#sync
-        : mode === PluginHostPipelineMode.async
-          ? this.#async
-          : mode === PluginHostPipelineMode.generator
-            ? this.#generator
-            : this.#asyncGenerator
-    const snapshot = Object.freeze([...lane])
-    this.#snapshots.set(mode, snapshot)
-    return snapshot
+  /** The immutable stages one execution will traverse. */
+  snapshot(): readonly IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[] {
+    if (this.#snapshot) return this.#snapshot
+    this.#snapshot = Object.freeze([...this.#stages])
+    return this.#snapshot
   }
 
-  /** A fresh copy of all four lanes, for a candidate batch that builds off the current ones. */
+  /** A fresh lane copy for a candidate install batch. */
   copy(): ILaneSet<TValue> {
-    return {
-      syncStages: [...this.#sync],
-      asyncStages: [...this.#async],
-      generatorStages: [...this.#generator],
-      asyncGeneratorStages: [...this.#asyncGenerator]
-    }
+    return { stages: [...this.#stages] }
   }
 
-  /** Adopts a committed batch's lanes wholesale; the batch built them off the current ones. */
+  /** Adopts a committed batch lane wholesale. */
   replace(next: ILaneSet<TValue>): void {
     this.#invalidate()
-    this.#sync = next.syncStages
-    this.#async = next.asyncStages
-    this.#generator = next.generatorStages
-    this.#asyncGenerator = next.asyncGeneratorStages
+    this.#stages = next.stages
   }
 
-  /** Empties all four lanes in place, keeping every array identity the runtimes already hold. */
+  /** Empties the lane and retained owner ledger. */
   clear(): void {
     this.#invalidate()
-    this.#sync.length = 0
-    this.#async.length = 0
-    this.#generator.length = 0
-    this.#asyncGenerator.length = 0
+    this.#stages.length = 0
     this.#owned = []
   }
 }

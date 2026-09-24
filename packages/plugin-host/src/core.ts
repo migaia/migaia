@@ -1,33 +1,28 @@
 import { createPluginHostTypeError } from './error-text.js'
+import {
+  MiddlewarePipelineMode,
+  type IAsyncGeneratorMiddlewareStage,
+  type IAsyncMiddlewareStage,
+  type IGeneratorMiddlewareStage,
+  type IMiddlewarePipelineMode,
+  type ISyncMiddlewareStage
+} from '@migaia/middleware-pipeline'
 import type {
-  IAsyncGeneratorPipelineStage,
-  IAsyncPipelineStage,
-  IGeneratorPipelineStage,
   IPluginConfig,
   IPluginResource,
   IPluginHostCore,
   IPluginOperationContext,
   IPluginRegistrationContext,
-  IReadonlyConfig,
-  IPipelineMode,
-  ISyncPipelineStage
+  IReadonlyConfig
 } from './typing.js'
-import {
-  adaptSyncStageToAsync,
-  adaptSyncStageToAsyncGenerator,
-  adaptSyncStageToGenerator
-} from './pipeline.js'
 import type { IRegistration } from './registry.js'
-import { PluginHostPipelineMode, type IPluginHostPipelineViolation } from './state-constants.js'
 
 export type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly registration: IRegistration<TDomainCore, TValue>
   readonly createDomainCore: () => TDomainCore
   readonly assertRegistrationValid: () => void
-  readonly pipelineMode: () => IPipelineMode
-  readonly onPipelineViolation: (kind: IPluginHostPipelineViolation) => void
   readonly registerResource: (resource: IPluginResource) => void
-  readonly registerStage: (stage: Function, kind: IPipelineMode) => void
+  readonly registerStage: (stage: Function, kind: IMiddlewarePipelineMode) => void
   readonly operation: () => IPluginOperationContext
   readonly lifecycle: () => IPluginRegistrationContext
 }
@@ -83,30 +78,20 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
     get: () => Object.freeze(context.lifecycle())
   })
   define('onDispose', (resource: IPluginResource) => context.registerResource(resource))
-  define('usePipeline', (stage: ISyncPipelineStage<TValue>) => {
-    const mode = context.pipelineMode()
-    if (mode === PluginHostPipelineMode.sync) context.registerStage(stage, mode)
-    else if (mode === PluginHostPipelineMode.async)
-      context.registerStage(adaptSyncStageToAsync(stage, context.onPipelineViolation), mode)
-    else if (mode === PluginHostPipelineMode.generator)
-      context.registerStage(adaptSyncStageToGenerator(stage, context.onPipelineViolation), mode)
-    else
-      context.registerStage(
-        adaptSyncStageToAsyncGenerator(stage, context.onPipelineViolation),
-        mode
-      )
+  define('usePipeline', (stage: ISyncMiddlewareStage<TValue>) => {
+    context.registerStage(stage, MiddlewarePipelineMode.sync)
     return facade
   })
-  define('useAsyncPipeline', (stage: IAsyncPipelineStage<TValue>) => {
-    context.registerStage(stage, PluginHostPipelineMode.async)
+  define('useAsyncPipeline', (stage: IAsyncMiddlewareStage<TValue>) => {
+    context.registerStage(stage, MiddlewarePipelineMode.async)
     return facade
   })
-  define('useGeneratorPipeline', (stage: IGeneratorPipelineStage<TValue>) => {
-    context.registerStage(stage, PluginHostPipelineMode.generator)
+  define('useGeneratorPipeline', (stage: IGeneratorMiddlewareStage<TValue>) => {
+    context.registerStage(stage, MiddlewarePipelineMode.generator)
     return facade
   })
-  define('useAsyncGeneratorPipeline', (stage: IAsyncGeneratorPipelineStage<TValue>) => {
-    context.registerStage(stage, PluginHostPipelineMode.asyncGenerator)
+  define('useAsyncGeneratorPipeline', (stage: IAsyncGeneratorMiddlewareStage<TValue>) => {
+    context.registerStage(stage, MiddlewarePipelineMode.asyncGenerator)
     return facade
   })
   return facade as TDomainCore & IPluginHostCore<TValue>

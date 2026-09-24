@@ -86,67 +86,24 @@ export { PluginHostErrorCode, type IPluginHostErrorCode } from './error-code.js'
 
 // 本文件自身也引用该类型（见 IPluginHostOptions.diagnostic）；re-export 不会把名字带进本地作用域。
 import type { IPluginHostErrorCode } from './error-code.js'
-import { PluginHostPipelineMode } from './state-constants.js'
 import {
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
-  GENERATOR_UNDEFINED
+  GENERATOR_UNDEFINED,
+  type IAsyncGeneratorMiddlewareStage,
+  type IAsyncMiddlewareStage,
+  type IGeneratorMiddlewareStage,
+  type IMiddlewarePipelineMode,
+  type ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
-import type { IMiddlewarePipelineContext } from '@migaia/middleware-pipeline'
 
-export type IPipelineMode = (typeof PluginHostPipelineMode)[keyof typeof PluginHostPipelineMode]
-export type IPipelineConfig = { mode?: IPipelineMode }
+export type IPipelineConfig = { mode?: IMiddlewarePipelineMode }
 /** Explicit generator return value for a final `undefined` payload. */
 /**
  * Generator signals are re-exported from middleware-pipeline so adapters and runners share
  * identity.
  */
 export { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED }
-type IGeneratorUndefinedSignal<TValue> = undefined extends TValue
-  ? typeof GENERATOR_UNDEFINED
-  : never
-
-/** 同步 stage。next() 必须在 stage 返回前调用；延迟调用会被忽略并告警。 */
-export type ISyncPipelineStage<TValue> = (
-  value: TValue,
-  next: (value: TValue) => void,
-  context?: IMiddlewarePipelineContext
-) => void
-
-export type IAsyncPipelineStage<TValue> = (
-  value: TValue,
-  next: (value: TValue) => Promise<void>,
-  context?: IMiddlewarePipelineContext
-) => void | Promise<void>
-
-/** Generator stage yields zero or more intermediate values; last yielded value continues. */
-export type IGeneratorPipelineStage<TValue> = (
-  value: TValue,
-  context?: IMiddlewarePipelineContext
-) => Generator<
-  TValue,
-  | TValue
-  | IGeneratorUndefinedSignal<TValue>
-  | typeof GENERATOR_HALT
-  | typeof GENERATOR_CONTINUE
-  | undefined,
-  void
->
-
-/** Async-generator stage：串行 drain 每个 stage，中间 yield 不会提前进入下一 stage。 */
-export type IAsyncGeneratorPipelineStage<TValue> = (
-  value: TValue,
-  context?: IMiddlewarePipelineContext
-) => AsyncGenerator<
-  TValue,
-  | TValue
-  | IGeneratorUndefinedSignal<TValue>
-  | typeof GENERATOR_HALT
-  | typeof GENERATOR_CONTINUE
-  | undefined,
-  void
->
-
 /** 通用插件契约；具体应用通过 TCore 暴露自己的领域能力。 */
 export type IPlugin<
   TCore,
@@ -501,10 +458,10 @@ export interface IPluginHostCore<
   readonly operation: IPluginOperationContext
   readonly lifecycle: IPluginRegistrationContext
   onDispose(resource: IPluginResource): void
-  usePipeline(stage: ISyncPipelineStage<TValue>): this
-  useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this
-  useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this
-  useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this
+  usePipeline(stage: ISyncMiddlewareStage<TValue>): this
+  useAsyncPipeline(stage: IAsyncMiddlewareStage<TValue>): this
+  useGeneratorPipeline(stage: IGeneratorMiddlewareStage<TValue>): this
+  useAsyncGeneratorPipeline(stage: IAsyncGeneratorMiddlewareStage<TValue>): this
 }
 
 export type IPluginHostOptions = {
