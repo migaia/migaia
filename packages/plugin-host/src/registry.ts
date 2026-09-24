@@ -59,6 +59,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   installed: boolean
   /** Orthogonal reachability state; disabling never changes lifecycle or releases resources. */
   enabled: boolean
+  /** Whether a missing or unavailable required provider has temporarily gated this registration. */
+  suspended: boolean
   lifecycle: (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]
   lifecycleController?: IAbortController
   operation?: IGenerationRequest

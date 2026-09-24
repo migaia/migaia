@@ -1,3 +1,5 @@
+import { createTopologyIndex, type ITopologyIndex } from '@migaia/capability/graph/topology'
+import { DependencyNodeStatus } from '@migaia/capability/graph/dependency'
 import { StageLanes } from './stage-lanes.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -5,6 +7,20 @@ import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IRegistration } from './registry.js'
+
+/** Creates the host-owned dependency index and translates structural failures at its boundary. */
+const createDependencyIndex = (): ITopologyIndex =>
+  createTopologyIndex({
+    onCycle: () => {
+      throw new PluginHostError(PluginHostErrorCode.dependencyCycle, ERROR_TEXT.DEPENDENCY_CYCLE)
+    },
+    onInvalid: () => {
+      throw new PluginHostError(
+        PluginHostErrorCode.pluginDefinitionInvalid,
+        ERROR_TEXT.PLUGIN_DEFINITION_INVALID
+      )
+    }
+  })
 
 /**
  * Every piece of mutable state a host shares with its runtimes, in one owner.
@@ -20,6 +36,8 @@ import type { IRegistration } from './registry.js'
  * `0n` and revision `0`.
  */
 export class PluginHostState<TDomainCore extends object, TValue> {
+  /** Persistent dependency facts shared by every planner invocation for this host. */
+  readonly #index = createDependencyIndex()
   /** Installed registrations by plugin name. */
   readonly registrations = new Map<string, IRegistration<TDomainCore, TValue>>()
   /** Registration owner for each immutable extension view slot. */
@@ -40,6 +58,21 @@ export class PluginHostState<TDomainCore extends object, TValue> {
 
   get revision(): number {
     return this.#revision
+  }
+
+  /** Returns the host's single mutable dependency index to planning and commit paths. */
+  dependencyIndex(): ITopologyIndex {
+    return this.#index
+  }
+
+  /** Projects one committed registration into the status vocabulary owned by capability. */
+  readDependencyStatus(name: string): DependencyNodeStatus {
+    /** Registration named by an index node; index and registry commits stay atomic. */
+    const registration = this.registrations.get(name)!
+    if (!registration.enabled) return DependencyNodeStatus.disabled
+    if (registration.suspended) return DependencyNodeStatus.suspended
+    if (!registration.activated) return DependencyNodeStatus.inactive
+    return DependencyNodeStatus.active
   }
 
   /** Reserves the next ordering ordinal. Ordinals are never reused, so order stays total. */
