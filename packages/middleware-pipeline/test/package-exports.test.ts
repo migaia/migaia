@@ -14,6 +14,7 @@ import type {
   ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
 
+/** A5 verifies the complete runtime package-boundary migration. */
 describe('package exports', () => {
   it('MP-T51/MP-T67 exposes signal contract through package boundary', async () => {
     /** Runtime package root used to verify the breaking export migration. */
