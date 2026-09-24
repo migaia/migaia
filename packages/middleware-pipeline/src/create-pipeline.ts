@@ -159,8 +159,11 @@ const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
 /** Selects a call-time signal before the construction-time default. */
 const selectControl = (
   options: INormalizedPipelineOptions,
-  control: IMiddlewarePipelineControlOptions | undefined
+  control: IMiddlewarePipelineControlOptions | null | undefined
 ): IMiddlewarePipelineControlOptions | undefined => {
+  if (control === null || typeof control !== 'object' || Array.isArray(control)) {
+    if (control !== undefined) throw invalidOption(MiddlewarePipelineSignalText.invalidOption)
+  }
   /** Call-time signal wins when supplied; creation signal remains the fallback. */
   const signal = control?.signal ?? options.signal
   return signal === undefined ? undefined : { signal }
@@ -196,9 +199,9 @@ const runForMode = (
   done: unknown,
   control: IMiddlewarePipelineControlOptions | undefined
 ): void | Promise<void> => {
-  /** Effective signal control shared by all four runner variants. */
-  const effectiveControl = selectControl(options, control)
-  if (mode === MiddlewarePipelineMode.sync)
+  if (mode === MiddlewarePipelineMode.sync) {
+    /** Sync mode keeps malformed control failures synchronous. */
+    const effectiveControl = selectControl(options, control)
     return runSyncMiddleware(
       stages as readonly ISyncMiddlewareStage<unknown>[],
       value,
@@ -207,7 +210,15 @@ const runForMode = (
       effectiveControl,
       options.assertActive
     )
-  if (mode === MiddlewarePipelineMode.async)
+  }
+  if (mode === MiddlewarePipelineMode.async) {
+    /** Async mode converts malformed control admission into a rejected Promise. */
+    let effectiveControl: IMiddlewarePipelineControlOptions | undefined
+    try {
+      effectiveControl = selectControl(options, control)
+    } catch (error) {
+      return Promise.reject(error)
+    }
     return runAsyncMiddleware(
       stages as readonly IAsyncMiddlewareStage<unknown>[],
       value,
@@ -219,7 +230,10 @@ const runForMode = (
         signal: effectiveControl?.signal
       }
     )
-  if (mode === MiddlewarePipelineMode.generator)
+  }
+  if (mode === MiddlewarePipelineMode.generator) {
+    /** Generator mode keeps malformed control failures synchronous. */
+    const effectiveControl = selectControl(options, control)
     return runGeneratorMiddleware(
       stages as readonly IGeneratorMiddlewareStage<unknown>[],
       value,
@@ -228,14 +242,21 @@ const runForMode = (
       effectiveControl,
       options.assertActive
     )
-  return runAsyncGeneratorMiddleware(
-    stages as readonly IAsyncGeneratorMiddlewareStage<unknown>[],
-    value,
-    done as (value: unknown, context?: IMiddlewarePipelineContext) => void | Promise<void>,
-    options.signals,
-    effectiveControl,
-    options.assertActive
-  )
+  }
+  try {
+    /** Async-generator mode converts malformed control admission into a rejected Promise. */
+    const effectiveControl = selectControl(options, control)
+    return runAsyncGeneratorMiddleware(
+      stages as readonly IAsyncGeneratorMiddlewareStage<unknown>[],
+      value,
+      done as (value: unknown, context?: IMiddlewarePipelineContext) => void | Promise<void>,
+      options.signals,
+      effectiveControl,
+      options.assertActive
+    )
+  } catch (error) {
+    return Promise.reject(error)
+  }
 }
 
 /** Creates a stateless sync pipeline with a value type chosen by its caller. */
