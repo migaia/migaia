@@ -1,12 +1,14 @@
 import {
+  DependencyNodeStatus,
+  DependencyPolicy,
+  planActivation,
   resolveInstallSet,
-  type DependencyPolicy,
   type IDependencyPlan
 } from '@migaia/capability/graph/dependency'
 import type { ITopologyIndexNode } from '@migaia/capability/graph/topology'
 import { isFeatureReference, readDefinedFeature } from './define-feature.js'
 import { PluginHostErrorCode } from './error-code.js'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import type { IFeatureReference } from './feature-types.js'
 import type { PluginHostState } from './host-state.js'
 import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry.js'
@@ -32,6 +34,38 @@ export const PluginInactiveProviderPolicy = {
 } as const
 
 export type PluginInactiveProviderPolicy = keyof typeof PluginInactiveProviderPolicy
+
+/** Admitted dependency mutation options shared by removal and disable entry points. */
+export type IAdmittedDependencyMutationOptions = Readonly<{
+  readonly policy: DependencyPolicy
+  readonly dryRun: boolean
+}>
+
+/** Reads the breaking R3 dependency mutation option shape and applies its reject default. */
+export const admitDependencyMutationOptions = (
+  value: unknown
+): IAdmittedDependencyMutationOptions => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
+  /** Runtime option values, including the retired compatibility key. */
+  const options = value as {
+    readonly cascade?: unknown
+    readonly policy?: unknown
+    readonly dryRun?: unknown
+  }
+  if ('cascade' in options) throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
+  /** Default policy preserves existing reject semantics. */
+  const policy = options.policy ?? DependencyPolicy.reject
+  if (
+    policy !== DependencyPolicy.reject &&
+    policy !== DependencyPolicy.cascade &&
+    policy !== DependencyPolicy.suspend
+  )
+    throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
+  if (options.dryRun !== undefined && typeof options.dryRun !== 'boolean')
+    throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
+  return Object.freeze({ policy, dryRun: options.dryRun ?? false })
+}
 
 /** Collects trusted cross-plugin references from one plugin's complete local feature closure. */
 export const collectPluginFeatureDependencies = (
@@ -90,10 +124,12 @@ export const toIndexNode = (name: string, plugin: IPluginDefinition<any>): ITopo
 export const validateInstallBatch = <TDomainCore extends object, TValue>(
   entries: readonly IInstallEntry<TDomainCore, TValue>[],
   state: PluginHostState<TDomainCore, TValue>,
-  inactive: PluginInactiveProviderPolicy = PluginInactiveProviderPolicy.reject
+  inactive: PluginInactiveProviderPolicy = PluginInactiveProviderPolicy.reject,
+  activationRoots?: readonly string[]
 ): Readonly<{
   readonly order: readonly IInstallEntry<TDomainCore, TValue>[]
   readonly installSet: ReadonlySet<string>
+  readonly activationOrder: readonly string[]
 }> => {
   /** Batch entries by stable plugin name. */
   const byName = new Map(entries.map((entry) => [entry.name, entry]))
@@ -114,6 +150,12 @@ export const validateInstallBatch = <TDomainCore extends object, TValue>(
       members,
       (name) => byName.get(name)!.plugin.activation === 'lazy'
     )
+    /** Committed inactive providers that must activate before this batch installs. */
+    const activationOrder = planActivation(
+      transaction,
+      (name) => (byName.has(name) ? DependencyNodeStatus.active : state.readDependencyStatus(name)),
+      activationRoots ?? members.filter((name) => installSet.has(name))
+    ).order.filter((name) => state.registrations.has(name))
     for (const entry of entries) {
       /** First Feature reference per provider retains the public diagnostic Feature name. */
       const references = new Map(
@@ -150,7 +192,8 @@ export const validateInstallBatch = <TDomainCore extends object, TValue>(
     }
     return Object.freeze({
       order: Object.freeze(transaction.order(members).map((name) => byName.get(name)!)),
-      installSet
+      installSet,
+      activationOrder: Object.freeze(activationOrder)
     })
   } finally {
     transaction.rollback()

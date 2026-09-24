@@ -1,5 +1,10 @@
 import { boundedWait, type ILifecycleScheduler } from '@migaia/lifecycle'
 import {
+  DependencyMutationKind,
+  DependencyPolicy,
+  planDependencyMutation
+} from '@migaia/capability/graph/dependency'
+import {
   captureCleanupFence,
   createDataOrderSlotState,
   createRegistrationReceipt,
@@ -17,7 +22,7 @@ import {
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { reportDiagnostic } from './diagnostic-report.js'
-import { planPluginDependencyMutation, readPluginBlockers } from './dependency-runtime.js'
+import type { PluginHostState } from './host-state.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry.js'
 import type {
@@ -45,6 +50,8 @@ export type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue
   readonly scheduler: ILifecycleScheduler
   readonly pipelineDrainTimeoutMs: number | false
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
+  /** Host-owned dependency facts used for one whole-batch removal plan. */
+  readonly state: PluginHostState<TDomainCore, TValue>
   readonly stageSlots: Map<string, IDataOrderSlotState>
   readonly allocateStageSlot: () => bigint
   readonly assertActive: () => void
@@ -318,21 +325,22 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
   #orderRemoval(
     registrations: readonly IRegistration<TDomainCore, TValue>[]
   ): readonly IRegistration<TDomainCore, TValue>[] {
-    const names = new Set(registrations.map((registration) => registration.name))
-    for (const registration of registrations) {
-      const blockedBy = readPluginBlockers(registration.name, this.#port.registrations).filter(
-        (name) => !names.has(name)
+    /** Exact roots held by the prepared receipt set. */
+    const names = registrations.map((registration) => registration.name)
+    /** One canonical plan replaces per-registration blocker scans and a second ordering scan. */
+    const plan = planDependencyMutation(
+      this.#port.state.dependencyIndex(),
+      (name) => this.#port.state.readDependencyStatus(name),
+      { roots: names, kind: DependencyMutationKind.remove, policy: DependencyPolicy.reject }
+    )
+    if (plan.blockedBy.length > 0)
+      throw new PluginHostError(
+        PluginHostErrorCode.dependencyBlocked,
+        ERROR_TEXT.DEPENDENCY_BLOCKED(names[0] ?? ''),
+        { detail: { blockedBy: plan.blockedBy } }
       )
-      if (blockedBy.length > 0)
-        throw new PluginHostError(
-          PluginHostErrorCode.dependencyBlocked,
-          ERROR_TEXT.DEPENDENCY_BLOCKED(registration.name),
-          { detail: { blockedBy: Object.freeze(blockedBy) } }
-        )
-    }
-    const order = planPluginDependencyMutation([...names], this.#port.registrations).order
     return Object.freeze(
-      [...registrations].sort((left, right) => order.indexOf(left.name) - order.indexOf(right.name))
+      plan.order.map((name) => this.#port.registrations.get(name)!).filter(Boolean)
     )
   }
 

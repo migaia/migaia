@@ -1,4 +1,11 @@
 import { containAsyncRejection } from '@migaia/lifecycle'
+import {
+  DependencyAction,
+  DependencyMutationKind,
+  planDependencyMutation,
+  type DependencyPolicy,
+  type IDependencyPlan
+} from '@migaia/capability/graph/dependency'
 import { reportDiagnostic } from './diagnostic-report.js'
 import { invokeCaptured } from './invocation.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
@@ -9,14 +16,13 @@ import type {
   IPluginConstraint,
   IPluginEnablement,
   IPluginDependencyMutationOptions,
-  IPluginDependencyPlan,
   IPluginRegistrationContext,
   IPluginHostDiagnostic
 } from './typing.js'
 import {
+  admitDependencyMutationOptions,
   findUnavailableProvider,
-  planPluginDependencyMutation,
-  readPluginBlockers
+  toPluginPlan
 } from './dependency-runtime.js'
 
 export type IPluginHostEnablementRuntimePort<TDomainCore extends object, TValue> = Readonly<{
@@ -57,11 +63,6 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
     return registration
   }
 
-  /** Exposes current registrations to the package-owned dependency planner. */
-  registrations(): ReadonlyMap<string, IRegistration<TDomainCore, TValue>> {
-    return this.#port.state.registrations
-  }
-
   /**
    * Rejects enabling `registration` while one of its required providers is disabled or gone; a
    * dependent must never serve against a provider that is not serving.
@@ -77,6 +78,15 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
       enabling
     )
     if (unavailable) throw unavailable
+  }
+
+  /** Plans one disable request against this runtime's current host state. */
+  planDisable(name: string, policy: DependencyPolicy): IDependencyPlan {
+    return planDependencyMutation(
+      this.#port.state.dependencyIndex(),
+      (pluginName) => this.#port.state.readDependencyStatus(pluginName),
+      { roots: [name], kind: DependencyMutationKind.disable, policy }
+    )
   }
 
   /** Disables an installed registration atomically and reports whether state changed. */
@@ -178,18 +188,21 @@ export const createPluginHostEnablementFacade = <
       admit()
       return port.enqueue(async () => {
         runtime.requireInstalled(name)
-        const required = readPluginBlockers(name, runtime.registrations())
-        if (required.length > 0 && !options.cascade)
+        /** Validated breaking option shape and default reject policy. */
+        const admitted = admitDependencyMutationOptions(options)
+        /** Capability-owned decision for this disable mutation. */
+        const plan = runtime.planDisable(name, admitted.policy)
+        if (plan.blockedBy.length > 0)
           throw new PluginHostError(
             PluginHostErrorCode.dependencyBlocked,
             ERROR_TEXT.DEPENDENCY_BLOCKED(name),
-            { detail: { blockedBy: required } }
+            { detail: { blockedBy: plan.blockedBy } }
           )
-        const plan = planPluginDependencyMutation(name, runtime.registrations())
-        if (options.dryRun) return plan satisfies IPluginDependencyPlan
+        if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
         const disabled: IRegistration<TDomainCore, TValue>[] = []
-        for (const pluginName of plan.order) {
-          const dependent = runtime.requireInstalled(pluginName)
+        for (const step of plan.steps) {
+          if (step.action !== DependencyAction.disable) continue
+          const dependent = runtime.requireInstalled(step.id)
           if (runtime.disable(dependent)) disabled.push(dependent)
         }
         return Object.freeze({

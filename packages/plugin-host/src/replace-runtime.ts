@@ -1,7 +1,8 @@
+import { DependencyAction, planReplacement, planRestart } from '@migaia/capability/graph/dependency'
 import { reportDiagnostic } from './diagnostic-report.js'
-import { planPluginDependencyMutation, readPluginDependents } from './dependency-runtime.js'
 import { PluginHostErrorCode } from './error-code.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
+import type { PluginHostState } from './host-state.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IInstallEntry, IRegistration } from './registry.js'
 import type { IPluginHostDiagnostic } from './typing.js'
@@ -10,6 +11,8 @@ import type { IPluginHostDiagnostic } from './typing.js'
 export type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Committed registrations by name, read after each publication. */
   readonly registrations: ReadonlyMap<string, IRegistration<TDomainCore, TValue>>
+  /** Host-owned topology and registration status used by capability replacement plans. */
+  readonly state: PluginHostState<TDomainCore, TValue>
   /** Installs a candidate batch; `publish: false` leaves publication to this runtime. */
   installBatch(
     entries: readonly IInstallEntry<TDomainCore, TValue>[],
@@ -80,23 +83,29 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
 
     const hookErrors: unknown[] = []
     const cleanupErrors: unknown[] = []
-    /** Direct dependents that must restart: no rebind hook, or the hook threw. */
-    const restartRoots: string[] = []
-    const dependents = readPluginDependents(name, this.#port.registrations).required
-    for (const dependentName of dependents) {
-      const dependent = this.#port.registrations.get(dependentName)
-      // An inactive lazy dependent has not resolved the provider yet; it will bind on activation.
-      if (!dependent || !dependent.activated) continue
-      const hook = dependent.plugin.onDependencyReplaced
-      if (!hook) {
-        restartRoots.push(dependentName)
-        continue
+    /** Canonical replacement decision before any dependent hook executes. */
+    const replacementPlan = planReplacement(
+      this.#port.state.dependencyIndex(),
+      (pluginName) => this.#port.state.readDependencyStatus(pluginName),
+      {
+        target: name,
+        canRebind: (pluginName) =>
+          this.#port.registrations.get(pluginName)?.plugin.onDependencyReplaced !== undefined
       }
+    )
+    /** Direct rebind failures that capability must expand into restart closures. */
+    const failedRebinds: string[] = []
+    for (const step of replacementPlan.steps) {
+      if (step.action !== DependencyAction.rebind) continue
+      const dependentName = step.id
+      const dependent = this.#port.registrations.get(dependentName)
+      if (!dependent) continue
+      const hook = dependent.plugin.onDependencyReplaced!
       try {
         await hook(name, replacement.featureOutputs ?? Object.freeze({}))
       } catch (error) {
         hookErrors.push(error)
-        restartRoots.push(dependentName)
+        failedRebinds.push(dependentName)
         reportDiagnostic(
           this.#port.diagnostic,
           ERROR_TEXT.DEPENDENCY_REBIND_FAILED(dependentName, name),
@@ -106,11 +115,21 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
       }
     }
 
-    /** Restart closure in reverse-topological order: dependents of dependents leave first. */
+    /** Initial non-rebindable closure plus failed rebind closures, dependents first. */
+    const restartRoots = [
+      ...replacementPlan.steps
+        .filter((step) => step.action === DependencyAction.restart)
+        .map((step) => step.id),
+      ...failedRebinds
+    ]
     const restartOrder =
       restartRoots.length === 0
         ? []
-        : planPluginDependencyMutation(restartRoots, this.#port.registrations).order
+        : planRestart(
+            this.#port.state.dependencyIndex(),
+            (pluginName) => this.#port.state.readDependencyStatus(pluginName),
+            restartRoots
+          ).order
     const restarted: IRegistration<TDomainCore, TValue>[] = []
     for (const restartName of restartOrder) {
       const registration = this.#port.registrations.get(restartName)
