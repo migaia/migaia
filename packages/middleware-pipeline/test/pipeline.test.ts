@@ -74,6 +74,7 @@ const assertNestedControlDoesNotEraseStageError = async (
   }
 }
 
+/** A3 reuses this unchanged behavior suite through the unified pipeline factory. */
 describe('runSyncMiddleware', () => {
   it('snapshots replacement, insertion, and deletion before sync dispatch', () => {
     const stages: Array<ISyncMiddlewareStage<number>> = []
