@@ -50,7 +50,12 @@ export function normalizeRetainedModule(moduleId, consumerDirectory, installedPa
     const packageModule = relative(approvedPackage.root, canonicalModule)
     if (packageModule === '' || packageModule.startsWith('..') || isAbsolute(packageModule))
       return `escaped-package:${moduleId}`
-    return `${packageName}/${packageModule}`
+    /** Content hashes are build-instance data; the chunk stem is the stable reviewed identity. */
+    const stablePackageModule = packageModule.replace(
+      /^(dist\/[^/]+)-[A-Za-z0-9_-]{8}\.js$/,
+      '$1-[chunk].js'
+    )
+    return `${packageName}/${stablePackageModule}`
   }
   /** Generic dependency marker keeps unreviewed third-party modules observable. */
   const dependencyMarker = '/node_modules/'

@@ -1,0 +1,1141 @@
+{
+  "packages": {
+    "@migaia/capability": {
+      ".": [
+        "CAPABILITY_SOURCE",
+        "CapabilityEnableStatus",
+        "CapabilityErrorCode",
+        "CapabilityState",
+        "createCapabilityHost",
+        "snapshotGraphReadiness"
+      ],
+      "./graph": [
+        "CAPABILITY_GRAPH_SOURCE",
+        "CapabilityGraphErrorCode",
+        "CapabilityGraphNodeState",
+        "CapabilityGraphState",
+        "TopologyInvalidReason",
+        "buildCapabilityTopology",
+        "createCapabilityGraph"
+      ],
+      "./graph/topology": [
+        "TopologyInvalidReason",
+        "buildCapabilityTopology"
+      ],
+      "./graph/dynamic": [
+        "createDynamicCapabilityGraph"
+      ]
+    },
+    "@migaia/event-subscriber": {
+      ".": [
+        "EVENT_SUBSCRIBER_SOURCE",
+        "EventApiStyle",
+        "EventDispatchPolicy",
+        "EventSubscriberErrorCode",
+        "EventSubscriberState",
+        "createEventChannel",
+        "createEventHub",
+        "defineEventApiStyle",
+        "invokeEachLive",
+        "invokeParallel",
+        "invokeParallelSettled",
+        "invokeSerial",
+        "invokeSerialSettled",
+        "invokeTask",
+        "invokeTaskSettled",
+        "subscribeOnce",
+        "subscribeSubscriber",
+        "subscribeUntil",
+        "withSnapshotEntries"
+      ],
+      "./subscriber": [
+        "subscribeOnce",
+        "subscribeSubscriber",
+        "subscribeUntil"
+      ]
+    },
+    "@migaia/lifecycle": {
+      ".": [
+        "DisposeTransactionKind",
+        "LIFECYCLE_SOURCE",
+        "LifecycleErrorCode",
+        "LifecycleErrorPolicy",
+        "LifecycleErrorText",
+        "LifecycleState",
+        "LifecycleUnitState",
+        "ThenableProbeKind",
+        "assimilateCapturedThen",
+        "boundedWait",
+        "containAsyncRejection",
+        "createAbortController",
+        "createDisposeTransaction",
+        "createErrorCollector",
+        "createGenerationController",
+        "createLifecycleError",
+        "createLifecycleRangeError",
+        "createLifecycleScope",
+        "createLifecycleUnit",
+        "createManualScheduler",
+        "createMutationQueue",
+        "createObjectLeaseRegistry",
+        "createPendingTracker",
+        "createProvisionalScope",
+        "createQuiescenceTracker",
+        "createStringLeaseRegistry",
+        "createStringQuiescenceTracker",
+        "createSyncLifecycleScope",
+        "createSyncStartedDisposalLedger",
+        "createTerminalController",
+        "executeReleaseDescriptor",
+        "probeThenable",
+        "snapshotScheduler",
+        "systemScheduler",
+        "tagLifecycleError",
+        "validateSchedulerDelay",
+        "validateSchedulerTime"
+      ],
+      "./abort": [
+        "createAbortController",
+        "observeAbortSubscription"
+      ],
+      "./scheduler": [
+        "addSchedulerTime",
+        "createManualScheduler",
+        "resolveScheduler",
+        "resolveSchedulerOption",
+        "snapshotScheduler",
+        "systemScheduler",
+        "validateSchedulerDelay",
+        "validateSchedulerTime"
+      ],
+      "./quiescence": [
+        "createObjectLeaseRegistry",
+        "createPendingTracker",
+        "createQuiescenceTracker",
+        "createStringLeaseRegistry",
+        "createStringQuiescenceTracker"
+      ],
+      "./scope": [
+        "createLifecycleScope"
+      ],
+      "./generation": [
+        "createGenerationController"
+      ],
+      "./disposal": [
+        "createDisposeTransaction",
+        "createSyncStartedDisposalLedger",
+        "executeReleaseDescriptor"
+      ],
+      "./errors": [
+        "LIFECYCLE_SOURCE",
+        "assimilateCapturedThen",
+        "containAsyncRejection",
+        "createErrorCollector",
+        "createLifecycleError",
+        "createLifecycleFailure",
+        "createLifecycleRangeError",
+        "createLifecycleTypeError",
+        "probeThenable",
+        "tagLifecycleError"
+      ]
+    },
+    "@migaia/logger": {
+      ".": [
+        "LOGGER_SOURCE",
+        "Logger",
+        "LoggerColorMode",
+        "LoggerErrorCode",
+        "LoggerLevel",
+        "LoggerReasoningPhase",
+        "LoggerStatus",
+        "getLoggerRuntimeManager",
+        "setLoggerRuntimeManager"
+      ],
+      "./plugins": [
+        "ANSIS_PLUGIN_NAME",
+        "BATCH_PLUGIN_NAME",
+        "HTTP_PLUGIN_NAME",
+        "LEVEL_PLUGIN_NAME",
+        "PROCESS_PLUGIN_NAME",
+        "REASONING_PLUGIN_NAME",
+        "UUID_PLUGIN_NAME",
+        "batch",
+        "color",
+        "http",
+        "level",
+        "process",
+        "reasoning",
+        "uuid"
+      ],
+      "./plugins/file": [
+        "FILE_PLUGIN_NAME",
+        "file"
+      ]
+    },
+    "@migaia/middleware-pipeline": {
+      ".": [
+        "GENERATOR_CONTINUE",
+        "GENERATOR_HALT",
+        "GENERATOR_UNDEFINED",
+        "MIDDLEWARE_PIPELINE_SOURCE",
+        "MiddlewarePipelineErrorCode",
+        "MiddlewarePipelineGeneratorSignals",
+        "MiddlewarePipelineMode",
+        "MiddlewarePipelineViolation",
+        "adaptGeneratorStageToAsyncGenerator",
+        "adaptSyncStageToAsync",
+        "adaptSyncStageToAsyncGenerator",
+        "adaptSyncStageToGenerator",
+        "runAsyncGeneratorMiddleware",
+        "runAsyncMiddleware",
+        "runGeneratorMiddleware",
+        "runSyncMiddleware"
+      ]
+    },
+    "@migaia/plugin-host": {
+      ".": [
+        "ERROR_TEXT",
+        "GENERATOR_CONTINUE",
+        "GENERATOR_HALT",
+        "GENERATOR_UNDEFINED",
+        "PluginHost",
+        "PluginHostDisposalNodeKind",
+        "PluginHostError",
+        "PluginHostErrorCode",
+        "PluginHostPipelineMode",
+        "PluginHostPipelineViolation",
+        "PluginHostRegistrationLifecycle",
+        "PluginHostStatus",
+        "adaptGeneratorStageToAsyncGenerator",
+        "adaptSyncStageToAsync",
+        "adaptSyncStageToAsyncGenerator",
+        "adaptSyncStageToGenerator",
+        "asyncDisposeKey",
+        "createRegistrationView",
+        "defineFeature",
+        "defineHost",
+        "definePlugin",
+        "disposeKey",
+        "invokeCaptured",
+        "readPluginHostDisposalProvenance"
+      ],
+      "./composition": [
+        "buildManagedPort",
+        "createView",
+        "inspectFeatures",
+        "isManagedHost",
+        "openComposition",
+        "registerManagedHost"
+      ]
+    },
+    "@migaia/reactive": {
+      ".": [
+        "Computed",
+        "Effect",
+        "REACTIVE_SOURCE",
+        "ReactiveErrorCode",
+        "ReactiveErrorPhase",
+        "ReactiveErrorText",
+        "ReactiveTracePhase",
+        "ReactiveTraceType",
+        "Signal",
+        "createRuntime",
+        "defaultRuntime"
+      ],
+      "./runtime": [
+        "DependencyTracker",
+        "RUNTIME_BRAND",
+        "ReactiveDependencyKind",
+        "ReactiveErrorPhase",
+        "ReactiveTracePhase",
+        "ReactiveTraceReason",
+        "ReactiveTraceType",
+        "Runtime",
+        "Scheduler",
+        "VersionClock",
+        "createObserverBinding",
+        "createRuntime"
+      ],
+      "./ownership": [
+        "assertOwnedBy",
+        "assertReactiveOwnedBy",
+        "claimOwnership",
+        "ownerOf"
+      ],
+      "./internals": [
+        "internalsOf",
+        "isRuntime",
+        "registerInternals"
+      ],
+      "./node-internals": [
+        "mutableDepVersions",
+        "mutableDeps",
+        "mutableSubs",
+        "readVersion",
+        "registerDepVersions",
+        "registerDeps",
+        "registerSubs",
+        "registerVersion",
+        "setVersion"
+      ],
+      "./node-factories": [
+        "internalRuntimeOf",
+        "isAnyRuntimeTracking",
+        "isRuntimeTracking"
+      ],
+      "./source": [
+        "createFieldSource"
+      ],
+      "./copy-check": [
+        "assertNoForeignOwnershipBrand",
+        "assertSingleRuntimeCopy",
+        "brandOwnedValue",
+        "consumePendingCopyWarning",
+        "noteRuntimeCopy",
+        "resetRuntimeCopiesForTest",
+        "runtimeCopyCount"
+      ]
+    },
+    "@migaia/resource": {
+      ".": [
+        "RESOURCE_SOURCE",
+        "Resource",
+        "ResourceErrorCode",
+        "ResourceStatus"
+      ]
+    },
+    "@migaia/rpc-contract": {
+      ".": [
+        "RpcContractErrorCode",
+        "createDescriptor",
+        "deserializeRpcError",
+        "normalizePortable",
+        "normalizeRpcEnvelope",
+        "rpcProtocolV1",
+        "serializeRpcError"
+      ],
+      "./v1": [
+        "default",
+        "normalizeRpcEnvelope",
+        "rpcProtocol"
+      ],
+      "./framing": [
+        "bindRpcFrameIngress",
+        "createBinaryFramer",
+        "createReassembler",
+        "createStringFramer",
+        "messageFramerV1"
+      ],
+      "./framing/v1": [
+        "messageFramer"
+      ]
+    },
+    "@migaia/serialize": {
+      ".": [
+        "SERIALIZE_SOURCE",
+        "SERIALIZE_TYPE_PATTERN",
+        "SerializeChunkKind",
+        "SerializeCleanupKind",
+        "SerializeCleanupPolicy",
+        "SerializeCodecError",
+        "SerializeErrorCode",
+        "SerializeOutput",
+        "SerializePhase",
+        "SerializePluginType",
+        "assertSerializeType",
+        "base64ToBytes",
+        "bytesToBase64",
+        "chunkToBytes",
+        "chunkToText",
+        "collectStream",
+        "createSerializeError",
+        "createSerializeRangeError",
+        "createSerializeRegistry",
+        "createSerializeTypeError",
+        "decodeStream",
+        "encodeStream",
+        "isChunkShape",
+        "jsonParser",
+        "jsonPlugin",
+        "sliceByFrameBudget",
+        "streamBase64Chunks",
+        "tagSerializeError"
+      ],
+      "./core": [
+        "SERIALIZE_SOURCE",
+        "SERIALIZE_TYPE_PATTERN",
+        "SerializeCodecError",
+        "SerializeErrorCode",
+        "assertSerializeType",
+        "base64ToBytes",
+        "bytesToBase64",
+        "collectStream",
+        "createSerializeError",
+        "createSerializeRangeError",
+        "createSerializeTypeError",
+        "decodeStream",
+        "encodeStream",
+        "isChunkShape",
+        "sliceByFrameBudget",
+        "streamBase64Chunks",
+        "tagSerializeError"
+      ],
+      "./plugins": [
+        "jsonParser",
+        "jsonPlugin"
+      ],
+      "./registry": [
+        "chunkToBytes",
+        "chunkToText",
+        "createSerializeRegistry"
+      ],
+      "./codec": [
+        "CodecErrorText",
+        "asCodecValue",
+        "assertCodecVersion",
+        "assertPortableValue",
+        "createCodecError",
+        "identityCodecV1",
+        "normalizeCodecFailure",
+        "toPortableValue"
+      ],
+      "./codecs/identity": [
+        "identityCodec",
+        "identityCodecV1"
+      ],
+      "./codecs/identity/v1": [
+        "identityCodec"
+      ],
+      "./codecs/json": [
+        "defineJsonCodec"
+      ],
+      "./codecs/message-pack": [
+        "defineMessagePackCodec"
+      ],
+      "./codecs/cbor": [
+        "defineCBORCodec"
+      ],
+      "./codecs/protobuf": [
+        "defineProtobufCodec"
+      ]
+    },
+    "@migaia/storage-contract": {
+      ".": [
+        "COLLECTIONS_JSON_CODEC_NAME",
+        "ConflictPolicy",
+        "KEY_DOMAIN_LIMITS",
+        "STORAGE_CONTRACT_SOURCE",
+        "StorageContractConflictPolicy",
+        "StorageContractError",
+        "StorageContractErrorCode",
+        "asChangeFeedStore",
+        "asRecordStore",
+        "asSecondaryIndexRecordStore",
+        "assertCodec",
+        "assertOperationContext",
+        "assertStorageKey",
+        "assertStringStorageKey",
+        "assertSyncWriteOptions",
+        "assertTransactionCallback",
+        "collectionsJsonCodec",
+        "compareStorageKeys",
+        "intrinsicConstructorName",
+        "isArrayBuffer",
+        "isChangeFeedStore",
+        "isKeyValueStore",
+        "isRecordStore",
+        "isSecondaryIndexRecordStore",
+        "isStorageCapabilities",
+        "isStorageContractError",
+        "isUint8Array",
+        "readTransactionConflictPolicy",
+        "snapshotCodec",
+        "snapshotKeyValueStore",
+        "snapshotKeyValueStoreDetailed",
+        "snapshotOperationContext",
+        "snapshotRecordStore",
+        "snapshotStorageCapabilities",
+        "snapshotStorageKey",
+        "snapshotSyncWriteOptions"
+      ]
+    },
+    "@migaia/storage-web": {
+      ".": [
+        "STORAGE_WEB_SOURCE",
+        "StorageError",
+        "StorageErrorCode",
+        "StorageErrorText",
+        "lengthPrefixedNamespaceCodec"
+      ],
+      "./memory": [
+        "memoryStorageHost"
+      ],
+      "./local-storage": [
+        "localStorageHost"
+      ],
+      "./session-storage": [
+        "sessionStorageHost"
+      ],
+      "./cookies": [
+        "cookiesHost"
+      ],
+      "./indexed-db": [
+        "indexedDbHost"
+      ],
+      "./host": [
+        "STORAGE_LIVE_QUERY_SERVICE_NAME",
+        "StorageHostFacade",
+        "assertStorageBackendId",
+        "createStorageHost",
+        "defineFeature",
+        "definePlugin",
+        "pluginNameFromBackendId",
+        "reactiveAdapterNameFromBackendId",
+        "readStorageNativePluginMetadata"
+      ],
+      "./plugins/memory": [
+        "memoryBackendPlugin"
+      ],
+      "./plugins/local-storage": [
+        "localStorageBackendPlugin"
+      ],
+      "./plugins/session-storage": [
+        "sessionStorageBackendPlugin"
+      ],
+      "./plugins/cookies": [
+        "cookieBackendPlugin"
+      ],
+      "./plugins/indexed-db": [
+        "indexedDbBackendPlugin",
+        "prepareIndexedDbStore"
+      ],
+      "./entity": [
+        "defineEntity"
+      ],
+      "./schema": [
+        "fromStandardSchema",
+        "passthrough",
+        "runMigrations"
+      ],
+      "./serialize": [
+        "binaryCodec",
+        "jsonCodec",
+        "selectCodec",
+        "structuredCodec"
+      ],
+      "./reactive-adapter": [
+        "defineReactiveAdapterFeature"
+      ],
+      "./plugins/reactive": [
+        "cookiesReactive",
+        "indexedDbReactive",
+        "localStorageReactive",
+        "memoryReactive",
+        "sessionStorageReactive"
+      ],
+      "./plugins/reactive/memory": [
+        "memoryReactive"
+      ],
+      "./plugins/reactive/local-storage": [
+        "localStorageReactive"
+      ],
+      "./plugins/reactive/session-storage": [
+        "sessionStorageReactive"
+      ],
+      "./plugins/reactive/cookies": [
+        "cookiesReactive"
+      ],
+      "./plugins/reactive/indexed-db": [
+        "indexedDbReactive"
+      ]
+    },
+    "@migaia/store-devtools": {
+      ".": [
+        "STORE_DEVTOOLS_SOURCE",
+        "StoreDevtoolsCommand",
+        "StoreDevtoolsErrorCode",
+        "createStoreDevTools",
+        "createStoreDevtoolsAggregateError",
+        "createStoreDevtoolsError",
+        "createStoreDevtoolsRangeError",
+        "getDependencyTree",
+        "getObserverTree"
+      ]
+    },
+    "@migaia/store-indexed": {
+      ".": [
+        "IndexedOperation",
+        "ObservableArray",
+        "ObservableMap",
+        "ObservableObject",
+        "ObservableSet",
+        "STORE_INDEXED_SOURCE",
+        "StoreIndexedErrorCode",
+        "createStoreIndexedError",
+        "createStoreIndexedRangeError",
+        "createStoreIndexedTypeError",
+        "observableArray",
+        "observableMap",
+        "observableObject",
+        "observableSet"
+      ]
+    },
+    "@migaia/store-keyed": {
+      ".": [
+        "AtomKind",
+        "KeyedSplitCache",
+        "STORE_KEYED_SOURCE",
+        "StoreKeyedErrorCode",
+        "assertNotThenable",
+        "atomDef",
+        "atomDefFactory",
+        "computeUniqueKeys",
+        "createAtomStore",
+        "createStoreKeyedAggregateError",
+        "createStoreKeyedError",
+        "createStoreKeyedRangeError",
+        "createStoreKeyedTypeError",
+        "defaultAtomStore",
+        "derivedDef",
+        "derivedFamilyDef",
+        "familyDef",
+        "filterOutKey",
+        "findKeyIndex",
+        "focusDef",
+        "isAtomDefinition",
+        "opticDef",
+        "previewSafeAtomDefFactory",
+        "readOpticPath",
+        "replaceAtIndex",
+        "requireKeyIndex",
+        "selectDef",
+        "shallowArrayEquals",
+        "spliceInsert",
+        "splitDef",
+        "writableDef",
+        "writeOpticPath"
+      ],
+      "./atom/store": [
+        "createAtomStore",
+        "defaultAtomStore"
+      ],
+      "./atom/definition": [
+        "assertNotThenable",
+        "atomDef",
+        "atomDefFactory",
+        "derivedDef",
+        "isAtomDefinition",
+        "previewSafeAtomDefFactory",
+        "writableDef"
+      ],
+      "./reactive/atom": [
+        "atomGetter",
+        "atomSetter"
+      ]
+    },
+    "@migaia/store-light": {
+      ".": [
+        "FIELD_BUILDER",
+        "STORE_LIGHT_SOURCE",
+        "StoreFieldMode",
+        "StoreLightErrorCode",
+        "StoreResourceDataKind",
+        "StoreResourceKind",
+        "createAsyncStore",
+        "createLegacyStore",
+        "createStore",
+        "createStoreLightAggregateError",
+        "createStoreLightError",
+        "createStoreLightRangeError",
+        "createStoreLightTypeError",
+        "createStoreResource",
+        "createStoreResourceScope",
+        "createStoreSync",
+        "isFieldBuilder",
+        "isRaw",
+        "raw",
+        "storeReady"
+      ]
+    },
+    "@migaia/store-middleware": {
+      ".": [
+        "ClonePolicy",
+        "MiddlewareCommandType",
+        "MiddlewareEventPhase",
+        "MiddlewareEventType",
+        "MutationPolicy",
+        "STORE_MIDDLEWARE_SOURCE",
+        "StoreMiddlewareErrorCode",
+        "bindStoreMiddleware",
+        "createMutationPolicy",
+        "createReduxDevToolsAdapter",
+        "createStoreMiddlewareAggregateError",
+        "createStoreMiddlewareError",
+        "createStoreMiddlewareHost",
+        "diagnosticClone",
+        "immutableSnapshotClone",
+        "loggerMiddleware",
+        "middlewarePlugin",
+        "opaqueReferenceClone",
+        "tolerantClone"
+      ],
+      "./tolerant-clone": [
+        "ClonePolicy",
+        "diagnosticClone",
+        "immutableSnapshotClone",
+        "opaqueReferenceClone",
+        "tolerantClone"
+      ]
+    },
+    "@migaia/store-persist": {
+      ".": [
+        "PersistCodecOutput",
+        "PersistEnvelopeError",
+        "PersistState",
+        "STORE_PERSIST_SOURCE",
+        "StorePersistErrorCode",
+        "assertEnvelope",
+        "createStorePersistAbortError",
+        "createStorePersistAggregateError",
+        "createStorePersistError",
+        "createStorePersistTypeError",
+        "defaultJsonCodec",
+        "persistUnit",
+        "readEnvelope",
+        "removeEnvelope",
+        "writeEnvelope"
+      ],
+      "./light": [
+        "persist"
+      ],
+      "./indexed": [
+        "persistCollection"
+      ],
+      "./keyed": [
+        "clearFamily",
+        "persistKeyed"
+      ]
+    },
+    "@migaia/store-react": {
+      ".": [
+        "STORE_REACT_SOURCE",
+        "StoreProvider",
+        "StoreProviderState",
+        "StoreReactErrorCode",
+        "StoreRegistry",
+        "assertStoreFeature",
+        "createStoreReactAggregateError",
+        "createStoreReactError",
+        "createStoreRegistry",
+        "createStoreToken",
+        "normalizeStoreConfig",
+        "readStoreFeature",
+        "useAssertStoreFeature",
+        "useAsyncAtomValue",
+        "useAtom",
+        "useAtomDefinition",
+        "useAtomValue",
+        "useNodeValue",
+        "useProvidedStore",
+        "useResource",
+        "useResourceValue",
+        "useSetAtom",
+        "useSetAtomDefinition",
+        "useSignal",
+        "useStore",
+        "useStoreConfig",
+        "useStoreFeature",
+        "useStoreFromProvider",
+        "useStoreRegistry",
+        "useStoreResource",
+        "useStoreRuntime",
+        "useTracked"
+      ]
+    },
+    "@migaia/store-shared": {
+      ".": [
+        "STORE_SHARED_SOURCE",
+        "SharedInt32Array",
+        "SharedInt32Signal",
+        "SharedWaitMode",
+        "StoreSharedErrorCode",
+        "createStoreSharedError",
+        "createStoreSharedRangeError",
+        "sharedInt32",
+        "sharedInt32Array"
+      ]
+    },
+    "@migaia/store-ssr": {
+      ".": [
+        "SSRRequestScope",
+        "STORE_SSR_SOURCE",
+        "SsrWireType",
+        "SsrWorkOutcome",
+        "StoreSsrErrorCode",
+        "assertSSRState",
+        "createSSRRequestScope",
+        "createSSRStateScript",
+        "createSSRStateScriptWith",
+        "createStoreSsrAggregateError",
+        "createStoreSsrError",
+        "createStoreSsrRangeError",
+        "createStoreSsrTypeError",
+        "deserializeSSRState",
+        "readSSRStateFromDocument",
+        "readSSRStateFromDocumentWith",
+        "serializeSSRState",
+        "serializeTrustedSSRState"
+      ]
+    },
+    "@migaia/store-wasm": {
+      ".": [
+        "STORE_WASM_SOURCE",
+        "StoreWasmErrorCode",
+        "WasmFieldMode",
+        "WasmReservedKey",
+        "array",
+        "boolean",
+        "createStoreWasmAggregateError",
+        "createStoreWasmError",
+        "createStoreWasmRangeError",
+        "createStoreWasmTypeError",
+        "ensureWasm",
+        "number",
+        "record",
+        "string"
+      ]
+    },
+    "@migaia/store-worker": {
+      ".": [
+        "STORE_WORKER_SOURCE",
+        "StoreWorkerErrorCode",
+        "WorkerAdapter",
+        "WorkerByteOwnership",
+        "WorkerDiagnosticType",
+        "createSerializeWorkerHandler",
+        "createStoreWorkerAggregateError",
+        "createStoreWorkerError",
+        "createWorkerHandler",
+        "workerComputed",
+        "workerParser",
+        "workerPlugin"
+      ]
+    },
+    "@migaia/tray": {
+      ".": [
+        "TRAY_SOURCE",
+        "TrayErrorCode",
+        "createTray"
+      ],
+      "./host": [
+        "TrayHostState",
+        "createHost"
+      ],
+      "./loader": [
+        "defineLoader",
+        "loadIntoHost"
+      ],
+      "./adapter": [
+        "defineAdapter"
+      ],
+      "./runtime": [
+        "createRuntime"
+      ]
+    },
+    "@migaia/utils": {
+      ".": [
+        "CONFIG_DELETE",
+        "ConfigProfile",
+        "MAX_NATIVE_RECURSION_DEPTH",
+        "ThenableProbeKind",
+        "UtilsAbortError",
+        "UtilsError",
+        "UtilsErrorCode",
+        "UtilsTimeoutError",
+        "admitAbortSignal",
+        "assimilateCapturedThen",
+        "attachErrorIdentity",
+        "attachSecondaryErrors",
+        "base64ToBytes",
+        "bytesToBase64",
+        "collect",
+        "combineConfig",
+        "combineErrors",
+        "createAbortTimeoutSignal",
+        "createConcurrencyLimiter",
+        "createManualScheduler",
+        "createNumberFormatter",
+        "createPathAccessor",
+        "decodeUtf8",
+        "deferred",
+        "diagnosticSnapshot",
+        "encodeUtf8",
+        "format",
+        "formatCompactNumber",
+        "formatCurrency",
+        "formatInteger",
+        "formatNumber",
+        "formatPercent",
+        "get",
+        "hostRethrowReporter",
+        "identitySnapshot",
+        "immutableSnapshot",
+        "inspectThenable",
+        "isArrayBuffer",
+        "isBlankString",
+        "isEmptyValue",
+        "isNullish",
+        "isPlainObject",
+        "isPrimitive",
+        "isUint8Array",
+        "isUtilsAbortError",
+        "isUtilsError",
+        "isUtilsTimeoutError",
+        "noop",
+        "observeThenableRejection",
+        "once",
+        "onceAsync",
+        "ownConfig",
+        "parseConfigPath",
+        "parseObjectPath",
+        "patchConfig",
+        "probeObjectPath",
+        "probeObjectPathSegments",
+        "probeProperty",
+        "probeThenable",
+        "raceWithAbort",
+        "readConfigPath",
+        "readonlyConfig",
+        "retry",
+        "safeErrorReason",
+        "set",
+        "sleep",
+        "snapshotOwnDescriptors",
+        "splitUtf8",
+        "streamBase64Chunks",
+        "structuredDiagnosticSnapshot",
+        "systemScheduler",
+        "toError",
+        "toPromise",
+        "utf8ByteLength",
+        "walkErrorCauses",
+        "withTimeout"
+      ],
+      "./promise": [
+        "UtilsAbortError",
+        "admitAbortSignal",
+        "createAbortTimeoutSignal",
+        "createConcurrencyLimiter",
+        "createManualScheduler",
+        "deferred",
+        "hostRethrowReporter",
+        "raceWithAbort",
+        "retry",
+        "sleep",
+        "systemScheduler",
+        "toPromise",
+        "withTimeout"
+      ],
+      "./error": [
+        "UtilsAbortError",
+        "UtilsError",
+        "UtilsErrorCode",
+        "UtilsTimeoutError",
+        "attachErrorIdentity",
+        "attachSecondaryErrors",
+        "combineErrors",
+        "isUtilsAbortError",
+        "isUtilsError",
+        "isUtilsTimeoutError",
+        "safeErrorReason",
+        "toError",
+        "walkErrorCauses"
+      ],
+      "./bytes": [
+        "base64ToBytes",
+        "bytesToBase64",
+        "decodeUtf8",
+        "encodeUtf8",
+        "isArrayBuffer",
+        "isUint8Array",
+        "splitUtf8",
+        "streamBase64Chunks",
+        "utf8ByteLength"
+      ],
+      "./object": [
+        "createPathAccessor",
+        "diagnosticSnapshot",
+        "get",
+        "identitySnapshot",
+        "immutableSnapshot",
+        "isPlainObject",
+        "parseObjectPath",
+        "probeObjectPath",
+        "probeObjectPathSegments",
+        "probeProperty",
+        "set",
+        "snapshotOwnDescriptors",
+        "structuredDiagnosticSnapshot"
+      ],
+      "./object-path": [
+        "createPathAccessor",
+        "get",
+        "parseObjectPath",
+        "probeObjectPath",
+        "probeObjectPathSegments",
+        "set"
+      ],
+      "./typing": [],
+      "./config": [
+        "CONFIG_DELETE",
+        "ConfigProfile",
+        "combineConfig",
+        "ownConfig",
+        "parseConfigPath",
+        "patchConfig",
+        "readConfigPath",
+        "readonlyConfig"
+      ],
+      "./function": [
+        "MAX_NATIVE_RECURSION_DEPTH",
+        "ThenableProbeKind",
+        "assimilateCapturedThen",
+        "inspectThenable",
+        "noop",
+        "observeThenableRejection",
+        "once",
+        "onceAsync",
+        "probeThenable"
+      ],
+      "./value": [
+        "isBlankString",
+        "isEmptyValue",
+        "isNullish",
+        "isPrimitive"
+      ],
+      "./string": [
+        "format"
+      ],
+      "./number": [
+        "createNumberFormatter",
+        "formatCompactNumber",
+        "formatCurrency",
+        "formatInteger",
+        "formatNumber",
+        "formatPercent"
+      ]
+    },
+    "@migaia/web-rpc": {
+      ".": [
+        "WEBRPC_SOURCE",
+        "WebRpcAbortError",
+        "WebRpcAuthenticationError",
+        "WebRpcCandidateStatus",
+        "WebRpcChunkError",
+        "WebRpcConfigurationError",
+        "WebRpcConstructionError",
+        "WebRpcContractError",
+        "WebRpcEndpointStatus",
+        "WebRpcError",
+        "WebRpcErrorCode",
+        "WebRpcLifecycleError",
+        "WebRpcOperation",
+        "WebRpcPlatform",
+        "WebRpcProtocolError",
+        "WebRpcRemoteError",
+        "WebRpcSchemaValidationError",
+        "WebRpcSerializationError",
+        "WebRpcTimeoutError",
+        "WebRpcTransportEncoding",
+        "WebRpcTransportError",
+        "WebRpcTransportOwnership",
+        "WebRpcTransportTopology",
+        "abort",
+        "authentication",
+        "codec",
+        "connect",
+        "contract",
+        "createEndpoint",
+        "createFullEndpoint",
+        "createFullOneWayEndpoint",
+        "defineFeature",
+        "defineMiddleware",
+        "deserializeError",
+        "framer",
+        "hooks",
+        "isWebRpcError",
+        "ping",
+        "protocol",
+        "reachError",
+        "serializeError",
+        "timeout",
+        "uuid"
+      ],
+      "./core": [
+        "createComposedEndpoint"
+      ],
+      "./client": [
+        "createClientEndpoint"
+      ],
+      "./provider": [
+        "createProviderEndpoint"
+      ],
+      "./full": [
+        "createFullEndpoint",
+        "createFullOneWayEndpoint"
+      ],
+      "./transport-constants": [
+        "WebRpcCandidateStatus",
+        "WebRpcEndpointStatus",
+        "WebRpcOperation",
+        "WebRpcPlatform",
+        "WebRpcTransportEncoding",
+        "WebRpcTransportOwnership",
+        "WebRpcTransportTopology"
+      ],
+      "./features/outbound": [
+        "createOutboundFeature"
+      ],
+      "./features/one-way": [
+        "createOneWayFeature"
+      ],
+      "./features/provider": [
+        "createProviderFeature"
+      ],
+      "./features/discovery": [
+        "createDiscoveryFeature"
+      ],
+      "./features/control": [
+        "createControlFeature"
+      ],
+      "./adapters/window": [
+        "createWindowMessageTransport"
+      ],
+      "./adapters/message-port": [
+        "createBrowserMessagePortTransport",
+        "createNodeMessagePortTransport"
+      ],
+      "./adapters/web-worker": [
+        "createWebWorkerTransport"
+      ],
+      "./adapters/broadcast-channel": [
+        "createBroadcastChannelTransport"
+      ],
+      "./adapters/memory": [
+        "createMemoryTransportPair"
+      ],
+      "./adapters/shared-worker": [
+        "createSharedWorkerTransport"
+      ],
+      "./adapters/service-worker": [
+        "createServiceWorkerTransport"
+      ],
+      "./adapters/rtc-data-channel": [
+        "createRtcDataChannelTransport"
+      ],
+      "./adapters/web-transport": [
+        "createWebTransportDatagramTransport"
+      ]
+    }
+  }
+}
