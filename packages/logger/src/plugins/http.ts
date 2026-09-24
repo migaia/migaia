@@ -5,7 +5,7 @@ import {
   type IBatchController,
   type IBatchShared
 } from './batch.js'
-import { defineFeature, type IPipelineMode } from '@migaia/plugin-host'
+import { defineFeature, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
 import { getLoggerRuntimeManager } from '../runtime-manager.js'
 import {
   createLoggerAggregateError,
@@ -232,7 +232,7 @@ function ensureHttpFailure(
 class HttpPlugin implements ILoggerPlugin<
   IEmptyPluginExt,
   IHttpPluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly dependencies: typeof httpDependenciesFeature }
 > {
   readonly name = HTTP_PLUGIN_NAME
@@ -271,7 +271,7 @@ class HttpPlugin implements ILoggerPlugin<
   }
 
   install(
-    core: ILoggerPluginCore<IPipelineMode> &
+    core: ILoggerPluginCore<IMiddlewarePipelineMode> &
       Readonly<{ readonly features: { readonly dependencies: IHttpFeatureDependencies } }>
   ): IEmptyPluginExt {
     // 不读 this.config——统一通过 core.config.get() 读取
@@ -631,6 +631,6 @@ export const http = (
 ): ILoggerPlugin<
   IEmptyPluginExt,
   IHttpPluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly dependencies: typeof httpDependenciesFeature }
 > => new HttpPlugin(config)

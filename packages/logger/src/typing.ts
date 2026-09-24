@@ -1,8 +1,8 @@
 import type {
-  IAsyncGeneratorPipelineStage,
-  IAsyncPipelineStage,
+  IAsyncGeneratorMiddlewareStage,
+  IAsyncMiddlewareStage,
   IFeatureRecord,
-  IGeneratorPipelineStage,
+  IGeneratorMiddlewareStage,
   IMergePluginExts,
   IPlugin,
   IPluginConfig,
@@ -11,7 +11,7 @@ import type {
   IPluginHostDisposalResult,
   IPluginHandleTuple,
   IPipelineConfig,
-  IPipelineMode
+  IMiddlewarePipelineMode
 } from '@migaia/plugin-host'
 import type { ILifecycleScheduler } from '@migaia/lifecycle'
 
@@ -164,31 +164,25 @@ export type ILoggerCore<
   /**
    * 注册一个管线阶段：可以修改 entry、可以调用 next 放行，也可以不调用 next 直接丢弃。
    *
-   * 下面四个 `useXPipeline` 的条件类型都按"命中自己的 mode 才可用，其余三个 mode 一律 `never`"显式穷举， 不使用兜底 else 分支——`TMode`
-   * 是未收窄的 `IPipelineMode` 联合（例如插件签名里的默认值）时， 四个方法都保持可调用，交由运行时 `PIPELINE_MODE_MISMATCH` 兜底；但 `TMode`
-   * 收窄到具体某个 mode 字面量后， 其余三个必须真的是 `never`，而不是像旧版那样落进一个"看起来还能调用"的兜底分支——`IPipelineMode`
-   * 新增第四个取值（`'async-generator'`）时，旧的三选一 fallback 会把它错误地划进"可用"，这里改成穷举后不再有这个缺口。
+   * 可调用集合与 middleware-pipeline 的提升表一致：sync stage 可用于任意 mode，generator stage 还可提升到
+   * async-generator；其余 stage 只可用于同名 mode。未收窄的 mode 联合保留全部方法，由运行时兜底。
    */
-  usePipeline: [TMode] extends ['sync']
-    ? (stage: IPipelineStage) => ILoggerCore<TMode>
-    : [TMode] extends ['async'] | ['generator'] | ['async-generator']
-      ? never
-      : (stage: IPipelineStage) => ILoggerCore<TMode>
+  usePipeline: (stage: IPipelineStage) => ILoggerCore<TMode>
   useAsyncPipeline: [TMode] extends ['async']
-    ? (stage: IAsyncPipelineStage<ILogEntry>) => ILoggerCore<TMode>
+    ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>
     : [TMode] extends ['sync'] | ['generator'] | ['async-generator']
       ? never
-      : (stage: IAsyncPipelineStage<ILogEntry>) => ILoggerCore<TMode>
-  useGeneratorPipeline: [TMode] extends ['generator']
-    ? (stage: IGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>
-    : [TMode] extends ['sync'] | ['async'] | ['async-generator']
+      : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>
+  useGeneratorPipeline: [TMode] extends ['generator' | 'async-generator']
+    ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>
+    : [TMode] extends ['sync'] | ['async']
       ? never
-      : (stage: IGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>
+      : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>
   useAsyncGeneratorPipeline: [TMode] extends ['async-generator']
-    ? (stage: IAsyncGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>
+    ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>
     : [TMode] extends ['sync'] | ['async'] | ['generator']
       ? never
-      : (stage: IAsyncGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>
+      : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>
   /** 注册一个 sink：entry 通过完整管线后，由所有已注册 sink 各自处理（可以有多个，如控制台 + HTTP 同时存在） */
   useSink(sink: ISink): IOff
 
@@ -302,7 +296,7 @@ export type ILoggerCoreWithShared<
 
 /** Plugin-facing logger capabilities exclude Host-level topology mutation. */
 export type ILoggerPluginCore<
-  TMode extends IPipelineConfig['mode'] = IPipelineMode,
+  TMode extends IPipelineConfig['mode'] = IMiddlewarePipelineMode,
   TShared extends Record<string, unknown> = Record<string, never>
 > = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & {
   onDispose(resource: import('@migaia/plugin-host').IPluginResource): void
@@ -313,7 +307,7 @@ export type IResolvedPluginShared<_TPlugins extends readonly unknown[]> = Record
 export type ILoggerPlugin<
   TExt extends Record<string, unknown> = IEmptyPluginExt,
   TConfig extends IPluginConfig = IPluginConfig,
-  TMode extends IPipelineMode = IPipelineMode,
+  TMode extends IMiddlewarePipelineMode = IMiddlewarePipelineMode,
   TFeatures extends IFeatureRecord = Record<never, never>,
   TExpose extends object = Record<never, never>
 > = IPlugin<ILoggerPluginCore<TMode>, TExt, TConfig, Record<never, never>, TFeatures, TExpose>
@@ -325,7 +319,7 @@ export type { IMergePluginExts }
 
 export type ILoggerOptions<
   P extends readonly ILoggerPluginConstraint[] = [],
-  TMode extends IPipelineMode = 'sync'
+  TMode extends IMiddlewarePipelineMode = 'sync'
 > = {
   /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */
   execution: IPluginHostOptions['execution']
@@ -349,7 +343,7 @@ export type ILoggerOptions<
 export type IStaticLoggerCtor = {
   new <
     const LocalP extends readonly ILoggerPluginConstraint[] = readonly [],
-    const TMode extends IPipelineMode = 'sync'
+    const TMode extends IMiddlewarePipelineMode = 'sync'
   >(
     options: ILoggerOptions<LocalP, TMode>
   ): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & {

@@ -1,5 +1,5 @@
 import type { IDimFn, ILoggerPluginCore, ILoggerPlugin, IPaintFn } from '../typing.js'
-import { defineFeature, type IPipelineMode } from '@migaia/plugin-host'
+import { defineFeature, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
 import { optionalColorFeature, type IColorShared } from './color.js'
 import { LoggerReasoningPhase } from '../plugin-constants.js'
 
@@ -44,7 +44,7 @@ const reasoningDependenciesFeature = defineFeature<
 class ReasoningPlugin implements ILoggerPlugin<
   IReasoningPluginExt,
   IReasoningPluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly dependencies: typeof reasoningDependenciesFeature }
 > {
   readonly name = REASONING_PLUGIN_NAME
@@ -61,7 +61,7 @@ class ReasoningPlugin implements ILoggerPlugin<
   }
 
   install(
-    core: ILoggerPluginCore<IPipelineMode> &
+    core: ILoggerPluginCore<IMiddlewarePipelineMode> &
       Readonly<{ readonly features: { readonly dependencies: IReasoningFeatureDependencies } }>
   ): IReasoningPluginExt {
     // 不读 this.config——统一通过 core.config.get() 读取
@@ -80,7 +80,11 @@ class ReasoningPlugin implements ILoggerPlugin<
     }
   }
 
-  #startThinking(core: ILoggerPluginCore<IPipelineMode>, paint: IPaintFn, label?: string): void {
+  #startThinking(
+    core: ILoggerPluginCore<IMiddlewarePipelineMode>,
+    paint: IPaintFn,
+    label?: string
+  ): void {
     if (this.#phase !== LoggerReasoningPhase.idle && this.#phase !== LoggerReasoningPhase.thinking)
       this.#flushBuffer(core, 'response')
     this.#phase = LoggerReasoningPhase.thinking
@@ -89,18 +93,26 @@ class ReasoningPlugin implements ILoggerPlugin<
     this.#raw(core, `${paint('debug', text)}\n\n`)
   }
 
-  #appendThinking(core: ILoggerPluginCore<IPipelineMode>, dim: IDimFn, delta: string): void {
+  #appendThinking(
+    core: ILoggerPluginCore<IMiddlewarePipelineMode>,
+    dim: IDimFn,
+    delta: string
+  ): void {
     if (this.#phase !== LoggerReasoningPhase.thinking) this.#startThinking(core, (_t, s) => s)
     this.#buffer += delta
     this.#raw(core, dim(delta))
   }
 
-  #endThinking(core: ILoggerPluginCore<IPipelineMode>): void {
+  #endThinking(core: ILoggerPluginCore<IMiddlewarePipelineMode>): void {
     if (this.#phase === LoggerReasoningPhase.thinking) this.#raw(core, '\n\n')
     this.#flushBuffer(core, 'thinking')
   }
 
-  #startResponse(core: ILoggerPluginCore<IPipelineMode>, paint: IPaintFn, label?: string): void {
+  #startResponse(
+    core: ILoggerPluginCore<IMiddlewarePipelineMode>,
+    paint: IPaintFn,
+    label?: string
+  ): void {
     if (
       this.#phase !== LoggerReasoningPhase.idle &&
       this.#phase !== LoggerReasoningPhase.responding
@@ -112,18 +124,21 @@ class ReasoningPlugin implements ILoggerPlugin<
     if (text) this.#raw(core, `${paint('info', text)}\n\n`)
   }
 
-  #appendResponse(core: ILoggerPluginCore<IPipelineMode>, delta: string): void {
+  #appendResponse(core: ILoggerPluginCore<IMiddlewarePipelineMode>, delta: string): void {
     if (this.#phase !== LoggerReasoningPhase.responding) this.#startResponse(core, (_t, s) => s)
     this.#buffer += delta
     this.#raw(core, delta)
   }
 
-  #endResponse(core: ILoggerPluginCore<IPipelineMode>): void {
+  #endResponse(core: ILoggerPluginCore<IMiddlewarePipelineMode>): void {
     if (this.#phase === LoggerReasoningPhase.responding) this.#raw(core, '\n')
     this.#flushBuffer(core, 'response')
   }
 
-  #flushBuffer(core: ILoggerPluginCore<IPipelineMode>, tag: 'thinking' | 'response'): void {
+  #flushBuffer(
+    core: ILoggerPluginCore<IMiddlewarePipelineMode>,
+    tag: 'thinking' | 'response'
+  ): void {
     const text = this.#buffer
     this.#phase = LoggerReasoningPhase.idle
     this.#buffer = ''
@@ -135,7 +150,7 @@ class ReasoningPlugin implements ILoggerPlugin<
   }
 
   /** 对 reasoning 产生的裸输出统一应用当前插件的调度策略。 */
-  #raw(core: ILoggerPluginCore<IPipelineMode>, text: string): void {
+  #raw(core: ILoggerPluginCore<IMiddlewarePipelineMode>, text: string): void {
     core.raw(text, { asyncOutput: this.#resolvedConfig.asyncOutput })
   }
 }
@@ -145,6 +160,6 @@ export const reasoning = (
 ): ILoggerPlugin<
   IReasoningPluginExt,
   IReasoningPluginConfig,
-  IPipelineMode,
+  IMiddlewarePipelineMode,
   { readonly dependencies: typeof reasoningDependenciesFeature }
 > => new ReasoningPlugin(config)

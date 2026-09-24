@@ -109,7 +109,7 @@ const host = createStoreMiddlewareHost({
 - `getState: () => S`（必填）
 - `applyState?: (state: S) => void` —— 未提供时，DevTools 的 `jump`/`reset` 命令会抛出 `code: 'DEVTOOLS_CAPABILITY'`
 - `mutationPolicy?: MutationPolicy` —— 缺省时内部新建一个 `mode: 'off'` 的实例
-- `pipeline?: { mode?: IPipelineMode }` —— **会被构造函数强制覆盖成 `PluginHostPipelineMode.sync`**，传别的值不生效
+- `pipeline?: { mode?: IMiddlewarePipelineMode }` —— **会被构造函数强制覆盖成 `MiddlewarePipelineMode.sync`**，传别的值不生效
 - `diagnostic?` / `scheduler?` / `queueAdmissionTimeoutMs?` / `queueAdmissionDiagnosticMs?` / `disposeStepTimeoutMs?` —— 透传给 `@migaia/plugin-host` 的 `PluginHost`，语义见其 USEGUIDE
 
 **`StoreMiddlewareHost`｜10 秒上手** —— `createStoreMiddlewareHost()` 背后的类，`extends PluginHost`：
