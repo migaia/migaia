@@ -8,6 +8,8 @@
 
 - [导入与运行环境](#导入与运行环境)
 - [静态 Capability Graph](#静态-capability-graph)
+- [增量拓扑索引](#增量拓扑索引)
+- [依赖规划器](#依赖规划器)
 - [Dynamic Capability Graph](#dynamic-capability-graph)
 - [状态机](#状态机)
 - [宿主创建与开关快照](#宿主创建与开关快照)
@@ -42,7 +44,7 @@ import {
 } from '@migaia/capability'
 ```
 
-`exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；如果只需验证节点与 required 依赖是否合法并计算启动顺序，而不需要创建、启动或释放节点，则从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。
+`exports` 提供包根（`.`）、静态 Graph（`./graph`）、拓扑索引（`./graph/topology`）、依赖规划器（`./graph/dependency`）与动态 Graph（`./graph/dynamic`）子路径。Host 符号从包根导入，Graph 符号按职责从对应子路径导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。
 
 <a id="静态-capability-graph"></a>
 
@@ -81,6 +83,18 @@ type IGraphNodeDefinition<T> = {
 `snapshotGraphReadiness(source)` 是 Host 与 Graph 之间的低层准入快照：严格按 `state`、`error` 顺序各读取一次，只接受 `ready | blocked | failed`，并返回冻结的 `{ state, error }`。原生 `Error` getter failure 保持实例身份；非 `Error` 抛出值会以 `INVALID_OPTION` 包装且保留在 `cause`。普通业务代码应读取 Graph 自身状态；只有桥接外部 readiness source 时才直接调用它。
 
 Graph 状态为 `open → starting → ready | failed → quiescing → terminal`。`nodeState()` 与 `nodes` 在 terminal 后仍可读取；unknown node 抛 `GRAPH_UNKNOWN_NODE`。14 个 Graph error code 从 `CapabilityGraphErrorCode` 导出，错误保留 native Error/cause/stack，并由 `onError` 作为 diagnostics sink 接收 cleanup/late-result failure。
+
+## 增量拓扑索引
+
+`createTopologyIndex(adapter)` 从 `@migaia/capability/graph/topology` 导入。索引支持 `add`、`remove`、`setDependencies`、`dependencies`、`dependents`、`missing`、`closure`、`order`、`snapshot`、`metrics` 与 `begin`。required 与当前存在的 optional 边都参与层级和环检测；optional provider 缺席时保留悬空事实，但不阻塞节点。
+
+`order()` 使用 `(level, ordinal)`：先输出较低依赖层级，同层按首次加入索引的顺序。`begin()` 返回隔离事务；事务 `commit()` 前基础索引保持不变，`rollback()` 恢复完整可观察快照。事务打开期间基础索引禁止写入，已提交或回滚的事务禁止继续读取或写入。
+
+## 依赖规划器
+
+`@migaia/capability/graph/dependency` 导出 `planDependencyMutation`、`planRestart`、`planReplacement`、`planResume`、`planActivation`、`resolveInstallSet`、`planTeardown` 与 `collectPlanEdges`，以及相应的策略、动作、状态常量和类型。
+
+规划器不拥有生命周期，也不修改索引。调用方传入当前节点状态和 mutation 请求，得到深冻结的 `{ steps, order, edges, blockedBy }`。`reject` 只报告阻塞者；`cascade` 给出依赖者优先的释放计划；`suspend` 只暂停当前 active/disabled 的依赖者。replacement、resume 与 activation 同样只描述动作，实际 rebind、restart、release、lease drain 和错误上报仍由组合 owner 执行。
 
 ---
 
