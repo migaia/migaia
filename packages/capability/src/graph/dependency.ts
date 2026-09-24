@@ -1,0 +1,401 @@
+import { CapabilityGraphErrorCode } from './error-code.js'
+import { graphFailure, graphMessageFor } from './errors.js'
+import type { ITopologyDependency, ITopologyIndexReader } from './topology.js'
+
+export const DependencyPolicy = {
+  reject: 'reject',
+  cascade: 'cascade',
+  suspend: 'suspend'
+} as const
+
+export type DependencyPolicy = keyof typeof DependencyPolicy
+
+export const DependencyMutationKind = {
+  remove: 'remove',
+  disable: 'disable'
+} as const
+
+export type DependencyMutationKind = keyof typeof DependencyMutationKind
+
+export const DependencyAction = {
+  release: 'release',
+  disable: 'disable',
+  suspend: 'suspend',
+  resume: 'resume',
+  rebind: 'rebind',
+  restart: 'restart',
+  activate: 'activate'
+} as const
+
+export type DependencyAction = keyof typeof DependencyAction
+
+export const DependencyNodeStatus = {
+  active: 'active',
+  inactive: 'inactive',
+  disabled: 'disabled',
+  suspended: 'suspended'
+} as const
+
+export type DependencyNodeStatus = keyof typeof DependencyNodeStatus
+
+export const DependencyEdgeStatus = {
+  optionalAbsent: 'optional-absent'
+} as const
+
+export type IDependencyEdgeStatus = (typeof DependencyEdgeStatus)[keyof typeof DependencyEdgeStatus]
+
+export type IDependencyStatusReader = (id: string) => DependencyNodeStatus
+
+export type IDependencyPlanStep = Readonly<{
+  readonly id: string
+  readonly action: DependencyAction
+}>
+
+export type IDependencyPlanEdge = Readonly<{
+  readonly provider: string
+  readonly consumer: string
+  readonly optional: boolean
+  readonly status?: IDependencyEdgeStatus
+}>
+
+export type IDependencyPlan = Readonly<{
+  readonly steps: readonly IDependencyPlanStep[]
+  readonly order: readonly string[]
+  readonly edges: readonly IDependencyPlanEdge[]
+  readonly blockedBy: readonly string[]
+}>
+
+export type IDependencyMutationRequest = Readonly<{
+  readonly roots: readonly string[]
+  readonly kind: DependencyMutationKind
+  readonly policy: DependencyPolicy
+}>
+
+export type IDependencyReplacementRequest = Readonly<{
+  readonly target: string
+  readonly canRebind: (id: string) => boolean
+}>
+
+export type IDependencyResumeRequest = Readonly<{
+  readonly provider: string
+  readonly generationChanged: boolean
+  readonly canRebind: (id: string) => boolean
+}>
+
+/** Throws the package-owned native TypeError for an unknown planner option. */
+function invalidOption(): never {
+  throw graphFailure(
+    CapabilityGraphErrorCode.invalidOption,
+    new TypeError(graphMessageFor(CapabilityGraphErrorCode.invalidOption))
+  )
+}
+
+/** Returns a mutation-incapable set facade over one immutable insertion order. */
+function createReadonlySet<T>(values: Iterable<T>): ReadonlySet<T> {
+  /** Private lookup hidden behind the frozen facade. */
+  const lookup = new Set(values)
+  /** Frozen read-only set implementation. */
+  const facade = {
+    has: (value: T): boolean => lookup.has(value),
+    get size(): number {
+      return lookup.size
+    },
+    entries: (): SetIterator<[T, T]> => lookup.entries(),
+    keys: (): SetIterator<T> => lookup.keys(),
+    values: (): SetIterator<T> => lookup.values(),
+    forEach: (callback: (value: T, value2: T, set: ReadonlySet<T>) => void): void => {
+      for (const value of lookup) callback(value, value, facade)
+    },
+    [Symbol.iterator]: (): SetIterator<T> => lookup[Symbol.iterator]()
+  } as ReadonlySet<T>
+  return Object.freeze(facade)
+}
+
+/** Deep-freezes a complete dependency plan without retaining mutable caller arrays. */
+function createPlan(
+  steps: readonly IDependencyPlanStep[],
+  edges: readonly IDependencyPlanEdge[],
+  blockedBy: readonly string[] = []
+): IDependencyPlan {
+  /** Frozen step objects retained by both `steps` and derived `order`. */
+  const frozenSteps = Object.freeze(
+    steps.map((step) => Object.freeze({ id: step.id, action: step.action }))
+  )
+  return Object.freeze({
+    steps: frozenSteps,
+    order: Object.freeze(frozenSteps.map((step) => step.id)),
+    edges: Object.freeze(edges.map((edge) => Object.freeze({ ...edge }))),
+    blockedBy: Object.freeze([...blockedBy])
+  })
+}
+
+/** Returns true when one runtime value is a supported dependency policy. */
+function isDependencyPolicy(value: unknown): value is DependencyPolicy {
+  return (
+    value === DependencyPolicy.reject ||
+    value === DependencyPolicy.cascade ||
+    value === DependencyPolicy.suspend
+  )
+}
+
+/** Returns true when one runtime value is a supported dependency mutation kind. */
+function isDependencyMutationKind(value: unknown): value is DependencyMutationKind {
+  return value === DependencyMutationKind.remove || value === DependencyMutationKind.disable
+}
+
+/** Converts one canonical affected set to dependent-first order. */
+function dependentFirst(index: ITopologyIndexReader, affected: ReadonlySet<string>): string[] {
+  return [...index.order(affected)].reverse()
+}
+
+/** Returns whether every required provider is present and usable in the projected recovery state. */
+function requiredProvidersAvailable(
+  index: ITopologyIndexReader,
+  status: IDependencyStatusReader,
+  available: ReadonlySet<string>,
+  dependencies: readonly ITopologyDependency[]
+): boolean {
+  for (const dependency of dependencies) {
+    if (!dependency.required) continue
+    if (!index.has(dependency.provider)) return false
+    if (available.has(dependency.provider)) continue
+    if (status(dependency.provider) !== DependencyNodeStatus.active) return false
+  }
+  return true
+}
+
+/** Collects deterministic plan edges for one affected node set. */
+export function collectPlanEdges(
+  index: ITopologyIndexReader,
+  affected: ReadonlySet<string>
+): readonly IDependencyPlanEdge[] {
+  /** Edges emitted in canonical consumer and declaration order. */
+  const edges: IDependencyPlanEdge[] = []
+  for (const consumer of index.order()) {
+    for (const dependency of index.dependencies(consumer)) {
+      if (dependency.required) {
+        if (affected.has(consumer) && affected.has(dependency.provider))
+          edges.push({ provider: dependency.provider, consumer, optional: false })
+        continue
+      }
+      if (affected.has(dependency.provider)) {
+        edges.push({ provider: dependency.provider, consumer, optional: true })
+      } else if (affected.has(consumer) && !index.has(dependency.provider)) {
+        edges.push({
+          provider: dependency.provider,
+          consumer,
+          optional: true,
+          status: DependencyEdgeStatus.optionalAbsent
+        })
+      }
+    }
+  }
+  return Object.freeze(edges.map((edge) => Object.freeze(edge)))
+}
+
+/** Plans reject, cascade, or suspend semantics without mutating the topology index. */
+export function planDependencyMutation(
+  index: ITopologyIndexReader,
+  status: IDependencyStatusReader,
+  request: IDependencyMutationRequest
+): IDependencyPlan {
+  if (!isDependencyPolicy(request.policy) || !isDependencyMutationKind(request.kind))
+    invalidOption()
+  /** Required dependent closure, including all roots. */
+  const affected = new Set(index.closure(request.roots))
+  /** Roots retain mutation action even when one is also another root's dependent. */
+  const roots = new Set(request.roots)
+  /** Required closure in teardown order. */
+  const teardown = dependentFirst(index, affected)
+  /** Edges describing internal required and externally affected optional relationships. */
+  const edges = collectPlanEdges(index, affected)
+
+  if (request.policy === DependencyPolicy.reject) {
+    const blockedBy = teardown.filter((id) => !roots.has(id))
+    if (blockedBy.length > 0) return createPlan([], edges, blockedBy)
+  }
+
+  const rootAction =
+    request.kind === DependencyMutationKind.remove
+      ? DependencyAction.release
+      : DependencyAction.disable
+  if (request.policy !== DependencyPolicy.suspend)
+    return createPlan(
+      teardown.map((id) => ({ id, action: rootAction })),
+      edges
+    )
+
+  /** Suspend plan preserving dependent-first teardown order. */
+  const steps: IDependencyPlanStep[] = []
+  for (const id of teardown) {
+    if (roots.has(id)) {
+      steps.push({ id, action: rootAction })
+      continue
+    }
+    const nodeStatus = status(id)
+    if (nodeStatus === DependencyNodeStatus.active || nodeStatus === DependencyNodeStatus.disabled)
+      steps.push({ id, action: DependencyAction.suspend })
+  }
+  return createPlan(steps, edges)
+}
+
+/** Plans one dependent-first restart closure, excluding inactive nodes. */
+export function planRestart(
+  index: ITopologyIndexReader,
+  status: IDependencyStatusReader,
+  roots: readonly string[]
+): IDependencyPlan {
+  /** Full required closure reached from restart roots. */
+  const affected = new Set(index.closure(roots))
+  /** Restart steps skip nodes that have never activated. */
+  const steps = dependentFirst(index, affected)
+    .filter((id) => status(id) !== DependencyNodeStatus.inactive)
+    .map((id) => ({ id, action: DependencyAction.restart }) as const)
+  /** Edge projection covers only nodes participating in restart. */
+  const planned = new Set(steps.map((step) => step.id))
+  return createPlan(steps, collectPlanEdges(index, planned))
+}
+
+/** Plans direct rebinds first, then dependent-first restart closures. */
+export function planReplacement(
+  index: ITopologyIndexReader,
+  status: IDependencyStatusReader,
+  request: IDependencyReplacementRequest
+): IDependencyPlan {
+  /** Direct active consumers that can accept the replacement in place. */
+  const rebinds: IDependencyPlanStep[] = []
+  /** Direct active consumers that require restart closure. */
+  const restartRoots: string[] = []
+  for (const dependent of index.dependents(request.target).required) {
+    if (status(dependent) !== DependencyNodeStatus.active) continue
+    if (request.canRebind(dependent))
+      rebinds.push({ id: dependent, action: DependencyAction.rebind })
+    else restartRoots.push(dependent)
+  }
+  const restarts =
+    restartRoots.length === 0 ? createPlan([], []) : planRestart(index, status, restartRoots)
+  /** Target is affected even though replacement execution is consumer-owned. */
+  const affected = new Set([request.target, ...rebinds.map((step) => step.id), ...restarts.order])
+  return createPlan([...rebinds, ...restarts.steps], collectPlanEdges(index, affected))
+}
+
+/** Plans recovery of satisfiable suspended dependents in provider-first canonical order. */
+export function planResume(
+  index: ITopologyIndexReader,
+  status: IDependencyStatusReader,
+  request: IDependencyResumeRequest
+): IDependencyPlan {
+  /** Required dependent closure after provider availability returns. */
+  const closure = index.closure([request.provider])
+  /** Providers available now or after an earlier planned recovery step. */
+  const available = new Set<string>([request.provider])
+  /** Suspended nodes whose full required provider set is satisfiable. */
+  const eligible: string[] = []
+  for (const id of closure) {
+    if (id === request.provider || status(id) !== DependencyNodeStatus.suspended) continue
+    if (!requiredProvidersAvailable(index, status, available, index.dependencies(id))) continue
+    available.add(id)
+    eligible.push(id)
+  }
+
+  if (!request.generationChanged)
+    return createPlan(
+      eligible.map((id) => ({ id, action: DependencyAction.resume })),
+      collectPlanEdges(index, new Set([request.provider, ...eligible]))
+    )
+
+  /** Eligible direct consumers that can replace their provider binding in place. */
+  const rebind = new Set<string>()
+  /** Eligible direct consumers whose closure must restart. */
+  const restartRoots: string[] = []
+  const direct = new Set(index.dependents(request.provider).required)
+  for (const id of eligible) {
+    if (!direct.has(id)) continue
+    if (request.canRebind(id)) rebind.add(id)
+    else restartRoots.push(id)
+  }
+  /** Eligible nodes reached from non-rebindable direct consumers. */
+  const restart = new Set<string>()
+  for (const root of restartRoots)
+    for (const id of index.closure([root])) if (eligible.includes(id)) restart.add(id)
+
+  const steps = eligible.map((id) => ({
+    id,
+    action: rebind.has(id)
+      ? DependencyAction.rebind
+      : restart.has(id)
+        ? DependencyAction.restart
+        : DependencyAction.resume
+  }))
+  return createPlan(steps, collectPlanEdges(index, new Set([request.provider, ...eligible])))
+}
+
+/** Plans inactive required providers before the requested activation roots. */
+export function planActivation(
+  index: ITopologyIndexReader,
+  status: IDependencyStatusReader,
+  roots: readonly string[]
+): IDependencyPlan {
+  /** Required providers reached upstream from the requested roots. */
+  const reached = new Set<string>()
+  /** Upstream traversal queue. */
+  const queue = [...roots]
+  for (let position = 0; position < queue.length; position += 1) {
+    const consumer = queue[position]!
+    for (const dependency of index.dependencies(consumer)) {
+      if (!dependency.required || !index.has(dependency.provider)) continue
+      if (reached.has(dependency.provider)) continue
+      reached.add(dependency.provider)
+      queue.push(dependency.provider)
+    }
+  }
+  /** Inactive providers emitted in canonical provider-first order. */
+  const activating = index
+    .order(reached)
+    .filter((id) => !roots.includes(id) && status(id) === DependencyNodeStatus.inactive)
+  return createPlan(
+    activating.map((id) => ({ id, action: DependencyAction.activate })),
+    collectPlanEdges(index, new Set(activating))
+  )
+}
+
+/** Resolves immediate batch installation from non-lazy members and required providers. */
+export function resolveInstallSet(
+  index: ITopologyIndexReader,
+  members: readonly string[],
+  isLazy: (id: string) => boolean
+): ReadonlySet<string> {
+  /** Batch boundary preventing traversal into already-installed external providers. */
+  const memberSet = new Set(members)
+  /** Members selected for immediate installation. */
+  const selected = new Set<string>()
+  /** Required-provider traversal seeded only by non-lazy members. */
+  const queue: string[] = []
+  for (const member of members) {
+    if (isLazy(member)) continue
+    selected.add(member)
+    queue.push(member)
+  }
+  for (let position = 0; position < queue.length; position += 1) {
+    const consumer = queue[position]!
+    for (const dependency of index.dependencies(consumer)) {
+      if (!dependency.required || !memberSet.has(dependency.provider)) continue
+      if (selected.has(dependency.provider)) continue
+      selected.add(dependency.provider)
+      queue.push(dependency.provider)
+    }
+  }
+  return createReadonlySet(index.order(selected))
+}
+
+/** Plans release of every present node in inverse canonical order. */
+export function planTeardown(index: ITopologyIndexReader): IDependencyPlan {
+  /** All present IDs in dependent-first order. */
+  const order = [...index.order()].reverse()
+  /** Entire graph participates in teardown edge reporting. */
+  const affected = new Set(order)
+  return createPlan(
+    order.map((id) => ({ id, action: DependencyAction.release })),
+    collectPlanEdges(index, affected)
+  )
+}
