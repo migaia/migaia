@@ -68,3 +68,41 @@ export const createSystemTerminalRuntime = (
     throw error
   }
 })
+
+/** Runs the single terminal-report ladder while preserving every failure in occurrence order. */
+export const reportTerminalDiagnostic = (
+  code: (typeof EventSubscriberErrorCode)[keyof typeof EventSubscriberErrorCode],
+  errors: readonly unknown[],
+  terminalReport: ((error: AggregateError) => void | PromiseLike<void>) | undefined,
+  runtime: IEventTerminalRuntime
+): void => {
+  const reportSystem = (currentErrors: readonly unknown[]): void => {
+    const accumulated = [...currentErrors]
+    const diagnostic = (): AggregateError =>
+      createEventAggregateError(code, accumulated, eventErrorText(code))
+    try {
+      if (runtime.reportError(diagnostic())) return
+    } catch (error) {
+      accumulated.push(error)
+    }
+    try {
+      if (runtime.consoleError(diagnostic())) return
+    } catch (error) {
+      accumulated.push(error)
+    }
+    runtime.enqueueThrow(diagnostic())
+  }
+  const diagnostic = createEventAggregateError(code, errors, eventErrorText(code))
+  if (!terminalReport) {
+    reportSystem(errors)
+    return
+  }
+  try {
+    Promise.resolve(terminalReport(diagnostic)).then(
+      () => undefined,
+      (error) => reportSystem([...errors, error])
+    )
+  } catch (error) {
+    reportSystem([...errors, error])
+  }
+}

@@ -6,8 +6,11 @@ import {
   type IPathProbe
 } from '@migaia/utils/object-path'
 import { EventSubscriberErrorCode } from './error-code.js'
-import { createEventAggregateError, createEventTypeError, eventErrorText } from './errors.js'
-import { createSystemTerminalRuntime } from './internal/terminal-runtime.js'
+import { createEventTypeError, eventErrorText } from './errors.js'
+import {
+  createSystemTerminalRuntime,
+  reportTerminalDiagnostic
+} from './internal/terminal-runtime.js'
 import type { IEventChannelOptions, IEventContext } from './types.js'
 import type { IEventApiStyle } from './style.js'
 
@@ -163,44 +166,10 @@ function reportProjectionTerminal<T, S extends IEventApiStyle | undefined, V>(
   failure: unknown
 ): void {
   const errors = failure === undefined ? [diagnostic] : [diagnostic, failure]
-  const terminalDiagnostic = createEventAggregateError(
+  reportTerminalDiagnostic(
     EventSubscriberErrorCode.valueProjectionFailed,
     errors,
-    eventErrorText(EventSubscriberErrorCode.valueProjectionFailed)
+    options.terminalReport,
+    systemTerminalRuntime
   )
-  if (options.terminalReport) {
-    try {
-      Promise.resolve(options.terminalReport(terminalDiagnostic)).catch(
-        (terminalFailure: unknown) => {
-          reportSystemProjectionTerminal(terminalDiagnostic, terminalFailure)
-        }
-      )
-      return
-    } catch (terminalFailure) {
-      reportSystemProjectionTerminal(terminalDiagnostic, terminalFailure)
-      return
-    }
-  }
-  reportSystemProjectionTerminal(terminalDiagnostic, undefined)
-}
-
-/** Uses host sinks for projection failures without relabeling them as listener failures. */
-function reportSystemProjectionTerminal(diagnostic: AggregateError, failure: unknown): void {
-  const errors = failure === undefined ? [...diagnostic.errors] : [...diagnostic.errors, failure]
-  const finalDiagnostic = createEventAggregateError(
-    EventSubscriberErrorCode.valueProjectionFailed,
-    errors,
-    eventErrorText(EventSubscriberErrorCode.valueProjectionFailed)
-  )
-  try {
-    if (systemTerminalRuntime.reportError(finalDiagnostic)) return
-  } catch {
-    // Host sink failure is kept out of listener delivery; terminal fallback remains best effort.
-  }
-  try {
-    if (systemTerminalRuntime.consoleError(finalDiagnostic)) return
-  } catch {
-    // Console failure cannot change the completed listener operation.
-  }
-  systemTerminalRuntime.enqueueThrow(finalDiagnostic)
 }
