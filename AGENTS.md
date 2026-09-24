@@ -107,6 +107,7 @@ export type IFooErrorCode = (typeof FooErrorCode)[keyof typeof FooErrorCode];
 ## Function Context Rules
 
 - Do not use `bind`, `apply`, or `call` anywhere in project code or tests. Use arrow functions that capture the required context instead.
+- `Reflect.apply` and `Object.prototype.toString.call` are allowed where their exact built-in semantics are required; the ban targets the mutable receiver helpers above.
 
 ## String Contract Ownership
 

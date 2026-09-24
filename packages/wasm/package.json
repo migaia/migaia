@@ -22,7 +22,7 @@
   "scripts": {
     "fmt": "oxfmt README.md USEGUIDE.md",
     "lint": "cargo clippy --manifest-path rust/Cargo.toml --all-targets",
-    "build": "cd rust && wasm-pack build --target web --release --out-dir ../src",
+    "build": "node ../../scripts/dist-stamp.mjs clean && cd rust && wasm-pack build --target web --release --out-dir ../src && cd .. && node ../../scripts/dist-stamp.mjs write",
     "test:rust": "cd rust && cargo test",
     "test": "wasm-pack test --node rust",
     "typecheck": "tsc --noEmit -p tsconfig.json",

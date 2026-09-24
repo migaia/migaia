@@ -1,24 +1,24 @@
 /**
  * Build-output freshness for workspace packages.
  *
- * Every package export resolves to `dist/`, and no Vitest config aliases `@migaia/*` back to `src/`,
- * so any test that imports another workspace package — or reads a `dist/` path directly — observes
- * whatever build output happens to be on disk. Nothing previously proved that output matched the
- * current sources: a coverage baseline was once produced against a `dist/` built before the final
- * source change. This module closes that gap with two halves that must agree:
+ * Every package export resolves to `dist/`, and no Vitest config aliases `@migaia/*` back to
+ * `src/`, so any test that imports another workspace package — or reads a `dist/` path directly —
+ * observes whatever build output happens to be on disk. Nothing previously proved that output
+ * matched the current sources: a coverage baseline was once produced against a `dist/` built before
+ * the final source change. This module closes that gap with two halves that must agree:
  *
- * - a build writes `dist/.input-digest.json` recording the digest of the sources it was built from;
- * - every reader of `dist/` asserts that recorded digest equals the digest of the sources now on disk.
+ * - A build writes `dist/.input-digest.json` recording the digest of the sources it was built from;
+ * - Every reader of `dist/` asserts that recorded digest equals the digest of the sources now on
+ *   disk.
  *
  * A package's `dist/` depends only on its own sources: builds are `tsc` or Vite with workspace
  * dependencies kept external, so `dist/` holds bare `@migaia/*` imports rather than inlined copies.
  * Freshness of a consumer's view is therefore the freshness of every package in its dist closure.
  *
- * CLI (run from a package directory unless noted):
- *   node ../../scripts/dist-stamp.mjs clean           remove this package's dist/ before building
- *   node ../../scripts/dist-stamp.mjs write           stamp this package's freshly built dist/
- *   node ../../scripts/dist-stamp.mjs assert          assert this package's dist closure is fresh
- *   node scripts/dist-stamp.mjs assert-all            (repository root) assert every stampable package
+ * CLI (run from a package directory unless noted): node ../../scripts/dist-stamp.mjs clean remove
+ * this package's dist/ before building node ../../scripts/dist-stamp.mjs write stamp this package's
+ * freshly built dist/ node ../../scripts/dist-stamp.mjs assert assert this package's dist closure
+ * is fresh node scripts/dist-stamp.mjs assert-all (repository root) assert every stampable package
  */
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url'
 /** Repository root; every package path and git query is resolved against it. */
 export const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Stamp file name inside `dist/`; it rides along with the ignored build output it describes. */
+/** Stamp file name inside a package's build-output directory. */
 export const STAMP_FILE = '.input-digest.json'
 
 /**
@@ -64,7 +64,7 @@ export const DistStampErrorCode = {
  */
 export const DIST_STAMP_TEXT = {
   /**
-   * @param {readonly { name: string, reason: string }[]} entries
+   * @param {readonly { name: string; reason: string }[]} entries
    * @returns {string}
    */
   stale: (entries) =>
@@ -78,6 +78,7 @@ export const DIST_STAMP_TEXT = {
 
 /**
  * Attaches a code (and optional structured detail) without replacing the native error.
+ *
  * @param {Error} error
  * @param {string} code
  * @param {Record<string, unknown>} [detail]
@@ -94,7 +95,8 @@ const withCode = (error, code, detail = {}) => {
  * Package-relative paths that never influence build output. Excluding them keeps a README or test
  * edit from forcing a rebuild; including anything uncertain only costs an extra build, never a
  * false "fresh".
- * @param {string} path package-relative, forward-slash path
+ *
+ * @param {string} path Package-relative, forward-slash path
  * @returns {boolean}
  */
 const isBuildIrrelevant = (path) =>
@@ -105,8 +107,9 @@ const isBuildIrrelevant = (path) =>
 
 /**
  * Lists every workspace package directory under `packages/` that has a manifest.
+ *
  * @param {string} [root]
- * @returns {Map<string, string>} package directory name → absolute directory
+ * @returns {Map<string, string>} Package directory name → absolute directory
  */
 export const workspacePackages = (root = repositoryRoot) => {
   /** Directory name → absolute path for every manifest-bearing package. */
@@ -121,14 +124,17 @@ export const workspacePackages = (root = repositoryRoot) => {
 
 /**
  * Reads a package manifest.
+ *
  * @param {string} directory
  * @returns {Record<string, any>}
  */
-const readManifest = (directory) => JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
+const readManifest = (directory) =>
+  JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
 
 /**
  * Whether a package publishes build output under `dist/` that consumers resolve. Packages whose
  * exports point into `src/` (e.g. the wasm-pack package) have no dist to go stale.
+ *
  * @param {string} directory
  * @returns {boolean}
  */
@@ -136,17 +142,29 @@ export const isStampable = (directory) => {
   const manifest = readManifest(directory)
   return (
     typeof manifest.scripts?.build === 'string' &&
-    JSON.stringify([manifest.main, manifest.exports]).includes('./dist/')
+    (JSON.stringify([manifest.main, manifest.exports]).includes('./dist/') ||
+      manifest.name === '@migaia/wasm')
   )
+}
+
+/** Resolves the output directory stamped for a package. WASM-pack publishes directly from src/. */
+export const outputDirectory = (directory) =>
+  readManifest(directory).name === '@migaia/wasm' ? join(directory, 'src') : join(directory, 'dist')
+
+/** Whether one package-relative file participates in the package's build-input digest. */
+const isBuildInput = (directory, path) => {
+  if (readManifest(directory).name === '@migaia/wasm') return path.startsWith('rust/')
+  return !isBuildIrrelevant(path)
 }
 
 /**
  * Digests the build inputs of several packages with a single git query. Input set: tracked plus
  * untracked-but-not-ignored files under each package, minus build-irrelevant paths. `dist/` and
  * `node_modules/` are ignored by git and therefore never part of their own input.
- * @param {readonly string[]} directories absolute package directories
+ *
+ * @param {readonly string[]} directories Absolute package directories
  * @param {string} [root]
- * @returns {Map<string, string>} absolute directory → hex digest
+ * @returns {Map<string, string>} Absolute directory → hex digest
  */
 export const inputDigests = (directories, root = repositoryRoot) => {
   /** One git listing for all requested packages keeps closure assertions cheap. */
@@ -174,7 +192,7 @@ export const inputDigests = (directories, root = repositoryRoot) => {
     const owner = directories.find((directory) => absolute.startsWith(directory + sep))
     if (!owner) continue
     const path = relative(owner, absolute).split(sep).join('/')
-    if (isBuildIrrelevant(path)) continue
+    if (!isBuildInput(owner, path)) continue
     // A tracked file deleted in the worktree is simply absent from the input: its absence changes
     // the digest exactly as a content edit would.
     if (!existsSync(absolute)) continue
@@ -189,27 +207,41 @@ export const inputDigests = (directories, root = repositoryRoot) => {
 
 /**
  * Removes a package's `dist/` so a build cannot leave orphaned output from deleted sources.
+ *
  * @param {string} directory
  * @returns {void}
  */
 export const cleanDist = (directory) => {
-  rmSync(join(directory, 'dist'), { recursive: true, force: true })
+  if (readManifest(directory).name !== '@migaia/wasm') {
+    rmSync(join(directory, 'dist'), { recursive: true, force: true })
+    return
+  }
+  for (const name of [
+    'wasm_provider.js',
+    'wasm_provider.d.ts',
+    'wasm_provider_bg.wasm',
+    'wasm_provider_bg.wasm.d.ts',
+    STAMP_FILE
+  ])
+    rmSync(join(directory, 'src', name), { force: true })
 }
 
 /**
  * Stamps a freshly built `dist/` with the digest of the sources it was built from.
+ *
  * @param {string} directory
  * @param {string} [root]
- * @returns {string} the recorded digest
+ * @returns {string} The recorded digest
  * @throws {Error} `DIST_OUTPUT_MISSING` when the build left no `dist/`
  */
 export const writeStamp = (directory, root = repositoryRoot) => {
   const name = relative(join(root, 'packages'), directory)
-  if (!existsSync(join(directory, 'dist')))
+  const output = outputDirectory(directory)
+  if (!existsSync(output))
     throw withCode(new Error(DIST_STAMP_TEXT.missingOutput(name)), DistStampErrorCode.missingOutput)
   const digest = inputDigests([directory], root).get(directory)
   writeFileSync(
-    join(directory, 'dist', STAMP_FILE),
+    join(output, STAMP_FILE),
     `${JSON.stringify({ version: STAMP_VERSION, package: name, digest }, null, 2)}\n`
   )
   return digest
@@ -217,13 +249,15 @@ export const writeStamp = (directory, root = repositoryRoot) => {
 
 /**
  * Classifies one package's build output against its current sources.
+ *
  * @param {string} directory
- * @param {string} digest current input digest
+ * @param {string} digest Current input digest
  * @returns {'fresh' | 'unbuilt' | 'unstamped' | 'modified'}
  */
 const classify = (directory, digest) => {
-  if (!existsSync(join(directory, 'dist'))) return 'unbuilt'
-  const stampPath = join(directory, 'dist', STAMP_FILE)
+  const output = outputDirectory(directory)
+  if (!existsSync(output)) return 'unbuilt'
+  const stampPath = join(output, STAMP_FILE)
   if (!existsSync(stampPath)) return 'unstamped'
   try {
     const stamp = JSON.parse(readFileSync(stampPath, 'utf8'))
@@ -237,7 +271,8 @@ const classify = (directory, digest) => {
 /**
  * Asserts that every listed package's `dist/` was built from its current sources. All stale
  * packages are reported together so one rebuild command fixes the run.
- * @param {readonly string[]} directories absolute package directories
+ *
+ * @param {readonly string[]} directories Absolute package directories
  * @param {string} [root]
  * @returns {void}
  * @throws {Error} `DIST_STALE` with a `packages` property listing `{ name, reason }`
@@ -268,8 +303,9 @@ const SELF_DIST_REFERENCE = /(?:\.\.\/)+dist\b|['"]dist['"/]/
 
 /**
  * Workspace dependency names declared by a manifest.
+ *
  * @param {Record<string, any>} manifest
- * @param {boolean} includeDev whether devDependencies count (only for the package under test)
+ * @param {boolean} includeDev Whether devDependencies count (only for the package under test)
  * @returns {string[]} `@migaia/*` package names
  */
 const workspaceDependencies = (manifest, includeDev) =>
@@ -282,6 +318,7 @@ const workspaceDependencies = (manifest, includeDev) =>
 
 /**
  * Recursively collects files under a directory, skipping build output and installed modules.
+ *
  * @param {string} directory
  * @returns {string[]}
  */
@@ -301,11 +338,12 @@ const listSourceFiles = (directory) => {
 /**
  * Computes the set of packages whose `dist/` a package's tests can observe: its declared workspace
  * dependencies (including dev), every package its test sources read by `dist/` path, itself when
- * its tests read their own `dist/`, and the transitive runtime dependencies of all of those —
- * a loaded `dist/` imports its own dependencies' `dist/` in turn.
- * @param {string} directory absolute directory of the package under test
+ * its tests read their own `dist/`, and the transitive runtime dependencies of all of those — a
+ * loaded `dist/` imports its own dependencies' `dist/` in turn.
+ *
+ * @param {string} directory Absolute directory of the package under test
  * @param {string} [root]
- * @returns {string[]} absolute package directories, sorted
+ * @returns {string[]} Absolute package directories, sorted
  */
 export const distClosure = (directory, root = repositoryRoot) => {
   const packages = workspacePackages(root)
@@ -323,7 +361,10 @@ export const distClosure = (directory, root = repositoryRoot) => {
   }
   for (const dependency of workspaceDependencies(readManifest(directory), true))
     seed(byScopedName.get(dependency))
-  for (const file of [...listSourceFiles(join(directory, 'test')), ...listSourceFiles(join(directory, 'e2e'))]) {
+  for (const file of [
+    ...listSourceFiles(join(directory, 'test')),
+    ...listSourceFiles(join(directory, 'e2e'))
+  ]) {
     const text = readFileSync(file, 'utf8')
     if (TEMPLATED_DIST_REFERENCE.test(text)) for (const target of packages.values()) seed(target)
     for (const [, name] of text.matchAll(NAMED_DIST_REFERENCE)) seed(packages.get(name))
@@ -343,7 +384,8 @@ export const distClosure = (directory, root = repositoryRoot) => {
 
 /**
  * Asserts the dist closure of one package; the Vitest global setup calls this before any test.
- * @param {string} directory absolute directory of the package under test
+ *
+ * @param {string} directory Absolute directory of the package under test
  * @param {string} [root]
  * @returns {void}
  */
@@ -352,6 +394,7 @@ export const assertClosureFresh = (directory, root = repositoryRoot) =>
 
 /**
  * Asserts every stampable workspace package; coverage custody calls this around capture.
+ *
  * @param {string} [root]
  * @returns {void}
  */
@@ -360,6 +403,7 @@ export const assertAllFresh = (root = repositoryRoot) =>
 
 /**
  * CLI entry. Package-scoped verbs act on the current directory, which must be a workspace package.
+ *
  * @param {readonly string[]} argv
  * @returns {void}
  */
@@ -367,7 +411,10 @@ const main = (argv) => {
   const [verb] = argv
   if (verb === 'assert-all') return assertAllFresh()
   const directory = process.cwd()
-  if (!existsSync(join(directory, 'package.json')) || dirname(directory) !== join(repositoryRoot, 'packages'))
+  if (
+    !existsSync(join(directory, 'package.json')) ||
+    dirname(directory) !== join(repositoryRoot, 'packages')
+  )
     throw withCode(
       new Error(DIST_STAMP_TEXT.usage(`run "${verb}" from a packages/<name> directory`)),
       DistStampErrorCode.usage
@@ -376,7 +423,9 @@ const main = (argv) => {
   if (verb === 'write') return void writeStamp(directory)
   if (verb === 'assert') return assertClosureFresh(directory)
   throw withCode(
-    new Error(DIST_STAMP_TEXT.usage(`unknown command "${verb}" (clean | write | assert | assert-all)`)),
+    new Error(
+      DIST_STAMP_TEXT.usage(`unknown command "${verb}" (clean | write | assert | assert-all)`)
+    ),
     DistStampErrorCode.usage
   )
 }
