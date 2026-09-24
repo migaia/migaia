@@ -70,3 +70,157 @@ class AsyncHostWithDiagnostic extends PluginHost<Record<string, never>, number> 
     return Promise.resolve(this.runPipeline(value, () => undefined))
   }
 }
+
+/**
+ * Host-owned failure and closing semantics of an async host. These restore the R2 baselines that
+ * exercised the retired `runAsyncPipeline` wrapper directly; they now run through a real host so
+ * the host's combiner (`PIPELINE_FAILED`, source `@migaia/plugin-host`) and active checks are what
+ * is asserted, not middleware-pipeline's defaults.
+ */
+describe('async host pipeline failure and closing baselines', () => {
+  /** Runs once and returns the rejection value, or a sentinel when the run resolved. */
+  const settle = async (host: AsyncHost): Promise<unknown> => {
+    try {
+      await host.run(1)
+      return 'resolved'
+    } catch (error) {
+      return error
+    }
+  }
+
+  it('observes downstream failure when upstream throws after next()', async () => {
+    const host = new AsyncHost()
+    const stageError = new Error('upstream')
+    const downstreamError = new Error('downstream')
+    host.useAsyncPipeline(async (_value, next) => {
+      void next(2)
+      throw stageError
+    })
+    host.useAsyncPipeline(async () => {
+      throw downstreamError
+    })
+    const caught = await settle(host)
+    expect(caught).toBeInstanceOf(AggregateError)
+    expect(caught).toMatchObject({ code: 'PIPELINE_FAILED', source: '@migaia/plugin-host' })
+    expect((caught as AggregateError).errors).toEqual([stageError, downstreamError])
+  })
+
+  it.each(['await', 'return'] as const)(
+    'keeps two error slots when %s next() and downstream reject with the same Error',
+    async (style) => {
+      const host = new AsyncHost()
+      const sharedError = new Error(`same ${style} error`)
+      host.useAsyncPipeline(async (_value, next) => {
+        const result = next(2)
+        if (style === 'await') await result
+        else return result
+      })
+      host.useAsyncPipeline(async () => Promise.reject(sharedError))
+      await expect(host.run(1)).rejects.toMatchObject({
+        code: 'PIPELINE_FAILED',
+        errors: [sharedError, sharedError]
+      })
+    }
+  )
+
+  it('AF-T24: throw undefined and reject(undefined) are not swallowed as success', async () => {
+    const thrown = new AsyncHost()
+    thrown.useAsyncPipeline(async () => {
+      throw undefined
+    })
+    await expect(thrown.run(1)).rejects.toBeUndefined()
+
+    const rejected = new AsyncHost()
+    rejected.useAsyncPipeline(async (_value, next) => {
+      void next(2)
+    })
+    rejected.useAsyncPipeline(async () => Promise.reject(undefined))
+    await expect(rejected.run(1)).rejects.toBeUndefined()
+  })
+
+  it('AF-T24: double undefined failures produce a tagged AggregateError with two undefined slots', async () => {
+    const host = new AsyncHost()
+    host.useAsyncPipeline(async (_value, next) => {
+      void next(2)
+      throw undefined
+    })
+    host.useAsyncPipeline(async () => Promise.reject(undefined))
+    const caught = await settle(host)
+    expect((caught as { code?: string }).code).toBe('PIPELINE_FAILED')
+    expect((caught as AggregateError).errors).toEqual([undefined, undefined])
+  })
+
+  it('preserves exact stage rejection when host turns closing', async () => {
+    const host = new AsyncHost()
+    const stageError = new Error('stage failed while host closes')
+    host.useAsyncPipeline(async () => {
+      void host.dispose()
+      throw stageError
+    })
+    await expect(host.run(1)).rejects.toBe(stageError)
+  })
+
+  it('handles long next chains without overflowing the call stack', async () => {
+    const host = new AsyncHost()
+    for (let position = 0; position < 20000; position += 1)
+      host.useAsyncPipeline((value, next) => next(value + 1))
+    await expect(host.run(0)).resolves.toBe(20000)
+  })
+
+  it('BC5: host closing during downstream dispatch rejects with the lifecycle abort', async () => {
+    // R2 baseline "preserves exact downstream rejection when host turns closing" is superseded by
+    // BC5: async stages now observe the lifecycle signal, and the runner keeps cancellation as the
+    // primary failure. Reachability of the downstream error through the abort error is owned by
+    // middleware-pipeline and tracked as R3 deferred D1.
+    const host = new AsyncHost()
+    host.useAsyncPipeline(async (_value, next) => {
+      void next(2)
+    })
+    host.useAsyncPipeline(async () => {
+      void host.dispose()
+      throw new Error('downstream failed while host closes')
+    })
+    await expect(host.run(1)).rejects.toMatchObject({
+      source: '@migaia/plugin-host',
+      code: 'HOST_DISPOSING'
+    })
+  })
+
+  it('combines dual failures before HOST_DISPOSING in exact stage-first order', async () => {
+    const host = new AsyncHost()
+    const stageError = new Error('stage failed while host closes')
+    const downstreamError = new Error('downstream failed while host closes')
+    host.useAsyncPipeline(async (_value, next) => {
+      void next(2)
+      throw stageError
+    })
+    host.useAsyncPipeline(async () => {
+      void host.dispose()
+      throw downstreamError
+    })
+    const caught = await settle(host)
+    expect(caught).toBeInstanceOf(AggregateError)
+    expect(caught).toMatchObject({ source: '@migaia/plugin-host', code: 'PIPELINE_FAILED' })
+    expect((caught as AggregateError).errors).toEqual([stageError, downstreamError])
+  })
+
+  it('throws HOST_DISPOSING after successful incomplete dispatch', async () => {
+    const host = new AsyncHost()
+    host.useAsyncPipeline(async () => {
+      void host.dispose()
+    })
+    await expect(host.run(1)).rejects.toMatchObject({
+      source: '@migaia/plugin-host',
+      code: 'HOST_DISPOSING'
+    })
+  })
+
+  it('does not assert HOST_DISPOSING after done completes dispatch', async () => {
+    const host = new AsyncHost()
+    host.useAsyncPipeline(async (value, next) => {
+      await next(value + 1)
+      void host.dispose()
+    })
+    await expect(host.run(1)).resolves.toBe(2)
+  })
+})

@@ -278,6 +278,8 @@ export class PluginHost<
       mode: this.#pipelineMode,
       onViolation: this.#onPipelineViolation,
       assertActive: () => this.#assertActive(),
+      // BC5: every mode observes the lifecycle abort signal, so in-flight stages of any mode can
+      // stop through `context.signal` when the host closes.
       signal: this.#liveSignal,
       combineStageAndDownstreamError: (stageError, downstreamError) =>
         tagPluginHostError(
@@ -861,7 +863,13 @@ export class PluginHost<
       )
       this.#installRuntime.installBatchSync(entries)
       for (const entry of entries) {
-        const task = this.#resumeRuntime.resumeAfterProvider(entry.name, true).catch((error) => {
+        if (!this.#resumeRuntime.hasSuspendedDependents(entry.name)) continue
+        // Recovery drains, disposes and reinstalls registrations, so it must run inside the
+        // mutation queue like every other structural change instead of racing queued mutations.
+        /** Queued recovery for this entry; failures are reported, never rethrown to the caller. */
+        const task = this.#enqueue(() =>
+          this.#resumeRuntime.resumeAfterProvider(entry.name, true)
+        ).catch((error) => {
           reportDiagnostic(
             this.#diagnostic,
             ERROR_TEXT.DEPENDENT_RESTART_FAILED(entry.name, []),

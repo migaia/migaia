@@ -290,6 +290,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       activated: false,
       enabled: true,
       suspended: false,
+      restartPending: false,
       lifecycle: PluginHostRegistrationLifecycle.install,
       lifecycleController: createAbortController(),
       scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler }),

@@ -93,6 +93,12 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
           this.#port.registrations.get(pluginName)?.plugin.onDependencyReplaced !== undefined
       }
     )
+    // Suspended direct dependents are not planned (they are not active) yet still hold a binding
+    // to the generation just replaced; recovery must reinstall them rather than resume them.
+    for (const dependentName of this.#port.state.dependencyIndex().dependents(name).required) {
+      const dependent = this.#port.registrations.get(dependentName)
+      if (dependent?.suspended) dependent.restartPending = true
+    }
     /** Direct rebind failures that capability must expand into restart closures. */
     const failedRebinds: string[] = []
     for (const step of replacementPlan.steps) {
@@ -134,6 +140,13 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
     for (const restartName of restartOrder) {
       const registration = this.#port.registrations.get(restartName)
       if (!registration) continue
+      // A suspended member cannot reinstall while another required provider is absent; restarting
+      // it here would fail the whole restart batch and remove its healthy providers. It keeps its
+      // retained instance and restarts when recovery makes all of its providers available.
+      if (registration.suspended) {
+        registration.restartPending = true
+        continue
+      }
       restarted.push(registration)
       await this.#port.drainLeases(registration)
       cleanupErrors.push(...(await this.#port.disposeRegistration(registration)))

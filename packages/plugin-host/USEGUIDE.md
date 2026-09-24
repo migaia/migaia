@@ -284,11 +284,13 @@ host.usePipeline((value, next) => next(value.trim()))
 
 Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保护的 `runPipeline(value, done)` 触发一次遍历；插件 stage 的自动清理不覆盖"正在执行中"的调用——调用方在 `unUse()` 或 `dispose()` 前应自行停止提交新工作并 drain 现有业务流程。pipeline stage 不调用 `next()` 时，该次 pipeline 会被拦截、`done` 回调不会执行，但发起这次 pipeline 调用的操作本身仍会正常完成——调用方需要自行保证每个 stage 按约定推进，Host 不会替你检测"这个 stage 是不是忘了调 next"。
 
-### async/async-generator 模式下的中途 dispose
+### 遍历中途 dispose 与生命周期 signal
 
-`async` 与 `async-generator` 都会在遍历跨越微任务边界的过程中持续检查 host 是否还活着，一旦在 stage 执行期间 `dispose()` 被调用，遍历会在下一个协作检查点中止，`runPipeline()` 返回的 Promise 以 `PluginHostError('HOST_DISPOSING', ...)`（此时仍在 `closing` 窗口）或 `PluginHostError('HOST_DISPOSED', ...)`（已经到达 terminal）reject，具体是哪一个取决于检查点触发时 host 恰好处于哪个阶段——两种都可能出现，调用方应统一按 `instanceof PluginHostError` 处理，不要依赖某个固定的 code。
+四种模式的 stage 都会在最后一个参数收到 `context`（generator 类 stage 是第二个参数），其中 `context.signal` 就是 host 的生命周期 signal：`dispose()` 开始时被中止，`reason` 是与 `assertActive()` 同一个 `PluginHostError` 实例。等待外部 I/O 的 stage 应监听或轮询它，以便及时退出。
 
-两种模式实现这个检查的机制不同：`async` 模式复用 `@migaia/middleware-pipeline` 的 `assertActive` 回调（`runAsyncMiddleware` 原生支持）；`async-generator` 模式的底层 runner（`runAsyncGeneratorMiddleware`）不支持 `assertActive` 回调，只接受 `IMiddlewarePipelineAbortSignal`，因此 Host 内部构造了一个只读的结构化 signal（`aborted` 反映 `#status !== active`，`reason` 返回与 `assertActive()` 会抛出的同一个 `PluginHostError` 实例），把它作为 `control.signal` 传给底层 runner——由于 middleware-pipeline 的中止错误工厂对 `Error` 类型的 reason 会原样抛出、不再包装，最终两种模式抛出的错误身份完全一致，调用方感知不到底层机制的差异。这个 signal 只在检查点被轮询读取，从不调用其 `addEventListener`。
+遍历期间 `dispose()` 被调用后，遍历会在下一个协作检查点（进入 stage 前、stage 返回后、`next()` 派发时）中止：sync/generator 同步抛出，async/async-generator 的 Promise reject，错误为 `PluginHostError('HOST_DISPOSING', ...)`（仍在 `closing` 窗口）或 `PluginHostError('HOST_DISPOSED', ...)`（已到达 terminal）。两种都可能出现，调用方应统一按 `instanceof PluginHostError` 处理，不要依赖某个固定的 code。
+
+已知限制：中止与 stage 或下游的普通失败同时发生时，中止错误作为主错误，普通失败目前不会出现在它的 `cause` 上。这由 `@migaia/middleware-pipeline` 的修订版处理，届时本节更新。
 
 ---
 
