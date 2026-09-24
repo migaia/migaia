@@ -56,6 +56,8 @@ import { bindTerminalSink, reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostOperationRuntime } from './operation-runtime.js'
 import {
   createPipeline,
+  MIDDLEWARE_PIPELINE_SOURCE,
+  MiddlewarePipelineErrorCode,
   MiddlewarePipelineMode,
   type IAsyncGeneratorMiddlewareStage,
   type IAsyncMiddlewareStage,
@@ -662,6 +664,19 @@ export class PluginHost<
         allocateSlot: () => this.#state.allocateStageSlot()
       })
     } catch (error) {
+      if (
+        error instanceof TypeError &&
+        Reflect.get(error, 'code') === MiddlewarePipelineErrorCode.invalidOption &&
+        Reflect.get(error, 'source') === MIDDLEWARE_PIPELINE_SOURCE
+      )
+        throw attachPluginHostIdentity(
+          new PluginHostError(
+            PluginHostErrorCode.pipelineModeMismatch,
+            ERROR_TEXT.PIPELINE_MODE_MISMATCH(this.#pipelineMode, kind),
+            { cause: error }
+          ),
+          this
+        )
       this.#rethrowWithIdentity(error)
     }
   }
