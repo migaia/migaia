@@ -25,11 +25,12 @@ describe('dependency mutation policy', () => {
     })
     expect(providerHandle.name).toBe('A')
     expect(consumerHandle.name).toBe('B')
-    await expect(host.unUse('A', { cascade: true, dryRun: true })).resolves.toMatchObject({
+    await expect(host.unUse('A', { policy: 'cascade', dryRun: true })).resolves.toMatchObject({
+      policy: 'cascade',
       order: ['B', 'A']
     })
     expect(providerHandle.name).toBe('A')
-    await expect(host.unUse('A', { cascade: true })).resolves.toEqual({ ok: true })
+    await expect(host.unUse('A', { policy: 'cascade' })).resolves.toEqual({ ok: true })
     expect(() => providerHandle.extensions).toThrow()
     expect(() => consumerHandle.extensions).toThrow()
   })

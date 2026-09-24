@@ -26,6 +26,21 @@ const filesUnderModule = async (name: string): Promise<string[]> => {
 }
 
 describe('architecture boundaries', () => {
+  it('keeps dependency planning in capability and removes the retired host planners', async () => {
+    const files = await filesUnder(sourceRoot)
+    const source = (await Promise.all(files.map((file) => readFile(file, 'utf8')))).join('\n')
+    expect(source.match(/buildCapabilityTopology/g)).toHaveLength(1)
+    for (const retired of [
+      'planPluginDependencyMutation',
+      'readPluginBlockers',
+      'readPluginDependents',
+      'collectLazyActivationOrder',
+      'resolveBatchInstallSet',
+      'buildRegistrationTopology'
+    ])
+      expect(source).not.toContain(retired)
+  })
+
   it('keeps internal lower layers independent from the facade and platform adapters', async () => {
     const files = []
     for (const module of ['config', 'core', 'disposal', 'extension', 'pipeline', 'registry'])

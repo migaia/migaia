@@ -5,7 +5,7 @@ import {
   definePlugin,
   PluginHost,
   PluginHostErrorCode,
-  PluginHostPipelineMode,
+  MiddlewarePipelineMode,
   type IPluginConstraint
 } from '../src/index.js'
 
@@ -140,7 +140,7 @@ describe('hot replacement transaction', () => {
         return this.runPipeline(value, () => undefined)
       }
     }
-    const host = new PipelineHost({ execution, pipeline: { mode: PluginHostPipelineMode.async } })
+    const host = new PipelineHost({ execution, pipeline: { mode: MiddlewarePipelineMode.async } })
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
       release = resolve
@@ -335,7 +335,7 @@ describe('enablement prerequisites', () => {
     const host = new PluginHost<Record<string, never>>({ execution })
     const { provider, consumer } = createRequiredPair()
     await host.use(provider, consumer)
-    await host.plugin.disable('A', { cascade: true })
+    await host.plugin.disable('A', { policy: 'cascade' })
     await expect(host.plugin.enable('B')).rejects.toMatchObject({
       code: PluginHostErrorCode.prerequisiteDisabled
     })

@@ -12,16 +12,17 @@ import {
 import * as pluginHostPublic from '../src/index.js'
 import type { IPluginConstraint, IPluginHostCore, IPluginHostOptions } from '../src/typing'
 import {
+  createPipeline,
   GENERATOR_CONTINUE as middlewareContinue,
   GENERATOR_HALT as middlewareHalt,
-  GENERATOR_UNDEFINED as middlewareUndefined
+  GENERATOR_UNDEFINED as middlewareUndefined,
+  MiddlewarePipelineMode
 } from '@migaia/middleware-pipeline'
 import {
   GENERATOR_CONTINUE as hostContinue,
   GENERATOR_HALT as hostHalt,
   GENERATOR_UNDEFINED as hostUndefined
 } from '../src/typing'
-import { runAsyncPipeline } from '../src/pipeline.js'
 import { PluginHostRemovalRuntime } from '../src/removal-runtime.js'
 import { createManualScheduler } from '@migaia/lifecycle'
 import { openComposition } from '../src/composition-entry.js'
@@ -564,7 +565,7 @@ describe('PluginHost', () => {
       removeEventListener() {}
     }
     await expect(
-      runAsyncPipeline(
+      createPipeline<number>({ mode: MiddlewarePipelineMode.async, signal }).run(
         [
           async (_value, _next, context) => {
             aborted = true
@@ -572,10 +573,7 @@ describe('PluginHost', () => {
           }
         ],
         1,
-        () => undefined,
-        () => undefined,
-        undefined,
-        signal
+        () => undefined
       )
     ).rejects.toMatchObject({ code: 'ABORTED' })
   })
@@ -584,6 +582,9 @@ describe('PluginHost', () => {
     expect(hostContinue).toBe(middlewareContinue)
     expect(hostHalt).toBe(middlewareHalt)
     expect(hostUndefined).toBe(middlewareUndefined)
+    expect(pluginHostPublic.MiddlewarePipelineMode).toBe(MiddlewarePipelineMode)
+    expect(pluginHostPublic).not.toHaveProperty('PluginHostPipelineMode')
+    expect(pluginHostPublic).not.toHaveProperty('adaptSyncStageToAsync')
   })
 
   it('keeps plugin stage and resource registration available across async install', async () => {
@@ -1086,6 +1087,7 @@ describe('PluginHost', () => {
     const runtime = new PluginHostRemovalRuntime({
       host: {},
       registrations: new Map([[registration.name, registration]]),
+      removeRegistration: () => undefined,
       extensionOwners: new Map(),
       pipelineLeases: { seal: () => undefined } as any,
       pipelineOwnerKeys: new Map([[registration.name, registration.pipelineOwnerKey]]),
@@ -1217,6 +1219,9 @@ describe('PluginHost', () => {
     const runtime = new PluginHostRemovalRuntime({
       host,
       registrations,
+      removeRegistration: (current) => {
+        registrations.delete(current.name)
+      },
       extensionOwners,
       pipelineLeases: { seal: () => undefined } as any,
       pipelineOwnerKeys: new Map([[registration.name, registration.pipelineOwnerKey]]),
