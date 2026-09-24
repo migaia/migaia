@@ -61,6 +61,12 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   enabled: boolean
   /** Whether a missing or unavailable required provider has temporarily gated this registration. */
   suspended: boolean
+  /**
+   * Set while suspended when a provider this registration bound to changed generation (replace
+   * restart) before recovery; its retained instance is stale, so recovery must reinstall it instead
+   * of resuming or rebinding it.
+   */
+  restartPending: boolean
   lifecycle: (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]
   lifecycleController?: IAbortController
   operation?: IGenerationRequest

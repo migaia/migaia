@@ -44,8 +44,13 @@ const measure = async (size: number) => {
     })
     plugins.push(previous)
   }
-  await host.use(...(plugins as never))
   const index = captured.at(-1)!
+  await host.use(...(plugins as never))
+  /** Index work of installing the whole chain as one batch, normalized per member. */
+  const batchWorkPerMember = {
+    visitedNodes: index.metrics().visitedNodes / size,
+    visitedEdges: index.metrics().visitedEdges / size
+  }
   const leaf = definePlugin({
     name: `leaf-${size}`,
     features: {
@@ -65,6 +70,7 @@ const measure = async (size: number) => {
   return {
     host,
     index,
+    batchWorkPerMember,
     deltas: [
       delta(beforeUse, afterUse),
       delta(afterUse, afterDryRun),
@@ -80,6 +86,14 @@ describe('dependency index scaling', () => {
     const smallBeforeLarge = small.index.metrics()
     const large = await measure(2000)
     expect(large.deltas).toEqual(small.deltas)
+    // Recovery planning after install must not walk each member's dependent closure (R1).
+    // Bounded by a constant factor: a closure walk per member makes this ratio grow with size.
+    expect(large.batchWorkPerMember.visitedNodes).toBeLessThan(
+      2 * small.batchWorkPerMember.visitedNodes
+    )
+    expect(large.batchWorkPerMember.visitedEdges).toBeLessThan(
+      2 * small.batchWorkPerMember.visitedEdges
+    )
     expect(small.index.metrics()).toEqual(smallBeforeLarge)
 
     const sizeBeforeFailure = large.index.size
