@@ -4,10 +4,10 @@ import { CapabilityGraphErrorCode } from './error-code.js'
 import { graphFailure, graphMessageFor } from './errors.js'
 import {
   DependencyMutationKind,
-  DependencyNodeStatus,
   DependencyPolicy,
   planDependencyMutation,
-  planRestart
+  planRestart,
+  type IDependencyNodeState
 } from './dependency.js'
 import {
   createTopologyIndex,
@@ -334,12 +334,16 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   const readClosureEntries = (roots: readonly string[]): IStoredNode<TBinding>[] =>
     readOrderedEntries(topologyIndex.closure(roots))
 
-  /** Projects runtime node state into the pure planner's status vocabulary. */
-  const readDependencyStatus = (id: string): DependencyNodeStatus => {
+  /** Projects runtime node state into the pure planner's orthogonal state flags. */
+  const readDependencyState = (id: string): IDependencyNodeState => {
     const state = definitions.get(id)?.state
-    if (state === CapabilityGraphNodeState.ready) return DependencyNodeStatus.active
-    if (state === CapabilityGraphNodeState.suspended) return DependencyNodeStatus.suspended
-    return DependencyNodeStatus.inactive
+    return {
+      activated:
+        state === CapabilityGraphNodeState.ready || state === CapabilityGraphNodeState.suspended,
+      enabled: true,
+      suspended: state === CapabilityGraphNodeState.suspended,
+      stale: false
+    }
   }
 
   /** Plans a remove or suspend frontier and preserves the dynamic reject error payload. */
@@ -350,7 +354,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     const policy = options?.policy ?? DependencyPolicy.cascade
     if (policy !== DependencyPolicy.reject && policy !== DependencyPolicy.cascade)
       throw fail(CapabilityGraphErrorCode.invalidOption)
-    const plan = planDependencyMutation(topologyIndex, readDependencyStatus, {
+    const plan = planDependencyMutation(topologyIndex, readDependencyState, {
       roots: [id],
       kind: DependencyMutationKind.remove,
       policy
@@ -732,8 +736,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           const restart = new Set<string>()
           for (const dependent of topologyIndex.dependents(node.id).required) {
             if (!options.onReplaced) {
-              for (const item of planRestart(topologyIndex, readDependencyStatus, [dependent])
-                .order)
+              for (const item of planRestart(topologyIndex, readDependencyState, [dependent]).order)
                 restart.add(item)
               continue
             }
@@ -741,8 +744,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
               await options.onReplaced(dependent as IGraphNodeId, binding)
             } catch (error) {
               report(error)
-              for (const item of planRestart(topologyIndex, readDependencyStatus, [dependent])
-                .order)
+              for (const item of planRestart(topologyIndex, readDependencyState, [dependent]).order)
                 restart.add(item)
             }
           }
