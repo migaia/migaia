@@ -1,0 +1,155 @@
+{
+  "baseCommit": "6da16beee6f241bade1442339ca18b0a38361c65",
+  "fixtures": [
+    {
+      "name": "chain",
+      "nodes": [
+        { "id": "a", "ordinal": 0, "dependencies": [] },
+        {
+          "id": "b",
+          "ordinal": 1,
+          "dependencies": [{ "provider": "a", "required": true }]
+        },
+        {
+          "id": "c",
+          "ordinal": 2,
+          "dependencies": [{ "provider": "b", "required": true }]
+        }
+      ],
+      "expected": {
+        "ordered": ["a", "b", "c"],
+        "level": { "a": 0, "b": 1, "c": 2 },
+        "indegree": { "a": 0, "b": 1, "c": 1 },
+        "providers": ["a", "b"]
+      }
+    },
+    {
+      "name": "diamond",
+      "nodes": [
+        { "id": "root", "ordinal": 0, "dependencies": [] },
+        {
+          "id": "left",
+          "ordinal": 1,
+          "dependencies": [{ "provider": "root", "required": true }]
+        },
+        {
+          "id": "right",
+          "ordinal": 2,
+          "dependencies": [{ "provider": "root", "required": true }]
+        },
+        {
+          "id": "leaf",
+          "ordinal": 3,
+          "dependencies": [
+            { "provider": "left", "required": true },
+            { "provider": "right", "required": true }
+          ]
+        }
+      ],
+      "expected": {
+        "ordered": ["root", "left", "right", "leaf"],
+        "level": { "root": 0, "left": 1, "right": 1, "leaf": 2 },
+        "indegree": { "root": 0, "left": 1, "right": 1, "leaf": 2 },
+        "providers": ["root", "left", "right"]
+      }
+    },
+    {
+      "name": "fan-out",
+      "nodes": [
+        { "id": "root", "ordinal": 0, "dependencies": [] },
+        {
+          "id": "first",
+          "ordinal": 1,
+          "dependencies": [{ "provider": "root", "required": true }]
+        },
+        {
+          "id": "second",
+          "ordinal": 2,
+          "dependencies": [{ "provider": "root", "required": true }]
+        },
+        {
+          "id": "third",
+          "ordinal": 3,
+          "dependencies": [{ "provider": "root", "required": true }]
+        }
+      ],
+      "expected": {
+        "ordered": ["root", "first", "second", "third"],
+        "level": { "root": 0, "first": 1, "second": 1, "third": 1 },
+        "indegree": { "root": 0, "first": 1, "second": 1, "third": 1 },
+        "providers": ["root"]
+      }
+    },
+    {
+      "name": "optional-present",
+      "nodes": [
+        { "id": "provider", "ordinal": 0, "dependencies": [] },
+        {
+          "id": "optional",
+          "ordinal": 1,
+          "dependencies": [{ "provider": "provider", "required": false }]
+        },
+        {
+          "id": "required",
+          "ordinal": 2,
+          "dependencies": [{ "provider": "provider", "required": true }]
+        },
+        {
+          "id": "leaf",
+          "ordinal": 3,
+          "dependencies": [{ "provider": "optional", "required": true }]
+        }
+      ],
+      "expected": {
+        "ordered": ["provider", "optional", "required", "leaf"],
+        "level": { "provider": 0, "optional": 1, "required": 1, "leaf": 2 },
+        "indegree": { "provider": 0, "optional": 1, "required": 1, "leaf": 1 },
+        "providers": ["provider", "optional"]
+      }
+    },
+    {
+      "name": "optional-missing",
+      "nodes": [
+        {
+          "id": "consumer",
+          "ordinal": 0,
+          "dependencies": [{ "provider": "missing", "required": false }]
+        },
+        {
+          "id": "leaf",
+          "ordinal": 1,
+          "dependencies": [{ "provider": "consumer", "required": true }]
+        }
+      ],
+      "expected": {
+        "ordered": ["consumer", "leaf"],
+        "level": { "consumer": 0, "leaf": 1 },
+        "indegree": { "consumer": 0, "leaf": 1 },
+        "providers": ["consumer"]
+      }
+    },
+    {
+      "name": "interleaved-levels",
+      "nodes": [
+        { "id": "a", "ordinal": 0, "dependencies": [] },
+        {
+          "id": "b",
+          "ordinal": 1,
+          "dependencies": [{ "provider": "a", "required": true }]
+        },
+        { "id": "c", "ordinal": 2, "dependencies": [] },
+        {
+          "id": "d",
+          "ordinal": 3,
+          "dependencies": [{ "provider": "b", "required": true }]
+        }
+      ],
+      "expected": {
+        "ordered": ["a", "c", "b", "d"],
+        "level": { "a": 0, "b": 1, "c": 0, "d": 2 },
+        "indegree": { "a": 0, "b": 1, "c": 0, "d": 1 },
+        "providers": ["a", "b"]
+      }
+    }
+  ]
+}
