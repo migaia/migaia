@@ -68,10 +68,7 @@ describe('package exports', () => {
     const adaptedAsync = async.lift(stage, MiddlewarePipelineMode.sync)
     const adaptedGenerator = generator.lift(stage, MiddlewarePipelineMode.sync)
     const adaptedAsyncGenerator = asyncGenerator.lift(stage, MiddlewarePipelineMode.sync)
-    const promotedGenerator = asyncGenerator.lift(
-      generatorStage,
-      MiddlewarePipelineMode.generator
-    )
+    const promotedGenerator = asyncGenerator.lift(generatorStage, MiddlewarePipelineMode.generator)
     await adaptedAsync(1, () => Promise.resolve())
 
     expect(MiddlewarePipelineMode.sync).toBe('sync')

@@ -197,12 +197,7 @@ describe('createPipeline', () => {
       )
     ).rejects.toBe(activeFailure)
 
-    expect(trace).toEqual([
-      'sync:first',
-      'generator:first',
-      'async:first',
-      'async-generator:first'
-    ])
+    expect(trace).toEqual(['sync:first', 'generator:first', 'async:first', 'async-generator:first'])
 
     /** Creation-time signal remains active while call-time control is already aborted. */
     const creationController = new AbortController()
@@ -218,9 +213,11 @@ describe('createPipeline', () => {
     })
     expect(() =>
       signalPipeline.run(
-        [(_value, _next) => {
-          stageCalls += 1
-        }],
+        [
+          (_value, _next) => {
+            stageCalls += 1
+          }
+        ],
         1,
         () => undefined,
         { signal: controlController.signal }

@@ -13,10 +13,7 @@ import {
 } from '../src/index.js'
 
 /** Async construction options accepted by migrated behavior-baseline calls. */
-type IAsyncTestOptions = Omit<
-  ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>,
-  'mode'
->
+type IAsyncTestOptions = Omit<ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>, 'mode'>
 
 /** Runs one sync baseline through the unified public factory. */
 export const runSyncForTest = <TValue>(
