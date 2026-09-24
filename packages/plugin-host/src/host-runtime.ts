@@ -768,6 +768,11 @@ export class PluginHost<
           PluginHostErrorCode.pluginDisabled,
           ERROR_TEXT.PLUGIN_DISABLED(name)
         )
+      if (registration.suspended)
+        throw new PluginHostError(
+          PluginHostErrorCode.pluginSuspended,
+          ERROR_TEXT.PLUGIN_SUSPENDED(name)
+        )
       if (!registration.activated) {
         // Validate first so a rejected activation leaves every lazy provider untouched; then
         // activate the lazy provider chain providers-first before this registration.
