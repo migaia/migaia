@@ -12,7 +12,7 @@ import {
   reportCleanupError,
   type IStorageOperationRuntime
 } from '../core/operation-reporter.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError, StorageErrorCode, createStorageError } from '../types/errors.js'
 import { indexUniqueConflictText, StorageErrorText } from '../error-text.js'
 import {
   StorageBackend,
@@ -2216,7 +2216,10 @@ export const indexedDbHost = <TValue = unknown>(
               }
               const database = readIdbRequestResult(request)
               if (!transaction)
-                throw new Error('IndexedDB upgrade event is missing its transaction')
+                throw createStorageError(
+                  StorageErrorCode.transactionFailed,
+                  StorageErrorText.indexedDbUpgradeTransactionMissing
+                )
               ensureStores(database)
               cleanupLegacyRecordStore(database, transaction, failUpgrade)
             } catch (cause) {

@@ -1,5 +1,6 @@
 import type { IBackendKind } from '../types/capabilities.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { StorageErrorText } from '../error-text.js'
 import { normalizeError } from '../core/errors.js'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 
@@ -76,7 +77,10 @@ export const namespacedKey = (
   try {
     const physicalKey = codec.encode(namespace, key)
     if (typeof physicalKey !== 'string')
-      throw new TypeError('namespace codec encode must return a string')
+      throw createStorageTypeError(
+        StorageErrorCode.extensionFailed,
+        StorageErrorText.namespaceCodecEncodeInvalid
+      )
     return physicalKey
   } catch (cause) {
     throw normalizeError(
@@ -104,7 +108,10 @@ export const stripNamespace = (
   try {
     const key = codec.decode(namespace, physicalKey)
     if (key !== undefined && typeof key !== 'string')
-      throw new TypeError('namespace codec decode must return string or undefined')
+      throw createStorageTypeError(
+        StorageErrorCode.extensionFailed,
+        StorageErrorText.namespaceCodecDecodeInvalid
+      )
     return key
   } catch (cause) {
     throw normalizeError(

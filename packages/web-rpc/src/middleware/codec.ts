@@ -35,7 +35,7 @@ export function codec<TDescriptor extends ICodecDescriptor>(
     }),
     install: (): IWebRpcPluginInstallResult => ({
       extension: Object.freeze({ codec: descriptor }),
-      shared: Object.freeze({})
+      ports: Object.freeze({})
     })
   })
 }

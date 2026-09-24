@@ -13,6 +13,12 @@ import {
 import { isStorageErrorFamily } from './error-family.js'
 import { StorageBackend } from '../constants.js'
 import { isArrayBuffer } from '@migaia/utils/bytes'
+import { StorageErrorText } from '../error-text.js'
+import {
+  StorageErrorCode,
+  createStorageRangeError,
+  createStorageTypeError
+} from '../types/errors.js'
 
 // key 域纯校验（`KEY_DOMAIN_LIMITS`/`assertStorageKey`/`assertStringStorageKey`/`compareStorageKeys`）
 // 已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
@@ -76,9 +82,15 @@ export const decodeFlatStorageKey = (
     const decode = (wire: unknown, depth: number): IStorageKey => {
       nodes += 1
       if (nodes > KEY_DOMAIN_LIMITS.maxNodes || depth > KEY_DOMAIN_LIMITS.maxDepth)
-        throw new RangeError('storage key exceeds decode limits')
+        throw createStorageRangeError(
+          StorageErrorCode.deserializeFailed,
+          StorageErrorText.storageKeyDecodeLimitExceeded
+        )
       if (!Array.isArray(wire) || wire.length !== 2 || typeof wire[0] !== 'string')
-        throw new TypeError('invalid storage key wire')
+        throw createStorageTypeError(
+          StorageErrorCode.deserializeFailed,
+          StorageErrorText.storageKeyWireInvalid
+        )
       const [tag, payload] = wire
       if (tag === 's' && typeof payload === 'string') return payload
       if (tag === 'n' && typeof payload === 'number' && Number.isFinite(payload)) return payload
@@ -86,12 +98,18 @@ export const decodeFlatStorageKey = (
       if (tag === 'b' && typeof payload === 'string') {
         const bytes = base64ToBytes(payload)
         if (bytes.byteLength > KEY_DOMAIN_LIMITS.maxBinaryBytes)
-          throw new RangeError('key too large')
+          throw createStorageRangeError(
+            StorageErrorCode.deserializeFailed,
+            StorageErrorText.storageKeyBinaryTooLarge
+          )
         return bytes.slice().buffer as ArrayBuffer
       }
       if (tag === 'a' && Array.isArray(payload) && payload.length > 0)
         return payload.map((item) => decode(item, depth + 1))
-      throw new TypeError('invalid storage key wire tag')
+      throw createStorageTypeError(
+        StorageErrorCode.deserializeFailed,
+        StorageErrorText.storageKeyWireTagInvalid
+      )
     }
     const result = decode(root, 0)
     assertStorageKey(result, backend)

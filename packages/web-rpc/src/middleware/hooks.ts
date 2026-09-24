@@ -1,6 +1,6 @@
 import type { IWebRpcHooksConfig, IWebRpcPlugin, IWebRpcPluginInstallResult } from '../typing.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { WebRpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 import { createConstructionDiagnosticReporter } from '../internal/hooks.js'
@@ -63,7 +63,7 @@ function createHooksPlugin(config: IWebRpcHooksConfig): IWebRpcPlugin {
         })
         return {
           extension: Object.freeze({}),
-          shared: Object.freeze({ [WebRpcSharedKey.hooks]: port })
+          ports: Object.freeze({ [WebRpcPortName.hooks]: port })
         }
       } catch (error) {
         if (error instanceof WebRpcError) throw error

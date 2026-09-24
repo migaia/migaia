@@ -1,6 +1,6 @@
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { WebRpcProviderAttachment } from '../internal/provider-attachment.js'
 import { registerEndpointDebugSnapshot } from '../internal/test-observer.js'
 import type { IOutboundSurface } from './outbound.js'
@@ -84,19 +84,19 @@ export const createProviderFeature = (
         installation = preparedInstallation
         return preparedInstallation
       }
-      const shared = (): Readonly<Record<PropertyKey, unknown>> => {
+      const ports = (): Readonly<Record<PropertyKey, unknown>> => {
         if (!attachment)
           throw new WebRpcError(
             WebRpcErrorCode.invalidConfig,
             WebRpcErrorText.endpointModuleDependencyMissing
           )
         return Object.freeze({
-          [WebRpcSharedKey.providerCancellation]: Object.freeze({
+          [WebRpcPortName.providerCancellation]: Object.freeze({
             abort: (id: string) => attachment!.abort(id)
           })
         })
       }
-      return Object.freeze({ prepare, shared })
+      return Object.freeze({ prepare, ports })
     },
     { outbound: outboundCapability }
   )

@@ -1,5 +1,5 @@
 import { WebRpcAuthenticationError, WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 import type {
   IWebRpcAuthenticationCapability,
@@ -21,11 +21,11 @@ export const authentication = (config: IWebRpcAuthenticationConfig): IWebRpcPlug
         exposedKeys: [],
         activator: false
       },
-      sharedProvides: [WebRpcSharedKey.authentication]
+      sharedProvides: [WebRpcPortName.authentication]
     },
     install: () => ({
       extension: {},
-      shared: { [WebRpcSharedKey.authentication]: createAuthenticationCapability(config) }
+      ports: { [WebRpcPortName.authentication]: createAuthenticationCapability(config) }
     })
   }
   return freezePlugin(plugin)

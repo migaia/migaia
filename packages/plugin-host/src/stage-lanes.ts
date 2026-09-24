@@ -22,7 +22,8 @@ export type ILaneSet<TValue> = {
 /** One retained plugin stage with its original within-owner registration sequence. */
 type IOwnedStage = Readonly<{
   readonly kind: IPipelineMode
-  readonly owner: string
+  readonly owner: object
+  readonly ownerName: string
   readonly stage: Function
   readonly sequence: number
 }>
@@ -53,6 +54,13 @@ export class StageLanes<TValue> {
   #owned: IOwnedStage[] = []
   /** Monotonic within-owner registration order used when rebuilding lanes. */
   #nextSequence = 0
+  /** Frozen execution snapshots reused until a committed lane mutation invalidates them. */
+  #snapshots = new Map<IPipelineMode, readonly unknown[]>()
+
+  /** Invalidates execution snapshots after a lane mutation. */
+  #invalidate(): void {
+    this.#snapshots.clear()
+  }
 
   /**
    * Registers one stage into its lane.
@@ -72,6 +80,7 @@ export class StageLanes<TValue> {
     readonly stageSlots: Map<string, IDataOrderSlotState>
     readonly allocateSlot: () => bigint
   }): void {
+    this.#invalidate()
     registerPluginHostStage({
       ...context,
       ...this.lanes,
@@ -82,7 +91,8 @@ export class StageLanes<TValue> {
     if (context.owner)
       this.#owned.push({
         kind: context.kind,
-        owner: context.owner.name,
+        owner: context.owner,
+        ownerName: context.owner.name,
         stage: context.stage,
         sequence: this.#nextSequence++
       })
@@ -93,10 +103,11 @@ export class StageLanes<TValue> {
     registrations: readonly IRegistration<TDomainCore, TValue>[],
     stageSlots: ReadonlyMap<string, IDataOrderSlotState>
   ): void {
-    const enabled = new Set(registrations.map((registration) => registration.name))
+    this.#invalidate()
+    const enabled = new Set<object>(registrations)
     const compare = (left: IOwnedStage, right: IOwnedStage) => {
-      const leftSlot = stageSlots.get(left.owner)?.ordinal ?? 1n << 100n
-      const rightSlot = stageSlots.get(right.owner)?.ordinal ?? 1n << 100n
+      const leftSlot = stageSlots.get(left.ownerName)?.ordinal ?? 1n << 100n
+      const rightSlot = stageSlots.get(right.ownerName)?.ordinal ?? 1n << 100n
       return leftSlot === rightSlot ? left.sequence - right.sequence : leftSlot < rightSlot ? -1 : 1
     }
     const select = (kind: IPipelineMode): Function[] =>
@@ -131,8 +142,9 @@ export class StageLanes<TValue> {
   }
 
   /** Forgets canonical stages only when their owner is actually removed. */
-  removeOwner(name: string): void {
-    this.#owned = this.#owned.filter((entry) => entry.owner !== name)
+  removeOwner(owner: object): void {
+    this.#invalidate()
+    this.#owned = this.#owned.filter((entry) => entry.owner !== owner)
   }
 
   /** The distinct owners of a stage snapshot, for the leases one execution must retain. */
@@ -173,10 +185,19 @@ export class StageLanes<TValue> {
 
   /** The stages one execution will traverse, as a copy taken at its start. */
   snapshot(mode: IPipelineMode): readonly unknown[] {
-    if (mode === PluginHostPipelineMode.sync) return [...this.#sync]
-    if (mode === PluginHostPipelineMode.async) return [...this.#async]
-    if (mode === PluginHostPipelineMode.generator) return [...this.#generator]
-    return [...this.#asyncGenerator]
+    const cached = this.#snapshots.get(mode)
+    if (cached) return cached
+    const lane =
+      mode === PluginHostPipelineMode.sync
+        ? this.#sync
+        : mode === PluginHostPipelineMode.async
+          ? this.#async
+          : mode === PluginHostPipelineMode.generator
+            ? this.#generator
+            : this.#asyncGenerator
+    const snapshot = Object.freeze([...lane])
+    this.#snapshots.set(mode, snapshot)
+    return snapshot
   }
 
   /** A fresh copy of all four lanes, for a candidate batch that builds off the current ones. */
@@ -191,6 +212,7 @@ export class StageLanes<TValue> {
 
   /** Adopts a committed batch's lanes wholesale; the batch built them off the current ones. */
   replace(next: ILaneSet<TValue>): void {
+    this.#invalidate()
     this.#sync = next.syncStages
     this.#async = next.asyncStages
     this.#generator = next.generatorStages
@@ -199,6 +221,7 @@ export class StageLanes<TValue> {
 
   /** Empties all four lanes in place, keeping every array identity the runtimes already hold. */
   clear(): void {
+    this.#invalidate()
     this.#sync.length = 0
     this.#async.length = 0
     this.#generator.length = 0

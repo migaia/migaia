@@ -24,11 +24,9 @@ import {
 import { runAsyncPipeline } from '../src/pipeline.js'
 import { PluginHostRemovalRuntime } from '../src/removal-runtime.js'
 import { createManualScheduler } from '@migaia/lifecycle'
+import { openComposition } from '../src/composition-entry.js'
 
-type IExt = { marker?: string } & Pick<
-  IPluginHostCore<number>,
-  'getShared' | 'onDispose' | 'usePipeline'
->
+type IExt = { marker?: string } & Pick<IPluginHostCore<number>, 'onDispose' | 'usePipeline'>
 type IStageCore = IExt & {
   usePipeline: (stage: (value: number, next: (value: number) => void) => void) => unknown
 }
@@ -99,12 +97,12 @@ describe('PluginHost', () => {
     })
     const legacySentinel = definePlugin('ys23-legacy-sentinel', () => ({ legacy: true }) as never)
     const host = new FeatureHost()
-    const view = await host.use(object)
-    expect(view.extensions).toMatchObject({ install: true, expose: true })
+    const [handle] = await host.use(object)
+    expect(handle.extensions).toMatchObject({ install: true, expose: true })
     await expect(host.use(legacySentinel)).rejects.toMatchObject({
       cause: { code: 'INVALID_OPTION' }
     })
-    expect(host.getCurrentView().extensions).not.toHaveProperty('legacy')
+    expect(openComposition(host).getCurrentSnapshot().extensions).not.toHaveProperty('legacy')
     await host.dispose()
   })
 
@@ -112,10 +110,9 @@ describe('PluginHost', () => {
     let descriptorCalls = 0
     let installCalls = 0
     let exposeCalls = 0
-    let sharedCalls = 0
     const plugin = definePlugin('descriptor-hooks', (core) => {
       descriptorCalls += 1
-      expect(typeof core.getShared).toBe('function')
+      expect(typeof core.onDispose).toBe('function')
       return {
         install: () => {
           installCalls += 1
@@ -124,18 +121,14 @@ describe('PluginHost', () => {
         expose: () => {
           exposeCalls += 1
           return { exposed: descriptorCalls }
-        },
-        shared: () => {
-          sharedCalls += 1
-          return { token: descriptorCalls }
         }
       }
     })
-    const first = await new FeatureHost().use(plugin)
-    const second = await new FeatureHost().use(plugin)
+    const [first] = await new FeatureHost().use(plugin)
+    const [second] = await new FeatureHost().use(plugin)
     expect(first.extensions).toMatchObject({ installed: 1, exposed: 1 })
     expect(second.extensions).toMatchObject({ installed: 2, exposed: 2 })
-    expect([descriptorCalls, installCalls, exposeCalls, sharedCalls]).toEqual([2, 2, 2, 2])
+    expect([descriptorCalls, installCalls, exposeCalls]).toEqual([2, 2, 2])
   })
 
   it('rejects descriptor expose collisions without invoking callback results as hooks', async () => {
@@ -177,7 +170,8 @@ describe('PluginHost', () => {
       { feature }
     )
     const host = new FeatureHost()
-    await expect(host.use(plugin)).resolves.toMatchObject({ extensions: { value: 11 } })
+    const [handle] = await host.use(plugin)
+    expect(handle.extensions.value).toBe(11)
     await host.dispose()
   })
 
@@ -208,7 +202,7 @@ describe('PluginHost', () => {
       featureExpose: {},
       install: (core) => ({ value: (core as any).features.feature.value })
     })
-    const result = await new FeatureHost().use(plugin)
+    const [result] = await new FeatureHost().use(plugin)
     expect(result.extensions.value).toBe(1)
     expect(calls).toBe(1)
   })
@@ -240,7 +234,7 @@ describe('PluginHost', () => {
     expect(calls).toBe(0)
   })
 
-  it('injects only featureExpose into Feature factories, never Plugin shared or lifecycle core', async () => {
+  it('injects only featureExpose into Feature factories, never lifecycle core', async () => {
     const feature = defineFeature<
       { readonly read: () => number },
       Record<never, never>,
@@ -254,11 +248,11 @@ describe('PluginHost', () => {
       name: 'feature-core-isolation',
       features: { feature },
       featureExpose: { read: () => 7 },
-      shared: () => ({ privateToPlugins: true }),
       install: (core) => ({ read: core.features.feature.read() })
     })
     const host = new FeatureHost()
-    await expect(host.use(plugin)).resolves.toMatchObject({ extensions: { read: 7 } })
+    const [handle] = await host.use(plugin)
+    expect(handle.extensions.read).toBe(7)
     await host.dispose()
   })
 
@@ -414,9 +408,9 @@ describe('PluginHost', () => {
       }
     })
     const host = new FeatureHost()
-    const first = await host.use(plugin)
+    const [first] = await host.use(plugin)
     expect(first.extensions.result).toBe(42)
-    const second = await new FeatureHost().use(plugin)
+    const [second] = await new FeatureHost().use(plugin)
     expect(second.extensions.result).toBe(42)
     expect(Object.isFrozen(expose)).toBe(false)
   })
@@ -633,11 +627,7 @@ describe('PluginHost', () => {
       })
     )
     const result = await host.unUse('resource-drain')
-    expect(result).toMatchObject({
-      ok: false,
-      removed: true,
-      error: { code: 'PLUGIN_DISPOSE_FAILED' }
-    })
+    expect(result).toMatchObject({ ok: false, errors: expect.any(Array) })
     expect(calls).toEqual(['first'])
   })
 
@@ -659,38 +649,8 @@ describe('PluginHost', () => {
       )
     )
     const result = await host.unUse('dispose-stage')
-    expect(result).toMatchObject({
-      ok: false,
-      removed: true,
-      error: { code: 'PLUGIN_DISPOSE_FAILED' }
-    })
+    expect(result).toMatchObject({ ok: false, errors: expect.any(Array) })
     expect(host.run(1)).toBe(1)
-  })
-
-  it('keeps shared values available inside dispose before removing them', async () => {
-    const host = new Host()
-    let core: IExt | undefined
-    let observed: unknown
-    await host.use(
-      plugin(
-        'dispose-shared',
-        (received) => {
-          core = received
-          return {}
-        },
-        {
-          shared: () => ({ handle: 42 }),
-          dispose: () => {
-            observed = core?.getShared('handle')
-          }
-        }
-      )
-    )
-    await host.unUse('dispose-shared')
-    expect(observed).toBeUndefined()
-    expect(() => host.getShared('handle')).toThrowError(
-      expect.objectContaining({ code: PluginHostErrorCode.prerequisiteRemoved })
-    )
   })
 
   it('rejects pipeline and resource registration during update', async () => {
@@ -745,10 +705,7 @@ describe('PluginHost', () => {
         )
       )
       await host.config.update(`lifecycle-${mode}`, () => ({ enabled: false }))
-      await expect(host.unUse(`lifecycle-${mode}`)).resolves.toMatchObject({
-        ok: true,
-        removed: true
-      })
+      await expect(host.unUse(`lifecycle-${mode}`)).resolves.toEqual({ ok: true })
       const result = host.run(1)
       if (mode === 'async' || mode === 'async-generator') await expect(result).resolves.toBe(1)
       else expect(result).toBe(1)
@@ -804,16 +761,7 @@ describe('PluginHost', () => {
           return {}
         }
       } as never)
-    ).resolves.toMatchObject({ host })
-  })
-
-  it('keeps eager lifecycle error text stable across hosts', async () => {
-    const first = new Host()
-    const second = new Host()
-    await first.dispose()
-    await second.dispose()
-    expect(() => first.getShared('missing')).toThrow('host is disposed')
-    expect(() => second.getShared('missing')).toThrow('host is disposed')
+    ).resolves.toHaveLength(1)
   })
 
   it('validates and isolates diagnostic callbacks', () => {
@@ -845,7 +793,7 @@ describe('PluginHost', () => {
     pluginInstance.install = () => ({ marker: 'b' })
     await installing
     expect(pluginInstance.count).toBe(1)
-    expect(((await installing) as any).extensions.marker).toBe('a')
+    expect(((await installing) as any)[0].extensions.marker).toBe('a')
   })
 
   it('uses the admitted install snapshot after caller mutation', async () => {
@@ -856,8 +804,8 @@ describe('PluginHost', () => {
     }
     const second = host.use(secondPlugin as never)
     secondPlugin.install = () => ({ marker: 'mutated' })
-    const view = (await second) as any
-    expect(view.extensions.marker).toBe('admitted')
+    const handles = (await second) as any
+    expect(handles[0].extensions.marker).toBe('admitted')
   })
 
   it('rejects duplicate names in one use admission', async () => {
@@ -869,17 +817,6 @@ describe('PluginHost', () => {
   it('rejects malformed lifecycle hooks during admission', async () => {
     const host = new Host()
     expect(() => host.use({ name: 'invalid-hook', install: 1 } as never)).toThrow(TypeError)
-  })
-
-  it('preserves symbol shared keys', async () => {
-    const host = new Host()
-    const sharedKey = Symbol('shared')
-    await host.use(
-      plugin('symbol-shared', () => ({}), {
-        shared: () => ({ [sharedKey]: 'value' })
-      })
-    )
-    expect(host.getShared(sharedKey)).toBe('value')
   })
 
   it('rejects class and inherited-then extension results before mounting', async () => {
@@ -1089,20 +1026,18 @@ describe('PluginHost', () => {
       })
     )
     const result = await host.unUse('extension')
-    expect(result).toMatchObject({
-      ok: false,
-      removed: true,
-      error: { code: 'PLUGIN_DISPOSE_FAILED' }
-    })
+    expect(result).toMatchObject({ ok: false, errors: expect.any(Array) })
   })
 
   it('revoked extension closure rejects a callable captured before unUse', async () => {
     const host = new Host()
-    const view = await host.use(plugin('revoked-closure', () => ({ read: () => 7 })))
-    const read = (view.extensions as { read: () => number }).read
+    const [handle] = await host.use(plugin('revoked-closure', () => ({ read: () => 7 })))
+    const read = (handle.extensions as { read: () => number }).read
     expect(read()).toBe(7)
     await host.unUse('revoked-closure')
-    expect(() => read()).toThrow(expect.objectContaining({ code: 'VIEW_REVOKED' }))
+    expect(() => read()).toThrow(
+      expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
+    )
   })
 
   it('feature expose invalidation revokes a captured Feature output immediately after unUse', async () => {
@@ -1130,8 +1065,7 @@ describe('PluginHost', () => {
     await host.unUse('feature-invalidation')
     expect(() => output.read()).toThrow(
       expect.objectContaining({
-        code: 'VIEW_REVOKED',
-        message: expect.stringContaining('plugin-host view has been revoked')
+        code: PluginHostErrorCode.registrationRevoked
       })
     )
   })
@@ -1152,8 +1086,6 @@ describe('PluginHost', () => {
     const runtime = new PluginHostRemovalRuntime({
       host: {},
       registrations: new Map([[registration.name, registration]]),
-      shared: new Map(),
-      retiredShared: new Map(),
       extensionOwners: new Map(),
       pipelineLeases: { seal: () => undefined } as any,
       pipelineOwnerKeys: new Map([[registration.name, registration.pipelineOwnerKey]]),
@@ -1189,8 +1121,7 @@ describe('PluginHost', () => {
     await host.unUse('feature-revoked-cause-chain')
     expect(() => output.read()).toThrow(
       expect.objectContaining({
-        code: 'VIEW_REVOKED',
-        message: expect.stringContaining('plugin-host view has been revoked')
+        code: PluginHostErrorCode.registrationRevoked
       })
     )
   })
@@ -1258,12 +1189,11 @@ describe('PluginHost', () => {
     await enteredGate
     expect(() => output.read()).toThrow(
       expect.objectContaining({
-        code: 'VIEW_REVOKED',
-        message: expect.stringContaining('plugin-host view has been revoked')
+        code: PluginHostErrorCode.registrationRevoked
       })
     )
     scheduler.advance(10)
-    await expect(removal).resolves.toMatchObject({ removed: true, cleanupComplete: false })
+    await expect(removal).resolves.toMatchObject({ ok: false, errors: expect.any(Array) })
   })
 
   it('stage slot retention keeps exact ordinal and clears registration-owned references', () => {
@@ -1287,8 +1217,6 @@ describe('PluginHost', () => {
     const runtime = new PluginHostRemovalRuntime({
       host,
       registrations,
-      shared: new Map(),
-      retiredShared: new Map(),
       extensionOwners,
       pipelineLeases: { seal: () => undefined } as any,
       pipelineOwnerKeys: new Map([[registration.name, registration.pipelineOwnerKey]]),
@@ -1452,13 +1380,11 @@ describe('PluginHost', () => {
       }
     })
 
-    await expect(host.use(plugin('to-string-tag', () => extension))).resolves.toMatchObject({
-      host
-    })
+    await expect(host.use(plugin('to-string-tag', () => extension))).resolves.toHaveLength(1)
     expect(read).toBe(false)
   })
 
-  it('does not execute config or shared getters', async () => {
+  it('does not execute config getters', async () => {
     const host = new Host()
     let configRead = false
     const config = {}
@@ -1474,33 +1400,17 @@ describe('PluginHost', () => {
       expect.objectContaining({ code: PluginHostErrorCode.invalidConfigValue })
     )
     expect(configRead).toBe(false)
-    let sharedRead = false
-    const shared = {}
-    Object.defineProperty(shared, 'value', {
-      enumerable: true,
-      configurable: true,
-      get: () => {
-        sharedRead = true
-        return 1
-      }
-    })
-    await expect(
-      host.use(plugin('shared-getter', () => ({}), { shared: () => shared }))
-    ).rejects.toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
-    expect(sharedRead).toBe(false)
   })
 
-  it('only rejects a non-extensible host when an extension is mounted', async () => {
+  it('publishes handles without mutating non-extensible host instances', async () => {
     const noExtension = new Host()
     Object.preventExtensions(noExtension)
-    await expect(noExtension.use(plugin('no-extension', () => ({})))).resolves.toMatchObject({
-      host: noExtension
-    })
+    await expect(noExtension.use(plugin('no-extension', () => ({})))).resolves.toHaveLength(1)
     const withExtension = new Host()
     Object.preventExtensions(withExtension)
     await expect(
       withExtension.use(plugin('with-extension', () => ({ feature: true })))
-    ).resolves.toMatchObject({ host: withExtension })
+    ).resolves.toHaveLength(1)
   })
 
   it('reserves Promise-like extension names', async () => {
@@ -1544,7 +1454,7 @@ describe('PluginHost', () => {
         })
       )
     ).rejects.toThrow('bad')
-    await expect(host.use(plugin('good', () => ({})))).resolves.toMatchObject({ host })
+    await expect(host.use(plugin('good', () => ({})))).resolves.toHaveLength(1)
   })
 
   it('does not expose config mutation through plugin core', async () => {
@@ -1705,13 +1615,13 @@ describe('PluginHost', () => {
     )
     await host.use(retryable)
     const removal = await host.unUse('retryable')
-    expect(removal).toMatchObject({ ok: false, removed: true })
+    expect(removal).toMatchObject({ ok: false, errors: expect.any(Array) })
     await expect(host.config.update('retryable', () => ({}))).rejects.toBeInstanceOf(
       PluginHostError
     )
     expect(pluginDisposeCalls).toBe(1)
     expect(resourceDisposeCalls).toBe(1)
-    await expect(host.use(retryable)).resolves.toMatchObject({ host })
+    await expect(host.use(retryable)).resolves.toHaveLength(1)
   })
 
   it('requires config recipes to return synchronous plain records', async () => {
@@ -1762,7 +1672,6 @@ describe('PluginHost', () => {
           return {}
         },
         {
-          shared: () => ({ value: 1 }),
           dispose: () =>
             new Promise<void>((resolve) => {
               entered?.()
@@ -1773,7 +1682,6 @@ describe('PluginHost', () => {
     )
     const closing = host.dispose()
     await disposeStarted
-    expect(() => host.getShared('value')).toThrow(PluginHostError)
     expect(() => host.run(1)).toThrow(PluginHostError)
     expect(() => host.config.get('closing-read.value')).toThrow(PluginHostError)
     expect(() => (core as { config: { get: () => unknown } }).config.get()).toThrow(PluginHostError)
@@ -1847,7 +1755,7 @@ describe('PluginHost', () => {
         { config: { enabled: true } }
       )
     )
-    await expect(installing).resolves.toMatchObject({ host })
+    await expect(installing).resolves.toHaveLength(1)
     await expect(host.dispose()).resolves.toMatchObject({ logicalTerminal: true })
     expect(core).toBeDefined()
   })
@@ -1881,7 +1789,7 @@ describe('PluginHost', () => {
       code: 'PLUGIN_INSTALL_FAILED'
     })
     expect(host).not.toHaveProperty('marker')
-    await expect(host.use(plugin('broken', () => ({})))).resolves.toMatchObject({ host })
+    await expect(host.use(plugin('broken', () => ({})))).resolves.toHaveLength(1)
   })
 
   it('protects config snapshots and update candidates with readonly views', async () => {
@@ -1977,9 +1885,11 @@ describe('PluginHost', () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
   })
 
-  it('makes missing unUse a no-op but missing config updates an error', async () => {
+  it('rejects missing unUse and missing config updates', async () => {
     const host = new Host()
-    await expect(host.unUse('missing')).resolves.toMatchObject({ ok: true, removed: false })
+    await expect(host.unUse('missing')).rejects.toMatchObject({
+      code: PluginHostErrorCode.pluginNotInstalled
+    })
     await expect(host.config.update('missing', () => ({}))).rejects.toBeInstanceOf(PluginHostError)
   })
 
@@ -1988,29 +1898,20 @@ describe('PluginHost', () => {
     const sharedPlugin = plugin('same', () => ({}))
     const first = host.use(sharedPlugin)
     expect(() => host.use(sharedPlugin)).toThrow(PluginHostError)
-    await expect(first).resolves.toMatchObject({ host })
+    await expect(first).resolves.toHaveLength(1)
   })
 
-  it('removes plugin pipeline stages and shared values on unUse', async () => {
+  it('removes plugin pipeline stages on unUse', async () => {
     const host = new Host()
     const stage = (_value: number, next: (value: number) => void) => next(99)
-    const shared = { value: 'owned' }
-    const owned = plugin(
-      'owned',
-      (core) => {
-        ;(core as IStageCore).usePipeline(stage)
-        return {}
-      },
-      { shared: () => ({ owned: shared }) }
-    )
+    const owned = plugin('owned', (core) => {
+      ;(core as IStageCore).usePipeline(stage)
+      return {}
+    })
     await host.use(owned)
     expect(host.run(1)).toBe(99)
-    expect(host.getShared('owned')).toBe(shared)
     await host.unUse('owned')
     expect(host.run(1)).toBe(1)
-    expect(() => host.getShared('owned')).toThrowError(
-      expect.objectContaining({ code: PluginHostErrorCode.prerequisiteRemoved })
-    )
     await host.use(owned)
     expect(host.run(1)).toBe(99)
   })

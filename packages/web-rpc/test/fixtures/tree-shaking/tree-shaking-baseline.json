@@ -66,7 +66,7 @@
     "/Users/kaeo/workspack/migai/packages/plugin-host/dist/symbols.js",
     "/Users/kaeo/workspack/migai/packages/utils/dist/bytes.js",
     "/Users/kaeo/workspack/migai/packages/utils/dist/config.js",
-    "/Users/kaeo/workspack/migai/packages/utils/dist/error-text-Cw8rxmXe.js",
+    "/Users/kaeo/workspack/migai/packages/utils/dist/error-text-[chunk].js",
     "/Users/kaeo/workspack/migai/packages/utils/dist/error.js",
     "/Users/kaeo/workspack/migai/packages/utils/dist/function.js",
     "/Users/kaeo/workspack/migai/packages/utils/dist/object-path.js",
@@ -391,7 +391,7 @@
       "renderedBytes": 2469
     },
     {
-      "module": "/Users/kaeo/workspack/migai/packages/utils/dist/error-text-Cw8rxmXe.js",
+      "module": "/Users/kaeo/workspack/migai/packages/utils/dist/error-text-[chunk].js",
       "originalBytes": 2380,
       "renderedBytes": 2339
     },

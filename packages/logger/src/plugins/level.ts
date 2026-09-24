@@ -50,7 +50,7 @@ class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> 
   }
 
   install(core: ILoggerPluginCore): ILevelPluginExt {
-    // 不读 this.config——统一通过 core.config.get() 读取，跟 shared/getShared
+    // 不读 this.config——统一通过 core.config.get() 读取。
     // 走的是同一层，好处是"这个插件当前配置是什么"这件事对 core 本身可见，
     // 不是被插件私下攥在手里。
     const config = core.config.get<ILevelPluginConfig>() ?? {}

@@ -77,8 +77,13 @@ function findLoggerCleanupError(value: unknown): Error & { cause?: unknown } {
     if (candidate instanceof AggregateError) pending.push(...candidate.errors)
     if (candidate instanceof Error) pending.push(candidate.cause)
     if (candidate && typeof candidate === 'object') {
-      const record = candidate as { readonly cleanupErrors?: unknown; readonly error?: unknown }
+      const record = candidate as {
+        readonly cleanupErrors?: unknown
+        readonly errors?: unknown
+        readonly error?: unknown
+      }
       if (Array.isArray(record.cleanupErrors)) pending.push(...record.cleanupErrors)
+      if (Array.isArray(record.errors)) pending.push(...record.errors)
       if (record.error !== undefined) pending.push(record.error)
     }
   }
@@ -213,8 +218,7 @@ describe('Round27 logger final cleanup containment', () => {
       })
       expect(runtimeProcess.exit).not.toBe(originalExit)
       await expect(second.unUse('process')).resolves.toMatchObject({
-        ok: true,
-        removed: true
+        ok: true
       })
       expect(runtimeProcess.exit).toBe(originalExit)
     } finally {

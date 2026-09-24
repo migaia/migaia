@@ -1,6 +1,6 @@
 import { WebRpcControlAttachment } from '../internal/control-attachment.js'
 import type { IWebRpcCandidatePingPort } from '../internal/plugin-shared-keys.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
 import type { IWebRpcEndpoint } from '../typing.js'
@@ -79,15 +79,15 @@ export const createControlFeature = (
         installation = preparedInstallation
         return preparedInstallation
       }
-      const shared = (): Readonly<Record<PropertyKey, unknown>> => {
+      const ports = (): Readonly<Record<PropertyKey, unknown>> => {
         if (!candidatePing)
           throw new WebRpcError(
             WebRpcErrorCode.invalidConfig,
             WebRpcErrorText.endpointModuleDependencyMissing
           )
-        return Object.freeze({ [WebRpcSharedKey.candidatePing]: candidatePing })
+        return Object.freeze({ [WebRpcPortName.candidatePing]: candidatePing })
       }
-      return Object.freeze({ prepare, shared })
+      return Object.freeze({ prepare, ports })
     },
     { outbound: outboundCapability, discovery: discoveryCapability }
   )

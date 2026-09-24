@@ -1,8 +1,13 @@
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { invokeCaptured } from './invocation.js'
-import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
-import { snapshotFeatureRecord } from './define-feature.js'
+import ERROR_TEXT, {
+  createPluginDefinitionTypeError,
+  createPluginHostTypeError,
+  PluginHostError
+} from './error-text.js'
+import { PluginHostErrorCode } from './error-code.js'
+import { createFeatureReference, snapshotFeatureRecord } from './define-feature.js'
 import type { IPluginDefinition, IPluginDescriptor } from './registry.js'
 import type {
   IFeatureOutputs,
@@ -32,6 +37,8 @@ const knownKeys = new Set<PropertyKey>([
   'shared',
   'features',
   'featureExpose',
+  'activation',
+  'onDependencyReplaced',
   Symbol.dispose,
   Symbol.asyncDispose
 ])
@@ -55,7 +62,9 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   const update = readData(source, 'update')
   const onEnable = readData(source, 'onEnable')
   const onDisable = readData(source, 'onDisable')
-  const shared = readData(source, 'shared')
+  const onDependencyReplaced = readData(source, 'onDependencyReplaced')
+  const activation = readData(source, 'activation') ?? 'eager'
+  const retiredShared = readData(source, 'shared')
   const dispose = readData(source, 'dispose')
   const features = readData(source, 'features')
   const featureExpose = readData(source, 'featureExpose')
@@ -72,13 +81,15 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     ['update', update],
     ['onEnable', onEnable],
     ['onDisable', onDisable],
-    ['shared', shared],
+    ['onDependencyReplaced', onDependencyReplaced],
     ['dispose', dispose],
     [String(Symbol.asyncDispose), asyncDisposer],
     [String(Symbol.dispose), syncDisposer]
   ] as const)
     if (value !== undefined && typeof value !== 'function')
       throw createPluginHostTypeError(`plugin ${key} must be a function`)
+  if (activation !== 'eager' && activation !== 'lazy') throw createPluginDefinitionTypeError()
+  if (retiredShared !== undefined) throw createPluginDefinitionTypeError()
   if (
     featureExpose !== undefined &&
     typeof featureExpose !== 'object' &&
@@ -116,6 +127,18 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     value: (core: unknown) => invokeCaptured(install as Function, source, [core]),
     enumerable: true
   })
+  Object.defineProperty(plugin, 'activation', { value: activation, enumerable: true })
+  Object.defineProperty(plugin, 'getFeature', {
+    enumerable: false,
+    value: (feature: string, options?: Readonly<{ readonly optional?: boolean }>) => {
+      if (!Object.hasOwn(featureRecord, feature))
+        throw new PluginHostError(
+          PluginHostErrorCode.featureNotDeclared,
+          ERROR_TEXT.FEATURE_NOT_DECLARED(name, feature)
+        )
+      return createFeatureReference(name, feature, options?.optional === true)
+    }
+  })
   if (update !== undefined)
     Object.defineProperty(plugin, 'update', {
       value: (next: unknown, core: unknown) =>
@@ -132,9 +155,10 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
       value: (context: unknown) => invokeCaptured(onDisable as Function, source, [context]),
       enumerable: true
     })
-  if (shared !== undefined)
-    Object.defineProperty(plugin, 'shared', {
-      value: (core: unknown) => invokeCaptured(shared as Function, source, [core]),
+  if (onDependencyReplaced !== undefined)
+    Object.defineProperty(plugin, 'onDependencyReplaced', {
+      value: (provider: string, outputs: Readonly<Record<string, object>>) =>
+        invokeCaptured(onDependencyReplaced as Function, source, [provider, outputs]),
       enumerable: true
     })
   if (dispose !== undefined)
@@ -169,8 +193,10 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     update: plugin.update as IPluginConstraint<any>['update'],
     onEnable: plugin.onEnable as IPluginConstraint<any>['onEnable'],
     onDisable: plugin.onDisable as IPluginConstraint<any>['onDisable'],
+    onDependencyReplaced:
+      plugin.onDependencyReplaced as IPluginConstraint<any>['onDependencyReplaced'],
+    activation: activation as 'eager' | 'lazy',
     dispose: plugin.dispose as IPluginConstraint<any>['dispose'],
-    shared: plugin.shared as IPluginConstraint<any>['shared'],
     features: Object.freeze(featureRecord),
     featureExpose: featureExpose as IPluginDefinition<any>['featureExpose'],
     disposer
@@ -219,7 +245,7 @@ export function definePlugin<
   TExpose
 >
 
-/** Functional full descriptor form retaining config/shared and metadata shape. */
+/** Functional full descriptor form retaining config and metadata shape. */
 export function definePlugin<
   TCore extends object = Record<string, never>,
   TExtension extends Record<string, unknown> = Record<string, never>,
@@ -262,18 +288,16 @@ export function definePlugin(
       throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_DESCRIPTOR_HOOK_DATA)
     const definition = createDefinition({
       name: args[0],
-      install: () => ({})
+      install: () => ({}),
+      features: args[2]
     } as IPluginConstraint<any>)
-    const featureRecord = snapshotFeatureRecord(args[2])
     const stored = definitions.get(definition.plugin)!
     Object.assign(
       stored as {
         descriptorFactory?: (core: object) => IPluginDescriptor
-        features: Readonly<Record<string, object>>
       },
       {
-        descriptorFactory: args[1] as (core: object) => IPluginDescriptor,
-        features: Object.freeze(featureRecord)
+        descriptorFactory: args[1] as (core: object) => IPluginDescriptor
       }
     )
     return definition.plugin as IDefinedPluginConstraint

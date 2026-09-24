@@ -1,3 +1,4 @@
+import { reportDiagnostic } from './diagnostic-report.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { asyncDisposeKey, disposeKey } from './disposal.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -9,7 +10,6 @@ const objectPrototypeKeys = new Set(Reflect.ownKeys(Object.prototype))
 const hostReservedKeys = new Set<PropertyKey>([
   'config',
   'pipelineMode',
-  'getShared',
   'usePipeline',
   'useAsyncPipeline',
   'useGeneratorPipeline',
@@ -59,14 +59,11 @@ export const mountPluginExtensions = <TRegistration extends IExtensionRegistrati
   for (const key of Reflect.ownKeys(extensionObject)) {
     const descriptor = Object.getOwnPropertyDescriptor(extensionObject, key)
     if (!descriptor?.enumerable) {
-      try {
-        diagnostic(
-          ERROR_TEXT.EXTENSION_NON_ENUMERABLE_IGNORED(registration.name, key),
-          PluginHostErrorCode.extensionNonEnumerableIgnored
-        )
-      } catch {
-        // Diagnostics must never alter extension publication.
-      }
+      reportDiagnostic(
+        diagnostic,
+        ERROR_TEXT.EXTENSION_NON_ENUMERABLE_IGNORED(registration.name, key),
+        PluginHostErrorCode.extensionNonEnumerableIgnored
+      )
       continue
     }
     if (objectPrototypeKeys.has(key))

@@ -1,27 +1,10 @@
 import type { IPluginConstraint, IPluginHostCore } from '@migaia/plugin-host'
 import type { IWebRpcConstructionControl } from './construction-install.js'
+import type { IWebRpcPortFeature } from './port-feature.js'
 import type { IWebRpcAbortSignal, IWebRpcHookEvent } from '../typing.js'
 import type { IWebRpcTransport } from '../transport.js'
-import {
-  WebRpcSharedKey,
-  type IWebRpcAuthenticationPort,
-  type IWebRpcAbortEnablePort,
-  type IWebRpcConnectPort,
-  type IWebRpcContractPort,
-  type IWebRpcDiscoveryResolverPort,
-  type IWebRpcHooksPort,
-  type IWebRpcInboundIdentityPort,
-  type IWebRpcOutboundOperationsPort,
-  type IWebRpcPingEnablePort,
-  type IWebRpcProviderCancellationPort,
-  type IWebRpcProtocolPort,
-  type IWebRpcOutboundAttachmentPort,
-  type IWebRpcSharedValues,
-  type IWebRpcTimePort,
-  type IWebRpcTimeoutPort,
-  type IWebRpcUuidPort,
-  type IWebRpcVariationCoordinatorPort
-} from './plugin-shared-keys.js'
+import { WebRpcPortName } from './plugin-shared-keys.js'
+import type { IWebRpcPortValues } from './plugin-shared-keys.js'
 
 /** Domain core copied into each PluginHost registration without exposing raw host controls. */
 export type IWebRpcPluginCore = {
@@ -30,6 +13,13 @@ export type IWebRpcPluginCore = {
   readonly signal: IWebRpcAbortSignal
   readonly hooks: (event: IWebRpcHookEvent) => void
   readonly construction: IWebRpcConstructionControl
+  /** Reads a port from the registration-local Feature output catalog during construction. */
+  readonly getPort: {
+    <TKey extends keyof IWebRpcPortValues>(key: TKey): IWebRpcPortValues[TKey]
+    (key: PropertyKey): unknown
+  }
+  /** Publishes one provider's Feature outputs into the construction catalog exactly once. */
+  readonly publishPortFeatures: (outputs: Readonly<Record<string, IWebRpcPortFeature>>) => void
   /** Records one registration-local native middleware projection before endpoint activation. */
   readonly registerNativeMiddlewareKeys: (name: string, keys: readonly string[]) => void
 }
@@ -40,7 +30,7 @@ export type IWebRpcPluginInstallScope = {
   readonly transport: IWebRpcTransport
   readonly signal: IWebRpcAbortSignal
   readonly hooks: (event: IWebRpcHookEvent) => void
-  readonly getShared: (key: PropertyKey) => unknown
+  readonly getPort: (key: PropertyKey) => unknown
   own<T>(resource: T, release: () => void | Promise<void>): T
 }
 
@@ -66,32 +56,32 @@ export const WebRpcFirstPartyRoleSchema: Readonly<
   Record<IWebRpcFirstPartyRole, IWebRpcFirstPartyRoleContract>
 > = Object.freeze({
   hooks: Object.freeze({
-    sharedProvides: Object.freeze([WebRpcSharedKey.hooks]),
+    sharedProvides: Object.freeze([WebRpcPortName.hooks]),
     sharedConsumes: Object.freeze([]),
     sharedOptionalConsumes: Object.freeze([])
   }),
   ping: Object.freeze({
-    sharedProvides: Object.freeze([WebRpcSharedKey.ping]),
+    sharedProvides: Object.freeze([WebRpcPortName.ping]),
     sharedConsumes: Object.freeze([]),
     sharedOptionalConsumes: Object.freeze([])
   }),
   uuid: Object.freeze({
-    sharedProvides: Object.freeze([WebRpcSharedKey.uuid]),
+    sharedProvides: Object.freeze([WebRpcPortName.uuid]),
     sharedConsumes: Object.freeze([]),
     sharedOptionalConsumes: Object.freeze([])
   }),
   'middleware-finalize': Object.freeze({
     sharedProvides: Object.freeze([]),
-    sharedConsumes: Object.freeze([WebRpcSharedKey.connect]),
+    sharedConsumes: Object.freeze([WebRpcPortName.connect]),
     sharedOptionalConsumes: Object.freeze([
-      WebRpcSharedKey.protocol,
-      WebRpcSharedKey.contract,
-      WebRpcSharedKey.authentication,
-      WebRpcSharedKey.timeout,
-      WebRpcSharedKey.abort,
-      WebRpcSharedKey.hooks,
-      WebRpcSharedKey.ping,
-      WebRpcSharedKey.uuid
+      WebRpcPortName.protocol,
+      WebRpcPortName.contract,
+      WebRpcPortName.authentication,
+      WebRpcPortName.timeout,
+      WebRpcPortName.abort,
+      WebRpcPortName.hooks,
+      WebRpcPortName.ping,
+      WebRpcPortName.uuid
     ])
   })
 })
@@ -117,12 +107,12 @@ export const WebRpcControlRoleSchema: Readonly<
   Record<IWebRpcControlRole, IWebRpcControlRoleContract>
 > = Object.freeze({
   control: Object.freeze({
-    sharedProvides: Object.freeze([WebRpcSharedKey.candidatePing]),
+    sharedProvides: Object.freeze([WebRpcPortName.candidatePing]),
     sharedConsumes: Object.freeze([
-      WebRpcSharedKey.outboundOperations,
-      WebRpcSharedKey.discoveryResolver,
-      WebRpcSharedKey.time,
-      WebRpcSharedKey.variationCoordinator
+      WebRpcPortName.outboundOperations,
+      WebRpcPortName.discoveryResolver,
+      WebRpcPortName.time,
+      WebRpcPortName.variationCoordinator
     ]),
     sharedOptionalConsumes: Object.freeze([]),
     publicKeys: Object.freeze(['ping', 'pingAll']),
@@ -139,11 +129,11 @@ export type IWebRpcProviderRole = (typeof WebRpcProviderRole)[keyof typeof WebRp
 
 /** Exact provider shared/public projection and fixed installation order. */
 export type IWebRpcProviderRoleContract = {
-  readonly sharedProvides: readonly [typeof WebRpcSharedKey.providerCancellation]
+  readonly sharedProvides: readonly [typeof WebRpcPortName.providerCancellation]
   readonly sharedConsumes: readonly [
-    typeof WebRpcSharedKey.outboundOperations,
-    typeof WebRpcSharedKey.inboundIdentity,
-    typeof WebRpcSharedKey.variationCoordinator
+    typeof WebRpcPortName.outboundOperations,
+    typeof WebRpcPortName.inboundIdentity,
+    typeof WebRpcPortName.variationCoordinator
   ]
   readonly publicKeys: readonly ['provide']
   readonly exposedKeys: readonly ['provide']
@@ -155,11 +145,11 @@ export const WebRpcProviderRoleSchema: Readonly<
   Record<IWebRpcProviderRole, IWebRpcProviderRoleContract>
 > = Object.freeze({
   provider: Object.freeze({
-    sharedProvides: Object.freeze([WebRpcSharedKey.providerCancellation] as const),
+    sharedProvides: Object.freeze([WebRpcPortName.providerCancellation] as const),
     sharedConsumes: Object.freeze([
-      WebRpcSharedKey.outboundOperations,
-      WebRpcSharedKey.inboundIdentity,
-      WebRpcSharedKey.variationCoordinator
+      WebRpcPortName.outboundOperations,
+      WebRpcPortName.inboundIdentity,
+      WebRpcPortName.variationCoordinator
     ] as const),
     publicKeys: Object.freeze(['provide'] as const),
     exposedKeys: Object.freeze(['provide'] as const),
@@ -198,37 +188,8 @@ export const WebRpcProviderCancellationPortMetadata: IWebRpcProviderCancellation
     })
   })
 
-/** Host core view with concrete return types for every package-owned shared symbol. */
-export type IWebRpcPluginHostCore = Omit<
-  IPluginHostCore<unknown, IWebRpcSharedValues>,
-  'getShared'
-> & {
-  getShared(key: typeof WebRpcSharedKey.protocol): IWebRpcProtocolPort | undefined
-  getShared(key: typeof WebRpcSharedKey.authentication): IWebRpcAuthenticationPort | undefined
-  getShared(key: typeof WebRpcSharedKey.contract): IWebRpcContractPort | undefined
-  getShared(key: typeof WebRpcSharedKey.connect): IWebRpcConnectPort | undefined
-  getShared(key: typeof WebRpcSharedKey.abort): IWebRpcAbortEnablePort | undefined
-  getShared(key: typeof WebRpcSharedKey.ping): IWebRpcPingEnablePort | undefined
-  getShared(key: typeof WebRpcSharedKey.hooks): IWebRpcHooksPort | undefined
-  getShared(key: typeof WebRpcSharedKey.timeout): IWebRpcTimeoutPort | undefined
-  getShared(key: typeof WebRpcSharedKey.uuid): IWebRpcUuidPort | undefined
-  getShared(key: typeof WebRpcSharedKey.inboundIdentity): IWebRpcInboundIdentityPort | undefined
-  getShared(
-    key: typeof WebRpcSharedKey.variationCoordinator
-  ): IWebRpcVariationCoordinatorPort | undefined
-  getShared(
-    key: typeof WebRpcSharedKey.outboundOperations
-  ): IWebRpcOutboundOperationsPort | undefined
-  getShared(key: typeof WebRpcSharedKey.discoveryResolver): IWebRpcDiscoveryResolverPort | undefined
-  getShared(
-    key: typeof WebRpcSharedKey.providerCancellation
-  ): IWebRpcProviderCancellationPort | undefined
-  getShared(key: typeof WebRpcSharedKey.time): IWebRpcTimePort | undefined
-  getShared(
-    key: typeof WebRpcSharedKey.outboundAttachment
-  ): IWebRpcOutboundAttachmentPort | undefined
-  getShared(key: PropertyKey): unknown
-}
+/** PluginHost lifecycle core combined with the WebRPC domain core by `defineHost`. */
+export type IWebRpcPluginHostCore = IPluginHostCore<unknown>
 
 /** Type constraint accepted by the one WebRPC PluginHost install batch. */
 export type IWebRpcPluginConstraint = IPluginConstraint<IWebRpcPluginCore & IWebRpcPluginHostCore>

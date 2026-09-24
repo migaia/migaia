@@ -41,7 +41,7 @@ class PublicationBarrierHost extends TestHost {
         discardPreparedAdmissions: port.discardPreparedAdmissions,
         prepareUnUseBatch: port.prepareUnUseBatch,
         commitPreparedUnUseBatch: port.commitPreparedUnUseBatch,
-        getCurrentView: port.getCurrentView,
+        getCurrentSnapshot: port.getCurrentSnapshot,
         get revision() {
           return port.revision
         },

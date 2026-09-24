@@ -81,6 +81,17 @@ export function createPluginHostTypeError(
   )
 }
 
+/** Removed definition fields fail with their dedicated public admission code. */
+export function createPluginDefinitionTypeError(): TypeError & {
+  readonly source: string
+  readonly code: IPluginHostErrorCode
+} {
+  return tagPluginHostError(
+    new TypeError(ERROR_TEXT.PLUGIN_DEFINITION_INVALID),
+    PluginHostErrorCode.pluginDefinitionInvalid
+  )
+}
+
 const PREFIX = '[plugin-host] '
 
 /** Uses stable English package text; consumers localize by `(source, code)` at their boundary. */
@@ -105,18 +116,18 @@ const ERROR_TEXT = {
   get INVALID_PIPELINE_MODE() {
     return localize('无效的 pipeline mode', 'invalid pipeline mode')
   },
-  /** Stable text distinguishing a temporarily disabled shared prerequisite owner. */
+  /** Stable text distinguishing a temporarily disabled Feature prerequisite owner. */
   PREREQUISITE_DISABLED(key: PropertyKey, owner: string) {
     return localize(
-      `共享前置 ${String(key)} 的所有者 ${owner} 已禁用`,
-      `shared prerequisite ${String(key)} is disabled with owner ${owner}`
+      `feature 前置 ${String(key)} 的所有者 ${owner} 已禁用`,
+      `feature prerequisite ${String(key)} is disabled with owner ${owner}`
     )
   },
-  /** Stable text distinguishing a permanently removed shared prerequisite owner. */
+  /** Stable text distinguishing a permanently removed Feature prerequisite owner. */
   PREREQUISITE_REMOVED(key: PropertyKey, owner: string) {
     return localize(
-      `共享前置 ${String(key)} 的所有者 ${owner} 已卸载`,
-      `shared prerequisite ${String(key)} was removed with owner ${owner}`
+      `feature 前置 ${String(key)} 的所有者 ${owner} 已卸载`,
+      `feature prerequisite ${String(key)} was removed with owner ${owner}`
     )
   },
   /** Stable diagnostic for an enablement notification failure that never rolls state back. */
@@ -319,6 +330,74 @@ const ERROR_TEXT = {
   get PLUGIN_NOT_INSTALLED() {
     return (name: string) => localize(`插件 "${name}" 未安装`, `plugin "${name}" is not installed`)
   },
+  /** Handle access is rejected while the named registration is disabled. */
+  PLUGIN_DISABLED: (name: string) =>
+    localize(`插件 "${name}" 已禁用`, `plugin "${name}" is disabled`),
+  /** Lazy registration requires explicit activation before synchronous access. */
+  PLUGIN_NOT_ACTIVATED: (name: string) =>
+    localize(`插件 "${name}" 尚未激活`, `plugin "${name}" is not activated`),
+  /** Plugin definition requested a feature outside its declared feature record. */
+  FEATURE_NOT_DECLARED: (plugin: string, feature: string) =>
+    localize(
+      `插件 "${plugin}" 未声明 feature "${feature}"`,
+      `plugin "${plugin}" does not declare feature "${feature}"`
+    ),
+  /** Required cross-plugin feature provider is absent. */
+  PREREQUISITE_MISSING: (plugin: string, feature: string) =>
+    localize(
+      `必需 feature ${plugin}.${feature} 的 provider 未安装`,
+      `required feature provider ${plugin}.${feature} is not installed`
+    ),
+  /** Cross-plugin feature dependency graph is cyclic. */
+  get DEPENDENCY_CYCLE() {
+    return localize('插件 feature 依赖成环', 'plugin feature dependency cycle detected')
+  },
+  /** Required dependents prevent a non-cascading mutation. */
+  DEPENDENCY_BLOCKED: (name: string) =>
+    localize(`插件 "${name}" 仍被依赖`, `plugin "${name}" still has required dependents`),
+  /** Replacement target and candidate names must remain identical. */
+  REPLACE_NAME_MISMATCH: (name: string, next: string) =>
+    localize(
+      `替换插件名不一致：${name} / ${next}`,
+      `replacement plugin name mismatch: ${name} / ${next}`
+    ),
+  /** Constructor option validation for the diagnostic outlet. */
+  get DIAGNOSTIC_OPTION() {
+    return localize('diagnostic 必须是函数', 'diagnostic must be a function')
+  },
+  /** Constructor option validation for the diagnostic failure sink. */
+  get DIAGNOSTIC_FAILURE_OPTION() {
+    return localize('onDiagnosticFailure 必须是函数', 'onDiagnosticFailure must be a function')
+  },
+  /** A Feature rejection could not be delivered because the diagnostic reporter itself failed. */
+  get FEATURE_REJECTION_REPORT_FAILED() {
+    return localize(
+      'feature 拒绝的诊断上报失败，原拒绝与上报错误一并附上',
+      'feature rejection diagnostic failed; the rejection and reporter failure are attached'
+    )
+  },
+  /** Replacement committed but some dependents could not be restarted against it. */
+  DEPENDENT_RESTART_FAILED: (name: string, dependents: readonly string[]) =>
+    localize(
+      `替换插件 "${name}" 后依赖者重启失败：${dependents.join(', ')}`,
+      `dependents failed to restart after replacing plugin "${name}": ${dependents.join(', ')}`
+    ),
+  /** Cleanup of a registration left by replacement failed; reported, never thrown. */
+  REPLACE_CLEANUP_FAILED: (name: string) =>
+    localize(
+      `替换插件 "${name}" 时旧注册清理失败`,
+      `cleanup failed while replacing plugin "${name}"`
+    ),
+  /** Dependent rebind hook failed; the dependent restarts instead. */
+  DEPENDENCY_REBIND_FAILED: (dependent: string, provider: string) =>
+    localize(
+      `插件 "${dependent}" 换绑 "${provider}" 失败，改为重启`,
+      `plugin "${dependent}" failed to rebind "${provider}" and will restart`
+    ),
+  /** Removed plugin definition fields fail at definition admission. */
+  get PLUGIN_DEFINITION_INVALID() {
+    return localize('插件定义包含不受支持字段', 'plugin definition contains unsupported fields')
+  },
   /** 插件卸载存在清理失败。 */
   get PLUGIN_DISPOSE_FAILED() {
     return (name: string) =>
@@ -331,14 +410,6 @@ const ERROR_TEXT = {
   get PLUGIN_ROLLBACK_FAILED() {
     return (name: string) =>
       localize(`插件 "${name}" 安装失败且回滚失败`, `plugin "${name}" install rollback failed`)
-  },
-  /** Shared key 重复。 */
-  get SHARED_DUPLICATE() {
-    return (key: PropertyKey) =>
-      localize(
-        `shared key "${String(key)}" 已经注册`,
-        `shared key "${String(key)}" is already registered`
-      )
   },
   /** 资源注册不在 install 生命周期内。 */
   get RESOURCE_OUTSIDE_INSTALL() {
@@ -418,9 +489,9 @@ const ERROR_TEXT = {
       `mutation 执行超过 ${waitedMs}ms，已撤销提交资格`,
       `mutation exceeded its ${waitedMs}ms execution budget and lost commit authority`
     ),
-  /** Stable text for access through a logically revoked immutable view. */
-  get VIEW_REVOKED() {
-    return localize('宿主视图已撤销', 'plugin-host view has been revoked')
+  /** Stable text for a callable captured from a logically revoked registration. */
+  get REGISTRATION_REVOKED() {
+    return localize('插件注册已撤销', 'plugin registration has been revoked')
   },
   /** Stable install-result contract text shared by synchronous and asynchronous rejection paths. */
   INSTALL_RESULT_THENABLE: (name: string) =>

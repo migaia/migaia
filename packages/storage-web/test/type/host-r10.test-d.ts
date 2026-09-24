@@ -12,8 +12,8 @@ const runtime = createRuntime()
 
 /** Feature factories receive only the reserved exposure plane, never Plugin lifecycle authority. */
 const reservedFeature = defineFeature((core) => {
-  // @ts-expect-error shared capabilities belong to Plugin install, not Feature factories.
-  core.getShared('storageSharedCapability')
+  // @ts-expect-error cross-plugin capabilities arrive through declared Feature dependencies.
+  void core.features
   // @ts-expect-error Store transfer belongs to Plugin install, not Feature factories.
   void core.registerStore
   // @ts-expect-error resource ownership belongs to Plugin install, not Feature factories.

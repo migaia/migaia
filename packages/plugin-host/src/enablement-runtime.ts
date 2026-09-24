@@ -1,4 +1,5 @@
 import { containAsyncRejection } from '@migaia/lifecycle'
+import { reportDiagnostic } from './diagnostic-report.js'
 import { invokeCaptured } from './invocation.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -7,22 +8,31 @@ import type { IRegistration } from './registry.js'
 import type {
   IPluginConstraint,
   IPluginEnablement,
-  IPluginHostDynamicView,
-  IPluginHostErrorCode,
-  IPluginRegistrationContext
+  IPluginDependencyMutationOptions,
+  IPluginDependencyPlan,
+  IPluginRegistrationContext,
+  IPluginHostDiagnostic
 } from './typing.js'
+import {
+  findUnavailableProvider,
+  planPluginDependencyMutation,
+  readPluginBlockers
+} from './dependency-runtime.js'
 
 export type IPluginHostEnablementRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly state: PluginHostState<TDomainCore, TValue>
-  readonly diagnostic: (message: string, code?: IPluginHostErrorCode) => unknown
+  readonly diagnostic: IPluginHostDiagnostic
 }>
 
 /** Host operations needed to serialize enablement without moving queue ownership. */
-export type IPluginHostEnablementFacadePort<THost, TDomainCore extends object, TValue> = Readonly<{
+export type IPluginHostEnablementFacadePort<
+  _THost,
+  _TDomainCore extends object,
+  _TValue
+> = Readonly<{
   readonly assertActive: () => void
   readonly assertMutationAllowed: () => void
   readonly enqueue: <T>(task: () => Promise<T>) => Promise<T>
-  readonly createView: () => IPluginHostDynamicView<THost, TDomainCore, TValue>
 }>
 
 /** Owns reversible plugin reachability without taking over resource lifecycle ownership. */
@@ -45,6 +55,28 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
         ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
       )
     return registration
+  }
+
+  /** Exposes current registrations to the package-owned dependency planner. */
+  registrations(): ReadonlyMap<string, IRegistration<TDomainCore, TValue>> {
+    return this.#port.state.registrations
+  }
+
+  /**
+   * Rejects enabling `registration` while one of its required providers is disabled or gone; a
+   * dependent must never serve against a provider that is not serving.
+   */
+  assertProvidersAvailable(
+    registration: IRegistration<TDomainCore, TValue>,
+    enabling: ReadonlySet<string> = new Set()
+  ): void {
+    const unavailable = findUnavailableProvider(
+      registration,
+      this.#port.state.registrations,
+      this.#port.state.removedNames,
+      enabling
+    )
+    if (unavailable) throw unavailable
   }
 
   /** Disables an installed registration atomically and reports whether state changed. */
@@ -108,15 +140,12 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
     const callback = registration.plugin[hook]
     if (!callback) return
     const report = (error: unknown): void => {
-      try {
-        containAsyncRejection(
-          this.#port.diagnostic(
-            ERROR_TEXT.ENABLEMENT_HOOK_FAILED(registration.name, hook, error),
-            PluginHostErrorCode.pluginInstallFailed
-          ),
-          () => undefined
-        )
-      } catch {}
+      reportDiagnostic(
+        this.#port.diagnostic,
+        ERROR_TEXT.ENABLEMENT_HOOK_FAILED(registration.name, hook, error),
+        PluginHostErrorCode.pluginInstallFailed,
+        error
+      )
     }
     const context = Object.freeze({
       signal: registration.lifecycleController!.signal
@@ -144,33 +173,47 @@ export const createPluginHostEnablementFacade = <
     port.assertActive()
     port.assertMutationAllowed()
   }
-  /** Restores only the exact registration captured by a disable token. */
-  const enableRegistration = async (
-    registration: IRegistration<TDomainCore, TValue>
-  ): Promise<IPluginHostDynamicView<THost, TDomainCore, TValue>> => {
-    admit()
-    return port.enqueue(async () => {
-      runtime.enable(registration)
-      return port.createView()
-    })
-  }
   return Object.freeze({
-    disable: async (name: string) => {
+    disable: async (name: string, options: IPluginDependencyMutationOptions = {}) => {
       admit()
       return port.enqueue(async () => {
-        const registration = runtime.requireInstalled(name)
-        runtime.disable(registration)
+        runtime.requireInstalled(name)
+        const required = readPluginBlockers(name, runtime.registrations())
+        if (required.length > 0 && !options.cascade)
+          throw new PluginHostError(
+            PluginHostErrorCode.dependencyBlocked,
+            ERROR_TEXT.DEPENDENCY_BLOCKED(name),
+            { detail: { blockedBy: required } }
+          )
+        const plan = planPluginDependencyMutation(name, runtime.registrations())
+        if (options.dryRun) return plan satisfies IPluginDependencyPlan
+        const disabled: IRegistration<TDomainCore, TValue>[] = []
+        for (const pluginName of plan.order) {
+          const dependent = runtime.requireInstalled(pluginName)
+          if (runtime.disable(dependent)) disabled.push(dependent)
+        }
         return Object.freeze({
-          token: Object.freeze({ name, enable: () => enableRegistration(registration) }),
-          view: port.createView()
+          token: Object.freeze({
+            name,
+            enable: async () => {
+              admit()
+              return port.enqueue(async () => {
+                // Check the whole restore set first so a rejected token enables nothing.
+                const enabling = new Set(disabled.map((item) => item.name))
+                for (const item of disabled) runtime.assertProvidersAvailable(item, enabling)
+                for (const item of [...disabled].reverse()) runtime.enable(item)
+              })
+            }
+          })
         })
       })
     },
     enable: async (name: string) => {
       admit()
       return port.enqueue(async () => {
-        runtime.enable(runtime.requireInstalled(name))
-        return port.createView()
+        const registration = runtime.requireInstalled(name)
+        runtime.assertProvidersAvailable(registration)
+        runtime.enable(registration)
       })
     },
     disabled: () => runtime.disabled()

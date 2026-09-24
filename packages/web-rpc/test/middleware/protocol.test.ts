@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { canonicalProtocol as protocol } from '../../src/middleware/canonical-protocol.js'
 import { WebRpcErrorCode } from '../../src/errors'
 import { WebRpcErrorText } from '../../src/error-text.js'
-import { WebRpcSharedKey } from '../../src/internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../../src/internal/plugin-shared-keys.js'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import type { IWebRpcPluginInstallResult, IWebRpcPluginInstallScope } from '../../src/typing'
 
@@ -13,7 +13,7 @@ function scope(): IWebRpcPluginInstallScope {
     transport,
     signal: { aborted: false, addEventListener() {}, removeEventListener() {} },
     hooks: () => undefined,
-    getShared: () => undefined,
+    getPort: () => undefined,
     own: <T>(resource: T): T => resource
   }
 }
@@ -22,7 +22,7 @@ describe('protocol plugin', () => {
   it('contributes only the semantic normalizer and leaves byte conversion to codec()', () => {
     const result = protocol(rpcProtocolV1).install(scope()) as IWebRpcPluginInstallResult
     expect(result.extension).toEqual({})
-    expect(result.shared).toMatchObject({ [WebRpcSharedKey.protocol]: rpcProtocolV1 })
+    expect(result.ports).toMatchObject({ [WebRpcPortName.protocol]: rpcProtocolV1 })
   })
 
   it('rejects legacy encode/decode installation before the Host can subscribe', () => {

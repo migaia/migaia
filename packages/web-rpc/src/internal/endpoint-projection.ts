@@ -40,7 +40,7 @@ export function createEndpointProjection(
     'use',
     'unUse',
     'config',
-    'getShared',
+    'getPort',
     'usePipeline',
     '__proto__'
   ])
@@ -158,16 +158,15 @@ function projectionError(): WebRpcError {
 }
 
 /**
- * Retells a revoked-view failure as this endpoint's own disposal error.
+ * Retells a revoked-registration failure as this endpoint's own disposal error.
  *
  * A published extension closure is revoked the moment its registrations are, which is the host's
  * guarantee and the right one — but the caller here holds an _endpoint_, and what it needs to learn
- * is that the endpoint is disposed, not that some host view it never saw is gone. The host error
- * stays on `cause`, so the chain still reaches the decision that was actually made.
+ * is that the endpoint is disposed, not that one host registration it never saw is gone. The host
+ * error stays on `cause`, so the chain still reaches the decision that was actually made.
  *
- * Only `VIEW_REVOKED` is translated. Every other failure belongs to the member being called and is
- * rethrown untouched; widening this would make the endpoint claim disposal for faults it did not
- * cause.
+ * `REGISTRATION_REVOKED` and the enclosing Host's terminal `HOST_DISPOSED` both mean the endpoint
+ * can no longer serve the call. Every other failure belongs to the member being called.
  */
 function translateRevokedView<T>(call: () => T, asRejection: boolean): T {
   try {
@@ -191,7 +190,8 @@ function asEndpointDisposed(error: unknown): unknown {
   if (
     error &&
     typeof error === 'object' &&
-    (error as { code?: unknown }).code === 'VIEW_REVOKED' &&
+    ((error as { code?: unknown }).code === 'REGISTRATION_REVOKED' ||
+      (error as { code?: unknown }).code === 'HOST_DISPOSED') &&
     (error as { source?: unknown }).source === '@migaia/plugin-host'
   )
     return new WebRpcLifecycleError(WebRpcErrorText.endpointDisposed, error)

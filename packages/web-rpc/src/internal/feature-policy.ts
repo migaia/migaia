@@ -9,7 +9,8 @@ import {
   WebRpcFirstPartyRoleSchema,
   WebRpcProviderRole
 } from './plugin-contract.js'
-import { WebRpcSharedKey } from './plugin-shared-keys.js'
+import { WebRpcPortName } from './plugin-shared-keys.js'
+import { isManagedHost, openComposition } from '@migaia/plugin-host/composition'
 
 /** Static metadata read by the pure WebRPC admission gate before Host construction. */
 export type IWebRpcClaimAdmission = Readonly<{
@@ -176,9 +177,9 @@ export function preflightFeatureClaims(
       const roleName = definition.name.replace(/^middleware:/, '')
       const expectedCancellationKey =
         roleName === 'timeout'
-          ? WebRpcSharedKey.timeout
+          ? WebRpcPortName.timeout
           : roleName === 'abort'
-            ? WebRpcSharedKey.abort
+            ? WebRpcPortName.abort
             : undefined
       if (
         expectedCancellationKey !== undefined &&
@@ -358,11 +359,11 @@ export function assertFeatureClaimParity(
   if (runtime.activationPhase === 'pre-activation') {
     if (!runtime.activated || activatorCount !== 1) fail()
   } else if (runtime.activated !== (activatorCount === 1)) fail()
-  const sharedHost = host as { readonly getShared?: (key: PropertyKey) => unknown }
+  const sharedHost = host as { readonly getPort?: (key: PropertyKey) => unknown }
   for (const key of definitions.flatMap((definition) => definition.sharedProvides ?? []))
-    if (sharedHost.getShared?.(key) === undefined) fail()
+    if (sharedHost.getPort?.(key) === undefined) fail()
   for (const key of definitions.flatMap((definition) => definition.sharedConsumes ?? []))
-    if (sharedHost.getShared?.(key) === undefined) fail()
+    if (sharedHost.getPort?.(key) === undefined) fail()
   const expectedRoutes = new Set(claims.flatMap((claim) => claim.routes))
   const actualRoutes = runtime.routeKeys ?? kernel.routeKeys
   if (
@@ -381,6 +382,10 @@ export function assertFeatureClaimParity(
 /** Reads the immutable PluginHost view without becoming another publication owner. */
 function readPublishedFeatureExtensions(host: object): object {
   try {
+    const internalReader = (host as { readonly getCurrentExtensions?: () => object })
+      .getCurrentExtensions
+    if (internalReader) return internalReader()
+    if (isManagedHost(host)) return openComposition(host).getCurrentSnapshot().extensions
     const extensions = (host as { readonly extensions?: unknown }).extensions
     if (extensions !== null && (typeof extensions === 'object' || typeof extensions === 'function'))
       return extensions
@@ -413,7 +418,7 @@ function snapshotRoleClaimSource(
 function assertNativeProviderRole(source: IWebRpcNativeRoleClaimSource): void {
   if (source.name !== WebRpcProviderRole.provider || source.claims === undefined) return
   const nativeClaim =
-    source.sharedProvides?.some((key) => key === WebRpcSharedKey.providerCancellation) === true ||
+    source.sharedProvides?.some((key) => key === WebRpcPortName.providerCancellation) === true ||
     (source.sharedConsumes?.length ?? 0) > 0
   const claims = source.claims
   const candidate =

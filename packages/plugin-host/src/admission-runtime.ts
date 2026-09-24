@@ -1,7 +1,11 @@
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { snapshotFeatureRecord } from './define-feature.js'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, {
+  PluginHostError,
+  createPluginDefinitionTypeError,
+  createPluginHostTypeError
+} from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginDefinition } from './registry.js'
 import type {
@@ -38,8 +42,10 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       readonly update: unknown
       readonly onEnable: unknown
       readonly onDisable: unknown
+      readonly onDependencyReplaced: unknown
+      readonly activation: unknown
       readonly dispose: unknown
-      readonly shared: unknown
+      readonly retiredShared: unknown
       readonly features: unknown
       readonly featureExpose: unknown
       readonly disposer: ReturnType<typeof snapshotDisposer>
@@ -52,8 +58,10 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
         update: plugin?.update,
         onEnable: plugin?.onEnable,
         onDisable: plugin?.onDisable,
+        onDependencyReplaced: plugin?.onDependencyReplaced,
+        activation: plugin?.activation ?? 'eager',
         dispose: plugin?.dispose,
-        shared: plugin?.shared,
+        retiredShared: (plugin as { readonly shared?: unknown })?.shared,
         features: plugin?.features,
         featureExpose: plugin?.featureExpose,
         disposer: snapshotDisposer(plugin as IPluginResource)
@@ -68,8 +76,10 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       update,
       onEnable,
       onDisable,
+      onDependencyReplaced,
+      activation,
       dispose,
-      shared,
+      retiredShared,
       features,
       featureExpose,
       disposer
@@ -83,11 +93,13 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       ['update', update],
       ['onEnable', onEnable],
       ['onDisable', onDisable],
-      ['dispose', dispose],
-      ['shared', shared]
+      ['onDependencyReplaced', onDependencyReplaced],
+      ['dispose', dispose]
     ] as const)
       if (hook !== undefined && typeof hook !== 'function')
         throw createPluginHostTypeError(`plugin ${key} must be a function`)
+    if (activation !== 'eager' && activation !== 'lazy') throw createPluginDefinitionTypeError()
+    if (retiredShared !== undefined) throw createPluginDefinitionTypeError()
     for (const candidate of [...disposer.asyncCandidates, ...disposer.disposeCandidates])
       if (candidate.value !== undefined && typeof candidate.value !== 'function')
         throw createPluginHostTypeError(
@@ -107,8 +119,9 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       update: update as IPluginConstraint<any>['update'],
       onEnable: onEnable as IPluginConstraint<any>['onEnable'],
       onDisable: onDisable as IPluginConstraint<any>['onDisable'],
+      onDependencyReplaced: onDependencyReplaced as IPluginConstraint<any>['onDependencyReplaced'],
+      activation,
       dispose: dispose as IPluginConstraint<any>['dispose'],
-      shared: shared as IPluginConstraint<any>['shared'],
       disposer: disposer.disposer,
       features: snapshotFeatureRecord(features),
       featureExpose: featureExpose as IPluginDefinition<any>['featureExpose']

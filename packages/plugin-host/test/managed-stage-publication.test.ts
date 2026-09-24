@@ -145,9 +145,9 @@ describe('PluginHost managed stage publication', () => {
     const admission = openComposition(host).createPluginAdmission(plugin as never)
     const slot = openComposition(host).createDataOrderSlot('prepared')
     const prepared = await openComposition(host).prepareAdmissions([{ admission, slot }])
-    expect(host.getCurrentView().extensions.value).toBeUndefined()
+    expect(openComposition(host).getCurrentSnapshot().extensions.value).toBeUndefined()
     const [receipt] = openComposition(host).commitPreparedAdmissions(prepared)
-    expect(host.getCurrentView().extensions.value).toBe(true)
+    expect(openComposition(host).getCurrentSnapshot().extensions.value).toBe(true)
     const removal = await openComposition(host).commitPreparedUnUseBatch(
       openComposition(host).prepareUnUseBatch([receipt]),
       {
@@ -178,10 +178,10 @@ describe('PluginHost managed stage publication', () => {
       {}
     )
     expect(() => createView(receipt)).toThrowError(
-      expect.objectContaining({ code: 'VIEW_REVOKED' })
+      expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
     )
     expect(() => createView(Object.freeze({}) as never)).toThrowError(
-      expect.objectContaining({ code: 'VIEW_REVOKED' })
+      expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
     )
     await host.dispose()
   })
@@ -310,7 +310,7 @@ describe('PluginHost managed stage publication', () => {
     await openComposition(host).discardPreparedAdmissions(prepared)
     await openComposition(host).discardPreparedAdmissions(prepared)
     expect(disposed).toBe(1)
-    expect(host.getCurrentView().extensions.drifted).toBeUndefined()
+    expect(openComposition(host).getCurrentSnapshot().extensions.drifted).toBeUndefined()
     await host.dispose()
   })
 

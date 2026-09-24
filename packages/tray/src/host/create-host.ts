@@ -12,8 +12,7 @@ import {
   type IPluginAdmission,
   type IPluginDataOrderSlot,
   type IPluginRegistrationReceipt,
-  type IPluginHostDisposalResult,
-  type IPluginHostView
+  type IPluginHostDisposalResult
 } from '@migaia/plugin-host'
 import { TrayErrorCode } from '../error-code.js'
 import { attachTrayError, createTrayError } from '../errors.js'
@@ -41,12 +40,13 @@ import {
   createView as createRegistrationView,
   isManagedHost,
   openComposition,
-  type IPluginHostCompositionIntegration
+  type IPluginHostCompositionIntegration,
+  type IPluginHostCompositionSnapshot
 } from '@migaia/plugin-host/composition'
 
 // 宿主不再结构上包含托管协议：协议经 `openComposition` 取得，宿主类型只描述宿主自己。
 type IAnyHost = PluginHost<any, any, any>
-type IAnyView = IPluginHostView<IAnyHost, readonly IPluginConstraint<any>[]>
+type IAnySnapshot = IPluginHostCompositionSnapshot
 type IPluginBinding = ITrayPluginConstraint<IAnyHost>
 type IGraphId = IGraphNodeId
 type ICleanupAccumulator = {
@@ -105,13 +105,16 @@ export async function createHost<
     composition = openComposition(concrete as object)
     session = {}
     claims.set(concrete as object, session)
-    const baselineView = (await concrete.use()) as unknown as IAnyView
+    await concrete.use()
     anchorName = `__migaia_tray_anchor_${anchorSequence++}`
     const anchor = {
       name: anchorName,
       install: () => ({})
     }
-    let hostView = (await baselineView.use(anchor as never)) as unknown as IAnyView
+    await (concrete.use as (...plugins: readonly IPluginConstraint<any>[]) => Promise<unknown>)(
+      anchor as IPluginConstraint<any>
+    )
+    let hostSnapshot = composition!.getCurrentSnapshot()
     let receipt = composition!.revision
     const report = (error: unknown): void => {
       try {
@@ -143,7 +146,7 @@ export async function createHost<
       await composition!.discardPreparedAdmissions(prepared)
       throw error
     }
-    hostView = composition!.getCurrentView() as unknown as IAnyView
+    hostSnapshot = composition!.getCurrentSnapshot()
     receipt = composition!.revision
     initialAdmissions.forEach((entry, index) => {
       entry.receipt = receipts[index]
@@ -174,7 +177,7 @@ export async function createHost<
             entry.receipt = nextReceipts[index]
             receiptsByName.set(entry.snapshot.name, nextReceipts[index])
           })
-          hostView = composition!.getCurrentView() as unknown as IAnyView
+          hostSnapshot = composition!.getCurrentSnapshot()
           receipt = composition!.revision
         }
         return entries.map((entry) => {
@@ -201,13 +204,13 @@ export async function createHost<
         if (!bounded.complete) {
           cleanup.complete = false
           cleanup.physical.push(observePhysical(removalPromise))
-          hostView = composition!.getCurrentView() as unknown as IAnyView
+          hostSnapshot = composition!.getCurrentSnapshot()
           receipt = composition!.revision
           for (const entry of cleanupOrder) receiptsByName.delete(String(entry.id))
           return
         }
         const removal = bounded.value
-        hostView = removal.view as unknown as IAnyView
+        hostSnapshot = removal.snapshot as IAnySnapshot
         receipt = composition!.revision
         cleanup.errors.push(...removal.cleanupErrors)
         cleanup.complete = cleanup.complete && removal.cleanupComplete
@@ -251,9 +254,9 @@ export async function createHost<
       concrete,
       graph,
       captured as unknown as ICreateHostOptions<IAnyHost, readonly IPluginBinding[]>,
-      () => hostView,
+      () => hostSnapshot,
       (next) => {
-        hostView = next
+        hostSnapshot = next
         receipt = composition!.revision
       },
       () => {
@@ -332,10 +335,9 @@ export async function createHost<
     if (concrete !== undefined) {
       if (anchorName !== undefined) {
         try {
-          const anchorRemoval = await (concrete as IAnyHost).getCurrentView().unUse(anchorName)
-          cleanupErrors.push(...anchorRemoval.cleanupErrors)
-          if (anchorRemoval.physicalCompletion)
-            physical.push(observePhysical(anchorRemoval.physicalCompletion))
+          const anchorRemoval = await (concrete as IAnyHost).unUse(anchorName)
+          if ('ok' in anchorRemoval && !anchorRemoval.ok)
+            cleanupErrors.push(...anchorRemoval.errors)
         } catch (cleanupError) {
           cleanupErrors.push(cleanupError)
         }
@@ -473,8 +475,8 @@ function createManagedHost(
   concrete: IAnyHost,
   graph: IGraph,
   options: ICreateHostOptions<IAnyHost, readonly IPluginBinding[]>,
-  readView: () => IAnyView,
-  writeView: (view: IAnyView) => void,
+  readSnapshot: () => IAnySnapshot,
+  writeSnapshot: (snapshot: IAnySnapshot) => void,
   assertOwned: () => void,
   session: object,
   cleanup: ICleanupAccumulator,
@@ -521,11 +523,11 @@ function createManagedHost(
     },
     get extensions() {
       assertReadable()
-      return readView().extensions
+      return readSnapshot().extensions
     },
     get config() {
       assertReadable()
-      const config = readView().config
+      const config = readSnapshot().config
       return {
         get: (path: string) => config.get(path),
         update: async (
@@ -533,13 +535,9 @@ function createManagedHost(
           recipe: (previous: Readonly<Record<string, unknown>>) => Record<string, unknown>
         ) => {
           await config.update(name, recipe as never)
-          writeView(readView())
+          writeSnapshot(readSnapshot())
         }
       }
-    },
-    getShared(key: PropertyKey) {
-      assertReadable()
-      return readView().getShared(key)
     },
     pluginState(name: string) {
       assertReadable()
@@ -740,10 +738,9 @@ function createManagedHost(
           await graph.dispose()
           cleanupErrors.push(...cleanup.errors)
           physical.push(...cleanup.physical)
-          const anchorRemoval = await readView().unUse(anchorName)
-          cleanupErrors.push(...anchorRemoval.cleanupErrors)
-          if (anchorRemoval.physicalCompletion)
-            physical.push(observePhysical(anchorRemoval.physicalCompletion))
+          const anchorRemoval = await concrete.unUse(anchorName)
+          if ('ok' in anchorRemoval && !anchorRemoval.ok)
+            cleanupErrors.push(...anchorRemoval.errors)
           if (await deferConcreteDisposal()) {
             state = TrayHostState.terminal
             claims.delete(concrete as object)

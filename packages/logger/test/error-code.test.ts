@@ -481,9 +481,11 @@ describe('logger error-code contract (E-T9)', () => {
           if (candidate && typeof candidate === 'object') {
             const result = candidate as {
               readonly cleanupErrors?: unknown
+              readonly errors?: unknown
               readonly error?: unknown
             }
             if (Array.isArray(result.cleanupErrors)) pending.push(...result.cleanupErrors)
+            if (Array.isArray(result.errors)) pending.push(...result.errors)
             if (result.error !== undefined) pending.push(result.error)
           }
         }

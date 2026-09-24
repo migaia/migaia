@@ -5,7 +5,7 @@ import type {
   IWebRpcTimeoutConfig
 } from '../typing.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 
 const timeoutClaims = Object.freeze({
@@ -54,7 +54,7 @@ function snapshotTimeout(
 function createTimeoutPlugin(config: IWebRpcTimeoutConfig): IWebRpcPlugin {
   return Object.freeze({
     name: 'middleware:timeout',
-    metadata: Object.freeze({ claims: timeoutClaims, sharedProvides: [WebRpcSharedKey.timeout] }),
+    metadata: Object.freeze({ claims: timeoutClaims, sharedProvides: [WebRpcPortName.timeout] }),
     install: (): IWebRpcPluginInstallResult => {
       const snapshot = snapshotTimeout(config)
       if ('error' in snapshot) throw snapshot.error
@@ -74,7 +74,7 @@ function createTimeoutPlugin(config: IWebRpcTimeoutConfig): IWebRpcPlugin {
       })
       return {
         extension: Object.freeze({}),
-        shared: Object.freeze({ [WebRpcSharedKey.timeout]: port })
+        ports: Object.freeze({ [WebRpcPortName.timeout]: port })
       }
     }
   })

@@ -77,7 +77,7 @@ describe('native Feature synchronous installation', () => {
         const host = new Host({ diagnostic: (message: string) => diagnostics.push(message) })
         let caught: unknown
         try {
-          await host.use(candidate.plugin)
+          await host.use(candidate.plugin as never)
         } catch (error) {
           caught = error
         }
@@ -137,8 +137,8 @@ describe('native Feature synchronous installation', () => {
       featureExpose: {},
       install: (core) => ({ value: core.features.feature.value() })
     })
-    const view = new Host().install([plugin])
-    expect(view.extensions.value).toBe(7)
+    const [handle] = new Host().install([plugin])
+    expect(handle.extensions.value).toBe(7)
   })
 
   it('keeps Feature expose valid through disposer execution and revokes it after cleanup', async () => {
@@ -328,19 +328,14 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
     const host = new Host()
     const plugin = {} as Record<PropertyKey, unknown>
     const reads = new Map<PropertyKey, number>()
-    const calls = { install: 0, shared: 0, update: 0, dispose: 0 }
-    const receivers = { install: false, shared: false, update: false, dispose: false }
+    const calls = { install: 0, update: 0, dispose: 0 }
+    const receivers = { install: false, update: false, dispose: false }
     const count = (key: PropertyKey): void => {
       reads.set(key, (reads.get(key) ?? 0) + 1)
     }
     const install = function (this: object): Record<string, never> {
       calls.install += 1
       receivers.install = this === plugin
-      return {}
-    }
-    const shared = function (this: object): Record<string, never> {
-      calls.shared += 1
-      receivers.shared = this === plugin
       return {}
     }
     const update = function (this: object): void {
@@ -372,13 +367,6 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
         get: () => {
           count('install')
           return install
-        }
-      },
-      shared: {
-        configurable: true,
-        get: () => {
-          count('shared')
-          return shared
         }
       },
       update: {
@@ -415,7 +403,6 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
     Object.defineProperties(plugin, {
       config: { configurable: true, value: { enabled: false } },
       install: { configurable: true, value: replacement },
-      shared: { configurable: true, value: replacement },
       update: { configurable: true, value: replacement },
       dispose: { configurable: true, value: replacement },
       [asyncDisposeKey]: { configurable: true, value: replacement },
@@ -428,13 +415,12 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
     expect(reads.get('name')).toBe(1)
     expect(reads.get('config')).toBe(1)
     expect(reads.get('install')).toBe(1)
-    expect(reads.get('shared')).toBe(1)
     expect(reads.get('update')).toBe(1)
     expect(reads.get('dispose')).toBe(1)
     expect(reads.get(asyncDisposeKey)).toBe(1)
     expect(reads.get(disposeKey)).toBe(1)
-    expect(calls).toEqual({ install: 1, shared: 1, update: 1, dispose: 1 })
-    expect(receivers).toEqual({ install: true, shared: true, update: true, dispose: true })
+    expect(calls).toEqual({ install: 1, update: 1, dispose: 1 })
+    expect(receivers).toEqual({ install: true, update: true, dispose: true })
   })
 
   it('PH-T16b：symbol disposer admission 保持 async precedence、receiver 与 captured identity', async () => {
@@ -574,7 +560,7 @@ describe('#4 async lifecycle mutation admission', () => {
         return {}
       }
     } as any)
-    await expect(outer).resolves.toMatchObject({ host })
+    await expect(outer).resolves.toHaveLength(1)
   })
 
   it('directly awaited nested mutation fails before enqueue', async () => {
@@ -592,7 +578,7 @@ describe('#4 async lifecycle mutation admission', () => {
         return {}
       }
     } as any)
-    await expect(outer).resolves.toMatchObject({ host })
+    await expect(outer).resolves.toHaveLength(1)
   })
 
   it('rejects external mutation while an async lifecycle hook is pending', async () => {
@@ -616,8 +602,8 @@ describe('#5 扩展属性被外部覆写后，unUse 静默放弃卸载', () => {
     await host.unUse('p')
 
     expect((host as any).token).toBe('hijacked')
-    const view = await host.use({ name: 'p', install: () => ({ token: 'b' }) } as any)
-    expect(view.extensions.token).toBe('b')
+    const [handle] = await host.use({ name: 'p', install: () => ({ token: 'b' }) } as any)
+    expect(handle.extensions.token).toBe('b')
   })
 })
 
@@ -918,7 +904,7 @@ describe('second adversarial pass (R3, fixed)', () => {
       const outcome = await unUse
       expect(laterDisposerRan).toBe(true) // the timed-out step didn't block the rest of the group
       expect((outcome as any).ok).toBe(false)
-      expect((outcome as any).error.code).toBe('PLUGIN_DISPOSE_FAILED')
+      expect((outcome as any).errors[0].code).toBe('PLUGIN_DISPOSE_FAILED')
     } finally {
       vi.useRealTimers()
     }

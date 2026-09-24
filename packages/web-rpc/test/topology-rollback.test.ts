@@ -632,7 +632,7 @@ describe('composition topology and rollback', () => {
         scope.own({}, () => {
           disposed += 1
         })
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     }
     const failing = definePrepareRoot(() => {

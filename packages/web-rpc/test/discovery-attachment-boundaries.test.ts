@@ -6,7 +6,7 @@ import { WebRpcMessageKind } from '../src/semantic-constants.js'
 import { WebRpcPlatform } from '../src/transport-constants.js'
 import { WebRpcDiscoveryAttachment } from '../src/internal/discovery-attachment.js'
 import { prepareEndpoint } from '../src/internal/endpoint-bootstrap.js'
-import { WebRpcSharedKey } from '../src/internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../src/internal/plugin-shared-keys.js'
 import { WebRpcRoutingProfile, WebRpcRoutingType } from '../src/internal/routing-data.js'
 import type { IWebRpcRoutingData } from '../src/internal/routing-data.js'
 import type { IRpcEnvelope, IRpcPortableValue } from '@migaia/rpc-contract'
@@ -113,7 +113,7 @@ async function createDiscoveryHarness(
   const prepared = await deferred.finalize(
     [],
     async (operation) => await operation(),
-    (key) => (key === WebRpcSharedKey.connect ? connectPort : undefined)
+    (key) => (key === WebRpcPortName.connect ? connectPort : undefined)
   )
   const outbound = new WebRpcOutboundAttachment(kernel, prepared)
   const commands: IWebRpcOutboundCommand[] = []

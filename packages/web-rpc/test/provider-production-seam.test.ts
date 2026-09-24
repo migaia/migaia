@@ -18,7 +18,7 @@ import {
   WebRpcProviderRoleSchema
 } from '../src/internal/plugin-contract.js'
 import {
-  WebRpcSharedKey,
+  WebRpcPortName,
   type IWebRpcProviderCancellationPort,
   type IWebRpcOutboundCommand,
   type IWebRpcOutboundOperationsPort
@@ -201,7 +201,7 @@ type IActualAdmissionFixture = {
   readonly unregisterProviderRegistrationObservation: () => void
   readonly snapshot: () => Readonly<{
     readonly hostKeys: readonly PropertyKey[]
-    readonly shared: readonly unknown[]
+    readonly ports: readonly unknown[]
     readonly extensions: readonly (PropertyDescriptor | undefined)[]
     readonly installations: readonly {
       readonly installed: boolean
@@ -330,7 +330,7 @@ async function createActualAdmissionFixture(
       },
       observeOutboundCommand: options.observeOutboundCommand,
       transformOutput: (phase, output) =>
-        phase === 'shared' && options.transformShared ? options.transformShared(output) : output,
+        phase === 'ports' && options.transformShared ? options.transformShared(output) : output,
       transformFeaturePrepare: (name, prepare) =>
         name === 'first-party-outbound'
           ? (scope) =>
@@ -386,8 +386,8 @@ async function createActualAdmissionFixture(
       activated = false
     },
     onNativeFeatureActivate: () => capabilityBatch.plugin.activate(),
-    onActivationPreflight: (state, getShared) =>
-      assertFeatureClaimParity(admissions, { getShared }, kernel, {
+    onActivationPreflight: (state, getPort) =>
+      assertFeatureClaimParity(admissions, { getPort }, kernel, {
         activated: state.activated,
         activationPhase: 'pre-activation',
         routeKeys: state.routeKeys
@@ -427,9 +427,9 @@ async function createActualAdmissionFixture(
       }
     })(),
     hostKeys: [...Reflect.ownKeys(host)].sort(),
-    shared: Object.values(WebRpcSharedKey).map((key) => {
+    ports: Object.values(WebRpcPortName).map((key) => {
       try {
-        return host.getShared(key)
+        return host.getPort(key)
       } catch {
         return undefined
       }
@@ -453,8 +453,8 @@ async function createActualAdmissionFixture(
   ): Promise<void> => {
     activeDescriptors = nextDescriptors
     if (installOptions.parity === false) return
-    const hostView = await host.installBatch(batch.map(({ definition }) => definition))
-    assertFeatureClaimParity(admissions, hostView, kernel, { activated })
+    await host.installBatch(batch.map(({ definition }) => definition))
+    assertFeatureClaimParity(admissions, host, kernel, { activated })
   }
   return {
     id: endpointId,
@@ -516,7 +516,7 @@ async function readFinalD95BoundaryTexts(): Promise<readonly string[]> {
 function projectD95TerminalSnapshot(snapshot: ReturnType<IActualAdmissionFixture['snapshot']>) {
   return {
     hostKeys: snapshot.hostKeys,
-    sharedEmpty: snapshot.shared.every((value) => value === undefined),
+    sharedEmpty: snapshot.ports.every((value) => value === undefined),
     extensionsEmpty: snapshot.extensions.every((value) => value === undefined),
     installationsClear: snapshot.installations.every(({ installed }) => !installed),
     activated: snapshot.activated,
@@ -584,8 +584,10 @@ const HOST_SURFACE = Object.freeze([
   'useSync',
   'use',
   'unUse',
-  'getShared',
-  'getCurrentView',
+  'activate',
+  'replace',
+  'getPort',
+  'getCurrentExtensions',
   'usePipeline',
   'useAsyncPipeline',
   'useGeneratorPipeline',
@@ -619,7 +621,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         'dispatchAll',
         'provide'
       ])
-      expect(server).not.toHaveProperty('getShared')
+      expect(server).not.toHaveProperty('getPort')
       expect(server).not.toHaveProperty('use')
       await expect(client.send('provider-exposure-host', 'echo', 'ok')).resolves.toBe('ok')
     } finally {
@@ -865,7 +867,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(Object.isFrozen(observations?.[0])).toBe(true)
       const after = fixture.snapshot()
       expect({
-        shared: after.shared.every((value) => value === undefined),
+        ports: after.ports.every((value) => value === undefined),
         extensions: after.extensions.every((descriptor) => descriptor === undefined),
         installations: after.installations.every(
           ({ installed, extensionKeys, sharedKeys }) =>
@@ -880,7 +882,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         kernelRoutes: after.kernelRoutes,
         resources: after.resources
       }).toEqual({
-        shared: true,
+        ports: true,
         extensions: true,
         installations: true,
         activeSubscriptions: 0,
@@ -901,7 +903,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       })
       const terminal = fixture.snapshot()
       expect({
-        shared: terminal.shared.every((value) => value === undefined),
+        ports: terminal.ports.every((value) => value === undefined),
         extensions: terminal.extensions.every((descriptor) => descriptor === undefined),
         installations: terminal.installations.every(
           ({ installed, extensionKeys, sharedKeys }) =>
@@ -916,7 +918,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         kernelRoutes: terminal.kernelRoutes,
         resources: terminal.resources
       }).toEqual({
-        shared: true,
+        ports: true,
         extensions: true,
         installations: true,
         activeSubscriptions: 0,
@@ -951,11 +953,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T122 contract: provider schema and cancellation metadata are frozen and candidate-independent', () => {
     const schema = WebRpcProviderRoleSchema.provider
     expect(schema).toEqual({
-      sharedProvides: [WebRpcSharedKey.providerCancellation],
+      sharedProvides: [WebRpcPortName.providerCancellation],
       sharedConsumes: [
-        WebRpcSharedKey.outboundOperations,
-        WebRpcSharedKey.inboundIdentity,
-        WebRpcSharedKey.variationCoordinator
+        WebRpcPortName.outboundOperations,
+        WebRpcPortName.inboundIdentity,
+        WebRpcPortName.variationCoordinator
       ],
       publicKeys: ['provide'],
       exposedKeys: ['provide'],
@@ -1005,11 +1007,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         writable: false
       })
     }
-    assertFrozenArray(schema.sharedProvides, [WebRpcSharedKey.providerCancellation])
+    assertFrozenArray(schema.sharedProvides, [WebRpcPortName.providerCancellation])
     assertFrozenArray(schema.sharedConsumes, [
-      WebRpcSharedKey.outboundOperations,
-      WebRpcSharedKey.inboundIdentity,
-      WebRpcSharedKey.variationCoordinator
+      WebRpcPortName.outboundOperations,
+      WebRpcPortName.inboundIdentity,
+      WebRpcPortName.variationCoordinator
     ])
     assertFrozenArray(schema.publicKeys, ['provide'])
     assertFrozenArray(schema.exposedKeys, ['provide'])
@@ -1142,8 +1144,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     process.on('unhandledRejection', onUnhandledRejection)
     try {
       await fixture.install()
-      const operations = fixture.host.getShared(
-        WebRpcSharedKey.outboundOperations
+      const operations = fixture.host.getPort(
+        WebRpcPortName.outboundOperations
       ) as IWebRpcOutboundOperationsPort
       const commandKinds: string[] = []
       commandKinds.push('dispatch')
@@ -1225,7 +1227,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(fixture.host.dispose()).toBe(hostDispose)
       const terminal = fixture.snapshot()
       expect({
-        shared: terminal.shared.every((value) => value === undefined),
+        ports: terminal.ports.every((value) => value === undefined),
         extensions: terminal.extensions.every((descriptor) => descriptor === undefined),
         installations: terminal.installations.every(
           ({ installed, extensionKeys, sharedKeys }) =>
@@ -1237,7 +1239,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         kernelRoutes: terminal.kernelRoutes,
         resources: terminal.resources
       }).toEqual({
-        shared: true,
+        ports: true,
         extensions: true,
         installations: true,
         activeSubscriptions: 0,
@@ -1379,10 +1381,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     try {
       await discoveryFixture.install()
       // Native capability assembly exposes real ports through the Host, not a descriptor copy.
-      expect(discoveryFixture.host.getShared(WebRpcSharedKey.discoveryResolver)).toBeDefined()
-      expect(discoveryFixture.host.getShared(WebRpcSharedKey.inboundIdentity)).toBeDefined()
-      expect(discoveryFixture.host.getShared(WebRpcSharedKey.outboundOperations)).toBeDefined()
-      expect(discoveryFixture.host.getShared(WebRpcSharedKey.time)).toBeDefined()
+      expect(discoveryFixture.host.getPort(WebRpcPortName.discoveryResolver)).toBeDefined()
+      expect(discoveryFixture.host.getPort(WebRpcPortName.inboundIdentity)).toBeDefined()
+      expect(discoveryFixture.host.getPort(WebRpcPortName.outboundOperations)).toBeDefined()
+      expect(discoveryFixture.host.getPort(WebRpcPortName.time)).toBeDefined()
       expect(Object.keys(client)).toEqual([
         'hooks',
         'dispose',
@@ -1505,9 +1507,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         schema.sharedConsumes
       )
       await fixture.install()
-      expect(fixture.host.getShared(WebRpcSharedKey.outboundOperations)).toBeDefined()
-      expect(fixture.host.getShared(WebRpcSharedKey.discoveryResolver)).toBeDefined()
-      expect(fixture.host.getShared(WebRpcSharedKey.candidatePing)).toBeDefined()
+      expect(fixture.host.getPort(WebRpcPortName.outboundOperations)).toBeDefined()
+      expect(fixture.host.getPort(WebRpcPortName.discoveryResolver)).toBeDefined()
+      expect(fixture.host.getPort(WebRpcPortName.candidatePing)).toBeDefined()
     } finally {
       await fixture.dispose()
     }
@@ -1520,7 +1522,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await fixture.install()
-      const candidatePing = fixture.host.getShared(WebRpcSharedKey.candidatePing) as {
+      const candidatePing = fixture.host.getPort(WebRpcPortName.candidatePing) as {
         readonly ping?: unknown
       }
       expect(typeof candidatePing.ping).toBe('function')
@@ -1535,7 +1537,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       rootNames: ['first-party-outbound', 'first-party-control'],
       transformShared: (published) => {
         const omitted = { ...published }
-        delete omitted[WebRpcSharedKey.variationCoordinator]
+        delete omitted[WebRpcPortName.variationCoordinator]
         return omitted
       }
     })
@@ -1562,9 +1564,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         name: 'PluginHostError',
         source: '@migaia/plugin-host',
         code: 'PLUGIN_INSTALL_FAILED',
-        failedName: 'activation',
+        failedName: 'endpoint-capabilities',
         cause: expect.objectContaining({
-          name: 'WebRpcConfigurationError',
+          name: 'WebRpcError',
           source: '@migaia/web-rpc',
           code: WebRpcErrorCode.invalidConfig
         }),
@@ -1597,11 +1599,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     try {
       await first.install()
       await second.install()
-      const firstPort = first.host.getShared(WebRpcSharedKey.outboundOperations)
-      const secondPort = second.host.getShared(WebRpcSharedKey.outboundOperations)
+      const firstPort = first.host.getPort(WebRpcPortName.outboundOperations)
+      const secondPort = second.host.getPort(WebRpcPortName.outboundOperations)
       expect(firstPort).not.toBe(secondPort)
-      expect(first.host.getShared(WebRpcSharedKey.outboundOperations)).toBe(firstPort)
-      expect(second.host.getShared(WebRpcSharedKey.outboundOperations)).toBe(secondPort)
+      expect(first.host.getPort(WebRpcPortName.outboundOperations)).toBe(firstPort)
+      expect(second.host.getPort(WebRpcPortName.outboundOperations)).toBe(secondPort)
     } finally {
       await first.dispose()
       await second.dispose()
@@ -1617,7 +1619,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(fixture.host.dispose()).toBe(firstDispose)
     await firstDispose
     const terminal = fixture.snapshot()
-    expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+    expect(terminal.ports.every((value) => value === undefined)).toBe(true)
     expect(terminal.activeSubscriptions).toBe(0)
     await fixture.dispose()
   })
@@ -1669,12 +1671,12 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       'publicKeys',
       'exposedKeys'
     ])
-    expect(role.sharedProvides).toEqual([WebRpcSharedKey.candidatePing])
+    expect(role.sharedProvides).toEqual([WebRpcPortName.candidatePing])
     expect(role.sharedConsumes).toEqual([
-      WebRpcSharedKey.outboundOperations,
-      WebRpcSharedKey.discoveryResolver,
-      WebRpcSharedKey.time,
-      WebRpcSharedKey.variationCoordinator
+      WebRpcPortName.outboundOperations,
+      WebRpcPortName.discoveryResolver,
+      WebRpcPortName.time,
+      WebRpcPortName.variationCoordinator
     ])
     expect(role.sharedOptionalConsumes).toEqual([])
     expect(role.publicKeys).toEqual(['ping', 'pingAll'])
@@ -1692,7 +1694,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(Reflect.defineProperty(role, 'forged', { value: true })).toBe(false)
     expect(Reflect.deleteProperty(role, 'sharedConsumes')).toBe(false)
     expect(() => Object.setPrototypeOf(role, {})).toThrow()
-    expect(Reflect.defineProperty(role.sharedConsumes, '0', { value: WebRpcSharedKey.time })).toBe(
+    expect(Reflect.defineProperty(role.sharedConsumes, '0', { value: WebRpcPortName.time })).toBe(
       false
     )
     expect(Reflect.deleteProperty(role.publicKeys, '0')).toBe(false)
@@ -1844,7 +1846,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           cleanupOrder.push('first')
           throw firstCleanup
         })
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     }
     const secondMiddleware: IWebRpcPlugin = {
@@ -1864,7 +1866,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           cleanupOrder.push('second')
           throw secondCleanup
         })
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     }
     const [transport] = createMemoryTransportPair()
@@ -1925,8 +1927,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(controlSource).not.toContain('outboundCompatibility')
     expect(chunkSource).not.toContain('outboundCompatibility')
     expect(chunkSource).toContain('WebRpcCanonicalChunkAttachment')
-    expect(chunkSource).not.toContain('WebRpcSharedKey.inboundIdentity')
-    expect(chunkSource).not.toContain('WebRpcSharedKey.time')
+    expect(chunkSource).not.toContain('WebRpcPortName.inboundIdentity')
+    expect(chunkSource).not.toContain('WebRpcPortName.time')
   })
 
   it('T276 concurrent reused control modules preserve independent endpoint snapshots', async () => {
@@ -2628,7 +2630,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   })
 
   it('T224 superseded copied bridge injection has no surviving shared-key seam', () => {
-    assertNoRemovedD95Key(Reflect.ownKeys(WebRpcSharedKey))
+    assertNoRemovedD95Key(Reflect.ownKeys(WebRpcPortName))
   })
 
   it('T225 superseded hostile bridge injection has no surviving publisher descriptor seam', async () => {
@@ -2677,7 +2679,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await firstDispose
       const terminal = fixture.snapshot()
       expect({
-        sharedEmpty: terminal.shared.every((value) => value === undefined),
+        sharedEmpty: terminal.ports.every((value) => value === undefined),
         extensionsEmpty: terminal.extensions.every((value) => value === undefined),
         installationsClear: terminal.installations.every(({ installed }) => !installed),
         activeSubscriptions: terminal.activeSubscriptions,
@@ -2834,10 +2836,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const second = await createActualAdmissionFixture({ endpointId: 'r71-port-second' })
     try {
       await Promise.all([first.install(), second.install()])
-      const firstPort = first.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const firstPort = first.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
-      const secondPort = second.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const secondPort = second.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       expect(firstPort).toBeDefined()
@@ -2900,7 +2902,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       expect(cancellation).toBeDefined()
@@ -2936,7 +2938,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         kernelRoutes: [],
         resources: 0
       })
-      expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+      expect(terminal.ports.every((value) => value === undefined)).toBe(true)
       expect(terminal.extensions.every((value) => value === undefined)).toBe(true)
       expect(
         terminal.installations.every(
@@ -2992,10 +2994,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     ])
     try {
       await Promise.all([first.install(), second.install()])
-      const firstPort = first.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const firstPort = first.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
-      const secondPort = second.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const secondPort = second.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       expect(firstPort).toBeDefined()
@@ -3042,7 +3044,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       cancellation?.abort('r71-before-registration-task')
@@ -3068,7 +3070,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const fixture = await createActualAdmissionFixture({ endpointId: 'r71-after-completion' })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       const taskId = 'r71-after-completion-task'
@@ -3098,7 +3100,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         kernelRoutes: [],
         resources: 0
       })
-      expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+      expect(terminal.ports.every((value) => value === undefined)).toBe(true)
       expect(terminal.extensions.every((value) => value === undefined)).toBe(true)
       expect(
         terminal.installations.every(
@@ -3145,7 +3147,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       const taskId = 'r71-same-tick-task'
@@ -3179,7 +3181,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         kernelRoutes: [],
         resources: 0
       })
-      expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+      expect(terminal.ports.every((value) => value === undefined)).toBe(true)
       expect(terminal.extensions.every((value) => value === undefined)).toBe(true)
       expect(
         terminal.installations.every(
@@ -3220,7 +3222,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
     try {
       await fixture.install()
-      const cancellation = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       const taskId = 'r71-late-resolve-task'
@@ -3261,7 +3263,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         kernelRoutes: [],
         resources: 0
       })
-      expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+      expect(terminal.ports.every((value) => value === undefined)).toBe(true)
       expect(terminal.extensions.every((value) => value === undefined)).toBe(true)
       expect(
         terminal.installations.every(
@@ -3304,7 +3306,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
     try {
       await fixture.install()
-      const cancellation = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       const taskId = 'r71-late-reject-task'
@@ -3351,7 +3353,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         kernelRoutes: [],
         resources: 0
       })
-      expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+      expect(terminal.ports.every((value) => value === undefined)).toBe(true)
       expect(terminal.extensions.every((value) => value === undefined)).toBe(true)
       expect(
         terminal.installations.every(
@@ -3417,7 +3419,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const fixture = await createActualAdmissionFixture({ endpointId: 'r71-forged-id' })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
+      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
         | IWebRpcProviderCancellationPort
         | undefined
       const before = fixture.snapshot().providerState
@@ -3465,7 +3467,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           kernelRoutes: [],
           resources: 0
         })
-        expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+        expect(terminal.ports.every((value) => value === undefined)).toBe(true)
         expect(terminal.extensions.every((value) => value === undefined)).toBe(true)
         expect(
           terminal.installations.every(
@@ -3507,7 +3509,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await fixture.install()
       const observation = registerFixtureIdentityReleaseObservation(fixture)
       try {
-        const cancellation = fixture.host.getShared(WebRpcSharedKey.providerCancellation) as
+        const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
           | IWebRpcProviderCancellationPort
           | undefined
         const taskId = 'r71-identity-late-task'
@@ -3544,7 +3546,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           resources: 0
         })
         const terminal = fixture.snapshot()
-        expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+        expect(terminal.ports.every((value) => value === undefined)).toBe(true)
         expect(terminal.extensions.every((value) => value === undefined)).toBe(true)
         expect(
           terminal.installations.every(
@@ -3611,7 +3613,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           resources: 0
         })
         const terminal = fixture.snapshot()
-        expect(terminal.shared.every((value) => value === undefined)).toBe(true)
+        expect(terminal.ports.every((value) => value === undefined)).toBe(true)
         expect(terminal.extensions.every((value) => value === undefined)).toBe(true)
         expect(
           terminal.installations.every(
@@ -3797,7 +3799,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(after.activated).toBe(false)
       expect(after.subscribeCalls).toBe(0)
       expect(after.dispatches).toBe(0)
-      expect(after.shared.every((value) => value === undefined)).toBe(true)
+      expect(after.ports.every((value) => value === undefined)).toBe(true)
       expect(after.extensions.every((descriptor) => descriptor === undefined)).toBe(true)
       expect(
         after.installations.every(
@@ -3867,7 +3869,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(after.activated).toBe(false)
       expect(after.subscribeCalls).toBe(0)
       expect(after.dispatches).toBe(0)
-      expect(after.shared.every((value) => value === undefined)).toBe(true)
+      expect(after.ports.every((value) => value === undefined)).toBe(true)
       expect(after.extensions.every((descriptor) => descriptor === undefined)).toBe(true)
       expect(
         after.installations.every(
@@ -3944,7 +3946,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(after.activated).toBe(false)
       expect(after.subscribeCalls).toBe(0)
       expect(after.dispatches).toBe(0)
-      expect(after.shared.every((value) => value === undefined)).toBe(true)
+      expect(after.ports.every((value) => value === undefined)).toBe(true)
       expect(after.extensions.every((descriptor) => descriptor === undefined)).toBe(true)
       expect(
         after.installations.every(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/lifecycle'
 import { definePlugin, PluginHost } from '../src/index.js'
+import { openComposition } from '../src/composition-entry.js'
 import { PluginHostErrorCode, type IPluginHostErrorCode } from '../src/error-code.js'
 import type { IPluginConfig } from '../src/typing.js'
 
@@ -138,7 +139,7 @@ describe('config value domain', () => {
     )
     const before = host.config.get('config')
     const revision = host.revision
-    const view = host.getCurrentView()
+    const view = openComposition(host).getCurrentSnapshot()
     const extensions = view.extensions
     await expect(
       host.config.update('config', () => {
@@ -156,7 +157,7 @@ describe('config value domain', () => {
     )
     const before = host.config.get('config')
     const revision = host.revision
-    const view = host.getCurrentView()
+    const view = openComposition(host).getCurrentSnapshot()
     const extensions = view.extensions
     await expect(
       host.config.update('config', () => ({ value: new Map() }) as any)
@@ -180,7 +181,7 @@ describe('config value domain', () => {
     )
     const before = host.config.get('config')
     const revision = host.revision
-    const view = host.getCurrentView()
+    const view = openComposition(host).getCurrentSnapshot()
     const extensions = view.extensions
     await expect(host.config.update('config', () => ({ value: 2 }))).rejects.toBe(original)
     expect(host.config.get('config')).toBe(before)
@@ -215,7 +216,7 @@ describe('config value domain', () => {
     )
     const before = host.config.get('config')
     const revision = host.revision
-    const view = host.getCurrentView()
+    const view = openComposition(host).getCurrentSnapshot()
     const extensions = view.extensions
     const pending = host.config.update('config', () => ({ value: 2 }))
     await enteredGate

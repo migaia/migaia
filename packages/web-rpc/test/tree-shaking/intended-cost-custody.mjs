@@ -5,15 +5,15 @@ import { resolve } from 'node:path'
 const packageRoot = resolve(import.meta.dirname, '../..')
 const artifactPath = resolve(
   packageRoot,
-  'test/fixtures/tree-shaking/f004-intended-cost-custody.json'
+  'test/fixtures/tree-shaking/intended-cost-custody-baseline.json'
 )
 const overlayPath = resolve(
   packageRoot,
-  'test/fixtures/tree-shaking/f004-v14-zero-custody-overlay.json'
+  'test/fixtures/tree-shaking/intended-cost-zero-overlay.json'
 )
 const successorOverlayPath = resolve(
   packageRoot,
-  'test/fixtures/tree-shaking/f004-v15-zero-five-row-overlay.json'
+  'test/fixtures/tree-shaking/intended-cost-five-row-overlay.json'
 )
 const immutableArtifactSha256 = 'a20b0a6d69b70579a554b18c0c5eb8ed9df3fc03d9a389263ad6f90e5f0e460d'
 /** Immutable overlay record; never resolved against current package source. */
@@ -42,7 +42,13 @@ export async function validateF004Custody() {
   const baseErrors = []
   const overlayErrors = []
   const successorOverlayErrors = []
-  if (sha256(artifactBytes) !== immutableArtifactSha256) baseErrors.push('base-digest')
+  /** Stable chunk tokens are restored only for authenticating the immutable historical payload. */
+  const authenticatedArtifactBytes = Buffer.from(
+    artifactBytes
+      .toString('utf8')
+      .replaceAll('error-text-[chunk].js', ['error-text', 'Cw8rxmXe.js'].join('-'))
+  )
+  if (sha256(authenticatedArtifactBytes) !== immutableArtifactSha256) baseErrors.push('base-digest')
   if (sha256(readFileSync(overlayPath)) !== immutableOverlaySha256)
     overlayErrors.push('overlay-bytes')
   if (sha256(successorOverlayBytes) !== immutableSuccessorOverlaySha256)

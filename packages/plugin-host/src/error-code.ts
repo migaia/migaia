@@ -36,6 +36,60 @@ export const PluginHostErrorCode = {
   pluginNotInstalled: 'PLUGIN_NOT_INSTALLED',
 
   /**
+   * A handle member, or an extension taken from it, is used while that plugin is disabled; also
+   * thrown by `activate()` on a disabled lazy plugin. Enforces per-registration liveness (R2); the
+   * caller should `enable` the plugin (or its restore token) before retrying.
+   */
+  pluginDisabled: 'PLUGIN_DISABLED',
+  /**
+   * A lazy plugin is accessed synchronously before activation, or a synchronous install needs an
+   * inactive lazy provider. Activation is an explicit async step (R9); the caller should `await
+   * host.activate(name)` or install through the async `use()` path.
+   */
+  pluginNotActivated: 'PLUGIN_NOT_ACTIVATED',
+  /**
+   * `definition.getFeature(name)` or `handle.getFeature(name)` named a Feature the plugin does not
+   * declare. Lookups never return `undefined` (R4); the caller has a wrong name or wrong plugin.
+   */
+  featureNotDeclared: 'FEATURE_NOT_DECLARED',
+  /**
+   * A required Feature provider was never installed in this host (a removed one reports
+   * `PREREQUISITE_REMOVED`). Thrown before any install hook runs (R5); install the provider first
+   * or in the same batch.
+   */
+  prerequisiteMissing: 'PREREQUISITE_MISSING',
+  /**
+   * Cross-plugin Feature references inside one batch form a cycle. Detected before any install hook
+   * runs (R5); the caller must break the cycle in its plugin definitions.
+   */
+  dependencyCycle: 'DEPENDENCY_CYCLE',
+  /**
+   * `unUse`/`disable` (or a managed removal) would leave required dependents behind and cascade was
+   * not requested. State is unchanged (R6); `detail.blockedBy` lists every transitive dependent in
+   * cascade order — pass `cascade: true`, include them, or inspect `dryRun` first.
+   */
+  dependencyBlocked: 'DEPENDENCY_BLOCKED',
+  /**
+   * `replace(name, next)` received a candidate whose name differs from `name`. Nothing is installed
+   * (R8); the caller passed the wrong definition.
+   */
+  replaceNameMismatch: 'REPLACE_NAME_MISMATCH',
+  /**
+   * `replace()` published the new provider, but at least one dependent that had to restart (no
+   * `onDependencyReplaced`, or the hook threw) failed to reinstall. The replacement stays
+   * committed, the previous provider is disposed, and the failed restart closure stays uninstalled.
+   * `cause` is an `AggregateError` whose first entry is the restart failure, followed by the hook
+   * and cleanup errors; the caller should reinstall the listed dependents after fixing them.
+   */
+  dependentRestartFailed: 'DEPENDENT_RESTART_FAILED',
+  /**
+   * A plugin definition carries a retired or unsupported field (for example `shared`), or its
+   * dependency data is structurally invalid. Rejected at definition admission (R14); migrate the
+   * definition to Feature dependencies.
+   */
+  pluginDefinitionInvalid: 'PLUGIN_DEFINITION_INVALID',
+
+  /**
    * 插件 `install()` 抛错。原始安装错误**恒为 primary**（挂在 `cause` 上，按错误码契约 §3.2 保持 `===` 可达）。
    *
    * `detail` 保留失败插件名与按回滚顺序排列的原始 rollback identities；异步 `use()` 直接发布已完成的冻结 detail， 同步 `useSync()`
@@ -67,28 +121,21 @@ export const PluginHostErrorCode = {
   extensionObjectPrototype: 'EXTENSION_OBJECT_PROTOTYPE',
 
   /**
-   * 扩展属性名命中 Host 的保留键（`config`、`getShared`、`onDispose`、`usePipeline` 等）。
+   * 扩展属性名命中 Host 的保留键（`config`、`onDispose`、`usePipeline` 等）。
    *
    * 保留键是 Host 自身协议的一部分，被覆盖会让插件之间互相破坏；调用方必须改名。
    */
   extensionReserved: 'EXTENSION_RESERVED',
 
   /**
-   * 两个插件为同一个 shared key 注册值。
-   *
-   * Shared key 是 Host 内的唯一命名空间，先注册者持有所有权；后来者必须改键名。
-   */
-  sharedDuplicate: 'SHARED_DUPLICATE',
-
-  /**
-   * A shared prerequisite exists but its owner is temporarily disabled under R1 BZ26. The caller
-   * may enable that owner and retry the same lookup.
+   * A Feature prerequisite exists but its owner is temporarily disabled. The caller may enable that
+   * owner and retry the same lookup.
    */
   prerequisiteDisabled: 'PREREQUISITE_DISABLED',
 
   /**
-   * A previously published shared prerequisite lost its owner through removal under R1 BZ26. The
-   * caller must install a provider again; retrying the unchanged lookup cannot recover it.
+   * A previously published Feature prerequisite lost its owner through removal. The caller must
+   * install a provider again; retrying the unchanged lookup cannot recover it.
    */
   prerequisiteRemoved: 'PREREQUISITE_REMOVED',
 
@@ -204,7 +251,7 @@ export const PluginHostErrorCode = {
   mutationExecutionTimeout: 'MUTATION_EXECUTION_TIMEOUT',
 
   /** A previously published view was logically revoked by removal or disposal. */
-  viewRevoked: 'VIEW_REVOKED',
+  registrationRevoked: 'REGISTRATION_REVOKED',
 
   /** Plugin install returned an own `then` key, which is never a publishable extension result. */
   installResultThenable: 'INSTALL_RESULT_THENABLE',

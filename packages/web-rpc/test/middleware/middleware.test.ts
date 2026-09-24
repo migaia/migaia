@@ -12,7 +12,7 @@ import {
 import type { IWebRpcPluginInstallResult } from '../../src/typing'
 import { installPlugin, pluginScope } from './helpers'
 import { WebRpcErrorCode } from '../../src/errors'
-import { WebRpcSharedKey } from '../../src/internal/plugin-shared-keys'
+import { WebRpcPortName } from '../../src/internal/plugin-shared-keys'
 
 describe('middleware capabilities', () => {
   it('installs concrete capability values for every built-in middleware', async () => {
@@ -40,8 +40,8 @@ describe('middleware capabilities', () => {
     const contractResult = contract({ version: '1' }).install(
       pluginScope()
     ) as IWebRpcPluginInstallResult
-    expect(protocolResult.shared[WebRpcSharedKey.protocol]).toBeDefined()
-    expect(contractResult.shared[WebRpcSharedKey.contract]).toBeDefined()
+    expect(protocolResult.ports[WebRpcPortName.protocol]).toBeDefined()
+    expect(contractResult.ports[WebRpcPortName.contract]).toBeDefined()
   })
 
   it('rejects invalid middleware configuration during installation', async () => {

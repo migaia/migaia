@@ -20,28 +20,28 @@ import type { IRpcEnvelope } from '@migaia/rpc-contract'
 /** Typed outbound owner port consumed by dependent feature descriptors. */
 export type IWebRpcOutboundAttachmentPort = IOutboundAttachmentHost
 
-/** Package-owned symbols prevent cross-endpoint and cross-package shared-port collisions. */
-export const WebRpcSharedKey = Object.freeze({
-  protocol: Symbol('web-rpc.shared.protocol'),
-  authentication: Symbol('web-rpc.shared.authentication'),
-  contract: Symbol('web-rpc.shared.contract'),
-  connect: Symbol('web-rpc.shared.connect'),
-  abort: Symbol('web-rpc.shared.abort-enable'),
-  hooks: Symbol('web-rpc.shared.hooks'),
-  timeout: Symbol('web-rpc.shared.timeout'),
-  uuid: Symbol('web-rpc.shared.uuid'),
-  ping: Symbol('web-rpc.shared.ping-enable'),
-  inboundIdentity: Symbol('web-rpc.shared.inbound-identity'),
-  variationCoordinator: Symbol('web-rpc.shared.variation-coordinator'),
-  outboundOperations: Symbol('web-rpc.shared.outbound-operations'),
-  discoveryResolver: Symbol('web-rpc.shared.discovery-resolver'),
-  candidatePing: Symbol('web-rpc.shared.candidate-ping'),
-  providerCancellation: Symbol('web-rpc.shared.provider-cancellation'),
-  time: Symbol('web-rpc.shared.time'),
-  outboundAttachment: Symbol('web-rpc.shared.outbound-attachment')
+/** Stable Feature names for the seventeen package-owned middleware ports. */
+export const WebRpcPortName = Object.freeze({
+  protocol: 'protocol',
+  authentication: 'authentication',
+  contract: 'contract',
+  connect: 'connect',
+  abort: 'abort',
+  hooks: 'hooks',
+  timeout: 'timeout',
+  uuid: 'uuid',
+  ping: 'ping',
+  inboundIdentity: 'inboundIdentity',
+  variationCoordinator: 'variationCoordinator',
+  outboundOperations: 'outboundOperations',
+  discoveryResolver: 'discoveryResolver',
+  candidatePing: 'candidatePing',
+  providerCancellation: 'providerCancellation',
+  time: 'time',
+  outboundAttachment: 'outboundAttachment'
 } as const)
 
-export type IWebRpcSharedKey = (typeof WebRpcSharedKey)[keyof typeof WebRpcSharedKey]
+export type IWebRpcPortName = (typeof WebRpcPortName)[keyof typeof WebRpcPortName]
 
 /** Stable protocol commands shared by protocol providers and frame consumers. */
 export type IWebRpcProtocolPort = IWebRpcProtocolCapability
@@ -198,22 +198,22 @@ export type IWebRpcTimePort = {
 }
 
 /** Typed slot map used by PluginHost shared providers and consumers. */
-export type IWebRpcSharedValues = {
-  readonly [WebRpcSharedKey.protocol]?: IWebRpcProtocolPort
-  readonly [WebRpcSharedKey.authentication]?: IWebRpcAuthenticationPort
-  readonly [WebRpcSharedKey.contract]?: IWebRpcContractPort
-  readonly [WebRpcSharedKey.connect]?: IWebRpcConnectPort
-  readonly [WebRpcSharedKey.abort]?: IWebRpcAbortEnablePort
-  readonly [WebRpcSharedKey.ping]?: IWebRpcPingEnablePort
-  readonly [WebRpcSharedKey.hooks]?: IWebRpcHooksPort
-  readonly [WebRpcSharedKey.timeout]?: IWebRpcTimeoutPort
-  readonly [WebRpcSharedKey.uuid]?: IWebRpcUuidPort
-  readonly [WebRpcSharedKey.inboundIdentity]?: IWebRpcInboundIdentityPort
-  readonly [WebRpcSharedKey.variationCoordinator]?: IWebRpcVariationCoordinatorPort
-  readonly [WebRpcSharedKey.outboundOperations]?: IWebRpcOutboundOperationsPort
-  readonly [WebRpcSharedKey.discoveryResolver]?: IWebRpcDiscoveryResolverPort
-  readonly [WebRpcSharedKey.candidatePing]?: IWebRpcCandidatePingPort
-  readonly [WebRpcSharedKey.providerCancellation]?: IWebRpcProviderCancellationPort
-  readonly [WebRpcSharedKey.time]?: IWebRpcTimePort
-  readonly [WebRpcSharedKey.outboundAttachment]?: IOutboundAttachmentHost
+export type IWebRpcPortValues = {
+  readonly [WebRpcPortName.protocol]?: IWebRpcProtocolPort
+  readonly [WebRpcPortName.authentication]?: IWebRpcAuthenticationPort
+  readonly [WebRpcPortName.contract]?: IWebRpcContractPort
+  readonly [WebRpcPortName.connect]?: IWebRpcConnectPort
+  readonly [WebRpcPortName.abort]?: IWebRpcAbortEnablePort
+  readonly [WebRpcPortName.ping]?: IWebRpcPingEnablePort
+  readonly [WebRpcPortName.hooks]?: IWebRpcHooksPort
+  readonly [WebRpcPortName.timeout]?: IWebRpcTimeoutPort
+  readonly [WebRpcPortName.uuid]?: IWebRpcUuidPort
+  readonly [WebRpcPortName.inboundIdentity]?: IWebRpcInboundIdentityPort
+  readonly [WebRpcPortName.variationCoordinator]?: IWebRpcVariationCoordinatorPort
+  readonly [WebRpcPortName.outboundOperations]?: IWebRpcOutboundOperationsPort
+  readonly [WebRpcPortName.discoveryResolver]?: IWebRpcDiscoveryResolverPort
+  readonly [WebRpcPortName.candidatePing]?: IWebRpcCandidatePingPort
+  readonly [WebRpcPortName.providerCancellation]?: IWebRpcProviderCancellationPort
+  readonly [WebRpcPortName.time]?: IWebRpcTimePort
+  readonly [WebRpcPortName.outboundAttachment]?: IOutboundAttachmentHost
 }

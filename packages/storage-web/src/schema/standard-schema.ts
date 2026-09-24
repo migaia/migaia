@@ -1,4 +1,5 @@
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { StorageErrorText } from '../error-text.js'
 import type { ISchemaAdapter } from './types.js'
 
 /**
@@ -89,10 +90,16 @@ export const fromStandardSchema = <T>(
         try {
           for (const issue of issues) {
             if (typeof issue !== 'object' || issue === null || Array.isArray(issue))
-              throw new TypeError('Standard Schema returned invalid issues')
+              throw createStorageTypeError(
+                StorageErrorCode.validationFailed,
+                StorageErrorText.standardSchemaIssuesInvalid
+              )
             const message = (issue as { readonly message?: unknown }).message
             if (typeof message !== 'string')
-              throw new TypeError('Standard Schema returned invalid issues')
+              throw createStorageTypeError(
+                StorageErrorCode.validationFailed,
+                StorageErrorText.standardSchemaIssuesInvalid
+              )
             messages.push(message)
           }
         } catch (cause) {

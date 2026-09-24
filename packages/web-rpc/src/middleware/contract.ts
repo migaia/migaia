@@ -10,7 +10,7 @@ import type {
 } from '../typing.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import { createSafeRecord, safeRead } from '../internal/safe-value.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 
 const contractClaims = {
   routes: [],
@@ -111,7 +111,7 @@ function createContractCapability(config: IWebRpcContractConfig): IWebRpcContrac
 
 const contractMetadata: IWebRpcPluginMetadata = Object.freeze({
   claims: contractClaims,
-  sharedProvides: Object.freeze([WebRpcSharedKey.contract])
+  sharedProvides: Object.freeze([WebRpcPortName.contract])
 })
 
 /** Creates the admitted contract plugin and publishes only its typed shared capability. */
@@ -123,7 +123,7 @@ export const contract = (config: IWebRpcContractConfig = {}): IWebRpcPlugin =>
       const capability = createContractCapability(config)
       return {
         extension: Object.freeze({}),
-        shared: Object.freeze({ [WebRpcSharedKey.contract]: capability })
+        ports: Object.freeze({ [WebRpcPortName.contract]: capability })
       }
     }
   })

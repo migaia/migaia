@@ -3,7 +3,7 @@ import type {
   IWebRpcPluginInstallResult,
   IWebRpcPluginInstallScope
 } from '../../src/typing.js'
-import { WebRpcSharedKey } from '../../src/internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../../src/internal/plugin-shared-keys.js'
 
 /** Builds the host-neutral install scope used by direct native-plugin unit tests. */
 export function pluginScope(
@@ -18,7 +18,7 @@ export function pluginScope(
     transport,
     signal: { aborted: false, addEventListener() {}, removeEventListener() {} },
     hooks: () => undefined,
-    getShared: () => undefined,
+    getPort: () => undefined,
     own: <T>(resource: T): T => resource
   }
 }
@@ -31,17 +31,17 @@ export function installPlugin(
   const result = plugin.install(pluginScope(transport))
   if (result instanceof Promise) throw new Error('test plugin must install synchronously')
   const values = new Map<string, unknown>()
-  const shared = (result as IWebRpcPluginInstallResult).shared
+  const shared = (result as IWebRpcPluginInstallResult).ports
   const names = new Map<PropertyKey, string>([
-    [WebRpcSharedKey.protocol, 'protocolCapability'],
-    [WebRpcSharedKey.contract, 'contractCapability'],
-    [WebRpcSharedKey.authentication, 'authenticationCapability'],
-    [WebRpcSharedKey.connect, 'connectCapability'],
-    [WebRpcSharedKey.timeout, 'timeoutCapability'],
-    [WebRpcSharedKey.abort, 'abortCapability'],
-    [WebRpcSharedKey.hooks, 'hooks'],
-    [WebRpcSharedKey.ping, 'pingCapability'],
-    [WebRpcSharedKey.uuid, 'uuid']
+    [WebRpcPortName.protocol, 'protocolCapability'],
+    [WebRpcPortName.contract, 'contractCapability'],
+    [WebRpcPortName.authentication, 'authenticationCapability'],
+    [WebRpcPortName.connect, 'connectCapability'],
+    [WebRpcPortName.timeout, 'timeoutCapability'],
+    [WebRpcPortName.abort, 'abortCapability'],
+    [WebRpcPortName.hooks, 'hooks'],
+    [WebRpcPortName.ping, 'pingCapability'],
+    [WebRpcPortName.uuid, 'uuid']
   ])
   for (const key of Reflect.ownKeys(shared)) {
     const name = names.get(key)

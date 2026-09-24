@@ -1,13 +1,11 @@
 import type {
   IExtractPluginConfig,
   IExtractPluginExt,
-  IExtractPluginShared,
   IPluginConstraint,
   IPluginHostConfigFor,
   IPluginHostDisposalResult,
   IPluginHostInstalledPlugins,
   IMergePluginExts,
-  IMergePluginShared,
   PluginHost
 } from '@migaia/plugin-host'
 import { asyncDisposeKey } from '@migaia/plugin-host'
@@ -269,7 +267,6 @@ export type ITrayHost<
     IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>
   >
   readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>
-  getShared(key: PropertyKey): unknown
   pluginState(name: string): string
   on<TKey extends keyof ITrayHostEventMap>(
     type: TKey,
@@ -380,7 +377,5 @@ export type ITrayHostCreationError = Error &
 
 export type IExtractTrayPluginConfig<T> = IExtractPluginConfig<T>
 export type IExtractTrayPluginExt<T> = IExtractPluginExt<T>
-export type IExtractTrayPluginShared<T> = IExtractPluginShared<T>
 export type IMergeTrayPluginExts<T extends readonly unknown[]> = IMergePluginExts<T>
-export type IMergeTrayPluginShared<T extends readonly unknown[]> = IMergePluginShared<T>
 export type IPluginHostDisposal = IPluginHostDisposalResult

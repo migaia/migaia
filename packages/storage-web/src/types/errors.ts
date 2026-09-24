@@ -23,6 +23,57 @@ export type IStorageTypeError = TypeError & {
   readonly code: IStorageErrorCode
 }
 
+/** Native generic error enriched with this package's stable boundary identity. */
+export type IStorageNativeError = Error & {
+  readonly source: string
+  readonly code: IStorageErrorCode
+}
+
+/** Native range error enriched with this package's stable boundary identity. */
+export type IStorageRangeError = RangeError & {
+  readonly source: string
+  readonly code: IStorageErrorCode
+}
+
+/** Attach the public package identity without replacing the supplied native error instance. */
+const attachStorageErrorIdentity = <T extends Error>(
+  error: T,
+  code: IStorageErrorCode
+): T & { readonly source: string; readonly code: IStorageErrorCode } => {
+  Object.defineProperty(error, 'source', {
+    configurable: false,
+    enumerable: false,
+    value: STORAGE_WEB_SOURCE,
+    writable: false
+  })
+  Object.defineProperty(error, 'code', {
+    configurable: false,
+    enumerable: false,
+    value: code,
+    writable: false
+  })
+  return error as T & { readonly source: string; readonly code: IStorageErrorCode }
+}
+
+/** Create a coded native Error for internal failures that may cross the package boundary. */
+export const createStorageError = (
+  code: IStorageErrorCode,
+  message: string,
+  cause?: unknown
+): IStorageNativeError =>
+  attachStorageErrorIdentity(new Error(message, cause === undefined ? undefined : { cause }), code)
+
+/** Create a coded native RangeError while preserving its runtime prototype. */
+export const createStorageRangeError = (
+  code: IStorageErrorCode,
+  message: string,
+  cause?: unknown
+): IStorageRangeError =>
+  attachStorageErrorIdentity(
+    new RangeError(message, cause === undefined ? undefined : { cause }),
+    code
+  )
+
 /** Native aggregate carrying storage-web identity while preserving every cleanup failure object. */
 export type IStorageAggregateError = AggregateError & {
   readonly source: string
@@ -66,23 +117,10 @@ export const createStorageTypeError = (
   message: string,
   cause?: unknown
 ): IStorageTypeError => {
-  const error = new TypeError(
-    message,
-    cause === undefined ? undefined : { cause }
-  ) as IStorageTypeError
-  Object.defineProperty(error, 'source', {
-    configurable: false,
-    enumerable: false,
-    value: STORAGE_WEB_SOURCE,
-    writable: false
-  })
-  Object.defineProperty(error, 'code', {
-    configurable: false,
-    enumerable: false,
-    value: code,
-    writable: false
-  })
-  return error
+  return attachStorageErrorIdentity(
+    new TypeError(message, cause === undefined ? undefined : { cause }),
+    code
+  )
 }
 
 export type IStorageChannel = 'value' | 'bytes' | 'record'

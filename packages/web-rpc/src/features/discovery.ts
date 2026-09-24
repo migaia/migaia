@@ -1,7 +1,7 @@
 import { WebRpcDiscoveryAttachment } from '../internal/discovery-attachment.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import type { IWebRpcEndpoint } from '../typing.js'
 import type { IWebRpcFeature } from '../feature.js'
 import type {
@@ -109,19 +109,19 @@ export const createDiscoveryFeature = (
           })
           return preparedInstallation
         }
-        const shared = (): Readonly<Record<PropertyKey, unknown>> => {
+        const ports = (): Readonly<Record<PropertyKey, unknown>> => {
           if (!installation)
             throw new WebRpcError(
               WebRpcErrorCode.invalidConfig,
               WebRpcErrorText.endpointModuleDependencyMissing
             )
           return Object.freeze({
-            [WebRpcSharedKey.discoveryResolver]: Object.freeze({
+            [WebRpcPortName.discoveryResolver]: Object.freeze({
               resolve: (id: string) => attachment!.resolveReceiver(id)
             })
           })
         }
-        return Object.freeze({ prepare, shared })
+        return Object.freeze({ prepare, ports })
       },
       { outbound: outboundCapability }
     )

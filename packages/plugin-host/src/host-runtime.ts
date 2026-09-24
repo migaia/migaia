@@ -51,6 +51,8 @@ export {
 import { adaptSyncStageForMode } from './pipeline.js'
 import { executePluginHostPipeline } from './pipeline-runtime.js'
 import { PluginHostRemovalRuntime } from './removal-runtime.js'
+import { PluginHostReplaceRuntime } from './replace-runtime.js'
+import { bindTerminalSink, reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostOperationRuntime } from './operation-runtime.js'
 import type { IMiddlewarePipelineAbortSignal } from '@migaia/middleware-pipeline'
 import { PluginHostCoreRuntime } from './core-runtime.js'
@@ -62,6 +64,15 @@ import {
   createPluginHostEnablementFacade
 } from './enablement-runtime.js'
 import { createPluginHostPublication } from './publication.js'
+import { createPluginHandle } from './plugin-handle.js'
+import {
+  collectLazyActivationOrder,
+  orderPluginInstallBatch,
+  planPluginDependencyMutation,
+  PluginInactiveProviderPolicy,
+  readPluginBlockers,
+  resolveBatchInstallSet
+} from './dependency-runtime.js'
 import { PluginHostPipelineMode, PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IRegistration } from './registry.js'
 import type {
@@ -72,12 +83,15 @@ import type {
   IPluginConstraintTuple,
   IPluginHostCore,
   IPluginHostConfigFor,
-  IPluginHostErrorCode,
-  IPluginHostView,
-  IPluginHostDynamicView,
+  IPluginHostDiagnostic,
+  IPluginHandle,
+  IPluginHandleTuple,
+  IUniquePluginNames,
+  IPluginDependencyMutationOptions,
+  IPluginDependencyPlan,
+  IPluginRemoval,
+  IPluginHostCompositionSnapshot,
   IPluginHostCompositionIntegration,
-  IPluginRemovalResult,
-  IMergePluginShared,
   IPluginHostOptions,
   IPluginEnablement,
   IPipelineMode,
@@ -130,7 +144,7 @@ const DEFAULT_QUEUE_ADMISSION_DIAGNOSTIC_MS = 1000
  */
 const DEFAULT_DISPOSE_STEP_TIMEOUT_MS = 5000
 /** Runtime-neutral plugin host. All external mutation enters one Promise queue. */
-export abstract class PluginHost<
+export class PluginHost<
   TDomainCore extends object,
   TValue = never,
   TInstalled extends readonly IPluginConstraint<any>[] = readonly []
@@ -154,6 +168,8 @@ export abstract class PluginHost<
   #cleanupRuntime: PluginHostCleanupRuntime
   #installRuntime: PluginHostInstallRuntime<TDomainCore, TValue>
   #removalRuntime: PluginHostRemovalRuntime<TDomainCore, TValue>
+  /** Owns hot replacement orchestration over the install and removal runtimes. */
+  #replaceRuntime: PluginHostReplaceRuntime<TDomainCore, TValue>
   #coreRuntime: PluginHostCoreRuntime<TDomainCore, TValue>
   #pipelineDrainTimeoutMs: number | false
   /** Records disposer steps detached by a bounded timeout until the current host disposal settles. */
@@ -168,7 +184,7 @@ export abstract class PluginHost<
   #state = new PluginHostState<TDomainCore, TValue>()
   #hookRegistration: IRegistration<TDomainCore, TValue> | undefined
   #pipelineMode: IPipelineMode
-  #diagnostic: (message: string, code?: IPluginHostErrorCode) => void
+  #diagnostic: IPluginHostDiagnostic
   /** Real lifecycle signal shared by active pipeline stages and disposal cancellation. */
   #liveSignal: IMiddlewarePipelineAbortSignal = this.#executionController
     .signal as unknown as IMiddlewarePipelineAbortSignal
@@ -184,6 +200,8 @@ export abstract class PluginHost<
   #activeInstallBatch: IInstallBatchContext<TDomainCore, TValue> | undefined
   /** Functional-entry reader for trusted definitions; absent in the structural entry. */
   #trustedDefinitionReader: ITrustedDefinitionReader | undefined
+  /** Shared activation Promises keyed by lazy registration name. */
+  #activationRequests = new Map<string, Promise<IPluginHandle<IPluginConstraint<any>>>>()
 
   constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader) {
     this.#trustedDefinitionReader = trustedDefinitionReader
@@ -199,10 +217,19 @@ export abstract class PluginHost<
     this.identity = issueHostIdentity(this, options.identity?.name)
     this.#pipelineMode = options.pipeline?.mode ?? PluginHostPipelineMode.sync
     if (options.diagnostic !== undefined && typeof options.diagnostic !== 'function')
-      throw createPluginHostTypeError('diagnostic must be a function')
+      throw createPluginHostTypeError(ERROR_TEXT.DIAGNOSTIC_OPTION)
+    const onDiagnosticFailure = options.onDiagnosticFailure
+    if (onDiagnosticFailure !== undefined && typeof onDiagnosticFailure !== 'function')
+      throw createPluginHostTypeError(ERROR_TEXT.DIAGNOSTIC_FAILURE_OPTION)
     const diagnostic = options.diagnostic ?? defaultDiagnostic
-    this.#diagnostic = (message, code) =>
-      diagnostic(formatPluginHostDiagnostic(this, message), code)
+    this.#diagnostic = (message, code, error) =>
+      error === undefined
+        ? diagnostic(formatPluginHostDiagnostic(this, message), code)
+        : diagnostic(formatPluginHostDiagnostic(this, message), code, error)
+    if (onDiagnosticFailure) {
+      bindTerminalSink(this.#diagnostic, onDiagnosticFailure)
+      bindTerminalSink(this.#pipelineDiagnostic, onDiagnosticFailure)
+    }
     this.#enablementRuntime = new PluginHostEnablementRuntime({
       state: this.#state,
       diagnostic: this.#diagnostic
@@ -212,8 +239,7 @@ export abstract class PluginHost<
       {
         assertActive: () => this.#assertActive(),
         assertMutationAllowed: () => this.#assertMutationAllowed(),
-        enqueue: (task) => this.#enqueue(task),
-        createView: () => this.#createView() as IPluginHostDynamicView<this, TDomainCore, TValue>
+        enqueue: (task) => this.#enqueue(task)
       }
     )
     if (
@@ -266,7 +292,7 @@ export abstract class PluginHost<
       scheduler: this.#scheduler,
       timeoutMs: mutationTimeoutMs,
       isHostOpen: () => this.#terminal.lifecycle === 'open',
-      diagnostic: (message) => this.#diagnostic(message)
+      diagnostic: this.#diagnostic
     })
     this.#cleanupRuntime = new PluginHostCleanupRuntime({
       scheduler: this.#scheduler,
@@ -289,8 +315,9 @@ export abstract class PluginHost<
     })
     this.#installRuntime = new PluginHostInstallRuntime({
       scheduler: this.#scheduler,
+      committedRegistrations: this.#state.registrations,
       snapshotBatch: () => ({
-        shared: new Map(this.#state.shared),
+        registrations: new Map(this.#state.registrations),
         extensionOwners: new Map(this.#state.extensionOwners),
         ...this.#state.lanes.copy(),
         committed: false
@@ -312,18 +339,17 @@ export abstract class PluginHost<
         this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity),
       closeRegistrationSync: (registration, rollbackErrors) =>
         this.#closeRegistrationSync(registration, rollbackErrors),
+      removedNames: this.#state.removedNames,
       diagnostic: this.#diagnostic,
       decorateError: (error) => attachPluginHostIdentity(error, this)
     })
     this.#removalRuntime = new PluginHostRemovalRuntime({
       registrations: this.#state.registrations,
-      shared: this.#state.shared,
-      retiredShared: this.#state.retiredShared,
       extensionOwners: this.#state.extensionOwners,
       pipelineLeases: this.#pipelineLeases,
       pipelineOwnerKeys: this.#state.lanes.pipelineOwnerKeys,
       stageSlots: this.#state.stageSlots,
-      removePipelineOwner: (name) => this.#state.lanes.removeOwner(name),
+      removePipelineOwner: (registration) => this.#state.lanes.removeOwner(registration),
       host: this,
       executionSignal: this.#executionController.signal,
       cleanupRuntime: this.#cleanupRuntime,
@@ -331,13 +357,34 @@ export abstract class PluginHost<
         this.#hookRegistration = registration
       }
     })
+    this.#replaceRuntime = new PluginHostReplaceRuntime({
+      registrations: this.#state.registrations,
+      installBatch: (entries, publish, prepareBatch) =>
+        this.#installRuntime.installBatch(entries, publish, prepareBatch),
+      publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
+      drainLeases: (registration) => this.#drainRegistrationLeases(registration),
+      disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
+      activate: (registration) => this.#installRuntime.activate(registration),
+      disable: (registration) => {
+        this.#enablementRuntime.disable(registration)
+      },
+      markRemoved: (name) => {
+        this.#state.removedNames.add(name)
+      },
+      forget: (name) => this.#enablementRuntime.forget(name),
+      settle: () => {
+        this.#state.lanes.rebuild(this.#state.enabledRegistrations(), this.#state.stageSlots)
+        this.#state.commit()
+      },
+      diagnostic: this.#diagnostic,
+      decorateError: (error) => attachPluginHostIdentity(error, this)
+    })
     this.#coreRuntime = new PluginHostCoreRuntime({
       createDomainCore: (request) => this.createPluginDomainCore(request),
       assertRegistrationValid: (registration) =>
         this.#state.assertRegistrationValid(registration, (current) =>
           this.#operationRuntime.assertCurrent(current)
         ),
-      committedShared: this.#state.shared,
       executionSignal: this.#executionController.signal,
       pipelineMode: () => this.#pipelineMode,
       onPipelineViolation: this.#onPipelineViolation,
@@ -370,7 +417,25 @@ export abstract class PluginHost<
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
       enqueueTerminal: (task) => this.#enqueue(task, true),
-      registrationsInReverse: () => [...this.#state.registrations.values()].reverse(),
+      // Dependents are disposed before the providers they captured, independent of install order.
+      registrationsInReverse: () => {
+        try {
+          return planPluginDependencyMutation(
+            [...this.#state.registrations.keys()],
+            this.#state.registrations
+          ).order.map((name) => this.#state.registrations.get(name)!)
+        } catch (error) {
+          // Terminal disposal must always proceed; admission keeps the graph acyclic, so this
+          // fallback (reverse install order) only guards an invariant breach, which is reported.
+          reportDiagnostic(
+            this.#diagnostic,
+            ERROR_TEXT.DEPENDENCY_CYCLE,
+            PluginHostErrorCode.dependencyCycle,
+            error
+          )
+          return [...this.#state.registrations.values()].reverse()
+        }
+      },
       disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
       clearPipelineState: () => {
         this.#state.lanes.clear()
@@ -412,6 +477,9 @@ export abstract class PluginHost<
       disposeRegistrationStrict: (registration) =>
         this.#removalRuntime.disposeRegistrationStrict(registration),
       createView: () => this.#createView(),
+      markRemoved: (name) => {
+        this.#state.removedNames.add(name)
+      },
       diagnostic: this.#diagnostic
     })
     this.#pipelineDrainTimeoutMs = pipelineDrainTimeoutMs
@@ -435,7 +503,10 @@ export abstract class PluginHost<
       buildManagedPort(
         this.#compositionRuntime as unknown as IPluginHostCompositionIntegration<object>,
         () => this.revision,
-        () => this.getCurrentView()
+        () => {
+          this.#assertActive()
+          return this.#createView()
+        }
       )
     )
   }
@@ -448,12 +519,6 @@ export abstract class PluginHost<
   /** Current committed Host mutation receipt; it changes only at publication boundaries. */
   get revision(): number {
     return this.#state.revision
-  }
-
-  /** Returns a fresh dynamic view over the currently committed registrations. */
-  getCurrentView(): IPluginHostDynamicView<this, TDomainCore, TValue> {
-    this.#assertActive()
-    return this.#createView() as IPluginHostDynamicView<this>
   }
 
   #assertActive(): void {
@@ -522,9 +587,15 @@ export abstract class PluginHost<
   }
 
   /** Preserves this host's identity and diagnostic sink for pipeline contract failures. */
-  #onPipelineViolation = createPluginHostPipelineViolationHandler(this, (message, code) =>
-    this.#diagnostic(message, code)
-  )
+  /**
+   * Late-bound diagnostic used by the pipeline violation handler, which is created during field
+   * initialization before `#diagnostic` exists; bound to the same terminal sink in the
+   * constructor.
+   */
+  #pipelineDiagnostic: IPluginHostDiagnostic = (message, code, error) =>
+    this.#diagnostic(message, code, error)
+
+  #onPipelineViolation = createPluginHostPipelineViolationHandler(this, this.#pipelineDiagnostic)
 
   #registerStage(
     stage: Function,
@@ -605,22 +676,11 @@ export abstract class PluginHost<
     return this
   }
 
-  getShared<T = unknown>(key: PropertyKey): T | undefined {
-    this.#assertActive()
-    try {
-      return this.#state.getShared<T>(key)
-    } catch (error) {
-      this.#rethrowWithIdentity(error)
-    }
-  }
-
   use<const TPlugins extends readonly IPluginConstraint<any>[]>(
     ...plugins: TPlugins &
-      IPluginConstraintTuple<
-        TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>,
-        TPlugins
-      >
-  ): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins], TDomainCore, TValue>> {
+      IUniquePluginNames<TPlugins> &
+      IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins>
+  ): Promise<IPluginHandleTuple<TPlugins>> {
     this.#assertActive()
     this.#assertMutationAllowed()
     const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
@@ -631,15 +691,99 @@ export abstract class PluginHost<
       const entries = preflightPluginDefinitions(definitions, (name) =>
         this.#state.registrations.has(name)
       )
+      // Validate every prerequisite before activating anything, so a rejected batch has no
+      // activation side effect; then activate only the committed lazy providers that members
+      // installing now actually require (lazy members stay lazy).
+      const ordered = this.#validateBatch(entries, PluginInactiveProviderPolicy.admit)
+      const installSet = resolveBatchInstallSet(ordered)
+      const activation = collectLazyActivationOrder(
+        ordered.filter((entry) => installSet.has(entry.name)).map((entry) => entry.plugin),
+        this.#state.registrations
+      )
+      // Only await when something activates: install must otherwise start in this same turn so
+      // the lifecycle-mutation guard observes the running hook synchronously.
+      if (activation.length > 0) await this.#activateInOrder(activation)
       await this.#installRuntime.installBatch(entries)
-      return this.#createView<[...TInstalled, ...TPlugins]>()
+      return Object.freeze(
+        entries.map((entry) => this.#createHandle(entry.name))
+      ) as IPluginHandleTuple<TPlugins>
+    })
+  }
+
+  /** Explicitly activates one lazy plugin; concurrent callers receive one Promise identity. */
+  activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>> {
+    this.#assertActive()
+    const current = this.#activationRequests.get(name)
+    if (current) return current
+    this.#assertMutationAllowed()
+    const activation = this.#enqueue(async () => {
+      const registration = this.#state.registrations.get(name)
+      if (!registration)
+        throw new PluginHostError(
+          PluginHostErrorCode.pluginNotInstalled,
+          ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
+        )
+      if (!registration.enabled)
+        throw new PluginHostError(
+          PluginHostErrorCode.pluginDisabled,
+          ERROR_TEXT.PLUGIN_DISABLED(name)
+        )
+      if (!registration.activated) {
+        // Validate first so a rejected activation leaves every lazy provider untouched; then
+        // activate the lazy provider chain providers-first before this registration.
+        this.#validateBatch(
+          [{ name, plugin: registration.plugin }],
+          PluginInactiveProviderPolicy.admit,
+          name
+        )
+        await this.#activateInOrder(
+          collectLazyActivationOrder([registration.plugin], this.#state.registrations)
+        )
+        await this.#installRuntime.activate(registration)
+      }
+      return this.#createHandle(name)
+    }).finally(() => {
+      this.#activationRequests.delete(name)
+    })
+    this.#activationRequests.set(name, activation)
+    return activation
+  }
+
+  /** Atomically installs a replacement before revoking the previous registration generation. */
+  replace<TPlugin extends IPluginConstraint<any>>(
+    name: string,
+    next: TPlugin
+  ): Promise<IPluginHandle<TPlugin>> {
+    this.#assertActive()
+    this.#assertMutationAllowed()
+    const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
+      [next],
+      this.#trustedDefinitionReader
+    )
+    const definition = definitions[0]!
+    if (definition.name !== name)
+      return Promise.reject(
+        new PluginHostError(
+          PluginHostErrorCode.replaceNameMismatch,
+          ERROR_TEXT.REPLACE_NAME_MISMATCH(name, definition.name)
+        )
+      )
+    return this.#enqueue(async () => {
+      const previous = this.#state.registrations.get(name)
+      if (!previous)
+        throw new PluginHostError(
+          PluginHostErrorCode.pluginNotInstalled,
+          ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
+        )
+      await this.#replaceRuntime.replace(previous, definition)
+      return this.#createHandle<TPlugin>(name)
     })
   }
 
   /** Installs constructor-time plugins synchronously or throws before the host escapes. */
   protected useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(
     plugins: readonly IPluginConstraint<any>[]
-  ): IPluginHostView<this, TViewPlugins, TDomainCore, TValue> {
+  ): IPluginHandleTuple<TViewPlugins> {
     try {
       this.#assertActive()
       this.#assertMutationAllowed()
@@ -651,10 +795,62 @@ export abstract class PluginHost<
         this.#state.registrations.has(name)
       )
       this.#installRuntime.installBatchSync(entries)
-      return this.#createView<TViewPlugins>()
+      return Object.freeze(
+        entries.map((entry) => this.#createHandle(entry.name))
+      ) as IPluginHandleTuple<TViewPlugins>
     } catch (error) {
       this.#rethrowWithIdentity(error)
     }
+  }
+
+  /**
+   * Validates one batch's dependency prerequisites against committed state without side effects.
+   * `self` excludes an already-committed registration that is being activated in place.
+   */
+  #validateBatch(
+    entries: readonly import('./registry.js').IInstallEntry<TDomainCore, TValue>[],
+    inactive: PluginInactiveProviderPolicy,
+    self?: string
+  ): readonly import('./registry.js').IInstallEntry<TDomainCore, TValue>[] {
+    const committed =
+      self === undefined
+        ? this.#state.registrations
+        : new Map([...this.#state.registrations].filter(([name]) => name !== self))
+    try {
+      return orderPluginInstallBatch(entries, committed, this.#state.removedNames, inactive)
+    } catch (error) {
+      this.#rethrowWithIdentity(error)
+    }
+  }
+
+  /** Activates committed lazy registrations in the given provider-first order. */
+  async #activateInOrder(
+    registrations: readonly IRegistration<TDomainCore, TValue>[]
+  ): Promise<void> {
+    for (const registration of registrations)
+      if (!registration.activated) await this.#installRuntime.activate(registration)
+  }
+
+  /** Seals one registration's pipeline owner and waits for its active leases to drain. */
+  async #drainRegistrationLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void> {
+    this.#pipelineLeases.seal(registration.pipelineOwnerKey)
+    await drainPipelineLeases({
+      leases: this.#pipelineLeases,
+      key: registration.pipelineOwnerKey,
+      drainTimeoutMs: this.#pipelineDrainTimeoutMs,
+      scheduler: this.#scheduler
+    })
+  }
+
+  /** Creates a live name-addressed handle over the current registration generation. */
+  #createHandle<TPlugin extends IPluginConstraint<any>>(name: string): IPluginHandle<TPlugin> {
+    return createPluginHandle(name, {
+      host: this,
+      assertActive: () => this.#assertActive(),
+      lookup: (pluginName) => this.#state.registrations.get(pluginName),
+      readConfig: (pluginName) => this.config.get(pluginName),
+      updateConfig: (pluginName, recipe) => this.config.update(pluginName, recipe)
+    }) as IPluginHandle<TPlugin>
   }
 
   /** Publishes a fully prepared candidate without invoking user code or allocating state. */
@@ -663,7 +859,8 @@ export abstract class PluginHost<
     batch: IInstallBatchContext<TDomainCore, TValue>
   ): void {
     this.#state.publishInstallBatch(installed, batch)
-    for (const registration of installed) this.#enablementRuntime.notifyInstalled(registration)
+    for (const registration of installed)
+      if (registration.activated) this.#enablementRuntime.notifyInstalled(registration)
   }
 
   /**
@@ -686,26 +883,26 @@ export abstract class PluginHost<
     for (const registration of registrations)
       if (!this.#state.isLive(registration))
         throw attachPluginHostIdentity(
-          new PluginHostError(PluginHostErrorCode.viewRevoked, ERROR_TEXT.VIEW_REVOKED),
+          new PluginHostError(
+            PluginHostErrorCode.registrationRevoked,
+            ERROR_TEXT.REGISTRATION_REVOKED
+          ),
           this
         )
   }
 
   /** Materializes a null-prototype, frozen view over the current committed registrations. */
-  #createView<TViewPlugins extends readonly IPluginConstraint<any>[]>(
+  #createView(
     registrations: readonly IRegistration<TDomainCore, TValue>[] = [
       ...this.#state.registrations.values()
     ]
-  ): IPluginHostView<this, TViewPlugins, TDomainCore, TValue> {
+  ): IPluginHostCompositionSnapshot {
     const enabled = registrations.filter((registration) => registration.enabled)
-    return createPluginHostPublication<this, TDomainCore, TValue, TViewPlugins>(enabled, {
+    return createPluginHostPublication<this, TDomainCore, TValue>(enabled, {
       host: this,
       assertLive: (captured) => this.#assertViewLive(captured),
       readConfig: (path) => this.config.get(path),
-      updateConfig: (name, recipe) => this.config.update(name, recipe),
-      getShared: (key) => this.getShared(key),
-      use: (plugins) => this.use(...plugins),
-      unUse: (name) => this.unUse(name)
+      updateConfig: (name, recipe) => this.config.update(name, recipe)
     })
   }
 
@@ -713,72 +910,48 @@ export abstract class PluginHost<
     return this.#configRuntime.getFacade()
   }
 
-  unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>> {
+  unUse(
+    name: string,
+    options: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
+  ): Promise<IPluginDependencyPlan>
+  unUse(
+    name: string,
+    options?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
+  ): Promise<IPluginRemoval>
+  unUse(
+    name: string,
+    options: IPluginDependencyMutationOptions = {}
+  ): Promise<IPluginRemoval | IPluginDependencyPlan> {
     this.#assertActive()
     this.#assertMutationAllowed()
     return this.#enqueue(async () => {
-      const registration = this.#state.registrations.get(name)
-      if (!registration)
-        return Object.freeze({
-          ok: true,
-          removed: false,
-          view: this.#createView() as IPluginHostDynamicView<this>,
-          cleanupComplete: true,
-          cleanupErrors: Object.freeze([])
-        })
-      this.#pipelineLeases.seal(registration.pipelineOwnerKey)
-      const drain = await drainPipelineLeases({
-        leases: this.#pipelineLeases,
-        key: registration.pipelineOwnerKey,
-        drainTimeoutMs: this.#pipelineDrainTimeoutMs,
-        scheduler: this.#scheduler
-      })
-      const errors = await this.#removalRuntime.disposeRegistration(registration)
-      this.#enablementRuntime.forget(name)
-      this.#state.commit()
-      const view = this.#createView() as IPluginHostDynamicView<this>
-      const cleanupErrors = Object.freeze([...errors])
-      const cleanupComplete = drain.complete && errors.length === 0
-      if (errors.length === 0)
-        return Object.freeze({
-          ok: true,
-          removed: true,
-          view,
-          cleanupComplete,
-          cleanupErrors,
-          ...(drain.physicalCompletion ? { physicalCompletion: drain.physicalCompletion } : {})
-        })
-      const error = registerPluginHostDisposalNode(
-        attachPluginHostIdentity(
-          new PluginHostError(
-            PluginHostErrorCode.pluginDisposeFailed,
-            ERROR_TEXT.PLUGIN_DISPOSE_FAILED(name),
-            {
-              cause: errors[0],
-              detail: { errors: Object.freeze([...errors]) }
-            }
-          ),
-          this
-        ),
-        { kind: PluginHostDisposalNodeKind.hostError, phase: 'plugin disposal' }
-      )
-      try {
-        this.#diagnostic(
-          ERROR_TEXT.PLUGIN_DISPOSE_FAILED(name),
-          PluginHostErrorCode.pluginDisposeFailed
+      if (!this.#state.registrations.has(name))
+        throw new PluginHostError(
+          PluginHostErrorCode.pluginNotInstalled,
+          ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
         )
-      } catch {
-        // Diagnostics never alter the committed removal result.
+      const blockedBy = readPluginBlockers(name, this.#state.registrations)
+      if (blockedBy.length > 0 && !options.cascade)
+        throw new PluginHostError(
+          PluginHostErrorCode.dependencyBlocked,
+          ERROR_TEXT.DEPENDENCY_BLOCKED(name),
+          { detail: { blockedBy } }
+        )
+      const { order, edges } = planPluginDependencyMutation(name, this.#state.registrations)
+      if (options.dryRun) return Object.freeze({ order, edges })
+      const cleanupErrors: unknown[] = []
+      for (const pluginName of order) {
+        const registration = this.#state.registrations.get(pluginName)
+        if (!registration) continue
+        await this.#drainRegistrationLeases(registration)
+        cleanupErrors.push(...(await this.#removalRuntime.disposeRegistration(registration)))
+        this.#enablementRuntime.forget(pluginName)
+        this.#state.removedNames.add(pluginName)
       }
-      return Object.freeze({
-        ok: false,
-        removed: true,
-        view,
-        error,
-        cleanupComplete,
-        cleanupErrors,
-        ...(drain.physicalCompletion ? { physicalCompletion: drain.physicalCompletion } : {})
-      })
+      this.#state.commit()
+      return cleanupErrors.length === 0
+        ? Object.freeze({ ok: true as const })
+        : Object.freeze({ ok: false as const, errors: Object.freeze(cleanupErrors) })
     })
   }
 

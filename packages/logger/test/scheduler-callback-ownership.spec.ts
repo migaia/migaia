@@ -387,15 +387,14 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     const batches: string[][] = []
     const logger: any = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      scheduler,
-      plugins: [batch()]
+      scheduler
     })
-    const batcher = logger.getShared('createBatcher')(
-      { maxSize: 10, maxWaitMs: 5 },
-      (items: string[]) => {
+    const [batchHandle] = await logger.use(batch())
+    const batcher = batchHandle
+      .getFeature('batch')
+      .createBatcher({ maxSize: 10, maxWaitMs: 5 }, (items: string[]) => {
         batches.push(items)
-      }
-    )
+      })
 
     batcher.push('round26-batch')
     await logger.flush()

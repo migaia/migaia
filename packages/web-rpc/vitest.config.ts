@@ -3,6 +3,7 @@ import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 
 export default defineConfig(withDistFreshness({
   test: {
+    include: ['test/**/*.{test,spec}.ts'],
     exclude: [...configDefaults.exclude, 'test/control-plane/**'],
     coverage: {
       provider: 'v8',

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
-import { PluginHost, type IPluginHostCore } from '@migaia/plugin-host'
+import {
+  PluginHost,
+  type IPluginDependencyMutationOptions,
+  type IPluginDependencyPlan,
+  type IPluginHostCore,
+  type IPluginRemoval
+} from '@migaia/plugin-host'
+import { openComposition } from '@migaia/plugin-host/composition'
 import { createHost } from '../src/host/index.js'
 
 class RuntimeHost extends PluginHost<Record<string, never>, string> {}
@@ -149,7 +156,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
     id: 'TPD-T10',
     run: async () => {
       const host = await createHost(hostOptions([plugin('one')]))
-      expect(host.getShared('missing')).toBeUndefined()
+      expect('getShared' in host).toBe(false)
       await host.dispose()
     }
   },
@@ -209,16 +216,20 @@ const runtimeCases: readonly IRuntimeCase[] = [
         /** Records logical removals so the private Tray anchor cleanup is observable. */
         removedNames: string[] = []
 
-        /** Wraps the dynamic view to retain the exact logical removal names. */
-        override getCurrentView() {
-          const view = super.getCurrentView()
-          return {
-            ...view,
-            unUse: async (name: string) => {
-              this.removedNames.push(name)
-              return view.unUse(name)
-            }
-          }
+        /** Records concrete removals while preserving PluginHost's canonical mutation path. */
+        override unUse(
+          name: string,
+          options: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
+        ): Promise<IPluginDependencyPlan>
+        override unUse(
+          name: string,
+          options?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
+        ): Promise<IPluginRemoval>
+        override unUse(name: string, options?: IPluginDependencyMutationOptions) {
+          this.removedNames.push(name)
+          return options?.dryRun === true
+            ? super.unUse(name, { ...options, dryRun: true })
+            : super.unUse(name, { ...options, dryRun: false })
         }
 
         /** Returns a deterministic cleanup failure while preserving physical completion identity. */
@@ -508,7 +519,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
           )
         expect(preDisposeRevision).toBeGreaterThanOrEqual(initialRevision)
         expect(rawHost.disposeCalls).toBeGreaterThan(0)
-        expect(() => rawHost.getCurrentView()).toThrow()
+        expect(() => openComposition(rawHost).getCurrentSnapshot()).toThrow()
         const terminalRevision = rawHost.revision
         await raceHost.dispose()
         expect(rawHost.revision).toBe(terminalRevision)

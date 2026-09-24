@@ -7,18 +7,19 @@ import type {
   IAsyncGeneratorPipelineStage,
   IAsyncPipelineStage,
   IGeneratorPipelineStage,
-  IMergePluginShared,
   IPipelineMode,
   IPluginConstraint,
   IPluginConstraintTuple,
   IPluginHostCore,
+  IPluginHandle,
+  IPluginHandleTuple,
+  IPluginRemoval,
+  IPluginDependencyMutationOptions,
+  IPluginDependencyPlan,
   IPluginHostDisposalResult,
   IPluginHostConfigFor,
-  IPluginHostDynamicView,
   IPluginEnablement,
   IPluginHostOptions,
-  IPluginHostView,
-  IPluginRemovalResult,
   ISyncPipelineStage
 } from './typing.js'
 
@@ -87,38 +88,20 @@ export type IHostHandle<
   readonly revision: number
   readonly config: IPluginHostConfigFor<TInstalled>
   useSync<const TPlugins extends readonly IPluginConstraint<any>[]>(
-    ...plugins: TPlugins &
-      IPluginConstraintTuple<
-        TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>,
-        TPlugins
-      >
-  ): IPluginHostView<
-    IHostHandle<TDomainCore, TValue, [...TInstalled, ...TPlugins]>,
-    [...TInstalled, ...TPlugins],
-    TDomainCore,
-    TValue
-  >
+    ...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins>
+  ): IPluginHandleTuple<TPlugins>
   use<const TPlugins extends readonly IPluginConstraint<any>[]>(
-    ...plugins: TPlugins &
-      IPluginConstraintTuple<
-        TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>,
-        TPlugins
-      >
-  ): Promise<
-    IPluginHostView<
-      IHostHandle<TDomainCore, TValue, [...TInstalled, ...TPlugins]>,
-      [...TInstalled, ...TPlugins],
-      TDomainCore,
-      TValue
-    >
-  >
+    ...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins>
+  ): Promise<IPluginHandleTuple<TPlugins>>
   unUse(
-    name: string
-  ): Promise<
-    IPluginRemovalResult<IPluginHostDynamicView<IHostHandle<TDomainCore, TValue, TInstalled>>>
-  >
-  getShared<T = unknown>(key: PropertyKey): T | undefined
-  getCurrentView(): IPluginHostDynamicView<IHostHandle<TDomainCore, TValue, TInstalled>>
+    name: string,
+    options?: IPluginDependencyMutationOptions
+  ): Promise<IPluginRemoval | IPluginDependencyPlan>
+  activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>>
+  replace<TPlugin extends IPluginConstraint<any>>(
+    name: string,
+    next: TPlugin
+  ): Promise<IPluginHandle<TPlugin>>
   usePipeline(stage: ISyncPipelineStage<TValue>): IHostHandle<TDomainCore, TValue, TInstalled>
   useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): IHostHandle<TDomainCore, TValue, TInstalled>
   useGeneratorPipeline(
@@ -191,9 +174,12 @@ export function defineHost<TDomainCore extends object = Record<string, never>, T
     useSync: (...plugins: readonly IPluginConstraint<any>[]) => runtime.useSyncPublic(plugins),
     use: (...plugins: readonly IPluginConstraint<any>[]) =>
       runtime.use(...(plugins as [IPluginConstraint<any>])),
-    unUse: (name: string) => runtime.unUse(name),
-    getShared: <T = unknown>(key: PropertyKey) => runtime.getShared<T>(key),
-    getCurrentView: () => runtime.getCurrentView(),
+    unUse: (name: string, mutationOptions?: IPluginDependencyMutationOptions) =>
+      mutationOptions?.dryRun === true
+        ? runtime.unUse(name, { ...mutationOptions, dryRun: true })
+        : runtime.unUse(name, { ...mutationOptions, dryRun: false }),
+    activate: (name: string) => runtime.activate(name),
+    replace: (name: string, next: IPluginConstraint<any>) => runtime.replace(name, next),
     usePipeline: (stage: ISyncPipelineStage<TValue>) => {
       runtime.usePipeline(stage)
       return handle

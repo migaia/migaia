@@ -110,22 +110,22 @@ const packedPackages: readonly IPackageDefinition[] = [
 ]
 /** Exact memory-only retained graph after package-manager installation of the packed root. */
 const expectedRetainedModules = [
-  '@migaia/event-subscriber/dist/channel-BqvtJPfL.js',
+  '@migaia/event-subscriber/dist/channel-[chunk].js',
   '@migaia/lifecycle/dist/error-code.js',
   '@migaia/lifecycle/dist/errors.js',
   '@migaia/lifecycle/dist/quiescence-tracker.js',
   '@migaia/storage-contract/dist/index.js',
-  '@migaia/storage-web/dist/constants-dsZodWbf.js',
-  '@migaia/storage-web/dist/error-family-dP9Gp3jq.js',
-  '@migaia/storage-web/dist/key-BvNXS_aH.js',
-  '@migaia/storage-web/dist/memory-CoxY2jdm.js',
-  '@migaia/storage-web/dist/operation-BIcCCsyD.js',
-  '@migaia/storage-web/dist/operation-reporter-2IgqNVG1.js',
-  '@migaia/storage-web/dist/query-CtZGcI09.js',
-  '@migaia/storage-web/dist/reactive-controller-Dlz6dhfj.js',
-  '@migaia/storage-web/dist/transaction-DFyDvVX6.js',
+  '@migaia/storage-web/dist/constants-[chunk].js',
+  '@migaia/storage-web/dist/error-family-[chunk].js',
+  '@migaia/storage-web/dist/key-[chunk].js',
+  '@migaia/storage-web/dist/memory-[chunk].js',
+  '@migaia/storage-web/dist/operation-[chunk].js',
+  '@migaia/storage-web/dist/operation-reporter-[chunk].js',
+  '@migaia/storage-web/dist/query-[chunk].js',
+  '@migaia/storage-web/dist/reactive-controller-[chunk].js',
+  '@migaia/storage-web/dist/transaction-[chunk].js',
   '@migaia/utils/dist/bytes.js',
-  '@migaia/utils/dist/error-text-Cw8rxmXe.js',
+  '@migaia/utils/dist/error-text-[chunk].js',
   '@migaia/utils/dist/error.js',
   '@migaia/utils/dist/object-path.js',
   '@migaia/utils/dist/promise.js',
@@ -180,7 +180,10 @@ function normalizeSemanticRetainedGraph(
           : installedPackages.get(packageName)?.root
       if (!packageRoot) throw new Error(`unknown packed sourcemap owner: ${moduleId}`)
       owners.set(packageName, packageRoot)
-      const sourcePath = packageName === 'workspace-root' ? 'bundle-entry.js' : packageMatch![2]
+      const sourcePath =
+        packageName === 'workspace-root'
+          ? 'bundle-entry.js'
+          : relative(packageRoot, realpathSync(moduleId)).split('\\').join('/')
       const packageRecord = packageRecords.get(packageName) ?? {
         packageName,
         packageRoot,

@@ -3,9 +3,10 @@ import { StorageErrorText } from '../error-text.js'
 import {
   defineFeature as defineNativeFeature,
   definePlugin as defineNativePlugin,
-  type IPluginHostCore,
+  type IFeatureDependencyRecord,
   type IFeatureOutputs,
   type IFeature,
+  type IFeatureReference,
   type IFeatureRecord,
   type IFeatureRecordRequiredExpose,
   invokeCaptured
@@ -31,9 +32,18 @@ const nativePluginMetadata = new WeakMap<
   {
     readonly id: string
     readonly backendKind: object | undefined
-    readonly storeKey: symbol
     readonly reactiveFeatureName: string | undefined
-    readonly reactiveBundleKey: symbol | undefined
+    readonly reactiveFeatureReference:
+      | IFeatureReference<
+          {
+            readonly attach: (
+              service: IStorageReactiveService,
+              report: (error: unknown) => void
+            ) => IStorageReactiveAdapter
+          },
+          false
+        >
+      | undefined
     readonly reactiveExpectedKinds: readonly object[]
   }
 >()
@@ -104,7 +114,6 @@ type IStorageDescriptorHook = (() => unknown) | undefined
 /** Storage-owned hooks supplied by the transparent descriptor projection. */
 type IStorageDescriptorHooks = Readonly<{
   readonly install: (hook: IStorageDescriptorHook) => () => unknown
-  readonly shared: (hook: IStorageDescriptorHook) => () => unknown
   readonly featureExpose: (hook: IStorageDescriptorHook) => () => unknown
 }>
 
@@ -120,7 +129,7 @@ const createNativeDescriptorProjection = (
   /** Empty target permits projection of frozen or non-configurable caller descriptors. */
   const target = Object.create(null)
   /** These are the only descriptor hooks Storage bridges into its existing registration closure. */
-  const hookNames = new Set<string>(['install', 'shared', 'featureExpose'])
+  const hookNames = new Set<string>(['install', 'featureExpose'])
   return new Proxy(target, {
     getPrototypeOf: () => Object.getPrototypeOf(value),
     get: (_target, key) => {
@@ -176,7 +185,6 @@ export type IStoragePluginCore<
   readonly registerStore: (store: TStore) => void
   readonly getStore: () => TStore
   readonly getBackendId: () => string
-  readonly getShared: IPluginHostCore['getShared']
   readonly features: IFeatureOutputs<TFeatures>
   readonly featureExpose: IStorageNativeFeatureExpose<TFeatures, TStore>
 }
@@ -186,7 +194,6 @@ export type IStorageNativePluginDescriptor = {
   readonly install?: () => Record<string, unknown> | PromiseLike<Record<string, unknown>>
   readonly expose?: () => Record<string, unknown>
   readonly featureExpose?: () => object
-  readonly shared?: () => Record<PropertyKey, unknown>
 }
 
 /** Combines the separately-owned install and explicit public extension outputs. */
@@ -221,7 +228,7 @@ type IStorageFeatureStoreCompatibility<
 
 /** Defines a Storage Feature with the registration-local Store capabilities available by default. */
 export const defineFeature = <
-  const TDependencies extends IFeatureRecord = Record<never, never>,
+  const TDependencies extends IFeatureDependencyRecord = Record<never, never>,
   TOutput extends object = Record<never, never>
 >(
   factory: (
@@ -299,10 +306,6 @@ export const definePlugin = <
       .map((feature) => nativeReactiveFeatures.get(feature))
       .filter((kind): kind is object => kind !== undefined)
   )
-  const reactiveBundleKey =
-    reactiveFeatureName === undefined ? undefined : Symbol(`storage-web/reactive/${name}`)
-  /** Private Store identity shared only with this native registration's finalizer. */
-  const storeKey = Symbol(`storage-web/store/${name}`)
   const definition = defineNativePlugin<
     Record<string, never>,
     Record<string, unknown>,
@@ -345,7 +348,6 @@ export const definePlugin = <
         },
         getStore: () => nativeCore.getStore(),
         getBackendId: () => nativeCore.getBackendId(),
-        getShared: nativeCore.getShared,
         get features() {
           return nativeCore.features
         },
@@ -365,33 +367,11 @@ export const definePlugin = <
             const output = Object.create(null) as Record<PropertyKey, unknown>
             Object.setPrototypeOf(output, Object.getPrototypeOf(extensions))
             Object.defineProperties(output, Object.getOwnPropertyDescriptors(extensions ?? {}))
-            Object.defineProperty(output, storeKey, {
-              value: nativeCore.getStore(),
-              enumerable: true,
-              configurable: true,
-              writable: false
-            })
             return output
           } finally {
             transferActive = false
           }
         },
-        shared: (shared) => () =>
-          createNativeDataProjection(shared === undefined ? {} : (shared() ?? {}), {
-            [storeKey]: nativeCore.getStore(),
-            ...(reactiveBundleKey === undefined
-              ? {}
-              : {
-                  [reactiveBundleKey]: Object.freeze({
-                    // This Store came through this registration's single-assignment bridge.
-                    // The adapter verifies it before using the Feature-owned attach closure.
-                    store: nativeCore.getStore(),
-                    attach: (nativeCore.features as Record<string, { readonly attach: unknown }>)[
-                      reactiveFeatureName!
-                    ]?.attach
-                  })
-                })
-          }),
         featureExpose: (featureExpose) => () => {
           const expose = featureExpose === undefined ? {} : featureExpose()
           if (
@@ -424,9 +404,19 @@ export const definePlugin = <
     Object.freeze({
       id: name,
       backendKind: undefined,
-      storeKey,
       reactiveFeatureName,
-      reactiveBundleKey,
+      reactiveFeatureReference:
+        reactiveFeatureName === undefined
+          ? undefined
+          : (definition.getFeature(reactiveFeatureName as never) as IFeatureReference<
+              {
+                readonly attach: (
+                  service: IStorageReactiveService,
+                  report: (error: unknown) => void
+                ) => IStorageReactiveAdapter
+              },
+              false
+            >),
       reactiveExpectedKinds
     })
   )

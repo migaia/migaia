@@ -1,5 +1,5 @@
 import type { IWebRpcPlugin, IWebRpcPluginInstallResult } from '../typing.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 const abortPlugin: IWebRpcPlugin = Object.freeze({
   name: 'middleware:abort',
@@ -12,11 +12,11 @@ const abortPlugin: IWebRpcPlugin = Object.freeze({
       exposedKeys: [],
       activator: false
     }),
-    sharedProvides: [WebRpcSharedKey.abort]
+    sharedProvides: [WebRpcPortName.abort]
   }),
   install: (): IWebRpcPluginInstallResult => ({
     extension: Object.freeze({}),
-    shared: Object.freeze({ [WebRpcSharedKey.abort]: Object.freeze({ enabled: true }) })
+    ports: Object.freeze({ [WebRpcPortName.abort]: Object.freeze({ enabled: true }) })
   })
 })
 

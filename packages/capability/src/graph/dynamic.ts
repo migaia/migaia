@@ -28,6 +28,39 @@ export type IGraphMutationResult = Readonly<{
   readonly metrics: IGraphTraversalMetrics
 }>
 
+/** Policy used when a node still has required dependents. */
+export type IGraphDependencyMutationPolicy = 'reject' | 'cascade'
+
+/** Direct consumers of one provider, separated by dependency strength. */
+export type IGraphDependents = Readonly<{
+  readonly required: readonly IGraphNodeId[]
+  readonly optional: readonly IGraphNodeId[]
+}>
+
+/** Options for removal and suspension. */
+export type IGraphDependencyMutationOptions = Readonly<{
+  readonly policy?: IGraphDependencyMutationPolicy
+}>
+
+/** Controls whether replacement restarts or notifies dependent nodes. */
+export type IGraphReplaceOptions<TBinding> = Readonly<{
+  readonly restartDependents?: boolean
+  readonly onReplaced?: (
+    dependent: IGraphNodeId,
+    nextBinding: TBinding | undefined
+  ) => void | PromiseLike<void>
+}>
+
+/** Dynamic graph dependency edge; optional edges do not block or cascade. */
+export type IDynamicGraphDependency = Readonly<{
+  readonly provider: IGraphNodeId
+  readonly required: boolean
+}>
+
+/** Dynamic node definition supporting required and optional provider edges. */
+export type IDynamicGraphNodeDefinition<T> = Omit<IGraphNodeDefinition<T>, 'dependencies'> &
+  Readonly<{ readonly dependencies: readonly IDynamicGraphDependency[] }>
+
 /** Runtime-neutral dynamic graph options. */
 export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{
   /**
@@ -70,7 +103,7 @@ export type IGraphBindingLease<TBinding> = Readonly<{
 export type IGraphStartEntry<TBinding = unknown> = Readonly<{
   readonly id: IGraphNodeId
   readonly binding: TBinding | undefined
-  readonly definition: IGraphNodeDefinition<unknown>
+  readonly definition: IDynamicGraphNodeDefinition<unknown>
 }>
 
 /** Immutable view of one graph node supplied to a composition release owner. */
@@ -85,9 +118,22 @@ export type IDynamicCapabilityGraph<TBinding = unknown> = Readonly<{
   readonly nodes: readonly IGraphNodeId[]
   readonly state: ICapabilityGraphState
   readonly generation: number
-  register<T>(node: IGraphNodeDefinition<T>, binding?: TBinding): Promise<IGraphMutationResult>
-  remove(id: IGraphNodeId): Promise<IGraphMutationResult>
-  replace<T>(node: IGraphNodeDefinition<T>, binding?: TBinding): Promise<IGraphMutationResult>
+  register<T>(
+    node: IDynamicGraphNodeDefinition<T>,
+    binding?: TBinding
+  ): Promise<IGraphMutationResult>
+  remove(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>
+  suspend(
+    id: IGraphNodeId,
+    options?: IGraphDependencyMutationOptions
+  ): Promise<IGraphMutationResult>
+  resume(id: IGraphNodeId): Promise<IGraphMutationResult>
+  dependentsOf(id: IGraphNodeId): IGraphDependents
+  replace<T>(
+    node: IDynamicGraphNodeDefinition<T>,
+    binding?: TBinding,
+    options?: IGraphReplaceOptions<TBinding>
+  ): Promise<IGraphMutationResult>
   ready(): Promise<void>
   nodeState(id: IGraphNodeId): IGraphNodeDiagnostic
   getBinding<T = TBinding>(id: IGraphNodeId): T | undefined
@@ -96,7 +142,7 @@ export type IDynamicCapabilityGraph<TBinding = unknown> = Readonly<{
 }>
 
 type IStoredNode<TBinding> = {
-  definition: IGraphNodeDefinition<unknown>
+  definition: IDynamicGraphNodeDefinition<unknown>
   readonly ordinal: number
   rank: number
   level: number
@@ -104,6 +150,7 @@ type IStoredNode<TBinding> = {
   state: ICapabilityGraphNodeState
   value?: unknown
   error?: unknown
+  blockedReason?: 'missing' | 'suspended' | 'removed' | 'failed'
   generation: number
   instance?: IGraphNodeInstance<unknown>
   leaseKey: object
@@ -204,7 +251,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   }
 
   /** Copies the public node contract before any topology or lifecycle side effect. */
-  const validateNode = (node: IGraphNodeDefinition<unknown>): void => {
+  const validateNode = (node: IDynamicGraphNodeDefinition<unknown>): void => {
     if (!node || typeof node !== 'object' || typeof node.id !== 'string' || node.id.length === 0)
       throw fail(CapabilityGraphErrorCode.invalidNode)
     if (typeof node.kind !== 'string' || node.kind.length === 0 || typeof node.start !== 'function')
@@ -216,7 +263,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         !dependency ||
         typeof dependency.provider !== 'string' ||
         dependency.provider.length === 0 ||
-        dependency.required !== true
+        typeof dependency.required !== 'boolean'
       )
         throw fail(CapabilityGraphErrorCode.invalidNode)
       if (dependency.provider === node.id || seen.has(dependency.provider))
@@ -297,6 +344,10 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     traversalMetrics.queueOperations += queue.length
     for (const id of queue) {
       for (const consumer of consumersByProvider.get(id) ?? []) {
+        const edge = definitions
+          .get(consumer)
+          ?.definition.dependencies.find((dependency) => dependency.provider === id)
+        if (!edge?.required) continue
         if (!affected.has(consumer)) {
           affected.add(consumer)
           queue.push(consumer)
@@ -305,6 +356,37 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       }
     }
     return affected
+  }
+
+  /** Reads direct dependents without exposing mutable adjacency state. */
+  const readDependents = (id: string): IGraphDependents => {
+    const required: IGraphNodeId[] = []
+    const optional: IGraphNodeId[] = []
+    for (const consumer of consumersByProvider.get(id) ?? []) {
+      const edge = definitions
+        .get(consumer)
+        ?.definition.dependencies.find((dependency) => dependency.provider === id)
+      const target = edge?.required ? required : optional
+      target.push(consumer as IGraphNodeId)
+    }
+    return Object.freeze({ required: Object.freeze(required), optional: Object.freeze(optional) })
+  }
+
+  /** Rejects a dependency mutation before any graph state changes. */
+  const assertDependencyPolicy = (
+    id: string,
+    options: IGraphDependencyMutationOptions | undefined
+  ): void => {
+    const policy = options?.policy ?? 'cascade'
+    if (policy !== 'reject' && policy !== 'cascade')
+      throw fail(CapabilityGraphErrorCode.invalidOption)
+    const dependents = readDependents(id).required
+    if (policy === 'reject' && dependents.length > 0)
+      throw graphFailure(
+        CapabilityGraphErrorCode.nodeHasDependents,
+        graphMessageFor(CapabilityGraphErrorCode.nodeHasDependents),
+        { dependents }
+      )
   }
 
   /** Returns a deterministic topological affected frontier. */
@@ -406,6 +488,17 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     }
   }
 
+  /** Preserves the nearest supported provider failure reason in blocked diagnostics. */
+  const readBlockedReason = (provider: string): IStoredNode<TBinding>['blockedReason'] => {
+    const entry = definitions.get(provider)
+    if (entry?.state === CapabilityGraphNodeState.suspended) return 'suspended'
+    if (entry?.state === CapabilityGraphNodeState.failed || entry?.blockedReason === 'failed')
+      return 'failed'
+    if (entry?.blockedReason === 'removed') return 'removed'
+    if (entry?.blockedReason === 'suspended') return 'suspended'
+    return 'missing'
+  }
+
   /** Starts only blocked/registered/failed nodes in deterministic dependency order. */
   const start = async (entries: readonly IStoredNode<TBinding>[]): Promise<void> => {
     if (options.startBatch) {
@@ -417,9 +510,12 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       )
       for (const entry of entries) {
         if (entry.state === CapabilityGraphNodeState.ready) continue
-        const missing = entry.definition.dependencies.some((edge) => !available.has(edge.provider))
+        const missing = entry.definition.dependencies.some(
+          (edge) => edge.required && !available.has(edge.provider)
+        )
         if (missing) {
           entry.state = CapabilityGraphNodeState.blocked
+          entry.blockedReason = 'missing'
           continue
         }
         startable.push(entry)
@@ -446,6 +542,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           } else if (entry.state !== CapabilityGraphNodeState.ready) {
             entry.state = CapabilityGraphNodeState.blocked
             entry.error = undefined
+            entry.blockedReason = failedEntry ? 'failed' : 'missing'
           }
         }
         throw graphFailure(CapabilityGraphErrorCode.startFailed, error)
@@ -458,6 +555,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         entry.instance = instance
         entry.value = instance.value
         entry.error = undefined
+        entry.blockedReason = undefined
         entry.state = CapabilityGraphNodeState.ready
         entry.generation = graphGeneration
       }
@@ -467,11 +565,14 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     try {
       for (const entry of entries) {
         if (entry.state === CapabilityGraphNodeState.ready) continue
-        const missing = entry.definition.dependencies.some(
-          (edge) => definitions.get(edge.provider)?.state !== CapabilityGraphNodeState.ready
+        const unavailable = entry.definition.dependencies.find(
+          (edge) =>
+            edge.required &&
+            definitions.get(edge.provider)?.state !== CapabilityGraphNodeState.ready
         )
-        if (missing) {
+        if (unavailable) {
           entry.state = CapabilityGraphNodeState.blocked
+          entry.blockedReason = readBlockedReason(unavailable.provider)
           continue
         }
         const context = {
@@ -492,6 +593,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         entry.instance = instance
         entry.value = instance.value
         entry.error = undefined
+        entry.blockedReason = undefined
         entry.state = CapabilityGraphNodeState.ready
         entry.generation = graphGeneration
         failedEntry = undefined
@@ -504,6 +606,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         } else if (entry.state !== CapabilityGraphNodeState.ready) {
           entry.state = CapabilityGraphNodeState.blocked
           entry.error = undefined
+          entry.blockedReason = failedEntry ? 'failed' : 'missing'
         }
       }
       throw graphFailure(CapabilityGraphErrorCode.startFailed, error)
@@ -572,10 +675,11 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         }
       })
     },
-    remove(id) {
+    remove(id, options) {
       return mutate(async () => {
         const target = definitions.get(id)
         if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
+        assertDependencyPolicy(id, options)
         const affected = closure([id])
         await release(affected, new Set([id]), 'remove')
         for (const provider of providersByConsumer.get(id) ?? []) {
@@ -590,6 +694,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           if (affectedIds.has(entry.definition.id)) {
             entry.state = CapabilityGraphNodeState.blocked
             entry.error = undefined
+            entry.blockedReason = 'removed'
           }
         graphGeneration += 1
         return {
@@ -600,7 +705,69 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         }
       })
     },
-    replace(node, binding) {
+    suspend(id, options) {
+      return mutate(async () => {
+        const target = definitions.get(id)
+        if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
+        assertDependencyPolicy(id, options)
+        const affected = closure([id])
+        target.state = CapabilityGraphNodeState.suspended
+        target.blockedReason = undefined
+        for (const entry of affected) {
+          if (entry === target) continue
+          entry.state = CapabilityGraphNodeState.blocked
+          entry.blockedReason = 'suspended'
+        }
+        graphGeneration += 1
+        return {
+          affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
+          topologyChanged: false,
+          generation: graphGeneration,
+          metrics: readMetrics()
+        }
+      })
+    },
+    resume(id) {
+      return mutate(async () => {
+        const target = definitions.get(id)
+        if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
+        if (target.state !== CapabilityGraphNodeState.suspended)
+          throw fail(CapabilityGraphErrorCode.invalidOption)
+        const affected = closure([id])
+        target.state = CapabilityGraphNodeState.ready
+        target.blockedReason = undefined
+        // Topological order lets each retained instance observe its providers' resumed state; a
+        // dependent that still has another suspended or unavailable provider stays blocked.
+        for (const entry of affected) {
+          if (entry === target || !entry.instance) continue
+          const unavailable = entry.definition.dependencies.find(
+            (edge) =>
+              edge.required &&
+              definitions.get(edge.provider)?.state !== CapabilityGraphNodeState.ready
+          )
+          if (unavailable) {
+            entry.state = CapabilityGraphNodeState.blocked
+            entry.blockedReason = readBlockedReason(unavailable.provider)
+            continue
+          }
+          entry.state = CapabilityGraphNodeState.ready
+          entry.blockedReason = undefined
+        }
+        await start(affected.filter((entry) => entry.instance === undefined))
+        graphGeneration += 1
+        return {
+          affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
+          topologyChanged: false,
+          generation: graphGeneration,
+          metrics: readMetrics()
+        }
+      })
+    },
+    dependentsOf(id) {
+      if (!definitions.has(id)) throw fail(CapabilityGraphErrorCode.unknownNode)
+      return readDependents(id)
+    },
+    replace(node, binding, options) {
       return mutate(async () => {
         validateNode(node)
         const previous = definitions.get(node.id)
@@ -631,6 +798,41 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         const affected = topology(
           sameTopology ? oldAffected : new Set([...oldAffected, ...collectClosure([node.id])])
         )
+        if (options?.restartDependents === false) {
+          const targetOnly = [previous]
+          await release(targetOnly, new Set([node.id]), 'replace')
+          previous.binding = binding
+          previous.state = CapabilityGraphNodeState.registered
+          previous.error = undefined
+          previous.blockedReason = undefined
+          graphGeneration += 1
+          await start(targetOnly)
+          /** Dependents whose rebind is absent or failed; they restart with their own closure. */
+          const restart = new Set<string>()
+          for (const dependent of readDependents(node.id).required) {
+            if (!options.onReplaced) {
+              for (const item of collectClosure([dependent])) restart.add(item)
+              continue
+            }
+            try {
+              await options.onReplaced(dependent, binding)
+            } catch (error) {
+              report(error)
+              for (const item of collectClosure([dependent])) restart.add(item)
+            }
+          }
+          if (restart.size > 0) {
+            const restartEntries = topology(restart)
+            await release(restartEntries, new Set(), 'replace')
+            await start(restartEntries)
+          }
+          return {
+            affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
+            topologyChanged: !sameTopology,
+            generation: graphGeneration,
+            metrics: readMetrics()
+          }
+        }
         await release(affected, new Set([node.id]), 'replace')
         previous.binding = binding
         previous.state = CapabilityGraphNodeState.registered
@@ -660,6 +862,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         state: entry.state,
         value: entry.value,
         error: entry.error,
+        reason: entry.blockedReason,
         binding: entry.binding,
         generation: entry.generation,
         ordinal: entry.ordinal,

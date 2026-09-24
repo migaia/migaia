@@ -54,6 +54,7 @@ import type {
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IPluginConstraint } from '@migaia/plugin-host'
 import type { IWebRpcFeature, IWebRpcFeatureSurface } from './feature.js'
+import { readWebRpcPortFeature } from './internal/port-feature.js'
 
 /** Runtime-neutral configuration accepted by the composition kernel. */
 export type IWebRpcCoreConfig = Omit<IWebRpcFactoryConfig, 'features'> & {
@@ -96,7 +97,7 @@ async function createComposedEndpointRuntime<
       'use',
       'unUse',
       'config',
-      'getShared',
+      'getPort',
       'usePipeline',
       '__proto__'
     ])
@@ -140,7 +141,8 @@ async function createComposedEndpointRuntime<
   )
   let kernel: IEndpointKernelHost | undefined
   let host: IWebRpcPluginHost | undefined
-  let hostView: import('@migaia/plugin-host').IPluginHostView<IWebRpcPluginHost> | undefined
+  let hostExtensions: Readonly<Record<string, unknown>> | undefined
+  let resolvedPorts: ReadonlyMap<PropertyKey, unknown> | undefined
   let construction: ReturnType<typeof createConstructionControl> | undefined
   let prepared: IPreparedEndpoint<TTargetId> | undefined
   let rootCleanupErrors: IWebRpcCleanupError[] = []
@@ -172,7 +174,7 @@ async function createComposedEndpointRuntime<
     let activationPreflight:
       | ((
           state: IWebRpcComposedRuntimeState,
-          host: { readonly getShared: (key: PropertyKey) => unknown }
+          host: { readonly getPort: (key: PropertyKey) => unknown }
         ) => void)
       | undefined
     const activationKernel = kernel
@@ -251,7 +253,7 @@ async function createComposedEndpointRuntime<
       onRootDisposalErrors: (errors) => {
         rootCleanupErrors = [...rootCleanupErrors, ...errors]
       },
-      onActivationPreflight: (state, getShared) => activationPreflight?.(state, { getShared })
+      onActivationPreflight: (state, getPort) => activationPreflight?.(state, { getPort })
     })
     const admissions = batch.map((entry) => entry.admission)
     const claims = admissions.map((admission) => admission.claims)
@@ -275,7 +277,7 @@ async function createComposedEndpointRuntime<
         'use',
         'unUse',
         'config',
-        'getShared',
+        'getPort',
         'usePipeline',
         '__proto__'
       ])
@@ -296,15 +298,23 @@ async function createComposedEndpointRuntime<
         routeKeys: state.routeKeys
       })
     }
-    hostView = await host.installBatch(pluginDefinitions)
+    const handles = await host.installBatch(pluginDefinitions)
+    hostExtensions = mergeMiddlewareExtensions(handles)
+    resolvedPorts = resolveMiddlewarePorts(handles, admissions)
     /** Dynamic native Feature output is admitted by Host; append only keys it actually published. */
-    const publishedKeys = Reflect.ownKeys(hostView.extensions).filter(
+    const publishedKeys = Reflect.ownKeys(hostExtensions).filter(
       (key): key is string => typeof key === 'string'
     )
     publicKeys = [...publicKeys, ...publishedKeys.filter((key) => !publicKeys.includes(key))]
-    assertFeatureClaimParity(admissions, hostView, kernel, {
-      activated: activationCommitted
-    })
+    assertFeatureClaimParity(
+      admissions,
+      {
+        extensions: hostExtensions,
+        getPort: (key: PropertyKey) => resolvedPorts?.get(key)
+      },
+      kernel,
+      { activated: activationCommitted }
+    )
   } catch (primary) {
     if (host) {
       try {
@@ -368,10 +378,10 @@ async function createComposedEndpointRuntime<
   const exposedKeys = [...new Set<string>(publicKeys)]
   const snapshotReader =
     capabilityPlugin?.getSnapshotReader() ??
-    [hostView?.extensions]
+    [hostExtensions]
       .map((value) => getEndpointDebugSnapshotReader(value as object))
       .find((reader): reader is NonNullable<typeof reader> => reader !== undefined)
-  const hookOwner = hostView?.extensions as { hooks?: IWebRpcEndpoint['hooks'] } | undefined
+  const hookOwner = hostExtensions as { hooks?: IWebRpcEndpoint['hooks'] } | undefined
   const nativeOn = capabilityPlugin?.getOn()
   const nativeHooks = capabilityPlugin?.getHooks()
   let publicSurface: object
@@ -380,7 +390,7 @@ async function createComposedEndpointRuntime<
     publicSurface = createEndpointProjection({
       // 投影的来源是 view 的 extensions;没有 view 就没有任何可投影的成员。此处曾回退到宿主本身,
       // 那只在宿主是类实例（方法都在原型上、自有键为空）时碰巧等价——宿主改为句柄后就不再成立。
-      host: hostView?.extensions ?? {},
+      host: hostExtensions ?? {},
       publicKeys,
       exposedKeys,
       // 扇出成员在守卫前就是以 rejection 形态失败的；`ping`/`provide` 则是同步抛出。
@@ -465,6 +475,50 @@ type IPublicCallable = {
 
 /** Checked public boundary reuses the original composition runtime and prepare path. */
 export const createComposedEndpoint = createComposedEndpointRuntime as unknown as IPublicCallable
+
+/** Resolves every declared middleware port from the matching PluginHost handle Feature. */
+function resolveMiddlewarePorts(
+  handles: readonly Readonly<{
+    readonly extensions: object
+    getFeature(name: never): unknown
+  }>[],
+  admissions: readonly Readonly<{ readonly sharedProvides?: readonly PropertyKey[] }>[]
+): ReadonlyMap<PropertyKey, unknown> {
+  const ports = new Map<PropertyKey, unknown>()
+  handles.forEach((handle, index) => {
+    for (const name of admissions[index]?.sharedProvides ?? []) {
+      if (typeof name !== 'string' || ports.has(name))
+        throw new WebRpcError(
+          WebRpcErrorCode.capabilityConflict,
+          WebRpcErrorText.endpointModuleDuplicated
+        )
+      ports.set(name, readWebRpcPortFeature(handle.getFeature(name as never)))
+    }
+  })
+  return ports
+}
+
+/** Merges per-registration extensions while retaining the existing duplicate-key failure. */
+function mergeMiddlewareExtensions(
+  handles: readonly Readonly<{ readonly extensions: Readonly<Record<string, unknown>> }>[]
+): Readonly<Record<string, unknown>> {
+  const merged: Record<string, unknown> = Object.create(null)
+  for (const handle of handles)
+    for (const key of Reflect.ownKeys(handle.extensions)) {
+      if (typeof key !== 'string' || Object.hasOwn(merged, key))
+        throw new WebRpcError(
+          WebRpcErrorCode.capabilityConflict,
+          WebRpcErrorText.endpointModuleDuplicated
+        )
+      Object.defineProperty(merged, key, {
+        configurable: false,
+        enumerable: true,
+        value: handle.extensions[key],
+        writable: false
+      })
+    }
+  return Object.freeze(merged)
+}
 
 /** Snapshots the optional feature tuple before endpoint preparation can cause side effects. */
 function snapshotFeatureTuple(

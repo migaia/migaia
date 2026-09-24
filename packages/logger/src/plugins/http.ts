@@ -1,6 +1,11 @@
 import type { IEmptyPluginExt, ILogEntry, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
-import { createBatcherForCore, type IBatchController, type IBatchShared } from './batch.js'
-import type { IPipelineMode } from '@migaia/plugin-host'
+import {
+  createBatcherForCore,
+  optionalBatchFeature,
+  type IBatchController,
+  type IBatchShared
+} from './batch.js'
+import { defineFeature, type IPipelineMode } from '@migaia/plugin-host'
 import { getLoggerRuntimeManager } from '../runtime-manager.js'
 import {
   createLoggerAggregateError,
@@ -36,6 +41,16 @@ export type IHttpPluginConfig = {
 }
 
 export const HTTP_PLUGIN_NAME = 'http' as const
+
+/** Optional batch output resolved once for one HTTP registration. */
+type IHttpFeatureDependencies = Readonly<{ readonly batch: IBatchShared | undefined }>
+
+/** Bridges the batch provider reference into HTTP installation. */
+const httpDependenciesFeature = defineFeature<
+  Record<never, never>,
+  { readonly batch: typeof optionalBatchFeature },
+  IHttpFeatureDependencies
+>((_core, dependencies) => ({ batch: dependencies.batch }), { batch: optionalBatchFeature })
 
 /** Marks scheduler/listener admission failures that must outrank an earlier transport failure. */
 const HTTP_WAIT_PRIMARY = Symbol('logger.http.wait.primary')
@@ -207,9 +222,7 @@ function ensureHttpFailure(
 }
 
 /**
- * 注意插件安装顺序：http 插件在 install() 时通过 core.getShared("createBatcher") 读取 batch 插件的 shared 能力，所以 plugins
- * 数组里 batch 必须排在 http 之前， 例如 `plugins: [batch({...}), http({...})]`。这跟 Vite/Rollup 这类插件系统里 "顺序敏感"
- * 是同一类约定，不是 bug。没装 batch 也完全可以单独用 http 插件， 只是会退化成每条日志各自发一次请求。
+ * Batch 能力是可选 Feature；同批安装由宿主排序，缺席时退化成每条日志各自发送。
  *
  * 进程退出前的可靠性说明：不管走哪条路径（批量还是单条直发），这个插件的 sink 函数都会把发请求的 Promise **原样 return 出去**，而不是在内部
  * fire-and-forget 掉——这一点很关键，是配合核心那边 `#process()` 现在会 把 sink 返回的 Promise 纳入 flush()/shutdown()
@@ -220,11 +233,12 @@ class HttpPlugin implements ILoggerPlugin<
   IEmptyPluginExt,
   IHttpPluginConfig,
   IPipelineMode,
-  {},
-  Partial<IBatchShared>
+  { readonly dependencies: typeof httpDependenciesFeature }
 > {
   readonly name = HTTP_PLUGIN_NAME
   readonly config: IHttpPluginConfig
+  /** Declares the optional batch provider independently of input order. */
+  readonly features = Object.freeze({ dependencies: httpDependenciesFeature })
 
   #resolvedConfig!: IHttpPluginConfig
   #controller: AbortController | undefined
@@ -256,7 +270,10 @@ class HttpPlugin implements ILoggerPlugin<
     return typeof AbortController === 'function' ? new AbortController() : undefined
   }
 
-  install(core: ILoggerPluginCore<IPipelineMode, Partial<IBatchShared>>): IEmptyPluginExt {
+  install(
+    core: ILoggerPluginCore<IPipelineMode> &
+      Readonly<{ readonly features: { readonly dependencies: IHttpFeatureDependencies } }>
+  ): IEmptyPluginExt {
     // 不读 this.config——统一通过 core.config.get() 读取
     this.#resolvedConfig = core.config.get<IHttpPluginConfig>() ?? this.config
     this.#scheduler = core.scheduler
@@ -264,7 +281,7 @@ class HttpPlugin implements ILoggerPlugin<
     core.onDispose(core.onShutdown(() => this.#controller?.abort()))
 
     const send = (entries: ILogEntry[]): Promise<void> => this.#send(entries)
-    const createBatcher = core.getShared('createBatcher')
+    const createBatcher = core.features.dependencies.batch?.createBatcher
 
     if (createBatcher) {
       const batcher = createBatcher<ILogEntry>(this.#resolvedConfig.batch ?? {}, send)
@@ -611,5 +628,9 @@ class HttpPlugin implements ILoggerPlugin<
 
 export const http = (
   config: IHttpPluginConfig
-): ILoggerPlugin<IEmptyPluginExt, IHttpPluginConfig, IPipelineMode, {}, Partial<IBatchShared>> =>
-  new HttpPlugin(config)
+): ILoggerPlugin<
+  IEmptyPluginExt,
+  IHttpPluginConfig,
+  IPipelineMode,
+  { readonly dependencies: typeof httpDependenciesFeature }
+> => new HttpPlugin(config)

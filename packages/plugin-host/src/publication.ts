@@ -4,7 +4,7 @@ import type {
   IPluginConfig,
   IPluginConstraint,
   IPluginHostConfigFor,
-  IPluginHostView
+  IPluginHostCompositionSnapshot
 } from './typing.js'
 
 /** Host callbacks needed to materialize a view without transferring lifecycle ownership. */
@@ -16,9 +16,6 @@ export type IPluginHostPublicationPort<THost, TDomainCore extends object, TValue
     name: string,
     recipe: (previous: Readonly<IPluginConfig>) => Partial<IPluginConfig>
   ): Promise<void>
-  getShared(key: PropertyKey): unknown
-  use(plugins: readonly IPluginConstraint<any>[]): unknown
-  unUse(name: string): unknown
 }>
 
 /** Weak registration-set cache preserving callable identity across disable/enable round trips. */
@@ -54,15 +51,10 @@ const readExtensionCache = (
  * Materializes one immutable publication snapshot. All liveness and mutation decisions remain in
  * PluginHost; this module owns only descriptor-safe view construction.
  */
-export const createPluginHostPublication = <
-  THost,
-  TDomainCore extends object,
-  TValue,
-  TViewPlugins extends readonly IPluginConstraint<any>[]
->(
+export const createPluginHostPublication = <THost, TDomainCore extends object, TValue>(
   registrations: readonly IRegistration<TDomainCore, TValue>[],
   port: IPluginHostPublicationPort<THost, TDomainCore, TValue>
-): IPluginHostView<THost, TViewPlugins> => {
+): IPluginHostCompositionSnapshot => {
   /** Frozen registration identities defining this exact publication generation. */
   const captured = Object.freeze([...registrations])
   /** Exact-set cache keeps restored callable references stable without sharing stale generations. */
@@ -97,7 +89,6 @@ export const createPluginHostPublication = <
   /** Null-prototype public view whose every read revalidates the captured generation. */
   const view = Object.create(null) as Record<PropertyKey, unknown>
   Object.defineProperties(view, {
-    host: { value: port.host, enumerable: true, configurable: false, writable: false },
     extensions: {
       enumerable: true,
       configurable: false,
@@ -123,32 +114,11 @@ export const createPluginHostPublication = <
             port.assertLive(captured)
             return port.updateConfig(name, recipe)
           }
-        } as IPluginHostConfigFor<TViewPlugins>
+        } as IPluginHostConfigFor<readonly IPluginConstraint<any>[]>
       }
-    },
-    getShared: {
-      enumerable: true,
-      configurable: false,
-      writable: false,
-      value: (key: PropertyKey) => {
-        port.assertLive(captured)
-        return port.getShared(key)
-      }
-    },
-    use: {
-      enumerable: true,
-      configurable: false,
-      writable: false,
-      value: (...plugins: readonly IPluginConstraint<any>[]) => port.use(plugins)
-    },
-    unUse: {
-      enumerable: true,
-      configurable: false,
-      writable: false,
-      value: (name: string) => port.unUse(name)
     }
   })
-  return Object.freeze(view) as IPluginHostView<THost, TViewPlugins>
+  return Object.freeze(view) as IPluginHostCompositionSnapshot
 }
 
 /** Materializes only extension capabilities for one exact registration token. */

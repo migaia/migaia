@@ -4,7 +4,6 @@ import {
   createPendingTracker,
   createLifecycleScope,
   createProvisionalScope,
-  containAsyncRejection,
   probeThenable,
   type ILifecycleScheduler
 } from '@migaia/lifecycle'
@@ -13,22 +12,25 @@ import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-
 import { PluginHostErrorCode } from './error-code.js'
 import { mountPluginExtensions } from './extension.js'
 import { invokeCaptured } from './invocation.js'
+import { reportDiagnostic, reportTerminalFailure } from './diagnostic-report.js'
 import { compileFeatures, instantiateFeatures, snapshotFeatureExpose } from './feature-runtime.js'
+import { resolveBatchInstallSet, orderPluginInstallBatch } from './dependency-runtime.js'
+import { isFeatureReference } from './define-feature.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IInstallEntry, IPluginDescriptor, IRegistration, ISharedEntry } from './registry.js'
+import type { IInstallEntry, IPluginDescriptor, IRegistration } from './registry.js'
 import type {
   IAsyncGeneratorPipelineStage,
   IAsyncPipelineStage,
   IGeneratorPipelineStage,
   IPluginHostCore,
-  IPluginHostErrorCode,
   IPluginInstallFailureDetail,
-  ISyncPipelineStage
+  ISyncPipelineStage,
+  IPluginHostDiagnostic
 } from './typing.js'
 
 /** Candidate registries held privately until one install batch reaches its commit point. */
 export type IInstallBatchContext<TDomainCore extends object, TValue> = {
-  readonly shared: Map<PropertyKey, ISharedEntry<TDomainCore, TValue>>
+  readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
   readonly syncStages: ISyncPipelineStage<TValue>[]
   readonly asyncStages: IAsyncPipelineStage<TValue>[]
@@ -39,6 +41,7 @@ export type IInstallBatchContext<TDomainCore extends object, TValue> = {
 
 export type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly scheduler: ILifecycleScheduler
+  readonly committedRegistrations: ReadonlyMap<string, IRegistration<TDomainCore, TValue>>
   readonly snapshotBatch: () => IInstallBatchContext<TDomainCore, TValue>
   readonly setActiveBatch: (batch: IInstallBatchContext<TDomainCore, TValue> | undefined) => void
   readonly beginOperation: (registration: IRegistration<TDomainCore, TValue>) => void
@@ -66,7 +69,9 @@ export type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = 
     registration: IRegistration<TDomainCore, TValue>,
     rollbackErrors: unknown[]
   ) => void
-  readonly diagnostic: (message: string, code?: IPluginHostErrorCode) => void
+  /** Names removed from this host and not reinstalled; distinguishes removed from missing. */
+  readonly removedNames: ReadonlySet<string>
+  readonly diagnostic: IPluginHostDiagnostic
   /** Attributes a Host boundary error before its structured detail is frozen. */
   readonly decorateError: <TError extends PluginHostError>(error: TError) => TError
 }>
@@ -80,23 +85,76 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     this.#port = port
   }
 
+  /** Activates one already-published lazy registration without changing its public identity. */
+  activate(registration: IRegistration<TDomainCore, TValue>): Promise<void> {
+    if (registration.activated) return Promise.resolve()
+    if (registration.activationPromise) return registration.activationPromise
+    const activation = (async (): Promise<void> => {
+      const batch = this.#port.snapshotBatch()
+      batch.registrations.set(registration.name, registration)
+      this.#port.setActiveBatch(batch)
+      registration.lifecycle = PluginHostRegistrationLifecycle.install
+      try {
+        const installResult = this.#startInstall(registration, batch, true)
+        if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
+        const installThen = this.#readThen(installResult)
+        const installedValue = await this.#port.awaitOperation(
+          typeof installThen === 'function'
+            ? assimilateCapturedThen(installThen as (...args: unknown[]) => void, installResult)
+            : installResult,
+          registration
+        )
+        this.#port.assertOperationCurrent(registration)
+        this.#prepareInstallResult(registration, batch, installedValue)
+        await registration.provisional!.commitTo(registration.scope!)
+        registration.provisional = undefined
+        registration.installed = true
+        registration.activated = true
+        this.#port.publish([registration], batch)
+      } catch (error) {
+        if (registration.provisional) await registration.provisional.rollback()
+        registration.provisional = undefined
+        registration.installed = false
+        registration.activated = false
+        throw error
+      } finally {
+        this.#port.setHookRegistration(undefined)
+        this.#port.setActiveBatch(undefined)
+        registration.lifecycle = PluginHostRegistrationLifecycle.idle
+        registration.activationPromise = undefined
+      }
+    })()
+    registration.activationPromise = activation
+    return activation
+  }
+
   /** Installs one candidate batch and optionally publishes it at the final synchronous point. */
   async installBatch(
     entries: readonly IInstallEntry<TDomainCore, TValue>[],
-    publish = true
+    publish = true,
+    prepareBatch?: (batch: IInstallBatchContext<TDomainCore, TValue>) => void
   ): Promise<{
     readonly installed: readonly IRegistration<TDomainCore, TValue>[]
     readonly batch: IInstallBatchContext<TDomainCore, TValue>
   }> {
     const installed: IRegistration<TDomainCore, TValue>[] = []
+    // Dependency validation runs before the transaction: its codes are thrown as-is, not wrapped.
+    const ordered = this.#orderBatch(entries)
+    const installSet = resolveBatchInstallSet(ordered)
     const batch = this.#port.snapshotBatch()
+    prepareBatch?.(batch)
     let failedName = entries[0]?.name ?? 'unknown'
     this.#port.setActiveBatch(batch)
     try {
-      for (const entry of entries) {
+      for (const entry of ordered) {
         failedName = entry.name
         const registration = this.#createRegistration(entry)
         installed.push(registration)
+        batch.registrations.set(registration.name, registration)
+        if (!installSet.has(registration.name)) {
+          registration.lifecycle = PluginHostRegistrationLifecycle.idle
+          continue
+        }
         try {
           const installResult = this.#startInstall(registration, batch, true)
           if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
@@ -112,6 +170,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           await registration.provisional!.commitTo(registration.scope!)
           registration.provisional = undefined
           registration.installed = true
+          registration.activated = true
         } finally {
           this.#port.setHookRegistration(undefined)
           registration.lifecycle = PluginHostRegistrationLifecycle.idle
@@ -136,14 +195,21 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
   /** Runs constructor-time installation without allowing an awaitable extension to escape. */
   installBatchSync(entries: readonly IInstallEntry<TDomainCore, TValue>[]): void {
     const installed: IRegistration<TDomainCore, TValue>[] = []
+    const ordered = this.#orderBatch(entries)
+    const installSet = resolveBatchInstallSet(ordered)
     const batch = this.#port.snapshotBatch()
     let failedName = entries[0]?.name ?? 'unknown'
     this.#port.setActiveBatch(batch)
     try {
-      for (const entry of entries) {
+      for (const entry of ordered) {
         failedName = entry.name
         const registration = this.#createRegistration(entry)
         installed.push(registration)
+        batch.registrations.set(registration.name, registration)
+        if (!installSet.has(registration.name)) {
+          registration.lifecycle = PluginHostRegistrationLifecycle.idle
+          continue
+        }
         try {
           let installedValue: unknown
           try {
@@ -162,6 +228,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           }
           this.#prepareInstallResult(registration, batch, installedValue)
           registration.installed = true
+          registration.activated = true
         } finally {
           registration.lifecycle = PluginHostRegistrationLifecycle.idle
         }
@@ -197,6 +264,25 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     }
   }
 
+  /**
+   * Validates dependency prerequisites and orders one batch. Committed lazy providers must already
+   * be active here: the async Host path activates them before calling in, and the synchronous path
+   * cannot await an activation.
+   */
+  #orderBatch(
+    entries: readonly IInstallEntry<TDomainCore, TValue>[]
+  ): readonly IInstallEntry<TDomainCore, TValue>[] {
+    try {
+      return orderPluginInstallBatch(
+        entries,
+        this.#port.committedRegistrations,
+        this.#port.removedNames
+      )
+    } catch (error) {
+      throw error instanceof PluginHostError ? this.#port.decorateError(error) : error
+    }
+  }
+
   /** Allocates one registration shape shared by asynchronous and synchronous install transactions. */
   #createRegistration(
     entry: IInstallEntry<TDomainCore, TValue>
@@ -205,13 +291,13 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     return {
       name,
       plugin,
-      config: copyConfig(plugin.config),
+      config: copyConfig(entry.config ?? plugin.config),
       extensions: [],
       pipelineDisposers: [],
       pipelineOwnerKey: {},
       resourceDisposers: [],
-      shared: [],
       installed: false,
+      activated: false,
       enabled: true,
       lifecycle: PluginHostRegistrationLifecycle.install,
       lifecycleController: createAbortController(),
@@ -236,32 +322,13 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     return this.#invokeInstall(registration, this.#initializeFeatureCore(registration, batch))
   }
 
-  /** Commits common shared and extension preparation after each path resolves its install result. */
+  /** Commits extension preparation after each path resolves its install result. */
   #prepareInstallResult(
     registration: IRegistration<TDomainCore, TValue>,
     batch: IInstallBatchContext<TDomainCore, TValue>,
     installedValue: unknown
   ): void {
     const extensions = this.#mergeDescriptorExpose(registration, installedValue)
-    if (this.#sharedHook(registration)) {
-      this.#port.setHookRegistration(registration)
-      let sharedValue: unknown
-      try {
-        sharedValue = this.#invokeShared(registration, batch)
-      } finally {
-        this.#port.setHookRegistration(undefined)
-      }
-      const shared = readPlainDataRecord(sharedValue, 'plugin shared', false)
-      for (const key of Reflect.ownKeys(shared)) {
-        if (batch.shared.has(key))
-          throw new PluginHostError(
-            PluginHostErrorCode.sharedDuplicate,
-            ERROR_TEXT.SHARED_DUPLICATE(key)
-          )
-        batch.shared.set(key, { owner: registration, value: shared[key] })
-        registration.shared.push(key)
-      }
-    }
     mountPluginExtensions(registration, extensions, batch.extensionOwners, this.#port.diagnostic)
   }
 
@@ -338,7 +405,31 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       registration.plugin.features,
       registration.featureExpose,
       featurePlan,
-      (error) => this.#port.diagnostic(String(error), PluginHostErrorCode.pluginInstallFailed)
+      (error) =>
+        this.#port.diagnostic(
+          error instanceof Error ? error.message : String(error),
+          PluginHostErrorCode.pluginInstallFailed,
+          error
+        ),
+      (reference) => {
+        if (!isFeatureReference(reference)) return undefined
+        const provider = batch.registrations.get(reference.plugin)
+        if (!provider) return undefined
+        if (!provider.enabled)
+          throw new PluginHostError(
+            PluginHostErrorCode.prerequisiteDisabled,
+            ERROR_TEXT.PREREQUISITE_DISABLED(reference.feature, reference.plugin)
+          )
+        if (!provider.activated) {
+          if (reference.optional) return undefined
+          throw new PluginHostError(
+            PluginHostErrorCode.pluginNotActivated,
+            ERROR_TEXT.PLUGIN_NOT_ACTIVATED(reference.plugin)
+          )
+        }
+        return provider.featureOutputs?.[reference.feature]
+      },
+      (failure) => reportTerminalFailure(failure, this.#port.diagnostic)
     )
     Object.defineProperty(core, 'featureExpose', {
       value: registration.featureExpose,
@@ -361,10 +452,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     this.#rejectThenable(value, ERROR_TEXT.PLUGIN_DESCRIPTOR_OUTPUT)
     const descriptor: Record<string, unknown> = {}
     for (const key of Reflect.ownKeys(value)) {
-      if (
-        typeof key !== 'string' ||
-        !['install', 'expose', 'featureExpose', 'shared'].includes(key)
-      )
+      if (typeof key !== 'string' || !['install', 'expose', 'featureExpose'].includes(key))
         throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_DESCRIPTOR_HOOK)
       const property = Object.getOwnPropertyDescriptor(value, key)
       if (!property || !('value' in property) || typeof property.value !== 'function')
@@ -383,25 +471,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     return hook
       ? hook()
       : invokeCaptured(registration.plugin.install, registration.plugin.owner, [core])
-  }
-
-  /** Selects descriptor shared output without exposing it to Feature factories. */
-  #sharedHook(registration: IRegistration<TDomainCore, TValue>): unknown {
-    return registration.descriptor?.shared ?? registration.plugin.shared
-  }
-
-  /** Invokes shared through its owning descriptor or legacy Plugin core. */
-  #invokeShared(
-    registration: IRegistration<TDomainCore, TValue>,
-    batch: IInstallBatchContext<TDomainCore, TValue>
-  ): unknown {
-    const shared = registration.descriptor?.shared
-      ? registration.descriptor.shared()
-      : invokeCaptured(registration.plugin.shared!, registration.plugin.owner, [
-          this.#port.createCore(registration, batch)
-        ])
-    this.#rejectThenable(shared, ERROR_TEXT.PLUGIN_DESCRIPTOR_OUTPUT)
-    return shared
   }
 
   /** Merges descriptor install/expose outputs only after rejecting their own-key collision. */
@@ -454,12 +523,12 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
 
   /** Reports a late hook rejection without allowing diagnostics to replace its original cause. */
   #reportThenableRejection(error: unknown): void {
-    try {
-      containAsyncRejection(
-        this.#port.diagnostic(String(error), PluginHostErrorCode.pluginInstallFailed),
-        () => undefined
-      )
-    } catch {}
+    reportDiagnostic(
+      this.#port.diagnostic,
+      error instanceof Error ? error.message : String(error),
+      PluginHostErrorCode.pluginInstallFailed,
+      error
+    )
   }
 
   /** Reports rollback failures without replacing the original installation error. */
@@ -489,13 +558,11 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     const detail = rollbackErrors
       .map((error) => (error instanceof Error ? error.message : String(error)))
       .join('; ')
-    try {
-      this.#port.diagnostic(
-        `${ERROR_TEXT.PLUGIN_ROLLBACK_FAILED(failedName)}: ${detail}`,
-        PluginHostErrorCode.pluginInstallRollbackFailed
-      )
-    } catch {
-      // Diagnostics must never alter control flow.
-    }
+    reportDiagnostic(
+      this.#port.diagnostic,
+      `${ERROR_TEXT.PLUGIN_ROLLBACK_FAILED(failedName)}: ${detail}`,
+      PluginHostErrorCode.pluginInstallRollbackFailed,
+      new AggregateError(rollbackErrors, ERROR_TEXT.PLUGIN_ROLLBACK_FAILED(failedName))
+    )
   }
 }

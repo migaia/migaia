@@ -244,7 +244,7 @@ describe('WRC-C-B11f approved post-migration candidate', () => {
     const provenance = readProvenance()
     const custody = JSON.parse(
       readFileSync(
-        resolve(packageRoot, 'test/fixtures/tree-shaking/f004-intended-cost-custody.json'),
+        resolve(packageRoot, 'test/fixtures/tree-shaking/intended-cost-custody-baseline.json'),
         'utf8'
       )
     ) as {

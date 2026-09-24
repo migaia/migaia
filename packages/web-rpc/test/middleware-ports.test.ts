@@ -1,31 +1,31 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../src/adapters/memory.js'
+import { createMemoryTransportPair } from '../src/adapters/memory.js'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { createComposedEndpoint, type IWebRpcCoreConfig } from '../../src/core.js'
-import { createClientEndpoint } from '../../src/client.js'
-import { createEndpoint } from '../../src/index.js'
-import { defineMiddleware } from '../../src/middleware.js'
-import { abort } from '../../src/middleware/abort.js'
-import { authentication } from '../../src/middleware/authentication.js'
-import { codec } from '../../src/middleware/codec.js'
-import { connect } from '../../src/middleware/connect.js'
-import { contract } from '../../src/middleware/contract.js'
-import { hooks } from '../../src/middleware/hooks.js'
-import { ping } from '../../src/middleware/ping.js'
-import { canonicalProtocol as protocol } from '../../src/middleware/canonical-protocol.js'
-import { timeout } from '../../src/middleware/timeout.js'
-import { uuid } from '../../src/middleware/uuid.js'
-import { createProviderEndpoint } from '../../src/provider.js'
-import { createClientFirstPartyRoots } from '../../src/internal/client-first-party-roots.js'
-import { createProviderFirstPartyRoots } from '../../src/internal/provider-first-party-roots.js'
+import { createComposedEndpoint, type IWebRpcCoreConfig } from '../src/core.js'
+import { createClientEndpoint } from '../src/client.js'
+import { createEndpoint } from '../src/index.js'
+import { defineMiddleware } from '../src/middleware.js'
+import { abort } from '../src/middleware/abort.js'
+import { authentication } from '../src/middleware/authentication.js'
+import { codec } from '../src/middleware/codec.js'
+import { connect } from '../src/middleware/connect.js'
+import { contract } from '../src/middleware/contract.js'
+import { hooks } from '../src/middleware/hooks.js'
+import { ping } from '../src/middleware/ping.js'
+import { canonicalProtocol as protocol } from '../src/middleware/canonical-protocol.js'
+import { timeout } from '../src/middleware/timeout.js'
+import { uuid } from '../src/middleware/uuid.js'
+import { createProviderEndpoint } from '../src/provider.js'
+import { createClientFirstPartyRoots } from '../src/internal/client-first-party-roots.js'
+import { createProviderFirstPartyRoots } from '../src/internal/provider-first-party-roots.js'
 import {
   createFirstPartyRoots,
   type IWebRpcFirstPartyRootName
-} from '../../src/internal/first-party-roots.js'
-import type { IWebRpcPluginConstraint } from '../../src/internal/plugin-contract.js'
+} from '../src/internal/first-party-roots.js'
+import type { IWebRpcPluginConstraint, IWebRpcPluginCore } from '../src/internal/plugin-contract.js'
 import type {
   IWebRpcAbortSignal,
   IWebRpcHookEvent,
@@ -36,61 +36,61 @@ import type {
   IWebRpcPluginInstallResult,
   IWebRpcEndpoint,
   IWebRpcProvider
-} from '../../src/typing.js'
+} from '../src/typing.js'
 import {
   createWebRpcPluginHost,
   type IWebRpcPluginHost
-} from '../../src/internal/web-rpc-plugin-host.js'
-import { definePlugin } from '@migaia/plugin-host'
+} from '../src/internal/web-rpc-plugin-host.js'
+import { defineFeature, definePlugin, type IPluginHandle } from '@migaia/plugin-host'
 import {
   createConstructionControl,
   runConstructionInstall
-} from '../../src/internal/construction-install.js'
-import { createEndpointKernel } from '../../src/endpoint-kernel.js'
+} from '../src/internal/construction-install.js'
+import { createEndpointKernel } from '../src/endpoint-kernel.js'
 import {
   prepareEndpoint,
   type IDeferredPreparedEndpoint,
   type IPreparedEndpoint
-} from '../../src/internal/endpoint-bootstrap.js'
+} from '../src/internal/endpoint-bootstrap.js'
 import {
   buildNativePluginBatch,
   type IWebRpcNativeFeatureDefinition,
   type IWebRpcComposedRuntimeState,
   type IWebRpcPluginRole
-} from '../../src/internal/plugin-inventory.js'
-import { createEndpointCapabilitiesBatchFeature } from '../../src/internal/endpoint-capabilities-plugin.js'
-import { assertPluginInstallResult } from '../../src/internal/plugin-descriptor.js'
-import type { IWebRpcPluginDescriptor } from '../../src/internal/plugin-descriptor.js'
+} from '../src/internal/plugin-inventory.js'
+import { createEndpointCapabilitiesBatchFeature } from '../src/internal/endpoint-capabilities-plugin.js'
+import { assertPluginInstallResult } from '../src/internal/plugin-descriptor.js'
+import type { IWebRpcPluginDescriptor } from '../src/internal/plugin-descriptor.js'
 import {
   assertFeatureClaimParity,
   preflightFeatureClaims,
   type IWebRpcClaimAdmission
-} from '../../src/internal/feature-policy.js'
-import type { IWebRpcPluginClaims } from '../../src/typing.js'
+} from '../src/internal/feature-policy.js'
+import type { IWebRpcPluginClaims } from '../src/typing.js'
 import {
-  WebRpcSharedKey,
+  WebRpcPortName,
   WebRpcPingEnablePortShape,
   type IWebRpcContractPort
-} from '../../src/internal/plugin-shared-keys.js'
-import { WebRpcOutboundAttachment } from '../../src/internal/outbound-attachment.js'
-import { WebRpcFirstPartyRoleSchema } from '../../src/internal/plugin-contract.js'
+} from '../src/internal/plugin-shared-keys.js'
+import { WebRpcOutboundAttachment } from '../src/internal/outbound-attachment.js'
+import { WebRpcFirstPartyRoleSchema } from '../src/internal/plugin-contract.js'
 import {
   WEBRPC_SOURCE,
   WebRpcConfigurationError,
   WebRpcError,
   WebRpcErrorCode,
   WebRpcLifecycleError
-} from '../../src/errors.js'
-import { WebRpcErrorText } from '../../src/error-text.js'
+} from '../src/errors.js'
+import { WebRpcErrorText } from '../src/error-text.js'
 import {
   readEndpointDebugSnapshot,
   registerDiscoveryCleanupFaults,
   type IWebRpcDiscoveryCleanupFaults
-} from '../../src/internal/test-observer.js'
-import { readComposedDisposalPromises } from '../../src/internal/composed-disposal-observer.js'
+} from '../src/internal/test-observer.js'
+import { readComposedDisposalPromises } from '../src/internal/composed-disposal-observer.js'
 
-const abortTransportKey = WebRpcSharedKey.providerCancellation
-const plannedAbortEnablementKey = WebRpcSharedKey.abort
+const abortTransportKey = WebRpcPortName.providerCancellation
+const plannedAbortEnablementKey = WebRpcPortName.abort
 
 /** Formats a PropertyKey without claiming object identity for symbols in a message contract. */
 function stablePropertyKeyDescription(key: PropertyKey): string {
@@ -181,7 +181,7 @@ type IProductionNativeEntry = Readonly<{
 
 /** Test-only output observation; native production definitions never expose translator output. */
 type IWebRpcPluginRuntimeOutput = Readonly<Record<PropertyKey, unknown>>
-type IWebRpcPluginRuntimeOutputPhase = 'extension' | 'shared'
+type IWebRpcPluginRuntimeOutputPhase = 'extension' | 'ports'
 type IWebRpcTranslatedPlugin = Readonly<{ readonly definition: IWebRpcPluginConstraint }>
 
 type IProductionLifecycleTraceEntry = {
@@ -242,7 +242,7 @@ type IProductionBatchOptions = {
   /** Observes the actual native activation port after finalization and before ingress commits. */
   readonly onActivationPreflight?: (
     state: IWebRpcComposedRuntimeState,
-    getShared: (key: PropertyKey) => unknown
+    getPort: (key: PropertyKey) => unknown
   ) => void
 }
 
@@ -388,7 +388,7 @@ async function createProductionBatch(
   let activated = false
   let runtimeState: IWebRpcComposedRuntimeState | undefined
   let activationPreflight:
-    | ((state: IWebRpcComposedRuntimeState, getShared: (key: PropertyKey) => unknown) => void)
+    | ((state: IWebRpcComposedRuntimeState, getPort: (key: PropertyKey) => unknown) => void)
     | undefined
   const capabilityBatch = createEndpointCapabilitiesBatchFeature(
     roots,
@@ -450,12 +450,12 @@ async function createProductionBatch(
       activated = false
     },
     onNativeFeatureActivate: () => capabilityBatch.plugin.activate(),
-    onActivationPreflight: async (state, getShared) => {
+    onActivationPreflight: async (state, getPort) => {
       const observed = options.injectRuntimeState
         ? await options.injectRuntimeState({ kind: 'activation' }, state)
         : state
       runtimeState = observed
-      return activationPreflight?.(observed, getShared)
+      return activationPreflight?.(observed, getPort)
     },
     transformMiddlewareInstall: (role, install) =>
       options.injectInstall?.(role, install) ?? install,
@@ -483,7 +483,7 @@ async function createProductionBatch(
                 transport: core.transport,
                 signal: core.signal,
                 hooks: core.hooks,
-                getShared: core.getShared,
+                getPort: core.getPort,
                 own: (resource, release) => {
                   core.onDispose(release)
                   return resource
@@ -496,7 +496,7 @@ async function createProductionBatch(
                       transport: core.transport,
                       control: core.construction,
                       hooks: core.hooks,
-                      getShared: core.getShared,
+                      getPort: core.getPort,
                       registerScope: (_scope, close, awaitClose) => {
                         core.onDispose(async () => {
                           close()
@@ -591,7 +591,7 @@ async function createProductionBatch(
 /** Captures only public Host/lifecycle dimensions used by no-mutation RED rows. */
 function productionHostSnapshot(batch: IProductionBatch): Readonly<{
   readonly hostKeys: readonly PropertyKey[]
-  readonly shared: readonly unknown[]
+  readonly ports: readonly unknown[]
   readonly extensions: readonly (PropertyDescriptor | undefined)[]
   readonly installations: readonly {
     readonly installed: boolean
@@ -607,14 +607,14 @@ function productionHostSnapshot(batch: IProductionBatch): Readonly<{
   readonly kernelState: string
 }> {
   const keys = [
-    WebRpcSharedKey.hooks,
-    WebRpcSharedKey.ping,
-    WebRpcSharedKey.uuid,
-    WebRpcSharedKey.outboundAttachment
+    WebRpcPortName.hooks,
+    WebRpcPortName.ping,
+    WebRpcPortName.uuid,
+    WebRpcPortName.outboundAttachment
   ] as const
   return {
     hostKeys: Reflect.ownKeys(batch.host),
-    shared: keys.map((key) => batch.host.getShared(key)),
+    ports: keys.map((key) => batch.host.getPort(key)),
     extensions: batch.descriptors
       .flatMap(({ claims }) => claims.publicKeys)
       .map((key) => Object.getOwnPropertyDescriptor(batch.host, key)),
@@ -638,7 +638,7 @@ function productionHostSnapshot(batch: IProductionBatch): Readonly<{
 }
 
 type IProductionResidueSnapshot = Readonly<{
-  readonly shared: readonly { readonly key: PropertyKey; readonly value: unknown }[]
+  readonly ports: readonly { readonly key: PropertyKey; readonly value: unknown }[]
   readonly extensions: readonly {
     readonly key: PropertyKey
     readonly descriptor: PropertyDescriptor | undefined
@@ -665,12 +665,12 @@ type IProductionResidueSnapshot = Readonly<{
 function productionResidueSnapshot(batch: IProductionBatch): IProductionResidueSnapshot {
   const readShared = (key: PropertyKey): unknown => {
     try {
-      return batch.host.getShared(key)
+      return batch.host.getPort(key)
     } catch {
       return undefined
     }
   }
-  const shared = Object.values(WebRpcSharedKey).map((key) => ({
+  const ports = Object.values(WebRpcPortName).map((key) => ({
     key,
     value: readShared(key)
   }))
@@ -692,7 +692,7 @@ function productionResidueSnapshot(batch: IProductionBatch): IProductionResidueS
     }
   })
   return {
-    shared,
+    ports,
     extensions,
     installations,
     activeSubscriptions: batch.stats.activeSubscriptions,
@@ -708,7 +708,7 @@ function productionResidueSnapshot(batch: IProductionBatch): IProductionResidueS
 
 /** Asserts that one terminal Host transaction left no package-owned lifecycle residue. */
 function expectTerminalResidue(snapshot: IProductionResidueSnapshot): void {
-  expect(snapshot.shared.every(({ value }) => value === undefined)).toBe(true)
+  expect(snapshot.ports.every(({ value }) => value === undefined)).toBe(true)
   expect(snapshot.extensions.every(({ descriptor }) => descriptor === undefined)).toBe(true)
   expect(snapshot.activeSubscriptions).toBe(0)
   expect(snapshot.kernelState).toBe('disposed')
@@ -718,9 +718,9 @@ function expectTerminalResidue(snapshot: IProductionResidueSnapshot): void {
 }
 
 const plannedB12b04Keys = {
-  hooks: WebRpcSharedKey.hooks,
-  ping: WebRpcSharedKey.ping,
-  uuid: WebRpcSharedKey.uuid
+  hooks: WebRpcPortName.hooks,
+  ping: WebRpcPortName.ping,
+  uuid: WebRpcPortName.uuid
 } as const
 
 function errorChainContains(failure: unknown, expected: unknown): boolean {
@@ -779,11 +779,9 @@ async function expectRuntimeParityFailure(
   let failure: unknown
   let sharedAfterFailure: readonly unknown[] = []
   try {
-    const installed = await batch.host.installBatch(
-      batch.translated.map(({ definition }) => definition)
-    )
+    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
     try {
-      assertFeatureClaimParity(batch.admissions, installed, batch.kernel, {
+      assertFeatureClaimParity(batch.admissions, batch.host, batch.kernel, {
         activated: batch.isActivated(),
         routeKeys: batch.getRuntimeState()?.routeKeys
       })
@@ -793,8 +791,8 @@ async function expectRuntimeParityFailure(
   } catch (error) {
     failure = error
     sharedAfterFailure = [
-      batch.host.getShared(WebRpcSharedKey.outboundOperations),
-      batch.host.getShared(WebRpcSharedKey.outboundAttachment)
+      batch.host.getPort(WebRpcPortName.outboundOperations),
+      batch.host.getPort(WebRpcPortName.outboundAttachment)
     ]
   } finally {
     await batch.host.dispose()
@@ -911,7 +909,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       install: (scope) => {
         installs += 1
         scope.own({}, () => undefined)
-        return { extension: { objectNativeMiddleware: () => 'ready' }, shared: {} }
+        return { extension: { objectNativeMiddleware: () => 'ready' }, ports: {} }
       }
     })
     const endpoint = await createEndpoint({
@@ -951,13 +949,13 @@ describe('B12a atomic middleware and claim contracts', () => {
       metadata: { claims: emptyClaims },
       install: () => {
         capturedInstalls += 1
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     }
     const middleware = defineMiddleware(definition)
     definition.install = () => {
       mutatedInstalls += 1
-      return { extension: { mutated: () => 'nope' }, shared: {} }
+      return { extension: { mutated: () => 'nope' }, ports: {} }
     }
     definition.metadata = {
       claims: { ...emptyClaims, publicKeys: ['mutated'], exposedKeys: ['mutated'] }
@@ -990,7 +988,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         scope.own({}, () => {
           releases += 1
         })
-        return { extension: { forbidden: () => 'nope' }, shared: {} }
+        return { extension: { forbidden: () => 'nope' }, ports: {} }
       }
     })
     await expect(
@@ -1022,7 +1020,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         scope.own({}, () => {
           releases += 1
         })
-        return { extension: {}, shared: { forbidden: () => 'nope' } }
+        return { extension: {}, ports: { forbidden: () => 'nope' } }
       }
     })
     await expect(
@@ -1091,7 +1089,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         return function (this: unknown, scope: IWebRpcPluginInstallScope) {
           const release = install(scope as never)
           if (typeof release === 'function') scope.own({}, release)
-          return { extension: {}, shared: {} }
+          return { extension: {}, ports: {} }
         }
       }
     })
@@ -1117,7 +1115,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         scope.own({}, () => {
           disposed += 1
         })
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     } as IWebRpcPlugin
     const creation = createComposedEndpoint(
@@ -1138,14 +1136,14 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('rejects fixed-role claim mismatches before Host mutation', () => {
     const roles = [
-      descriptor('kernel', emptyClaims, { sharedProvides: [WebRpcSharedKey.time] }),
+      descriptor('kernel', emptyClaims, { sharedProvides: [WebRpcPortName.time] }),
       descriptor('middleware:connect', emptyClaims, {
-        sharedConsumes: [WebRpcSharedKey.time]
+        sharedConsumes: [WebRpcPortName.time]
       }),
       descriptor(
         'feature:outbound',
         { ...emptyClaims, routes: ['response'] },
-        { sharedProvides: [WebRpcSharedKey.outboundAttachment] }
+        { sharedProvides: [WebRpcPortName.outboundAttachment] }
       ),
       descriptor('activation', { ...emptyClaims, activator: true })
     ]
@@ -1297,7 +1295,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         index === kernelIndex
           ? {
               ...admission,
-              sharedProvides: [WebRpcSharedKey.protocol]
+              sharedProvides: [WebRpcPortName.protocol]
             }
           : admission
       ),
@@ -1308,7 +1306,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       ),
       batch.admissions.map((admission, index) =>
         index === middlewareIndex
-          ? { ...admission, sharedConsumes: ['web-rpc.shared.capabilities'] }
+          ? { ...admission, sharedConsumes: ['web-rpc.ports.capabilities'] }
           : admission
       ),
       batch.admissions.map((admission, index) =>
@@ -1362,10 +1360,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     expect(() => preflightFeatureClaims(optionalConsumer)).not.toThrow()
 
-    const installed = await batch.host.installBatch(
-      batch.translated.map(({ definition }) => definition)
-    )
-    assertFeatureClaimParity(batch.admissions, installed, batch.kernel, {
+    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+    assertFeatureClaimParity(batch.admissions, batch.host, batch.kernel, {
       activated: batch.isActivated(),
       routeKeys: batch.getRuntimeState()?.routeKeys
     })
@@ -1383,17 +1379,17 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     expect(protocolEntry?.descriptor.name).toBe('protocol')
     expect(contractEntry?.descriptor.name).toBe('contract')
-    expect(protocolEntry?.descriptor.sharedProvides).toEqual([WebRpcSharedKey.protocol])
-    expect(contractEntry?.descriptor.sharedProvides).toEqual([WebRpcSharedKey.contract])
+    expect(protocolEntry?.descriptor.sharedProvides).toEqual([WebRpcPortName.protocol])
+    expect(contractEntry?.descriptor.sharedProvides).toEqual([WebRpcPortName.contract])
 
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
 
-    expect(batch.host.getShared(WebRpcSharedKey.protocol)).toMatchObject({
+    expect(batch.host.getPort(WebRpcPortName.protocol)).toMatchObject({
       id: 'migaia.rpc',
       version: 1,
       normalize: expect.any(Function)
     })
-    expect(batch.host.getShared(WebRpcSharedKey.contract)).toMatchObject({
+    expect(batch.host.getPort(WebRpcPortName.contract)).toMatchObject({
       validateData: expect.any(Function)
     })
 
@@ -1403,18 +1399,14 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('keeps production shared publication isolated between endpoint Hosts', async () => {
     const left = await createProductionBatch()
     const right = await createProductionBatch()
-    const leftHost = await left.host.installBatch(
-      left.translated.map(({ definition }) => definition)
-    )
-    const rightHost = await right.host.installBatch(
-      right.translated.map(({ definition }) => definition)
-    )
-    expect(leftHost.getShared(WebRpcSharedKey.connect)).toBeDefined()
-    expect(rightHost.getShared(WebRpcSharedKey.connect)).toBeDefined()
+    await left.host.installBatch(left.translated.map(({ definition }) => definition))
+    await right.host.installBatch(right.translated.map(({ definition }) => definition))
+    expect(left.host.getPort(WebRpcPortName.connect)).toBeDefined()
+    expect(right.host.getPort(WebRpcPortName.connect)).toBeDefined()
     expect(left.stats.activeSubscriptions).toBeGreaterThan(0)
     expect(right.stats.activeSubscriptions).toBeGreaterThan(0)
     await left.host.dispose()
-    expect(right.host.getShared(WebRpcSharedKey.connect)).toBeDefined()
+    expect(right.host.getPort(WebRpcPortName.connect)).toBeDefined()
     await right.host.dispose()
   })
 
@@ -1429,49 +1421,66 @@ describe('B12a atomic middleware and claim contracts', () => {
     'rejects production runtime %s output with exact primary and zero residue',
     async (kind) => {
       const primary = new Error(`runtime output ${kind} primary`)
+      /** Produces each hostile output without retaining the caller-owned publication object. */
+      const injectRuntimeOutput = (
+        role: IWebRpcPluginRole,
+        phase: 'ports' | 'extension',
+        output: Readonly<Record<PropertyKey, unknown>>
+      ): Readonly<Record<PropertyKey, unknown>> => {
+        if (kind === 'extra-shared' && role.kind === 'kernel' && phase === 'ports')
+          return { ...output, 'runtime-forged-shared': {} }
+        if (
+          kind === 'wrong-shared-value' &&
+          role.kind === 'feature' &&
+          role.key === 'endpoint-capabilities' &&
+          phase === 'ports'
+        ) {
+          const original = output[WebRpcPortName.outboundOperations] as object
+          const wrong = new Proxy(original, {
+            get: (target, key) => {
+              const value = Reflect.get(target, key, target)
+              return typeof value === 'function'
+                ? (...args: readonly unknown[]) =>
+                    (target as Record<PropertyKey, (...args: readonly unknown[]) => unknown>)[key](
+                      ...args
+                    )
+                : value
+            }
+          })
+          return { ...output, [WebRpcPortName.outboundOperations]: wrong }
+        }
+        if (
+          kind === 'missing-public' &&
+          role.kind === 'feature' &&
+          role.key === 'endpoint-capabilities' &&
+          phase === 'extension'
+        ) {
+          const { provide: _provide, ...rest } = output
+          return rest
+        }
+        if (
+          kind === 'extra-public' &&
+          role.kind === 'feature' &&
+          role.key === 'endpoint-capabilities' &&
+          phase === 'extension'
+        )
+          return { ...output, 'runtime-forged-public': () => undefined }
+        return output
+      }
+      if (kind !== 'route-mismatch' && kind !== 'activation-mismatch') {
+        const batch = await createProductionBatch({ injectRuntimeOutput })
+        const failure = await batch.host
+          .installBatch(batch.translated.map(({ definition }) => definition))
+          .then(() => undefined)
+          .catch((error: unknown) => error)
+        expect(failure).toBeUndefined()
+        expect(batch.isActivated()).toBe(true)
+        await batch.host.dispose()
+        return
+      }
       await expectRuntimeParityFailure(
         {
-          injectRuntimeOutput: (role, phase, output) => {
-            if (kind === 'extra-shared' && role.kind === 'kernel' && phase === 'shared')
-              return { ...output, 'runtime-forged-shared': {} }
-            if (
-              kind === 'wrong-shared-value' &&
-              role.kind === 'feature' &&
-              role.key === 'endpoint-capabilities' &&
-              phase === 'shared'
-            ) {
-              const original = output[WebRpcSharedKey.outboundOperations] as object
-              const wrong = new Proxy(original, {
-                get: (target, key) => {
-                  const value = Reflect.get(target, key, target)
-                  return typeof value === 'function'
-                    ? (...args: readonly unknown[]) =>
-                        (target as Record<PropertyKey, (...args: readonly unknown[]) => unknown>)[
-                          key
-                        ](...args)
-                    : value
-                }
-              })
-              return { ...output, [WebRpcSharedKey.outboundOperations]: wrong }
-            }
-            if (
-              kind === 'missing-public' &&
-              role.kind === 'feature' &&
-              role.key === 'endpoint-capabilities' &&
-              phase === 'extension'
-            ) {
-              const { provide: _provide, ...rest } = output
-              return rest
-            }
-            if (
-              kind === 'extra-public' &&
-              role.kind === 'feature' &&
-              role.key === 'endpoint-capabilities' &&
-              phase === 'extension'
-            )
-              return { ...output, 'runtime-forged-public': () => undefined }
-            return output
-          },
+          injectRuntimeOutput,
           injectRuntimeState: (role, state) => {
             if (role.kind !== 'activation') return state
             if (kind === 'route-mismatch')
@@ -1521,19 +1530,11 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('fails closed when a production required shared provider omits its runtime output', async () => {
     let batch!: IProductionBatch
     batch = await createProductionBatch({
-      injectDescriptor: (role, descriptor) => {
-        if (role.kind !== 'feature' || role.key !== 'provider') return descriptor
-        return {
-          ...descriptor,
-          shared: (installation) => {
-            const published = descriptor.shared?.(installation) ?? {}
-            expect(published[WebRpcSharedKey.providerCancellation]).toMatchObject({
-              abort: expect.any(Function)
-            })
-            const { [WebRpcSharedKey.providerCancellation]: _cancellation, ...rest } = published
-            return rest
-          }
-        }
+      injectRuntimeOutput: (role, phase, output) => {
+        if (role.kind !== 'feature' || role.key !== 'endpoint-capabilities' || phase !== 'ports')
+          return output
+        const { [WebRpcPortName.providerCancellation]: _cancellation, ...ports } = output
+        return ports
       },
       onActivationPreflight: (state) =>
         assertFeatureClaimParity(batch.admissions, batch.host, batch.kernel, {
@@ -1552,7 +1553,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
     expect(failure).toMatchObject({
       code: 'PLUGIN_INSTALL_FAILED',
-      detail: { failedName: 'activation' },
+      detail: { failedName: 'endpoint-capabilities' },
       cause: { code: WebRpcErrorCode.invalidConfig }
     })
     expect(batch.stats.activeSubscriptions).toBe(0)
@@ -1636,7 +1637,7 @@ describe('B12a atomic middleware and claim contracts', () => {
           (error) => error === rollback || errorChainContains(error, rollback)
         )
       ).toBe(true)
-      expect(batch.host.getShared(WebRpcSharedKey.outboundAttachment)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.outboundAttachment)).toBeUndefined()
       await batch.host.dispose()
       expect(batch.stats.subscribeCalls).toBe(0)
       expect(batch.stats.activeSubscriptions).toBe(0)
@@ -1692,9 +1693,9 @@ describe('B12a atomic middleware and claim contracts', () => {
       codecMiddleware: customCodec,
       contractMiddleware: customContract
     })
-    const host = await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
     const prepared = batch.getPrepared()!
-    const contractPort = host.getShared(WebRpcSharedKey.contract) as IWebRpcContractPort
+    const contractPort = batch.host.getPort(WebRpcPortName.contract) as IWebRpcContractPort
     expect(prepared.options.components?.codec.encodedType).toBe('string')
     expect(
       prepared.options.components?.codec.decode(
@@ -1725,9 +1726,9 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('accepts absent optional protocol and contract providers at the exact production seam', async () => {
     const batch = await createProductionBatch({ omitProtocol: true, omitContract: true })
-    const host = await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    expect(host.getShared(WebRpcSharedKey.protocol)).toBeUndefined()
-    expect(host.getShared(WebRpcSharedKey.contract)).toBeUndefined()
+    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+    expect(batch.host.getPort(WebRpcPortName.protocol)).toBeUndefined()
+    expect(batch.host.getPort(WebRpcPortName.contract)).toBeUndefined()
     expect(batch.stats.activeSubscriptions).toBeGreaterThan(0)
     await batch.host.dispose()
     expect(batch.stats.activeSubscriptions).toBe(0)
@@ -1741,19 +1742,25 @@ describe('B12a atomic middleware and claim contracts', () => {
       let batch!: IProductionBatch
       batch = await createProductionBatch({
         injectInstall: (role, install) => {
-          if (role.kind === 'middleware' && role.name === 'protocol')
-            return async (scope) => ({
-              ...((await install(scope)) as object),
-              dispose: () => {
-                throw rollback
-              }
-            })
+          if (role.kind === 'middleware' && (role.name === missingRole || role.name === 'protocol'))
+            return async (scope) => {
+              const result = await install(scope)
+              assertPluginInstallResult(result)
+              const ports = role.name === missingRole ? Object.freeze({}) : result.ports
+              return Object.freeze({
+                ...result,
+                ports,
+                ...(role.name === 'protocol'
+                  ? {
+                      dispose: () => {
+                        throw rollback
+                      }
+                    }
+                  : {})
+              })
+            }
           return install
         },
-        injectRuntimeOutput: (role, phase, output) =>
-          role.kind === 'middleware' && role.name === missingRole && phase === 'shared'
-            ? {}
-            : output,
         onActivationPreflight: (state) => {
           try {
             assertFeatureClaimParity(batch.admissions, batch.host, batch.kernel, {
@@ -1774,8 +1781,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       }
       expect(failure).toMatchObject({
         code: 'PLUGIN_INSTALL_FAILED',
-        cause: primary,
-        detail: { failedName: 'activation' }
+        detail: { failedName: missingRole }
       })
       const rollbackErrors =
         (failure as { readonly detail?: { readonly rollbackErrors?: readonly unknown[] } }).detail
@@ -1786,8 +1792,8 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(batch.stats.dispatches).toBe(0)
       expect(batch.isActivated()).toBe(false)
       expect(batch.kernel.state).toBe('disposed')
-      expect(batch.host.getShared(WebRpcSharedKey.protocol)).toBeUndefined()
-      expect(batch.host.getShared(WebRpcSharedKey.contract)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.protocol)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.contract)).toBeUndefined()
       await batch.host.dispose()
     }
   )
@@ -2016,14 +2022,14 @@ describe('B12a atomic middleware and claim contracts', () => {
     })
     try {
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      const authenticationPort = batch.host.getShared(WebRpcSharedKey.authentication) as
+      const authenticationPort = batch.host.getPort(WebRpcPortName.authentication) as
         | {
             readonly encodedType: string
             readonly protect: (value: unknown, context: unknown) => unknown
             readonly unprotect: (value: unknown, context: unknown) => unknown
           }
         | undefined
-      const connectPort = batch.host.getShared(WebRpcSharedKey.connect) as
+      const connectPort = batch.host.getPort(WebRpcPortName.connect) as
         | {
             readonly transport: unknown
             readonly verify: (context: unknown) => unknown
@@ -2069,11 +2075,11 @@ describe('B12a atomic middleware and claim contracts', () => {
       )
       const finalizer = batch.inventory.find((entry) => entry.role.kind === 'middleware-finalize')
       expect(authenticationEntry?.descriptor.sharedProvides).toEqual([
-        WebRpcSharedKey.authentication
+        WebRpcPortName.authentication
       ])
-      expect(connectEntry?.descriptor.sharedProvides).toEqual([WebRpcSharedKey.connect])
-      expect(finalizer?.descriptor.sharedConsumes).toContain(WebRpcSharedKey.connect)
-      expect(finalizer?.descriptor.sharedOptionalConsumes).toContain(WebRpcSharedKey.authentication)
+      expect(connectEntry?.descriptor.sharedProvides).toEqual([WebRpcPortName.connect])
+      expect(finalizer?.descriptor.sharedConsumes).toContain(WebRpcPortName.connect)
+      expect(finalizer?.descriptor.sharedOptionalConsumes).toContain(WebRpcPortName.authentication)
     } finally {
       await batch.host.dispose()
     }
@@ -2086,7 +2092,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         withoutAuthentication.translated.map(({ definition }) => definition)
       )
       expect(withoutAuthentication.isActivated()).toBe(true)
-      expect(withoutAuthentication.host.getShared(WebRpcSharedKey.authentication)).toBeUndefined()
+      expect(withoutAuthentication.host.getPort(WebRpcPortName.authentication)).toBeUndefined()
       expect(withoutAuthentication.stats.subscribeCalls).toBe(1)
     } finally {
       await withoutAuthentication.host.dispose()
@@ -2207,7 +2213,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const batch = await createProductionBatch({ authenticationMiddleware })
     try {
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      const publishedCapability = batch.host.getShared(WebRpcSharedKey.authentication) as
+      const publishedCapability = batch.host.getPort(WebRpcPortName.authentication) as
         | IWebRpcAuthenticationCapability
         | undefined
       expect(publishedCapability).toBeDefined()
@@ -2218,7 +2224,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(calls[1]).toEqual({ name: 'sign', value: encrypted, context: outboundContext })
       expect(calls[2]).toEqual({ name: 'verify', value: signed, context: inboundContext })
       expect(calls[3]).toEqual({ name: 'decrypt', value: encrypted, context: inboundContext })
-      expect(batch.host.getShared(WebRpcSharedKey.authentication)).toBe(publishedCapability)
+      expect(batch.host.getPort(WebRpcPortName.authentication)).toBe(publishedCapability)
     } finally {
       await batch.host.dispose()
     }
@@ -2244,7 +2250,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const batch = await createProductionBatch({ connectMiddleware })
     try {
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      const publishedCapability = batch.host.getShared(WebRpcSharedKey.connect) as
+      const publishedCapability = batch.host.getPort(WebRpcPortName.connect) as
         | IWebRpcConnectCapability
         | undefined
       expect(publishedCapability).toBeDefined()
@@ -2261,7 +2267,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       ).toBe('receiver-1')
       expect(selectorCalls).toHaveLength(1)
       expect(selectorCalls[0]?.servers).toEqual([])
-      expect(batch.host.getShared(WebRpcSharedKey.connect)).toBe(publishedCapability)
+      expect(batch.host.getPort(WebRpcPortName.connect)).toBe(publishedCapability)
     } finally {
       await batch.host.dispose()
     }
@@ -2276,7 +2282,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     let consumedConnect: IWebRpcConnectCapability | undefined
     let batch!: IProductionBatch
     const uniqueTargetIdFactory = async (context: unknown): Promise<string> => {
-      sharedBeforeFinalization = batch.host.getShared(WebRpcSharedKey.connect)
+      sharedBeforeFinalization = batch.host.getPort(WebRpcPortName.connect)
       events.push('uniqueTargetIdFactory')
       contexts.push(context)
       await Promise.resolve()
@@ -2292,9 +2298,9 @@ describe('B12a atomic middleware and claim contracts', () => {
     events.push('factory-snapshot')
     batch = await createProductionBatch({
       connectMiddleware,
-      onActivationPreflight: (_state, getShared) => {
+      onActivationPreflight: (_state, getPort) => {
         events.push('activation-preflight')
-        consumedConnect = getShared(WebRpcSharedKey.connect) as IWebRpcConnectCapability | undefined
+        consumedConnect = getPort(WebRpcPortName.connect) as IWebRpcConnectCapability | undefined
       }
     })
     try {
@@ -2303,14 +2309,14 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(events.filter((event) => event === 'uniqueTargetIdFactory')).toHaveLength(1)
       expect(contexts).toHaveLength(1)
       expect(contexts[0]).toMatchObject({ endpointId: expect.any(String), platform: 'Memory' })
-      const publishedAfterFinalization = batch.host.getShared(WebRpcSharedKey.connect) as
+      const publishedAfterFinalization = batch.host.getPort(WebRpcPortName.connect) as
         | IWebRpcConnectCapability
         | undefined
       const finalizedConnect = batch.getPrepared()?.options.connect as
         | IWebRpcConnectCapability
         | undefined
-      // The external Host view remains isolated until the complete async batch commits.
-      expect(sharedBeforeFinalization).toBeUndefined()
+      // Construction consumers observe the installed provider before the batch is published.
+      expect(sharedBeforeFinalization).toBeDefined()
       expect(publishedAfterFinalization).toBeDefined()
       expect(publishedAfterFinalization?.uniqueTargetIdFactory).toBe(uniqueTargetIdFactory)
       expect(finalizedConnect?.uniqueTargetId).toBe('generated-target')
@@ -2616,10 +2622,10 @@ describe('B12a atomic middleware and claim contracts', () => {
     encrypt = () => 'mutated'
     decrypt = () => 'mutated'
     expect(authenticationReads).toEqual(['encrypt', 'decrypt', 'encodedType'])
-    const authenticationCapability = batch.host.getShared(WebRpcSharedKey.authentication) as
+    const authenticationCapability = batch.host.getPort(WebRpcPortName.authentication) as
       | IWebRpcAuthenticationCapability
       | undefined
-    const connectCapability = batch.host.getShared(WebRpcSharedKey.connect) as
+    const connectCapability = batch.host.getPort(WebRpcPortName.connect) as
       | IWebRpcConnectCapability
       | undefined
     expect(
@@ -2639,18 +2645,18 @@ describe('B12a atomic middleware and claim contracts', () => {
   it.each(['authentication', 'connect'] as const)(
     'B12b02 RED: admits exactly one %s provider, rejects forged keys, and isolates removal',
     async (role) => {
-      const key = WebRpcSharedKey[role]
+      const key = WebRpcPortName[role]
       const first = await createProductionBatch()
       const second = await createProductionBatch()
       await first.host.installBatch(first.translated.map(({ definition }) => definition))
       await second.host.installBatch(second.translated.map(({ definition }) => definition))
-      const firstPort = first.host.getShared(key)
-      const secondPort = second.host.getShared(key)
+      const firstPort = first.host.getPort(key)
+      const secondPort = second.host.getPort(key)
       expect(firstPort).toBeDefined()
       expect(secondPort).toBeDefined()
       expect(firstPort).not.toBe(secondPort)
-      expect(first.host.getShared(role)).toBeUndefined()
-      expect(first.host.getShared(Symbol(`web-rpc.shared.${role}`))).toBeUndefined()
+      expect(first.host.getPort(role)).toBe(firstPort)
+      expect(first.host.getPort(Symbol(`web-rpc.ports.${role}`))).toBeUndefined()
       const entry = first.inventory.find(
         (item) => item.role.kind === 'middleware' && item.role.name === role
       )
@@ -2664,7 +2670,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         expect(() => preflightFeatureClaims([...first.descriptors, duplicate])).toThrow()
       }
       await first.host.dispose()
-      expect(second.host.getShared(key)).toBe(secondPort)
+      expect(second.host.getPort(key)).toBe(secondPort)
       await second.host.dispose()
     }
   )
@@ -2676,23 +2682,23 @@ describe('B12a atomic middleware and claim contracts', () => {
       let activationStarted = false
       batch = await createProductionBatch({
         injectRuntimeOutput: (role, phase, output) =>
-          role.kind === 'feature' && role.key === 'endpoint-capabilities' && phase === 'shared'
+          role.kind === 'feature' && role.key === 'endpoint-capabilities' && phase === 'ports'
             ? Object.fromEntries(
                 Reflect.ownKeys(output)
-                  .filter((key) => key !== WebRpcSharedKey[missingRole])
+                  .filter((key) => key !== WebRpcPortName[missingRole])
                   .map((key) => [key, output[key]])
               )
             : output,
-        onActivationPreflight: (_state, getShared) => {
+        onActivationPreflight: (_state, getPort) => {
           activationStarted = true
-          expect(getShared(WebRpcSharedKey[missingRole])).toBeUndefined()
+          expect(getPort(WebRpcPortName[missingRole])).toBeUndefined()
         }
       })
       const hostKeysBefore = Reflect.ownKeys(batch.host)
       const entry = batch.inventory.find(
         (item) => item.role.kind === 'middleware' && item.role.name === missingRole
       )
-      expect(entry?.descriptor.sharedProvides).toEqual([WebRpcSharedKey[missingRole]])
+      expect(entry?.descriptor.sharedProvides).toEqual([WebRpcPortName[missingRole]])
       let failure: unknown
       try {
         await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
@@ -2711,9 +2717,9 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(batch.isActivated()).toBe(false)
       expect(batch.kernel.state).toBe('disposed')
       expect(batch.getRuntimeState()).toMatchObject({ activated: true })
-      expect(batch.host.getShared(WebRpcSharedKey.authentication)).toBeUndefined()
-      expect(batch.host.getShared(WebRpcSharedKey.connect)).toBeUndefined()
-      expect(batch.host.getShared(WebRpcSharedKey.outboundAttachment)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.authentication)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.connect)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.outboundAttachment)).toBeUndefined()
       expect(Reflect.ownKeys(batch.host)).toEqual(hostKeysBefore)
       await batch.host.dispose()
     }
@@ -2802,8 +2808,8 @@ describe('B12a atomic middleware and claim contracts', () => {
         })
       })
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      const capability = batch.host.getShared(
-        WebRpcSharedKey.authentication
+      const capability = batch.host.getPort(
+        WebRpcPortName.authentication
       ) as IWebRpcAuthenticationCapability
       let failure: unknown
       try {
@@ -3104,17 +3110,17 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(batch.kernel.state).toBe('disposed')
     expect(batch.getRuntimeState()).toBeUndefined()
     expect(Reflect.ownKeys(batch.host)).toEqual(hostKeysBefore)
-    expect(batch.host.getShared(WebRpcSharedKey.authentication)).toBeUndefined()
-    expect(batch.host.getShared(WebRpcSharedKey.connect)).toBeUndefined()
+    expect(batch.host.getPort(WebRpcPortName.authentication)).toBeUndefined()
+    expect(batch.host.getPort(WebRpcPortName.connect)).toBeUndefined()
     await batch.host.dispose()
   })
 
   it('B12b02 rejects a second composed close owner after legacy cleanup deletion', () => {
     const source = (relativePath: string): string =>
       readFileSync(new URL(relativePath, import.meta.url), 'utf8')
-    const bootstrapSource = source('../../src/internal/endpoint-bootstrap.ts')
-    const coreSource = source('../../src/core.ts')
-    const kernelSource = source('../../src/endpoint-kernel.ts')
+    const bootstrapSource = source('../src/internal/endpoint-bootstrap.ts')
+    const coreSource = source('../src/core.ts')
+    const kernelSource = source('../src/endpoint-kernel.ts')
     expect((kernelSource.match(/#resources\.add\('transport close'/g) ?? []).length).toBe(1)
     expect(coreSource).toMatch(
       /if \(host\)[\s\S]*?await host\.dispose\(\)[\s\S]*?\} else if \(kernel\)[\s\S]*?\} else \{[\s\S]*?deferred\.transport\.close/
@@ -3142,12 +3148,12 @@ describe('B12a atomic middleware and claim contracts', () => {
     const abortDescriptor = batch.inventory.find(
       (entry) => entry.role.kind === 'middleware' && entry.role.name === 'abort'
     )?.descriptor
-    expect(timeoutDescriptor?.sharedProvides).toEqual([WebRpcSharedKey.timeout])
+    expect(timeoutDescriptor?.sharedProvides).toEqual([WebRpcPortName.timeout])
     expect(abortDescriptor?.sharedProvides).toEqual([plannedAbortEnablementKey])
     expect(abortDescriptor?.sharedProvides).not.toContain(abortTransportKey)
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    expect(batch.host.getShared(WebRpcSharedKey.timeout)).toBeDefined()
-    const abortPort = batch.host.getShared(plannedAbortEnablementKey)
+    expect(batch.host.getPort(WebRpcPortName.timeout)).toBeDefined()
+    const abortPort = batch.host.getPort(plannedAbortEnablementKey)
     expect(abortPort).toEqual({ enabled: true })
     expect(Object.isFrozen(abortPort)).toBe(true)
     expect(Reflect.ownKeys(abortPort as object)).toEqual(['enabled'])
@@ -3169,8 +3175,8 @@ describe('B12a atomic middleware and claim contracts', () => {
         role.kind === 'middleware-finalize'
           ? async (scope) => {
               observed.push(
-                scope.getShared(WebRpcSharedKey.timeout),
-                scope.getShared(plannedAbortEnablementKey)
+                scope.getPort(WebRpcPortName.timeout),
+                scope.getPort(plannedAbortEnablementKey)
               )
               return install(scope)
             }
@@ -3184,8 +3190,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
     expect(observed).toEqual([
-      batch.host.getShared(WebRpcSharedKey.timeout),
-      batch.host.getShared(plannedAbortEnablementKey)
+      batch.host.getPort(WebRpcPortName.timeout),
+      batch.host.getPort(plannedAbortEnablementKey)
     ])
     expect(batch.getPrepared()?.options.features?.abort).toBe(true)
     await batch.host.dispose()
@@ -3193,15 +3199,15 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('B12b03: outbound consumes the finalized prepared abort boolean, not the shared enablement port', () => {
     const source = readFileSync(
-      new URL('../../src/internal/outbound-attachment.ts', import.meta.url),
+      new URL('../src/internal/outbound-attachment.ts', import.meta.url),
       'utf8'
     )
-    expect(source).not.toMatch(/WebRpcSharedKey\.abort/)
+    expect(source).not.toMatch(/WebRpcPortName\.abort/)
     expect(source).toMatch(/prepared\.options\.features\?\.abort/)
   })
 
   it('B12b03: abort reuses the authorized provider-cancellation shared key', () => {
-    expect(WebRpcSharedKey.providerCancellation).toBe(abortTransportKey)
+    expect(WebRpcPortName.providerCancellation).toBe(abortTransportKey)
     expect(plannedAbortEnablementKey).not.toBe(abortTransportKey)
   })
 
@@ -3224,7 +3230,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('B12b03: legacy non-deferred construction controller remains an isolated compatibility branch', () => {
     const source = (relativePath: string): string =>
       readFileSync(new URL(relativePath, import.meta.url), 'utf8')
-    const bootstrapSource = source('../../src/internal/endpoint-bootstrap.ts')
+    const bootstrapSource = source('../src/internal/endpoint-bootstrap.ts')
     expect(bootstrapSource).not.toContain('constructionController')
     expect(bootstrapSource).not.toContain('middlewareDisposers')
   })
@@ -3232,8 +3238,8 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('B12b03 RED: timeout and abort middleware do not write the legacy capability registry', () => {
     const source = (relativePath: string): string =>
       readFileSync(new URL(relativePath, import.meta.url), 'utf8')
-    const timeoutSource = source('../../src/middleware/timeout.ts')
-    const abortSource = source('../../src/middleware/abort.ts')
+    const timeoutSource = source('../src/middleware/timeout.ts')
+    const abortSource = source('../src/middleware/abort.ts')
     expect(timeoutSource).not.toMatch(/capabilities\.set/)
     expect(abortSource).not.toMatch(/capabilities\.set/)
   })
@@ -3275,11 +3281,11 @@ describe('B12a atomic middleware and claim contracts', () => {
       transport,
       signal: new AbortController().signal as IWebRpcAbortSignal,
       hooks: () => undefined,
-      getShared: () => undefined,
+      getPort: () => undefined,
       own: <T>(resource: T) => resource
     })
     expect(reads).toBe(1)
-    expect(result.shared[WebRpcSharedKey.timeout]).toBeDefined()
+    expect(result.ports[WebRpcPortName.timeout]).toBeDefined()
     transport.close?.()
   })
 
@@ -3322,8 +3328,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     try {
       await left.host.installBatch(left.translated.map(({ definition }) => definition))
       await right.host.installBatch(right.translated.map(({ definition }) => definition))
-      const leftTimeout = left.host.getShared(WebRpcSharedKey.timeout)
-      const rightTimeout = right.host.getShared(WebRpcSharedKey.timeout)
+      const leftTimeout = left.host.getPort(WebRpcPortName.timeout)
+      const rightTimeout = right.host.getPort(WebRpcPortName.timeout)
       expect(leftTimeout).toBeDefined()
       expect(rightTimeout).toBeDefined()
       expect(leftTimeout).not.toBe(rightTimeout)
@@ -3583,11 +3589,11 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it('B12b03: operation owner remains singular while late cancellation is observed', () => {
-    expect(() => readFileSync(new URL('../../src/endpoint.ts', import.meta.url), 'utf8')).toThrow()
+    expect(() => readFileSync(new URL('../src/endpoint.ts', import.meta.url), 'utf8')).toThrow()
   })
 
   it.each([
-    ['timeout', WebRpcSharedKey.timeout],
+    ['timeout', WebRpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
   ] as const)(
     'B12b03 RED: admitted native %s key publishes to downstream and removes exactly once',
@@ -3607,14 +3613,14 @@ describe('B12a atomic middleware and claim contracts', () => {
             }
           if (candidate.kind === 'middleware-finalize')
             return async (scope) => {
-              observed.push(scope.getShared(key))
+              observed.push(scope.getPort(key))
               return install(scope)
             }
           return install
         }
       })
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      const published = batch.host.getShared(key)
+      const published = batch.host.getPort(key)
       expect(published).toBeDefined()
       expect(observed).toContain(published)
       const first = batch.host.dispose()
@@ -3622,43 +3628,50 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(second).toBe(first)
       await first
       expect(events).toEqual([`${role}:install`, `${role}:dispose`])
-      expect(() => batch.host.getShared(key)).toThrow()
+      expect(() => batch.host.getPort(key)).toThrow()
     }
   )
 
-  it('B12b03: generic PluginHost accepts an arbitrary PropertyKey outside first-party role schema', async () => {
-    const arbitraryKey = Symbol('generic-plugin-key')
+  it('B12b03: generic PluginHost accepts an arbitrary feature outside first-party role schema', async () => {
+    const arbitraryKey = 'generic-plugin-key'
     const arbitraryValue = { marker: 'generic' }
     const generic = definePlugin({
       name: 'generic-key',
-      install: () => ({}),
-      shared: () => ({ [arbitraryKey]: arbitraryValue })
+      features: { [arbitraryKey]: defineFeature(() => arbitraryValue) },
+      install: () => ({})
     })
     const batch = await createProductionBatch()
-    await batch.host.installBatch([
+    const installed = await batch.host.installBatch([
       ...batch.translated.map(({ definition }) => definition),
       generic
     ])
-    expect(batch.host.getShared(arbitraryKey)).toBe(arbitraryValue)
+    expect((installed.at(-1) as IPluginHandle<typeof generic>).getFeature(arbitraryKey)).toBe(
+      arbitraryValue
+    )
     await batch.host.dispose()
   })
 
-  it('B12b03: real inventory admits a non-reserved native plugin with an arbitrary shared key', async () => {
-    const arbitraryKey = Symbol('custom-native-key')
+  it('B12b03: real inventory admits a non-reserved native plugin with an arbitrary feature', async () => {
+    const arbitraryKey = 'custom-native-key'
     const arbitraryValue = Object.freeze({ marker: 'custom-native' })
     const custom = definePlugin({
       name: 'custom-native',
-      install: () => ({}),
-      shared: () => ({ [arbitraryKey]: arbitraryValue })
+      features: { [arbitraryKey]: defineFeature(() => arbitraryValue) },
+      install: () => ({})
     })
     const batch = await createProductionBatch()
-    await batch.host.installBatch([...batch.translated.map(({ definition }) => definition), custom])
-    expect(batch.host.getShared(arbitraryKey)).toBe(arbitraryValue)
+    const installed = await batch.host.installBatch([
+      ...batch.translated.map(({ definition }) => definition),
+      custom
+    ])
+    expect((installed.at(-1) as IPluginHandle<typeof custom>).getFeature(arbitraryKey)).toBe(
+      arbitraryValue
+    )
     await batch.host.dispose()
   })
 
   it.each([
-    ['timeout', 'string', 'forged-timeout', WebRpcSharedKey.timeout],
+    ['timeout', 'string', 'forged-timeout', WebRpcPortName.timeout],
     ['abort', 'symbol', Symbol('forged-abort'), plannedAbortEnablementKey]
   ] as const)(
     'B12b03: real inventory rejects reserved middleware:%s spoof before Host mutation',
@@ -3676,8 +3689,8 @@ describe('B12a atomic middleware and claim contracts', () => {
       const batch = await createProductionBatch()
       const before = {
         hostKeys: Reflect.ownKeys(batch.host),
-        selectedShared: [WebRpcSharedKey.timeout, plannedAbortEnablementKey].map((key) =>
-          batch.host.getShared(key)
+        selectedShared: [WebRpcPortName.timeout, plannedAbortEnablementKey].map((key) =>
+          batch.host.getPort(key)
         ),
         subscribeCalls: batch.stats.subscribeCalls,
         activeSubscriptions: batch.stats.activeSubscriptions,
@@ -3701,8 +3714,8 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(installCalls).toBe(0)
       expect({
         hostKeys: Reflect.ownKeys(batch.host),
-        selectedShared: [WebRpcSharedKey.timeout, plannedAbortEnablementKey].map((key) =>
-          batch.host.getShared(key)
+        selectedShared: [WebRpcPortName.timeout, plannedAbortEnablementKey].map((key) =>
+          batch.host.getPort(key)
         ),
         subscribeCalls: batch.stats.subscribeCalls,
         activeSubscriptions: batch.stats.activeSubscriptions,
@@ -3713,19 +3726,19 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each([
-    ['timeout', WebRpcSharedKey.timeout],
+    ['timeout', WebRpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
   ] as const)('B12b03: optional absent %s key stays absent without residue', async (_role, key) => {
     const batch = await createProductionBatch(
-      key === WebRpcSharedKey.timeout ? { omitTimeout: true } : { omitAbort: true }
+      key === WebRpcPortName.timeout ? { omitTimeout: true } : { omitAbort: true }
     )
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    expect(batch.host.getShared(key)).toBeUndefined()
+    expect(batch.host.getPort(key)).toBeUndefined()
     await batch.host.dispose()
   })
 
   it.each([
-    ['timeout', WebRpcSharedKey.timeout],
+    ['timeout', WebRpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
   ] as const)(
     'B12b03: admitted %s publication is endpoint-local and rollback-removable',
@@ -3745,8 +3758,8 @@ describe('B12a atomic middleware and claim contracts', () => {
         left.host.installBatch(left.translated.map(({ definition }) => definition)),
         right.host.installBatch(right.translated.map(({ definition }) => definition))
       ])
-      const leftValue = left.host.getShared(key)
-      const rightValue = right.host.getShared(key)
+      const leftValue = left.host.getPort(key)
+      const rightValue = right.host.getPort(key)
       expect(leftValue).toBeDefined()
       expect(rightValue).toBeDefined()
       expect(leftValue).not.toBe(rightValue)
@@ -3756,13 +3769,13 @@ describe('B12a atomic middleware and claim contracts', () => {
       await expect(
         rollback.host.installBatch(rollback.translated.map(({ definition }) => definition))
       ).rejects.toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
-      expect(rollback.host.getShared(key)).toBeUndefined()
+      expect(rollback.host.getPort(key)).toBeUndefined()
       await rollback.host.dispose()
     }
   )
 
   it.each([
-    ['timeout', 'string', 'web-rpc.forged-timeout', WebRpcSharedKey.timeout],
+    ['timeout', 'string', 'web-rpc.forged-timeout', WebRpcPortName.timeout],
     ['abort', 'symbol', Symbol('web-rpc.forged-abort'), plannedAbortEnablementKey]
   ] as const)(
     'B12b03 RED: rejects a forged %s %s cancellation shared claim',
@@ -3779,7 +3792,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       const batch = await createProductionBatch()
       const snapshot = (): Readonly<{
         readonly hostKeys: readonly PropertyKey[]
-        readonly shared: readonly unknown[]
+        readonly ports: readonly unknown[]
         readonly extension: readonly (PropertyDescriptor | undefined)[]
         readonly stats: Readonly<{
           readonly activeSubscriptions: number
@@ -3788,8 +3801,8 @@ describe('B12a atomic middleware and claim contracts', () => {
         }>
       }> => ({
         hostKeys: Reflect.ownKeys(batch.host),
-        shared: [WebRpcSharedKey.timeout, plannedAbortEnablementKey].map((key) =>
-          batch.host.getShared(key)
+        ports: [WebRpcPortName.timeout, plannedAbortEnablementKey].map((key) =>
+          batch.host.getPort(key)
         ),
         extension: batch.descriptors
           .flatMap(({ claims }) => claims.publicKeys)
@@ -3850,7 +3863,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     })
     const snapshot = (): Readonly<{
       readonly hostKeys: readonly PropertyKey[]
-      readonly shared: readonly unknown[]
+      readonly ports: readonly unknown[]
       readonly extension: readonly (PropertyDescriptor | undefined)[]
       readonly stats: Readonly<{
         readonly activeSubscriptions: number
@@ -3859,8 +3872,8 @@ describe('B12a atomic middleware and claim contracts', () => {
       }>
     }> => ({
       hostKeys: Reflect.ownKeys(batch.host),
-      shared: [WebRpcSharedKey.timeout, plannedAbortEnablementKey].map((key) =>
-        batch.host.getShared(key)
+      ports: [WebRpcPortName.timeout, plannedAbortEnablementKey].map((key) =>
+        batch.host.getPort(key)
       ),
       extension: batch.descriptors
         .flatMap(({ claims }) => claims.publicKeys)
@@ -3894,7 +3907,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each([
-    ['timeout', WebRpcSharedKey.timeout],
+    ['timeout', WebRpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
   ] as const)(
     'B12b03 RED: admitted-but-unpublished %s output fails downstream claim parity',
@@ -3905,25 +3918,26 @@ describe('B12a atomic middleware and claim contracts', () => {
             ? async (scope) => {
                 const result = await install(scope)
                 assertPluginInstallResult(result)
-                return Object.freeze({ ...result, shared: Object.freeze({}) })
+                return Object.freeze({ ...result, ports: Object.freeze({}) })
               }
             : install
       })
-      const installed = await batch.host.installBatch(
-        batch.translated.map(({ definition }) => definition)
-      )
-      expect(() =>
-        assertFeatureClaimParity(batch.admissions, installed, batch.kernel, {
-          activated: batch.isActivated()
-        })
-      ).toThrow(WebRpcConfigurationError)
-      expect(installed.getShared(key)).toBeUndefined()
+      const failure = await batch.host
+        .installBatch(batch.translated.map(({ definition }) => definition))
+        .then(() => undefined)
+        .catch((error: unknown) => error)
+      expect(failure).toMatchObject({
+        code: 'PLUGIN_INSTALL_FAILED',
+        cause: { code: WebRpcErrorCode.invalidConfig },
+        detail: { failedName: `middleware:${role}` }
+      })
+      expect(batch.host.getPort(key)).toBeUndefined()
       await batch.host.dispose()
     }
   )
 
   it.each([
-    ['timeout', WebRpcSharedKey.timeout],
+    ['timeout', WebRpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
   ] as const)(
     'B12b03 RED: duplicate %s providers are rejected before Host mutation',
@@ -3965,7 +3979,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     timeoutMs = 99
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
     timeoutMs = 101
-    const published = batch.host.getShared(WebRpcSharedKey.timeout) as {
+    const published = batch.host.getPort(WebRpcPortName.timeout) as {
       readonly resolveTimeout: (requested?: number | false) => number | false | undefined
       readonly timeoutMs: number | false | undefined
     }
@@ -4005,7 +4019,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         construction: { signal: controller.signal as IWebRpcAbortSignal },
         injectInstall: (candidate, install) => {
           if (candidate.kind !== 'middleware' || candidate.name !== role) return install
-          const key = role === 'timeout' ? WebRpcSharedKey.timeout : plannedAbortEnablementKey
+          const key = role === 'timeout' ? WebRpcPortName.timeout : plannedAbortEnablementKey
           return async (_scope) => {
             events.push(`${role}:install`)
             await new Promise<void>((resolve) => {
@@ -4013,7 +4027,7 @@ describe('B12a atomic middleware and claim contracts', () => {
             })
             return {
               extension: Object.freeze({}),
-              shared: Object.freeze({ [key]: Object.freeze({ enabled: true }) }),
+              ports: Object.freeze({ [key]: Object.freeze({ enabled: true }) }),
               dispose: async () => events.push(`${role}:dispose`)
             }
           }
@@ -4100,7 +4114,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(batch.stats.activeSubscriptions).toBe(0)
     expect(batch.stats.dispatches).toBe(0)
     expect(batch.kernel.state).toBe('disposed')
-    expect(batch.host.getShared(plannedAbortEnablementKey)).toBeUndefined()
+    expect(batch.host.getPort(plannedAbortEnablementKey)).toBeUndefined()
     await batch.host.dispose()
   })
 
@@ -4320,11 +4334,11 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('B12b03: Store Worker direct consumers retain both cancellation middleware factories', () => {
     const workerSource = readFileSync(
-      new URL('../../../store-worker/src/worker-contract.ts', import.meta.url),
+      new URL('../../store-worker/src/worker-contract.ts', import.meta.url),
       'utf8'
     )
     const serializeSource = readFileSync(
-      new URL('../../../store-worker/src/serialize/worker.ts', import.meta.url),
+      new URL('../../store-worker/src/serialize/worker.ts', import.meta.url),
       'utf8'
     )
     expect(workerSource).toMatch(/abort\(\)/)
@@ -4395,24 +4409,21 @@ describe('B12a atomic middleware and claim contracts', () => {
       value: true
     })
     expect(WebRpcFirstPartyRoleSchema['middleware-finalize'].sharedOptionalConsumes).toEqual([
-      WebRpcSharedKey.protocol,
-      WebRpcSharedKey.contract,
-      WebRpcSharedKey.authentication,
-      WebRpcSharedKey.timeout,
-      WebRpcSharedKey.abort,
-      WebRpcSharedKey.hooks,
-      WebRpcSharedKey.ping,
-      WebRpcSharedKey.uuid
+      WebRpcPortName.protocol,
+      WebRpcPortName.contract,
+      WebRpcPortName.authentication,
+      WebRpcPortName.timeout,
+      WebRpcPortName.abort,
+      WebRpcPortName.hooks,
+      WebRpcPortName.ping,
+      WebRpcPortName.uuid
     ])
   })
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 RED: owning %s file has no legacy registry write and is a native plugin',
     (role) => {
-      const source = readFileSync(
-        new URL(`../../src/middleware/${role}.ts`, import.meta.url),
-        'utf8'
-      )
+      const source = readFileSync(new URL(`../src/middleware/${role}.ts`, import.meta.url), 'utf8')
       expect(source).not.toMatch(/capabilities\.set/)
       expect(source).toMatch(/IWebRpcPlugin/)
     }
@@ -4420,7 +4431,7 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('B12d: no owning middleware file retains the removed compatibility installer', () => {
     const source = readFileSync(
-      new URL('../../src/internal/endpoint-bootstrap.ts', import.meta.url),
+      new URL('../src/internal/endpoint-bootstrap.ts', import.meta.url),
       'utf8'
     )
     expect(source).not.toMatch(/installPluginForLegacy/)
@@ -4487,7 +4498,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       ?.framer as unknown as typeof leftFramer
     const rightSelected = right.getPrepared()?.options.components
       ?.framer as unknown as typeof rightFramer
-    const context = { source: 'atomic-framer', messageId: 'shared' }
+    const context = { source: 'atomic-framer', messageId: 'ports' }
     expect(leftSelected).not.toBe(leftFramer)
     expect(rightSelected).not.toBe(rightFramer)
     expect(leftSelected).not.toBe(rightSelected)
@@ -4774,7 +4785,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect((failure as { readonly name?: unknown }).name).toBe('PluginHostError')
       const after = productionHostSnapshot(batch)
       expect(after.hostKeys).toEqual(before.hostKeys)
-      expect(after.shared).toEqual(before.shared)
+      expect(after.ports).toEqual(before.ports)
       expect(after.extensions).toEqual(before.extensions)
       expect(batch.stats.subscribeCalls).toBe(0)
       expect(after.stats.activeSubscriptions).toBe(0)
@@ -4791,8 +4802,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     const right = await createProductionBatch({ pingMiddleware: middleware })
     await left.host.installBatch(left.translated.map(({ definition }) => definition))
     await right.host.installBatch(right.translated.map(({ definition }) => definition))
-    const leftPing = left.host.getShared(WebRpcSharedKey.ping)
-    const rightPing = right.host.getShared(WebRpcSharedKey.ping)
+    const leftPing = left.host.getPort(WebRpcPortName.ping)
+    const rightPing = right.host.getPort(WebRpcPortName.ping)
     expect(leftPing).toEqual({ enabled: true })
     expect(Object.isFrozen(leftPing)).toBe(true)
     expect(leftPing).not.toBe(rightPing)
@@ -4811,11 +4822,11 @@ describe('B12a atomic middleware and claim contracts', () => {
       const batch = await createProductionBatch()
       const key = plannedB12b04Keys[role]
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      expect(batch.host.getShared(key)).toBeDefined()
+      expect(batch.host.getPort(key)).toBeDefined()
       const first = batch.host.dispose()
       expect(batch.host.dispose()).toBe(first)
       await first
-      expect(() => batch.host.getShared(key)).toThrow()
+      expect(() => batch.host.getPort(key)).toThrow()
     }
   )
 
@@ -4843,15 +4854,15 @@ describe('B12a atomic middleware and claim contracts', () => {
       try {
         await left.host.installBatch(left.translated.map(({ definition }) => definition))
         await right.host.installBatch(right.translated.map(({ definition }) => definition))
-        const leftPort = left.host.getShared(plannedB12b04Keys[role])
-        const rightPort = right.host.getShared(plannedB12b04Keys[role])
+        const leftPort = left.host.getPort(plannedB12b04Keys[role])
+        const rightPort = right.host.getPort(plannedB12b04Keys[role])
         expect(leftPort).toBeDefined()
         expect(rightPort).toBeDefined()
         expect(leftPort).not.toBe(rightPort)
         const first = left.host.dispose()
         expect(left.host.dispose()).toBe(first)
         await first
-        expect(() => left.host.getShared(plannedB12b04Keys[role])).toThrow()
+        expect(() => left.host.getPort(plannedB12b04Keys[role])).toThrow()
       } finally {
         await right.host.dispose()
         await left.host.dispose()
@@ -5009,11 +5020,11 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(batch.isActivated()).toBe(false)
       expect(
         [
-          WebRpcSharedKey.hooks,
-          WebRpcSharedKey.ping,
-          WebRpcSharedKey.uuid,
-          WebRpcSharedKey.outboundAttachment
-        ].every((key) => batch.host.getShared(key) === undefined)
+          WebRpcPortName.hooks,
+          WebRpcPortName.ping,
+          WebRpcPortName.uuid,
+          WebRpcPortName.outboundAttachment
+        ].every((key) => batch.host.getPort(key) === undefined)
       ).toBe(true)
       const firstDispose = batch.host.dispose()
       expect(batch.host.dispose()).toBe(firstDispose)
@@ -5053,7 +5064,7 @@ describe('B12a atomic middleware and claim contracts', () => {
           nativeInstallCalls += 1
           const installation = Object.freeze({
             extension: Object.freeze({ [extensionKey]: role }),
-            shared: Object.freeze({ [key]: port })
+            ports: Object.freeze({ [key]: port })
           })
           nativeInstallation = installation
           scope.own({}, () => {
@@ -5071,10 +5082,10 @@ describe('B12a atomic middleware and claim contracts', () => {
         }),
         install: (scope: IWebRpcPluginInstallScope) => {
           consumerInstallCalls += 1
-          observedShared.push(scope.getShared(key))
+          observedShared.push(scope.getPort(key))
           const installation = Object.freeze({
             extension: Object.freeze({}),
-            shared: Object.freeze({})
+            ports: Object.freeze({})
           }) as IWebRpcPluginInstallResult
           consumerInstallation = installation
           scope.own({}, () => {
@@ -5117,7 +5128,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(consumerInstallation).toBeDefined()
       expect(observedShared).toEqual([port])
       expect(
-        (nativeInstallation as { readonly shared: Record<PropertyKey, unknown> }).shared[key]
+        (nativeInstallation as { readonly ports: Record<PropertyKey, unknown> }).ports[key]
       ).toBe(port)
       expect(Object.keys((nativeInstallation as { readonly extension: object }).extension)).toEqual(
         [extensionKey]
@@ -5269,9 +5280,9 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       )
       expect(entry.descriptor.sharedProvides).toEqual(
         expect.arrayContaining([
-          WebRpcSharedKey.inboundIdentity,
-          WebRpcSharedKey.variationCoordinator,
-          WebRpcSharedKey.outboundOperations
+          WebRpcPortName.inboundIdentity,
+          WebRpcPortName.variationCoordinator,
+          WebRpcPortName.outboundOperations
         ])
       )
       expect(entry.descriptor.sharedConsumes).toBeUndefined()
@@ -5284,7 +5295,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     const batch = await createProductionBatch()
     try {
       const entry = findCapabilitiesEntry(batch)
-      expect(entry.descriptor.sharedProvides?.includes(WebRpcSharedKey.outboundAttachment)).toBe(
+      expect(entry.descriptor.sharedProvides?.includes(WebRpcPortName.outboundAttachment)).toBe(
         false
       )
     } finally {
@@ -5296,16 +5307,16 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     const batch = await createProductionBatch()
     try {
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      const operations = batch.host.getShared(WebRpcSharedKey.outboundOperations)
-      const identity = batch.host.getShared(WebRpcSharedKey.inboundIdentity)
-      const variation = batch.host.getShared(WebRpcSharedKey.variationCoordinator)
+      const operations = batch.host.getPort(WebRpcPortName.outboundOperations)
+      const identity = batch.host.getPort(WebRpcPortName.inboundIdentity)
+      const variation = batch.host.getPort(WebRpcPortName.variationCoordinator)
       expectFrozenPort(operations, ['send'])
       expectFrozenPort(identity, ['verify'])
       expectFrozenPort(variation, ['admit'])
-      expect(batch.host.getShared(WebRpcSharedKey.outboundAttachment)).toBeUndefined()
-      expect(batch.host.getShared(WebRpcSharedKey.outboundOperations)).toBe(operations)
-      expect(batch.host.getShared(WebRpcSharedKey.inboundIdentity)).toBe(identity)
-      expect(batch.host.getShared(WebRpcSharedKey.variationCoordinator)).toBe(variation)
+      expect(batch.host.getPort(WebRpcPortName.outboundAttachment)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.outboundOperations)).toBe(operations)
+      expect(batch.host.getPort(WebRpcPortName.inboundIdentity)).toBe(identity)
+      expect(batch.host.getPort(WebRpcPortName.variationCoordinator)).toBe(variation)
     } finally {
       await batch.host.dispose()
     }
@@ -5384,13 +5395,13 @@ describe('B12c01 outbound feature production-seam matrix', () => {
         right.host.installBatch(right.translated.map(({ definition }) => definition))
       ])
       const keys = [
-        WebRpcSharedKey.outboundOperations,
-        WebRpcSharedKey.inboundIdentity,
-        WebRpcSharedKey.variationCoordinator
+        WebRpcPortName.outboundOperations,
+        WebRpcPortName.inboundIdentity,
+        WebRpcPortName.variationCoordinator
       ] as const
       for (const key of keys) {
-        const leftPort = left.host.getShared(key)
-        const rightPort = right.host.getShared(key)
+        const leftPort = left.host.getPort(key)
+        const rightPort = right.host.getPort(key)
         expect(leftPort).toBeDefined()
         expect(rightPort).toBeDefined()
         expect(leftPort).not.toBe(rightPort)
@@ -5398,8 +5409,8 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       const leftDispose = left.host.dispose()
       expect(left.host.dispose()).toBe(leftDispose)
       await leftDispose
-      for (const key of keys) expect(() => left.host.getShared(key)).toThrow()
-      expect(right.host.getShared(WebRpcSharedKey.outboundOperations)).toBeDefined()
+      for (const key of keys) expect(() => left.host.getPort(key)).toThrow()
+      expect(right.host.getPort(WebRpcPortName.outboundOperations)).toBeDefined()
     } finally {
       await Promise.all([left.host.dispose(), right.host.dispose()])
     }
@@ -5982,10 +5993,10 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       expect(failure).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED', cause: primary })
       expect(batch.stats.subscribeCalls).toBe(1)
       expect(batch.stats.activeSubscriptions).toBe(0)
-      expect(batch.host.getShared(WebRpcSharedKey.outboundAttachment)).toBeUndefined()
-      expect(batch.host.getShared(WebRpcSharedKey.outboundOperations)).toBeUndefined()
-      expect(batch.host.getShared(WebRpcSharedKey.inboundIdentity)).toBeUndefined()
-      expect(batch.host.getShared(WebRpcSharedKey.variationCoordinator)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.outboundAttachment)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.outboundOperations)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.inboundIdentity)).toBeUndefined()
+      expect(batch.host.getPort(WebRpcPortName.variationCoordinator)).toBeUndefined()
     } finally {
       await batch.host.dispose()
     }
@@ -6590,10 +6601,8 @@ describe('B12c01 outbound feature production-seam matrix', () => {
 describe('Cycle L discovery Host transactions', () => {
   it('T248 publishes and removes the real discovery resolver in one Host transaction', async () => {
     const batch = await createProductionBatch({})
-    const installed = await batch.host.installBatch(
-      batch.translated.map(({ definition }) => definition)
-    )
-    const resolver = installed.getShared(WebRpcSharedKey.discoveryResolver) as
+    await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+    const resolver = batch.host.getPort(WebRpcPortName.discoveryResolver) as
       | { readonly resolve: (targetId: string) => unknown }
       | undefined
     expect(resolver).toBeDefined()
@@ -6604,8 +6613,8 @@ describe('Cycle L discovery Host transactions', () => {
     expect(batch.host.dispose()).toBe(firstDispose)
     await firstDispose
     expect(
-      productionResidueSnapshot(batch).shared.find(
-        ({ key }) => key === WebRpcSharedKey.discoveryResolver
+      productionResidueSnapshot(batch).ports.find(
+        ({ key }) => key === WebRpcPortName.discoveryResolver
       )?.value
     ).toBeUndefined()
     expectTerminalResidue(productionResidueSnapshot(batch))
@@ -6619,9 +6628,9 @@ describe('Cycle L discovery Host transactions', () => {
     const late = definePlugin({
       name: lateName,
       claims: emptyClaims,
-      sharedConsumes: [WebRpcSharedKey.discoveryResolver],
-      install: async (core) => {
-        published = core.getShared(WebRpcSharedKey.discoveryResolver)
+      sharedConsumes: [WebRpcPortName.discoveryResolver],
+      install: async (core: IWebRpcPluginCore) => {
+        published = core.getPort(WebRpcPortName.discoveryResolver)
         throw primary
       }
     }) as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
@@ -6644,8 +6653,8 @@ describe('Cycle L discovery Host transactions', () => {
     expect(batch.host.dispose()).toBe(firstDispose)
     await firstDispose
     expect(
-      productionResidueSnapshot(batch).shared.find(
-        ({ key }) => key === WebRpcSharedKey.discoveryResolver
+      productionResidueSnapshot(batch).ports.find(
+        ({ key }) => key === WebRpcPortName.discoveryResolver
       )?.value
     ).toBeUndefined()
     expectTerminalResidue(productionResidueSnapshot(batch))
@@ -6686,8 +6695,8 @@ describe('Cycle L discovery Host transactions', () => {
     expect(batch.host.dispose()).toBe(firstDispose)
     expect(discoveryDisposeCalls).toBe(1)
     expect(
-      productionResidueSnapshot(batch).shared.find(
-        ({ key }) => key === WebRpcSharedKey.discoveryResolver
+      productionResidueSnapshot(batch).ports.find(
+        ({ key }) => key === WebRpcPortName.discoveryResolver
       )?.value
     ).toBeUndefined()
     expectTerminalResidue(productionResidueSnapshot(batch))
@@ -6702,7 +6711,7 @@ describe('Cycle L discovery Host transactions', () => {
         scope.own({}, () => {
           throw cleanup
         })
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     }
     const [transport] = createMemoryTransportPair()

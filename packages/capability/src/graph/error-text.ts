@@ -27,7 +27,9 @@ export const CapabilityGraphErrorText = {
   /** Stable reentrancy message consumed by callback guards. */
   reentrantOperation: 'capability graph operation is reentrant',
   /** Stable option-admission message consumed by factory validation. */
-  invalidOption: 'capability graph option admission failed'
+  invalidOption: 'capability graph option admission failed',
+  /** Stable dependency-block message consumed by reject-policy mutations. */
+  nodeHasDependents: 'capability graph node has required dependents'
 } as const
 
 export type ICapabilityGraphErrorText =

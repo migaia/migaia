@@ -3,7 +3,7 @@ import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { invokeCaptured } from './invocation.js'
-import type { IRegistration, ISharedEntry } from './registry.js'
+import type { IRegistration } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import { markRegistrationRevoked } from './composition.js'
 import type { IDataOrderSlotState } from './composition.js'
@@ -11,13 +11,11 @@ import type { IPluginDisposalContext } from './typing.js'
 
 export type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
-  readonly shared: Map<PropertyKey, ISharedEntry<TDomainCore, TValue>>
-  readonly retiredShared: Map<PropertyKey, string>
   readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
   readonly pipelineLeases: IQuiescenceTracker<object>
   readonly pipelineOwnerKeys: Map<string, object>
   readonly stageSlots: Map<string, IDataOrderSlotState>
-  readonly removePipelineOwner: (name: string) => void
+  readonly removePipelineOwner: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly host: object
   readonly executionSignal: IAbortSignal
   readonly cleanupRuntime: PluginHostCleanupRuntime
@@ -52,7 +50,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     this.#port.pipelineLeases.seal(registration.pipelineOwnerKey)
     if (this.#port.pipelineOwnerKeys.get(registration.name) === registration.pipelineOwnerKey)
       this.#port.pipelineOwnerKeys.delete(registration.name)
-    this.#port.removePipelineOwner(registration.name)
+    this.#port.removePipelineOwner(registration)
     if (this.#port.registrations.get(registration.name) === registration)
       this.#port.registrations.delete(registration.name)
     this.#removeOwnedPublication(registration)
@@ -165,13 +163,8 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     return registration.plugin.disposer
   }
 
-  /** Removes shared and extension capabilities still owned by the exact registration. */
+  /** Removes extension capabilities still owned by the exact registration. */
   #removeOwnedPublication(registration: IRegistration<TDomainCore, TValue>): void {
-    for (const key of registration.shared)
-      if (this.#port.shared.get(key)?.owner === registration) {
-        this.#port.shared.delete(key)
-        this.#port.retiredShared.set(key, registration.name)
-      }
     for (const { key } of [...registration.extensions].reverse())
       if (this.#port.extensionOwners.get(key) === registration)
         this.#port.extensionOwners.delete(key)

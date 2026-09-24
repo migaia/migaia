@@ -27,7 +27,7 @@ import { SourceIdentityRegistry } from '../../src/internal/source-identity.js'
 import { WebRpcVariationCoordinator } from '../../src/internal/variation-coordinator.js'
 import { WebRpcOutboundAttachment } from '../../src/internal/outbound-attachment.js'
 import { prepareEndpoint } from '../../src/internal/endpoint-bootstrap.js'
-import { WebRpcSharedKey } from '../../src/internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../../src/internal/plugin-shared-keys.js'
 import type { IWebRpcTransport } from '../../src/transport.js'
 import type {
   IWebRpcOutboundCommand,
@@ -105,7 +105,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     const candidate = (await import('../fixtures/tree-shaking/post-migration-candidate.json', {
       with: { type: 'json' }
     })) as { readonly default: IPostMigrationCandidate }
-    const custody = (await import('../fixtures/tree-shaking/f004-intended-cost-custody.json', {
+    const custody = (await import('../fixtures/tree-shaking/intended-cost-custody-baseline.json', {
       with: { type: 'json' }
     })) as {
       readonly default: {
@@ -538,7 +538,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     const prepared = await deferred.finalize(
       [],
       async (operation) => await operation(),
-      (key) => (key === WebRpcSharedKey.connect ? connectPort : undefined)
+      (key) => (key === WebRpcPortName.connect ? connectPort : undefined)
     )
     const outbound = new WebRpcOutboundAttachment(kernel, prepared)
     let sentQueryTask = ''

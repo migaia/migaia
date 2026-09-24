@@ -13,6 +13,7 @@ export const CapabilityGraphNodeState = {
   registered: 'registered',
   starting: 'starting',
   ready: 'ready',
+  suspended: 'suspended',
   failed: 'failed',
   blocked: 'blocked',
   rolledBack: 'rolled-back',

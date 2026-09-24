@@ -1,3 +1,4 @@
+import { reportDiagnostic } from './diagnostic-report.js'
 import { LifecycleErrorCode } from '@migaia/lifecycle'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -16,13 +17,10 @@ export const reportQueueWait = (
   diagnostic: (message: string) => void,
   info: { readonly owner: string | undefined; readonly waitedMs: number }
 ): void => {
-  try {
-    diagnostic(
-      `[plugin-host] mutation waited in the queue for ${info.waitedMs}ms${info.owner ? ` (owner: ${info.owner})` : ''}`
-    )
-  } catch {
-    // Diagnostics must never alter control flow.
-  }
+  reportDiagnostic(
+    diagnostic,
+    `[plugin-host] mutation waited in the queue for ${info.waitedMs}ms${info.owner ? ` (owner: ${info.owner})` : ''}`
+  )
 }
 
 /**

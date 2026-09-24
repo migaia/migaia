@@ -10,17 +10,15 @@ import type { IWebRpcMiddleware, IWebRpcPlugin, IWebRpcPluginInstallResult } fro
 import type { IWebRpcHookEvent } from '../src/typing.js'
 import type { IWebRpcPluginConstraint } from '../src/internal/plugin-contract.js'
 import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
+import { WebRpcErrorCode } from '../src/errors.js'
 
 type IObservedHost = {
   readonly config: { readonly get: (path: string) => unknown }
   readonly dispose: () => Promise<IPluginHostDisposalResult>
-  readonly getShared: (key: PropertyKey) => unknown
+  readonly getPort: (key: PropertyKey) => unknown
 }
 
-type IObservedView = {
-  readonly extensions: Readonly<Record<PropertyKey, unknown>>
-  readonly getShared: (key: PropertyKey) => unknown
-}
+type IObservedView = readonly unknown[]
 
 type IObservedBatch = {
   readonly host: IObservedHost
@@ -75,7 +73,7 @@ vi.mock('../src/internal/web-rpc-plugin-host.js', async () => {
         observed.events.push('host:installBatch')
         observed.batches.push({ host: wrapped, names: plugins.map((plugin) => plugin.name) })
         const view = await host.installBatch(plugins)
-        observed.views.push(view as IObservedView)
+        observed.views.push(view as unknown as IObservedView)
         return view
       },
       dispose: (): Promise<IPluginHostDisposalResult> => {
@@ -108,7 +106,7 @@ const hostControlKeys = [
   'useAsyncPipeline',
   'useGeneratorPipeline',
   'useAsyncGeneratorPipeline',
-  'getShared',
+  'getPort',
   'config',
   'use',
   'unUse'
@@ -162,7 +160,7 @@ function createSharedMiddleware(
 ): IWebRpcPlugin {
   const result: IWebRpcPluginInstallResult = {
     extension: {},
-    shared: { [key]: value }
+    ports: { [key]: value }
   }
   return {
     name,
@@ -209,7 +207,7 @@ describe('MET-RED-006 PluginHost batch completeness', () => {
 
 describe('MET-RED-007 Host rollback ownership', () => {
   it('proves extension, shared publication, and resources roll back once', async () => {
-    const sharedKey = Symbol('transaction-shared')
+    const sharedKey = 'transaction-shared'
     const firstValue = Object.freeze({ owner: 'first' })
     const extensionValue = vi.fn()
     let resourceDisposals = 0
@@ -229,7 +227,7 @@ describe('MET-RED-007 Host rollback ownership', () => {
     const failingFeature = createFeatureModule('transaction-failing-feature', async () => {
       const host = observed.hosts[0]
       observedExtension = undefined
-      observedShared = host?.getShared(sharedKey)
+      observedShared = host?.getPort(sharedKey)
       throw primaryFailure
     })
     const failure = await createComposedEndpoint(
@@ -238,9 +236,8 @@ describe('MET-RED-007 Host rollback ownership', () => {
     ).catch((error: unknown) => error)
 
     expect(failure).toBe(primaryFailure)
-    // Async batch publication is atomic: an external Host observer cannot see a candidate
-    // registration before the later member succeeds.
-    expect(observedShared).toBeUndefined()
+    // Construction-time consumers can read an earlier provider from the same ordered batch.
+    expect(observedShared).toBe(firstValue)
     expect(observedExtension).toBeUndefined()
     expect(resourceDisposals).toBe(1)
     expect(featureDisposals).toBe(1)
@@ -248,8 +245,8 @@ describe('MET-RED-007 Host rollback ownership', () => {
     expect(observed.batches).toHaveLength(1)
     const host = observed.hosts[0]!
     expect(Object.hasOwn(host, 'transactionExtension')).toBe(false)
-    expect(() => host.getShared(sharedKey)).toThrow(
-      expect.objectContaining({ code: 'HOST_DISPOSED' })
+    expect(() => host.getPort(sharedKey)).toThrow(
+      expect.objectContaining({ code: WebRpcErrorCode.endpointDisposed })
     )
     expect(observed.disposals).toHaveLength(1)
     expect(new Set(observed.disposals.map(({ host: disposedHost }) => disposedHost)).size).toBe(1)
@@ -265,7 +262,7 @@ describe('MET-RED-016 activation boundary', () => {
       metadata: { claims: emptyClaims },
       install: () => {
         installSubscriptionCount = subscriptions
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     }
     const endpoint = await createComposedEndpoint(
@@ -290,7 +287,7 @@ describe('MET-RED-016 activation boundary', () => {
       metadata: { claims: emptyClaims },
       install: () => {
         installSubscriptionCount = subscriptions
-        return { extension: {}, shared: {} }
+        return { extension: {}, ports: {} }
       }
     }
     const primaryFailure = new Error('later activation batch member failed')
@@ -360,7 +357,7 @@ describe('MET-RED-024 preflight conflict ownership', () => {
         metadata: { claims: { ...emptyClaims, ...claims } },
         install: async () => {
           installs += 1
-          return { extension: {}, shared: {} }
+          return { extension: {}, ports: {} }
         }
       })
       const second = defineMiddleware({
@@ -368,7 +365,7 @@ describe('MET-RED-024 preflight conflict ownership', () => {
         metadata: { claims: { ...emptyClaims, ...claims, publicKeys } },
         install: async () => {
           installs += 1
-          return { extension: {}, shared: {} }
+          return { extension: {}, ports: {} }
         }
       })
       const failure = await createComposedEndpoint(

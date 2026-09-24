@@ -11,7 +11,7 @@ import type { IWebRpcFeature } from '../feature.js'
 import type { IWebRpcPluginConstraint, IWebRpcPluginCore } from './plugin-contract.js'
 import type { IRpcFeatureExpose, IWebRpcOutboundCommandObservation } from './feature-contract.js'
 import {
-  WebRpcSharedKey,
+  WebRpcPortName,
   type IWebRpcCandidatePingPort,
   type IWebRpcTimePort
 } from './plugin-shared-keys.js'
@@ -21,6 +21,7 @@ import {
   registerEndpointDebugSnapshot,
   type IWebRpcDiscoveryCleanupFaults
 } from './test-observer.js'
+import { createWebRpcPortFeatureSet } from './port-feature.js'
 
 /** Read-only endpoint facts supplied to native first-party Features after middleware preparation. */
 export type IEndpointCapabilitiesFeatureExpose = IRpcFeatureExpose
@@ -57,7 +58,7 @@ type IEndpointCapabilitiesContext = Pick<IRpcFeatureExpose, 'getKernel' | 'getPr
    * absent.
    */
   readonly transformOutput?: (
-    phase: 'shared' | 'extension',
+    phase: 'ports' | 'extension',
     output: Readonly<Record<PropertyKey, unknown>>
   ) => Readonly<Record<PropertyKey, unknown>>
   /** Test-only seam wraps a named native prepare operation without cloning its Feature definition. */
@@ -76,6 +77,9 @@ export const createEndpointCapabilitiesPlugin = (
   sharedRoots: readonly string[] = [],
   publicRoots: ReadonlySet<string> | undefined = undefined
 ): IEndpointCapabilitiesPlugin => {
+  /** First-party attachments publish these ports as ordinary PluginHost Features. */
+  const providedPortNames = getFirstPartyPortNames(roots)
+  const portFeatures = createWebRpcPortFeatureSet(providedPortNames)
   /** One installation-owned key snapshot becomes available before the activation Plugin runs. */
   let publicKeys: readonly string[] = Object.freeze([])
   let hooks: { on(listener: import('../typing.js').IWebRpcHook): () => void } | undefined
@@ -95,10 +99,11 @@ export const createEndpointCapabilitiesPlugin = (
     IFeatureRecord,
     IEndpointCapabilitiesFeatureExpose,
     Record<string, unknown>,
-    Record<PropertyKey, unknown>
+    Record<never, never>
   >(
     'endpoint-capabilities',
     (core) => {
+      const portRuntime = portFeatures.createRuntime()
       /**
        * Runs first-party attachment preparation after middleware finalization, never in Feature
        * factories.
@@ -110,7 +115,7 @@ export const createEndpointCapabilitiesPlugin = (
             transport: core.transport,
             control: core.construction,
             hooks: core.hooks,
-            getShared: (key) => core.getShared(key),
+            getPort: (key) => core.getPort(key),
             report: (error) => {
               core.hooks({
                 name: 'failure',
@@ -144,6 +149,9 @@ export const createEndpointCapabilitiesPlugin = (
             return {}
           }
         )
+        const ports = collectFirstPartyPorts()
+        portRuntime.publish(ports)
+        core.publishPortFeatures(portRuntime.outputs)
         return {}
       }
       activate = (): void => {
@@ -158,18 +166,18 @@ export const createEndpointCapabilitiesPlugin = (
           activateFeature()
         }
       }
-      /** Publishes selected first-party ports before legacy reader attachments install. */
-      const shared = (): Readonly<Record<PropertyKey, unknown>> => {
+      /** Collects selected first-party ports before dependent attachments install. */
+      const collectFirstPartyPorts = (): Readonly<Record<PropertyKey, unknown>> => {
         const ports: Record<PropertyKey, unknown> = Object.create(null)
         for (const name of sharedRoots) {
           const output = core.features[name]
-          const createShared = output && (output as { readonly shared?: unknown }).shared
-          if (typeof createShared !== 'function')
+          const createPorts = output && (output as { readonly ports?: unknown }).ports
+          if (typeof createPorts !== 'function')
             throw new WebRpcError(
               WebRpcErrorCode.invalidConfig,
               WebRpcErrorText.endpointModuleInvalid
             )
-          const values = createShared()
+          const values = createPorts()
           if (!values || typeof values !== 'object')
             throw new WebRpcError(
               WebRpcErrorCode.invalidConfig,
@@ -191,12 +199,13 @@ export const createEndpointCapabilitiesPlugin = (
           }
         }
         const output = Object.freeze(ports)
-        return context.transformOutput?.('shared', output) ?? output
+        return context.transformOutput?.('ports', output) ?? output
       }
       /** Feature outputs become ready after descriptor creation and before Host publication. */
       const expose = (): Readonly<Record<string, unknown>> => {
         const projection: Record<string, unknown> = Object.create(null)
         for (const [name, output] of Object.entries(core.features)) {
+          if (!Object.hasOwn(roots, name)) continue
           if (publicRoots && !publicRoots.has(name)) continue
           const policy = readFeaturePolicy(roots[name]!)
           const prepared = preparedOutputs[name] as { readonly public?: object } | undefined
@@ -254,21 +263,21 @@ export const createEndpointCapabilitiesPlugin = (
       return Object.freeze({
         install,
         expose,
-        shared,
         featureExpose: () =>
           Object.freeze({
+            ...portRuntime.expose,
             getKernel: context.getKernel,
             getPrepared: context.getPrepared,
-            getTime: () => core.getShared(WebRpcSharedKey.time) as IWebRpcTimePort,
+            getTime: () => core.getPort(WebRpcPortName.time) as IWebRpcTimePort,
             getCandidatePing: () =>
-              core.getShared(WebRpcSharedKey.candidatePing) as IWebRpcCandidatePingPort | undefined,
+              core.getPort(WebRpcPortName.candidatePing) as IWebRpcCandidatePingPort | undefined,
             ...(context.observeOutboundCommand
               ? { observeOutboundCommand: context.observeOutboundCommand }
               : {})
           })
       })
     },
-    roots as IFeatureRecord
+    Object.freeze({ ...roots, ...portFeatures.features }) as IFeatureRecord
   )
   return Object.freeze({
     definition: definition as IWebRpcPluginConstraint,
@@ -332,19 +341,26 @@ export const createEndpointCapabilitiesBatchFeature = (
         exposedKeys: publicClaims.flatMap((claim) => claim.exposedKeys),
         activator: false
       }),
-      sharedProvides: Object.freeze([
-        ...(roots['first-party-outbound']
-          ? [
-              WebRpcSharedKey.inboundIdentity,
-              WebRpcSharedKey.variationCoordinator,
-              WebRpcSharedKey.outboundOperations
-            ]
-          : []),
-        ...(roots['first-party-discovery'] ? [WebRpcSharedKey.discoveryResolver] : []),
-        ...(roots['first-party-control'] ? [WebRpcSharedKey.candidatePing] : []),
-        ...(roots['first-party-provider'] ? [WebRpcSharedKey.providerCancellation] : [])
-      ])
+      sharedProvides: getFirstPartyPortNames(roots)
     }),
     firstPartyPolicies: Object.freeze(firstPartyPolicies)
   })
+}
+
+/** Returns the stable port Feature names contributed by selected first-party roots. */
+function getFirstPartyPortNames(
+  roots: Readonly<Record<string, IWebRpcFeature>>
+): readonly string[] {
+  return Object.freeze([
+    ...(roots['first-party-outbound']
+      ? [
+          WebRpcPortName.inboundIdentity,
+          WebRpcPortName.variationCoordinator,
+          WebRpcPortName.outboundOperations
+        ]
+      : []),
+    ...(roots['first-party-discovery'] ? [WebRpcPortName.discoveryResolver] : []),
+    ...(roots['first-party-control'] ? [WebRpcPortName.candidatePing] : []),
+    ...(roots['first-party-provider'] ? [WebRpcPortName.providerCancellation] : [])
+  ])
 }

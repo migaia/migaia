@@ -112,7 +112,7 @@
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
     "lint": "oxlint src test e2e",
-    "test": "vitest run test --coverage",
+    "test": "vitest run --coverage",
     "test:control-plane": "node test/control-plane/run.mjs",
     "test:tree-shaking-baseline": "node test/tree-shaking-baseline.mjs",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",

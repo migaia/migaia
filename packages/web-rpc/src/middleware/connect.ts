@@ -7,7 +7,7 @@ import type {
 import type { IWebRpcTransport } from '../transport.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import { safeRead } from '../internal/safe-value.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 
 export type IConnectConfig = IWebRpcConnectConfig
@@ -52,12 +52,12 @@ export const connect = <TMode extends IWebRpcDiscoveryMode = 'automatic'>(
     transport: configuredTransport,
     metadata: {
       claims: emptyClaims(),
-      sharedProvides: [WebRpcSharedKey.connect]
+      sharedProvides: [WebRpcPortName.connect]
     },
     install: ({ id, transport }) => ({
       extension: {},
-      shared: {
-        [WebRpcSharedKey.connect]: createConnectCapability(
+      ports: {
+        [WebRpcPortName.connect]: createConnectCapability(
           id,
           transport,
           configuredIdentifier,
@@ -201,7 +201,7 @@ function invalidConnectPlugin(message: string, cause?: unknown): IWebRpcPlugin {
     name: 'connect',
     metadata: {
       claims: emptyClaims(),
-      sharedProvides: [WebRpcSharedKey.connect]
+      sharedProvides: [WebRpcPortName.connect]
     },
     install: () => {
       throw new WebRpcError(WebRpcErrorCode.invalidConfig, message, cause)

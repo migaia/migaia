@@ -401,7 +401,7 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
     },
     discoveryMode: 'manual' as const,
     pingCapability: true as const,
-    install: () => ({ extension: {}, shared: {} })
+    install: () => ({ extension: {}, ports: {} })
   })
   const objectComponentEndpoint = await createFullEndpoint({
     id: 'object-component-contribution',

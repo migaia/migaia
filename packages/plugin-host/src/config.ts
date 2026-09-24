@@ -103,8 +103,8 @@ export const copyConfigWithPatch = (
 export const parseConfigPath = (path: string): string[] => {
   try {
     return [...parseUtilsConfigPath(path)]
-  } catch {
-    throw createPluginHostTypeError('config path is invalid')
+  } catch (cause) {
+    throw createPluginHostTypeError('config path is invalid', { cause })
   }
 }
 export const readConfigPath = (config: IPluginConfig, segments: readonly string[]): unknown => {

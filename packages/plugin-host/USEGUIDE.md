@@ -55,7 +55,8 @@ import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'
 | 字段                          | 类型                                                               | 默认值                 | 说明                                                                                                                                                             |
 | ----------------------------- | ------------------------------------------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pipeline?`                   | `{ mode?: 'sync' \| 'async' \| 'generator' \| 'async-generator' }` | `{ mode: 'sync' }`     | Pipeline 模式；构造后不能切换。`mode` 不在合法取值集合内会抛 `INVALID_PIPELINE_MODE`。                                                                           |
-| `diagnostic?`                 | `(message: string, code?: IPluginHostErrorCode) => void`           | 空操作（no-op）        | 接收"不构成错误但值得关注"的信号，见 [§9](#9-错误码完整参考)。不是函数会抛 `TypeError`（`INVALID_OPTION`）；诊断回调自身抛出的异常永远不会影响宿主正常执行流程。 |
+| `onDiagnosticFailure?`        | `(error: unknown) => void` | 交给 `globalThis.reportError`（若存在） | `diagnostic` 自身抛错/reject 时收到原失败对象；Node 无 `reportError`，需要观测时显式提供。不是函数抛 `TypeError`（`INVALID_OPTION`）。 |
+| `diagnostic?`                 | `(message: string, code?: IPluginHostErrorCode, error?: unknown) => void` | 空操作（no-op）        | 接收"不构成错误但值得关注"的信号，见 [§9](#9-错误码完整参考)。不是函数会抛 `TypeError`（`INVALID_OPTION`）；诊断回调自身抛出的异常永远不会影响宿主正常执行流程。 |
 | `scheduler?`                  | `ILifecycleScheduler`（来自 `@migaia/lifecycle`）                  | 内部 `systemScheduler` | 队列排队计时、disposal 计时共用的时间源。传入对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`（`INVALID_OPTION`）。                                         |
 | `queueAdmissionTimeoutMs?`    | `number \| false`                                                  | `undefined`            | mutation 在 FIFO 队列中排队被拒绝的阈值。见下方说明。                                                                                                            |
 | `queueAdmissionDiagnosticMs?` | `number \| false`                                                  | `1000`                 | 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值。见下方说明。                                                                                       |
@@ -84,11 +85,10 @@ const host = new Host({
 | API                                     | 参数                                                               | 返回                                                    | 作用                                                                              |
 | --------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `host.use(...plugins)`                  | 至少 1 个 `IPlugin`，按顺序安装                                    | `Promise<Host & Extensions>`                            | 运行期安装插件；批次内任一失败按逆序回滚整批，见 [§8](#8-生命周期与错误)。        |
-| `host.unUse(name)`                      | `name: string`                                                     | `Promise<void>`                                         | 卸载该插件及其 extension/shared/stage/资源；未知名称无操作（不抛错）。            |
+| `host.unUse(name)`                      | `name: string`                                                     | `Promise<IPluginRemoval>`                               | 依赖安全地卸载插件及其 extension/stage/资源。                                     |
 | `host.dispose()`                        | 无                                                                 | `Promise<void>`                                         | 卸载全部插件并永久关闭宿主；重复调用复用同一 Promise。                            |
 | `host.config.get(path)`                 | `path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`        | `unknown \| undefined`                                  | 同步读取；对象/数组返回 Readonly 懒代理；未知插件或路径返回 `undefined`。         |
 | `host.config.update(name, recipe)`      | `name: string`；`recipe(previous) => Partial<patch>`（须同步返回） | `Promise<void>`                                         | Copy-on-Write 合并 patch，跑 `plugin.update(next, core)` 成功才提交。             |
-| `host.getShared(key)`                   | `key: PropertyKey`                                                 | `T \| undefined`                                        | 读取已安装 provider 的 shared 值，原始引用、不做只读包装。                        |
 | `host.pipelineMode`                     | 无（只读属性）                                                     | `'sync' \| 'async' \| 'generator' \| 'async-generator'` | 构造时固定的 pipeline 模式。                                                      |
 | `host.usePipeline(stage)`               | `stage: (value, next) => void`                                     | `this`                                                  | 按当前 mode 注册；async/generator/async-generator mode 会自动适配这个 sync 签名。 |
 | `host.useAsyncPipeline(stage)`          | `stage: (value, next) => void \| Promise<void>`                    | `this`                                                  | 仅 async mode 可用，否则抛 `PIPELINE_MODE_MISMATCH`；`next()` 返回 Promise。      |
@@ -98,7 +98,7 @@ const host = new Host({
 
 `host.config.get(path)` 与 `host.config.update()` 都要求 Host 处于 `active` 状态，否则前者同步抛 `HOST_DISPOSING`/`HOST_DISPOSED`，后者在其内部队列任务中以同样的错误 reject。两者的"找不到插件"语义不对称：`get(path)` 对不存在的插件或缺失路径返回 `undefined`（读取是探测性操作）；`update(name, ...)` 对不存在的插件抛出 `PLUGIN_NOT_INSTALLED`（写入是明确的意图表达）。`host.config` facade 本身在重复访问时保持同一引用（懒加载单例）。
 
-`getShared()` 返回 provider 明确共享的原始引用，不提供 config 式的只读隔离；provider 与 consumer 应共同约定其可变性和生命周期。
+跨插件能力由 Feature 引用表达；Host 依据引用拓扑排序安装，并在 provider 缺失、禁用或移除时给出对应的前置条件错误。
 
 错误边界约定：`PluginHostError` 用于可由调用方按错误码处理的 host 状态/协议错误；入参形状校验（插件名/配置路径/pipeline stage/extension/domain core/资源 disposer 等不满足 JavaScript API 约束）一律用原生 `TypeError`（挂 `code: 'INVALID_OPTION'`）表达，不是 `PluginHostError`——判断输入错误用 `error instanceof TypeError`，判断协议/状态错误用 `error instanceof PluginHostError` 或按 `error.code` 分支。
 
@@ -126,18 +126,18 @@ const prefix: IPlugin<IPluginCore, { greet(name: string): void }, IPluginConfig>
 }
 ```
 
-`IPlugin<TCore, TExt, TConfig, TShared>` 全部字段：
+`IPlugin<TCore, TExt, TConfig>` 全部字段：
 
-| 字段 / 签名                                     | 输入                                                                         | 必填性 | 返回值                  | 同步/异步 | 作用                                                                                                                |
-| ----------------------------------------------- | ---------------------------------------------------------------------------- | ------ | ----------------------- | --------- | ------------------------------------------------------------------------------------------------------------------- |
-| `name: string`                                  | 非空字符串，**不能包含 `.`**                                                 | 必填   | 无                      | —         | 当前 Host 内的唯一插件标识；含 `.` 会在安装入口直接被拒绝（避免和 `config.get('plugin.key')` 的路径解析产生歧义）。 |
-| `config?: TConfig`                              | `TConfig extends Record<string, unknown>`                                    | 可选   | 无                      | —         | 初始配置；Host 以深拷贝的所有权快照保存（见 [§5](#5-配置系统)）。                                                   |
-| `install(core)`                                 | 领域 core 与 `config.get()`、`getShared()`、`onDispose()`、pipeline 注册方法 | 必填   | `TExt \| Promise<TExt>` | 视情况    | 初始化插件并返回 plain extension record；同步安装（`useSync`）不允许返回 Promise。                                  |
-| `shared?(core)`                                 | 同 `install` core                                                            | 可选   | `TShared` plain record  | 同步      | 注册供后续插件读取的能力；必须**同步**返回，不支持 `Promise`。同名 key 已存在会在安装期抛 `SHARED_DUPLICATE`。      |
-| `update?(next, core)`                           | `next: IReadonlyConfig<TConfig>`，候选完整配置                               | 可选   | `void \| Promise<void>` | 视情况    | 响应 `config.update`；成功返回才提交 `next`，且 `next` 只能读取。                                                   |
-| `dispose?()`                                    | 无                                                                           | 可选   | `void \| Promise<void>` | 视情况    | 插件级清理。                                                                                                        |
-| `[disposeKey]?` / `[Symbol.dispose]?`           | 无                                                                           | 可选   | `void`                  | 同步      | 未声明 `dispose` 时的同步清理兜底；也接受宿主原生 `Symbol.dispose`（若存在）。                                      |
-| `[asyncDisposeKey]?` / `[Symbol.asyncDispose]?` | 无                                                                           | 可选   | `void \| Promise<void>` | 视情况    | 未声明 `dispose` 时的清理兜底；同步安装（`useSync`）的插件不支持这个异步形式，见 [§4](#4-插件-core-api-参考)。      |
+| 字段 / 签名                                     | 输入                                                                        | 必填性 | 返回值                  | 同步/异步 | 作用                                                                                                                |
+| ----------------------------------------------- | --------------------------------------------------------------------------- | ------ | ----------------------- | --------- | ------------------------------------------------------------------------------------------------------------------- |
+| `name: string`                                  | 非空字符串，**不能包含 `.`**                                                | 必填   | 无                      | —         | 当前 Host 内的唯一插件标识；含 `.` 会在安装入口直接被拒绝（避免和 `config.get('plugin.key')` 的路径解析产生歧义）。 |
+| `config?: TConfig`                              | `TConfig extends Record<string, unknown>`                                   | 可选   | 无                      | —         | 初始配置；Host 以深拷贝的所有权快照保存（见 [§5](#5-配置系统)）。                                                   |
+| `install(core)`                                 | 领域 core 与 `config.get()`、Feature 输出、`onDispose()`、pipeline 注册方法 | 必填   | `TExt \| Promise<TExt>` | 视情况    | 初始化插件并返回 plain extension record；同步安装（`useSync`）不允许返回 Promise。                                  |
+| `features`                                      | 命名 Feature 定义或 provider 的 Feature 引用                                | 可选   | Feature record          | 同步      | 声明本插件提供和消费的实例能力；依赖拓扑由 Host 统一解析。                                                          |
+| `update?(next, core)`                           | `next: IReadonlyConfig<TConfig>`，候选完整配置                              | 可选   | `void \| Promise<void>` | 视情况    | 响应 `config.update`；成功返回才提交 `next`，且 `next` 只能读取。                                                   |
+| `dispose?()`                                    | 无                                                                          | 可选   | `void \| Promise<void>` | 视情况    | 插件级清理。                                                                                                        |
+| `[disposeKey]?` / `[Symbol.dispose]?`           | 无                                                                          | 可选   | `void`                  | 同步      | 未声明 `dispose` 时的同步清理兜底；也接受宿主原生 `Symbol.dispose`（若存在）。                                      |
+| `[asyncDisposeKey]?` / `[Symbol.asyncDispose]?` | 无                                                                          | 可选   | `void \| Promise<void>` | 视情况    | 未声明 `dispose` 时的清理兜底；同步安装（`useSync`）的插件不支持这个异步形式，见 [§4](#4-插件-core-api-参考)。      |
 
 `install()` 返回的 extension 对象上，只有**可枚举的 data property** 会被挂载到 host——非枚举 key 会被有意忽略并经 `diagnostic` 回调上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性、或非 `configurable` 的属性直接抛 `TypeError`（`INVALID_OPTION`）。extension 对象本身必须是普通对象（`null`/`Object.prototype` 原型），否则抛 `TypeError`。**保留键不能作为 extension key**：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object.prototype` 成员（如 `toString`）冲突抛 `EXTENSION_OBJECT_PROTOTYPE`。`catch`、`finally` 可以正常使用（不在保留键集合内）。
 
@@ -162,21 +162,20 @@ const configurable = definePlugin({
 })
 ```
 
-第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose`、`shared` hooks；第二种保留对象形可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`defineHost()` 与 `PluginHost` 都只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。
+第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose` hooks；第二种对象形可提供 `config`、`features`、`featureExpose`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`defineHost()` 与 `PluginHost` 都只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。
 
 安装时获得的 `core` 是一个稳定的 facade（`src/core.ts` 的 `createPluginCore`）。它包含子类提供的领域方法，加上下面的通用能力：
 
 | API / 签名                              | 参数                                                                 | 必填性          | 返回值               | 同步/异步 | 作用                                                                                 |
 | --------------------------------------- | -------------------------------------------------------------------- | --------------- | -------------------- | --------- | ------------------------------------------------------------------------------------ |
 | `core.config.get<T>()`                  | 可选泛型 `T`，通常由插件 `config` 推导                               | 无运行时参数    | `IReadonlyConfig<T>` | 同步      | 当前插件已提交配置的只读懒代理；嵌套对象/数组按访问路径缓存代理，不允许修改。        |
-| `core.getShared<T>(key)`                | `key: PropertyKey`                                                   | `key` 必填      | `T \| undefined`     | 同步      | 读取安装顺序中更早的 provider 提供的 shared 值。                                     |
 | `core.onDispose(resource)`              | `IPluginResource`（函数 / `Symbol.dispose` / `Symbol.asyncDispose`） | `resource` 必填 | `void`               | 同步      | **仅 `install()` 期间可调用**；否则抛 `RESOURCE_OUTSIDE_INSTALL`；卸载时按逆序执行。 |
 | `core.usePipeline(stage)`               | `stage: (value, next) => void`                                       | `stage` 必填    | `core`               | 同步      | 同 Host 侧 `usePipeline`；仅 install 期间可注册，pipeline 执行期间也拒绝。           |
 | `core.useAsyncPipeline(stage)`          | `stage: (value, next) => void \| Promise<void>`                      | `stage` 必填    | `core`               | 同步      | 仅 install 期间、且 Host mode 为 `async` 时可用。                                    |
 | `core.useGeneratorPipeline(stage)`      | `stage: (value) => Generator`                                        | `stage` 必填    | `core`               | 同步      | 仅 install 期间、且 Host mode 为 `generator` 时可用。                                |
 | `core.useAsyncGeneratorPipeline(stage)` | `stage: (value) => AsyncGenerator`                                   | `stage` 必填    | `core`               | 同步      | 仅 install 期间、且 Host mode 为 `async-generator` 时可用。                          |
 
-`core.config`/`core.getShared`/`core.onDispose`/`core.usePipeline`/`core.useAsyncPipeline`/`core.useGeneratorPipeline`/`core.useAsyncGeneratorPipeline` 是 core facade 的**保留键**：领域 core（`createPluginDomainCore()` 的返回值）若定义了同名字段，会在构造 core 时抛 `TypeError`（`INVALID_OPTION`）。
+`core.config`/`core.onDispose`/`core.usePipeline`/`core.useAsyncPipeline`/`core.useGeneratorPipeline`/`core.useAsyncGeneratorPipeline` 是 core facade 的**保留键**：领域 core（`createPluginDomainCore()` 的返回值）若定义了同名字段，会在构造 core 时抛 `TypeError`（`INVALID_OPTION`）。
 
 `onDispose` 接受函数、`{ [Symbol.dispose]() }` 或 `{ [Symbol.asyncDispose]() }`。同步安装（构造函数期通过 `useSync` 安装）的插件也可注册 async disposer：Host 会先同步撤销可见状态，再通过 `PLUGIN_INSTALL_FAILED.detail.completion` 提供包含完整 rollback identities 的冻结结果；需要完整 secondary identity 的错误转换必须 await completion。资源、shared、pipeline stage 和 extension 都由这次安装记录拥有；`unUse()` 时会按逆序撤销它们（见 [§10](#10-资源清理协议)）。
 
@@ -227,27 +226,35 @@ Host 在插件 admission（安装/`update`）时取得配置所有权快照，�
 
 ---
 
-## 6. shared 共享能力
+## 6. Feature 跨插件能力
 
 ```ts
-const provider: IPlugin<ICore, {}, {}, { format: (value: string) => string }> = {
-  name: 'provider',
-  install: () => ({}),
-  shared: () => ({ format: (value) => value.trim() })
-}
+const formatFeature = defineFeature(
+  (core: { featureExpose: { format(value: string): string } }) => core.featureExpose.format
+)
 
-const consumer: IPlugin<ICore> = {
-  name: 'consumer',
-  install: (core) => {
-    core.getShared('format')?.(' value ')
-    return {}
-  }
-}
+const provider = definePlugin(
+  'provider',
+  () => ({
+    install: () => ({}),
+    featureExpose: () => ({ format: (value: string) => value.trim() })
+  }),
+  { format: formatFeature }
+)
 
-await host.use(provider, consumer)
+const consumer = definePlugin(
+  'consumer',
+  (core) => ({
+    install: () => ({ formatValue: (value: string) => core.features.format(value) })
+  }),
+  { format: provider.getFeature('format') }
+)
+
+const [, consumerHandle] = await host.use(consumer, provider)
+consumerHandle.extensions.formatValue(' value ')
 ```
 
-shared 能力的可见顺序就是插件的安装顺序——后安装的插件能读到先安装插件的 shared，反过来不行。相同 key（`PropertyKey`，含 `symbol`）会在安装期直接报错（`SHARED_DUPLICATE`）。Host **不维护依赖图**，如果要卸载一个 provider，必须先手动卸载依赖它的 consumer；已经被 consumer 缓存下来的 shared 函数引用，Host 无法追溯撤销（这也是为什么 shared 通常应该是无状态的纯函数或稳定引用，而不是持有可变内部状态的对象）。`host.getShared(key)`/`core.getShared(key)` 返回原始引用，不做只读包装。
+Feature 引用同时表达能力与依赖。Host 会按引用拓扑排序，所以调用方传入顺序不影响安装；必需 provider 缺失、禁用或移除时分别抛前置条件错误。可选依赖用 `provider.getFeature('format', { optional: true })` 声明。
 
 ---
 
@@ -305,15 +312,29 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 ## 禁用与启用
 
-`host.plugin.disable(name)` 只切换可达性，返回 `{ token, view }`：新 view 的 extension 类型和运行时键都不含被禁用插件；禁用前保存的 extension 与 Feature expose 会报 `VIEW_REVOKED`。`await token.enable()` 用同一注册恢复精确类型和原 stage 位置。`host.plugin.enable(name)` 面向字符串操作，返回动态 view；`host.plugin.disabled()` 返回当前禁用插件名的只读快照。`PluginHost` class 与 `defineHost()` handle 都提供这个门面。
+`host.plugin.disable(name)` 只切换可达性并返回恢复 token；对应句柄在禁用期间抛 `PLUGIN_DISABLED`。`await token.enable()` 用同一注册恢复原 stage 位置。`host.plugin.disabled()` 返回当前禁用插件名的只读快照。`PluginHost` class 与 `defineHost()` handle 都提供这个门面。
 
-禁用不会调用插件 `dispose`、资源 disposer，也不释放 scope；它不是轻量卸载。`onDisable`/`onEnable` 是通知钩子，失败经 `diagnostic` 上报而不回滚。初装成功后也会触发一次 `onEnable`。要回收资源须调用 `unUse(name)`。禁用期间 `host.config` 仍可读取和更新该插件配置；收缩后的 view 在类型层不再列出被禁用插件配置，需要更新时从宿主自身的 `config` 入口操作。
+禁用不会调用插件 `dispose`、资源 disposer，也不释放 scope；它不是轻量卸载。`onDisable`/`onEnable` 是通知钩子，失败经 `diagnostic` 上报而不回滚。初装成功后也会触发一次 `onEnable`。要回收资源须调用 `unUse(name)`。禁用期间 `host.config` 仍可读取和更新该插件配置。
 
-已发布的 shared 键若所有者被禁用，`getShared` 抛 `PREREQUISITE_DISABLED`，`detail.recoverable === true`；卸载后同一键抛 `PREREQUISITE_REMOVED`，`detail.recoverable === false`。一个新插件重新发布该键后，读取恢复正常。从未发布的键仍返回 `undefined`。
+安装依赖者时，必需 Feature provider 被禁用抛 `PREREQUISITE_DISABLED`，被卸载抛 `PREREQUISITE_REMOVED`，从未安装抛 `PREREQUISITE_MISSING`，批内成环抛 `DEPENDENCY_CYCLE`；它们都在任何 install 执行前、以顶层错误抛出。provider 仍被禁用时单独 `enable` 依赖者抛 `PREREQUISITE_DISABLED`；`token.enable()` 会先检查整组恢复集合，不满足则一个都不启用。
+
+依赖感知的 `disable`/`unUse` 默认拒绝破坏必需依赖，`detail.blockedBy` 按级联处理顺序列出**全部**传递依赖者；可显式使用 `cascade`，或先 `dryRun` 取得 `{ order, edges }` 计划。`edges` 中可选边标 `optional: true`，可选 provider 缺席的边额外带 `status: 'optional-absent'`。托管组合协议的 `prepareUnUseBatch`/`commitPreparedUnUseBatch` 同样拒绝留下必需依赖者，并按依赖者优先的顺序清理；`host.dispose()` 也按依赖者优先的顺序释放。
+
+## 热替换与惰性激活
+
+`await host.replace(name, next)`（`next.name` 必须等于 `name`，否则 `REPLACE_NAME_MISMATCH`）：
+
+1. 安装 `next`。失败时整体回滚，旧注册继续服务，错误以 `PLUGIN_INSTALL_FAILED` 抛出、原始错误在 `cause`。
+2. 发布 `next`；旧注册上已取出的 extension 立即抛 `REGISTRATION_REVOKED`，句柄自动指向新实现。旧注册若处于禁用状态，新注册同样保持禁用。
+3. 对每个已激活的必需依赖者：实现了 `onDependencyReplaced(name, outputs)` 的调用钩子换绑；未实现或钩子抛错（原错误对象经 `diagnostic` 第三个参数上报）的，连同其必需依赖闭包一起按依赖者优先顺序排空 pipeline 租约并 dispose，再按拓扑序重装（沿用重启前的运行时 config，原先已激活的惰性插件重新激活、原先禁用的保持禁用）。
+4. 旧注册在其 pipeline 租约排空后 dispose；清理失败以 `CLEANUP_INCOMPLETE` 经 `diagnostic` 上报原始错误对象。
+5. 若第 3 步重装失败，替换依然生效，重启失败的插件保持卸载（之后依赖它们的安装得到 `PREREQUISITE_REMOVED`），并抛 `DEPENDENT_RESTART_FAILED`：`cause` 是 `AggregateError`，首项为重装失败，其后依次为钩子错误与清理错误，`detail.dependents` 列出受影响插件。
+
+`activation: 'lazy'` 的插件在 `use()` 时只做准入与依赖校验并登记名称，句柄访问抛 `PLUGIN_NOT_ACTIVATED`。`await host.activate(name)` 先按依赖顺序激活它必需的惰性 provider，再安装自身；对同一插件的并发调用共享同一个 Promise，失败后插件保持未激活，可重试；已禁用的插件不能激活（`PLUGIN_DISABLED`）。非惰性插件安装时先激活它必需的已登记惰性 provider；同批中只被惰性成员依赖的惰性成员保持未激活；依赖校验失败时不会激活任何插件。`useSync()` 无法等待激活，遇到未激活的必需 provider 抛 `PLUGIN_NOT_ACTIVATED`。
 
 ## 9. 错误码完整参考
 
-`PluginHostErrorCode` 导出以下 33 个稳定错误码，均可通过 `error.code` 分支处理：
+`PluginHostErrorCode` 导出以下 41 个稳定错误码，均可通过 `error.code` 分支处理：
 
 | code                               | 含义                                                                                                                                                                                                                                                                             |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -321,18 +342,26 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 | `HOST_DISPOSING`                   | Host 正在卸载，不能开始新的变更。                                                                                                                                                                                                                                                |
 | `PLUGIN_DUPLICATE`                 | 插件已安装，或同一批次中出现重复名字。                                                                                                                                                                                                                                           |
 | `PLUGIN_NOT_INSTALLED`             | 目标插件未安装（`unUse`/`config.update` 找不到对应插件）。                                                                                                                                                                                                                       |
+| `PLUGIN_DISABLED`                  | 句柄所指插件当前已禁用；先启用该插件再访问。                                                                                                                                                                                                                                     |
+| `PLUGIN_NOT_ACTIVATED`             | 惰性插件尚未激活；先执行 `await host.activate(name)`。                                                                                                                                                                                                                           |
+| `FEATURE_NOT_DECLARED`             | `getFeature(name)` 请求了插件未声明的 feature。                                                                                                                                                                                                                                  |
+| `PREREQUISITE_MISSING`             | 必需 feature provider 尚未安装。                                                                                                                                                                                                                                                 |
+| `DEPENDENCY_CYCLE`                 | feature 引用形成依赖环；本批次不会执行任何 install。                                                                                                                                                                                                                             |
+| `DEPENDENCY_BLOCKED`               | 卸载或禁用 provider 时仍有必需依赖者；查看 `detail.blockedBy`，或显式使用 `cascade`/`dryRun`。                                                                                                                                                                                   |
+| `REPLACE_NAME_MISMATCH`            | `replace(name, next)` 的两个插件名不一致。                                                                                                                                                                                                                                       |
+| `DEPENDENT_RESTART_FAILED`         | `replace()` 已提交新实现，但需要重启的依赖者重装失败；它们保持卸载。`cause` 为 `AggregateError`（首项为重装失败），`detail.dependents` 列出受影响插件；修复后重新安装它们。 |
+| `PLUGIN_DEFINITION_INVALID`        | 插件定义含已退役或不受支持的字段（例如 `shared`）。                                                                                                                                                                                                                              |
 | `PLUGIN_INSTALL_FAILED`            | 插件安装失败；原始错误位于 `cause`。                                                                                                                                                                                                                                             |
 | `PLUGIN_INSTALL_ROLLBACK_FAILED`   | 诊断（非抛出）：插件安装失败且回滚清理也失败；原始安装错误**保持 primary**（顶层码 `PLUGIN_INSTALL_FAILED`），回滚失败经 `diagnostic` 上报。                                                                                                                                     |
 | `INSTALL_RESULT_THENABLE`          | 插件 `install()` 返回值自带 `then` key；同步 `useSync()` 与异步 `use()` 一致拒绝，不会发布可被误当作 Promise 的扩展。                                                                                                                                                            |
-| `COMPOSITION_TARGET_UNMANAGED`     | `openComposition()` 的目标不是本包登记的托管宿主。托管协议只对本包构造出的宿主开放，普通对象、另一份包副本产出的宿主都会被拒绝；组合方应先用 `isManagedHost()` 判定。                                                                                                                                                            |
+| `COMPOSITION_TARGET_UNMANAGED`     | `openComposition()` 的目标不是本包登记的托管宿主。托管协议只对本包构造出的宿主开放，普通对象、另一份包副本产出的宿主都会被拒绝；组合方应先用 `isManagedHost()` 判定。                                                                                                            |
 | `PLUGIN_DISPOSE_FAILED`            | 单个插件卸载失败；原始错误位于 `cause`。                                                                                                                                                                                                                                         |
 | `EXTENSION_DUPLICATE`              | extension key 与已有成员冲突。                                                                                                                                                                                                                                                   |
 | `EXTENSION_OBJECT_PROTOTYPE`       | extension key 与 `Object.prototype` 上的成员冲突（如 `toString`）。                                                                                                                                                                                                              |
 | `EXTENSION_RESERVED`               | extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。                                                                                                                                                                                                   |
 | `EXTENSION_NON_ENUMERABLE_IGNORED` | 诊断（非抛出）：`install()` 返回值上的非枚举 key 被有意忽略，未挂载到 Host；通过 `diagnostic` 回调上报。                                                                                                                                                                         |
-| `SHARED_DUPLICATE`                 | shared key 已被占用。                                                                                                                                                                                                                                                            |
-| `PREREQUISITE_DISABLED`            | shared key 的所有者被禁用；可启用该插件后重试。                                                                                                                                                                                                                                    |
-| `PREREQUISITE_REMOVED`             | shared key 的所有者已卸载；需重新安装提供该键的插件。                                                                                                                                                                                                                              |
+| `PREREQUISITE_DISABLED`            | feature provider 被禁用；可启用该插件后重试。                                                                                                                                                                                                                                    |
+| `PREREQUISITE_REMOVED`             | feature provider 已卸载；需重新安装 provider。                                                                                                                                                                                                                                   |
 | `RESOURCE_OUTSIDE_INSTALL`         | 在允许的插件生命周期之外注册资源或 pipeline stage。                                                                                                                                                                                                                              |
 | `LIFECYCLE_MUTATION`               | 插件生命周期钩子内尝试变更 Host，见 [§8](#8-生命周期与错误)。                                                                                                                                                                                                                    |
 | `INVALID_PIPELINE_MODE`            | 构造时传入的 pipeline mode 无效。                                                                                                                                                                                                                                                |
@@ -344,7 +373,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 | `MUTATION_QUEUE_TIMEOUT`           | mutation 在 FIFO 队列中等待超过**已配置**的 `queueAdmissionTimeoutMs` 阈值后被拒绝（默认未配置该阈值，不会触发）；不会中断已经开始执行的插件代码。语义是**终止**：该 mutation 不会再被执行。                                                                                     |
 | `DISPOSE_STEP_TIMEOUT`             | disposal 期间单个 pipeline disposer / 插件 dispose 钩子 / resource disposer 等待超过 `disposeStepTimeoutMs`（默认 5000ms）仍未完成（含反过来 await 触发它的那次 `dispose()` 调用这种自依赖）。语义是**降级继续**：该步骤被计为失败，disposal 事务继续推进直至收敛到 `disposed`。 |
 | `MUTATION_EXECUTION_TIMEOUT`       | 已取得执行权的 lifecycle hook 超过 mutation 预算；提交资格已撤销，协作插件应停止并清理其 operation 资源。                                                                                                                                                                        |
-| `VIEW_REVOKED`                     | 已撤销的 immutable view 或其 core 被访问；调用方应改用最近一次返回的 view。                                                                                                                                                                                                      |
+| `REGISTRATION_REVOKED`             | 已取出的 extension 函数所属 registration 已被卸载、禁用或替换；调用方应从当前句柄重新读取 extension。                                                                                                                                                                            |
 | `PIPELINE_DRAIN_TIMEOUT`           | Host 进入逻辑终态前 active pipeline 未在 drain 预算内归零；检查返回的 disposal result 与 physical completion。                                                                                                                                                                   |
 | `CLEANUP_INCOMPLETE`               | 逻辑清理已提交但仍有物理 cleanup 未完成；调用方应观察 `physicalCompletion`。                                                                                                                                                                                                     |
 | `INVALID_CONFIG_VALUE`             | config 值不满足准入的 plain-data 语法（如 symbol、非法原型、危险键名、descriptor、thenable）；调用方需改用受支持的取值。                                                                                                                                                         |
@@ -357,7 +386,7 @@ import { PluginHostErrorCode, type IPluginHostErrorCode } from '@migaia/plugin-h
 PluginHostErrorCode.mutationQueueTimeout // 'MUTATION_QUEUE_TIMEOUT'
 ```
 
-`diagnostic` 是构造 `PluginHost` 时可选传入的回调（`(message: string, code?: IPluginHostErrorCode) => void`），用于接收"不构成错误、但值得关注"的信息：`PIPELINE_NEXT_LATE`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`，以及未配置 `queueAdmissionTimeoutMs` 时的队列排队等待提示（这一条**不携带错误码**）。`MUTATION_QUEUE_TIMEOUT` 与 `DISPOSE_STEP_TIMEOUT` 是正式抛出/reject 的错误，不再只经 `diagnostic` 上报。diagnostic 回调自身抛出的异常永远不会影响宿主的正常执行流程。
+`diagnostic` 是构造 `PluginHost` 时可选传入的回调（`IPluginHostDiagnostic`：`(message: string, code?: IPluginHostErrorCode, error?: unknown) => void`；被吞下改为上报的错误会以原始对象经 `error` 送达），用于接收"不构成错误、但值得关注"的信息：`PIPELINE_NEXT_LATE`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`，以及未配置 `queueAdmissionTimeoutMs` 时的队列排队等待提示（这一条**不携带错误码**）。`MUTATION_QUEUE_TIMEOUT` 与 `DISPOSE_STEP_TIMEOUT` 是正式抛出/reject 的错误，不再只经 `diagnostic` 上报。diagnostic 回调自身抛出的异常永远不会影响宿主的正常执行流程。
 
 ---
 
@@ -416,30 +445,31 @@ const asyncStage = adaptSyncStageToAsync<string>((value, next) => next(value.tri
 
 ## 12. 完整示例
 
-### 12.1 带配置的插件 + shared 能力组合
+### 12.1 带配置的插件 + Feature 能力组合
 
 ```ts
-import { PluginHost, type IPlugin } from '@migaia/plugin-host'
+import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 
 type ICore = { write(text: string): void }
 type IFormatterConfig = { prefix?: string }
-type IFormatterShared = { format: (value: string) => string }
-
-const formatter: IPlugin<ICore, {}, IFormatterConfig, IFormatterShared> = {
-  name: 'formatter',
-  config: { prefix: '[app]' },
-  install: () => ({}),
-  shared: (core) => ({
-    format: (value: string) => `${core.config.get().prefix} ${value}`
-  })
-}
-
-const writer: IPlugin<ICore, { log(msg: string): void }> = {
-  name: 'writer',
-  install: (core) => ({
-    log: (msg: string) => core.write(core.getShared<IFormatterShared['format']>('format')!(msg))
-  })
-}
+const format = defineFeature(
+  (core: { featureExpose: { format(value: string): string } }) => core.featureExpose.format
+)
+const formatter = definePlugin(
+  'formatter',
+  (core: ICore & { config: { get(): IFormatterConfig } }) => ({
+    install: () => ({}),
+    featureExpose: () => ({ format: (value: string) => `${core.config.get().prefix} ${value}` })
+  }),
+  { format }
+)
+const writer = definePlugin(
+  'writer',
+  (core: ICore & { features: { format(value: string): string } }) => ({
+    install: () => ({ log: (msg: string) => core.write(core.features.format(msg)) })
+  }),
+  { format: formatter.getFeature('format') }
+)
 
 class Host extends PluginHost<ICore, never> {
   protected createPluginDomainCore(): ICore {
@@ -447,11 +477,12 @@ class Host extends PluginHost<ICore, never> {
   }
 }
 
-const host = await new Host().use(formatter, writer)
-host.log('server started') // "[app] server started"
+const host = new Host()
+const [, writerHandle] = await host.use(formatter, writer)
+writerHandle.extensions.log('server started') // "[app] server started"
 
 await host.config.update('formatter', () => ({ prefix: '[api]' }))
-host.log('request handled') // "[api] request handled"
+writerHandle.extensions.log('request handled') // "[api] request handled"
 
 await host.dispose()
 ```

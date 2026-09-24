@@ -2,7 +2,7 @@ import { readDefinedPluginDefinition } from './define-plugin.js'
 import { PluginHost as RuntimePluginHost } from './host-runtime.js'
 
 /** Root functional Host configures the canonical runtime with trusted definition admission. */
-export abstract class PluginHost<
+export class PluginHost<
   TDomainCore extends object,
   TValue = never,
   TInstalled extends readonly import('./typing.js').IPluginConstraint<any>[] = readonly []
@@ -47,11 +47,15 @@ export type {
   IExtractPluginExt,
   IExtractPluginConfig,
   IMergePluginExts,
-  IMergePluginShared,
-  IExtractPluginShared,
   IPlugin,
   IPluginConfig,
   IPluginConstraint,
+  IPluginHandle,
+  IPluginHandleConfig,
+  IPluginHandleTuple,
+  IPluginRemoval,
+  IPluginDependencyMutationOptions,
+  IPluginDependencyPlan,
   IDefinedPluginConstraint,
   IPluginFeatureCore,
   IPluginFeatureOptions,
@@ -67,15 +71,13 @@ export type {
   IPluginInstallFailureDetail,
   IPluginHostCore,
   IPluginHostOptions,
+  IPluginHostDiagnostic,
   IPluginEnablement,
   IPluginDisableToken,
   IExcludePluginByName,
   IPluginOperationContext,
   IPluginRegistrationContext,
   IPluginDisposalContext,
-  IPluginHostView,
-  IPluginHostDynamicView,
-  IPluginRemovalResult,
   IPluginHostDisposalResult,
   IPluginHostPhysicalCleanupResult,
   IPluginDataOrderSlot,
@@ -104,6 +106,9 @@ export type {
   IFeatureOutput,
   IFeatureOutputs,
   IFeatureRecord,
+  IFeatureReference,
+  IFeatureDependency,
+  IFeatureDependencyRecord,
   IFeatureRequiredExpose,
   IFeatureRecordRequiredExpose
 } from './feature-types.js'

@@ -16,6 +16,8 @@ import {
 } from './composition.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
+import { reportDiagnostic } from './diagnostic-report.js'
+import { planPluginDependencyMutation, readPluginBlockers } from './dependency-runtime.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry.js'
 import type {
@@ -26,11 +28,11 @@ import type {
   IPluginConstraint,
   IPluginDataOrderSlot,
   IPluginHostCore,
-  IPluginHostErrorCode,
   IPluginHostPhysicalCleanupResult,
   IPluginPreparedAdmissions,
   IPluginPreparedRemovalBatch,
-  IPluginRegistrationReceipt
+  IPluginRegistrationReceipt,
+  IPluginHostDiagnostic
 } from './typing.js'
 
 type ICompositionStrictCleanupResult<TRegistration> = Readonly<{
@@ -76,7 +78,9 @@ export type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue
     registration: IRegistration<TDomainCore, TValue>
   ) => Promise<unknown[]>
   readonly createView: () => unknown
-  readonly diagnostic: (message: string, code?: IPluginHostErrorCode) => void
+  /** Records a name removed through the managed protocol; see `PREREQUISITE_REMOVED`. */
+  readonly markRemoved: (name: string) => void
+  readonly diagnostic: IPluginHostDiagnostic
 }>
 
 /** Owns opaque composition capabilities and staged install/removal transactions. */
@@ -218,7 +222,11 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       seen.add(match)
       return match
     })
-    return registerPreparedRemoval({ host: this.#port.host, registrations, committed: false })
+    return registerPreparedRemoval({
+      host: this.#port.host,
+      registrations: this.#orderRemoval(registrations),
+      committed: false
+    })
   }
 
   /** Commits logical revocation, then drains the caller fence and strict cleanup chain. */
@@ -235,10 +243,16 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     const beforeCleanup = captureCleanupFence(options.beforeCleanup)
     this.#port.assertActive()
     this.#port.assertMutationAllowed()
+    // Registrations may have changed since preparation; the dependency check is re-run at the
+    // commit point, which is the only point that actually revokes anything.
+    this.#orderRemoval(state.registrations)
     state.committed = true
-    for (const registration of state.registrations) this.#port.revokeRegistration(registration)
+    for (const registration of state.registrations) {
+      this.#port.revokeRegistration(registration)
+      this.#port.markRemoved(registration.name)
+    }
     this.#port.commitRevision()
-    const view = this.#port.createView() as TView
+    const snapshot = this.#port.createView() as TView
     const physicalTask = this.#runStrictCleanup(state.registrations, beforeCleanup)
     let detail: ICompositionStrictCleanupResult<IRegistration<TDomainCore, TValue>> | undefined
     const completed =
@@ -267,7 +281,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       return Object.freeze({
         ok: detail.cleanupErrors.length === 0,
         committed: true,
-        view,
+        snapshot,
         leaves: Object.freeze(leaves),
         cleanupComplete: detail.cleanupErrors.length === 0,
         cleanupErrors: detail.cleanupErrors
@@ -279,7 +293,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     return Object.freeze({
       ok: false,
       committed: true,
-      view,
+      snapshot,
       leaves: Object.freeze(
         state.registrations.map((registration) =>
           Object.freeze({
@@ -297,6 +311,31 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     })
   }
 
+  /**
+   * Rejects a managed removal that would leave a required dependent of a removed registration
+   * behind (`DEPENDENCY_BLOCKED`), and orders the set dependents-first for cleanup.
+   */
+  #orderRemoval(
+    registrations: readonly IRegistration<TDomainCore, TValue>[]
+  ): readonly IRegistration<TDomainCore, TValue>[] {
+    const names = new Set(registrations.map((registration) => registration.name))
+    for (const registration of registrations) {
+      const blockedBy = readPluginBlockers(registration.name, this.#port.registrations).filter(
+        (name) => !names.has(name)
+      )
+      if (blockedBy.length > 0)
+        throw new PluginHostError(
+          PluginHostErrorCode.dependencyBlocked,
+          ERROR_TEXT.DEPENDENCY_BLOCKED(registration.name),
+          { detail: { blockedBy: Object.freeze(blockedBy) } }
+        )
+    }
+    const order = planPluginDependencyMutation([...names], this.#port.registrations).order
+    return Object.freeze(
+      [...registrations].sort((left, right) => order.indexOf(left.name) - order.indexOf(right.name))
+    )
+  }
+
   /** Executes the fence and leaf cleanup chain without a deadline; callers bound observation. */
   async #runStrictCleanup(
     registrations: readonly IRegistration<TDomainCore, TValue>[],
@@ -311,14 +350,12 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       await fence
     } catch (error) {
       errors.push(error)
-      try {
-        this.#port.diagnostic(
-          ERROR_TEXT.CLEANUP_FENCE_REJECTED,
-          PluginHostErrorCode.cleanupIncomplete
-        )
-      } catch {
-        // A diagnostic observer cannot alter the strict cleanup chain.
-      }
+      reportDiagnostic(
+        this.#port.diagnostic,
+        ERROR_TEXT.CLEANUP_FENCE_REJECTED,
+        PluginHostErrorCode.cleanupIncomplete,
+        error
+      )
     }
     for (const registration of registrations) {
       const leafErrors = await this.#port.disposeRegistrationStrict(registration)

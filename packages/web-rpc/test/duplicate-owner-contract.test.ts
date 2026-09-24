@@ -184,7 +184,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     const first = {
       name: 'candidate-007-first',
       config: { enabled: true },
-      shared: () => ({ [sharedKey]: sharedValue }),
+      ports: () => ({ [sharedKey]: sharedValue }),
       install: (core: { onDispose: (dispose: () => void) => void }) => {
         core.onDispose(() => {
           cleanupCalls += 1
@@ -201,7 +201,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await expect(host.use(first, second)).rejects.toMatchObject({ cause: primary })
     expect(cleanupCalls).toBe(1)
     expect(Object.hasOwn(host, 'candidate007Extension')).toBe(false)
-    expect(host.getShared(sharedKey)).toBeUndefined()
+    expect(host.getPort(sharedKey)).toBeUndefined()
     expect(host.config.get('candidate-007-first')).toBeUndefined()
     await host.dispose()
   })
@@ -343,9 +343,9 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(installs).toBe(0)
   })
 
-  it('proves MET-RED-019 keeps shared ports endpoint-local and symbol-keyed', async () => {
+  it('proves MET-RED-019 keeps named ports endpoint-local', async () => {
     const [firstTransport, secondTransport] = createMemoryTransportPair()
-    const sharedKey = Symbol('candidate-019')
+    const portName = 'candidate019'
     const firstHost = createWebRpcPluginHost(
       'candidate-019-first',
       firstTransport,
@@ -362,11 +362,13 @@ describe('candidate-specific duplicate-owner contracts', () => {
     )
     await firstHost.use({
       name: 'candidate-019-owner',
-      shared: () => ({ [sharedKey]: 'owned' }),
-      install: () => ({})
+      install: (core) => {
+        core.publishPortFeatures({ [portName]: { get: () => 'owned' } })
+        return {}
+      }
     })
-    expect(firstHost.getShared(sharedKey)).toBe('owned')
-    expect(secondHost.getShared(sharedKey)).toBeUndefined()
+    expect(firstHost.getPort(portName)).toBe('owned')
+    expect(secondHost.getPort(portName)).toBeUndefined()
     await Promise.all([firstHost.dispose(), secondHost.dispose()])
   })
 

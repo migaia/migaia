@@ -1,7 +1,7 @@
-import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { Logger } from './src/log'
-import { batch, type IBatchShared } from './src/plugins/batch'
+import { batch } from './src/plugins/batch'
 import { color } from './src/plugins/color'
 import { level } from './src/plugins/level'
 import { reasoning } from './src/plugins/reasoning'
@@ -11,7 +11,7 @@ import { uuid } from './src/plugins/uuid'
 import { setLoggerRuntimeManager } from './src/runtime-manager'
 import { LoggerErrorCode } from './src/errors'
 import type { ILogEntry, ILoggerPlugin, ILoggerPluginCore } from './src/typing'
-import { GENERATOR_CONTINUE, type IPipelineMode } from '@migaia/plugin-host'
+import { definePlugin, GENERATOR_CONTINUE } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/lifecycle'
 
 describe('logger plugin host integration', () => {
@@ -683,32 +683,6 @@ describe('logger plugin host integration', () => {
     expect(reasons).toEqual(['signal'])
   })
 
-  it('infers getShared keys and values from plugin shared declarations', async () => {
-    const sharedPlugin = {
-      name: 'typed-shared',
-      shared: () => ({ answer: 42, format: (value: number) => String(value) }),
-      install: () => ({})
-    }
-    const logger = new Logger({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [sharedPlugin]
-    })
-    const dynamicLogger = await new Logger({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-    }).use(sharedPlugin)
-
-    expectTypeOf(logger.getShared('answer')).toEqualTypeOf<number | undefined>()
-    expectTypeOf(logger.getShared('format')).toEqualTypeOf<
-      ((value: number) => string) | undefined
-    >()
-    expectTypeOf(dynamicLogger.getShared('answer')).toEqualTypeOf<number | undefined>()
-    // oxlint-disable-next-line no-constant-condition
-    if (false) {
-      // @ts-expect-error unknown shared keys are rejected
-      logger.getShared('missing')
-    }
-  })
-
   it('serializes concurrent updates', async () => {
     const seen: number[] = []
     const plugin: ILoggerPlugin<Record<string, never>, { value: number }> = {
@@ -779,12 +753,16 @@ describe('logger plugin host integration', () => {
       plugins: [plugin]
     })
 
-    await Promise.all([logger.unUse('serial-dispose'), logger.unUse('serial-dispose')])
+    const concurrent = await Promise.allSettled([
+      logger.unUse('serial-dispose'),
+      logger.unUse('serial-dispose')
+    ])
 
     expect(disposed).toBe(1)
-    await expect(logger.unUse('serial-dispose')).resolves.toMatchObject({
-      ok: true,
-      removed: false
+    expect(concurrent.filter(({ status }) => status === 'fulfilled')).toHaveLength(1)
+    expect(concurrent.filter(({ status }) => status === 'rejected')).toHaveLength(1)
+    await expect(logger.unUse('serial-dispose')).rejects.toMatchObject({
+      code: 'PLUGIN_NOT_INSTALLED'
     })
   })
 
@@ -1094,27 +1072,16 @@ describe('logger plugin host integration', () => {
 
   it('runs full batch callbacks asynchronously by default', async () => {
     const batches: string[][] = []
-    const consumer: ILoggerPlugin<
-      Record<string, never>,
-      Record<string, unknown>,
-      IPipelineMode,
-      {},
-      IBatchShared
-    > = {
-      name: 'default-async-batch-consumer',
-      install: (core) => {
-        const createBatcher = core.getShared('createBatcher')!
-        const batcher = createBatcher<string>({ maxSize: 1 }, (items) => {
-          batches.push(items)
-        })
-        core.useSink((entry) => batcher.push(entry.message))
-        return {}
-      }
-    }
     const logger = new Logger({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [batch(), consumer]
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
+    const [batchHandle] = await logger.use(batch())
+    const batcher = batchHandle
+      .getFeature('batch')
+      .createBatcher<string>({ maxSize: 1 }, (items) => {
+        batches.push(items)
+      })
+    logger.useSink((entry) => batcher.push(entry.message))
 
     logger.log('info', 'deferred-1')
     logger.log('info', 'deferred-2')
@@ -1124,29 +1091,18 @@ describe('logger plugin host integration', () => {
     expect(batches).toEqual([['deferred-1'], ['deferred-2']])
   })
 
-  it('allows synchronous full batch callbacks explicitly', () => {
+  it('allows synchronous full batch callbacks explicitly', async () => {
     const batches: string[][] = []
-    const consumer: ILoggerPlugin<
-      Record<string, never>,
-      Record<string, unknown>,
-      IPipelineMode,
-      {},
-      IBatchShared
-    > = {
-      name: 'sync-batch-consumer',
-      install: (core) => {
-        const createBatcher = core.getShared('createBatcher')!
-        const batcher = createBatcher<string>({ maxSize: 1 }, (items) => {
-          batches.push(items)
-        })
-        core.useSink((entry) => batcher.push(entry.message))
-        return {}
-      }
-    }
     const logger = new Logger({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [batch({ asyncOutput: false }), consumer]
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
+    const [batchHandle] = await logger.use(batch({ asyncOutput: false }))
+    const batcher = batchHandle
+      .getFeature('batch')
+      .createBatcher<string>({ maxSize: 1 }, (items) => {
+        batches.push(items)
+      })
+    logger.useSink((entry) => batcher.push(entry.message))
 
     logger.log('info', 'immediate')
 
@@ -1158,18 +1114,20 @@ describe('logger plugin host integration', () => {
     let active = 0
     const peak: number[] = []
     const logger = new Logger({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [batch()]
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
-    const batcher = logger.getShared('createBatcher')!<string>(
-      { maxSize: 1, asyncOutput: false, maxConcurrentBatches: 1, maxPendingBatches: 1 },
-      async () => {
-        active += 1
-        peak.push(active)
-        await new Promise<void>((resolve) => (release = resolve))
-        active -= 1
-      }
-    )
+    const [batchHandle] = await logger.use(batch())
+    const batcher = batchHandle
+      .getFeature('batch')
+      .createBatcher<string>(
+        { maxSize: 1, asyncOutput: false, maxConcurrentBatches: 1, maxPendingBatches: 1 },
+        async () => {
+          active += 1
+          peak.push(active)
+          await new Promise<void>((resolve) => (release = resolve))
+          active -= 1
+        }
+      )
 
     batcher.push('first')
     expect(() => batcher.push('second')).toThrowError(
@@ -1310,29 +1268,17 @@ describe('logger plugin host integration', () => {
   })
 
   it('rejects nested plugin mutation during install', async () => {
-    const inner: ILoggerPlugin<
-      Record<string, never>,
-      Record<string, unknown>,
-      IPipelineMode,
-      { innerShared: number }
-    > = {
+    const inner = definePlugin({
       name: 'nested-inner',
-      shared: () => ({ innerShared: 42 }),
       install: () => ({})
-    }
-    const outer: ILoggerPlugin<
-      Record<string, never>,
-      Record<string, unknown>,
-      IPipelineMode,
-      { outerShared: number }
-    > = {
+    })
+    const outer = definePlugin({
       name: 'nested-outer',
-      shared: () => ({ outerShared: 7 }),
       install: (core) => {
         ;(core as unknown as { use(plugin: unknown): unknown }).use(inner)
         return {}
       }
-    }
+    })
 
     const logger = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }

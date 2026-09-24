@@ -1,6 +1,6 @@
 import type { IWebRpcPingCapability, IWebRpcPlugin, IWebRpcPluginInstallResult } from '../typing.js'
 import { WebRpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
-import { WebRpcSharedKey } from '../internal/plugin-shared-keys.js'
+import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 
 const emptyClaims = Object.freeze({
@@ -24,7 +24,7 @@ const pingPlugin: IWebRpcPlugin = Object.freeze({
     const capability: IWebRpcPingCapability = Object.freeze({ enabled: true })
     return {
       extension: Object.freeze({}),
-      shared: Object.freeze({ [WebRpcSharedKey.ping]: capability })
+      ports: Object.freeze({ [WebRpcPortName.ping]: capability })
     }
   }
 })
