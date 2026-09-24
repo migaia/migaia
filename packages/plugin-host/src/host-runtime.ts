@@ -55,6 +55,12 @@ import { PluginHostReplaceRuntime } from './replace-runtime.js'
 import { bindTerminalSink, reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostOperationRuntime } from './operation-runtime.js'
 import type { IMiddlewarePipelineAbortSignal } from '@migaia/middleware-pipeline'
+import {
+  DependencyAction,
+  DependencyMutationKind,
+  planDependencyMutation,
+  planTeardown
+} from '@migaia/capability/graph/dependency'
 import { PluginHostCoreRuntime } from './core-runtime.js'
 import { PluginHostConfigRuntime } from './config-runtime.js'
 import { PluginHostDisposalRuntime } from './host-disposal-runtime.js'
@@ -66,12 +72,10 @@ import {
 import { createPluginHostPublication } from './publication.js'
 import { createPluginHandle } from './plugin-handle.js'
 import {
-  collectLazyActivationOrder,
-  orderPluginInstallBatch,
-  planPluginDependencyMutation,
+  admitDependencyMutationOptions,
   PluginInactiveProviderPolicy,
-  readPluginBlockers,
-  resolveBatchInstallSet
+  toPluginPlan,
+  validateInstallBatch
 } from './dependency-runtime.js'
 import { PluginHostPipelineMode, PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IRegistration } from './registry.js'
@@ -359,6 +363,7 @@ export class PluginHost<
     })
     this.#replaceRuntime = new PluginHostReplaceRuntime({
       registrations: this.#state.registrations,
+      state: this.#state,
       installBatch: (entries, publish, prepareBatch) =>
         this.#installRuntime.installBatch(entries, publish, prepareBatch),
       publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
@@ -420,10 +425,9 @@ export class PluginHost<
       // Dependents are disposed before the providers they captured, independent of install order.
       registrationsInReverse: () => {
         try {
-          return planPluginDependencyMutation(
-            [...this.#state.registrations.keys()],
-            this.#state.registrations
-          ).order.map((name) => this.#state.registrations.get(name)!)
+          return planTeardown(this.#state.dependencyIndex()).order.map((name) =>
+            this.#state.registrations.get(name)!
+          )
         } catch (error) {
           // Terminal disposal must always proceed; admission keeps the graph acyclic, so this
           // fallback (reverse install order) only guards an invariant breach, which is reported.
@@ -456,6 +460,7 @@ export class PluginHost<
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
       registrations: this.#state.registrations,
+      state: this.#state,
       stageSlots: this.#state.stageSlots,
       allocateStageSlot: () => this.#state.allocateStageSlot(),
       assertActive: () => this.#assertActive(),
@@ -694,12 +699,9 @@ export class PluginHost<
       // Validate every prerequisite before activating anything, so a rejected batch has no
       // activation side effect; then activate only the committed lazy providers that members
       // installing now actually require (lazy members stay lazy).
-      const ordered = this.#validateBatch(entries, PluginInactiveProviderPolicy.admit)
-      const installSet = resolveBatchInstallSet(ordered)
-      const activation = collectLazyActivationOrder(
-        ordered.filter((entry) => installSet.has(entry.name)).map((entry) => entry.plugin),
-        this.#state.registrations
-      )
+      const { activationOrder } = this.#validateBatch(entries, PluginInactiveProviderPolicy.admit)
+      /** Committed lazy providers selected by capability's activation plan. */
+      const activation = activationOrder.map((name) => this.#state.registrations.get(name)!)
       // Only await when something activates: install must otherwise start in this same turn so
       // the lifecycle-mutation guard observes the running hook synchronously.
       if (activation.length > 0) await this.#activateInOrder(activation)
@@ -731,13 +733,13 @@ export class PluginHost<
       if (!registration.activated) {
         // Validate first so a rejected activation leaves every lazy provider untouched; then
         // activate the lazy provider chain providers-first before this registration.
-        this.#validateBatch(
+        const { activationOrder } = this.#validateBatch(
           [{ name, plugin: registration.plugin }],
           PluginInactiveProviderPolicy.admit,
-          name
+          [name]
         )
         await this.#activateInOrder(
-          collectLazyActivationOrder([registration.plugin], this.#state.registrations)
+          activationOrder.map((provider) => this.#state.registrations.get(provider)!)
         )
         await this.#installRuntime.activate(registration)
       }
@@ -805,19 +807,16 @@ export class PluginHost<
 
   /**
    * Validates one batch's dependency prerequisites against committed state without side effects.
-   * `self` excludes an already-committed registration that is being activated in place.
+   * Existing same-name nodes are projected with transaction-local dependencies for activation and
+   * replacement validation.
    */
   #validateBatch(
     entries: readonly import('./registry.js').IInstallEntry<TDomainCore, TValue>[],
     inactive: PluginInactiveProviderPolicy,
-    self?: string
-  ): readonly import('./registry.js').IInstallEntry<TDomainCore, TValue>[] {
-    const committed =
-      self === undefined
-        ? this.#state.registrations
-        : new Map([...this.#state.registrations].filter(([name]) => name !== self))
+    activationRoots?: readonly string[]
+  ): ReturnType<typeof validateInstallBatch<TDomainCore, TValue>> {
     try {
-      return orderPluginInstallBatch(entries, committed, this.#state.removedNames, inactive)
+      return validateInstallBatch(entries, this.#state, inactive, activationRoots)
     } catch (error) {
       this.#rethrowWithIdentity(error)
     }
@@ -930,23 +929,34 @@ export class PluginHost<
           PluginHostErrorCode.pluginNotInstalled,
           ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
         )
-      const blockedBy = readPluginBlockers(name, this.#state.registrations)
-      if (blockedBy.length > 0 && !options.cascade)
+      /** Validated breaking option shape and default reject policy. */
+      const admitted = admitDependencyMutationOptions(options)
+      /** Capability-owned dependency decision for this exact committed state. */
+      const plan = planDependencyMutation(
+        this.#state.dependencyIndex(),
+        (pluginName) => this.#state.readDependencyStatus(pluginName),
+        {
+          roots: [name],
+          kind: DependencyMutationKind.remove,
+          policy: admitted.policy
+        }
+      )
+      if (plan.blockedBy.length > 0)
         throw new PluginHostError(
           PluginHostErrorCode.dependencyBlocked,
           ERROR_TEXT.DEPENDENCY_BLOCKED(name),
-          { detail: { blockedBy } }
+          { detail: { blockedBy: plan.blockedBy } }
         )
-      const { order, edges } = planPluginDependencyMutation(name, this.#state.registrations)
-      if (options.dryRun) return Object.freeze({ order, edges })
+      if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
       const cleanupErrors: unknown[] = []
-      for (const pluginName of order) {
-        const registration = this.#state.registrations.get(pluginName)
+      for (const step of plan.steps) {
+        if (step.action !== DependencyAction.release) continue
+        const registration = this.#state.registrations.get(step.id)
         if (!registration) continue
         await this.#drainRegistrationLeases(registration)
         cleanupErrors.push(...(await this.#removalRuntime.disposeRegistration(registration)))
-        this.#enablementRuntime.forget(pluginName)
-        this.#state.removedNames.add(pluginName)
+        this.#enablementRuntime.forget(step.id)
+        this.#state.removedNames.add(step.id)
       }
       this.#state.commit()
       return cleanupErrors.length === 0

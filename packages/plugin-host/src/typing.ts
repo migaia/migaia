@@ -293,13 +293,21 @@ export type IPluginHostDiagnostic = (
 
 /** Dependency-aware removal/disable behavior. */
 export type IPluginDependencyMutationOptions = Readonly<{
-  readonly cascade?: boolean
+  readonly policy?: import('@migaia/capability/graph/dependency').DependencyPolicy
   readonly dryRun?: boolean
+}>
+
+/** One capability planner action projected onto a PluginHost registration name. */
+export type IPluginDependencyPlanStep = Readonly<{
+  readonly name: string
+  readonly action: import('@migaia/capability/graph/dependency').DependencyAction
 }>
 
 /** Immutable dependency mutation plan returned by dry-run operations. */
 export type IPluginDependencyPlan = Readonly<{
+  readonly policy: import('@migaia/capability/graph/dependency').DependencyPolicy
   readonly order: readonly string[]
+  readonly steps: readonly IPluginDependencyPlanStep[]
   readonly edges: readonly Readonly<{
     readonly provider: string
     readonly consumer: string

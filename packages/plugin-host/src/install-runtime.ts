@@ -270,6 +270,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
   #validateBatch(entries: readonly IInstallEntry<TDomainCore, TValue>[]): Readonly<{
     readonly order: readonly IInstallEntry<TDomainCore, TValue>[]
     readonly installSet: ReadonlySet<string>
+    readonly activationOrder: readonly string[]
   }> {
     try {
       return validateInstallBatch(entries, this.#port.state)
