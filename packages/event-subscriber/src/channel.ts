@@ -23,7 +23,8 @@ import type {
   IStyledEventChannel,
   IStyledEventChannelOptions
 } from './types.js'
-import { createSubscriptionHandle } from './internal/subscription.js'
+import { createSubscriptionHandle, installSubscriptionSource } from './internal/subscription.js'
+import { isRecord } from './internal/record.js'
 import { EventDispatchPolicy, EventSubscriberState } from './state-constants.js'
 import {
   normalizeEventApiStyle,
@@ -33,7 +34,7 @@ import {
 } from './style.js'
 import {
   createSystemTerminalRuntime,
-  type IEventTerminalRuntime
+  reportTerminalDiagnostic
 } from './internal/terminal-runtime.js'
 import {
   addEventProjection,
@@ -91,12 +92,6 @@ const filteredCapabilities = new WeakMap<object, IFilteredCapability<unknown, un
 
 /** The host adapter is lazy and does not inspect globals until a terminal failure occurs. */
 const systemTerminalRuntime = createSystemTerminalRuntime()
-
-/** Reads an own/public option object without accepting null, arrays, or functions. */
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  if (typeof value !== 'object' || value === null) return false
-  return !Array.isArray(value)
-}
 
 /** Validates a task label before it can enter a registration or selection index. */
 export const validateTaskId = (value: unknown, allowUndefined: boolean): string | undefined => {
@@ -387,60 +382,12 @@ const reportTerminal = <T, S extends IEventApiStyle | undefined = undefined, V =
   failure: unknown
 ): void => {
   const errors = failure === undefined ? diagnostic.errors : [...diagnostic.errors, failure]
-  const nextDiagnostic = createEventAggregateError(
+  reportTerminalDiagnostic(
     EventSubscriberErrorCode.unhandledListenerFailure,
     errors,
-    eventErrorText(EventSubscriberErrorCode.unhandledListenerFailure)
+    options.terminalReport,
+    systemTerminalRuntime
   )
-  const terminal = options.terminalReport
-  if (terminal) {
-    try {
-      const result = terminal(nextDiagnostic)
-      observePromiseLike(
-        result,
-        () => undefined,
-        (error) => reportSystemTerminal(nextDiagnostic, error)
-      )
-      return
-    } catch (error) {
-      reportSystemTerminal(nextDiagnostic, error)
-      return
-    }
-  }
-  reportSystemTerminal(nextDiagnostic, undefined)
-}
-
-/** Uses host terminal sinks only after user-owned reporters have failed or are absent. */
-const reportSystemTerminal = (
-  diagnostic: AggregateError,
-  failure: unknown,
-  runtime: IEventTerminalRuntime = systemTerminalRuntime
-): void => {
-  const errors = failure === undefined ? [...diagnostic.errors] : [...diagnostic.errors, failure]
-  const appendFailure = (error: unknown): void => {
-    errors.push(error)
-  }
-  const currentDiagnostic = (): AggregateError =>
-    createEventAggregateError(
-      EventSubscriberErrorCode.unhandledListenerFailure,
-      errors,
-      eventErrorText(EventSubscriberErrorCode.unhandledListenerFailure)
-    )
-  try {
-    if (runtime.reportError(currentDiagnostic())) {
-      return
-    }
-  } catch (error) {
-    appendFailure(error)
-  }
-  try {
-    if (runtime.consoleError(currentDiagnostic())) {
-      return
-    }
-  } catch (error) {
-    appendFailure(error)
-  }
-  runtime.enqueueThrow(currentDiagnostic())
 }
 
 /** Creates a canonical transient channel backed by an O(1) linked registration list. */
@@ -935,58 +882,11 @@ export const subscribeSubscriber = <T, R>(
   const typedSubscriber = subscriber as {
     handle(event: IEventContext<T>): R | PromiseLike<R>
   }
-  let released = false
-  let releaseReady = false
-  let sourceReleaseCalled = false
-  let syncDelivered = false
-  let sourceRelease: IUnsubscribe | undefined
-  const release = (): void => {
-    if (released) return
-    released = true
-    if (releaseReady && !sourceReleaseCalled) {
-      sourceReleaseCalled = true
-      try {
-        sourceRelease?.()
-      } catch (error) {
-        throw codeExistingError(error, EventSubscriberErrorCode.invalidChannel)
-      }
-    }
-  }
-  let candidate: IUnsubscribe
   try {
-    candidate = validated.subscribe((event) => {
-      if (released) return undefined as R
-      if (!releaseReady) {
-        syncDelivered = true
-        return undefined as R
-      }
-      return typedSubscriber.handle(event)
-    })
-    if (typeof candidate !== 'function') {
-      throw createEventTypeError(
-        EventSubscriberErrorCode.invalidChannel,
-        eventErrorText(EventSubscriberErrorCode.invalidChannel)
-      )
-    }
-    sourceRelease = candidate
-    releaseReady = true
-    if (released) release()
-    if (syncDelivered) {
-      const primary = createEventTypeError(
-        EventSubscriberErrorCode.invalidChannel,
-        eventErrorText(EventSubscriberErrorCode.invalidChannel)
-      )
-      try {
-        release()
-      } catch (error) {
-        throw createEventAggregateError(
-          EventSubscriberErrorCode.invalidChannel,
-          [primary, error],
-          eventErrorText(EventSubscriberErrorCode.invalidChannel)
-        )
-      }
-      throw primary
-    }
+    return installSubscriptionSource<IEventContext<T>, R | PromiseLike<R>>(
+      (wrapped) => validated.subscribe(wrapped),
+      (event) => typedSubscriber.handle(event)
+    )
   } catch (error) {
     let hasCode = false
     try {
@@ -999,7 +899,6 @@ export const subscribeSubscriber = <T, R>(
     if (hasCode) throw error
     throw codeExistingError(error, EventSubscriberErrorCode.invalidChannel)
   }
-  return release
 }
 
 /** Installs once semantics on any event-subscriber-compatible structural channel. */
@@ -1016,58 +915,17 @@ export const subscribeOnce = <T, R, V = undefined>(
       eventErrorText(EventSubscriberErrorCode.invalidListener)
     )
   }
-  let sourceRelease: IUnsubscribe | undefined
-  let released = false
-  let syncDelivered = false
-  const release = (): void => {
-    if (released) return
-    released = true
-    try {
-      sourceRelease?.()
-    } catch (error) {
-      throw codeExistingError(error, EventSubscriberErrorCode.invalidChannel)
-    }
-  }
-  let releaseReady = false
   let fired = false
-  const candidate = validated.subscribe(
+  let release: IUnsubscribe = () => undefined
+  release = installSubscriptionSource<Parameters<IEventListener<T, R, V>>[0], R | PromiseLike<R>>(
+    (wrapped) => validated.subscribe(wrapped, taskId === undefined ? undefined : { taskId }),
     (event) => {
-      if (released) return undefined as R
-      if (!releaseReady) {
-        syncDelivered = true
-        return undefined as R
-      }
       if (fired) return undefined as R
       fired = true
       release()
       return listener(event)
-    },
-    taskId === undefined ? undefined : { taskId }
-  )
-  if (typeof candidate !== 'function') {
-    throw createEventTypeError(
-      EventSubscriberErrorCode.invalidChannel,
-      eventErrorText(EventSubscriberErrorCode.invalidChannel)
-    )
-  }
-  sourceRelease = candidate
-  releaseReady = true
-  if (syncDelivered) {
-    const primary = createEventTypeError(
-      EventSubscriberErrorCode.invalidChannel,
-      eventErrorText(EventSubscriberErrorCode.invalidChannel)
-    )
-    try {
-      release()
-    } catch (error) {
-      throw createEventAggregateError(
-        EventSubscriberErrorCode.invalidChannel,
-        [primary, error],
-        eventErrorText(EventSubscriberErrorCode.invalidChannel)
-      )
     }
-    throw primary
-  }
+  )
   return release
 }
 
@@ -1140,9 +998,7 @@ export const subscribeUntil = <T, R, V = undefined>(
     }
   }
   let sourceRelease: IUnsubscribe = () => undefined
-  let sourceReleaseReady = false
   let released = false
-  let sourceReleaseCalled = false
   let abortInstallAttempted = false
   let sourceSubscriptionFailed = false
   let observerInstallComplete = false
@@ -1154,17 +1010,11 @@ export const subscribeUntil = <T, R, V = undefined>(
     observerRemoved = true
     signal.removeEventListener(EventSubscriberState.abort, abortListener)
   }
-  const releaseSourceIfReady = (): void => {
-    if (sourceReleaseReady && !sourceReleaseCalled) {
-      sourceReleaseCalled = true
-      sourceRelease()
-    }
-  }
   const release = (): void => {
     if (released) return
     released = true
     try {
-      releaseSourceIfReady()
+      sourceRelease()
     } catch (error) {
       throw codeExistingError(error, EventSubscriberErrorCode.invalidSignal)
     }
@@ -1227,46 +1077,30 @@ export const subscribeUntil = <T, R, V = undefined>(
     overlayAborted = true
     completeAbort(true)
   }
-  let installing = true
-  let syncDelivered = false
   try {
     abortInstallAttempted = true
     signal.addEventListener(EventSubscriberState.abort, abortListener, { once: true })
     observerInstallComplete = true
     if (removeRequested) removeObserver()
-    let candidate: IUnsubscribe
     try {
-      candidate = validated.subscribe(
+      sourceRelease = installSubscriptionSource<
+        Parameters<IEventListener<T, R, V>>[0],
+        R | PromiseLike<R>
+      >(
+        (wrapped) => validated.subscribe(wrapped, taskId === undefined ? undefined : { taskId }),
         (event) => {
           if (released) return undefined as R
-          if (installing) {
-            syncDelivered = true
-            return undefined as R
-          }
           if (overlayAborted) return undefined as R
           return listener(eventWrapper(event) as never)
         },
-        taskId === undefined ? undefined : { taskId }
+        EventSubscriberErrorCode.invalidSignal,
+        () => released || overlayAborted
       )
     } catch (error) {
       sourceSubscriptionFailed = true
       throw error
     }
-    if (typeof candidate !== 'function') {
-      throw createEventTypeError(
-        EventSubscriberErrorCode.invalidChannel,
-        eventErrorText(EventSubscriberErrorCode.invalidChannel)
-      )
-    }
-    sourceRelease = candidate
-    sourceReleaseReady = true
-    if (released) releaseSourceIfReady()
-    if (syncDelivered) {
-      throw createEventTypeError(
-        EventSubscriberErrorCode.invalidChannel,
-        eventErrorText(EventSubscriberErrorCode.invalidChannel)
-      )
-    }
+    if (released) sourceRelease()
     const secondAborted = signal.aborted
     if (typeof secondAborted !== 'boolean') {
       throw createEventTypeError(
@@ -1283,7 +1117,6 @@ export const subscribeUntil = <T, R, V = undefined>(
           eventErrorText(EventSubscriberErrorCode.aborted)
         )
     }
-    installing = false
   } catch (primary) {
     const cleanup: unknown[] = []
     observerInstallComplete = true

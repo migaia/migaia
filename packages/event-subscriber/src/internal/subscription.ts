@@ -1,6 +1,7 @@
 import { EventSubscriberErrorCode } from '../error-code.js'
 import {
   createEventAggregateError,
+  codeExistingError,
   createEventError,
   createEventTypeError,
   eventErrorText
@@ -88,3 +89,62 @@ export const createRawSubscriptionOwner = <T extends ISubscriptionHandle<unknown
 
 /** Builds public subscription handles through the shared raw owner. */
 export const createSubscriptionHandle = createRawSubscriptionOwner
+
+/** Installs one structural source subscription with the canonical synchronous-delivery guard. */
+export const installSubscriptionSource = <TEvent, R>(
+  subscribe: (listener: (event: TEvent) => R) => unknown,
+  listener: (event: TEvent) => R,
+  releaseErrorCode: (typeof EventSubscriberErrorCode)[keyof typeof EventSubscriberErrorCode] = EventSubscriberErrorCode.invalidChannel,
+  /** Suppresses an installation-time delivery already made terminal by an outer abort protocol. */
+  ignoreSynchronousDelivery: () => boolean = () => false
+): IUnsubscribe => {
+  let sourceRelease: IUnsubscribe | undefined
+  let ready = false
+  let released = false
+  let sourceReleaseCalled = false
+  let synchronousDelivery = false
+  const release = (): void => {
+    if (released && sourceReleaseCalled) return
+    released = true
+    if (!ready || sourceReleaseCalled) return
+    sourceReleaseCalled = true
+    try {
+      sourceRelease?.()
+    } catch (error) {
+      throw codeExistingError(error, releaseErrorCode)
+    }
+  }
+  const candidate = subscribe((event) => {
+    if (released || ignoreSynchronousDelivery()) return undefined as R
+    if (!ready) {
+      synchronousDelivery = true
+      return undefined as R
+    }
+    return listener(event)
+  })
+  if (typeof candidate !== 'function')
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidChannel,
+      eventErrorText(EventSubscriberErrorCode.invalidChannel)
+    )
+  sourceRelease = candidate as IUnsubscribe
+  ready = true
+  if (released) release()
+  if (synchronousDelivery) {
+    const primary = createEventTypeError(
+      EventSubscriberErrorCode.invalidChannel,
+      eventErrorText(EventSubscriberErrorCode.invalidChannel)
+    )
+    try {
+      release()
+    } catch (error) {
+      throw createEventAggregateError(
+        EventSubscriberErrorCode.invalidChannel,
+        [primary, error],
+        eventErrorText(EventSubscriberErrorCode.invalidChannel)
+      )
+    }
+    throw primary
+  }
+  return release
+}

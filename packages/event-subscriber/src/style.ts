@@ -1,5 +1,6 @@
 import { EventSubscriberErrorCode } from './error-code.js'
 import { createEventTypeError, eventErrorText } from './errors.js'
+import { isRecord } from './internal/record.js'
 
 /** Stable preset names shared by Channel and Hub style projections. */
 export const EventApiStyle = {
@@ -204,10 +205,6 @@ export const projectEventApiStyle = <T extends object>(surface: T, plan: IEventA
   Object.defineProperties(surface, descriptors)
   return surface
 }
-
-/** Reads a style field only through ordinary object data/getter semantics. */
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** Validates one semantic method name before it enters a descriptor plan. */
 const validateStyleName = (value: unknown): string => {
