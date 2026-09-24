@@ -179,6 +179,11 @@ export const validateInstallBatch = <TDomainCore extends object, TValue>(
             PluginHostErrorCode.prerequisiteDisabled,
             ERROR_TEXT.PREREQUISITE_DISABLED(reference.feature, reference.plugin)
           )
+        if (registration.suspended)
+          throw new PluginHostError(
+            PluginHostErrorCode.pluginSuspended,
+            ERROR_TEXT.PLUGIN_SUSPENDED(reference.plugin)
+          )
         if (
           !registration.activated &&
           inactive === PluginInactiveProviderPolicy.reject &&
@@ -233,6 +238,11 @@ export const findUnavailableProvider = <TDomainCore extends object, TValue>(
       return new PluginHostError(
         PluginHostErrorCode.prerequisiteDisabled,
         ERROR_TEXT.PREREQUISITE_DISABLED(reference.feature, reference.plugin)
+      )
+    if (provider.suspended)
+      return new PluginHostError(
+        PluginHostErrorCode.pluginSuspended,
+        ERROR_TEXT.PLUGIN_SUSPENDED(reference.plugin)
       )
   }
   return undefined
