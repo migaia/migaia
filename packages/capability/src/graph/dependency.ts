@@ -152,20 +152,43 @@ function dependentFirst(index: ITopologyIndexReader, affected: ReadonlySet<strin
   return [...index.order(affected)].reverse()
 }
 
-/** Returns whether every required provider is present and usable in the projected recovery state. */
+/** Returns whether every required provider serves now or will serve after earlier recovery. */
 function requiredProvidersAvailable(
   index: ITopologyIndexReader,
   state: IDependencyStateReader,
-  available: ReadonlySet<string>,
+  recoverable: ReadonlySet<string>,
   dependencies: readonly ITopologyDependency[]
 ): boolean {
   for (const dependency of dependencies) {
     if (!dependency.required) continue
     if (!index.has(dependency.provider)) return false
-    if (available.has(dependency.provider)) continue
-    if (!isServing(state(dependency.provider))) return false
+    const providerState = state(dependency.provider)
+    if (recoverable.has(dependency.provider) && providerState.enabled) continue
+    if (!isServing(providerState)) return false
   }
   return true
+}
+
+/** Collects the provider and suspended-only downstream frontier in canonical order. */
+function collectResumeCandidates(
+  index: ITopologyIndexReader,
+  state: IDependencyStateReader,
+  provider: string
+): readonly string[] {
+  /** Suspended nodes reachable without crossing a non-suspended dependent. */
+  const candidates = new Set<string>()
+  if (state(provider).suspended) candidates.add(provider)
+  /** Providers whose direct required dependents still need inspection. */
+  const queue = [provider]
+  for (let position = 0; position < queue.length; position += 1) {
+    const current = queue[position]!
+    for (const dependent of index.dependents(current).required) {
+      if (candidates.has(dependent) || !state(dependent).suspended) continue
+      candidates.add(dependent)
+      queue.push(dependent)
+    }
+  }
+  return index.order(candidates)
 }
 
 /** Collects deterministic plan edges for one affected node set. */
@@ -322,51 +345,66 @@ export function planResume(
   state: IDependencyStateReader,
   request: IDependencyResumeRequest
 ): IDependencyPlan {
-  /** Required dependent closure after provider availability returns. */
-  const closure = index.closure([request.provider])
-  /** Providers available now or after an earlier planned recovery step. */
-  const available = new Set<string>([request.provider])
-  /** Suspended nodes whose full required provider set is satisfiable. */
-  const eligible: string[] = []
-  for (const id of closure) {
-    if (id === request.provider || !state(id).suspended) continue
-    if (!requiredProvidersAvailable(index, state, available, index.dependencies(id))) continue
-    available.add(id)
-    eligible.push(id)
+  /** Suspended frontier reached without traversing the full dependent closure. */
+  const candidates = collectResumeCandidates(index, state, request.provider)
+  if (candidates.length === 0) return createPlan([], [])
+
+  /** Candidates whose required providers can serve after earlier recovery steps. */
+  const recoverable = new Set<string>()
+  for (const id of candidates) {
+    if (!requiredProvidersAvailable(index, state, recoverable, index.dependencies(id))) continue
+    recoverable.add(id)
   }
 
-  if (!request.generationChanged)
-    return createPlan(
-      eligible.map((id) => ({ id, action: DependencyAction.resume })),
-      collectPlanEdges(index, new Set([request.provider, ...eligible]))
-    )
-
-  /** Eligible direct consumers that can replace their provider binding in place. */
+  /** Recoverable direct consumers whose binding can change without restart. */
   const rebind = new Set<string>()
-  /** Eligible direct consumers whose closure must restart. */
-  const restartRoots: string[] = []
-  const direct = new Set(index.dependents(request.provider).required)
-  for (const id of eligible) {
+  /** Recoverable nodes whose retained instance must restart. */
+  const restartRoots = new Set<string>()
+  const direct = request.generationChanged
+    ? new Set(index.dependents(request.provider).required)
+    : new Set<string>()
+  for (const id of recoverable) {
+    const nodeState = state(id)
+    if (nodeState.stale) {
+      restartRoots.add(id)
+      continue
+    }
     if (!direct.has(id)) continue
     if (request.canRebind(id)) rebind.add(id)
-    else restartRoots.push(id)
+    else restartRoots.add(id)
   }
-  /** Eligible IDs as a set, so the restart closure test is O(1) per member. */
-  const eligibleSet = new Set(eligible)
-  /** Eligible nodes reached from non-rebindable direct consumers. */
-  const restart = new Set<string>()
-  for (const root of restartRoots)
-    for (const id of index.closure([root])) if (eligibleSet.has(id)) restart.add(id)
 
-  const steps = eligible.map((id) => ({
-    id,
-    action: rebind.has(id)
-      ? DependencyAction.rebind
-      : restart.has(id)
-        ? DependencyAction.restart
-        : DependencyAction.resume
-  }))
-  return createPlan(steps, collectPlanEdges(index, new Set([request.provider, ...eligible])))
+  /** Candidate members in restart closures that can be reconstructed. */
+  const restart = new Set<string>()
+  /** Candidate members blocked behind a restart root remain stale and suspended. */
+  const invalidate = new Set<string>()
+  const candidateSet = new Set(candidates)
+  for (const root of restartRoots) {
+    /** Suspended-only restart traversal bounded by the candidate frontier. */
+    const queue = [root]
+    const visited = new Set<string>()
+    for (let position = 0; position < queue.length; position += 1) {
+      const id = queue[position]!
+      if (visited.has(id) || !candidateSet.has(id)) continue
+      visited.add(id)
+      if (recoverable.has(id)) restart.add(id)
+      else invalidate.add(id)
+      for (const dependent of index.dependents(id).required) queue.push(dependent)
+    }
+  }
+
+  /** Canonically ordered actions with restart semantics taking precedence over rebind. */
+  const steps = candidates.flatMap((id): IDependencyPlanStep[] => {
+    if (restart.has(id)) return [{ id, action: DependencyAction.restart }]
+    if (invalidate.has(id)) return [{ id, action: DependencyAction.invalidate }]
+    if (rebind.has(id)) return [{ id, action: DependencyAction.rebind }]
+    if (recoverable.has(id)) return [{ id, action: DependencyAction.resume }]
+    return []
+  })
+  return createPlan(
+    steps,
+    collectPlanEdges(index, new Set([request.provider, ...steps.map((step) => step.id)]))
+  )
 }
 
 /** Plans inactive required providers before the requested activation roots. */
