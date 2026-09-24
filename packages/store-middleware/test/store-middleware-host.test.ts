@@ -13,6 +13,7 @@ import {
 } from '../src/index'
 import { ClonePolicy } from '../src/tolerant-clone'
 
+/** A10 covers the direct consumer after migration to canonical plugin-host pipeline exports. */
 type IState = { readonly value: number }
 
 /** Explicit unbounded policy used by legacy Store behavior tests. */

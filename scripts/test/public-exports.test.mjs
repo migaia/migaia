@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
+/** A13 compares every built runtime export with the tracked three-package integration baseline. */
 /** Repository and tracked baseline locations are independent of the caller's working directory. */
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const baselinePath = join(repositoryRoot, 'scripts/fixtures/public-exports.baseline.json')

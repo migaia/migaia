@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
 
-/** Creates the required two-level chain plus one optional direct consumer. */
+/** A3 creates the required two-level chain plus one optional direct consumer. */
 const createFixture = async () => {
   const host = new PluginHost<Record<string, never>>({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
 
+/** A4-A7 cover suspended access, recovery, failure containment and teardown. */
 /** Sync pipeline host used to observe suspended-stage exclusion. */
 class SuspendHost extends PluginHost<Record<string, never>, number> {
   run(value: number): number {
