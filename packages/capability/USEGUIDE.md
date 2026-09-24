@@ -92,9 +92,9 @@ Graph 状态为 `open → starting → ready | failed → quiescing → terminal
 
 ## 依赖规划器
 
-`@migaia/capability/graph/dependency` 导出 `planDependencyMutation`、`planRestart`、`planReplacement`、`planResume`、`planActivation`、`resolveInstallSet`、`planTeardown` 与 `collectPlanEdges`，以及相应的策略、动作、状态常量和类型。
+`@migaia/capability/graph/dependency` 导出 `planDependencyMutation`、`planRestart`、`planReplacement`、`planResume`、`planActivation`、`resolveInstallSet`、`planTeardown` 与 `collectPlanEdges`，以及相应的策略、动作和状态类型。状态读取函数返回 `{ activated, enabled, suspended, stale }` 四个正交标志；没有单值状态常量。
 
-规划器不拥有生命周期，也不修改索引。调用方传入当前节点状态和 mutation 请求，得到深冻结的 `{ steps, order, edges, blockedBy }`。`reject` 只报告阻塞者；`cascade` 给出依赖者优先的释放计划；`suspend` 只暂停当前 active/disabled 的依赖者。replacement、resume 与 activation 同样只描述动作，实际 rebind、restart、release、lease drain 和错误上报仍由组合 owner 执行。
+规划器不拥有生命周期，也不修改索引。调用方传入当前节点状态和 mutation 请求，得到深冻结的 `{ steps, order, edges, blockedBy }`。`reject` 只报告阻塞者；`cascade` 给出依赖者优先的释放计划；`suspend` 只暂停已激活且尚未挂起的依赖者。replacement、resume 与 activation 同样只描述动作：挂起节点在 provider 换代时得到 `invalidate`，调用方置 `stale`；满足依赖后 `planResume` 将过期节点规划为 `restart`，并且只遍历挂起前沿。实际 rebind、restart、release、lease drain 和错误上报仍由组合 owner 执行。
 
 ---
 

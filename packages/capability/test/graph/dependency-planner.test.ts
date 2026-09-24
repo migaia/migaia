@@ -1,8 +1,8 @@
+import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
 import {
   DependencyAction,
   DependencyMutationKind,
-  DependencyNodeStatus,
   DependencyPolicy,
   planActivation,
   planDependencyMutation,
@@ -11,8 +11,9 @@ import {
   planResume,
   planTeardown,
   resolveInstallSet,
+  type IDependencyNodeState,
   type IDependencyPlan,
-  type IDependencyStatusReader
+  type IDependencyStateReader
 } from '../../src/graph/dependency.js'
 import {
   createTopologyIndex,
@@ -32,13 +33,19 @@ function createTestIndex(): ITopologyIndex {
   })
 }
 
-/** Creates a stable status reader over the supplied node-state entries. */
-function statuses(
-  entries: Readonly<
-    Record<string, (typeof DependencyNodeStatus)[keyof typeof DependencyNodeStatus]>
-  >
-): IDependencyStatusReader {
-  return (id) => entries[id] ?? DependencyNodeStatus.active
+/** Default planner state for an activated provider that currently serves dependents. */
+const servingState: IDependencyNodeState = Object.freeze({
+  activated: true,
+  enabled: true,
+  suspended: false,
+  stale: false
+})
+
+/** Creates a stable state reader over per-node overrides of the serving state. */
+function states(
+  entries: Readonly<Record<string, Partial<IDependencyNodeState>>>
+): IDependencyStateReader {
+  return (id) => Object.freeze({ ...servingState, ...entries[id] })
 }
 
 /** Converts a snapshot into ordinary data for mutation-free planner assertions. */
@@ -58,6 +65,45 @@ function mutatePlan(plan: IDependencyPlan): void {
   ;(plan.steps as Array<{ id: string; action: string }>).push({ id: 'x', action: 'release' })
 }
 
+/** Builds one service chain plus an optional fixed-size suspended direct frontier. */
+function createResumeFixture(
+  length: number,
+  suspendedDirect = 0
+): Readonly<{ index: ITopologyIndex; state: IDependencyStateReader }> {
+  const index = createTestIndex()
+  index.add({ id: 'p', dependencies: [] })
+  for (let position = 0; position < length; position += 1)
+    index.add({
+      id: `chain-${position}`,
+      dependencies: [{ provider: position === 0 ? 'p' : `chain-${position - 1}`, required: true }]
+    })
+  /** Suspended direct dependents used to prove traversal ignores the service chain. */
+  const entries: Record<string, Partial<IDependencyNodeState>> = {}
+  for (let position = 0; position < suspendedDirect; position += 1) {
+    const id = `suspended-${position}`
+    index.add({ id, dependencies: [{ provider: 'p', required: true }] })
+    entries[id] = { suspended: true }
+  }
+  return { index, state: states(entries) }
+}
+
+/** Returns the median duration of three 1000-call resume-planning runs. */
+function measureResumeMs(fixture: ReturnType<typeof createResumeFixture>): number {
+  /** Three independent elapsed durations used to discard one scheduling outlier. */
+  const samples: number[] = []
+  for (let run = 0; run < 3; run += 1) {
+    const startedAt = performance.now()
+    for (let iteration = 0; iteration < 1_000; iteration += 1)
+      planResume(fixture.index, fixture.state, {
+        provider: 'p',
+        generationChanged: true,
+        canRebind: () => false
+      })
+    samples.push(performance.now() - startedAt)
+  }
+  return samples.sort((left, right) => left - right)[1]!
+}
+
 describe('dependency planner', () => {
   it('A7 plans reject, cascade, and suspend dependency mutations', () => {
     const index = createTestIndex()
@@ -66,9 +112,9 @@ describe('dependency planner', () => {
     index.add({ id: 'b', dependencies: [{ provider: 'a', required: true }] })
     index.add({ id: 'c', dependencies: [{ provider: 'p', required: false }] })
     index.add({ id: 'l', dependencies: [{ provider: 'p', required: true }] })
-    const readStatus = statuses({ l: DependencyNodeStatus.inactive })
+    const readState = states({ l: { activated: false } })
 
-    const rejected = planDependencyMutation(index, readStatus, {
+    const rejected = planDependencyMutation(index, readState, {
       roots: ['p'],
       kind: DependencyMutationKind.remove,
       policy: DependencyPolicy.reject
@@ -76,7 +122,7 @@ describe('dependency planner', () => {
     expect(rejected.blockedBy).toEqual(['b', 'l', 'a'])
     expect(rejected.steps).toEqual([])
 
-    const cascaded = planDependencyMutation(index, readStatus, {
+    const cascaded = planDependencyMutation(index, readState, {
       roots: ['p'],
       kind: DependencyMutationKind.remove,
       policy: DependencyPolicy.cascade
@@ -84,7 +130,7 @@ describe('dependency planner', () => {
     expect(cascaded.order).toEqual(['b', 'l', 'a', 'p'])
     expect(cascaded.steps.every((step) => step.action === DependencyAction.release)).toBe(true)
 
-    const suspended = planDependencyMutation(index, readStatus, {
+    const suspended = planDependencyMutation(index, readState, {
       roots: ['p'],
       kind: DependencyMutationKind.remove,
       policy: DependencyPolicy.suspend
@@ -96,7 +142,7 @@ describe('dependency planner', () => {
     ])
     expect(suspended.edges).toContainEqual({ provider: 'p', consumer: 'c', optional: true })
 
-    const disabled = planDependencyMutation(index, readStatus, {
+    const disabled = planDependencyMutation(index, readState, {
       roots: ['p'],
       kind: DependencyMutationKind.disable,
       policy: DependencyPolicy.suspend
@@ -104,7 +150,7 @@ describe('dependency planner', () => {
     expect(disabled.steps.at(-1)).toEqual({ id: 'p', action: DependencyAction.disable })
 
     expect(() =>
-      planDependencyMutation(index, readStatus, {
+      planDependencyMutation(index, readState, {
         roots: ['p'],
         kind: DependencyMutationKind.remove,
         policy: 'unknown' as never
@@ -132,10 +178,10 @@ describe('dependency planner', () => {
     index.add({ id: 'b', dependencies: [{ provider: 'p', required: true }] })
     index.add({ id: 'l', dependencies: [{ provider: 'p', required: true }] })
     index.add({ id: 'd', dependencies: [{ provider: 'b', required: true }] })
-    const readStatus = statuses({ l: DependencyNodeStatus.inactive })
+    const readState = states({ l: { activated: false } })
 
     expect(
-      planReplacement(index, readStatus, {
+      planReplacement(index, readState, {
         target: 'p',
         canRebind: (id) => id === 'a'
       }).steps
@@ -144,7 +190,7 @@ describe('dependency planner', () => {
       { id: 'd', action: DependencyAction.restart },
       { id: 'b', action: DependencyAction.restart }
     ])
-    expect(planRestart(index, readStatus, ['a']).steps).toEqual([
+    expect(planRestart(index, readState, ['a']).steps).toEqual([
       { id: 'a', action: DependencyAction.restart }
     ])
   })
@@ -161,14 +207,14 @@ describe('dependency planner', () => {
       ]
     })
     index.add({ id: 'p', dependencies: [] })
-    const readStatus = statuses({
-      a: DependencyNodeStatus.suspended,
-      b: DependencyNodeStatus.suspended,
-      e: DependencyNodeStatus.suspended
+    const readState = states({
+      a: { suspended: true },
+      b: { suspended: true },
+      e: { suspended: true }
     })
 
     expect(
-      planResume(index, readStatus, {
+      planResume(index, readState, {
         provider: 'p',
         generationChanged: true,
         canRebind: () => false
@@ -178,7 +224,7 @@ describe('dependency planner', () => {
       { id: 'b', action: DependencyAction.restart }
     ])
     expect(
-      planResume(index, readStatus, {
+      planResume(index, readState, {
         provider: 'p',
         generationChanged: true,
         canRebind: (id) => id === 'a'
@@ -188,7 +234,7 @@ describe('dependency planner', () => {
       { id: 'b', action: DependencyAction.resume }
     ])
     expect(
-      planResume(index, readStatus, {
+      planResume(index, readState, {
         provider: 'p',
         generationChanged: false,
         canRebind: () => false
@@ -196,6 +242,16 @@ describe('dependency planner', () => {
     ).toEqual([
       { id: 'a', action: DependencyAction.resume },
       { id: 'b', action: DependencyAction.resume }
+    ])
+    expect(
+      planResume(index, states({ a: { suspended: true, stale: true }, b: { suspended: true } }), {
+        provider: 'p',
+        generationChanged: true,
+        canRebind: () => true
+      }).steps
+    ).toEqual([
+      { id: 'a', action: DependencyAction.restart },
+      { id: 'b', action: DependencyAction.restart }
     ])
   })
 
@@ -205,13 +261,13 @@ describe('dependency planner', () => {
     index.add({ id: 'l2', dependencies: [{ provider: 'l1', required: true }] })
     index.add({ id: 'e', dependencies: [{ provider: 'l2', required: true }] })
     index.add({ id: 'l3', dependencies: [] })
-    const readStatus = statuses({
-      l1: DependencyNodeStatus.inactive,
-      l2: DependencyNodeStatus.inactive,
-      l3: DependencyNodeStatus.inactive
+    const readState = states({
+      l1: { activated: false },
+      l2: { activated: false },
+      l3: { activated: false }
     })
 
-    expect(planActivation(index, readStatus, ['e']).steps).toEqual([
+    expect(planActivation(index, readState, ['e']).steps).toEqual([
       { id: 'l1', action: DependencyAction.activate },
       { id: 'l2', action: DependencyAction.activate }
     ])
@@ -229,7 +285,7 @@ describe('dependency planner', () => {
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
     const before = projectSnapshot(index.snapshot())
-    const plan = planDependencyMutation(index, statuses({}), {
+    const plan = planDependencyMutation(index, states({}), {
       roots: ['p'],
       kind: DependencyMutationKind.remove,
       policy: DependencyPolicy.cascade
@@ -256,7 +312,7 @@ describe('dependency planner', () => {
       for (let position = 0; position < background; position += 1)
         index.add({ id: `unrelated-${position}`, dependencies: [] })
       const before = index.metrics()
-      const plan = planDependencyMutation(index, statuses({}), {
+      const plan = planDependencyMutation(index, states({}), {
         roots: ['a'],
         kind: DependencyMutationKind.remove,
         policy: DependencyPolicy.cascade
@@ -271,5 +327,148 @@ describe('dependency planner', () => {
     // An O(nodes) edge scan would grow with the background; the neighbourhood read does not.
     expect(deltas[1]).toEqual(deltas[0])
     expect(deltas[0]![0]).toBeLessThanOrEqual(8)
+  })
+
+  it('A14 reads disabled and suspended as orthogonal state flags', () => {
+    const index = createTestIndex()
+    index.add({ id: 'p', dependencies: [] })
+    index.add({ id: 'm', dependencies: [{ provider: 'p', required: true }] })
+
+    expect(
+      planDependencyMutation(index, states({ m: { enabled: false, suspended: true } }), {
+        roots: ['p'],
+        kind: DependencyMutationKind.remove,
+        policy: DependencyPolicy.suspend
+      }).steps
+    ).toEqual([{ id: 'p', action: DependencyAction.release }])
+    expect(
+      planDependencyMutation(index, states({ m: { enabled: false } }), {
+        roots: ['p'],
+        kind: DependencyMutationKind.remove,
+        policy: DependencyPolicy.suspend
+      }).steps
+    ).toEqual([
+      { id: 'm', action: DependencyAction.suspend },
+      { id: 'p', action: DependencyAction.release }
+    ])
+  })
+
+  it('A15 resumes a provider without serving through a disabled recovered node', () => {
+    const index = createTestIndex()
+    index.add({ id: 'p', dependencies: [] })
+    index.add({ id: 'm', dependencies: [{ provider: 'p', required: true }] })
+    index.add({ id: 's', dependencies: [{ provider: 'm', required: true }] })
+    /** Request shape shared by the three state projections. */
+    const request = {
+      provider: 'p',
+      generationChanged: false,
+      canRebind: () => false
+    } as const
+
+    expect(
+      planResume(
+        index,
+        states({ m: { enabled: false, suspended: true }, s: { suspended: true } }),
+        request
+      ).steps
+    ).toEqual([{ id: 'm', action: DependencyAction.resume }])
+    expect(
+      planResume(index, states({ m: { suspended: true }, s: { suspended: true } }), {
+        ...request,
+        provider: 'm'
+      }).steps
+    ).toEqual([
+      { id: 'm', action: DependencyAction.resume },
+      { id: 's', action: DependencyAction.resume }
+    ])
+    expect(
+      planResume(index, states({ s: { suspended: true } }), { ...request, provider: 'm' }).steps
+    ).toEqual([{ id: 's', action: DependencyAction.resume }])
+  })
+
+  it('A16 invalidates suspended bindings and restarts disabled consumers', () => {
+    const index = createTestIndex()
+    index.add({ id: 'p', dependencies: [] })
+    index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+    index.add({ id: 'd', dependencies: [{ provider: 'p', required: true }] })
+    index.add({ id: 'x', dependencies: [{ provider: 'p', required: true }] })
+    index.add({
+      id: 'y',
+      dependencies: [
+        { provider: 'd', required: true },
+        { provider: 'q', required: true }
+      ]
+    })
+    const readState = states({
+      d: { enabled: false },
+      x: { suspended: true },
+      y: { suspended: true }
+    })
+
+    expect(
+      planReplacement(index, readState, {
+        target: 'p',
+        canRebind: (id) => id === 'a'
+      }).steps
+    ).toEqual([
+      { id: 'a', action: DependencyAction.rebind },
+      { id: 'x', action: DependencyAction.invalidate },
+      { id: 'y', action: DependencyAction.invalidate },
+      { id: 'd', action: DependencyAction.restart }
+    ])
+    expect(planRestart(index, readState, ['d']).steps).toEqual([
+      { id: 'y', action: DependencyAction.invalidate },
+      { id: 'd', action: DependencyAction.restart }
+    ])
+    expect(
+      planResume(index, states({ x: { suspended: true, stale: true } }), {
+        provider: 'p',
+        generationChanged: true,
+        canRebind: () => true
+      }).steps
+    ).toContainEqual({ id: 'x', action: DependencyAction.restart })
+  })
+
+  it('A17 bounds empty and suspended-frontier resume work', () => {
+    const small = createResumeFixture(100)
+    const large = createResumeFixture(2_000)
+    /** Metric deltas for empty plans at both service-chain sizes. */
+    const emptyDeltas = [small, large].map((fixture) => {
+      const before = fixture.index.metrics()
+      const plan = planResume(fixture.index, fixture.state, {
+        provider: 'p',
+        generationChanged: true,
+        canRebind: () => false
+      })
+      const after = fixture.index.metrics()
+      expect(plan.steps).toEqual([])
+      return [
+        after.visitedNodes - before.visitedNodes,
+        after.visitedEdges - before.visitedEdges
+      ] as const
+    })
+    expect(emptyDeltas[1]).toEqual(emptyDeltas[0])
+
+    const smallDuration = measureResumeMs(small)
+    const largeDuration = measureResumeMs(large)
+    expect(largeDuration).toBeLessThanOrEqual(smallDuration * 2)
+
+    /** Same suspended direct frontier attached to differently sized service chains. */
+    const frontierDeltas = [createResumeFixture(100, 3), createResumeFixture(2_000, 3)].map(
+      (fixture) => {
+        const before = fixture.index.metrics()
+        planResume(fixture.index, fixture.state, {
+          provider: 'p',
+          generationChanged: true,
+          canRebind: () => true
+        })
+        const after = fixture.index.metrics()
+        return [
+          after.visitedNodes - before.visitedNodes,
+          after.visitedEdges - before.visitedEdges
+        ] as const
+      }
+    )
+    expect(frontierDeltas[1]).toEqual(frontierDeltas[0])
   })
 })
