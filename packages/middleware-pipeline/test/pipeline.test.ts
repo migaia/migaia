@@ -935,7 +935,7 @@ describe('runAsyncMiddleware', () => {
   })
 })
 
-describe('liftSyncToAsyncForTest', () => {
+describe('adaptSyncStageToAsync', () => {
   it('reports duplicate next and starts only the first downstream', async () => {
     const violations: string[] = []
     let downstreamRuns = 0
@@ -985,7 +985,7 @@ describe('liftSyncToAsyncForTest', () => {
   })
 })
 
-describe('liftSyncToGeneratorForTest', () => {
+describe('adaptSyncStageToGenerator', () => {
   it('converts next into a yielded value and reports duplicate/late calls', () => {
     const violations: string[] = []
     let lateNext!: (value: number) => void
