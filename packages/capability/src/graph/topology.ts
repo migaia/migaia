@@ -273,3 +273,15 @@ export function buildCapabilityTopology(
     ordinal: createReadonlyMap(snapshots.map((node) => [node.id, node.ordinal]))
   })
 }
+
+export {
+  createTopologyIndex,
+  type IGraphDependents,
+  type ITopologyIndex,
+  type ITopologyIndexAdapter,
+  type ITopologyIndexMetrics,
+  type ITopologyIndexNode,
+  type ITopologyIndexReader,
+  type ITopologyIndexWriter,
+  type ITopologyTransaction
+} from './topology-index.js'
