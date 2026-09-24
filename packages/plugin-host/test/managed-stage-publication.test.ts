@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm'
 import {
   defineHost,
   PluginHost,
-  PluginHostPipelineMode,
+  MiddlewarePipelineMode,
   type IPluginHostCore
 } from '../src/index.js'
 import { createView } from '../src/composition-entry.js'
@@ -45,7 +45,7 @@ describe('PluginHost managed stage publication', () => {
     })
     const host = new ManagedStageHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      pipeline: { mode: PluginHostPipelineMode.async }
+      pipeline: { mode: MiddlewarePipelineMode.async }
     })
     const installing = host.use({
       name: 'pending-stage',
@@ -115,7 +115,7 @@ describe('PluginHost managed stage publication', () => {
     })
     const host = new ManagedStageHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      pipeline: { mode: PluginHostPipelineMode.async }
+      pipeline: { mode: MiddlewarePipelineMode.async }
     })
     host.useAsyncPipeline(async (value, next) => {
       await stageGate

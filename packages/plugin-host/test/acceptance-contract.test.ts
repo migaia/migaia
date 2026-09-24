@@ -442,7 +442,7 @@ describe('PHV3 acceptance contract', () => {
   it('PHV3-T27: carries TValue through pipeline declarations', () => {
     // 函数式 Host 的 TValue 由句柄类型承载。
     const source = readFileSync(new URL('../src/typing.ts', import.meta.url), 'utf8')
-    expect(source).toContain('IAsyncGeneratorPipelineStage<TValue>')
+    expect(source).toContain('IAsyncGeneratorMiddlewareStage<TValue>')
     const handle = readFileSync(new URL('../src/define-host.ts', import.meta.url), 'utf8')
     expect(handle).toContain('IHostHandle<TDomainCore, TValue')
   })

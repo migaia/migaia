@@ -22,6 +22,12 @@ describe('PluginHost public error-code documentation', () => {
     expect(error.stack).toBeTruthy()
   })
 
+  it('declares the suspended boundary code with descriptive source documentation', async () => {
+    expect(PluginHostErrorCode.pluginSuspended).toBe('PLUGIN_SUSPENDED')
+    const source = await readFile(new URL('../src/error-code.ts', import.meta.url), 'utf8')
+    expect(source).toMatch(/\/\*\*[\s\S]+temporarily suspended[\s\S]+pluginSuspended/)
+  })
+
   it('入参校验 TypeError 保持类型不变并携带 (source, INVALID_OPTION)（§7 裸抛扫描门禁）', () => {
     const error = createPluginHostTypeError('plugin name must be a non-empty string')
     expect(error).toBeInstanceOf(TypeError)

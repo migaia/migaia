@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { runGeneratorPipeline } from '../../src/pipeline'
+import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED } from '../../src/typing'
 
 describe('runGeneratorPipeline', () => {
   it('uses final return value and last yield fallback', () => {
     const values: number[] = []
-    runGeneratorPipeline<number>(
+    createPipeline<number>({ mode: MiddlewarePipelineMode.generator }).run(
       [
         function* (value) {
           yield value + 1
@@ -24,7 +24,7 @@ describe('runGeneratorPipeline', () => {
 
   it('supports an explicit undefined final value', () => {
     const values: unknown[] = []
-    runGeneratorPipeline<unknown>(
+    createPipeline<unknown>({ mode: MiddlewarePipelineMode.generator }).run(
       [
         function* () {
           return GENERATOR_UNDEFINED
@@ -38,7 +38,7 @@ describe('runGeneratorPipeline', () => {
 
   it('supports explicit halt after yielding', () => {
     const values: number[] = []
-    runGeneratorPipeline<number>(
+    createPipeline<number>({ mode: MiddlewarePipelineMode.generator }).run(
       [
         function* () {
           yield 2

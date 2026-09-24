@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { runSyncPipeline } from '../../src/pipeline'
+import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 describe('runSyncPipeline', () => {
   it('uses stage snapshot and completes value flow', () => {
     const values: number[] = []
-    runSyncPipeline<number>(
+    createPipeline<number>({ mode: MiddlewarePipelineMode.sync }).run(
       [(value, next) => next(value + 1), (value, next) => next(value * 2)],
       2,
-      (value) => values.push(value),
-      () => {
-        throw new Error('unexpected violation')
-      }
+      (value) => values.push(value)
     )
     expect(values).toEqual([6])
   })
