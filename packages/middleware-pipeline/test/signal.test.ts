@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
+import { GENERATOR_CONTINUE } from '../src/index.js'
 import {
-  GENERATOR_CONTINUE,
-  runAsyncMiddleware,
-  runAsyncGeneratorMiddleware,
-  runGeneratorMiddleware,
-  runSyncMiddleware
-} from '../src/index.js'
+  runAsyncForTest,
+  runAsyncGeneratorForTest,
+  runGeneratorForTest,
+  runSyncForTest
+} from './pipeline-test-helpers.js'
 
 type ITestSignal = {
   aborted: boolean
@@ -24,7 +24,15 @@ const signal = (aborted = false, reason?: unknown): ITestSignal => ({
 describe('signal round 2 contract', () => {
   it('MP-T51/MP-T67 exports structural signal surface and preserves package boundary', async () => {
     const module = await import('../src/index.js')
-    expect(typeof module.runSyncMiddleware).toBe('function')
+    expect(typeof module.createPipeline).toBe('function')
+    expect(module).not.toHaveProperty('runSyncMiddleware')
+    expect(module).not.toHaveProperty('runAsyncMiddleware')
+    expect(module).not.toHaveProperty('runGeneratorMiddleware')
+    expect(module).not.toHaveProperty('runAsyncGeneratorMiddleware')
+    expect(module).not.toHaveProperty('adaptSyncStageToAsync')
+    expect(module).not.toHaveProperty('adaptSyncStageToGenerator')
+    expect(module).not.toHaveProperty('adaptGeneratorStageToAsyncGenerator')
+    expect(module).not.toHaveProperty('adaptSyncStageToAsyncGenerator')
     expect(module.MIDDLEWARE_PIPELINE_SOURCE).toBe('@migaia/middleware-pipeline')
   })
 
@@ -39,7 +47,7 @@ describe('signal round 2 contract', () => {
     }
     let nextRuns = 0
     expect(() =>
-      runSyncMiddleware(
+      runSyncForTest(
         [
           (_value, next, context) => {
             aborted = true
@@ -70,7 +78,7 @@ describe('signal round 2 contract', () => {
     }
     let settled = false
     await expect(
-      runAsyncGeneratorMiddleware(
+      runAsyncGeneratorForTest(
         [
           async function* (value, context) {
             yield value
@@ -100,7 +108,7 @@ describe('signal round 2 contract', () => {
       removeEventListener() {}
     }
     await expect(
-      runAsyncGeneratorMiddleware(
+      runAsyncGeneratorForTest(
         [
           async function* () {
             throw failure
@@ -137,7 +145,7 @@ describe('signal round 2 contract', () => {
     const abort = new Error('abort')
     Object.defineProperty(input, 'reason', { value: abort })
     try {
-      runGeneratorMiddleware([stage], 1, () => undefined, undefined, { signal: input })
+      runGeneratorForTest([stage], 1, () => undefined, undefined, { signal: input })
       throw new Error('expected cleanup aggregate')
     } catch (error) {
       expect(error).toMatchObject({ code: 'ABORT_CLEANUP_FAILED' })
@@ -152,7 +160,7 @@ describe('signal round 2 contract', () => {
     const input = { aborted: true, reason, addEventListener() {}, removeEventListener() {} }
     let done = false
     expect(() =>
-      runSyncMiddleware(
+      runSyncForTest(
         [],
         1,
         () => {
@@ -169,7 +177,7 @@ describe('signal round 2 contract', () => {
     const first = signal()
     const second = signal()
     let contexts: unknown[] = []
-    runSyncMiddleware(
+    runSyncForTest(
       [
         (_value, next, context) => {
           contexts.push(context)
@@ -181,7 +189,7 @@ describe('signal round 2 contract', () => {
       () => undefined,
       { signal: first }
     )
-    runSyncMiddleware(
+    runSyncForTest(
       [
         (_value, next, context) => {
           contexts.push(context)
@@ -208,7 +216,7 @@ describe('signal round 2 contract', () => {
         addEventListener() {},
         removeEventListener() {}
       }
-      const result = runAsyncGeneratorMiddleware(
+      const result = runAsyncGeneratorForTest(
         [
           async function* () {
             try {
@@ -312,7 +320,7 @@ describe('signal round 2 contract', () => {
       removeEventListener() {}
     }
     let started = false
-    await runAsyncMiddleware(
+    await runAsyncForTest(
       [],
       1,
       async (_value, context) => {
@@ -339,7 +347,7 @@ describe('signal round 2 contract', () => {
       removeEventListener() {}
     }
     expect(() =>
-      runSyncMiddleware(
+      runSyncForTest(
         [(_value, next) => next(2)],
         1,
         () => undefined,
@@ -364,7 +372,7 @@ describe('signal round 2 contract', () => {
       addEventListener() {},
       removeEventListener() {}
     }
-    runSyncMiddleware(
+    runSyncForTest(
       [(_value, next) => next(2)],
       1,
       () => undefined,
@@ -376,7 +384,7 @@ describe('signal round 2 contract', () => {
     expect(reasonReads).toBe(0)
     aborted = true
     expect(() =>
-      runSyncMiddleware(
+      runSyncForTest(
         [],
         1,
         () => undefined,
@@ -406,7 +414,7 @@ describe('signal round 2 contract', () => {
       removeEventListener() {}
     }
     expect(() =>
-      runSyncMiddleware(
+      runSyncForTest(
         [(_value, next) => next(2)],
         1,
         () => undefined,
@@ -434,7 +442,7 @@ describe('signal round 2 contract', () => {
     }
     const downstream = new Error('downstream')
     const combine = vi.fn((stage: unknown, child: unknown) => new AggregateError([stage, child]))
-    const run = runAsyncMiddleware(
+    const run = runAsyncForTest(
       [
         async (_value, next) => {
           await next(2)
@@ -457,7 +465,7 @@ describe('signal round 2 contract', () => {
     const downstreamFailure = new Error('downstream')
     const combine = vi.fn((stage: unknown, downstream: unknown) => ({ stage, downstream }))
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             void next(2)
@@ -490,7 +498,7 @@ describe('signal round 2 contract', () => {
     }
     const combine = vi.fn(() => new Error('combined'))
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             const pending = next(2)
@@ -522,7 +530,7 @@ describe('signal round 2 contract', () => {
     }
     const combine = vi.fn(() => new Error('combined'))
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             let downstreamFailed = false
@@ -560,7 +568,7 @@ describe('signal round 2 contract', () => {
     }
     const combine = vi.fn(() => new Error('combined'))
     await expect(
-      runAsyncMiddleware(
+      runAsyncForTest(
         [
           async (_value, next) => {
             aborted = true
@@ -579,7 +587,7 @@ describe('signal round 2 contract', () => {
 
   it('MP-T52/MP-T55 preserves legacy callback arity and passes one frozen context when enabled', () => {
     const legacy: number[] = []
-    runSyncMiddleware(
+    runSyncForTest(
       [
         function (_value, _next) {
           legacy.push(arguments.length)
@@ -593,7 +601,7 @@ describe('signal round 2 contract', () => {
 
     let observed: unknown
     const input = signal()
-    runSyncMiddleware(
+    runSyncForTest(
       [
         (_value, next, context) => {
           observed = context
@@ -613,7 +621,7 @@ describe('signal round 2 contract', () => {
     const input = signal(true, 'stop')
     let touched = false
     expect(() =>
-      runSyncMiddleware(
+      runSyncForTest(
         [
           () => {
             touched = true
@@ -629,7 +637,7 @@ describe('signal round 2 contract', () => {
     ).toThrow('middleware pipeline aborted')
     expect(touched).toBe(false)
     expect(() =>
-      runSyncMiddleware(
+      runSyncForTest(
         [],
         1,
         () => undefined,
@@ -638,7 +646,7 @@ describe('signal round 2 contract', () => {
       )
     ).toThrowError(expect.objectContaining({ code: 'INVALID_OPTION' }))
     await expect(
-      runAsyncGeneratorMiddleware([], 1, () => undefined, undefined, null as never)
+      runAsyncGeneratorForTest([], 1, () => undefined, undefined, null as never)
     ).rejects.toThrowError(expect.objectContaining({ code: 'INVALID_OPTION' }))
     const admissionCause = new Error('hostile aborted getter')
     const malformedSignal = {
@@ -650,7 +658,7 @@ describe('signal round 2 contract', () => {
     }
     let malformedError: unknown
     try {
-      runSyncMiddleware(
+      runSyncForTest(
         [],
         1,
         () => undefined,
@@ -685,7 +693,7 @@ describe('signal round 2 contract', () => {
       return GENERATOR_CONTINUE
     }
     expect(() =>
-      runGeneratorMiddleware([stage], 1, () => undefined, undefined, { signal: syncInput })
+      runGeneratorForTest([stage], 1, () => undefined, undefined, { signal: syncInput })
     ).toThrow('middleware pipeline aborted')
 
     let asyncReads = 0
@@ -707,7 +715,7 @@ describe('signal round 2 contract', () => {
       return GENERATOR_CONTINUE
     }
     await expect(
-      runAsyncGeneratorMiddleware([asyncStage], 1, () => undefined, undefined, {
+      runAsyncGeneratorForTest([asyncStage], 1, () => undefined, undefined, {
         signal: asyncInput
       })
     ).rejects.toThrow('middleware pipeline aborted')
@@ -722,7 +730,7 @@ const runAsyncMiddlewareForTest = (
   business?: Error,
   ignoreSignal = false
 ): Promise<void> =>
-  runAsyncMiddleware(
+  runAsyncForTest(
     [
       async (value, next, context) => {
         await gate
