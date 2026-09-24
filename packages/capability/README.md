@@ -50,6 +50,7 @@ pnpm add @migaia/capability
 - [宿主创建与生命周期方法](#宿主创建与生命周期方法)
 - [状态与枚举常量](#状态与枚举常量)
 - [静态 Capability Graph](#静态-capability-graph)
+- [增量拓扑索引与依赖规划](#增量拓扑索引与依赖规划)
 - [Dynamic Graph generation leases](#dynamic-graph-generation-leases)
 - [错误码与错误结构](#错误码与错误结构)
 - [高阶组合示例](#高阶组合示例)
@@ -98,6 +99,42 @@ await graph.dispose()
 
 静态 Graph core 只拥有 required 拓扑、启动顺序与生命周期协调，不反向依赖上层组合框架或平台适配器。optional/notification 与 cross-realm 仍是独立的未发布边界，dynamic replacement 则由 `@migaia/capability/graph/dynamic` 单独提供，避免把运行时 mutation 混入静态 Graph。
 
+## 增量拓扑索引与依赖规划
+
+运行期组合层可复用同一套纯图语义，而不用复制邻接表、闭包或排序算法：
+
+```ts
+import { createTopologyIndex } from '@migaia/capability/graph/topology'
+import {
+  DependencyMutationKind,
+  DependencyPolicy,
+  planDependencyMutation
+} from '@migaia/capability/graph/dependency'
+
+const index = createTopologyIndex({
+  onCycle: (path) => {
+    throw new Error(`cycle: ${path.join(' -> ')}`)
+  },
+  onInvalid: (reason, id) => {
+    throw new Error(`${reason}: ${id ?? '<unknown>'}`)
+  }
+})
+index.add({ id: 'provider', dependencies: [] })
+index.add({
+  id: 'consumer',
+  dependencies: [{ provider: 'provider', required: true }]
+})
+
+const plan = planDependencyMutation(index, () => 'active', {
+  roots: ['provider'],
+  kind: DependencyMutationKind.remove,
+  policy: DependencyPolicy.cascade
+})
+plan.order // ['consumer', 'provider']
+```
+
+索引拥有节点、required/optional 边、缺席 provider、规范顺序与事务；顺序固定为 `(level, ordinal)`。规划器只读取索引和调用方状态，返回深冻结的纯计划，不启动、释放或修改节点。生命周期、generation、lease 与物理资源仍由 `graph/dynamic` 或上层组合 owner 执行。
+
 ---
 
 <a id="宿主创建与生命周期方法"></a>
@@ -126,10 +163,7 @@ type INotificationCenter = ICapabilityHandle & {
 }
 
 const mount = document.querySelector<HTMLElement>('#notification-center')!
-const capabilities = createCapabilityHost(
-  { mount },
-  { flags: { notificationCenter: true } }
-)
+const capabilities = createCapabilityHost({ mount }, { flags: { notificationCenter: true } })
 
 capabilities.register<INotificationCenter>({
   name: 'notificationCenter',
@@ -540,5 +574,5 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 交给 `releaseBatch(entries, fence)`；物理 provider 清理不得越过该 fence。
 
 mutation metrics 同时报告 affected-frontier 的 `visitedNodes`、`visitedEdges`、`queueOperations`、
-`queueTimeMs`、`wallTimeMs` 与 `fullScan`。拓扑使用按 admission ordinal 的确定性优先队列，复杂度上界为
-`O((VΔ + EΔ) log VΔ)`，不会在每个输出节点重新 filter/sort 整个 frontier。
+`queueTimeMs`、`wallTimeMs` 与 `fullScan`。Dynamic Graph 复用增量拓扑索引和依赖规划器，所有 frontier
+按 `(level, ordinal)` 的规范顺序执行；无依赖关系但层级不同的节点不再沿用旧的最小 ordinal 堆顺序。
