@@ -14,7 +14,6 @@ describe('dependency planner public contract', () => {
       'DependencyAction',
       'DependencyEdgeStatus',
       'DependencyMutationKind',
-      'DependencyNodeStatus',
       'DependencyPolicy',
       'collectPlanEdges',
       'planActivation',
@@ -26,6 +25,11 @@ describe('dependency planner public contract', () => {
       'resolveInstallSet'
     ])
     expect(topology.createTopologyIndex).toBeTypeOf('function')
+  })
+
+  it('A14 exposes invalidate without the removed single-value status constant', () => {
+    expect(dependency).not.toHaveProperty('DependencyNodeStatus')
+    expect(dependency.DependencyAction.invalidate).toBe('invalidate')
   })
 
   it('A13 declares the dependency planner package subpath', () => {

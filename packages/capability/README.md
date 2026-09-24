@@ -125,15 +125,19 @@ index.add({
   dependencies: [{ provider: 'provider', required: true }]
 })
 
-const plan = planDependencyMutation(index, () => 'active', {
+const plan = planDependencyMutation(
+  index,
+  () => ({ activated: true, enabled: true, suspended: false, stale: false }),
+  {
   roots: ['provider'],
   kind: DependencyMutationKind.remove,
   policy: DependencyPolicy.cascade
-})
+  }
+)
 plan.order // ['consumer', 'provider']
 ```
 
-索引拥有节点、required/optional 边、缺席 provider、规范顺序与事务；顺序固定为 `(level, ordinal)`。规划器只读取索引和调用方状态，返回深冻结的纯计划，不启动、释放或修改节点。生命周期、generation、lease 与物理资源仍由 `graph/dynamic` 或上层组合 owner 执行。
+索引拥有节点、required/optional 边、缺席 provider、规范顺序与事务；顺序固定为 `(level, ordinal)`。规划器只读取索引和调用方提供的 `{ activated, enabled, suspended, stale }` 正交状态，返回深冻结的纯计划，不启动、释放或修改节点。`invalidate` 表示挂起实例的 provider 绑定已过期：调用方保持实例挂起并置 `stale`，之后由 `planResume` 产出 `restart`。恢复只遍历挂起前沿，不扫描 provider 的整个在服务依赖者闭包。生命周期、generation、lease 与物理资源仍由 `graph/dynamic` 或上层组合 owner 执行。
 
 ---
 
