@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+/** A1 proves dependency planning has one canonical package owner and no retired host planner. */
 const sourceRoot = new URL('../src/', import.meta.url).pathname
 
 const filesUnder = async (directory: string): Promise<string[]> => {

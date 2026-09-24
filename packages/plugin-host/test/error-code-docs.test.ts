@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { PluginHostErrorCode } from '../src/typing'
 import { PluginHostError, createPluginHostTypeError } from '../src/error-text'
 
+/** A12 links PLUGIN_SUSPENDED and every public error code to maintained documentation. */
 describe('PluginHost public error-code documentation', () => {
   it('documents every exported error code in README and USEGUIDE', async () => {
     const [readme, useguide] = await Promise.all([

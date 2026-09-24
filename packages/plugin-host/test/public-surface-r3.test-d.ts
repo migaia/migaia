@@ -1,3 +1,4 @@
+/** A9 proves the R3 public type removals and canonical middleware re-exports. */
 // @ts-expect-error R3 removes the duplicated mode constant.
 import { PluginHostPipelineMode } from '../src/index.js'
 // @ts-expect-error R3 removes the duplicated sync stage declaration.

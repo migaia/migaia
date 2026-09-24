@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ITopologyIndex, ITopologyIndexMetrics } from '@migaia/capability/graph/topology'
 
-/** Captures each host-owned index created through the capability package. */
+/** A11 captures each host-owned index to compare work across graph sizes and failed batches. */
 const captured = vi.hoisted(() => [] as ITopologyIndex[])
 
 vi.mock('@migaia/capability/graph/topology', async (importOriginal) => {
