@@ -426,20 +426,6 @@ export const runAsyncMiddleware = async <TValue>(
         hasDownstreamError = true
       }
     }
-    // A signal can abort while a downstream stage is settling. Check the runner-owned control
-    // state before reducing ordinary stage/downstream failures so cancellation remains primary.
-    if (
-      !completed &&
-      context?.signal.aborted &&
-      (!hasStageError || stageError === downstreamError)
-    ) {
-      try {
-        check(context)
-      } catch (error) {
-        markParentActiveError(error)
-        throw error
-      }
-    }
     if (downstreamControlPath.hasActiveError) {
       /** Exact runner-owned active guard value, kept separate from ordinary failures. */
       const activeError = downstreamControlPath.activeError
@@ -453,6 +439,7 @@ export const runAsyncMiddleware = async <TValue>(
       throw activeError
     }
     if (hasStageError && hasDownstreamError) {
+      if (stageError === downstreamError) throw downstreamError
       if (options.combineStageAndDownstreamError) {
         throw options.combineStageAndDownstreamError(stageError, downstreamError)
       }
