@@ -105,6 +105,20 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
     return true
   }
 
+  /** Suspends one dependent without disabling or disposing its retained registration. */
+  suspend(registration: IRegistration<TDomainCore, TValue>): boolean {
+    this.#assertCurrent(registration)
+    if (registration.suspended) return false
+    registration.suspended = true
+    registration.featureExposeValid = false
+    this.#port.state.lanes.rebuild(
+      this.#port.state.enabledRegistrations(),
+      this.#port.state.stageSlots
+    )
+    this.#port.state.commit()
+    return true
+  }
+
   /** Enables an exact still-installed registration and restores its original stage ordering. */
   enable(registration: IRegistration<TDomainCore, TValue>): boolean {
     this.#assertCurrent(registration)
@@ -201,9 +215,10 @@ export const createPluginHostEnablementFacade = <
         if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
         const disabled: IRegistration<TDomainCore, TValue>[] = []
         for (const step of plan.steps) {
-          if (step.action !== DependencyAction.disable) continue
           const dependent = runtime.requireInstalled(step.id)
-          if (runtime.disable(dependent)) disabled.push(dependent)
+          if (step.action === DependencyAction.suspend) runtime.suspend(dependent)
+          else if (step.action === DependencyAction.disable && runtime.disable(dependent))
+            disabled.push(dependent)
         }
         return Object.freeze({
           token: Object.freeze({
