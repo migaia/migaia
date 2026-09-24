@@ -790,6 +790,11 @@ export class PluginHost<
           PluginHostErrorCode.pluginNotInstalled,
           ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
         )
+      if (previous.suspended)
+        throw new PluginHostError(
+          PluginHostErrorCode.pluginSuspended,
+          ERROR_TEXT.PLUGIN_SUSPENDED(name)
+        )
       await this.#replaceRuntime.replace(previous, definition)
       return this.#createHandle<TPlugin>(name)
     })
@@ -963,9 +968,13 @@ export class PluginHost<
       if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
       const cleanupErrors: unknown[] = []
       for (const step of plan.steps) {
-        if (step.action !== DependencyAction.release) continue
         const registration = this.#state.registrations.get(step.id)
         if (!registration) continue
+        if (step.action === DependencyAction.suspend) {
+          this.#enablementRuntime.suspend(registration)
+          continue
+        }
+        if (step.action !== DependencyAction.release) continue
         await this.#drainRegistrationLeases(registration)
         cleanupErrors.push(...(await this.#removalRuntime.disposeRegistration(registration)))
         this.#enablementRuntime.forget(step.id)

@@ -159,6 +159,8 @@ export class PluginHostState<TDomainCore extends object, TValue> {
 
   /** Current enabled registrations in stable installation order. */
   enabledRegistrations(): readonly IRegistration<TDomainCore, TValue>[] {
-    return [...this.registrations.values()].filter((registration) => registration.enabled)
+    return [...this.registrations.values()].filter(
+      (registration) => registration.enabled && !registration.suspended
+    )
   }
 }

@@ -33,6 +33,11 @@ const requireRegistration = <TDomainCore extends object, TValue>(
     )
   if (!registration.enabled)
     throw new PluginHostError(PluginHostErrorCode.pluginDisabled, ERROR_TEXT.PLUGIN_DISABLED(name))
+  if (registration.suspended)
+    throw new PluginHostError(
+      PluginHostErrorCode.pluginSuspended,
+      ERROR_TEXT.PLUGIN_SUSPENDED(name)
+    )
   if (!registration.activated)
     throw new PluginHostError(
       PluginHostErrorCode.pluginNotActivated,
@@ -68,6 +73,11 @@ const readExtensions = <TDomainCore extends object, TValue>(
                 throw new PluginHostError(
                   PluginHostErrorCode.pluginDisabled,
                   ERROR_TEXT.PLUGIN_DISABLED(registration.name)
+                )
+              if (registration.suspended)
+                throw new PluginHostError(
+                  PluginHostErrorCode.pluginSuspended,
+                  ERROR_TEXT.PLUGIN_SUSPENDED(registration.name)
                 )
               return invokeCaptured(value, port.host, args)
             }
