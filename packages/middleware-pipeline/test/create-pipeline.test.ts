@@ -165,7 +165,9 @@ describe('createPipeline', () => {
           }
         ],
         1,
-        () => trace.push('async:done')
+        () => {
+          trace.push('async:done')
+        }
       )
     ).rejects.toBe(activeFailure)
 
@@ -189,7 +191,9 @@ describe('createPipeline', () => {
           }
         ],
         1,
-        () => trace.push('async-generator:done')
+        () => {
+          trace.push('async-generator:done')
+        }
       )
     ).rejects.toBe(activeFailure)
 
@@ -250,7 +254,7 @@ describe('createPipeline', () => {
     /** Captured unsupported-lift failure for native-type and identity assertions. */
     let unsupportedFailure: unknown
     try {
-      sync.lift(asyncStage, MiddlewarePipelineMode.async as never)
+      sync.lift(asyncStage as never, MiddlewarePipelineMode.async as never)
     } catch (error) {
       unsupportedFailure = error
     }
@@ -275,7 +279,9 @@ describe('createPipeline', () => {
     await asyncGenerator.run(
       [asyncGenerator.lift(generatorStage, MiddlewarePipelineMode.generator)],
       1,
-      (value) => values.push(value)
+      (value) => {
+        values.push(value)
+      }
     )
     expect(values).toEqual([2])
   })
