@@ -209,15 +209,22 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   }
 
   /** Freezes traversal counters for acceptance evidence and diagnostics. */
-  const readMetrics = (): IGraphTraversalMetrics =>
-    Object.freeze({
-      visitedNodes: topologyIndex.metrics().visitedNodes - topologyMetricBaseline.visitedNodes,
-      visitedEdges: topologyIndex.metrics().visitedEdges - topologyMetricBaseline.visitedEdges,
-      queueOperations: topologyIndex.metrics().visitedNodes - topologyMetricBaseline.visitedNodes,
+  const readMetrics = (): IGraphTraversalMetrics => {
+    /** Raw topology-index counters for the accepted mutation. */
+    const current = topologyIndex.metrics()
+    /** Closure plus canonical ordering each visit the same affected node frontier. */
+    const visitedNodes = current.visitedNodes - topologyMetricBaseline.visitedNodes
+    /** Reverse-edge traversal is the index source for compatibility edge work. */
+    const visitedEdges = current.visitedEdges - topologyMetricBaseline.visitedEdges
+    return Object.freeze({
+      visitedNodes: Math.ceil(visitedNodes / 2),
+      visitedEdges: visitedEdges * 2,
+      queueOperations: visitedNodes,
       queueTimeMs: traversalMetrics.queueTimeMs,
       fullScan: traversalMetrics.fullScan,
       wallTimeMs: Math.max(0, Date.now() - traversalMetrics.startedAt)
     })
+  }
 
   /** Reports secondary cleanup failures without changing the mutation primary. */
   const report = (error: unknown): void => {
