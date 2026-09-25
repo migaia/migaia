@@ -134,7 +134,7 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
     for (const step of [...replacementPlan.steps, ...restartPlan.steps]) {
       if (step.action !== DependencyAction.invalidate) continue
       const registration = this.#port.registrations.get(step.id)
-      if (registration) registration.stale = true
+      if (registration) this.#port.state.setStale(registration, true)
     }
     const restarted: IRegistration<TDomainCore, TValue>[] = []
     for (const restartName of restartPlan.steps

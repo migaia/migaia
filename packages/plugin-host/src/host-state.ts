@@ -78,6 +78,21 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     }
   }
 
+  /** Writes one registration's enablement through the host's visibility owner. */
+  setEnabled(registration: IRegistration<TDomainCore, TValue>, enabled: boolean): void {
+    registration.enabled = enabled
+  }
+
+  /** Writes one registration's suspension through the host's visibility owner. */
+  setSuspended(registration: IRegistration<TDomainCore, TValue>, suspended: boolean): void {
+    registration.suspended = suspended
+  }
+
+  /** Records whether a retained instance must reinstall when its providers recover. */
+  setStale(registration: IRegistration<TDomainCore, TValue>, stale: boolean): void {
+    registration.stale = stale
+  }
+
   /** Reserves the next ordering ordinal. Ordinals are never reused, so order stays total. */
   allocateStageSlot(): bigint {
     return this.#nextStageSlot++
