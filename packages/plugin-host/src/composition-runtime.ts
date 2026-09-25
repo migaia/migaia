@@ -12,6 +12,7 @@ import {
   readDataOrderSlotState,
   readPreparedAdmissions,
   readPreparedRemoval,
+  readRegistrationForReceipt,
   readRegistrationReceipt,
   registerAdmissionDefinition,
   registerPreparedAdmissions,
@@ -218,10 +219,16 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       throw createPluginHostTypeError('registration receipts must be an array')
     const seen = new Set<IRegistration<TDomainCore, TValue>>()
     const registrations = receipts.map((receipt) => {
-      let match: IRegistration<TDomainCore, TValue> | undefined
-      for (const candidate of this.#port.registrations.values())
-        if (readRegistrationReceipt(candidate) === receipt) match = candidate
-      if (!match || seen.has(match))
+      /** Exact registration and issuing host bound to this opaque receipt. */
+      const resolved = readRegistrationForReceipt(receipt)
+      const match = resolved?.registration as IRegistration<TDomainCore, TValue> | undefined
+      if (
+        !match ||
+        resolved?.host !== this.#port.host ||
+        this.#port.registrations.get(match.name) !== match ||
+        readRegistrationReceipt(match) !== receipt ||
+        seen.has(match)
+      )
         throw new PluginHostError(
           PluginHostErrorCode.pluginNotInstalled,
           ERROR_TEXT.PLUGIN_NOT_INSTALLED('receipt')
