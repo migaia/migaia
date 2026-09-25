@@ -17,7 +17,7 @@ import type {
 } from './typing.js'
 import type { IRegistration } from './registry.js'
 
-export type IPluginCoreContext<TDomainCore extends object, TValue> = {
+type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly registration: IRegistration<TDomainCore, TValue>
   readonly createDomainCore: () => TDomainCore
   readonly assertRegistrationValid: () => void

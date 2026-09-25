@@ -23,19 +23,19 @@ const hostReservedKeys = new Set<PropertyKey>([
   'extensions'
 ])
 
-export type IExtensionRegistration = {
+type IExtensionRegistration = {
   readonly name: string
   readonly extensions: Array<{ readonly key: PropertyKey; readonly descriptor: PropertyDescriptor }>
 }
 
 /** Minimal owner lookup/write boundary used by an isolated install overlay. */
-export type IExtensionOwnerStore<TRegistration> = Readonly<{
+type IExtensionOwnerStore<TRegistration> = Readonly<{
   has(key: PropertyKey): boolean
   set(key: PropertyKey, registration: TRegistration): void
 }>
 
 /** Validate extension container before Host-specific descriptor mounting. */
-export const assertExtensionResult = (extension: unknown, pluginName: string): object => {
+const assertExtensionResult = (extension: unknown, pluginName: string): object => {
   if (extension === null || typeof extension !== 'object' || Array.isArray(extension))
     throw createPluginHostTypeError('plugin install() must return an object')
   const prototype = Object.getPrototypeOf(extension)

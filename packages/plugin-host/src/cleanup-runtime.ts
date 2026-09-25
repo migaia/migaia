@@ -23,7 +23,7 @@ export type IPluginHostDisposalProvenance = Readonly<{
   readonly phase?: string
 }>
 
-export type IPluginHostCleanupRuntimeOptions = Readonly<{
+type IPluginHostCleanupRuntimeOptions = Readonly<{
   readonly scheduler: ILifecycleScheduler
   readonly pending: IPendingTracker
   readonly disposeStepTimeoutMs: number | false

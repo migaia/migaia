@@ -5,13 +5,13 @@ import { invokeCaptured } from './invocation.js'
 export { asyncDisposeKey, disposeKey }
 
 /** One disposer property value captured during admission, before user mutation can replace it. */
-export type IDisposerCandidate = {
+type IDisposerCandidate = {
   readonly key: symbol
   readonly value: unknown
 }
 
 /** Complete disposer admission snapshot, including values needed for plugin validation. */
-export type IDisposerSnapshot = {
+type IDisposerSnapshot = {
   readonly disposer: IPluginDisposer | undefined
   readonly asyncCandidates: readonly IDisposerCandidate[]
   readonly disposeCandidates: readonly IDisposerCandidate[]

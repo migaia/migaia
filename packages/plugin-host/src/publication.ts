@@ -8,7 +8,7 @@ import type {
 } from './typing.js'
 
 /** Host callbacks needed to materialize a view without transferring lifecycle ownership. */
-export type IPluginHostPublicationPort<THost, TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostPublicationPort<THost, TDomainCore extends object, TValue> = Readonly<{
   readonly host: THost
   assertLive(registrations: readonly IRegistration<TDomainCore, TValue>[]): void
   readConfig(path: string): unknown

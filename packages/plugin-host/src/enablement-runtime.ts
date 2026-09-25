@@ -25,17 +25,13 @@ import {
   toPluginPlan
 } from './dependency-runtime.js'
 
-export type IPluginHostEnablementRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostEnablementRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly state: PluginHostState<TDomainCore, TValue>
   readonly diagnostic: IPluginHostDiagnostic
 }>
 
 /** Host operations needed to serialize enablement without moving queue ownership. */
-export type IPluginHostEnablementFacadePort<
-  _THost,
-  _TDomainCore extends object,
-  _TValue
-> = Readonly<{
+type IPluginHostEnablementFacadePort<_THost, _TDomainCore extends object, _TValue> = Readonly<{
   readonly assertActive: () => void
   readonly assertMutationAllowed: () => void
   readonly enqueue: <T>(task: () => Promise<T>) => Promise<T>

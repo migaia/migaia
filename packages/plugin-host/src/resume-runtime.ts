@@ -12,7 +12,7 @@ import type { IInstallEntry, IRegistration } from './registry.js'
 import type { IPluginHostDiagnostic } from './typing.js'
 
 /** Host authority used to resume suspended registrations after a provider becomes available. */
-export type IPluginHostResumeRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostResumeRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly state: PluginHostState<TDomainCore, TValue>
   drainLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void>
   disposeRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]>

@@ -11,7 +11,7 @@ import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IPluginHostCore, IPluginResource } from './typing.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 
-export type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /**
    * Builds one registration's domain core.
    *

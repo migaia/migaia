@@ -5,7 +5,7 @@ import type { IRegistration } from './registry.js'
 import type { IPluginConfig } from './typing.js'
 
 /** Host-owned access used to keep handles live across replacement generations. */
-export type IPluginHandlePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHandlePort<TDomainCore extends object, TValue> = Readonly<{
   readonly host: object
   assertActive(): void
   lookup(name: string): IRegistration<TDomainCore, TValue> | undefined

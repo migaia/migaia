@@ -91,7 +91,7 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   descriptor?: IPluginDescriptor
 }
 
-export type IExtensionOwnership = {
+type IExtensionOwnership = {
   readonly key: PropertyKey
   readonly descriptor: PropertyDescriptor
 }

@@ -44,7 +44,7 @@ export const createPluginHostPipelineViolationHandler =
     )
   }
 
-export type IPluginHostPipelineExecutionOptions<TValue> = Readonly<{
+type IPluginHostPipelineExecutionOptions<TValue> = Readonly<{
   readonly mode: IMiddlewarePipelineMode
   readonly snapshot: IStageSnapshot<TValue>
   readonly value: TValue
@@ -57,7 +57,7 @@ export type IPluginHostPipelineExecutionOptions<TValue> = Readonly<{
   readonly pending: IPendingTracker
 }>
 
-export type IPluginHostStageRegistrationOptions<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostStageRegistrationOptions<TDomainCore extends object, TValue> = Readonly<{
   readonly host: object
   readonly depth: number
   readonly stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
