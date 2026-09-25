@@ -28,6 +28,12 @@ export type IExtensionRegistration = {
   readonly extensions: Array<{ readonly key: PropertyKey; readonly descriptor: PropertyDescriptor }>
 }
 
+/** Minimal owner lookup/write boundary used by an isolated install overlay. */
+export type IExtensionOwnerStore<TRegistration> = Readonly<{
+  has(key: PropertyKey): boolean
+  set(key: PropertyKey, registration: TRegistration): void
+}>
+
 /** Validate extension container before Host-specific descriptor mounting. */
 export const assertExtensionResult = (extension: unknown, pluginName: string): object => {
   if (extension === null || typeof extension !== 'object' || Array.isArray(extension))
@@ -52,7 +58,7 @@ export const assertExtensionResult = (extension: unknown, pluginName: string): o
 export const mountPluginExtensions = <TRegistration extends IExtensionRegistration>(
   registration: TRegistration,
   extension: unknown,
-  extensionOwners: Map<PropertyKey, TRegistration>,
+  extensionOwners: IExtensionOwnerStore<TRegistration>,
   diagnostic: (message: string, code?: IPluginHostErrorCode) => void
 ): void => {
   const extensionObject = assertExtensionResult(extension, registration.name)

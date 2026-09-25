@@ -123,6 +123,9 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       this.registrations.set(registration.name, registration)
       this.removedNames.delete(registration.name)
     }
+    for (const released of batch.releasedOwners)
+      for (const { key } of released.extensions)
+        if (this.extensionOwners.get(key) === released) this.extensionOwners.delete(key)
     for (const [key, registration] of batch.extensionOwners)
       this.extensionOwners.set(key, registration)
     for (const registration of installed) this.lanes.bindOwner(registration)
