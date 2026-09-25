@@ -300,4 +300,34 @@ describe('stage allocation order', () => {
     expect(await host.run()).toBe('d')
     await host.dispose()
   })
+  it('A28 rejects a prepared admission whose data-order slot was retired before commit', async () => {
+    const host = new StageOrderHost({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const composition = openComposition(host)
+    // Enough retired, ownerless slots to trigger tombstone compaction once more are retired.
+    for (let index = 0; index < 80; index += 1)
+      composition.retireDataOrderSlot(composition.createDataOrderSlot(`spent-${index}`))
+    const admission = composition.createPluginAdmission(stagePlugin('late') as never)
+    const slot = composition.createDataOrderSlot('late')
+    const prepared = await composition.prepareAdmissions([{ admission, slot }])
+    composition.retireDataOrderSlot(slot)
+    for (let index = 80; index < 160; index += 1)
+      composition.retireDataOrderSlot(composition.createDataOrderSlot(`spent-${index}`))
+    // Top-level PluginHostError; the candidate never binds to the tombstoned segment.
+    expect(() => composition.commitPreparedAdmissions(prepared)).toThrowError(
+      expect.objectContaining({ code: 'PLUGIN_INSTALL_FAILED' })
+    )
+    await composition.discardPreparedAdmissions(prepared)
+    expect(host.run()).toBe('')
+    // A fresh slot for the same name admits the plugin and its stage runs.
+    const retry = composition.createPluginAdmission(stagePlugin('late') as never)
+    composition.commitPreparedAdmissions(
+      await composition.prepareAdmissions([
+        { admission: retry, slot: composition.createDataOrderSlot('late') }
+      ])
+    )
+    expect(host.run()).toBe('late')
+    await host.dispose()
+  })
 })

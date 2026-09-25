@@ -181,7 +181,13 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       )
     this.#port.assertActive()
     this.#port.assertMutationAllowed()
-    if (this.#port.revision() !== state.baseRevision)
+    // Retiring a data-order slot does not advance the revision, but a candidate staged on it would
+    // bind to a tombstoned segment that compaction may already have dropped, silently losing its
+    // stages; a retired slot is therefore drift for the prepared batch that captured it.
+    if (
+      this.#port.revision() !== state.baseRevision ||
+      state.installed.some((registration) => registration.segment?.retired === true)
+    )
       throw new PluginHostError(
         PluginHostErrorCode.pluginInstallFailed,
         ERROR_TEXT.PREPARED_ADMISSION_DRIFT

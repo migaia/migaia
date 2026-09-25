@@ -15,6 +15,8 @@ export type IStageOwnerSegment = {
   readonly ordinal: bigint
   owner?: object
   retired: boolean
+  /** Counted as a tombstone exactly once: set when the segment is retired and ownerless. */
+  dead?: boolean
 }
 
 /** Host stages occupy their own allocation position between plugin slots. */
@@ -100,10 +102,7 @@ export class StageLanes<TValue> {
     if (segment?.owner === registration) {
       segment.owner = undefined
       this.invalidate()
-      if (segment.retired) {
-        this.#dead += 1
-        this.#compactIfNeeded()
-      }
+      this.#markDeadIfOwnerless(segment)
     }
     leases.seal(registration.pipelineOwnerKey)
   }
@@ -113,18 +112,21 @@ export class StageLanes<TValue> {
     const segment = slot.segment
     if (!segment || segment.retired) return
     segment.retired = true
-    if (!segment.owner) {
-      this.#dead += 1
-      this.#compactIfNeeded()
-    }
+    this.#markDeadIfOwnerless(segment)
+  }
+
+  /** Counts a retired, ownerless segment as a tombstone once, then compacts when amortized. */
+  #markDeadIfOwnerless(segment: IStageOwnerSegment): void {
+    if (!segment.retired || segment.owner || segment.dead) return
+    segment.dead = true
+    this.#dead += 1
+    this.#compactIfNeeded()
   }
 
   /** Removes tombstones only when the scan can be charged to earlier retirements. */
   #compactIfNeeded(): void {
     if (this.#segments.length < 64 || this.#dead <= this.#segments.length / 2) return
-    this.#segments = this.#segments.filter(
-      (segment) => segment.kind === 'host' || !segment.retired || !!segment.owner
-    )
+    this.#segments = this.#segments.filter((segment) => segment.kind === 'host' || !segment.dead)
     this.#dead = 0
   }
 
