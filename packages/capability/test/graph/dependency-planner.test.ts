@@ -471,4 +471,44 @@ describe('dependency planner', () => {
     )
     expect(frontierDeltas[1]).toEqual(frontierDeltas[0])
   })
+  it('A18 plans activation without walking activated ancestors', () => {
+    /** Builds an activated chain of the given length, then three inactive lazy providers and a root. */
+    const fixture = (size: number) => {
+      const index = createTestIndex()
+      for (let position = 0; position < size; position += 1)
+        index.add({
+          id: `c-${position}`,
+          dependencies: position === 0 ? [] : [{ provider: `c-${position - 1}`, required: true }]
+        })
+      index.add({ id: 'l1', dependencies: [{ provider: `c-${size - 1}`, required: true }] })
+      index.add({ id: 'l2', dependencies: [{ provider: 'l1', required: true }] })
+      index.add({ id: 'l3', dependencies: [{ provider: 'l2', required: true }] })
+      index.add({ id: 'root', dependencies: [{ provider: 'l3', required: true }] })
+      return {
+        index,
+        state: states({
+          l1: { activated: false },
+          l2: { activated: false },
+          l3: { activated: false }
+        })
+      }
+    }
+    /** Index work and resulting steps of one activation plan at one chain length. */
+    const measure = (size: number) => {
+      const { index, state } = fixture(size)
+      const before = index.metrics()
+      const plan = planActivation(index, state, ['root'])
+      const after = index.metrics()
+      return {
+        steps: plan.steps.map((step) => `${step.id}:${step.action}`),
+        work: [after.visitedNodes - before.visitedNodes, after.visitedEdges - before.visitedEdges]
+      }
+    }
+    const small = measure(100)
+    const large = measure(2_000)
+    expect(small.steps).toEqual(['l1:activate', 'l2:activate', 'l3:activate'])
+    expect(large.steps).toEqual(small.steps)
+    // Work is bounded by the inactive frontier, not by the activated ancestry above it.
+    expect(large.work).toEqual(small.work)
+  })
 })
