@@ -11,7 +11,7 @@ import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginHostDiagnostic, IPluginHostDisposalResult } from './typing.js'
 
-export type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
+type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly terminal: ITerminalController
   readonly executionController: IAbortController
   readonly pipelineLeases: IQuiescenceTracker<object>

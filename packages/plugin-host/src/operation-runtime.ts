@@ -9,12 +9,12 @@ import {
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 
-export type IPluginHostOperationRegistration = {
+type IPluginHostOperationRegistration = {
   operation?: IGenerationRequest
   operationDeadlineAt?: number
 }
 
-export type IPluginHostOperationRuntimeOptions = Readonly<{
+type IPluginHostOperationRuntimeOptions = Readonly<{
   readonly parentSignal: IAbortSignal
   readonly scheduler: ILifecycleScheduler
   readonly timeoutMs: number | false

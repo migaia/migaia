@@ -8,7 +8,7 @@ import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import { markRegistrationRevoked } from './composition.js'
 import type { IPluginDisposalContext } from './typing.js'
 
-export type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   /** Removes an exact committed registration and its dependency node atomically. */
   readonly removeRegistration: (registration: IRegistration<TDomainCore, TValue>) => void

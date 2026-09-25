@@ -46,7 +46,7 @@ type ICompositionStrictCleanupResult<TRegistration> = Readonly<{
   readonly leafErrorsByRegistration: ReadonlyMap<TRegistration, readonly unknown[]>
 }>
 
-export type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly host: object
   readonly scheduler: ILifecycleScheduler
   readonly pipelineDrainTimeoutMs: number | false

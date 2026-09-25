@@ -44,7 +44,7 @@ export const resolveAdmissionDefinitions = <TDefinition>(
 }
 
 /** Private prepared-admission state bound to one concrete Host instance. */
-export type IPreparedAdmissionsState<TRegistration, TBatch> = {
+type IPreparedAdmissionsState<TRegistration, TBatch> = {
   readonly host: object
   readonly installed: readonly TRegistration[]
   readonly batch: TBatch
@@ -54,7 +54,7 @@ export type IPreparedAdmissionsState<TRegistration, TBatch> = {
 }
 
 /** Private prepared-removal state bound to exact live registrations. */
-export type IPreparedRemovalState<TRegistration> = {
+type IPreparedRemovalState<TRegistration> = {
   readonly host: object
   readonly registrations: readonly TRegistration[]
   committed: boolean
@@ -97,7 +97,7 @@ export const registerAdmissionDefinition = <TDefinition>(
 }
 
 /** Reads a captured definition only through its exact opaque admission object. */
-export const readAdmissionDefinition = <TDefinition>(admission: object): TDefinition | undefined =>
+const readAdmissionDefinition = <TDefinition>(admission: object): TDefinition | undefined =>
   admissionDefinitions.get(admission) as TDefinition | undefined
 
 /** Creates and registers one opaque Host-owned data-order lane. */

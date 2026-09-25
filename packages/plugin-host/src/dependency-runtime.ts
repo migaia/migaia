@@ -16,13 +16,10 @@ import type { IPluginDependencyPlan } from './typing.js'
 /** Graph ownership stays in capability; this module only adapts plugin definitions and errors. */
 
 /** Cross-plugin reference plus the local feature that consumes it. */
-export type IPluginFeatureDependency = Readonly<{
+type IPluginFeatureDependency = Readonly<{
   readonly consumer: string
   readonly reference: IFeatureReference<object, boolean>
 }>
-
-/** One immutable provider-consumer edge exposed by dependency dry-runs. */
-export type IPluginDependencyEdge = IPluginDependencyPlan['edges'][number]
 
 /** Controls how a committed but not yet activated lazy provider is treated during validation. */
 export const PluginInactiveProviderPolicy = {
@@ -35,7 +32,7 @@ export const PluginInactiveProviderPolicy = {
 export type PluginInactiveProviderPolicy = keyof typeof PluginInactiveProviderPolicy
 
 /** Admitted dependency mutation options shared by removal and disable entry points. */
-export type IAdmittedDependencyMutationOptions = Readonly<{
+type IAdmittedDependencyMutationOptions = Readonly<{
   readonly policy: DependencyPolicy
   readonly dryRun: boolean
 }>
@@ -67,7 +64,7 @@ export const admitDependencyMutationOptions = (
 }
 
 /** Collects trusted cross-plugin references from one plugin's complete local feature closure. */
-export const collectPluginFeatureDependencies = (
+const collectPluginFeatureDependencies = (
   plugin: IPluginDefinition<any>
 ): readonly IPluginFeatureDependency[] => {
   const found: IPluginFeatureDependency[] = []

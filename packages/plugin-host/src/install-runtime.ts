@@ -34,7 +34,7 @@ export type IInstallBatchContext<TDomainCore extends object, TValue> = {
   committed: boolean
 }
 
-export type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly scheduler: ILifecycleScheduler
   /** Shared host state owning dependency facts and committed registration status. */
   readonly state: PluginHostState<TDomainCore, TValue>

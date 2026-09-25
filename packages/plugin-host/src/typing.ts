@@ -176,7 +176,7 @@ export type IPluginConstraint<
 }
 
 /** Extracts one candidate's native Feature roots without widening a tuple element. */
-export type IPluginConstraintFeatures<TPlugin> =
+type IPluginConstraintFeatures<TPlugin> =
   TPlugin extends IDefinedPluginConstraint<any, any, any, any, any, any, infer TFeatures, any>
     ? TFeatures
     : TPlugin extends { readonly features?: infer TFeatures extends IFeatureRecord }
@@ -184,7 +184,7 @@ export type IPluginConstraintFeatures<TPlugin> =
       : Record<never, never>
 
 /** Extracts a candidate's expose value while preserving its concrete method surface. */
-export type IPluginConstraintExpose<TPlugin> = TPlugin extends {
+type IPluginConstraintExpose<TPlugin> = TPlugin extends {
   readonly featureExpose: infer TExpose
 }
   ? TExpose extends (...args: never[]) => infer TFactoryExpose

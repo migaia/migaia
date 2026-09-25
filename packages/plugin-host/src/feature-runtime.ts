@@ -8,7 +8,7 @@ import { assimilateCapturedThen, containAsyncRejection, probeThenable } from '@m
 import { reportTerminalFailure } from './diagnostic-report.js'
 
 /** One canonical identity-to-topology compilation shared by preflight and registration execution. */
-export type IFeaturePlan = Readonly<{
+type IFeaturePlan = Readonly<{
   readonly ordered: readonly object[]
   readonly dependencies: ReadonlyMap<object, Readonly<Record<string, object>>>
 }>

@@ -10,7 +10,7 @@ import type {
   IPluginHostCore
 } from './typing.js'
 
-export type IPluginHostConfigRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostConfigRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly assertActive: () => void
   readonly enqueue: <T>(task: () => Promise<T>) => Promise<T>

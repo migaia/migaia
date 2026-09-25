@@ -8,7 +8,7 @@ import type { IInstallEntry, IRegistration } from './registry.js'
 import type { IPluginHostDiagnostic } from './typing.js'
 
 /** Narrow Host authority used by one replacement transaction; every call runs inside the queue. */
-export type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Committed registrations by name, read after each publication. */
   readonly registrations: ReadonlyMap<string, IRegistration<TDomainCore, TValue>>
   /** Host-owned topology and registration status used by capability replacement plans. */
