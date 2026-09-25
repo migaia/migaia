@@ -413,23 +413,27 @@ export function planActivation(
   state: IDependencyStateReader,
   roots: readonly string[]
 ): IDependencyPlan {
-  /** Required providers reached upstream from the requested roots. */
+  /**
+   * Inactive required providers reached upstream from the requested roots. The walk never enters an
+   * activated provider: activation always activates a node's providers first, so everything above
+   * an activated provider is already activated, and walking it would make every install under a
+   * deep chain cost the whole ancestry (R16).
+   */
   const reached = new Set<string>()
-  /** Upstream traversal queue. */
+  /** Upstream traversal queue: the roots, then only inactive providers. */
   const queue = [...roots]
   for (let position = 0; position < queue.length; position += 1) {
     const consumer = queue[position]!
     for (const dependency of index.dependencies(consumer)) {
       if (!dependency.required || !index.has(dependency.provider)) continue
       if (reached.has(dependency.provider)) continue
+      if (state(dependency.provider).activated) continue
       reached.add(dependency.provider)
       queue.push(dependency.provider)
     }
   }
   /** Inactive providers emitted in canonical provider-first order. */
-  const activating = index
-    .order(reached)
-    .filter((id) => !roots.includes(id) && !state(id).activated)
+  const activating = index.order(reached).filter((id) => !roots.includes(id))
   return createPlan(
     activating.map((id) => ({ id, action: DependencyAction.activate })),
     collectPlanEdges(index, new Set(activating))
