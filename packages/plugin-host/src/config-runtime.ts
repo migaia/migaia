@@ -57,14 +57,15 @@ export class PluginHostConfigRuntime<
     return this.#facade
   }
 
-  /** Resolves the longest matching plugin name before traversing its immutable config snapshot. */
+  /** Resolves the dot-free plugin name before traversing its immutable config snapshot. */
   #read(path: string): unknown {
     this.#port.assertActive()
     if (typeof path !== 'string' || path.length === 0)
       throw createPluginHostTypeError('config path must be a non-empty string')
-    const registration = [...this.#port.registrations.entries()]
-      .sort(([left], [right]) => right.length - left.length)
-      .find(([name]) => path === name || path.startsWith(`${name}.`))?.[1]
+    /** Plugin names cannot contain dots, so the first path segment is an exact map key. */
+    const separator = path.indexOf('.')
+    const name = separator < 0 ? path : path.slice(0, separator)
+    const registration = this.#port.registrations.get(name)
     if (!registration) return undefined
     return readConfigPath(registration.config, parseConfigPath(path))
   }
