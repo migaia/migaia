@@ -330,7 +330,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     /** One canonical plan replaces per-registration blocker scans and a second ordering scan. */
     const plan = planDependencyMutation(
       this.#port.state.dependencyIndex(),
-      (name) => this.#port.state.readDependencyStatus(name),
+      (name) => this.#port.state.readDependencyState(name),
       { roots: names, kind: DependencyMutationKind.remove, policy: DependencyPolicy.reject }
     )
     if (plan.blockedBy.length > 0)

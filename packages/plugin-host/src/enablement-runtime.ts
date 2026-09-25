@@ -85,7 +85,7 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
   planDisable(name: string, policy: DependencyPolicy): IDependencyPlan {
     return planDependencyMutation(
       this.#port.state.dependencyIndex(),
-      (pluginName) => this.#port.state.readDependencyStatus(pluginName),
+      (pluginName) => this.#port.state.readDependencyState(pluginName),
       { roots: [name], kind: DependencyMutationKind.disable, policy }
     )
   }
