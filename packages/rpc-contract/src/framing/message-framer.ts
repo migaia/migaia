@@ -1,7 +1,7 @@
 import { createDescriptor } from '../protocol.js'
 import { registerNativeRpcFrameIngress, type IRpcNativeFrameOutputDomain } from './reassembler.js'
 import { RpcContractErrorCode } from '../error-code.js'
-import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from '../error-text.js'
+import { createContractError } from '../contract-error.js'
 import type {
   IRpcBinaryFrame,
   IRpcFrameAcceptResult,
@@ -48,24 +48,6 @@ const DEFAULT_MAX_CHUNKS = 4096
 const DEFAULT_MAX_BUFFERED_BYTES = 64 * 1024 * 1024
 const DEFAULT_MAX_CONCURRENT = 256
 
-/** Creates a native error carrying the framing package identity and stable code. */
-function framingError(
-  code: (typeof RpcContractErrorCode)[keyof typeof RpcContractErrorCode]
-): Error {
-  const text =
-    RpcContractErrorText[
-      code === RpcContractErrorCode.frameLimitExceeded
-        ? 'frameLimitExceeded'
-        : code === RpcContractErrorCode.frameAssemblyExpired
-          ? 'frameAssemblyExpired'
-          : 'invalidFrame'
-    ]
-  const error = new RangeError(text)
-  Object.defineProperty(error, 'source', { value: RPC_CONTRACT_SOURCE, enumerable: true })
-  Object.defineProperty(error, 'code', { value: code, enumerable: true })
-  return error
-}
-
 /** Validates bounded framer options before the framer becomes externally visible. */
 function snapshotOptions(
   options: IRpcFramerOptions = {}
@@ -101,13 +83,13 @@ function snapshotOptions(
     result.assemblyTimeoutMs
   ]) {
     if (!Number.isSafeInteger(value) || value <= 0)
-      throw framingError(RpcContractErrorCode.invalidFrame)
+      throw createContractError(RpcContractErrorCode.invalidFrame)
   }
   if (
     result.chunkBytes > result.maxMessageBytes ||
     result.maxMessageBytes > result.maxBufferedBytes
   )
-    throw framingError(RpcContractErrorCode.frameLimitExceeded)
+    throw createContractError(RpcContractErrorCode.frameLimitExceeded)
   return result
 }
 
@@ -226,10 +208,11 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
   const frame = (value: TEncoded, context: IRpcFrameContext): readonly (TEncoded | IFrame)[] => {
     const size = lengthOf(value)
     if (!Number.isSafeInteger(size) || size > options.maxMessageBytes)
-      throw framingError(RpcContractErrorCode.frameLimitExceeded)
+      throw createContractError(RpcContractErrorCode.frameLimitExceeded)
     if (size <= options.chunkBytes) return [value]
     const count = Math.ceil(size / options.chunkBytes)
-    if (count > options.maxChunks) throw framingError(RpcContractErrorCode.frameLimitExceeded)
+    if (count > options.maxChunks)
+      throw createContractError(RpcContractErrorCode.frameLimitExceeded)
     const frames: IFrame[] = []
     for (let index = 0; index < count; index += 1) {
       const start = index * options.chunkBytes
@@ -249,20 +232,19 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
   }
   const accept = (value: unknown, context: IRpcFrameContext): IRpcFrameAcceptResult<TEncoded> => {
     if (closed)
-      return { status: 'rejected', error: framingError(RpcContractErrorCode.invalidFrame) }
+      return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     if (
       (kind === 'string' && typeof value === 'string') ||
       (kind === 'binary' && typeof value === 'object' && value !== null && isUint8Array(value))
     )
       return { status: 'complete', value: value as TEncoded }
     if (typeof value !== 'object' || value === null)
-      return { status: 'rejected', error: framingError(RpcContractErrorCode.invalidFrame) }
+      return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     let snapshot: IFrameSnapshot | undefined
     try {
       snapshot = snapshotFrame(value as IFrame)
     } catch (cause) {
-      const error = framingError(RpcContractErrorCode.invalidFrame)
-      Object.defineProperty(error, 'cause', { value: cause, enumerable: false })
+      const error = createContractError(RpcContractErrorCode.invalidFrame, cause)
       return { status: 'rejected', error }
     }
     if (
@@ -280,7 +262,7 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       typeof snapshot.length !== 'number' ||
       !Number.isSafeInteger(snapshot.length)
     )
-      return { status: 'rejected', error: framingError(RpcContractErrorCode.invalidFrame) }
+      return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     if (
       (kind === 'string' && typeof snapshot.data !== 'string') ||
       (kind === 'binary' &&
@@ -288,20 +270,23 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
           snapshot.data === null ||
           !isUint8Array(snapshot.data)))
     )
-      return { status: 'rejected', error: framingError(RpcContractErrorCode.invalidFrame) }
+      return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     const index = snapshot.index as number
     const count = snapshot.count as number
     const length = snapshot.length as number
     const bytes = lengthOf(snapshot.data as TEncoded)
     if (length <= 0 || length > options.maxMessageBytes || bytes > options.chunkBytes)
-      return { status: 'rejected', error: framingError(RpcContractErrorCode.frameLimitExceeded) }
+      return {
+        status: 'rejected',
+        error: createContractError(RpcContractErrorCode.frameLimitExceeded)
+      }
     const source = context.source
     const messageId = snapshot.messageId as string
     const terminalState = terminal.get(source)?.get(messageId)
     if (terminalState !== undefined)
       return {
         status: 'rejected',
-        error: framingError(
+        error: createContractError(
           terminalState
             ? RpcContractErrorCode.frameAssemblyExpired
             : RpcContractErrorCode.invalidFrame
@@ -316,7 +301,7 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       )
         return {
           status: 'rejected',
-          error: framingError(
+          error: createContractError(
             index === 0
               ? RpcContractErrorCode.frameLimitExceeded
               : RpcContractErrorCode.invalidFrame
@@ -332,7 +317,7 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       activeBuffers += 1
     }
     if (buffer.count !== count || buffer.expectedLength !== length || index !== buffer.next)
-      return { status: 'rejected', error: framingError(RpcContractErrorCode.invalidFrame) }
+      return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     buffer.parts.push(snapshot.data as TEncoded)
     buffer.next += 1
     buffer.bytes += bytes
@@ -340,7 +325,10 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     if (buffer.bytes > options.maxMessageBytes || bufferedBytes > options.maxBufferedBytes) {
       clearBuffer(source, messageId)
       markTerminal(source, messageId, false)
-      return { status: 'rejected', error: framingError(RpcContractErrorCode.frameLimitExceeded) }
+      return {
+        status: 'rejected',
+        error: createContractError(RpcContractErrorCode.frameLimitExceeded)
+      }
     }
     if (buffer.next !== buffer.count) return { status: 'pending' }
     const complete = buffer.parts.reduce<TEncoded>(
@@ -353,7 +341,7 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     if (lengthOf(complete) !== buffer.expectedLength) {
       clearBuffer(source, messageId)
       markTerminal(source, messageId, false)
-      return { status: 'rejected', error: framingError(RpcContractErrorCode.invalidFrame) }
+      return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     }
     clearBuffer(source, messageId)
     markTerminal(source, messageId, false)
@@ -386,8 +374,7 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
         snapshot =
           typeof value === 'object' && value !== null ? snapshotFrame(value as IFrame) : undefined
       } catch (cause) {
-        const error = framingError(RpcContractErrorCode.invalidFrame)
-        Object.defineProperty(error, 'cause', { value: cause, enumerable: false })
+        const error = createContractError(RpcContractErrorCode.invalidFrame, cause)
         throw error
       }
       return Object.freeze({

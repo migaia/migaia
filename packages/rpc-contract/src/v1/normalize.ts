@@ -1,5 +1,6 @@
 import { RpcContractErrorCode } from '../error-code.js'
-import { contractError, normalizePortable } from '../normalize.js'
+import { createContractError } from '../contract-error.js'
+import { normalizePortable } from '../normalize.js'
 import type { IRpcPortableValue } from '../types.js'
 import type { IRpcEnvelope } from './types.js'
 
@@ -7,11 +8,11 @@ import type { IRpcEnvelope } from './types.js'
 export function normalizeRpcEnvelope(value: unknown): IRpcEnvelope {
   const normalized = normalizePortable(value)
   if (typeof normalized !== 'object' || normalized === null || Array.isArray(normalized)) {
-    throw contractError(RpcContractErrorCode.invalidEnvelope)
+    throw createContractError(RpcContractErrorCode.invalidEnvelope)
   }
   const record = normalized as Record<string, IRpcPortableValue>
   const kind = record.kind
-  if (typeof kind !== 'string') throw contractError(RpcContractErrorCode.invalidEnvelope)
+  if (typeof kind !== 'string') throw createContractError(RpcContractErrorCode.invalidEnvelope)
   const hasOnly = (required: readonly string[], optional: readonly string[] = []): boolean => {
     const allowed = new Set([...required, ...optional])
     return (
@@ -20,18 +21,19 @@ export function normalizeRpcEnvelope(value: unknown): IRpcEnvelope {
   }
   if (kind === 'response') {
     if (record.ok !== true && record.ok !== false)
-      throw contractError(RpcContractErrorCode.invalidEnvelope)
-    if (typeof record.id !== 'string') throw contractError(RpcContractErrorCode.invalidEnvelope)
+      throw createContractError(RpcContractErrorCode.invalidEnvelope)
+    if (typeof record.id !== 'string')
+      throw createContractError(RpcContractErrorCode.invalidEnvelope)
     if (record.ok === true) {
       if (!hasOnly(['kind', 'ok', 'id', 'data']) || record.data === undefined)
-        throw contractError(RpcContractErrorCode.invalidEnvelope)
+        throw createContractError(RpcContractErrorCode.invalidEnvelope)
     } else {
       if (!hasOnly(['kind', 'ok', 'id', 'code', 'message'], ['data', 'error']))
-        throw contractError(RpcContractErrorCode.invalidEnvelope)
+        throw createContractError(RpcContractErrorCode.invalidEnvelope)
       if (typeof record.code !== 'string' || typeof record.message !== 'string')
-        throw contractError(RpcContractErrorCode.invalidEnvelope)
+        throw createContractError(RpcContractErrorCode.invalidEnvelope)
       if (record.error !== undefined && !isSerializedError(record.error))
-        throw contractError(RpcContractErrorCode.invalidEnvelope)
+        throw createContractError(RpcContractErrorCode.invalidEnvelope)
     }
   } else if (kind === 'request') {
     if (
@@ -39,7 +41,7 @@ export function normalizeRpcEnvelope(value: unknown): IRpcEnvelope {
       typeof record.id !== 'string' ||
       typeof record.method !== 'string'
     )
-      throw contractError(RpcContractErrorCode.invalidEnvelope)
+      throw createContractError(RpcContractErrorCode.invalidEnvelope)
   } else if (kind === 'discovery') {
     if (
       !hasOnly(['kind', 'id', 'version', 'acceptVersions'], ['data']) ||
@@ -47,14 +49,14 @@ export function normalizeRpcEnvelope(value: unknown): IRpcEnvelope {
       typeof record.version !== 'string' ||
       !Array.isArray(record.acceptVersions)
     )
-      throw contractError(RpcContractErrorCode.invalidEnvelope)
+      throw createContractError(RpcContractErrorCode.invalidEnvelope)
     if (record.acceptVersions.some((item) => typeof item !== 'string'))
-      throw contractError(RpcContractErrorCode.invalidEnvelope)
+      throw createContractError(RpcContractErrorCode.invalidEnvelope)
   } else if (kind === 'variation') {
     if (!hasOnly(['kind', 'id', 'data']) || typeof record.id !== 'string')
-      throw contractError(RpcContractErrorCode.invalidEnvelope)
+      throw createContractError(RpcContractErrorCode.invalidEnvelope)
   } else {
-    throw contractError(RpcContractErrorCode.invalidEnvelope)
+    throw createContractError(RpcContractErrorCode.invalidEnvelope)
   }
   return normalized as IRpcEnvelope
 }
