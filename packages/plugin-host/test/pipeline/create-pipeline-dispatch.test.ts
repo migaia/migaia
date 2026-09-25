@@ -4,8 +4,7 @@ import {
   MiddlewarePipelineMode,
   type IMiddlewarePipelineMode
 } from '@migaia/middleware-pipeline'
-import { PluginHostError } from '../../src/error-text.js'
-import { PluginHost } from '../../src/host-runtime.js'
+import { PluginHost, PluginHostError } from '../../src/index.js'
 
 /** A8 exercises Host dispatch, canonical lifting, mismatch causality and lane atomicity. */
 /** Host exposing pipeline execution for each canonical runner mode. */
