@@ -1,5 +1,6 @@
 import { RpcContractErrorCode } from './error-code.js'
-import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.js'
+import { createContractError } from './contract-error.js'
+import { RPC_CONTRACT_SOURCE } from './error-text.js'
 import type { IRpcPortableBytes, IRpcPortableRecord, IRpcPortableValue } from './types.js'
 
 const RESERVED = '$rpc'
@@ -31,22 +32,6 @@ function isCanonicalBase64url(value: string): boolean {
   return true
 }
 
-/** Add stable package identity while preserving native error type and cause. */
-export function contractError(
-  code: (typeof RpcContractErrorCode)[keyof typeof RpcContractErrorCode],
-  cause?: unknown
-): Error {
-  const error = new TypeError(
-    RpcContractErrorText[
-      code === RpcContractErrorCode.invalidEnvelope ? 'invalidEnvelope' : 'invalidDescriptor'
-    ],
-    cause === undefined ? undefined : { cause }
-  )
-  Object.defineProperty(error, 'source', { value: RPC_CONTRACT_SOURCE, enumerable: true })
-  Object.defineProperty(error, 'code', { value: code, enumerable: true })
-  return error
-}
-
 /** Convert a byte array to canonical unpadded base64url without Node dependencies. */
 function toBase64url(bytes: Uint8Array): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -69,29 +54,37 @@ export function normalizePortable(
   depth = 0,
   active = new Set<object>()
 ): IRpcPortableValue {
-  if (depth > MAX_DEPTH) throw contractError(RpcContractErrorCode.invalidEnvelope)
+  if (depth > MAX_DEPTH) throw createContractError(RpcContractErrorCode.invalidEnvelope)
   if (value === null) return null
   switch (typeof value) {
     case 'boolean':
     case 'string':
       return value
     case 'number':
-      if (!Number.isFinite(value)) throw contractError(RpcContractErrorCode.invalidEnvelope)
+      if (!Number.isFinite(value)) throw createContractError(RpcContractErrorCode.invalidEnvelope)
       return value
     case 'object':
       break
     default:
-      throw contractError(RpcContractErrorCode.invalidEnvelope)
+      throw createContractError(RpcContractErrorCode.invalidEnvelope)
   }
-  if (isUint8Array(value)) {
+  /** Whether the value is a byte array; classification runs guarded because `instanceof` can trap. */
+  let bytes: boolean
+  try {
+    bytes = isUint8Array(value)
+    if (!bytes && (value instanceof Date || value instanceof Map || value instanceof Set))
+      throw createContractError(RpcContractErrorCode.invalidEnvelope)
+  } catch (error) {
+    if (isContractError(error)) throw error
+    throw createContractError(RpcContractErrorCode.invalidEnvelope, error)
+  }
+  if (bytes) {
     return Object.freeze({
       $rpc: 'bytes',
-      base64url: toBase64url(new Uint8Array(value))
+      base64url: toBase64url(new Uint8Array(value as Uint8Array))
     }) as IRpcPortableBytes
   }
-  if (value instanceof Date || value instanceof Map || value instanceof Set)
-    throw contractError(RpcContractErrorCode.invalidEnvelope)
-  if (active.has(value)) throw contractError(RpcContractErrorCode.invalidEnvelope)
+  if (active.has(value)) throw createContractError(RpcContractErrorCode.invalidEnvelope)
   active.add(value)
   if (Array.isArray(value)) {
     try {
@@ -99,7 +92,7 @@ export function normalizePortable(
       return Object.freeze(result) as readonly IRpcPortableValue[]
     } catch (error) {
       if (isContractError(error)) throw error
-      throw contractError(RpcContractErrorCode.invalidEnvelope, error)
+      throw createContractError(RpcContractErrorCode.invalidEnvelope, error)
     } finally {
       active.delete(value)
     }
@@ -109,11 +102,11 @@ export function normalizePortable(
     prototype = Object.getPrototypeOf(value)
   } catch (error) {
     active.delete(value)
-    throw contractError(RpcContractErrorCode.invalidEnvelope, error)
+    throw createContractError(RpcContractErrorCode.invalidEnvelope, error)
   }
   if (prototype !== Object.prototype && prototype !== null) {
     active.delete(value)
-    throw contractError(RpcContractErrorCode.invalidEnvelope)
+    throw createContractError(RpcContractErrorCode.invalidEnvelope)
   }
   try {
     const source = value as Record<string, unknown>
@@ -137,13 +130,13 @@ export function normalizePortable(
       IRpcPortableValue
     >
     for (const [key, child] of entries) {
-      if (key === RESERVED) throw contractError(RpcContractErrorCode.invalidEnvelope)
+      if (key === RESERVED) throw createContractError(RpcContractErrorCode.invalidEnvelope)
       output[key] = normalizePortable(child, depth + 1, active)
     }
     return Object.freeze(output) as IRpcPortableRecord
   } catch (error) {
     if (isContractError(error)) throw error
-    throw contractError(RpcContractErrorCode.invalidEnvelope, error)
+    throw createContractError(RpcContractErrorCode.invalidEnvelope, error)
   } finally {
     active.delete(value)
   }
