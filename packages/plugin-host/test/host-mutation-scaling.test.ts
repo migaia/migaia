@@ -333,6 +333,114 @@ describe('host mutation scaling', () => {
     )
   }, 120000)
 
+  it('A18 keeps dependency-chain mutations independent of the chain length', async () => {
+    /** Builds a required chain and returns the host plus the tail feature reference. */
+    const chainWithTail = async (size: number) => {
+      const host = new PluginHost<Record<string, never>>({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
+      /** Chain members in dependency order. */
+      const plugins: any[] = []
+      /** Most recent chain member, whose feature the next member requires. */
+      let previous: any
+      for (let index = 0; index < size; index += 1) {
+        const feature = previous
+          ? defineFeature(
+              (_core, dependencies: any) => ({ value: dependencies.previous.value + 1 }),
+              {
+                previous: previous.getFeature('value')
+              }
+            )
+          : defineFeature(() => ({ value: 0 }))
+        previous = definePlugin({
+          name: `tail-chain-${index}`,
+          features: { value: feature },
+          install: () => ({})
+        })
+        plugins.push(previous)
+      }
+      await host.use(...(plugins as never))
+      return { host, tail: previous.getFeature('value') }
+    }
+    /** A leaf that requires the chain tail, so installing it validates against the whole chain. */
+    const tailLeaf = (name: string, tail: unknown) =>
+      definePlugin({
+        name,
+        features: {
+          value: defineFeature((_core, dependencies: any) => ({ value: dependencies.tail.value }), {
+            tail: tail as never
+          })
+        },
+        install: () => ({})
+      })
+    /** One per-operation sample for every chain-dependent category at one chain length. */
+    const sample = async (size: number) => {
+      const { host, tail } = await chainWithTail(size)
+      try {
+        const use = await time200((index) => host.use(tailLeaf(`tail-leaf-${index}`, tail)))
+        const batchUse = await time200((index) =>
+          host.use(
+            ...(Array.from({ length: 10 }, (_, member) =>
+              tailLeaf(`tail-batch-${index}-${member}`, tail)
+            ) as never)
+          )
+        )
+        const replace = await time200(() =>
+          host.replace('tail-leaf-0', tailLeaf('tail-leaf-0', tail))
+        )
+        const toggle = await time200((index) =>
+          index % 2 === 0
+            ? host.plugin.disable('tail-leaf-1' as never)
+            : host.plugin.enable('tail-leaf-1' as never)
+        )
+        return { use, batchUse, replace, toggle }
+      } finally {
+        await host.dispose()
+      }
+    }
+    /** Builds the chain one `use` at a time, the procedure of the pre-fix X5 table, per member. */
+    const sequentialBuild = async (size: number) => {
+      const host = new PluginHost<Record<string, never>>({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
+      try {
+        /** Most recent chain member built so far. */
+        let previous: any
+        const started = performance.now()
+        for (let index = 0; index < size; index += 1) {
+          const feature = previous
+            ? defineFeature(
+                (_core, dependencies: any) => ({ value: dependencies.previous.value + 1 }),
+                {
+                  previous: previous.getFeature('value')
+                }
+              )
+            : defineFeature(() => ({ value: 0 }))
+          previous = definePlugin({
+            name: `seq-${index}`,
+            features: { value: feature },
+            install: () => ({})
+          })
+          await host.use(previous)
+        }
+        return (performance.now() - started) / size
+      } finally {
+        await host.dispose()
+      }
+    }
+    const small: Record<string, number>[] = []
+    const large: Record<string, number>[] = []
+    for (let run = 0; run < 3; run += 1) {
+      small.push({ ...(await sample(500)), sequential: await sequentialBuild(500) })
+      large.push({ ...(await sample(4000)), sequential: await sequentialBuild(4000) })
+    }
+    console.info('A18 chain-dependent timing (ms/op)', JSON.stringify({ small, large }))
+    for (const key of Object.keys(small[0]!))
+      expect(median(large.map((entry) => entry[key]!)), key).toBeLessThanOrEqual(
+        3 * median(small.map((entry) => entry[key]!))
+      )
+  }, 300000)
+
   it('A27 keeps config.get independent of unrelated registration count', async () => {
     /** Lower comparison scale from R19(d). */
     const small = await createHost(500)
