@@ -292,7 +292,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 遍历期间 `dispose()` 被调用后，遍历会在下一个协作检查点（进入 stage 前、stage 返回后、`next()` 派发时）中止：sync/generator 同步抛出，async/async-generator 的 Promise reject，错误为 `PluginHostError('HOST_DISPOSING', ...)`（仍在 `closing` 窗口）或 `PluginHostError('HOST_DISPOSED', ...)`（已到达 terminal）。两种都可能出现，调用方应统一按 `instanceof PluginHostError` 处理，不要依赖某个固定的 code。
 
-已知限制：中止与 stage 或下游的普通失败同时发生时，中止错误作为主错误，普通失败目前不会出现在它的 `cause` 上。这由 `@migaia/middleware-pipeline` 的修订版处理，届时本节更新。
+中止与 stage 或下游的普通失败同时发生时，普通失败优先；只有一个普通失败时，原错误实例即为拒绝值。
 
 ---
 

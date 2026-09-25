@@ -167,23 +167,17 @@ describe('async host pipeline failure and closing baselines', () => {
     await expect(host.run(0)).resolves.toBe(20000)
   })
 
-  it('BC5: host closing during downstream dispatch rejects with the lifecycle abort', async () => {
-    // R2 baseline "preserves exact downstream rejection when host turns closing" is superseded by
-    // BC5: async stages now observe the lifecycle signal, and the runner keeps cancellation as the
-    // primary failure. Reachability of the downstream error through the abort error is owned by
-    // middleware-pipeline and tracked as R3 deferred D1.
+  it('preserves exact downstream rejection when host turns closing', async () => {
     const host = new AsyncHost()
+    const downstreamError = new Error('downstream failed while host closes')
     host.useAsyncPipeline(async (_value, next) => {
       void next(2)
     })
     host.useAsyncPipeline(async () => {
       void host.dispose()
-      throw new Error('downstream failed while host closes')
+      throw downstreamError
     })
-    await expect(host.run(1)).rejects.toMatchObject({
-      source: '@migaia/plugin-host',
-      code: 'HOST_DISPOSING'
-    })
+    await expect(host.run(1)).rejects.toBe(downstreamError)
   })
 
   it('combines dual failures before HOST_DISPOSING in exact stage-first order', async () => {

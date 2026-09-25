@@ -227,7 +227,7 @@ host.useAsyncGeneratorPipeline(async function* (value) {
 
 **sync 是扁平转换管道**：`next()` 只记录下一个值，下游 stage 在当前 stage 返回**之后**才执行。**async 是洋葱模型**：`await next(value)` 会等下游链跑完才继续，因此当前 stage 能在 `next()` 之后写"后置逻辑"。四种模式执行期间均拒绝注册新 stage（`PIPELINE_EXECUTING`），且嵌套调用用深度计数、外层未结束前依然拒绝。async pipeline 的 stage 与 downstream 同时失败会聚合成 `AggregateError`（`PIPELINE_FAILED`）——这是 async 洋葱模型特有的失败模式，async-generator 是串行 drain-then-terminal，没有等价的双失败场景。
 
-Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保护的 `runPipeline(value, done)` 触发一次遍历。四种模式的 stage 都会收到 `context.signal`，它就是 host 的生命周期 signal：`dispose()` 开始时被中止，长时间运行的 stage 可以据此提前退出。若 host 在遍历进行到一半时被 `dispose()`，遍历会在下一个协作检查点中止，抛出（sync/generator）或 reject（async/async-generator）`PluginHostError('HOST_DISPOSING' | 'HOST_DISPOSED', ...)`。已知限制：中止与 stage 或下游的普通失败同时发生时，中止错误优先，普通失败目前不会挂在中止错误上（由 middleware-pipeline 的修订版处理）。
+Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保护的 `runPipeline(value, done)` 触发一次遍历。四种模式的 stage 都会收到 `context.signal`，它就是 host 的生命周期 signal：`dispose()` 开始时被中止，长时间运行的 stage 可以据此提前退出。若 host 在遍历进行到一半时被 `dispose()`，遍历会在下一个协作检查点中止，抛出（sync/generator）或 reject（async/async-generator）`PluginHostError('HOST_DISPOSING' | 'HOST_DISPOSED', ...)`。中止与 stage 或下游的普通失败同时发生时，普通失败优先；只有一个普通失败时，原错误实例即为拒绝值。
 
 ---
 
