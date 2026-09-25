@@ -439,7 +439,7 @@ export const runAsyncMiddleware = async <TValue>(
       throw activeError
     }
     if (hasStageError && hasDownstreamError) {
-      if (stageError === downstreamError) throw downstreamError
+      if (context?.signal.aborted && stageError === downstreamError) throw downstreamError
       if (options.combineStageAndDownstreamError) {
         throw options.combineStageAndDownstreamError(stageError, downstreamError)
       }
