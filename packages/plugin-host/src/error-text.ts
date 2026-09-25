@@ -1,6 +1,7 @@
 import type { IPluginHostErrorCode, IPluginHostErrorDetail } from './typing.js'
 import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js'
 import { readHostIdentity } from './host-identity.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
 export type ILocaleKey = 'en' | 'zh'
 
@@ -65,9 +66,10 @@ export function tagPluginHostError<E extends Error>(
   error: E,
   code: IPluginHostErrorCode
 ): E & { readonly source: string; readonly code: IPluginHostErrorCode } {
-  Object.defineProperty(error, 'source', { value: PLUGIN_HOST_SOURCE, enumerable: true })
-  Object.defineProperty(error, 'code', { value: code, enumerable: true })
-  return error as E & { readonly source: string; readonly code: IPluginHostErrorCode }
+  return attachErrorIdentity(error, { source: PLUGIN_HOST_SOURCE, code }) as E & {
+    readonly source: string
+    readonly code: IPluginHostErrorCode
+  }
 }
 
 /** 入参校验错误：原生 `TypeError` + `INVALID_OPTION`（`docs/contracts/error-codes.md` §7 裸抛扫描门禁）。 */
