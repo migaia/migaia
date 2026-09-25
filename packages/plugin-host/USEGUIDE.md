@@ -203,8 +203,10 @@ TypeScript 的"已安装插件"类型（`TInstalled` 元组）只会随 `use()` 
 5. `retireDataOrderSlot()` 只在 definition 真正删除或 session 终结时调用；replace 与 blocked restart 必须复用
    原 slot。
 
+宿主直接注册的 stage 与插件槽位共用单调分配序号，按首次分配顺序执行；禁用、启用、挂起、恢复和替换不重排。`createDataOrderSlot(name)` 在调用时即保留位置，所以之后注册的宿主 stage 排在该插件 stage 后。替换在发布点切换可见代，新运行只含新代；旧运行继续持有旧代租约。
+
 managed cleanup 的 `physicalCompletion` 是全批次共享的严格链：前一 provider/resource 未真实 settle 时，
-后一项不会开始。`pipelineDrainTimeoutMs` 只决定何时向调用方返回逻辑 incomplete，不取消 lease 或 disposer。
+后一项不会开始。`pipelineDrainTimeoutMs` 只决定何时向调用方返回逻辑 incomplete，不取消 lease 或 disposer。排空开始时先解除旧代的 stage 可见性，再封存租约 key；此后新运行不含该 stage，也不会因 `QUIESCENCE_SEALED` 失败。
 因此不要把 `cleanupComplete: false` 当成已释放；应 await `physicalCompletion`，或由 realm owner 在更外层执行
 可证明的强制终止。
 
@@ -329,7 +331,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 `await host.replace(name, next)`（`next.name` 必须等于 `name`，否则 `REPLACE_NAME_MISMATCH`）：
 
 1. 安装 `next`。失败时整体回滚，旧注册继续服务，错误以 `PLUGIN_INSTALL_FAILED` 抛出、原始错误在 `cause`。
-2. 发布 `next`；旧注册上已取出的 extension 立即抛 `REGISTRATION_REVOKED`，句柄自动指向新实现。旧注册若处于禁用状态，新注册同样保持禁用。
+2. 发布 `next`，并在这一点把同名 stage 槽位切到新一代；之后开始的 pipeline 运行只含新 stage，既有运行继续持有旧代租约。旧注册上已取出的 extension 立即抛 `REGISTRATION_REVOKED`，句柄自动指向新实现。旧注册若处于禁用状态，新注册同样保持禁用。
 3. 对每个已激活的必需依赖者：实现了 `onDependencyReplaced(name, outputs)` 的调用钩子换绑；未实现或钩子抛错（原错误对象经 `diagnostic` 第三个参数上报）的，连同其必需依赖闭包一起按依赖者优先顺序排空 pipeline 租约并 dispose，再按拓扑序重装（沿用重启前的运行时 config，原先已激活的惰性插件重新激活、原先禁用的保持禁用）。
 4. 旧注册在其 pipeline 租约排空后 dispose；清理失败以 `CLEANUP_INCOMPLETE` 经 `diagnostic` 上报原始错误对象。
 5. 若第 3 步重装失败，替换依然生效，重启失败的插件保持卸载（之后依赖它们的安装得到 `PREREQUISITE_REMOVED`），并抛 `DEPENDENT_RESTART_FAILED`：`cause` 是 `AggregateError`，首项为重装失败，其后依次为钩子错误与清理错误，`detail.dependents` 列出受影响插件。
