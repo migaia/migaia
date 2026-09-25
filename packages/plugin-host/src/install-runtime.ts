@@ -29,6 +29,8 @@ import type {
 export type IInstallBatchContext<TDomainCore extends object, TValue> = {
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
+  /** Committed generations whose extension slots are released only when this batch publishes. */
+  readonly releasedOwners: Set<IRegistration<TDomainCore, TValue>>
   committed: boolean
 }
 
@@ -317,7 +319,21 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     installedValue: unknown
   ): void {
     const extensions = this.#mergeDescriptorExpose(registration, installedValue)
-    mountPluginExtensions(registration, extensions, batch.extensionOwners, this.#port.diagnostic)
+    mountPluginExtensions(
+      registration,
+      extensions,
+      {
+        has: (key) => {
+          if (batch.extensionOwners.has(key)) return true
+          const committed = this.#port.state.extensionOwners.get(key)
+          return committed !== undefined && !batch.releasedOwners.has(committed)
+        },
+        set: (key, owner) => {
+          batch.extensionOwners.set(key, owner)
+        }
+      },
+      this.#port.diagnostic
+    )
   }
 
   /** Detects an own then key before async assimilation can turn an extension result into a promise. */
@@ -401,7 +417,9 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         ),
       (reference) => {
         if (!isFeatureReference(reference)) return undefined
-        const provider = batch.registrations.get(reference.plugin)
+        const provider =
+          batch.registrations.get(reference.plugin) ??
+          this.#port.state.registrations.get(reference.plugin)
         if (!provider) return undefined
         if (!provider.enabled)
           throw new PluginHostError(

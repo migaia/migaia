@@ -175,6 +175,133 @@ describe('hot replacement transaction', () => {
     expect(previousDispose).toHaveBeenCalledTimes(1)
   })
 
+  it('A23 keeps the previous lease key while a replace candidate stages before publication', async () => {
+    class PipelineHost extends PluginHost<Record<string, never>, number> {
+      run(): Promise<void> {
+        return this.runPipeline(1, () => undefined) as Promise<void>
+      }
+    }
+    const host = new PipelineHost({ execution, pipeline: { mode: MiddlewarePipelineMode.async } })
+    /** Holds a run in the old stage after candidate registration but before publication. */
+    let releaseRun!: () => void
+    const runGate = new Promise<void>((resolve) => {
+      releaseRun = resolve
+    })
+    let enteredRun!: () => void
+    const runStarted = new Promise<void>((resolve) => {
+      enteredRun = resolve
+    })
+    /** Holds candidate publication until the old run owns its lease. */
+    let releaseInstall!: () => void
+    const installGate = new Promise<void>((resolve) => {
+      releaseInstall = resolve
+    })
+    let enteredInstall!: () => void
+    const installStarted = new Promise<void>((resolve) => {
+      enteredInstall = resolve
+    })
+    const oldDispose = vi.fn()
+    await host.use(
+      definePlugin({
+        name: 'A',
+        install: (core: any) => {
+          core.useAsyncPipeline(async (value: number, next: (value: number) => unknown) => {
+            enteredRun()
+            await runGate
+            return next(value)
+          })
+          return {}
+        },
+        dispose: oldDispose
+      }) as never
+    )
+    const replacing = host.replace(
+      'A',
+      definePlugin({
+        name: 'A',
+        install: async (core: any) => {
+          core.useAsyncPipeline(async (value: number, next: (value: number) => unknown) =>
+            next(value)
+          )
+          enteredInstall()
+          await installGate
+          return {}
+        }
+      })
+    )
+    await installStarted
+    const running = host.run()
+    await runStarted
+    releaseInstall()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(oldDispose).not.toHaveBeenCalled()
+    releaseRun()
+    await running
+    await replacing
+    expect(oldDispose).toHaveBeenCalledTimes(1)
+    await host.dispose()
+  })
+
+  it('A23 preserves the old lease after a staged replace candidate fails', async () => {
+    class PipelineHost extends PluginHost<Record<string, never>, number> {
+      run(): Promise<void> {
+        return this.runPipeline(1, () => undefined) as Promise<void>
+      }
+    }
+    const host = new PipelineHost({ execution, pipeline: { mode: MiddlewarePipelineMode.async } })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let entered!: () => void
+    const started = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const oldDispose = vi.fn()
+    await host.use(
+      definePlugin({
+        name: 'A',
+        install: (core: any) => {
+          core.useAsyncPipeline(async (value: number, next: (value: number) => unknown) => {
+            entered()
+            await gate
+            return next(value)
+          })
+          return {}
+        },
+        dispose: oldDispose
+      }) as never
+    )
+    const installFailure = new Error('candidate failed')
+    await expect(
+      host.replace(
+        'A',
+        definePlugin({
+          name: 'A',
+          install: (core: any) => {
+            core.useAsyncPipeline(async (value: number, next: (value: number) => unknown) =>
+              next(value)
+            )
+            throw installFailure
+          }
+        })
+      )
+    ).rejects.toMatchObject({
+      code: PluginHostErrorCode.pluginInstallFailed,
+      cause: installFailure
+    })
+    const running = host.run()
+    await started
+    const removing = host.unUse('A')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(oldDispose).not.toHaveBeenCalled()
+    release()
+    await running
+    await removing
+    expect(oldDispose).toHaveBeenCalledTimes(1)
+    await host.dispose()
+  })
+
   it('keeps a restarted dependent runtime config instead of its definition default', async () => {
     const host = new PluginHost<Record<string, never>>({ execution })
     const value = defineFeature(() => ({ value: 1 }))

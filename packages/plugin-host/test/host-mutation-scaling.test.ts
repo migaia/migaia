@@ -38,7 +38,16 @@ describe('host mutation scaling', () => {
     /** Higher comparison scale from R19(d). */
     const large = await createHost(4000)
     try {
-      expect(measureConfigGet(large)).toBeLessThanOrEqual(2 * measureConfigGet(small))
+      /** Alternating samples exclude one JIT or collection pause from the 10,000-read ratio. */
+      const smallSamples: number[] = []
+      const largeSamples: number[] = []
+      for (let sample = 0; sample < 3; sample += 1) {
+        smallSamples.push(measureConfigGet(small))
+        largeSamples.push(measureConfigGet(large))
+      }
+      smallSamples.sort((left, right) => left - right)
+      largeSamples.sort((left, right) => left - right)
+      expect(largeSamples[1]).toBeLessThanOrEqual(2 * smallSamples[1]!)
     } finally {
       await small.dispose()
       await large.dispose()

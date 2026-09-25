@@ -74,7 +74,7 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
       [{ name, plugin: definition }],
       false,
       (candidate) => {
-        for (const { key } of previous.extensions) candidate.extensionOwners.delete(key)
+        candidate.releasedOwners.add(previous)
       }
     )
     const replacement = installed[0]!

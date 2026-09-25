@@ -350,8 +350,9 @@ export class PluginHost<
       scheduler: this.#scheduler,
       state: this.#state,
       snapshotBatch: () => ({
-        registrations: new Map(this.#state.registrations),
-        extensionOwners: new Map(this.#state.extensionOwners),
+        registrations: new Map(),
+        extensionOwners: new Map(),
+        releasedOwners: new Set(),
         committed: false
       }),
       beginOperation: (registration) => {
