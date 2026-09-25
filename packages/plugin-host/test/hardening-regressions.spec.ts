@@ -730,7 +730,7 @@ describe('#6（重新裁定，见 SDD §5.6/M-T15）useSync 回滚改为两阶�
 })
 
 describe('#7（批次0）registerStage 对同一函数重复注册的不变量', () => {
-  it('钉住"删任意匹配项都等价"这一假设——同一函数注册两次，卸载后一次都不残留', async () => {
+  it('同一函数的每次注册都是独立条目——同一函数注册两次，卸载后一次都不残留', async () => {
     const host = new Host()
     let runs = 0
     const stage = (value: string, next: (v: string) => void): void => {
@@ -753,7 +753,7 @@ describe('#7（批次0）registerStage 对同一函数重复注册的不变量',
     await host.unUse('dup2')
     runs = 0
     ;(host as any).runPipeline('x', () => {})
-    expect(runs).toBe(0) // 卸载后一次都不残留——验证"删任意匹配项都等价"这条假设站得住
+    expect(runs).toBe(0) // 卸载后两个独立条目都不残留。
   })
 })
 

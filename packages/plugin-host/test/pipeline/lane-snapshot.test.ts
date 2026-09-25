@@ -12,17 +12,21 @@ import { StageLanes } from '../../src/stage-lanes.js'
 const verifySnapshot = async (mode: IMiddlewarePipelineMode): Promise<void> => {
   const seen: string[] = []
   const runner = createPipeline<number, IMiddlewarePipelineMode>({ mode })
-  const stages: Function[] = []
-  stages.push(
+  const lanes = new StageLanes<number>()
+  lanes.appendHost(
     runner.lift((value, next) => {
       seen.push('first')
-      stages.push(runner.lift(() => seen.push('appended'), MiddlewarePipelineMode.sync))
+      lanes.appendHost(
+        runner.lift(() => seen.push('appended'), MiddlewarePipelineMode.sync),
+        1n
+      )
       next(value)
-    }, MiddlewarePipelineMode.sync)
+    }, MiddlewarePipelineMode.sync),
+    0n
   )
   await executePluginHostPipeline({
     mode,
-    stages,
+    snapshot: lanes.snapshot(),
     value: 0,
     done: () => seen.push('done'),
     runner,
@@ -33,7 +37,7 @@ const verifySnapshot = async (mode: IMiddlewarePipelineMode): Promise<void> => {
     pending: createPendingTracker()
   } as never)
   expect(seen).toEqual(['first', 'done'])
-  expect(stages).toHaveLength(2)
+  expect(lanes.snapshot().stages).toHaveLength(2)
 }
 
 describe('pipeline lane snapshot', () => {
@@ -43,9 +47,8 @@ describe('pipeline lane snapshot', () => {
     const second = lanes.snapshot()
     expect(first).toBe(second)
     expect(Object.isFrozen(first)).toBe(true)
-    lanes.replace({
-      stages: [(value: number, next: (value: number) => void) => next(value)] as never
-    })
+    expect(Object.isFrozen(first.stages)).toBe(true)
+    lanes.appendHost((value: number, next: (value: number) => void) => next(value), 0n)
     const changed = lanes.snapshot()
     expect(changed).not.toBe(first)
     expect(Object.isFrozen(changed)).toBe(true)

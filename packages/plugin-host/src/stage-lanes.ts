@@ -1,160 +1,179 @@
-import type { IMiddlewarePipelineMode, IMiddlewarePipelineStage } from '@migaia/middleware-pipeline'
-import { registerPluginHostStage } from './pipeline-runtime.js'
 import type { IQuiescenceTracker } from '@migaia/lifecycle'
+import type { IMiddlewarePipelineMode, IMiddlewarePipelineStage } from '@migaia/middleware-pipeline'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IRegistration } from './registry.js'
 
-/** The one canonical lane already lifted into the host execution mode. */
-export type ILaneSet<TValue> = {
-  stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[]
+/** One exact stage registration; identical function objects still have independent lifetimes. */
+export type IStageEntry<TValue> = {
+  readonly stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
+  alive: boolean
 }
 
-/** One retained plugin stage with its original within-owner registration sequence. */
-type IOwnedStage<TValue> = Readonly<{
-  readonly owner: object
-  readonly ownerName: string
-  readonly stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
-  readonly sequence: number
+/** Stable name slot whose visible owner changes only at publication or retirement. */
+export type IStageOwnerSegment = {
+  readonly kind: 'owner'
+  readonly ordinal: bigint
+  owner?: object
+  retired: boolean
+}
+
+/** Host stages occupy their own allocation position between plugin slots. */
+type IHostSegment<TValue> = {
+  readonly kind: 'host'
+  readonly ordinal: bigint
+  readonly entry: IStageEntry<TValue>
+}
+
+/** Frozen stages and the exact generation keys retained by one execution. */
+export type IStageSnapshot<TValue> = Readonly<{
+  readonly stages: readonly IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[]
+  readonly ownerKeys: readonly object[]
 }>
 
-/** Owns the single host-mode stage lane and immutable execution snapshots. */
+/** Append-only allocation-order lane with one cached immutable execution snapshot per version. */
 export class StageLanes<TValue> {
-  /** Stages already lifted into the exact host mode. */
-  #stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[] = []
-  /** Owner provenance for committed and candidate stage functions. */
-  readonly stageOwners = new WeakMap<Function, string>()
-  /** Stable quiescence keys, so removal drains only the revoked plugin stages. */
-  readonly pipelineOwnerKeys = new Map<string, object>()
-  /** Canonical plugin-owned stages retained while an owner is temporarily inactive. */
-  #owned: IOwnedStage<TValue>[] = []
-  /** Monotonic within-owner registration order used when rebuilding the lane. */
-  #nextSequence = 0
-  /** Frozen execution snapshot reused until a committed lane mutation. */
-  #snapshot: readonly IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[] | undefined
+  /** Host entries and stable plugin slots in allocation order. */
+  #segments: Array<IHostSegment<TValue> | IStageOwnerSegment> = []
+  /** Retired empty slots left as tombstones until amortized compaction. */
+  #dead = 0
+  /** Cached version, invalidated only when visible execution can change. */
+  #snapshot: IStageSnapshot<TValue> | undefined
 
-  /** Invalidates the execution snapshot after a lane mutation. */
-  #invalidate(): void {
+  /** Invalidates the cached execution version after a visible mutation. */
+  invalidate(): void {
     this.#snapshot = undefined
   }
 
-  /** Registers one stage after the host runner has lifted it into the host mode. */
-  register<TDomainCore extends object>(context: {
-    readonly host: object
-    readonly kind: IMiddlewarePipelineMode
-    readonly depth: number
-    readonly stage: Function
-    readonly lift: (
-      stage: Function,
-      kind: IMiddlewarePipelineMode
-    ) => IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
-    readonly owner: IRegistration<TDomainCore, TValue> | undefined
-    readonly activeBatch: unknown
-    readonly stageSlots: Map<string, IDataOrderSlotState>
-    readonly allocateSlot: () => bigint
-  }): void {
-    const lifted = context.lift(context.stage, context.kind)
-    this.#invalidate()
-    registerPluginHostStage({
-      host: context.host,
-      depth: context.depth,
-      stage: lifted,
-      owner: context.owner,
-      activeBatch: context.activeBatch,
-      stages: this.#stages,
-      stageSlots: context.stageSlots,
-      stageOwners: this.stageOwners,
-      pipelineOwnerKeys: this.pipelineOwnerKeys,
-      allocateSlot: context.allocateSlot,
-      readLiveStages: () => [this.#stages]
-    } as never)
-    if (context.owner)
-      this.#owned.push({
-        owner: context.owner,
-        ownerName: context.owner.name,
-        stage: lifted,
-        sequence: this.#nextSequence++
-      })
+  /** Allocates the segment as soon as its opaque data-order slot is created. */
+  ensureSlot(slot: IDataOrderSlotState): IStageOwnerSegment {
+    if (slot.segment) return slot.segment
+    /** One append preserves the slot's allocation position without insertion or sorting. */
+    const segment: IStageOwnerSegment = {
+      kind: 'owner',
+      ordinal: slot.ordinal,
+      retired: false
+    }
+    slot.segment = segment
+    this.#segments.push(segment)
+    return segment
   }
 
-  /** Rebuilds plugin-owned stages from enabled registrations without reallocating slots. */
-  rebuild<TDomainCore extends object>(
-    registrations: readonly IRegistration<TDomainCore, TValue>[],
-    stageSlots: ReadonlyMap<string, IDataOrderSlotState>
+  /** Appends a host-owned stage at its allocation position. */
+  appendHost(
+    stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>,
+    ordinal: bigint
   ): void {
-    this.#invalidate()
-    const enabled = new Set<object>(registrations)
-    const compare = (left: IOwnedStage<TValue>, right: IOwnedStage<TValue>) => {
-      const leftSlot = stageSlots.get(left.ownerName)?.ordinal ?? 1n << 100n
-      const rightSlot = stageSlots.get(right.ownerName)?.ordinal ?? 1n << 100n
-      return leftSlot === rightSlot ? left.sequence - right.sequence : leftSlot < rightSlot ? -1 : 1
+    this.#segments.push({ kind: 'host', ordinal, entry: { stage, alive: true } })
+    this.invalidate()
+  }
+
+  /** Records a candidate stage on its exact registration, invisible until publication. */
+  registerOwner<TDomainCore extends object>(
+    registration: IRegistration<TDomainCore, TValue>,
+    slot: IDataOrderSlotState,
+    stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
+  ): void {
+    registration.segment = this.ensureSlot(slot)
+    /** Disposer toggles only its own occurrence, even when another owner uses the same function. */
+    const entry: IStageEntry<TValue> = { stage, alive: true }
+    registration.stageEntries.push(entry)
+    registration.pipelineDisposers.push(() => {
+      if (!entry.alive) return
+      entry.alive = false
+      if (registration.segment?.owner === registration) this.invalidate()
+    })
+  }
+
+  /** Switches a slot to the committed generation at the publication point. */
+  bindOwner<TDomainCore extends object>(registration: IRegistration<TDomainCore, TValue>): void {
+    if (!registration.segment) return
+    registration.segment.owner = registration
+    this.invalidate()
+  }
+
+  /** Detaches visibility before sealing the old generation's lease key. */
+  retireLeaseOwner<TDomainCore extends object>(
+    registration: IRegistration<TDomainCore, TValue>,
+    leases: IQuiescenceTracker<object>
+  ): void {
+    const segment = registration.segment
+    if (segment?.owner === registration) {
+      segment.owner = undefined
+      this.invalidate()
+      if (segment.retired) {
+        this.#dead += 1
+        this.#compactIfNeeded()
+      }
     }
-    const hostStages = this.#stages.filter((stage) => this.stageOwners.get(stage) === undefined)
-    const pluginStages = this.#owned
-      .filter((entry) => enabled.has(entry.owner))
-      .sort(compare)
-      .map((entry) => entry.stage)
-    this.#stages = [...hostStages, ...pluginStages]
+    leases.seal(registration.pipelineOwnerKey)
   }
 
-  /** Forgets canonical stages only when their owner is actually removed. */
-  removeOwner(owner: object): void {
-    this.#invalidate()
-    this.#owned = this.#owned.filter((entry) => entry.owner !== owner)
-  }
-
-  /** The distinct owners of a stage snapshot, for the leases one execution must retain. */
-  ownersOf(stages: readonly Function[]): readonly string[] {
-    const owners = new Set<string>()
-    for (const stage of stages) {
-      const owner = this.stageOwners.get(stage)
-      if (owner !== undefined) owners.add(owner)
+  /** Retires an opaque slot without disturbing an owner that is still committed. */
+  retireSlot(slot: IDataOrderSlotState): void {
+    const segment = slot.segment
+    if (!segment || segment.retired) return
+    segment.retired = true
+    if (!segment.owner) {
+      this.#dead += 1
+      this.#compactIfNeeded()
     }
-    return [...owners]
   }
 
-  /** Retains the global lease and each distinct owner of one immutable stage snapshot. */
+  /** Removes tombstones only when the scan can be charged to earlier retirements. */
+  #compactIfNeeded(): void {
+    if (this.#segments.length < 64 || this.#dead <= this.#segments.length / 2) return
+    this.#segments = this.#segments.filter(
+      (segment) => segment.kind === 'host' || !segment.retired || !!segment.owner
+    )
+    this.#dead = 0
+  }
+
+  /** Freezes the visible stage list and generation keys once for this lane version. */
+  snapshot(): IStageSnapshot<TValue> {
+    if (this.#snapshot) return this.#snapshot
+    /** Visible stages in the same allocation order as their segments. */
+    const stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[] = []
+    /** Lease keys belonging to registrations that contribute visible stages. */
+    const ownerKeys: object[] = []
+    for (const segment of this.#segments) {
+      if (segment.kind === 'host') {
+        if (segment.entry.alive) stages.push(segment.entry.stage)
+        continue
+      }
+      const owner = segment.owner as IRegistration<object, TValue> | undefined
+      if (!owner || !owner.enabled || owner.suspended) continue
+      let contributed = false
+      for (const entry of owner.stageEntries) {
+        if (!entry.alive) continue
+        stages.push(entry.stage)
+        contributed = true
+      }
+      if (contributed) ownerKeys.push(owner.pipelineOwnerKey)
+    }
+    this.#snapshot = Object.freeze({
+      stages: Object.freeze(stages),
+      ownerKeys: Object.freeze(ownerKeys)
+    })
+    return this.#snapshot
+  }
+
+  /** Retains the global key and only the generation keys present in this snapshot. */
   retainLeases(
     leases: IQuiescenceTracker<object>,
     pipelineKey: object,
-    stages: readonly Function[]
+    ownerKeys: readonly object[]
   ): () => void {
     const releases = [leases.retain(pipelineKey)]
-    for (const owner of this.ownersOf(stages)) {
-      const key = this.pipelineOwnerKeys.get(owner)
-      if (key !== undefined) releases.push(leases.retain(key))
-    }
+    for (const key of ownerKeys) releases.push(leases.retain(key))
     return () => {
       for (const release of releases) release()
     }
   }
 
-  /** The live lane used by candidate batches. */
-  get lanes(): ILaneSet<TValue> {
-    return { stages: this.#stages }
-  }
-
-  /** The immutable stages one execution will traverse. */
-  snapshot(): readonly IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[] {
-    if (this.#snapshot) return this.#snapshot
-    this.#snapshot = Object.freeze([...this.#stages])
-    return this.#snapshot
-  }
-
-  /** A fresh lane copy for a candidate install batch. */
-  copy(): ILaneSet<TValue> {
-    return { stages: [...this.#stages] }
-  }
-
-  /** Adopts a committed batch lane wholesale. */
-  replace(next: ILaneSet<TValue>): void {
-    this.#invalidate()
-    this.#stages = next.stages
-  }
-
-  /** Empties the lane and retained owner ledger. */
+  /** Clears every segment when the host reaches terminal disposal. */
   clear(): void {
-    this.#invalidate()
-    this.#stages.length = 0
-    this.#owned = []
+    this.#segments.length = 0
+    this.#dead = 0
+    this.invalidate()
   }
 }

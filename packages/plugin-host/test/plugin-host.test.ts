@@ -1090,9 +1090,7 @@ describe('PluginHost', () => {
       removeRegistration: () => undefined,
       extensionOwners: new Map(),
       pipelineLeases: { seal: () => undefined } as any,
-      pipelineOwnerKeys: new Map([[registration.name, registration.pipelineOwnerKey]]),
-      stageSlots: new Map(),
-      removePipelineOwner: () => undefined,
+      retireLeaseOwner: () => undefined,
       executionSignal: {} as any,
       cleanupRuntime: {} as any,
       setHookRegistration: () => undefined
@@ -1224,9 +1222,7 @@ describe('PluginHost', () => {
       },
       extensionOwners,
       pipelineLeases: { seal: () => undefined } as any,
-      pipelineOwnerKeys: new Map([[registration.name, registration.pipelineOwnerKey]]),
-      stageSlots,
-      removePipelineOwner: () => undefined,
+      retireLeaseOwner: () => undefined,
       executionSignal: {} as any,
       cleanupRuntime: {} as any,
       setHookRegistration: () => undefined

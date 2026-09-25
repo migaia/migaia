@@ -19,7 +19,8 @@ import type { IHostCoreConstructionRequest } from './define-host.js'
 import { reportQueueWait, translateQueueRejection } from './host-queue.js'
 import {
   createPluginHostPipelineViolationHandler,
-  drainPipelineLeases
+  drainPipelineLeases,
+  registerPluginHostStage
 } from './pipeline-runtime.js'
 import { assertRequiredTimeoutOption, assertTimeoutOption } from './host-options.js'
 import { asyncDisposeKey } from './disposal.js'
@@ -212,7 +213,6 @@ export class PluginHost<
   /** Readonly enablement facade over the same runtime that owns this Host's registrations. */
   readonly plugin: IPluginEnablement<this, TInstalled, TDomainCore, TValue>
   /** Candidate publication context used to keep plugin-owned stages off the live pipeline. */
-  #activeInstallBatch: IInstallBatchContext<TDomainCore, TValue> | undefined
   /** Functional-entry reader for trusted definitions; absent in the structural entry. */
   #trustedDefinitionReader: ITrustedDefinitionReader | undefined
   /** Shared activation Promises keyed by lazy registration name. */
@@ -352,12 +352,8 @@ export class PluginHost<
       snapshotBatch: () => ({
         registrations: new Map(this.#state.registrations),
         extensionOwners: new Map(this.#state.extensionOwners),
-        ...this.#state.lanes.copy(),
         committed: false
       }),
-      setActiveBatch: (batch) => {
-        this.#activeInstallBatch = batch
-      },
       beginOperation: (registration) => {
         this.#operationRuntime.begin(registration)
       },
@@ -380,9 +376,8 @@ export class PluginHost<
       removeRegistration: (registration) => this.#state.closeRegistration(registration),
       extensionOwners: this.#state.extensionOwners,
       pipelineLeases: this.#pipelineLeases,
-      pipelineOwnerKeys: this.#state.lanes.pipelineOwnerKeys,
-      stageSlots: this.#state.stageSlots,
-      removePipelineOwner: (registration) => this.#state.lanes.removeOwner(registration),
+      retireLeaseOwner: (registration) =>
+        this.#state.lanes.retireLeaseOwner(registration, this.#pipelineLeases),
       host: this,
       executionSignal: this.#executionController.signal,
       cleanupRuntime: this.#cleanupRuntime,
@@ -407,7 +402,6 @@ export class PluginHost<
       },
       forget: (name) => this.#enablementRuntime.forget(name),
       settle: () => {
-        this.#state.lanes.rebuild(this.#state.enabledRegistrations(), this.#state.stageSlots)
         this.#state.commit()
       },
       diagnostic: this.#diagnostic,
@@ -427,7 +421,6 @@ export class PluginHost<
       },
       forget: (name) => this.#enablementRuntime.forget(name),
       settle: () => {
-        this.#state.lanes.rebuild(this.#state.enabledRegistrations(), this.#state.stageSlots)
         this.#state.commit()
       },
       diagnostic: this.#diagnostic
@@ -586,9 +579,9 @@ export class PluginHost<
   }
 
   /** Retains global and owner leases for the exact stage snapshot about to execute. */
-  #retainPipelineLease(stages: readonly Function[]): () => void {
+  #retainPipelineLease(ownerKeys: readonly object[]): () => void {
     this.#assertActive()
-    return this.#state.lanes.retainLeases(this.#pipelineLeases, this.#pipelineKey, stages)
+    return this.#state.lanes.retainLeases(this.#pipelineLeases, this.#pipelineKey, ownerKeys)
   }
 
   #assertMutationAllowed(): void {
@@ -654,14 +647,12 @@ export class PluginHost<
     kind: IMiddlewarePipelineMode
   ): void {
     try {
-      this.#state.lanes.register({
+      registerPluginHostStage({
         host: this,
-        kind,
         depth: this.#pipelineDepth,
-        stage,
+        stage: this.#pipeline.lift(stage as never, kind as never),
         owner,
-        activeBatch: this.#activeInstallBatch,
-        lift: (candidate, source) => this.#pipeline.lift(candidate as never, source as never),
+        lanes: this.#state.lanes,
         stageSlots: this.#state.stageSlots,
         allocateSlot: () => this.#state.allocateStageSlot()
       })
@@ -687,12 +678,12 @@ export class PluginHost<
     try {
       return executePluginHostPipeline({
         mode: this.#pipelineMode,
-        stages: this.#state.lanes.snapshot(),
+        snapshot: this.#state.lanes.snapshot(),
         value,
         done,
         runner: this.#pipeline,
         assertActive: () => this.#assertActive(),
-        retainLease: (stages) => this.#retainPipelineLease(stages),
+        retainLease: (ownerKeys) => this.#retainPipelineLease(ownerKeys),
         enter: () => {
           this.#pipelineDepth += 1
         },
@@ -914,7 +905,7 @@ export class PluginHost<
 
   /** Seals one registration's pipeline owner and waits for its active leases to drain. */
   async #drainRegistrationLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void> {
-    this.#pipelineLeases.seal(registration.pipelineOwnerKey)
+    this.#state.lanes.retireLeaseOwner(registration, this.#pipelineLeases)
     await drainPipelineLeases({
       leases: this.#pipelineLeases,
       key: registration.pipelineOwnerKey,
@@ -952,9 +943,20 @@ export class PluginHost<
    */
   #closeRegistrationSync(
     registration: IRegistration<TDomainCore, TValue>,
-    _rollbackErrors: unknown[] = []
+    rollbackErrors: unknown[] = []
   ): void {
+    this.#state.lanes.retireLeaseOwner(registration, this.#pipelineLeases)
+    for (const detach of [...registration.pipelineDisposers].reverse()) {
+      try {
+        detach()
+      } catch (error) {
+        rollbackErrors.push(error)
+      }
+    }
+    registration.pipelineDisposers = []
+    registration.stageEntries = []
     this.#state.closeRegistration(registration)
+    registration.extensions = []
     registration.scope?.close()
     registration.lifecycle = PluginHostRegistrationLifecycle.dispose
   }
