@@ -30,7 +30,6 @@
         "DependencyAction",
         "DependencyEdgeStatus",
         "DependencyMutationKind",
-        "DependencyNodeStatus",
         "DependencyPolicy",
         "collectPlanEdges",
         "planActivation",
