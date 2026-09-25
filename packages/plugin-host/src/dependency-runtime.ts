@@ -1,5 +1,4 @@
 import {
-  DependencyNodeStatus,
   DependencyPolicy,
   planActivation,
   resolveInstallSet,
@@ -153,7 +152,10 @@ export const validateInstallBatch = <TDomainCore extends object, TValue>(
     /** Committed inactive providers that must activate before this batch installs. */
     const activationOrder = planActivation(
       transaction,
-      (name) => (byName.has(name) ? DependencyNodeStatus.active : state.readDependencyStatus(name)),
+      (name) =>
+        byName.has(name)
+          ? { activated: true, enabled: true, suspended: false, stale: false }
+          : state.readDependencyState(name),
       activationRoots ?? members.filter((name) => installSet.has(name))
     ).order.filter((name) => state.registrations.has(name))
     for (const entry of entries) {

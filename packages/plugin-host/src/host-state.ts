@@ -1,5 +1,5 @@
 import { createTopologyIndex, type ITopologyIndex } from '@migaia/capability/graph/topology'
-import { DependencyNodeStatus } from '@migaia/capability/graph/dependency'
+import type { IDependencyNodeState } from '@migaia/capability/graph/dependency'
 import { StageLanes } from './stage-lanes.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -66,14 +66,16 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     return this.#index
   }
 
-  /** Projects one committed registration into the status vocabulary owned by capability. */
-  readDependencyStatus(name: string): DependencyNodeStatus {
+  /** Projects one committed registration into capability's orthogonal dependency state. */
+  readDependencyState(name: string): IDependencyNodeState {
     /** Registration named by an index node; index and registry commits stay atomic. */
     const registration = this.registrations.get(name)!
-    if (!registration.enabled) return DependencyNodeStatus.disabled
-    if (registration.suspended) return DependencyNodeStatus.suspended
-    if (!registration.activated) return DependencyNodeStatus.inactive
-    return DependencyNodeStatus.active
+    return {
+      activated: registration.activated,
+      enabled: registration.enabled,
+      suspended: registration.suspended,
+      stale: registration.stale
+    }
   }
 
   /** Reserves the next ordering ordinal. Ordinals are never reused, so order stays total. */
