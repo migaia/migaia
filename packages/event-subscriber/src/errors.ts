@@ -52,10 +52,12 @@ const eventErrorAttachmentFallback = <T extends object>(
   readonly source: typeof EVENT_SUBSCRIBER_SOURCE
   readonly code: IEventSubscriberErrorCode
 } => {
-  const wrapped = new TypeError(eventErrorText(code), { cause: error })
-  Object.defineProperty(wrapped, 'source', { value: EVENT_SUBSCRIBER_SOURCE, enumerable: true })
-  Object.defineProperty(wrapped, 'code', { value: code, enumerable: true })
-  Object.defineProperty(wrapped, 'detail', { value: { attachError }, enumerable: true })
+  /** Fresh package-owned wrapper; the original stays reachable through `cause`. */
+  const wrapped = attachErrorIdentity(new TypeError(eventErrorText(code), { cause: error }), {
+    source: EVENT_SUBSCRIBER_SOURCE,
+    code,
+    detail: { attachError }
+  })
   return wrapped as unknown as T & {
     readonly source: typeof EVENT_SUBSCRIBER_SOURCE
     readonly code: IEventSubscriberErrorCode
