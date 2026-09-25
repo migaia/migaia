@@ -348,6 +348,23 @@ describe('incremental topology index', () => {
     expect(afterRead.visitedNodes).toBeGreaterThan(beforeRead.visitedNodes)
   })
 
+  it('A19 keeps a rolled-back transaction visit count in the base metrics', () => {
+    const index = createTestIndex()
+    index.add({ id: 'p', dependencies: [] })
+    const before = index.metrics()
+    const transaction = index.begin()
+    transaction.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+    transaction.order()
+    const transactionOwn = transaction.metrics()
+    transaction.rollback()
+    // The writes are gone, but the reads the validation performed stay visible to metrics().
+    expect(index.has('a')).toBe(false)
+    expect(index.metrics().visitedNodes).toBeGreaterThan(before.visitedNodes)
+    expect(index.metrics().visitedNodes - before.visitedNodes).toBe(
+      transactionOwn.visitedNodes - before.visitedNodes + 1
+    )
+  })
+
   it('A4 opens and rolls back a transaction without copying the index', () => {
     /** Median wall time of begin() plus one add and rollback() for one index size. */
     const measure = (size: number): number => {

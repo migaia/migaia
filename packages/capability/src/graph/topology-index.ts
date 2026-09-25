@@ -497,7 +497,8 @@ class TopologyIndex implements ITopologyIndex {
 
   /**
    * Opens one isolated transaction while base readers retain pre-transaction state. Opening costs
-   * O(1); commit costs the keys the transaction wrote; rollback drops the overlay.
+   * O(1); commit costs the keys the transaction wrote; rollback drops the overlay but keeps the
+   * transaction's visit counts.
    */
   begin(): ITopologyTransaction {
     if (this.#transactionOpen) this.#adapter.onInvalid(TopologyInvalidReason.transactionOpen)
@@ -507,9 +508,7 @@ class TopologyIndex implements ITopologyIndex {
     return new TopologyTransaction(
       working,
       () => this.#adopt(working),
-      () => {
-        this.#transactionOpen = false
-      },
+      () => this.#discard(working),
       () => this.#adapter.onInvalid(TopologyInvalidReason.transactionClosed)
     )
   }
@@ -519,6 +518,16 @@ class TopologyIndex implements ITopologyIndex {
     ;(working.#nodes as OverlayStore<string, IStoredTopologyNode>).applyTo(this.#nodes)
     ;(working.#consumers as OverlayStore<string, Set<string>>).applyTo(this.#consumers)
     this.#nextOrdinal = working.#nextOrdinal
+    this.#visitedNodes += working.#visitedNodes - working.#visitBaseline.visitedNodes
+    this.#visitedEdges += working.#visitedEdges - working.#visitBaseline.visitedEdges
+    this.#transactionOpen = false
+  }
+
+  /**
+   * Drops a transaction view's writes but keeps its visit counts: the reads happened, and a
+   * validation transaction that always rolls back must still show its cost in `metrics()`.
+   */
+  #discard(working: TopologyIndex): void {
     this.#visitedNodes += working.#visitedNodes - working.#visitBaseline.visitedNodes
     this.#visitedEdges += working.#visitedEdges - working.#visitBaseline.visitedEdges
     this.#transactionOpen = false
