@@ -86,19 +86,13 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
     /** Canonical replacement decision before any dependent hook executes. */
     const replacementPlan = planReplacement(
       this.#port.state.dependencyIndex(),
-      (pluginName) => this.#port.state.readDependencyStatus(pluginName),
+      (pluginName) => this.#port.state.readDependencyState(pluginName),
       {
         target: name,
         canRebind: (pluginName) =>
           this.#port.registrations.get(pluginName)?.plugin.onDependencyReplaced !== undefined
       }
     )
-    // Suspended direct dependents are not planned (they are not active) yet still hold a binding
-    // to the generation just replaced; recovery must reinstall them rather than resume them.
-    for (const dependentName of this.#port.state.dependencyIndex().dependents(name).required) {
-      const dependent = this.#port.registrations.get(dependentName)
-      if (dependent?.suspended) dependent.restartPending = true
-    }
     /** Direct rebind failures that capability must expand into restart closures. */
     const failedRebinds: string[] = []
     for (const step of replacementPlan.steps) {
@@ -128,25 +122,26 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
         .map((step) => step.id),
       ...failedRebinds
     ]
-    const restartOrder =
+    const restartPlan =
       restartRoots.length === 0
-        ? []
+        ? replacementPlan
         : planRestart(
             this.#port.state.dependencyIndex(),
-            (pluginName) => this.#port.state.readDependencyStatus(pluginName),
+            (pluginName) => this.#port.state.readDependencyState(pluginName),
             restartRoots
-          ).order
+          )
+    /** Planned invalidations keep suspended instances without attempting installation. */
+    for (const step of [...replacementPlan.steps, ...restartPlan.steps]) {
+      if (step.action !== DependencyAction.invalidate) continue
+      const registration = this.#port.registrations.get(step.id)
+      if (registration) registration.stale = true
+    }
     const restarted: IRegistration<TDomainCore, TValue>[] = []
-    for (const restartName of restartOrder) {
+    for (const restartName of restartPlan.steps
+      .filter((step) => step.action === DependencyAction.restart)
+      .map((step) => step.id)) {
       const registration = this.#port.registrations.get(restartName)
       if (!registration) continue
-      // A suspended member cannot reinstall while another required provider is absent; restarting
-      // it here would fail the whole restart batch and remove its healthy providers. It keeps its
-      // retained instance and restarts when recovery makes all of its providers available.
-      if (registration.suspended) {
-        registration.restartPending = true
-        continue
-      }
       restarted.push(registration)
       await this.#port.drainLeases(registration)
       cleanupErrors.push(...(await this.#port.disposeRegistration(registration)))

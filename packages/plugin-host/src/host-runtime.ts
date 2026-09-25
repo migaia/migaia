@@ -863,7 +863,7 @@ export class PluginHost<
       )
       this.#installRuntime.installBatchSync(entries)
       for (const entry of entries) {
-        if (!this.#resumeRuntime.hasSuspendedDependents(entry.name)) continue
+        if (this.#resumeRuntime.planAfterProvider(entry.name, true).steps.length === 0) continue
         // Recovery drains, disposes and reinstalls registrations, so it must run inside the
         // mutation queue like every other structural change instead of racing queued mutations.
         /** Queued recovery for this entry; failures are reported, never rethrown to the caller. */
@@ -1016,7 +1016,7 @@ export class PluginHost<
       /** Capability-owned dependency decision for this exact committed state. */
       const plan = planDependencyMutation(
         this.#state.dependencyIndex(),
-        (pluginName) => this.#state.readDependencyStatus(pluginName),
+        (pluginName) => this.#state.readDependencyState(pluginName),
         {
           roots: [name],
           kind: DependencyMutationKind.remove,
