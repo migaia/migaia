@@ -51,7 +51,14 @@ describe('architecture boundaries', () => {
 
   it('keeps internal lower layers independent from the facade and platform adapters', async () => {
     const files = []
-    for (const module of ['config', 'core', 'disposal', 'extension', 'pipeline', 'registry'])
+    for (const module of [
+      'config',
+      'core',
+      'disposal',
+      'extension',
+      'pipeline-runtime',
+      'registry'
+    ])
       files.push(...(await filesUnderModule(module)))
     const source = (await Promise.all(files.map((file) => readFile(file, 'utf8')))).join('\n')
     expect(source).not.toMatch(/from\s+['"].*plugin-host['"]|from\s+['"].*store\//)

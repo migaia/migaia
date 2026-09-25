@@ -11,6 +11,7 @@ import type {
   IProvisionalScope
 } from '@migaia/lifecycle'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
+import type { IStageEntry, IStageOwnerSegment } from './stage-lanes.js'
 
 export type IPluginDefinition<TCore> = {
   readonly owner: IPluginConstraint<TCore>
@@ -50,6 +51,10 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   config: IPluginConfig
   extensions: IExtensionOwnership[]
   pipelineDisposers: IPluginDisposer[]
+  /** Stages registered by this exact generation, not keyed by function identity. */
+  stageEntries: IStageEntry<TValue>[]
+  /** Stable name slot shared by committed generations, if this owner registered a stage. */
+  segment?: IStageOwnerSegment
   /** Exact generation lease key; replacement generations never share a physical drain fence. */
   readonly pipelineOwnerKey: object
   /** Captured resource/disposer pairs used by composition's strict physical cleanup chain. */

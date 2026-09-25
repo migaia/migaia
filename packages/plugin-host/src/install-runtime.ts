@@ -19,7 +19,6 @@ import { isFeatureReference } from './define-feature.js'
 import type { PluginHostState } from './host-state.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IInstallEntry, IPluginDescriptor, IRegistration } from './registry.js'
-import type { IMiddlewarePipelineMode, IMiddlewarePipelineStage } from '@migaia/middleware-pipeline'
 import type {
   IPluginHostCore,
   IPluginInstallFailureDetail,
@@ -30,7 +29,6 @@ import type {
 export type IInstallBatchContext<TDomainCore extends object, TValue> = {
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
-  readonly stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[]
   committed: boolean
 }
 
@@ -39,7 +37,6 @@ export type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = 
   /** Shared host state owning dependency facts and committed registration status. */
   readonly state: PluginHostState<TDomainCore, TValue>
   readonly snapshotBatch: () => IInstallBatchContext<TDomainCore, TValue>
-  readonly setActiveBatch: (batch: IInstallBatchContext<TDomainCore, TValue> | undefined) => void
   readonly beginOperation: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly createCore: (
     registration: IRegistration<TDomainCore, TValue>,
@@ -86,7 +83,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     const activation = (async (): Promise<void> => {
       const batch = this.#port.snapshotBatch()
       batch.registrations.set(registration.name, registration)
-      this.#port.setActiveBatch(batch)
       registration.lifecycle = PluginHostRegistrationLifecycle.install
       try {
         const installResult = this.#startInstall(registration, batch, true)
@@ -108,12 +104,17 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       } catch (error) {
         if (registration.provisional) await registration.provisional.rollback()
         registration.provisional = undefined
+        for (const detach of [...registration.pipelineDisposers].reverse()) detach()
+        registration.pipelineDisposers = []
+        registration.stageEntries = []
+        for (const { key } of registration.extensions)
+          if (batch.extensionOwners.get(key) === registration) batch.extensionOwners.delete(key)
+        registration.extensions = []
         registration.installed = false
         registration.activated = false
         throw error
       } finally {
         this.#port.setHookRegistration(undefined)
-        this.#port.setActiveBatch(undefined)
         registration.lifecycle = PluginHostRegistrationLifecycle.idle
         registration.activationPromise = undefined
       }
@@ -137,7 +138,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     const batch = this.#port.snapshotBatch()
     prepareBatch?.(batch)
     let failedName = entries[0]?.name ?? 'unknown'
-    this.#port.setActiveBatch(batch)
     try {
       for (const entry of ordered) {
         failedName = entry.name
@@ -180,8 +180,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         failedName,
         rollbackErrors: Object.freeze([...rollbackErrors])
       })
-    } finally {
-      this.#port.setActiveBatch(undefined)
     }
   }
 
@@ -191,7 +189,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     const { order: ordered, installSet } = this.#validateBatch(entries)
     const batch = this.#port.snapshotBatch()
     let failedName = entries[0]?.name ?? 'unknown'
-    this.#port.setActiveBatch(batch)
     try {
       for (const entry of ordered) {
         failedName = entry.name
@@ -251,8 +248,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         completion
       }
       throw this.#installFailure(failedName, cause, failureDetail)
-    } finally {
-      this.#port.setActiveBatch(undefined)
     }
   }
 
@@ -284,6 +279,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       config: copyConfig(entry.config ?? plugin.config),
       extensions: [],
       pipelineDisposers: [],
+      stageEntries: [],
       pipelineOwnerKey: {},
       resourceDisposers: [],
       installed: false,

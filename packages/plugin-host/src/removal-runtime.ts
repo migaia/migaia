@@ -6,7 +6,6 @@ import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import { markRegistrationRevoked } from './composition.js'
-import type { IDataOrderSlotState } from './composition.js'
 import type { IPluginDisposalContext } from './typing.js'
 
 export type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
@@ -15,9 +14,7 @@ export type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = 
   readonly removeRegistration: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
   readonly pipelineLeases: IQuiescenceTracker<object>
-  readonly pipelineOwnerKeys: Map<string, object>
-  readonly stageSlots: Map<string, IDataOrderSlotState>
-  readonly removePipelineOwner: (registration: IRegistration<TDomainCore, TValue>) => void
+  readonly retireLeaseOwner: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly host: object
   readonly executionSignal: IAbortSignal
   readonly cleanupRuntime: PluginHostCleanupRuntime
@@ -41,6 +38,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     markRegistrationRevoked(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.dispose
     registration.featureExposeValid = false
+    this.#port.retireLeaseOwner(registration)
     for (const detach of [...registration.pipelineDisposers].reverse()) {
       try {
         detach()
@@ -49,10 +47,6 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
       }
     }
     registration.pipelineDisposers = []
-    this.#port.pipelineLeases.seal(registration.pipelineOwnerKey)
-    if (this.#port.pipelineOwnerKeys.get(registration.name) === registration.pipelineOwnerKey)
-      this.#port.pipelineOwnerKeys.delete(registration.name)
-    this.#port.removePipelineOwner(registration)
     this.#port.removeRegistration(registration)
     this.#removeOwnedPublication(registration)
     // The name-keyed slot retains its ordinal across a same-name reinstall. Composition-issued

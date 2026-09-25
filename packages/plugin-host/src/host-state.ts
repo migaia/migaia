@@ -81,11 +81,13 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   /** Writes one registration's enablement through the host's visibility owner. */
   setEnabled(registration: IRegistration<TDomainCore, TValue>, enabled: boolean): void {
     registration.enabled = enabled
+    this.lanes.invalidate()
   }
 
   /** Writes one registration's suspension through the host's visibility owner. */
   setSuspended(registration: IRegistration<TDomainCore, TValue>, suspended: boolean): void {
     registration.suspended = suspended
+    this.lanes.invalidate()
   }
 
   /** Records whether a retained instance must reinstall when its providers recover. */
@@ -111,6 +113,8 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     for (const registration of installed) {
       /** Registration currently owning this name before candidate publication, if any. */
       const previous = this.registrations.get(registration.name)
+      if (previous && previous !== registration && !registration.segment)
+        registration.segment = previous.segment
       /** Canonical dependency node derived from the admitted plugin snapshot. */
       const node = toIndexNode(registration.name, registration.plugin)
       if (!previous) this.#index.add(node)
@@ -121,7 +125,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     }
     for (const [key, registration] of batch.extensionOwners)
       this.extensionOwners.set(key, registration)
-    this.lanes.replace(batch)
+    for (const registration of installed) this.lanes.bindOwner(registration)
     batch.committed = true
     this.commit()
   }
@@ -171,13 +175,6 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       registration.installed &&
       registration.enabled &&
       this.registrations.get(registration.name) === registration
-    )
-  }
-
-  /** Current enabled registrations in stable installation order. */
-  enabledRegistrations(): readonly IRegistration<TDomainCore, TValue>[] {
-    return [...this.registrations.values()].filter(
-      (registration) => registration.enabled && !registration.suspended
     )
   }
 }

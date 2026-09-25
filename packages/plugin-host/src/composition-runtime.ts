@@ -127,6 +127,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       this.#port.allocateStageSlot()
     )
     this.#port.stageSlots.set(name, state)
+    this.#port.state.lanes.ensureSlot(state)
     return slot
   }
 
@@ -139,6 +140,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_SLOT_FOREIGN)
     if (state.retired) return
     state.retired = true
+    this.#port.state.lanes.retireSlot(state)
     if (this.#port.stageSlots.get(state.name) === state) this.#port.stageSlots.delete(state.name)
   }
 

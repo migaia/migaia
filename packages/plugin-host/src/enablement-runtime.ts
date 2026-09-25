@@ -96,10 +96,6 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
     if (!registration.enabled) return false
     this.#port.state.setEnabled(registration, false)
     this.#disabled.add(registration.name)
-    this.#port.state.lanes.rebuild(
-      this.#port.state.enabledRegistrations(),
-      this.#port.state.stageSlots
-    )
     registration.featureExposeValid = false
     this.#port.state.commit()
     this.#notify('onDisable', registration)
@@ -112,10 +108,6 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
     if (registration.suspended) return false
     this.#port.state.setSuspended(registration, true)
     registration.featureExposeValid = false
-    this.#port.state.lanes.rebuild(
-      this.#port.state.enabledRegistrations(),
-      this.#port.state.stageSlots
-    )
     this.#port.state.commit()
     return true
   }
@@ -127,10 +119,6 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
     this.#port.state.setEnabled(registration, true)
     this.#disabled.delete(registration.name)
     registration.featureExposeValid = true
-    this.#port.state.lanes.rebuild(
-      this.#port.state.enabledRegistrations(),
-      this.#port.state.stageSlots
-    )
     this.#port.state.commit()
     this.#notify('onEnable', registration)
     return true
