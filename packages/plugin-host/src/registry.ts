@@ -66,7 +66,7 @@ export type IRegistration<TDomainCore extends object, TValue> = {
    * restart) before recovery; its retained instance is stale, so recovery must reinstall it instead
    * of resuming or rebinding it.
    */
-  restartPending: boolean
+  stale: boolean
   lifecycle: (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]
   lifecycleController?: IAbortController
   operation?: IGenerationRequest
