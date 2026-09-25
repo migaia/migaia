@@ -75,7 +75,7 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
     /** Marks a retained suspended registration stale without releasing its instance. */
     const invalidate = (name: string): void => {
       const waiting = this.#port.state.registrations.get(name)
-      if (waiting) waiting.stale = true
+      if (waiting) this.#port.state.setStale(waiting, true)
     }
     for (const step of plan.steps)
       if (step.action === DependencyAction.invalidate) invalidate(step.id)
@@ -92,7 +92,7 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
       const registration = this.#port.state.registrations.get(step.id)
       if (!registration || restart.has(step.id)) continue
       if (step.action === DependencyAction.resume) {
-        registration.suspended = false
+        this.#port.state.setSuspended(registration, false)
         registration.featureExposeValid = true
       }
       if (step.action !== DependencyAction.rebind) continue
@@ -101,7 +101,7 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
           provider,
           providerRegistration.featureOutputs ?? Object.freeze({})
         )
-        registration.suspended = false
+        this.#port.state.setSuspended(registration, false)
         registration.featureExposeValid = true
       } catch (error) {
         hookErrors.push(error)
