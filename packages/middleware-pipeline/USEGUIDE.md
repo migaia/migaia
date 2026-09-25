@@ -192,7 +192,9 @@ const pipeline = createPipeline<string>({
 await pipeline.run(stages, payload, consume, { signal: request.signal })
 ```
 
-取消在入口、stage 边界和终点检查。取消错误保留原生类型、reason、`source`、`code` 和错误链。pipeline 不拥有 controller，也不关闭 host；创建与处置这些资源仍是调用方职责。
+四种 mode 都在进入 `run()`、每个 stage 开始前、每个 stage 返回后以及调用 `done` 前检查取消；generator 与 async-generator 还会在每次迭代后检查。已开始的 stage 不会被强制打断，应从收到的 `context.signal` 协作退出；原生 stage 与经 `lift()` 提升的 stage 收到同一个本次运行 signal。
+
+取消错误保留原生类型、reason、`source`、`code` 和错误链。用户代码已经抛出或拒绝普通失败时，该失败保持为主错误，后续取消检查不会替换它。async stage 与下游分别出现两个独立普通失败时，仍由 `combineStageAndDownstreamError` 组合，未提供组合器时产生 `EXECUTION_FAILED`。pipeline 不拥有 controller，也不关闭 host；创建与处置这些资源仍是调用方职责。
 
 `assertActive` 抛出的错误原样传播。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。
 

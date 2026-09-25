@@ -427,7 +427,7 @@ describe('signal round 2 contract', () => {
     expect(reasonReads).toBe(1)
   })
 
-  it('MP-T58 collapses nested downstream abort and preserves combiner call count for ordinary dual failure', async () => {
+  it('MP-T58 BC3 keeps an awaited downstream failure primary over a later abort and preserves combiner call count', async () => {
     const abort = new Error('abort')
     let aborted = false
     const input = {
@@ -456,7 +456,7 @@ describe('signal round 2 contract', () => {
       { onViolation: () => undefined, signal: input, combineStageAndDownstreamError: combine }
     )
     aborted = true
-    await expect(run).rejects.toBe(abort)
+    await expect(run).rejects.toBe(downstream)
     expect(combine).not.toHaveBeenCalled()
   })
 
@@ -484,7 +484,7 @@ describe('signal round 2 contract', () => {
     expect(combine).toHaveBeenCalledWith(stageFailure, downstreamFailure)
   })
 
-  it('MP-T58 preserves post-stage abort control over downstream failure', async () => {
+  it('MP-T58 BC3 keeps a downstream failure primary over a later post-stage abort', async () => {
     const abort = new Error('abort')
     const downstream = new Error('downstream')
     let aborted = false
@@ -513,7 +513,7 @@ describe('signal round 2 contract', () => {
         () => undefined,
         { onViolation: () => undefined, signal: input, combineStageAndDownstreamError: combine }
       )
-    ).rejects.toBe(abort)
+    ).rejects.toBe(downstream)
     expect(combine).not.toHaveBeenCalled()
   })
 

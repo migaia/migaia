@@ -118,6 +118,9 @@ await pipeline.run(stages, input, consume, { signal: request.signal })
 
 - `run()` 的 `control.signal` 优先于构造时的 `signal`。
 - 已取消的 signal 会保留原始 reason 与原生 AbortError 语义。
+- 四种 mode 都在进入 `run()`、每个 stage 开始前、每个 stage 返回后以及 `done` 前检查 signal；generator 类还会在每次迭代后检查。
+- 已开始的 stage 不会被强制打断；它可以从 `context.signal` 读取本次运行实际采用的 signal 并协作退出。
+- 用户代码已经抛出普通失败时，该失败保持为主错误，之后观察到的取消不会替换它；async stage 与下游分别失败时仍按组合器或 `EXECUTION_FAILED` 处理。
 - `assertActive` 在入口和每个 stage 之后执行，生命周期由 host 拥有。
 - 同一 stage 重复或返回后调用 `next()` 会报告 `duplicate` 或 `late`；默认处理器为空操作。
 - 同步与 generator 模式在调用栈内抛错；异步与 async-generator 模式返回 rejected Promise。
