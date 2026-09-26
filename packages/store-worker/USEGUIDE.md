@@ -22,7 +22,7 @@
 
 ## 1. 核心概念详解
 
-`@migaia/store-worker` 本身不实现任何通信协议——协议编解码、超时、取消、来源校验全部来自 `@migaia/web-rpc`，这个包只是把 web-rpc 的 `createEndpoint()`/`createWebWorkerTransport()` 按 Store 的两个具体场景（通用计算卸载、序列化编解码卸载）预先接好线。理解这个包，本质上是理解它怎么"抄近路"用 web-rpc：
+`@migaia/store-worker` 本身不实现任何通信协议——协议编解码、超时、取消、来源校验全部来自 `@migaia/rpc/core`，这个包只是把 RPC core 的 `createEndpoint()`/`createWebWorkerTransport()` 按 Store 的两个具体场景（通用计算卸载、序列化编解码卸载）预先接好线。理解这个包，本质上是理解它怎么"抄近路"用 RPC core：
 
 ### 1.1 主线程 ↔ Worker 是固定拓扑
 
@@ -51,7 +51,7 @@ export type ManagedRpcHandler = {
 };
 ```
 
-它本身**就是**一个函数——`self.onmessage = (event) => handler(event.data)` 是标准接法。之所以设计成"需要手动喂消息"而不是内部自动 `addEventListener`，是因为 Worker 侧的传输对象是包里手工搭的最小实现（`{ platform: 'Worker', peerId: 'main', send, subscribe }`），并不经过 `createWebWorkerTransport`——这样 Worker 侧就不需要引入完整的 web-rpc 适配器逻辑，胶水代码维持在几行以内。
+它本身**就是**一个函数——`self.onmessage = (event) => handler(event.data)` 是标准接法。之所以设计成"需要手动喂消息"而不是内部自动 `addEventListener`，是因为 Worker 侧的传输对象是包里手工搭的最小实现（`{ platform: 'Worker', peerId: 'main', send, subscribe }`），并不经过 `createWebWorkerTransport`——这样 Worker 侧就不需要引入完整的 RPC core 适配器逻辑，胶水代码维持在几行以内。
 
 ### 1.4 `IWorkerPort` / `IWorkerLike`
 
@@ -94,7 +94,7 @@ class WorkerAdapter {
 ```
 
 - **`port`**：满足 `IWorkerPort` 的对象，通常直接传 `new Worker(...)`。
-- **`options.clientId`**：本端在 web-rpc 拓扑里的 `id`，默认 `'main'`。同一个 Worker 如果被多个 `WorkerAdapter` 实例共用（不推荐，见下方注意事项），需要传不同的 `clientId` 区分。
+- **`options.clientId`**：本端在 RPC core 拓扑里的 `id`，默认 `'main'`。同一个 Worker 如果被多个 `WorkerAdapter` 实例共用（不推荐，见下方注意事项），需要传不同的 `clientId` 区分。
 - **`options.timeoutMs`**：请求默认超时（毫秒）。省略时不设默认超时——单次 `request()` 一直等对方响应，可以在 `request()` 调用点传 `signal` 自行控制取消。
 - **`request<Input, Output>(payload, options)`**：发起一次 `'call'` RPC 调用。入口会在返回 Promise 前一次性读取 `options.signal`/`options.transfer`，endpoint 尚未就绪期间不再读取调用者对象；getter 失败或非法 options 以带 `INVALID_OPTION` 的 rejected Promise 返回并保留 `cause`。`signal` 用于取消，`transfer` 指定零拷贝转移列表（比如 `Uint8Array.buffer`）。
 - **构造是异步的，但构造函数本身同步返回**：`createEndpoint()` 内部是异步的（要跑完中间件安装），`WorkerAdapter` 把这个 Promise 存在私有字段里，`request()` 会先 `await` 它再发请求——调用方不需要显式等待"连接就绪"，直接 `new WorkerAdapter(worker).request(...)` 就能用。
@@ -118,9 +118,9 @@ function createWorkerHandler<Input, Output>(
 - **`compute`**：真正干活的函数，接收主线程传来的 `payload` 和一个 `{ signal }` 上下文——`signal` 在调用方取消/超时时触发，`compute` 内部如果是可中断的长任务，应该监听它并尽早退出（框架不会强行中断正在跑的同步/异步代码，只是让最终结果被丢弃、返回给一个已经不再等待的调用方）。
 - **`postMessage`**：Worker 侧真正发消息出去的函数，通常传 `(message) => self.postMessage(message)`。之所以是参数而不是包内部写死 `self.postMessage`，是为了同一份实现能在真正的 Worker、`SharedWorker` 的某个 `port`、甚至单元测试的内存桩上复用。
 - **`options.timeoutMs`**：Worker 侧对每次请求处理设的超时（一般主线程侧的 `timeoutMs` 已经够用，Worker 侧这个是双保险）。
-- **返回值**：一个 `ManagedRpcHandler`，需要手动接上 `self.onmessage = (event) => { void handler(event.data); }`（返回的 Promise 通常不需要显式处理——错误会被 web-rpc 转成 RPC 失败响应发回主线程，不会变成 unhandled rejection）。
+- **返回值**：一个 `ManagedRpcHandler`，需要手动接上 `self.onmessage = (event) => { void handler(event.data); }`（返回的 Promise 通常不需要显式处理——错误会被 RPC core 转成 RPC 失败响应发回主线程，不会变成 unhandled rejection）。
 
-内部实现上，`provide('call', ...)` 里对 `compute` 的调用结果统一走 `context.success(...)` 包装；`compute` 抛出的异常由 web-rpc 端点框架捕获并转成失败响应，不会让异常逃逸成 Worker 全局的 unhandled error。
+内部实现上，`provide('call', ...)` 里对 `compute` 的调用结果统一走 `context.success(...)` 包装；`compute` 抛出的异常由 RPC core 端点框架捕获并转成失败响应，不会让异常逃逸成 Worker 全局的 unhandled error。
 
 ---
 
@@ -140,7 +140,7 @@ await handler.dispose(); // 先 close()，再等底层端点初始化并 dispose
 
 - **`handler(message)`**：`disposed === true` 时直接返回 `Promise<void>`（resolve），不会处理也不会报错——这是有意的静默丢弃：`close()`/`dispose()` 之后 Worker 可能还会因为消息队列里的残留消息被再调用一次，不应该因此抛错。
 - **`pendingCount`**：每次调用 `handler(message)` admission 时 +1，等待 endpoint 并同步交付消息后 -1。它是 inbound dispatch 指标，**不代表 provider compute 已完成**，也不能作为 `Worker.terminate()` 的 quiescence 门禁；真正的 provider drain/cleanup 由 Web RPC endpoint 拥有，终止前必须等待 `handler.dispose()` 完成。
-- **`close()` vs `dispose()`**：`close()` 同步标记 `disposed = true`，只负责"停止接受新消息"，不触发任何用户清理；`dispose()` 是唯一异步释放入口，内部先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`，清理失败时会把错误 reject 出来（错误形态与 `@migaia/web-rpc` 的 `endpoint.dispose()` 一致，是 `WebRpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——`close()` 重复调用是无操作；`dispose()` 多次调用复用同一个 Promise，不会重复触发清理。
+- **`close()` vs `dispose()`**：`close()` 同步标记 `disposed = true`，只负责"停止接受新消息"，不触发任何用户清理；`dispose()` 是唯一异步释放入口，内部先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`，清理失败时会把错误 reject 出来（错误形态与 `@migaia/rpc/core` 的 `endpoint.dispose()` 一致，是 `WebRpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——`close()` 重复调用是无操作；`dispose()` 多次调用复用同一个 Promise，不会重复触发清理。
 
 ---
 
@@ -208,7 +208,7 @@ type IWorkerPluginOptions = {
 | `type`               | `'worker'` | 写进 `ISerializePlugin.type` 的注册表格式标签，需要和读取这份存档时用的标签一致                                     |
 | `terminateOnDispose` | `false`    | `dispose()` 时是否顺带调用 `worker.terminate?.()`。外部传入的 Worker 默认被认为归调用方所有，不由这个包代管生命周期 |
 | `ownership`          | `'copy'`   | 字节数据过边界时是复制还是零拷贝转移，见 [§8](#8-字节转移语义ibyteownership)                                        |
-| `clientId`           | `'main'`   | 本端在 web-rpc 拓扑里的 `id`                                                                                        |
+| `clientId`           | `'main'`   | 本端在 RPC core 拓扑里的 `id`                                                                                        |
 
 ### 6.2 `workerParser(options): ISerializeParser`
 
@@ -249,7 +249,7 @@ Worker 侧的对端：把一个**普通的、跑在 Worker 里就地工作的** 
 
 - **`encode` 阶段**：不管主线程送来的是 `value` 段还是 `bytes` 段，转发给 `parser.encode()` 的都是段里的**负载本身**（`chunk[1]`），不是整个 `ISerializeChunk`。`parser.encode()` 的返回值可能是单段、`Promise`，或者（同步/异步）可迭代对象——多段的情况会在 Worker 本地就地拼装（见下方 §6.5），不会把结果原样透传回一堆分散的段。
 - **`decode` 阶段**：`parser.decode()` 解出来的值如果是 `Uint8Array`，按 `['bytes', value]` 回包（才能走 transfer）；否则按 `['value', value]` 回包（退化为结构化克隆）。
-- **异常处理**：`parser.encode`/`decode` 抛出的异常，以及送进来的 `chunk` 不满足 `isChunkShape` 校验的情况，都会直接 `throw`——和 `createWorkerHandler` 一样，由 web-rpc 端点框架统一捕获转成 RPC 失败响应，不会变成 Worker 的 unhandled error。
+- **异常处理**：`parser.encode`/`decode` 抛出的异常，以及送进来的 `chunk` 不满足 `isChunkShape` 校验的情况，都会直接 `throw`——和 `createWorkerHandler` 一样，由 RPC core 端点框架统一捕获转成 RPC 失败响应，不会变成 Worker 的 unhandled error。
 
 ### 6.5 多段结果的本地拼装
 
@@ -336,7 +336,7 @@ throw createStoreWorkerAggregateError(
 
 签名：`(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string) => AggregateError`。构造 `AggregateError(errors, message)`，`errors` 原样保留在结果的 `errors` 字段（顺序不变），同样贴上 `(source, code)` 身份。包内唯一的实际调用点是 `workerParser().dispose()`——endpoint 清理与 `terminateOnDispose: true` 时的 `worker.terminate()` 若同时失败，两个原始错误都会被保留在 `errors[]` 里，不会只保留其中一个。
 
-`STORE_WORKER_SOURCE`（`'@migaia/store-worker'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误（例如把它和 `@migaia/web-rpc` 的 `WebRpcError`——`source: '@migaia/web-rpc'`——区分开）。
+`STORE_WORKER_SOURCE`（`'@migaia/store-worker'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误（例如把它和 `@migaia/rpc/core` 的 `WebRpcError`——`source: '@migaia/rpc/core'`——区分开）。
 
 ---
 
@@ -366,7 +366,7 @@ type IByteOwnership = 'copy' | 'transfer';
 
 ### 8.1 通用 RPC 错误
 
-`WorkerAdapter.request()`、`workerComputed` 内部、`createSerializeWorkerHandler` 之外的路径，抛出的错误都是标准 `@migaia/web-rpc` 的 `WebRpcError`（`METHOD_NOT_FOUND`、`DEADLINE_EXCEEDED`、`TRANSPORT`、`CANCELLED` 等），完整错误码表见 [`@migaia/web-rpc` 的 USEGUIDE](../web-rpc/USEGUIDE.md#8-错误处理)。判断时按 `error.code` 分支，不要依赖 `error.message` 或具体子类。
+`WorkerAdapter.request()`、`workerComputed` 内部、`createSerializeWorkerHandler` 之外的路径，抛出的错误都是标准 `@migaia/rpc/core` 的 `WebRpcError`（`METHOD_NOT_FOUND`、`DEADLINE_EXCEEDED`、`TRANSPORT`、`CANCELLED` 等），完整错误码表见 [`@migaia/rpc/core` 的 USEGUIDE](../rpc/USEGUIDE.md#8-错误处理)。判断时按 `error.code` 分支，不要依赖 `error.message` 或具体子类。
 
 ### 8.2 `workerParser` 的 abort 特殊处理
 
@@ -386,7 +386,7 @@ class SerializeError extends Error {
 
 ### 8.3 Worker 侧异常不会静默丢失
 
-不管是 `createWorkerHandler` 的 `compute`,还是 `createSerializeWorkerHandler` 包裹的 `parser`,内部抛出的任何异常都会被 web-rpc 端点框架捕获、转成一次 RPC 失败响应发回主线程,主线程对应的 `request()`/`send()` 调用会以该错误 reject——不存在"Worker 内部炸了但主线程的 Promise 永远不 settle"的情况(前提是没有关掉 `timeout()`/网络层面自身没有异常断连,那类情况由 web-rpc 的 `onTransportError` 机制兜底,同样会让挂起请求失败,不会无限等待)。
+不管是 `createWorkerHandler` 的 `compute`,还是 `createSerializeWorkerHandler` 包裹的 `parser`,内部抛出的任何异常都会被 RPC core 端点框架捕获、转成一次 RPC 失败响应发回主线程,主线程对应的 `request()`/`send()` 调用会以该错误 reject——不存在"Worker 内部炸了但主线程的 Promise 永远不 settle"的情况(前提是没有关掉 `timeout()`/网络层面自身没有异常断连,那类情况由 RPC core 的 `onTransportError` 机制兜底,同样会让挂起请求失败,不会无限等待)。
 
 ---
 
@@ -510,7 +510,7 @@ registry.dispose(); // 连带 dispose workerParser 的端点,并 terminate worke
 
 ---
 
-如果本文没有回答你的问题,`@migaia/web-rpc` 的 [USEGUIDE.md](../web-rpc/USEGUIDE.md) 覆盖了协议层(超时、取消、错误码、生命周期)的完整细节;`@migaia/resource`、`@migaia/serialize` 各自的文档覆盖 `Resource`/序列化注册表本身的行为。
+如果本文没有回答你的问题,`@migaia/rpc/core` 的 [USEGUIDE.md](../rpc/USEGUIDE.md) 覆盖了协议层(超时、取消、错误码、生命周期)的完整细节;`@migaia/resource`、`@migaia/serialize` 各自的文档覆盖 `Resource`/序列化注册表本身的行为。
 
 ## 13. 构建、格式化与测试
 

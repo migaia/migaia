@@ -1,6 +1,6 @@
 # `@migaia/store-worker`
 
-把 Store 的响应式计算和序列化编解码搬到 Worker 里跑：主线程用几乎和调本地异步函数一样的写法把耗时工作丢给 Worker，同时保留 `@migaia/resource` 的 `Resource` 的取消、去重、缓存能力。本包**不实现**任何消息协议——协议、超时、取消、来源校验全部来自 `@migaia/web-rpc`，这里只负责把这些通用能力接到 Store 生态的两个具体场景上：通用计算卸载(`WorkerAdapter`/`workerComputed`)与序列化编解码卸载(`workerPlugin`)。
+把 Store 的响应式计算和序列化编解码搬到 Worker 里跑：主线程用几乎和调本地异步函数一样的写法把耗时工作丢给 Worker，同时保留 `@migaia/resource` 的 `Resource` 的取消、去重、缓存能力。本包**不实现**任何消息协议——协议、超时、取消、来源校验全部来自 `@migaia/rpc/core`，这里只负责把这些通用能力接到 Store 生态的两个具体场景上：通用计算卸载(`WorkerAdapter`/`workerComputed`)与序列化编解码卸载(`workerPlugin`)。
 
 ## 适用与不适用场景
 
@@ -8,7 +8,7 @@
 
 **不适用**：计算量小、同步就能算完的派生逻辑——引入 Worker 通信本身有固定的序列化和消息往返成本，小任务过 Worker 反而更慢；对象图(非纯字节)走 Worker 编解码同样不划算，实测比主线程直接做还慢一倍(见[性能特征](#性能特征))。
 
-依赖 `@migaia/reactive`、`@migaia/resource`、`@migaia/serialize`、`@migaia/web-rpc`、`@migaia/utils`(均为 workspace 依赖，随包一起装好)。
+依赖 `@migaia/reactive`、`@migaia/resource`、`@migaia/serialize`、`@migaia/rpc`、`@migaia/utils`(均为 workspace 依赖，随包一起装好)。
 
 ## 安装
 
@@ -56,7 +56,7 @@ adapter.dispose();
 
 `options` 全部字段：
 
-- `clientId?: string` —— 本端在 web-rpc 拓扑里的 id，默认 `'main'`
+- `clientId?: string` —— 本端在 RPC 拓扑里的 id，默认 `'main'`
 - `timeoutMs?: number` —— 请求默认超时(毫秒)，省略时不设默认超时
 
 实例方法：
@@ -92,7 +92,7 @@ self.onmessage = (event) => {
 
 签名：`<Input, Output>(compute, postMessage, options?) => IManagedRpcHandler`。
 
-- `compute: (payload: Input, context: { signal: IWebRpcAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 web-rpc 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error
+- `compute: (payload: Input, context: { signal: IWebRpcAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error
 - `postMessage: (message: unknown) => void`（必填）—— Worker 侧发消息回主线程的函数，通常传 `(message) => self.postMessage(message)`
 - `options.timeoutMs?: number` —— Worker 侧对每次请求处理设的超时，默认不设
 
@@ -185,7 +185,7 @@ const chunk = await registry.encode(largeBytePayload);
 - `type?: string` —— 写进 `ISerializePlugin.type` 的注册表格式标签，默认 `'worker'`
 - `terminateOnDispose?: boolean` —— `dispose()` 时是否顺带 `worker.terminate?.()`，默认 `false`(外部传入的 Worker 默认归调用方所有)
 - `ownership?: 'copy' | 'transfer'` —— 字节数据过边界时复制还是零拷贝转移，默认 `'copy'`
-- `clientId?: string` —— 本端在 web-rpc 拓扑里的 id，默认 `'main'`
+- `clientId?: string` —— 本端在 RPC 拓扑里的 id，默认 `'main'`
 
 **`workerParser`｜5 秒上手** —— `workerPlugin` 内部使用的主线程侧 `ISerializeParser` 实现，也可单独使用：
 

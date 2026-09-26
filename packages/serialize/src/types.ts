@@ -2,8 +2,8 @@
  * 结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal`
  * 类型的运行时里可用。
  *
- * 故意在这里复制一份而不是从 `@migaia/web-rpc` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层
- * codec 原语，web-rpc 是更上层的 传输库，反过来依赖它会把依赖方向倒过来，也会让只想用 codec、不碰 RPC 的消费方 在依赖图上被迫挂上整个 web-rpc 包。
+ * 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层
+ * codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。
  */
 import {
   SERIALIZE_SOURCE,

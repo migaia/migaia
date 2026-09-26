@@ -1,4 +1,4 @@
-import type { IWebRpcEndpoint } from '@migaia/web-rpc'
+import type { IWebRpcEndpoint } from '@migaia/rpc/core'
 
 /**
  * Worker 侧托管的 RPC 消息处理器。

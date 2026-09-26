@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
-import { WebRpcRemoteError, type IWebRpcAbortSignal, type IWebRpcEndpoint } from '@migaia/web-rpc'
+import { WebRpcRemoteError, type IWebRpcAbortSignal, type IWebRpcEndpoint } from '@migaia/rpc/core'
 import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
 import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
@@ -119,7 +119,7 @@ describe('store-worker exports', () => {
       expect(received).toMatchObject({
         name: 'WebRpcRemoteError',
         message: 'Provider failed',
-        source: '@migaia/web-rpc',
+        source: '@migaia/rpc/core',
         code: 'INTERNAL',
         cause: expect.any(Error)
       })
@@ -130,7 +130,7 @@ describe('store-worker exports', () => {
       expect(cause).toMatchObject({
         name: providerFailure.name,
         message: providerFailure.message,
-        source: '@migaia/web-rpc',
+        source: '@migaia/rpc/core',
         code: 'INTERNAL'
       })
       expect((cause as Error).stack).toBe(providerFailure.stack)
@@ -153,7 +153,7 @@ describe('store-worker exports', () => {
       expect(received).toMatchObject({
         name: 'WebRpcRemoteError',
         message: 'Provider failed',
-        source: '@migaia/web-rpc',
+        source: '@migaia/rpc/core',
         code: 'INTERNAL',
         cause: expect.any(TypeError)
       })
@@ -164,7 +164,7 @@ describe('store-worker exports', () => {
       expect(cause).toMatchObject({
         name: primary.name,
         message: primary.message,
-        source: '@migaia/web-rpc',
+        source: '@migaia/rpc/core',
         code: 'INTERNAL'
       })
       expect((cause as Error).stack).toBe(primary.stack)

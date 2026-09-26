@@ -9,13 +9,13 @@ import { defineCBORCodec } from '../src/codecs/cbor.js'
 import { defineJsonCodec } from '../src/codecs/json.js'
 import { defineMessagePackCodec } from '../src/codecs/message-pack.js'
 import { defineProtobufCodec } from '../src/codecs/protobuf.js'
-import { rpcProtocolV1 } from '../../rpc-contract/dist/index.js'
+import { rpcProtocolV1 } from '../../rpc/dist/contract/index.js'
 import {
   rpcEnvelopeDescriptorBase64,
   RpcEnvelopeSchema,
   type IRpcEnvelopeMessage
 } from './fixtures/rpc-envelope-schema.js'
-import { createRpcProtobufPayloadCodec } from '../../web-rpc/test/interop/rpc-protobuf-payload.mjs'
+import { createRpcProtobufPayloadCodec } from '../../rpc/test/core/interop/rpc-protobuf-payload.mjs'
 import type { ICodecValue } from '../src/codec.js'
 
 type ICanonicalVector = Readonly<{ id: string; value: ICodecValue }>
@@ -32,15 +32,12 @@ type IDescriptorModule = Readonly<{
 
 /** Canonical values shared with the runtime-neutral contract vector corpus. */
 const canonicalDocument = JSON.parse(
-  readFileSync(
-    resolve(import.meta.dirname, '../../rpc-contract/schema/vectors/canonical.json'),
-    'utf8'
-  )
+  readFileSync(resolve(import.meta.dirname, '../../rpc/schema/vectors/canonical.json'), 'utf8')
 ) as ICanonicalDocument
 
 /** Normative schema text used to create an independent protobufjs binding. */
 const protobufSchema = readFileSync(
-  resolve(import.meta.dirname, '../../rpc-contract/schema/rpc-v1.proto'),
+  resolve(import.meta.dirname, '../../rpc/schema/rpc-v1.proto'),
   'utf8'
 )
 
@@ -280,7 +277,7 @@ describe('independent codec interoperability', () => {
         thrown = error
       }
       expect(thrown).toMatchObject({
-        source: '@migaia/rpc-contract',
+        source: '@migaia/rpc/contract',
         code: 'INVALID_ENVELOPE'
       })
       expect((thrown as Error).cause).toBeDefined()

@@ -39,10 +39,9 @@
   "dependencies": {
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
-    "@migaia/rpc-contract": "workspace:^",
+    "@migaia/rpc": "workspace:^",
     "@migaia/serialize": "workspace:^",
-    "@migaia/utils": "workspace:^",
-    "@migaia/web-rpc": "workspace:^"
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

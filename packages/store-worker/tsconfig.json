@@ -6,8 +6,10 @@
     "paths": {
       "@migaia/resource": ["../resource/dist/index.d.ts"],
       "@migaia/serialize": ["../serialize/dist/index.d.ts"],
-      "@migaia/web-rpc": ["../web-rpc/dist/index.d.ts"],
-      "@migaia/web-rpc/*": ["../web-rpc/dist/adapters/*.d.ts"]
+      "@migaia/rpc/contract": ["../rpc/dist/contract/index.d.ts"],
+      "@migaia/rpc/core": ["../rpc/dist/core/index.d.ts"],
+      "@migaia/rpc/core/*": ["../rpc/dist/core/*.d.ts"],
+      "@migaia/rpc/browser/adapters/*": ["../rpc/dist/browser/adapters/*.d.ts"]
     }
   },
   "include": ["src", "test"]
