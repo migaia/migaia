@@ -3,35 +3,35 @@ import { ReplayWindow } from '../../../src/core/internal/replay.js'
 
 describe('ReplayWindow', () => {
   it('rejects non-positive or unsafe replay limits', () => {
-    expect(() => new ReplayWindow(0, 1)).toThrow()
-    expect(() => new ReplayWindow(1, Number.POSITIVE_INFINITY)).toThrow()
+    expect(() => new ReplayWindow(() => Date.now(), 0, 1)).toThrow()
+    expect(() => new ReplayWindow(() => Date.now(), 1, Number.POSITIVE_INFINITY)).toThrow()
   })
 
   it('rejects fresh entries independently at each capacity boundary', () => {
-    const window = new ReplayWindow(2, 10_000)
+    const window = new ReplayWindow(() => Date.now(), 2, 10_000)
     expect(window.reserveId('a')).toBe(true)
     expect(window.reserveId('b')).toBe(true)
     expect(window.reserveId('c')).toBe(false)
-    const second = new ReplayWindow(2, 10_000)
+    const second = new ReplayWindow(() => Date.now(), 2, 10_000)
     second.reserveId('id')
     expect(second.hasReservedId('id')).toBe(true)
   })
 
   it('clears both replay namespaces', () => {
-    const window = new ReplayWindow()
+    const window = new ReplayWindow(() => Date.now())
     window.reserveId('id')
     window.clear()
     expect(window.hasReservedId('id')).toBe(false)
   })
 
   it('exposes immutable capacity for independent replay namespaces', () => {
-    const window = new ReplayWindow(2, 10_000)
+    const window = new ReplayWindow(() => Date.now(), 2, 10_000)
     expect(window.maxEntries).toBe(2)
   })
   it('keeps an active identifier reserved past the retention window', () => {
     vi.useFakeTimers()
     try {
-      const window = new ReplayWindow(1, 100)
+      const window = new ReplayWindow(() => Date.now(), 1, 100)
       expect(window.reserveId('id')).toBe(true)
       vi.advanceTimersByTime(100)
       expect(window.hasReservedId('id')).toBe(true)
@@ -44,7 +44,7 @@ describe('ReplayWindow', () => {
   it('moves a released identifier to a tombstone until the replay window expires', () => {
     vi.useFakeTimers()
     try {
-      const window = new ReplayWindow(1, 100)
+      const window = new ReplayWindow(() => Date.now(), 1, 100)
       expect(window.reserveId('id')).toBe(true)
       window.releaseId('id')
       window.releaseId('id')
@@ -59,7 +59,7 @@ describe('ReplayWindow', () => {
   })
 
   it('expires an active identifier without creating a second tombstone', () => {
-    const window = new ReplayWindow(1, 10_000)
+    const window = new ReplayWindow(() => Date.now(), 1, 10_000)
     expect(window.reserveId('id')).toBe(true)
     window.expireId('id')
     expect(window.hasReservedId('id')).toBe(false)
@@ -67,7 +67,7 @@ describe('ReplayWindow', () => {
   })
 
   it('does not let released tombstones evade the bounded namespace', () => {
-    const window = new ReplayWindow(1, 10_000)
+    const window = new ReplayWindow(() => Date.now(), 1, 10_000)
     expect(window.reserveId('id')).toBe(true)
     window.releaseId('id')
     expect(window.reserveId('other')).toBe(false)
@@ -76,7 +76,7 @@ describe('ReplayWindow', () => {
   it('expires released tombstones but never active ids after the replay window', () => {
     vi.useFakeTimers()
     try {
-      const window = new ReplayWindow(2, 100)
+      const window = new ReplayWindow(() => Date.now(), 2, 100)
       window.reserveId('id')
       expect(window.hasReservedId('id')).toBe(true)
 

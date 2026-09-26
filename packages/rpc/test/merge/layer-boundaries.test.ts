@@ -6,16 +6,10 @@ import { describe, expect, it } from 'vitest'
 
 /** Source root whose dependency direction is enforced by A2. */
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../src')
-/** Browser dependencies on core allowed before transport-kit exists. */
-const browserCoreAllowlist = new Set([
-  'core/transport.ts',
-  'core/transport-constants.ts',
-  'core/errors.ts',
-  'core/error-text.ts',
-  'core/internal/listener-safety.ts',
-  'core/internal/message-listener-hub.ts',
-  'core/internal/safe-value.ts'
-])
+/** Only byte classification and error identity utilities may cross into contract. */
+const contractBareAllowlist = new Set(['@migaia/utils/bytes', '@migaia/utils/error'])
+/** Published adapter boundary: shared primitives, errors, and local text only. */
+const browserCoreAllowlist = new Set(['core/transport-kit.ts', 'core/errors.ts'])
 
 /** Return each import or re-export that violates the contract/core/browser direction. */
 function layerViolations(file: string, source: string): string[] {
@@ -31,11 +25,16 @@ function layerViolations(file: string, source: string): string[] {
     const target = isRelative ? relative(sourceRoot, resolved).split(sep).join('/') : ''
     const outside = isRelative && (target === '..' || target.startsWith('../'))
     let invalid = !isRelative && specifier.startsWith('@migaia/rpc/')
-    if (owner === 'contract') invalid ||= !isRelative || outside || !target.startsWith('contract/')
+    if (owner === 'contract')
+      invalid ||= isRelative
+        ? outside || !target.startsWith('contract/')
+        : !contractBareAllowlist.has(specifier)
     if (owner === 'core') invalid ||= outside || target.startsWith('browser/')
     if (owner === 'browser') {
       invalid ||=
-        outside || !isRelative || (target.startsWith('core/') && !browserCoreAllowlist.has(target))
+        outside ||
+        (!isRelative && specifier !== '@migaia/utils/bytes') ||
+        (target.startsWith('core/') && !browserCoreAllowlist.has(target))
     }
     if (isRelative && extname(specifier) !== '.js') invalid = true
     if (invalid) failures.push(`${relative(sourceRoot, file)}: ${specifier}`)
@@ -74,8 +73,11 @@ describe('A2 layer dependency direction', () => {
   })
 
   it.each([
+    ['contract byte utility', 'contract/normalize.ts', "import '@migaia/utils/bytes'"],
+    ['contract error utility', 'contract/contract-error.ts', "import '@migaia/utils/error'"],
     ['browser sibling', 'browser/adapters/window.ts', "import './broadcast-channel.js'"],
-    ['browser approved core', 'browser/adapters/window.ts', "import '../../core/transport.js'"]
+    ['browser approved core', 'browser/adapters/window.ts', "import '../../core/transport-kit.js'"],
+    ['browser bytes', 'browser/adapters/web-transport.ts', "import '@migaia/utils/bytes'"]
   ])('accepts %s', (_case, file, source) => {
     expect(layerViolations(join(sourceRoot, file), source)).toEqual([])
   })

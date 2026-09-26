@@ -6,15 +6,15 @@ import {
   EndpointKernelState,
   type IEndpointKernelCallbacks
 } from '../../src/core/endpoint-kernel.js'
-import { WebRpcErrorCode } from '../../src/core/errors.js'
-import type { IWebRpcInboundMessage, IWebRpcTransport } from '../../src/core/transport.js'
+import { RpcCoreErrorCode } from '../../src/core/errors.js'
+import type { IRpcInboundMessage, IRpcTransport } from '../../src/core/transport.js'
 import { createEndpointTransportActivation } from '../../src/core/internal/transport-activation.js'
-import { WebRpcCanonicalChunkAttachment } from '../../src/core/internal/canonical-chunk-attachment.js'
+import { RpcCanonicalChunkAttachment } from '../../src/core/internal/canonical-chunk-attachment.js'
 import { createStringFramer } from '../../src/contract/framing/index.js'
 
 /** Creates callbacks that expose transport ownership without adding feature behavior. */
 const callbacks = (
-  receive: (message: IWebRpcInboundMessage<unknown>) => void = () => undefined
+  receive: (message: IRpcInboundMessage<unknown>) => void = () => undefined
 ): IEndpointKernelCallbacks => ({
   receive,
   transportError: () => undefined,
@@ -94,7 +94,7 @@ describe('canonical endpoint kernel', () => {
             }
           })
         : kernel
-      new WebRpcCanonicalChunkAttachment(attachmentKernel, createStringFramer({ chunkBytes: 64 }))
+      new RpcCanonicalChunkAttachment(attachmentKernel, createStringFramer({ chunkBytes: 64 }))
       return kernel
     }
 
@@ -136,7 +136,7 @@ describe('canonical endpoint kernel', () => {
     const first = new Error('first')
     const second = new Error('second')
     const reasons: unknown[] = []
-    new WebRpcCanonicalChunkAttachment(kernel, {
+    new RpcCanonicalChunkAttachment(kernel, {
       ...native,
       close: (reason) => {
         reasons.push(reason)
@@ -181,9 +181,9 @@ describe('canonical endpoint kernel', () => {
 
   it('owns one receiver, constant-time routes, and one terminal Promise', async () => {
     const events: string[] = []
-    let listener: ((message: IWebRpcInboundMessage<unknown>) => void) | undefined
+    let listener: ((message: IRpcInboundMessage<unknown>) => void) | undefined
     const receive = vi.fn()
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       platform: 'Memory',
       ownership: 'owned',
       send: () => {
@@ -216,7 +216,7 @@ describe('canonical endpoint kernel', () => {
     } catch (error) {
       routeConflict = error
     }
-    expect(routeConflict).toMatchObject({ code: WebRpcErrorCode.capabilityConflict })
+    expect(routeConflict).toMatchObject({ code: RpcCoreErrorCode.capabilityConflict })
     releaseRoute()
     await expect(kernel.dispatchRoute('request', {})).resolves.toBe(false)
 
@@ -267,7 +267,7 @@ describe('canonical endpoint kernel', () => {
     const receive = vi.fn()
     const transportError = vi.fn()
     const listenerError = vi.fn()
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       platform: 'Memory',
       send: () => undefined,
       subscribe: (next) => {

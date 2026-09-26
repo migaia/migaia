@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { WebRpcErrorCode } from '../../../src/core/errors.js'
+import { RpcCoreErrorCode } from '../../../src/core/errors.js'
 import { contract } from '../../../src/core/middleware/contract.js'
-import { WebRpcPortName } from '../../../src/core/internal/plugin-shared-keys.js'
+import { RpcPortName } from '../../../src/core/internal/plugin-shared-keys.js'
 import type {
-  IWebRpcContractConfig,
-  IWebRpcPluginInstallResult,
-  IWebRpcPluginInstallScope
+  IRpcContractConfig,
+  IRpcPluginInstallResult,
+  IRpcPluginInstallScope
 } from '../../../src/core/typing.js'
 
-function scope(): IWebRpcPluginInstallScope {
+function scope(): IRpcPluginInstallScope {
   const transport = { platform: 'Memory' as const, send() {}, subscribe: () => () => undefined }
   return {
     id: 'a',
@@ -20,9 +20,9 @@ function scope(): IWebRpcPluginInstallScope {
   }
 }
 
-function install(config: IWebRpcContractConfig) {
-  const result = contract(config).install(scope()) as IWebRpcPluginInstallResult
-  return result.ports[WebRpcPortName.contract] as {
+function install(config: IRpcContractConfig) {
+  const result = contract(config).install(scope()) as IRpcPluginInstallResult
+  return result.ports[RpcPortName.contract] as {
     validateData: (method: string, side: 'params' | 'result', data: unknown) => void
   }
 }
@@ -66,18 +66,18 @@ describe('contract plugin', () => {
   it('rejects malformed schema and version descriptors during installation', () => {
     expect(() =>
       install({ schemas: { add: { params: {} as never, result: {} as never } } })
-    ).toThrow(expect.objectContaining({ code: WebRpcErrorCode.invalidConfig }))
+    ).toThrow(expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig }))
     expect(() => install({ acceptVersions: [1] as never })).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
     expect(() => install({ acceptVersions: 1 as never })).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
     expect(() => install(null as never)).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
     expect(() => install('invalid' as never)).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
 
@@ -91,7 +91,7 @@ describe('contract plugin', () => {
       }
     )
     expect(() => install(unreadable as never)).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
 

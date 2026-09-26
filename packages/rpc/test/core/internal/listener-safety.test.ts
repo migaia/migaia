@@ -9,26 +9,26 @@ import {
   reportListenerFailure,
   releaseListeners
 } from '../../../src/core/internal/listener-safety.js'
-import { WEBRPC_SOURCE, WebRpcErrorCode, WebRpcLifecycleError } from '../../../src/core/errors.js'
+import {
+  RPC_CORE_ERROR_SOURCE,
+  RpcCoreErrorCode,
+  RpcLifecycleError
+} from '../../../src/core/errors.js'
 
 describe('listener safety', () => {
   it('preserves an exact pre-tagged WebRPC error at a different cleanup boundary', () => {
     const cause = new Error('endpoint primary')
     const cleanupErrors = [{ resource: 'endpoint cleanup', error: new Error('cleanup') }]
-    const lifecycleError = new WebRpcLifecycleError(
-      'endpoint disposal failed',
-      cause,
-      cleanupErrors
-    )
+    const lifecycleError = new RpcLifecycleError('endpoint disposal failed', cause, cleanupErrors)
 
     const failure = createListenerFailure([lifecycleError], {
-      code: WebRpcErrorCode.transport
+      code: RpcCoreErrorCode.transport
     })
 
     expect(failure).toBe(lifecycleError)
     expect(failure).toMatchObject({
-      source: WEBRPC_SOURCE,
-      code: WebRpcErrorCode.endpointDisposed,
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.endpointDisposed,
       cause,
       cleanupErrors
     })
@@ -36,53 +36,53 @@ describe('listener safety', () => {
     const foreign = new Error('foreign identity')
     Object.defineProperties(foreign, {
       source: { value: '@foreign/rpc' },
-      code: { value: WebRpcErrorCode.endpointDisposed }
+      code: { value: RpcCoreErrorCode.endpointDisposed }
     })
-    expect(() => createListenerFailure([foreign], { code: WebRpcErrorCode.transport })).toThrow(
+    expect(() => createListenerFailure([foreign], { code: RpcCoreErrorCode.transport })).toThrow(
       TypeError
     )
 
     const invalidCode = new Error('invalid WebRPC identity')
     Object.defineProperties(invalidCode, {
-      source: { value: WEBRPC_SOURCE },
+      source: { value: RPC_CORE_ERROR_SOURCE },
       code: { value: 'NOT_A_WEBRPC_CODE' }
     })
-    expect(() => createListenerFailure([invalidCode], { code: WebRpcErrorCode.transport })).toThrow(
-      TypeError
-    )
+    expect(() =>
+      createListenerFailure([invalidCode], { code: RpcCoreErrorCode.transport })
+    ).toThrow(TypeError)
   })
 
   it('tags an exact bare single error with the cleanup boundary identity', () => {
     const bare = new Error('bare cleanup')
 
     const failure = createListenerFailure([bare], {
-      code: WebRpcErrorCode.transport
+      code: RpcCoreErrorCode.transport
     })
 
     expect(failure).toBe(bare)
     expect(failure).toMatchObject({
-      source: WEBRPC_SOURCE,
-      code: WebRpcErrorCode.transport
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.transport
     })
   })
 
   it('keeps ordered child identities in a tagged native AggregateError', () => {
-    const first = new WebRpcLifecycleError('endpoint cleanup')
+    const first = new RpcLifecycleError('endpoint cleanup')
     const second = new Error('transport cleanup')
 
     const failure = createListenerFailure([first, second], {
-      code: WebRpcErrorCode.transport
+      code: RpcCoreErrorCode.transport
     })
 
     expect(failure).toBeInstanceOf(AggregateError)
     expect((failure as AggregateError).errors).toEqual([first, second])
     expect(failure).toMatchObject({
-      source: WEBRPC_SOURCE,
-      code: WebRpcErrorCode.transport
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.transport
     })
     expect(first).toMatchObject({
-      source: WEBRPC_SOURCE,
-      code: WebRpcErrorCode.endpointDisposed
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.endpointDisposed
     })
     expect(second).not.toHaveProperty('source')
   })
@@ -134,11 +134,11 @@ describe('listener safety', () => {
     expect(reporterFailures.failures.map(({ error }) => error)).toEqual([diagnostic])
     expect(() =>
       drainListenerFailures([], {
-        code: WebRpcErrorCode.internal,
+        code: RpcCoreErrorCode.internal,
         secondaryFailures: reporterFailures
       })
     ).toThrow(diagnostic)
-    expect(diagnostic).toMatchObject({ code: WebRpcErrorCode.internal })
+    expect(diagnostic).toMatchObject({ code: RpcCoreErrorCode.internal })
     expect(reporterFailures.failures).toEqual([])
   })
 
@@ -158,11 +158,11 @@ describe('listener safety', () => {
     expect(reporterFailures.failures.map(({ error }) => error)).toEqual([reporterFailure])
     expect(() =>
       drainListenerFailures([], {
-        code: WebRpcErrorCode.transport,
+        code: RpcCoreErrorCode.transport,
         secondaryFailures: reporterFailures
       })
     ).toThrow(reporterFailure)
-    expect(reporterFailure).toMatchObject({ code: WebRpcErrorCode.transport })
+    expect(reporterFailure).toMatchObject({ code: RpcCoreErrorCode.transport })
   })
 
   it('keeps asynchronous reporter failures in invocation order at the terminal boundary', async () => {
@@ -184,7 +184,7 @@ describe('listener safety', () => {
 
     reportListenerFailure(new Error('terminal'), reporters, reporterFailures)
     const terminal = drainTerminalListenerFailures([], {
-      code: WebRpcErrorCode.transport,
+      code: RpcCoreErrorCode.transport,
       secondaryFailures: reporterFailures,
       aggregateSingle: true
     })
@@ -198,7 +198,7 @@ describe('listener safety', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(AggregateError)
       expect((error as AggregateError).errors).toEqual([first, second])
-      expect(error).toMatchObject({ code: WebRpcErrorCode.transport })
+      expect(error).toMatchObject({ code: RpcCoreErrorCode.transport })
     }
   })
 
@@ -251,7 +251,7 @@ describe('listener safety', () => {
     expect(active).toEqual(['first'])
     expect(failure).toBeInstanceOf(AggregateError)
     expect((failure as AggregateError).errors).toEqual([primary, cleanup])
-    expect(failure).toMatchObject({ code: WebRpcErrorCode.internal })
+    expect(failure).toMatchObject({ code: RpcCoreErrorCode.internal })
   })
 
   it('runs every removal and aggregates cleanup failures', () => {
@@ -275,6 +275,6 @@ describe('listener safety', () => {
     expect(removed).toEqual(['third', 'second', 'first'])
     expect(failure).toBeInstanceOf(AggregateError)
     expect((failure as AggregateError).errors).toHaveLength(2)
-    expect(failure).toMatchObject({ code: WebRpcErrorCode.internal })
+    expect(failure).toMatchObject({ code: RpcCoreErrorCode.internal })
   })
 })

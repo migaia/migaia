@@ -3,7 +3,7 @@ import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createEndpoint } from '../../src/core/index.js'
 import { authentication } from '../../src/core/middleware/authentication.js'
 import { connect } from '../../src/core/middleware/connect.js'
-import type { IWebRpcTransport } from '../../src/core/transport.js'
+import type { IRpcTransport } from '../../src/core/transport.js'
 
 /** Creates deterministic signed envelopes for integration tests. */
 const signed = () =>
@@ -38,7 +38,7 @@ describe('authentication integration', () => {
   it('rejects a forged frame before provider execution', async () => {
     const [clientBase, serverTransport] = createMemoryTransportPair()
     let providerCalls = 0
-    const forgedTransport: IWebRpcTransport = {
+    const forgedTransport: IRpcTransport = {
       ...clientBase,
       send: (value, options) =>
         clientBase.send({ ...(value as object), signature: 'forged' }, options)

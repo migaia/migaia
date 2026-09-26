@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createComposedEndpoint, type IWebRpcCoreConfig } from '../../src/core/composed.js'
+import { createComposedEndpoint, type IRpcCoreConfig } from '../../src/core/composed.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createClientFirstPartyRoots } from '../../src/core/internal/client-first-party-roots.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { hooks } from '../../src/core/middleware/hooks.js'
-import type { IWebRpcHookEvent, IWebRpcPlugin } from '../../src/core/typing.js'
+import type { IRpcHookEvent, IRpcPlugin } from '../../src/core/typing.js'
 
 const emptyClaims = Object.freeze({
   routes: Object.freeze([]),
@@ -22,7 +22,7 @@ function createPendingMiddleware(
   started: () => void,
   pending: Promise<never>,
   onCleanup: () => void
-): IWebRpcPlugin {
+): IRpcPlugin {
   return {
     name: `construction-pending-${idSequence++}`,
     metadata: { claims: emptyClaims },
@@ -37,10 +37,10 @@ function createPendingMiddleware(
 /** Builds the public factory configuration used by the real construction transaction tests. */
 function createConfig(
   signal: AbortSignal,
-  listeners: readonly ((event: IWebRpcHookEvent) => void | Promise<void>)[],
-  onHookError?: (error: unknown, event: IWebRpcHookEvent) => void,
-  pending?: IWebRpcPlugin
-): IWebRpcCoreConfig {
+  listeners: readonly ((event: IRpcHookEvent) => void | Promise<void>)[],
+  onHookError?: (error: unknown, event: IRpcHookEvent) => void,
+  pending?: IRpcPlugin
+): IRpcCoreConfig {
   const [transport] = createMemoryTransportPair()
   return {
     id: `construction-hooks-${idSequence++}`,
@@ -67,7 +67,7 @@ describe('real construction diagnostic reporter', () => {
       rejectLate = reject
     })
     const lateError = new Error('late construction failure')
-    const events: IWebRpcHookEvent[] = []
+    const events: IRpcHookEvent[] = []
     const pendingMiddleware = createPendingMiddleware(resolveStarted, pending, () => {
       cleanupCalls += 1
     })
@@ -120,7 +120,7 @@ describe('real construction diagnostic reporter', () => {
     const syncFailure = new Error('sync hook failure')
     const asyncFailure = new Error('async hook failure')
     const lateError = new Error('late diagnostic')
-    const events: IWebRpcHookEvent[] = []
+    const events: IRpcHookEvent[] = []
     const hookErrors: unknown[] = []
     const pendingMiddleware = createPendingMiddleware(resolveStarted, pending, () => undefined)
     const construction = createComposedEndpoint(
@@ -159,9 +159,9 @@ describe('real construction diagnostic reporter', () => {
 
   it('does not report a pre-settlement primary install failure as a late diagnostic', async () => {
     const primaryFailure = new Error('primary construction failure')
-    const events: IWebRpcHookEvent[] = []
+    const events: IRpcHookEvent[] = []
     const [transport] = createMemoryTransportPair()
-    const failing: IWebRpcPlugin = {
+    const failing: IRpcPlugin = {
       name: 'construction-primary-failure',
       metadata: { claims: emptyClaims },
       install: () => {

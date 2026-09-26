@@ -4,12 +4,12 @@ import { createProviderEndpoint } from '../../src/core/provider.js'
 import { createComposedEndpoint } from '../../src/core/composed.js'
 import {
   createFirstPartyRoots,
-  type IWebRpcFirstPartyRootName
+  type IRpcFirstPartyRootName
 } from '../../src/core/internal/first-party-roots.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { ping } from '../../src/core/middleware/ping.js'
-import { WebRpcLifecycleError } from '../../src/core/errors.js'
+import { RpcLifecycleError } from '../../src/core/errors.js'
 
 /**
  * Regression gate for `SOL-CB-R8-P2-003`: `sendAll`/`pingAll` must key their fulfilled/rejected
@@ -59,7 +59,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
+      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
     )
     const client = await createComposedEndpoint(
       {
@@ -68,7 +68,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
         targetIds: ['__proto__'],
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
+      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
     )
     try {
       const { fulfilled, rejected } = await client.pingAll!()
@@ -83,7 +83,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
     }
   })
 
-  it('pingAll rethrows a WebRpcLifecycleError instead of folding it into the per-target result', async () => {
+  it('pingAll rethrows a RpcLifecycleError instead of folding it into the per-target result', async () => {
     const [clientTransport] = createMemoryTransportPair()
     const client = await createComposedEndpoint(
       {
@@ -92,13 +92,13 @@ describe('composed sendAll/pingAll fanout contract', () => {
         targetIds: ['unreachable'],
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
+      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
     )
     await client.dispose()
-    await expect(client.pingAll!()).rejects.toBeInstanceOf(WebRpcLifecycleError)
+    await expect(client.pingAll!()).rejects.toBeInstanceOf(RpcLifecycleError)
   })
 
-  it('sendAll rethrows a WebRpcLifecycleError instead of resolving with per-target rejections (SOL-CB-R9-P2-003)', async () => {
+  it('sendAll rethrows a RpcLifecycleError instead of resolving with per-target rejections (SOL-CB-R9-P2-003)', async () => {
     const [clientTransport] = createMemoryTransportPair()
     const client = await createClientEndpoint({
       id: 'client-disposed-send-fanout',
@@ -107,6 +107,6 @@ describe('composed sendAll/pingAll fanout contract', () => {
       middlewares: [connect({ transport: clientTransport })]
     })
     await client.dispose()
-    await expect(client.sendAll('echo', 'value')).rejects.toBeInstanceOf(WebRpcLifecycleError)
+    await expect(client.sendAll('echo', 'value')).rejects.toBeInstanceOf(RpcLifecycleError)
   })
 })

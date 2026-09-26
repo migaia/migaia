@@ -1,3 +1,4 @@
+import { systemScheduler } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createEndpointTimePort } from '../../src/core/internal/time-port.js'
 
@@ -5,7 +6,7 @@ describe('endpoint-local time port', () => {
   it('tracks timers and clears them on disposal without mutating the port', () => {
     vi.useFakeTimers()
     try {
-      const port = createEndpointTimePort()
+      const port = createEndpointTimePort(systemScheduler)
       const task = vi.fn()
       const timer = port.setTimeout(task, 10)
       expect(Object.isFrozen(port)).toBe(true)

@@ -1,55 +1,18 @@
+import { systemScheduler } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
-import { ControlTaskRegistry } from '../../src/core/internal/control-task-registry.js'
-import { raceWithAsyncControl, waitWithSignal } from '../../src/core/internal/async-control.js'
+import { raceWithAsyncControl } from '../../src/core/internal/async-control.js'
 import { prepareEndpoint as prepareEndpointImpl } from '../../src/core/internal/endpoint-bootstrap.js'
 import { allocateRpcId } from '../../src/core/internal/id.js'
 import { ResourceScope } from '../../src/core/internal/resource-scope.js'
 import { createEndpointTimePort } from '../../src/core/internal/time-port.js'
 import { createEndpointTransportActivation } from '../../src/core/internal/transport-activation.js'
-import { VariationAdmissionRegistry } from '../../src/core/internal/variation-admission.js'
 import { PeerRegistry } from '../../src/core/internal/peers.js'
 import { translateEndpointDisposalError } from '../../src/core/internal/disposal-translation.js'
-import { WebRpcLifecycleError } from '../../src/core/errors.js'
-import type { IWebRpcTransport } from '../../src/core/transport.js'
+import { RpcLifecycleError } from '../../src/core/errors.js'
+import type { IRpcTransport } from '../../src/core/transport.js'
 
 describe('internal ownership boundary semantics', () => {
-  it('keeps control and variation admission duplicate-safe and expiry-aware', () => {
-    const control = new ControlTaskRegistry()
-    expect(control.admit('control-task', 0)).toBe(true)
-    expect(control.admit('control-task', 1)).toBe(false)
-    expect(control.rememberAbort('abort-task', 10, 0)).toBe(true)
-    expect(control.rememberAbort('abort-task', 20, 1)).toBe(true)
-    expect(control.consumeAbort('abort-task', 5)).toBe(true)
-    expect(control.consumeAbort('abort-task', 5)).toBe(false)
-    expect(control.rememberAbort('expired-task', 10, 0)).toBe(true)
-    expect(control.rememberAbort('new-task', 30, 20)).toBe(true)
-    expect(control.consumeAbort('expired-task', 20)).toBe(false)
-    expect(control.admitControl('peer', 'control-variation', 0)).toBe(true)
-    expect(control.admitControl('peer', 'control-variation', 1)).toBe(false)
-    expect(control.admitVariation('peer', 0)).toBe(true)
-    control.purge(100_000)
-    control.clear()
-
-    const variation = new VariationAdmissionRegistry()
-    expect(variation.admit('peer', 'variation-1', 0)).toBe(true)
-    expect(variation.admit('peer', 'variation-1', 1)).toBe(false)
-    expect(variation.admit('peer', 'variation-2', 2)).toBe(true)
-    expect(variation.admit('peer', 'variation-3', 60_000)).toBe(true)
-    expect(variation.admitBudget('peer', 60_001)).toBe(true)
-    variation.purge(120_001)
-    variation.clear()
-
-    const boundedVariation = new VariationAdmissionRegistry()
-    for (let index = 0; index < 128; index += 1)
-      expect(boundedVariation.admit('bounded-peer', `bounded-${index}`, 0)).toBe(true)
-    expect(boundedVariation.admit('bounded-peer', 'bounded-overflow', 0)).toBe(false)
-    const boundedBudget = new VariationAdmissionRegistry()
-    for (let index = 0; index < 128; index += 1)
-      expect(boundedBudget.admitBudget('bounded-peer', 0)).toBe(true)
-    expect(boundedBudget.admitBudget('bounded-peer', 0)).toBe(false)
-  })
-
   it('releases synchronous and asynchronous resources once and preserves cleanup errors', async () => {
     const scope = new ResourceScope()
     const order: string[] = []
@@ -94,7 +57,7 @@ describe('internal ownership boundary semantics', () => {
     let listenerError: ((error: unknown) => void) | undefined
     let received = 0
     let receiveErrors = 0
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       platform: 'Memory',
       subscribe: (callback) => {
         listener = callback
@@ -134,7 +97,7 @@ describe('internal ownership boundary semantics', () => {
     expect(received).toBe(111)
     expect(receiveErrors).toBe(0)
 
-    const failingTransport: IWebRpcTransport = {
+    const failingTransport: IRpcTransport = {
       platform: 'Memory',
       subscribe: () => () => undefined,
       onTransportError: () => {
@@ -154,7 +117,7 @@ describe('internal ownership boundary semantics', () => {
   it('owns endpoint timers through disposal and preserves UUID validation failures', () => {
     vi.useFakeTimers()
     try {
-      const time = createEndpointTimePort()
+      const time = createEndpointTimePort(systemScheduler)
       let fired = 0
       const timer = time.setTimeout(() => {
         fired += 1
@@ -229,20 +192,9 @@ describe('internal ownership boundary semantics', () => {
   it('settles cancellable waits and races through resolve, reject, timeout, and abort paths', async () => {
     vi.useFakeTimers()
     try {
-      const controller = new AbortController()
-      expect(() => waitWithSignal(-1, [], () => new Error('aborted'))).toThrowError()
-      controller.abort('already-aborted')
-      await expect(
-        waitWithSignal(10, [controller.signal], (reason) => new Error(String(reason)))
-      ).rejects.toThrow('already-aborted')
-
-      const activeController = new AbortController()
-      const waiting = waitWithSignal(10, [activeController.signal], () => new Error('aborted'))
-      vi.advanceTimersByTime(10)
-      await waiting
-
       await expect(
         raceWithAsyncControl({
+          time: createEndpointTimePort(systemScheduler),
           operation: async () => 'resolved',
           timeoutMs: false,
           createTimeoutError: () => new Error('timeout'),
@@ -251,6 +203,7 @@ describe('internal ownership boundary semantics', () => {
       ).resolves.toBe('resolved')
       await expect(
         raceWithAsyncControl({
+          time: createEndpointTimePort(systemScheduler),
           operation: async () => {
             throw new Error('operation failed')
           },
@@ -260,6 +213,7 @@ describe('internal ownership boundary semantics', () => {
         })
       ).rejects.toThrow('operation failed')
       const timedOut = raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => new Promise<string>(() => undefined),
         timeoutMs: 1,
         createTimeoutError: () => new Error('timeout'),
@@ -270,6 +224,7 @@ describe('internal ownership boundary semantics', () => {
 
       const abortController = new AbortController()
       const aborted = raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => new Promise<string>(() => undefined),
         timeoutMs: false,
         signals: [abortController.signal],
@@ -290,8 +245,10 @@ describe('internal ownership boundary semantics', () => {
             throw new Error('timeout callback')
           },
           onDiagnostic: (error) => diagnostics.push(error),
-          createTimer: () => {
-            throw new Error('timer setup')
+          time: {
+            setTimeout: () => {
+              throw new Error('timer setup')
+            }
           },
           onSetupFailure: async () => undefined
         })
@@ -380,7 +337,7 @@ describe('internal ownership boundary semantics', () => {
   })
 
   it('preserves configured peers while bounding learned peers and translating cleanup leaves', () => {
-    const peers = new PeerRegistry<string>(1, 10)
+    const peers = new PeerRegistry<string>(() => Date.now(), 1, 10)
     peers.add('configured', true)
     peers.add('learned-1')
     peers.add('learned-2')
@@ -391,10 +348,10 @@ describe('internal ownership boundary semantics', () => {
     peers.remove('configured')
     peers.clear()
     expect(peers.snapshot()).toEqual([])
-    expect(() => new PeerRegistry(0)).toThrowError()
-    expect(() => new PeerRegistry(1, 0)).toThrowError()
+    expect(() => new PeerRegistry(() => Date.now(), 0)).toThrowError()
+    expect(() => new PeerRegistry(() => Date.now(), 1, 0)).toThrowError()
 
-    const lifecycle = new WebRpcLifecycleError('endpoint disposed')
+    const lifecycle = new RpcLifecycleError('endpoint disposed')
     expect(translateEndpointDisposalError(lifecycle)).toBe(lifecycle)
     const rawError = new Error('raw cleanup')
     const extraError = new Error('extra cleanup')
@@ -405,7 +362,7 @@ describe('internal ownership boundary semantics', () => {
         { resource: 'middleware', error: extraError }
       ]
     )
-    expect(translated).toBeInstanceOf(WebRpcLifecycleError)
+    expect(translated).toBeInstanceOf(RpcLifecycleError)
     expect(translated.cleanupErrors).toEqual([
       { resource: 'canonical-transport', error: rawError },
       { resource: 'middleware', error: extraError }
@@ -422,7 +379,7 @@ describe('internal ownership boundary semantics', () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(0)
-      const peers = new PeerRegistry<string>(2, 10)
+      const peers = new PeerRegistry<string>(() => Date.now(), 2, 10)
       peers.add('learned')
       expect(peers.has('learned')).toBe(true)
       vi.setSystemTime(11)

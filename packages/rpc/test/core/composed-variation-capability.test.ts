@@ -4,7 +4,7 @@ import { createProviderEndpoint } from '../../src/core/provider.js'
 import { createClientEndpoint } from '../../src/core/client.js'
 import {
   createFirstPartyRoots,
-  type IWebRpcFirstPartyRootName
+  type IRpcFirstPartyRootName
 } from '../../src/core/internal/first-party-roots.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { connect } from '../../src/core/middleware/connect.js'
@@ -28,7 +28,7 @@ describe('composed inbound variation capability gating', () => {
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
+      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
     )
     const client = await createComposedEndpoint(
       {
@@ -36,7 +36,7 @@ describe('composed inbound variation capability gating', () => {
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
+      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
     )
     try {
       await expect(client.ping!('server', undefined, { timeoutMs: 2000 })).resolves.toBe(true)
@@ -54,7 +54,7 @@ describe('composed inbound variation capability gating', () => {
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport })]
       },
-      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
+      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
     )
     const client = await createComposedEndpoint(
       {
@@ -62,7 +62,7 @@ describe('composed inbound variation capability gating', () => {
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IWebRpcFirstPartyRootName>(['first-party-control']))
+      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
     )
     try {
       await expect(client.ping!('server-no-ping', undefined, { timeoutMs: 60 })).resolves.toBe(

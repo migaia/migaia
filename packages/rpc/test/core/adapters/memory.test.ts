@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createMemoryTransportPair } from '../../../src/core/adapters/memory.js'
-import type { IWebRpcTransport } from '../../../src/core/transport.js'
+import type { IRpcTransport } from '../../../src/core/transport.js'
 
 describe('memory transport adapter', () => {
   it('declares shared pair resources as borrowed', () => {
@@ -61,8 +61,8 @@ describe('memory transport adapter', () => {
         })
     )
 
-    const baseA: IWebRpcTransport = a
-    const baseB: IWebRpcTransport = b
+    const baseA: IRpcTransport = a
+    const baseB: IRpcTransport = b
     const closePromise = baseB.close?.()
     expect(closePromise).toBeInstanceOf(Promise)
     expect(baseA.close?.()).toBe(closePromise)

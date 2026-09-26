@@ -1,0 +1,2972 @@
+{
+  "baseCommit": "0d7805d",
+  "adapterCoreImports": [
+    {
+      "file": "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "from": "../../core/errors.js",
+      "names": ["WebRpcErrorCode"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "from": "../../core/internal/listener-safety.js",
+      "names": [
+        "collectListenerFailure",
+        "createListenerFailureState",
+        "drainListenerFailures",
+        "observeListener",
+        "registerListeners",
+        "releaseListenerRegistration",
+        "reportListenerFailure"
+      ]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "from": "../../core/internal/message-listener-hub.js",
+      "names": ["createMessageListenerHub"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "from": "../../core/transport-constants.js",
+      "names": ["WebRpcPlatform", "WebRpcTransportOwnership"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "from": "../../core/transport.js",
+      "names": ["IWebRpcTransport"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "from": "../../core/error-text.js",
+      "names": ["WebRpcErrorText"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "from": "../../core/errors.js",
+      "names": ["WebRpcErrorCode", "WebRpcTransportError", "tagWebRpcError"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "from": "../../core/internal/listener-safety.js",
+      "names": [
+        "collectListenerFailure",
+        "collectListenerCleanupFailures",
+        "createListenerFailureState",
+        "createListenerFailure",
+        "drainListenerFailures",
+        "observeListener",
+        "registerListeners",
+        "releaseListenerRegistration",
+        "reportListenerFailure"
+      ]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "from": "../../core/internal/message-listener-hub.js",
+      "names": ["createMessageListenerHub"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "from": "../../core/internal/safe-value.js",
+      "names": ["safeRead"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "from": "../../core/transport-constants.js",
+      "names": ["WebRpcPlatform", "WebRpcTransportOwnership"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "from": "../../core/transport.js",
+      "names": ["IWebRpcTransport"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/service-worker.ts",
+      "from": "../../core/errors.js",
+      "names": ["WebRpcErrorCode"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/service-worker.ts",
+      "from": "../../core/internal/listener-safety.js",
+      "names": [
+        "createListenerFailureState",
+        "drainListenerFailures",
+        "observeListener",
+        "registerListeners",
+        "releaseListenerRegistration",
+        "reportListenerFailure"
+      ]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/service-worker.ts",
+      "from": "../../core/internal/message-listener-hub.js",
+      "names": ["createMessageListenerHub"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/service-worker.ts",
+      "from": "../../core/internal/safe-value.js",
+      "names": ["safeRead"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/service-worker.ts",
+      "from": "../../core/transport-constants.js",
+      "names": ["WebRpcPlatform", "WebRpcTransportOwnership"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/service-worker.ts",
+      "from": "../../core/transport.js",
+      "names": ["IWebRpcSendOptions", "IWebRpcTransport"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "from": "../../core/errors.js",
+      "names": ["WebRpcErrorCode"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "from": "../../core/internal/listener-safety.js",
+      "names": [
+        "createListenerFailureState",
+        "drainListenerFailures",
+        "observeListener",
+        "registerListeners",
+        "releaseListenerRegistration",
+        "reportListenerFailure"
+      ]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "from": "../../core/internal/message-listener-hub.js",
+      "names": ["createMessageListenerHub"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "from": "../../core/transport-constants.js",
+      "names": ["WebRpcPlatform", "WebRpcTransportOwnership"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "from": "../../core/transport.js",
+      "names": ["IWebRpcSendOptions", "IWebRpcTransport"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-transport.ts",
+      "from": "../../core/error-text.js",
+      "names": ["WebRpcErrorText"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-transport.ts",
+      "from": "../../core/errors.js",
+      "names": ["WebRpcErrorCode", "WebRpcTransportError", "tagWebRpcError"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-transport.ts",
+      "from": "../../core/internal/listener-safety.js",
+      "names": [
+        "collectListenerFailure",
+        "createListenerFailureState",
+        "drainListenerFailures",
+        "drainTerminalListenerFailures",
+        "observeListener",
+        "reportListenerFailure"
+      ]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-transport.ts",
+      "from": "../../core/internal/message-listener-hub.js",
+      "names": ["createMessageListenerHub"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-transport.ts",
+      "from": "../../core/internal/safe-value.js",
+      "names": ["isUint8Array"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-transport.ts",
+      "from": "../../core/transport-constants.js",
+      "names": ["WebRpcPlatform", "WebRpcTransportOwnership"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-transport.ts",
+      "from": "../../core/transport.js",
+      "names": ["IWebRpcTransport"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-worker.ts",
+      "from": "../../core/errors.js",
+      "names": ["WebRpcErrorCode"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-worker.ts",
+      "from": "../../core/internal/listener-safety.js",
+      "names": [
+        "createListenerFailureState",
+        "drainListenerFailures",
+        "observeListener",
+        "registerListeners",
+        "releaseListenerRegistration",
+        "reportListenerFailure"
+      ]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-worker.ts",
+      "from": "../../core/internal/message-listener-hub.js",
+      "names": ["createMessageListenerHub"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-worker.ts",
+      "from": "../../core/internal/safe-value.js",
+      "names": ["safeString"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-worker.ts",
+      "from": "../../core/transport-constants.js",
+      "names": ["WebRpcPlatform", "WebRpcTransportOwnership"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/web-worker.ts",
+      "from": "../../core/transport.js",
+      "names": ["IWebRpcSendOptions", "IWebRpcTransport"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/window.ts",
+      "from": "../../core/errors.js",
+      "names": ["WebRpcError", "WebRpcErrorCode"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/window.ts",
+      "from": "../../core/internal/listener-safety.js",
+      "names": [
+        "createListenerFailureState",
+        "drainListenerFailures",
+        "observeListener",
+        "registerListeners",
+        "releaseListenerRegistration",
+        "reportListenerFailure"
+      ]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/window.ts",
+      "from": "../../core/internal/message-listener-hub.js",
+      "names": ["createMessageListenerHub"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/window.ts",
+      "from": "../../core/transport-constants.js",
+      "names": ["WebRpcPlatform", "WebRpcTransportOwnership"]
+    },
+    {
+      "file": "packages/rpc/src/browser/adapters/window.ts",
+      "from": "../../core/transport.js",
+      "names": ["IWebRpcSendOptions", "IWebRpcTransport"]
+    }
+  ],
+  "renameExports": [
+    {
+      "file": "packages/rpc/src/core/composed.ts",
+      "name": "IWebRpcCoreConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/composed.ts",
+      "name": "IWebRpcKernelSurface",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/composed.ts",
+      "name": "IWebRpcRootProjection",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/error-code.ts",
+      "name": "IWebRpcErrorCode",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/error-code.ts",
+      "name": "WebRpcErrorCode",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/error-text.ts",
+      "name": "WebRpcErrorText",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "isWebRpcError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "IWebRpcCleanupError",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "IWebRpcError",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "IWebRpcErrorCode",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "tagWebRpcError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WEBRPC_SOURCE",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcAbortError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcAuthenticationError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcChunkError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcConfigurationError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcConstructionError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcContractError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcErrorCode",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcLifecycleError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcProtocolError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcRemoteError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcSchemaValidationError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcSerializationError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcTimeoutError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/errors.ts",
+      "name": "WebRpcTransportError",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/feature.ts",
+      "name": "IWebRpcFeature",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/feature.ts",
+      "name": "IWebRpcFeatureDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/feature.ts",
+      "name": "IWebRpcFeatureSurface",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/feature.ts",
+      "name": "IWebRpcFiniteFeatureTuple",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/features/one-way.ts",
+      "name": "IWebRpcOneWayOptions",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "isWebRpcError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcCleanupError",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcError",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcErrorCode",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcFeature",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcFeatureDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcFeatureSurface",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcMiddlewareCore",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcMiddlewareDescriptor",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcNativeMiddleware",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcSendOptions",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcTransport",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "IWebRpcTransportTopology",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WEBRPC_SOURCE",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcAbortError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcAuthenticationError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcChunkError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcConfigurationError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcConstructionError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcContractError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcErrorCode",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcLifecycleError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcProtocolError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcRemoteError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcSchemaValidationError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcSerializationError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcTimeoutError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/index.ts",
+      "name": "WebRpcTransportError",
+      "kind": "reexport"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/canonical-chunk-attachment.ts",
+      "name": "WebRpcCanonicalChunkAttachment",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/construction-install.ts",
+      "name": "IWebRpcConstructionControl",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/construction-install.ts",
+      "name": "IWebRpcConstructionInstallOptions",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/construction-install.ts",
+      "name": "IWebRpcConstructionTime",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/control-attachment.ts",
+      "name": "IWebRpcControlPorts",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/control-attachment.ts",
+      "name": "WebRpcControlAttachment",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "name": "WebRpcDiscoveryAttachment",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/endpoint-options.ts",
+      "name": "IWebRpcEndpointOptions",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/endpoint-options.ts",
+      "name": "IWebRpcSelectedComponents",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/feature-contract.ts",
+      "name": "IWebRpcOutboundCommandObservation",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/feature-policy.ts",
+      "name": "IWebRpcClaimAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/feature-policy.ts",
+      "name": "IWebRpcFeaturePolicy",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/feature-policy.ts",
+      "name": "IWebRpcNativeRoleClaimSource",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/first-party-roots.ts",
+      "name": "IWebRpcFirstPartyRootName",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/first-party-roots.ts",
+      "name": "IWebRpcFirstPartyRoots",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/first-party-roots.ts",
+      "name": "IWebRpcPublicFirstPartyRootNames",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/hooks.ts",
+      "name": "IWebRpcHookFailureReporter",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "name": "WebRpcOutboundAttachment",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/outbound-sender.ts",
+      "name": "IWebRpcOutboundTransport",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/outbound-sender.ts",
+      "name": "WebRpcOutboundSender",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcControlRole",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcControlRoleContract",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcFirstPartyRole",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcFirstPartyRoleContract",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcPluginConstraint",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcPluginCore",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcPluginHostCore",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcPluginInstallScope",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcProviderCancellationPortMetadata",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcProviderRole",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "IWebRpcProviderRoleContract",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "WebRpcControlRole",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "WebRpcControlRoleSchema",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "WebRpcFirstPartyRole",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "WebRpcFirstPartyRoleSchema",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "WebRpcProviderCancellationPortMetadata",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "WebRpcProviderRole",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-contract.ts",
+      "name": "WebRpcProviderRoleSchema",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-descriptor.ts",
+      "name": "IWebRpcPluginDescriptor",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "name": "IWebRpcComposedRuntimeState",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "name": "IWebRpcNativeFeatureDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "name": "IWebRpcNativePluginBatchEntry",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "name": "IWebRpcNativePluginBatchOptions",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "name": "IWebRpcPluginRole",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcAbortEnablePort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcAuthenticationPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcCandidatePingPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcConnectPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcContractPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcDiscoveryResolverPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcEndpointTimer",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcHooksPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcIdentityCommand",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcInboundIdentityPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcOutboundAttachmentPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcOutboundCommand",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcOutboundOperationsPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcOutboundSend",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcPingEnablePort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcPortName",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcPortValues",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcProtocolPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcProviderCancellationPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcResponseOutboundCommand",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcSynchronousOutboundCommand",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcTimeoutPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcTimePort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcUuidPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcVariationAdmissionRequest",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "IWebRpcVariationCoordinatorPort",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "WebRpcPingEnablePortShape",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "name": "WebRpcPortName",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/port-feature.ts",
+      "name": "IWebRpcPortFeature",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/port-feature.ts",
+      "name": "IWebRpcPortFeatureRuntime",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/port-feature.ts",
+      "name": "IWebRpcPortFeatureSet",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/provider-attachment.ts",
+      "name": "IWebRpcProviderPorts",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/provider-attachment.ts",
+      "name": "WebRpcProviderAttachment",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/routing-data.ts",
+      "name": "IWebRpcRoutingData",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/routing-data.ts",
+      "name": "WebRpcRoutingProfile",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/routing-data.ts",
+      "name": "WebRpcRoutingType",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/test-observer.ts",
+      "name": "IWebRpcDiscoveryCleanupFaults",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/test-observer.ts",
+      "name": "IWebRpcEndpointDebugSnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/test-observer.ts",
+      "name": "IWebRpcProviderRegistration",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/test-observer.ts",
+      "name": "IWebRpcTimePortEvent",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/variation-coordinator.ts",
+      "name": "WebRpcVariationCoordinator",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "name": "IWebRpcPipelineValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "name": "IWebRpcPluginHost",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/middleware.ts",
+      "name": "IWebRpcMiddlewareComponentContribution",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/middleware.ts",
+      "name": "IWebRpcMiddlewareComponentPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/middleware.ts",
+      "name": "IWebRpcMiddlewareCore",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/middleware.ts",
+      "name": "IWebRpcMiddlewareDescriptor",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/middleware.ts",
+      "name": "IWebRpcNativeMiddleware",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "IWebRpcCandidateStatus",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "IWebRpcChunkEvent",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "IWebRpcControlKind",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "IWebRpcOperation",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "IWebRpcPlatformValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "IWebRpcTransportEncodingValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "IWebRpcTransportOwnershipValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "IWebRpcTransportTopologyValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcCandidateStatus",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcChunkEvent",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcContractFailureKind",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcControlKind",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcDebugPhase",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcEndpointStatus",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcOperation",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcPlatform",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcTransportEncoding",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcTransportOwnership",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/protocol-constants.ts",
+      "name": "WebRpcTransportTopology",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/semantic-constants.ts",
+      "name": "IWebRpcMessageKind",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/semantic-constants.ts",
+      "name": "IWebRpcVariation",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/semantic-constants.ts",
+      "name": "WebRpcMessageKind",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/semantic-constants.ts",
+      "name": "WebRpcVariation",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "IWebRpcCandidateStatus",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "IWebRpcOperation",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "IWebRpcPlatformValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "IWebRpcTransportEncodingValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "IWebRpcTransportOwnershipValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "IWebRpcTransportTopologyValue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "WebRpcCandidateStatus",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "WebRpcEndpointStatus",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "WebRpcOperation",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "WebRpcPlatform",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "WebRpcTransportEncoding",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "WebRpcTransportOwnership",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/transport-constants.ts",
+      "name": "WebRpcTransportTopology",
+      "kind": "value"
+    },
+    {
+      "file": "packages/rpc/src/core/transport.ts",
+      "name": "IWebRpcInboundMessage",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport.ts",
+      "name": "IWebRpcSendOptions",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport.ts",
+      "name": "IWebRpcTransport",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport.ts",
+      "name": "IWebRpcTransportEncoding",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport.ts",
+      "name": "IWebRpcTransportOwnership",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/transport.ts",
+      "name": "IWebRpcTransportTopology",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcAbortCapability",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcAbortSignal",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcAuthenticationCapability",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcAuthenticationConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcAuthenticationContext",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcAuthenticationTransform",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcAutomaticConnectControl",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcConnectCapability",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcConnectConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcConnectContext",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcConnectControl",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcConnectControlForMode",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcContext",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcContractCapability",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcContractConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcDiscoveryCandidate",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcDiscoveryControl",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcDiscoveryMode",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcEndpoint",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcEndpointFactory",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcEventListener",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcFactoryConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcFanoutResult",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcFeatureConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcHook",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcHookEvent",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcHooksConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcInboundDiscoveryQuery",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcManualConnectControl",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcMethodSchema",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcMiddleware",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPingCapability",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPingEndpointSurface",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPingOptions",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPlatform",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPlugin",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPluginClaims",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPluginInstallResult",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPluginInstallScope",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPluginMetadata",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcProtocolCapability",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcProtocolConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcProvider",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcProviderLimits",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcProviderResult",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcPublicError",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcSchema",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcSchemaIssue",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcServerMetadata",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcTimeoutCapability",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcTimeoutConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcUniqueTargetIdContext",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcUuidConfig",
+      "kind": "type"
+    },
+    {
+      "file": "packages/rpc/src/core/typing.ts",
+      "name": "IWebRpcUuidContext",
+      "kind": "type"
+    }
+  ],
+  "readers": {
+    "IWebRpcAbortCapability": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcAbortEnablePort": ["packages/rpc/src/core/internal/plugin-shared-keys.ts"],
+    "IWebRpcAbortSignal": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/composed-ping-parity.test.ts",
+      "packages/rpc/test/core/duplicate-owner-contract.test.ts",
+      "packages/rpc/test/core/internal/web-rpc-plugin-host.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/plugin-host/projection.test.ts",
+      "packages/store-worker/README.md",
+      "packages/store-worker/USEGUIDE.md",
+      "packages/store-worker/src/worker.ts",
+      "packages/store-worker/test/exports.test.ts"
+    ],
+    "IWebRpcAuthenticationCapability": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/middleware/authentication.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcAuthenticationConfig": [
+      "packages/rpc/src/core/middleware/authentication.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcAuthenticationContext": [
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcAuthenticationPort": [
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/test/core/plugin-host/type-contract.test-d.ts"
+    ],
+    "IWebRpcAuthenticationTransform": [
+      "packages/rpc/src/core/middleware/authentication.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts"
+    ],
+    "IWebRpcAutomaticConnectControl": ["packages/rpc/src/core/typing.ts"],
+    "IWebRpcCandidatePingPort": [
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcCandidateStatus": [
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcChunkEvent": ["packages/rpc/src/core/protocol-constants.ts"],
+    "IWebRpcClaimAdmission": [
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcCleanupError": [
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/disposal-translation.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts"
+    ],
+    "IWebRpcComposedRuntimeState": [
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcConnectCapability": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/internal/inbound-identity.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/middleware/connect.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcConnectConfig": [
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/middleware/connect.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "IWebRpcConnectContext": ["packages/rpc/USEGUIDE.md", "packages/rpc/src/core/typing.ts"],
+    "IWebRpcConnectControl": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcConnectControlForMode": ["packages/rpc/USEGUIDE.md", "packages/rpc/src/core/typing.ts"],
+    "IWebRpcConnectPort": ["packages/rpc/src/core/internal/plugin-shared-keys.ts"],
+    "IWebRpcConstructionControl": [
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts"
+    ],
+    "IWebRpcConstructionInstallOptions": ["packages/rpc/src/core/internal/construction-install.ts"],
+    "IWebRpcConstructionTime": ["packages/rpc/src/core/internal/construction-install.ts"],
+    "IWebRpcContext": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/internal/provider-executor-result.test.ts"
+    ],
+    "IWebRpcContractCapability": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcContractConfig": [
+      "packages/rpc/e2e/fixtures/rpc.ts",
+      "packages/rpc/e2e/fixtures/web-transport.ts",
+      "packages/rpc/src/core/internal/contract.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/internal/contract.test.ts",
+      "packages/rpc/test/core/middleware/contract.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "IWebRpcContractPort": [
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcControlKind": ["packages/rpc/src/core/protocol-constants.ts"],
+    "IWebRpcControlPorts": ["packages/rpc/src/core/internal/control-attachment.ts"],
+    "IWebRpcControlRole": ["packages/rpc/src/core/internal/plugin-contract.ts"],
+    "IWebRpcControlRoleContract": ["packages/rpc/src/core/internal/plugin-contract.ts"],
+    "IWebRpcCoreConfig": [
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/test/core/construction-hooks.test.ts",
+      "packages/rpc/test/core/duplicate-owner-contract.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/plugin-host/topology-adapter.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/topology-rollback.test.ts",
+      "packages/rpc/test/core/transaction-contract.test.ts"
+    ],
+    "IWebRpcDiscoveryCandidate": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/discovery-semantic-coverage.test.ts"
+    ],
+    "IWebRpcDiscoveryCleanupFaults": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/test-observer.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcDiscoveryControl": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcDiscoveryMode": [
+      "packages/rpc/src/core/middleware/connect.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcDiscoveryResolverPort": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcEndpoint": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/e2e/fixtures/rpc.ts",
+      "packages/rpc/e2e/fixtures/web-transport.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/discovery-semantic-coverage.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/store-worker/src/managed-rpc-handler.ts",
+      "packages/store-worker/test/exports.test.ts"
+    ],
+    "IWebRpcEndpointDebugSnapshot": [
+      "packages/rpc/e2e/fixtures/window-iframe.ts",
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/test-observer.ts"
+    ],
+    "IWebRpcEndpointFactory": ["packages/rpc/src/core/typing.ts"],
+    "IWebRpcEndpointOptions": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts"
+    ],
+    "IWebRpcEndpointTimer": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcError": [
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcErrorCode": [
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/listener-safety.ts"
+    ],
+    "IWebRpcEventListener": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/provider.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcFactoryConfig": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/client.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/pipeline-contract.ts",
+      "packages/rpc/src/core/provider.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/type-contract.test.ts"
+    ],
+    "IWebRpcFanoutResult": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcFeature": [
+      "packages/rpc/src/core/client.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/feature.ts",
+      "packages/rpc/src/core/features/canonical-chunk.ts",
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/features/one-way.ts",
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/define-rpc-feature.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/first-party-roots.ts",
+      "packages/rpc/src/core/pipeline-contract.ts",
+      "packages/rpc/src/core/provider.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/custom-feature.test.ts",
+      "packages/rpc/test/core/fixtures/packed/type-contract.ts",
+      "packages/rpc/test/core/topology-rollback.test.ts",
+      "packages/rpc/test/core/type-contract.test.ts"
+    ],
+    "IWebRpcFeatureConfig": [
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcFeatureDefinition": [
+      "packages/rpc/src/core/feature.ts",
+      "packages/rpc/src/core/index.ts"
+    ],
+    "IWebRpcFeaturePolicy": [
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts"
+    ],
+    "IWebRpcFeatureSurface": [
+      "packages/rpc/src/core/client.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/feature.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/provider.ts"
+    ],
+    "IWebRpcFiniteFeatureTuple": [
+      "packages/rpc/src/core/client.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/feature.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/pipeline-contract.ts",
+      "packages/rpc/src/core/provider.ts"
+    ],
+    "IWebRpcFirstPartyRole": ["packages/rpc/src/core/internal/plugin-contract.ts"],
+    "IWebRpcFirstPartyRoleContract": ["packages/rpc/src/core/internal/plugin-contract.ts"],
+    "IWebRpcFirstPartyRootName": [
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/internal/first-party-roots.ts",
+      "packages/rpc/test/core/composed-fanout-contract.test.ts",
+      "packages/rpc/test/core/composed-variation-capability.test.ts",
+      "packages/rpc/test/core/fixtures/tree-shaking/runtime-owner-topology.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts",
+      "packages/rpc/test/core/tree-shaking/static-composition-contracts.test.ts"
+    ],
+    "IWebRpcFirstPartyRoots": [
+      "packages/rpc/src/core/internal/client-first-party-roots.ts",
+      "packages/rpc/src/core/internal/first-party-roots.ts",
+      "packages/rpc/src/core/internal/provider-first-party-roots.ts"
+    ],
+    "IWebRpcHook": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/hooks.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcHookEvent": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/internal/hooks.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/construction-hooks.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/storage-v2-t53-event-trace.test.ts",
+      "packages/rpc/test/core/transaction-contract.test.ts"
+    ],
+    "IWebRpcHookFailureReporter": [
+      "packages/rpc/src/core/internal/hooks.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcHooksConfig": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/middleware/hooks.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcHooksPort": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcIdentityCommand": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcInboundDiscoveryQuery": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts"
+    ],
+    "IWebRpcInboundIdentityPort": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts"
+    ],
+    "IWebRpcInboundMessage": [
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/inbound-identity.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/transport.ts",
+      "packages/rpc/test/core/endpoint-kernel.test.ts",
+      "packages/rpc/test/core/endpoint.observer.test.ts",
+      "packages/rpc/test/core/tree-shaking/slim-attachment-hardening.test.ts"
+    ],
+    "IWebRpcKernelSurface": [
+      "packages/rpc/src/core/client.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/provider.ts"
+    ],
+    "IWebRpcManualConnectControl": ["packages/rpc/src/core/typing.ts"],
+    "IWebRpcMessageKind": ["packages/rpc/src/core/semantic-constants.ts"],
+    "IWebRpcMethodSchema": [
+      "packages/rpc/README.md",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcMiddleware": [
+      "packages/rpc/src/core/client.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/pipeline-contract.ts",
+      "packages/rpc/src/core/provider.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/transaction-contract.test.ts"
+    ],
+    "IWebRpcMiddlewareComponentContribution": [
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcMiddlewareComponentPolicy": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/middleware.ts"
+    ],
+    "IWebRpcMiddlewareCore": [
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/middleware.ts"
+    ],
+    "IWebRpcMiddlewareDescriptor": [
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/middleware.ts"
+    ],
+    "IWebRpcNativeFeatureDefinition": [
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcNativeMiddleware": [
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcNativePluginBatchEntry": ["packages/rpc/src/core/internal/plugin-inventory.ts"],
+    "IWebRpcNativePluginBatchOptions": ["packages/rpc/src/core/internal/plugin-inventory.ts"],
+    "IWebRpcNativeRoleClaimSource": [
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts"
+    ],
+    "IWebRpcOneWayOptions": ["packages/rpc/src/core/features/one-way.ts"],
+    "IWebRpcOperation": [
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcOutboundAttachmentPort": ["packages/rpc/src/core/internal/plugin-shared-keys.ts"],
+    "IWebRpcOutboundCommand": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts"
+    ],
+    "IWebRpcOutboundCommandObservation": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "IWebRpcOutboundOperationsPort": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts"
+    ],
+    "IWebRpcOutboundSend": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcOutboundTransport": ["packages/rpc/src/core/internal/outbound-sender.ts"],
+    "IWebRpcPingCapability": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/middleware/ping.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcPingEnablePort": ["packages/rpc/src/core/internal/plugin-shared-keys.ts"],
+    "IWebRpcPingEndpointSurface": [
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/composed-ping-parity.test.ts"
+    ],
+    "IWebRpcPingOptions": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/type-contract.test.ts"
+    ],
+    "IWebRpcPipelineValue": ["packages/rpc/src/core/internal/web-rpc-plugin-host.ts"],
+    "IWebRpcPlatform": [
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/inbound-identity.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcPlatformValue": [
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts",
+      "packages/rpc/src/core/transport.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcPlugin": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/plugin-descriptor.ts",
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/src/core/middleware/abort.ts",
+      "packages/rpc/src/core/middleware/authentication.ts",
+      "packages/rpc/src/core/middleware/canonical-protocol.ts",
+      "packages/rpc/src/core/middleware/codec.ts",
+      "packages/rpc/src/core/middleware/connect.ts",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/middleware/framer.ts",
+      "packages/rpc/src/core/middleware/hooks.ts",
+      "packages/rpc/src/core/middleware/ping.ts",
+      "packages/rpc/src/core/middleware/timeout.ts",
+      "packages/rpc/src/core/middleware/uuid.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/construction-hooks.test.ts",
+      "packages/rpc/test/core/duplicate-owner-contract.test.ts",
+      "packages/rpc/test/core/fixtures/packed/type-contract.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/middleware/helpers.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/transaction-contract.test.ts"
+    ],
+    "IWebRpcPluginClaims": [
+      "packages/rpc/src/core/internal/define-rpc-feature.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/middleware/canonical-protocol.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcPluginConstraint": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/test/core/internal/web-rpc-plugin-host.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/plugin-host/projection.test.ts",
+      "packages/rpc/test/core/transaction-contract.test.ts"
+    ],
+    "IWebRpcPluginCore": [
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/plugin-host/type-contract.test-d.ts"
+    ],
+    "IWebRpcPluginDescriptor": [
+      "packages/rpc/src/core/internal/plugin-descriptor.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "IWebRpcPluginHost": [
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/test/core/internal/web-rpc-plugin-host.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "IWebRpcPluginHostCore": [
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts"
+    ],
+    "IWebRpcPluginInstallResult": [
+      "packages/rpc/src/core/internal/plugin-descriptor.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/middleware/abort.ts",
+      "packages/rpc/src/core/middleware/canonical-protocol.ts",
+      "packages/rpc/src/core/middleware/codec.ts",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/middleware/framer.ts",
+      "packages/rpc/src/core/middleware/hooks.ts",
+      "packages/rpc/src/core/middleware/ping.ts",
+      "packages/rpc/src/core/middleware/timeout.ts",
+      "packages/rpc/src/core/middleware/uuid.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/middleware/contract.test.ts",
+      "packages/rpc/test/core/middleware/helpers.ts",
+      "packages/rpc/test/core/middleware/middleware.test.ts",
+      "packages/rpc/test/core/middleware/protocol.test.ts",
+      "packages/rpc/test/core/transaction-contract.test.ts"
+    ],
+    "IWebRpcPluginInstallScope": [
+      "packages/rpc/src/core/features/canonical-chunk.ts",
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/features/one-way.ts",
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/plugin-descriptor.ts",
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/middleware/contract.test.ts",
+      "packages/rpc/test/core/middleware/helpers.ts",
+      "packages/rpc/test/core/middleware/protocol.test.ts",
+      "packages/rpc/test/core/topology-rollback.test.ts"
+    ],
+    "IWebRpcPluginMetadata": [
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/src/core/middleware/canonical-protocol.ts",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcPluginRole": [
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "IWebRpcPortFeature": [
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/port-feature.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts"
+    ],
+    "IWebRpcPortFeatureRuntime": ["packages/rpc/src/core/internal/port-feature.ts"],
+    "IWebRpcPortFeatureSet": ["packages/rpc/src/core/internal/port-feature.ts"],
+    "IWebRpcPortName": ["packages/rpc/src/core/internal/plugin-shared-keys.ts"],
+    "IWebRpcPortValues": [
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts"
+    ],
+    "IWebRpcProtocolCapability": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcProtocolConfig": [
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcProtocolPort": [
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/test/core/internal/web-rpc-plugin-host.test.ts",
+      "packages/rpc/test/core/plugin-host/type-contract.test-d.ts"
+    ],
+    "IWebRpcProvider": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/e2e/fixtures/rpc.ts",
+      "packages/rpc/e2e/fixtures/web-transport.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/provider.ts",
+      "packages/rpc/src/core/internal/test-observer.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/internal/provider-executor-result.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "IWebRpcProviderCancellationPort": [
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "IWebRpcProviderCancellationPortMetadata": [
+      "packages/rpc/src/core/internal/plugin-contract.ts"
+    ],
+    "IWebRpcProviderLimits": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcProviderPorts": ["packages/rpc/src/core/internal/provider-attachment.ts"],
+    "IWebRpcProviderRegistration": ["packages/rpc/src/core/internal/test-observer.ts"],
+    "IWebRpcProviderResult": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/internal/provider-executor.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcProviderRole": ["packages/rpc/src/core/internal/plugin-contract.ts"],
+    "IWebRpcProviderRoleContract": ["packages/rpc/src/core/internal/plugin-contract.ts"],
+    "IWebRpcPublicError": ["packages/rpc/src/core/typing.ts"],
+    "IWebRpcPublicFirstPartyRootNames": [
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/internal/first-party-roots.ts"
+    ],
+    "IWebRpcResponseOutboundCommand": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcRootProjection": ["packages/rpc/src/core/composed.ts"],
+    "IWebRpcRoutingData": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/provider-executor.ts",
+      "packages/rpc/src/core/internal/routing-data.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts"
+    ],
+    "IWebRpcSchema": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcSchemaIssue": ["packages/rpc/src/core/typing.ts"],
+    "IWebRpcSelectedComponents": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/internal/test-observer.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts"
+    ],
+    "IWebRpcSendOptions": [
+      "packages/rpc/src/browser/adapters/service-worker.ts",
+      "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "packages/rpc/src/browser/adapters/web-worker.ts",
+      "packages/rpc/src/browser/adapters/window.ts",
+      "packages/rpc/src/core/adapters/message-port.ts",
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/pipeline-contract.ts",
+      "packages/rpc/src/core/transport.ts"
+    ],
+    "IWebRpcServerMetadata": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts"
+    ],
+    "IWebRpcSynchronousOutboundCommand": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcTimePort": [
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcTimePortEvent": [
+      "packages/rpc/src/core/internal/test-observer.ts",
+      "packages/rpc/test/core/composed-ping-parity.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "IWebRpcTimeoutCapability": [
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/middleware/timeout.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcTimeoutConfig": [
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/middleware/timeout.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcTimeoutPort": ["packages/rpc/src/core/internal/plugin-shared-keys.ts"],
+    "IWebRpcTransport": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/e2e/fixtures/rpc.ts",
+      "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "packages/rpc/src/browser/adapters/service-worker.ts",
+      "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "packages/rpc/src/browser/adapters/web-transport.ts",
+      "packages/rpc/src/browser/adapters/web-worker.ts",
+      "packages/rpc/src/browser/adapters/window.ts",
+      "packages/rpc/src/core/adapters/memory.ts",
+      "packages/rpc/src/core/adapters/message-port.ts",
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/transport-activation.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/src/core/middleware/connect.ts",
+      "packages/rpc/src/core/pipeline-contract.ts",
+      "packages/rpc/src/core/transport.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/adapters/memory.test.ts",
+      "packages/rpc/test/core/authentication.integration.test.ts",
+      "packages/rpc/test/core/composed-ping-parity.test.ts",
+      "packages/rpc/test/core/endpoint-kernel.test.ts",
+      "packages/rpc/test/core/fixtures/packed/type-contract.ts",
+      "packages/rpc/test/core/hardening-regressions.spec.ts",
+      "packages/rpc/test/core/internal-ownership-boundaries.test.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts",
+      "packages/rpc/test/core/internal/web-rpc-plugin-host.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/root-disposal.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts",
+      "packages/rpc/test/core/tree-shaking/slim-attachment-hardening.test.ts",
+      "packages/rpc/test/core/type-contract.test.ts",
+      "packages/rpc/test/core/worker-deterministic.test.ts"
+    ],
+    "IWebRpcTransportEncoding": [
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/transport.ts"
+    ],
+    "IWebRpcTransportEncodingValue": [
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts",
+      "packages/rpc/src/core/transport.ts"
+    ],
+    "IWebRpcTransportOwnership": [
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/transport.ts"
+    ],
+    "IWebRpcTransportOwnershipValue": [
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts",
+      "packages/rpc/src/core/transport.ts"
+    ],
+    "IWebRpcTransportTopology": [
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/inbound-identity.ts",
+      "packages/rpc/src/core/transport.ts"
+    ],
+    "IWebRpcTransportTopologyValue": [
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts",
+      "packages/rpc/src/core/transport.ts"
+    ],
+    "IWebRpcUniqueTargetIdContext": ["packages/rpc/src/core/typing.ts"],
+    "IWebRpcUuidConfig": [
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-options.ts",
+      "packages/rpc/src/core/internal/id.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/middleware/uuid.ts",
+      "packages/rpc/src/core/typing.ts",
+      "packages/rpc/test/core/internal/id.test.ts"
+    ],
+    "IWebRpcUuidContext": [
+      "packages/rpc/src/core/internal/id.ts",
+      "packages/rpc/src/core/typing.ts"
+    ],
+    "IWebRpcUuidPort": ["packages/rpc/src/core/internal/plugin-shared-keys.ts"],
+    "IWebRpcVariation": [
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/internal/variation-coordinator.ts",
+      "packages/rpc/src/core/semantic-constants.ts"
+    ],
+    "IWebRpcVariationAdmissionRequest": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts"
+    ],
+    "IWebRpcVariationCoordinatorPort": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/feature-contract.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts"
+    ],
+    "WEBRPC_SOURCE": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-serialization.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/listener-safety.ts",
+      "packages/rpc/test/core/error-serialization.test.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/internal/listener-safety.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/store-worker/test/serialize-worker.test.ts"
+    ],
+    "WebRpcAbortError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/internal/web-rpc-plugin-host.test.ts"
+    ],
+    "WebRpcAuthenticationError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/middleware/authentication.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts",
+      "packages/rpc/test/core/middleware/authentication.test.ts"
+    ],
+    "WebRpcCandidateStatus": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts"
+    ],
+    "WebRpcCanonicalChunkAttachment": [
+      "packages/rpc/src/core/features/canonical-chunk.ts",
+      "packages/rpc/src/core/internal/canonical-chunk-attachment.ts",
+      "packages/rpc/test/core/endpoint-kernel.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts"
+    ],
+    "WebRpcChunkError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/test/core/errors.test.ts"
+    ],
+    "WebRpcChunkEvent": ["packages/rpc/USEGUIDE.md", "packages/rpc/src/core/protocol-constants.ts"],
+    "WebRpcConfigurationError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/id.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/test/core/duplicate-owner-contract.test.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcConstructionError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/test/core/errors.test.ts"
+    ],
+    "WebRpcContractError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/provider-executor.ts",
+      "packages/rpc/test/core/composed-ping-parity.test.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/internal/provider-executor-result.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcContractFailureKind": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/internal/contract.ts",
+      "packages/rpc/src/core/protocol-constants.ts"
+    ],
+    "WebRpcControlAttachment": [
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/full.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts"
+    ],
+    "WebRpcControlKind": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/protocol-constants.ts"
+    ],
+    "WebRpcControlRole": [
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcControlRoleSchema": [
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcDebugPhase": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/internal/test-observer.ts",
+      "packages/rpc/src/core/protocol-constants.ts"
+    ],
+    "WebRpcDiscoveryAttachment": [
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts"
+    ],
+    "WebRpcEndpointStatus": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts"
+    ],
+    "WebRpcError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/browser/adapters/window.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/feature.ts",
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/canonical-chunk-attachment.ts",
+      "packages/rpc/src/core/internal/contract.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/endpoint-projection.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/id.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/plugin-descriptor.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/port-feature.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/src/core/middleware/authentication.ts",
+      "packages/rpc/src/core/middleware/canonical-protocol.ts",
+      "packages/rpc/src/core/middleware/codec.ts",
+      "packages/rpc/src/core/middleware/connect.ts",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/middleware/framer.ts",
+      "packages/rpc/src/core/middleware/hooks.ts",
+      "packages/rpc/src/core/middleware/timeout.ts",
+      "packages/rpc/src/core/middleware/uuid.ts",
+      "packages/rpc/test/core/composed-ping-parity.test.ts",
+      "packages/rpc/test/core/custom-feature.test.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/discovery-semantic-coverage.test.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/merge/error-source.test.ts",
+      "packages/store-worker/USEGUIDE.md"
+    ],
+    "WebRpcErrorCode": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "packages/rpc/src/browser/adapters/service-worker.ts",
+      "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "packages/rpc/src/browser/adapters/web-transport.ts",
+      "packages/rpc/src/browser/adapters/web-worker.ts",
+      "packages/rpc/src/browser/adapters/window.ts",
+      "packages/rpc/src/core/adapters/memory.ts",
+      "packages/rpc/src/core/adapters/message-port.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/error-serialization.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/async-control.ts",
+      "packages/rpc/src/core/internal/canonical-chunk-attachment.ts",
+      "packages/rpc/src/core/internal/contract.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/endpoint-projection.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/id.ts",
+      "packages/rpc/src/core/internal/identity.ts",
+      "packages/rpc/src/core/internal/listener-safety.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/internal/peers.ts",
+      "packages/rpc/src/core/internal/plugin-descriptor.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/port-feature.ts",
+      "packages/rpc/src/core/internal/provider-admission.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/provider-executor.ts",
+      "packages/rpc/src/core/internal/replay.ts",
+      "packages/rpc/src/core/internal/request-replay-ledger.ts",
+      "packages/rpc/src/core/internal/utf8.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/src/core/middleware/authentication.ts",
+      "packages/rpc/src/core/middleware/canonical-protocol.ts",
+      "packages/rpc/src/core/middleware/codec.ts",
+      "packages/rpc/src/core/middleware/connect.ts",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/middleware/framer.ts",
+      "packages/rpc/src/core/middleware/hooks.ts",
+      "packages/rpc/src/core/middleware/timeout.ts",
+      "packages/rpc/src/core/middleware/uuid.ts",
+      "packages/rpc/test/core/custom-feature.test.ts",
+      "packages/rpc/test/core/duplicate-owner-contract.test.ts",
+      "packages/rpc/test/core/endpoint-kernel.test.ts",
+      "packages/rpc/test/core/error-serialization.test.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/internal/listener-safety.test.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/middleware/contract.test.ts",
+      "packages/rpc/test/core/middleware/middleware.test.ts",
+      "packages/rpc/test/core/middleware/protocol.test.ts",
+      "packages/rpc/test/core/plugin-host/projection.test.ts",
+      "packages/rpc/test/core/plugin-host/topology-adapter.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/topology-rollback.test.ts",
+      "packages/rpc/test/core/transaction-contract.test.ts"
+    ],
+    "WebRpcErrorText": [
+      "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "packages/rpc/src/browser/adapters/web-transport.ts",
+      "packages/rpc/src/core/adapters/message-port.ts",
+      "packages/rpc/src/core/composed.ts",
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/error-text.ts",
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/internal/canonical-chunk-attachment.ts",
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/contract.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/disposal-translation.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/endpoint-projection.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/listener-safety.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/port-feature.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/utf8.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/src/core/middleware.ts",
+      "packages/rpc/src/core/middleware/canonical-protocol.ts",
+      "packages/rpc/src/core/middleware/codec.ts",
+      "packages/rpc/src/core/middleware/framer.ts",
+      "packages/rpc/test/core/custom-feature.test.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/middleware/protocol.test.ts",
+      "packages/rpc/test/core/plugin-host/projection.test.ts"
+    ],
+    "WebRpcFirstPartyRole": ["packages/rpc/src/core/internal/plugin-contract.ts"],
+    "WebRpcFirstPartyRoleSchema": [
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/middleware/hooks.ts",
+      "packages/rpc/src/core/middleware/ping.ts",
+      "packages/rpc/src/core/middleware/uuid.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "WebRpcLifecycleError": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/endpoint-kernel.ts",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/disposal-translation.ts",
+      "packages/rpc/src/core/internal/endpoint-projection.ts",
+      "packages/rpc/src/core/internal/operation-scope.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
+      "packages/rpc/test/core/composed-fanout-contract.test.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/duplicate-owner-contract.test.ts",
+      "packages/rpc/test/core/error-serialization.test.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/internal-ownership-boundaries.test.ts",
+      "packages/rpc/test/core/internal/listener-safety.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/plugin-host/projection.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/root-disposal.test.ts",
+      "packages/store-worker/USEGUIDE.md",
+      "packages/store-worker/src/serialize/worker.ts",
+      "packages/store-worker/test/exports.test.ts",
+      "packages/store-worker/test/serialize-worker.test.ts"
+    ],
+    "WebRpcMessageKind": [
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/provider-executor.ts",
+      "packages/rpc/src/core/semantic-constants.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcOperation": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts"
+    ],
+    "WebRpcOutboundAttachment": [
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts"
+    ],
+    "WebRpcOutboundSender": [
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/test/core/architecture.test.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts"
+    ],
+    "WebRpcPingEnablePortShape": [
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts"
+    ],
+    "WebRpcPlatform": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "packages/rpc/src/browser/adapters/service-worker.ts",
+      "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "packages/rpc/src/browser/adapters/web-transport.ts",
+      "packages/rpc/src/browser/adapters/web-worker.ts",
+      "packages/rpc/src/browser/adapters/window.ts",
+      "packages/rpc/src/core/adapters/memory.ts",
+      "packages/rpc/src/core/adapters/message-port.ts",
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/endpoint.observer.test.ts"
+    ],
+    "WebRpcPortName": [
+      "packages/rpc/src/core/features/control.ts",
+      "packages/rpc/src/core/features/discovery.ts",
+      "packages/rpc/src/core/features/outbound.ts",
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/src/core/internal/plugin-inventory.ts",
+      "packages/rpc/src/core/internal/plugin-shared-keys.ts",
+      "packages/rpc/src/core/middleware/abort.ts",
+      "packages/rpc/src/core/middleware/authentication.ts",
+      "packages/rpc/src/core/middleware/canonical-protocol.ts",
+      "packages/rpc/src/core/middleware/connect.ts",
+      "packages/rpc/src/core/middleware/contract.ts",
+      "packages/rpc/src/core/middleware/hooks.ts",
+      "packages/rpc/src/core/middleware/ping.ts",
+      "packages/rpc/src/core/middleware/timeout.ts",
+      "packages/rpc/src/core/middleware/uuid.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/internal/web-rpc-plugin-host.test.ts",
+      "packages/rpc/test/core/middleware-ports.test.ts",
+      "packages/rpc/test/core/middleware/contract.test.ts",
+      "packages/rpc/test/core/middleware/helpers.ts",
+      "packages/rpc/test/core/middleware/middleware.test.ts",
+      "packages/rpc/test/core/middleware/protocol.test.ts",
+      "packages/rpc/test/core/plugin-host/type-contract.test-d.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts"
+    ],
+    "WebRpcProtocolError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/test/core/errors.test.ts"
+    ],
+    "WebRpcProviderAttachment": [
+      "packages/rpc/src/core/features/provider.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts"
+    ],
+    "WebRpcProviderCancellationPortMetadata": [
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcProviderRole": [
+      "packages/rpc/src/core/internal/feature-policy.ts",
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcProviderRoleSchema": [
+      "packages/rpc/src/core/internal/plugin-contract.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcRemoteError": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/store-worker/e2e/store-worker.spec.ts",
+      "packages/store-worker/test/exports.test.ts"
+    ],
+    "WebRpcRoutingProfile": [
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/routing-data.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts",
+      "packages/rpc/test/core/internal/provider-executor-result.test.ts"
+    ],
+    "WebRpcRoutingType": [
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/routing-data.ts",
+      "packages/rpc/test/core/discovery-attachment-boundaries.test.ts"
+    ],
+    "WebRpcSchemaValidationError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/contract.ts",
+      "packages/rpc/src/core/internal/provider-executor.ts",
+      "packages/rpc/test/core/internal/contract.test.ts",
+      "packages/rpc/test/core/internal/provider-executor-result.test.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcSerializationError": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/error-serialization.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/test/core/error-serialization.test.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/internal/outbound-sender.test.ts"
+    ],
+    "WebRpcTimeoutError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/construction-install.ts",
+      "packages/rpc/src/core/internal/discovery-attachment.ts",
+      "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
+      "packages/rpc/src/core/internal/operation-scope.ts",
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/test/core/errors.test.ts",
+      "packages/rpc/test/core/internal/web-rpc-plugin-host.test.ts"
+    ],
+    "WebRpcTransportEncoding": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts"
+    ],
+    "WebRpcTransportError": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "packages/rpc/src/browser/adapters/web-transport.ts",
+      "packages/rpc/src/core/adapters/memory.ts",
+      "packages/rpc/src/core/adapters/message-port.ts",
+      "packages/rpc/src/core/error-code.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/outbound-sender.ts",
+      "packages/rpc/test/core/provider-production-seam.test.ts"
+    ],
+    "WebRpcTransportOwnership": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/browser/adapters/broadcast-channel.ts",
+      "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "packages/rpc/src/browser/adapters/service-worker.ts",
+      "packages/rpc/src/browser/adapters/shared-worker.ts",
+      "packages/rpc/src/browser/adapters/web-transport.ts",
+      "packages/rpc/src/browser/adapters/web-worker.ts",
+      "packages/rpc/src/browser/adapters/window.ts",
+      "packages/rpc/src/core/adapters/memory.ts",
+      "packages/rpc/src/core/adapters/message-port.ts",
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts",
+      "packages/rpc/test/core/endpoint.observer.test.ts"
+    ],
+    "WebRpcTransportTopology": [
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/protocol-constants.ts",
+      "packages/rpc/src/core/transport-constants.ts"
+    ],
+    "WebRpcVariation": [
+      "packages/rpc/src/core/internal/control-attachment.ts",
+      "packages/rpc/src/core/internal/provider-attachment.ts",
+      "packages/rpc/src/core/internal/routing-data.ts",
+      "packages/rpc/src/core/semantic-constants.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts"
+    ],
+    "WebRpcVariationCoordinator": [
+      "packages/rpc/src/core/internal/outbound-attachment.ts",
+      "packages/rpc/src/core/internal/variation-coordinator.ts",
+      "packages/rpc/test/core/topology-rollback.test.ts",
+      "packages/rpc/test/core/tree-shaking/retained-allocation-attribution.test.ts"
+    ],
+    "isWebRpcError": [
+      "packages/rpc/README.md",
+      "packages/rpc/USEGUIDE.md",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/index.ts",
+      "packages/rpc/test/core/errors.test.ts"
+    ],
+    "tagWebRpcError": [
+      "packages/rpc/src/browser/adapters/rtc-data-channel.ts",
+      "packages/rpc/src/browser/adapters/web-transport.ts",
+      "packages/rpc/src/core/errors.ts",
+      "packages/rpc/src/core/internal/async-control.ts",
+      "packages/rpc/src/core/internal/identity.ts",
+      "packages/rpc/src/core/internal/listener-safety.ts",
+      "packages/rpc/src/core/internal/peers.ts",
+      "packages/rpc/src/core/internal/provider-admission.ts",
+      "packages/rpc/src/core/internal/replay.ts",
+      "packages/rpc/src/core/internal/request-replay-ledger.ts",
+      "packages/rpc/src/core/internal/utf8.ts",
+      "packages/rpc/test/core/errors.test.ts"
+    ]
+  },
+  "browserOnlyErrorTextKeys": ["rtcSubscriptionCleanupFailed", "webTransportCleanupFailed"]
+}

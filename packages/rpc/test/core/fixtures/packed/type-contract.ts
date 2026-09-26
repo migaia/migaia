@@ -10,8 +10,8 @@ import {
   defineMiddleware,
   framer,
   protocol as canonicalProtocol,
-  type IWebRpcFeature,
-  type IWebRpcPlugin
+  type IRpcFeature,
+  type IRpcPlugin
 } from '@migaia/rpc/core'
 import { buildCapabilityTopology, type ITopologyNode } from '@migaia/capability/graph/topology'
 import rpcV1, { rpcProtocol } from '@migaia/rpc/contract/v1'
@@ -22,17 +22,14 @@ import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodec } from '@migaia/serialize/codec'
-import type { IWebRpcTransport } from '@migaia/rpc/core'
+import type { IRpcTransport } from '@migaia/rpc/core'
 
-declare const semantic: IWebRpcTransport<IRpcEnvelope>
-declare const opaque: IWebRpcTransport<unknown>
-declare const text: IWebRpcTransport<string>
-declare const textFrames: IWebRpcTransport<string | IRpcStringFrame>
+declare const semantic: IRpcTransport<IRpcEnvelope>
+declare const opaque: IRpcTransport<unknown>
+declare const text: IRpcTransport<string>
+declare const textFrames: IRpcTransport<string | IRpcStringFrame>
 declare const customStringFramer: IRpcFramer<string, string, 'custom', 1>
-declare const stagedInboundMismatch: Omit<
-  IWebRpcTransport<string | IRpcStringFrame>,
-  'subscribe'
-> & {
+declare const stagedInboundMismatch: Omit<IRpcTransport<string | IRpcStringFrame>, 'subscribe'> & {
   readonly subscribe: (listener: (message: { readonly data: Uint8Array }) => void) => () => void
 }
 
@@ -104,7 +101,7 @@ async function verifyPackedContracts(): Promise<void> {
     features: [packedFeature] as const
   })
   void rootWithFeature.custom()
-  const widenedFeatures = [packedFeature] as IWebRpcFeature[]
+  const widenedFeatures = [packedFeature] as IRpcFeature[]
   /** Compile-only branch proves widened feature arrays remain rejected at the public boundary. */
   const typeOnlyBranch: boolean = false
   if (typeOnlyBranch) {
@@ -113,7 +110,7 @@ async function verifyPackedContracts(): Promise<void> {
   }
 
   // @ts-expect-error removed context middleware objects are not native public plugins
-  const legacyPlugin: IWebRpcPlugin = { name: 'legacy', install() {} }
+  const legacyPlugin: IRpcPlugin = { name: 'legacy', install() {} }
   void legacyPlugin
 
   const providerEndpoint = await createProviderEndpoint(config('packed-provider-types'))
@@ -231,7 +228,7 @@ async function verifyPackedPipelineMatrix(): Promise<void> {
   await createFullEndpoint({
     id: 'packed-plugin-json-identity-binary',
     middlewares: [canonicalProtocol(rpcProtocol), codec(json), framer(messageFramer)] as const,
-    transport: undefined as unknown as IWebRpcTransport<Uint8Array>
+    transport: undefined as unknown as IRpcTransport<Uint8Array>
   })
   await createFullEndpoint({
     id: 'packed-top-level-framer-overrides-plugin-binary',

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { HookRegistry } from '../../src/core/internal/hooks.js'
-import type { IWebRpcHookEvent } from '../../src/core/typing.js'
+import type { IRpcHookEvent } from '../../src/core/typing.js'
 
 /** Creates the smallest valid hook event while keeping each trace label explicit. */
-const event = (name: string): IWebRpcHookEvent => ({ name, at: 0, localId: 'local' })
+const event = (name: string): IRpcHookEvent => ({ name, at: 0, localId: 'local' })
 
 describe('SWV2-T53 web-rpc event-subscriber traces', () => {
   it('preserves recursive nested hook order through HookRegistry', () => {

@@ -3,13 +3,13 @@ import { VerifiedPeerRegistry } from '../../../src/core/internal/identity.js'
 
 describe('VerifiedPeerRegistry', () => {
   it('keeps source bindings injective across delimiter characters', () => {
-    const registry = new VerifiedPeerRegistry()
+    const registry = new VerifiedPeerRegistry(() => Date.now())
     expect(registry.register('a:b', 'c', 'd')).not.toBe(registry.register('a', 'b:c', 'd'))
     expect(registry.register('a:b', 'c', 'd')).toBe(registry.register('a:b', 'c', 'd'))
   })
 
   it('rejects new bindings without evicting retained identities', () => {
-    const registry = new VerifiedPeerRegistry(2)
+    const registry = new VerifiedPeerRegistry(() => Date.now(), 2)
     registry.register('first')
     registry.register('second')
     expect(registry.register('third')).toBe(false)
@@ -19,7 +19,7 @@ describe('VerifiedPeerRegistry', () => {
   })
 
   it('bounds bindings per origin', () => {
-    const registry = new VerifiedPeerRegistry(10, 2)
+    const registry = new VerifiedPeerRegistry(() => Date.now(), 10, 2)
     registry.register('one', undefined, 'https://example.test', 'a')
     registry.register('two', undefined, 'https://example.test', 'b')
     expect(registry.register('three', undefined, 'https://example.test', 'c')).toBe(false)
@@ -29,7 +29,7 @@ describe('VerifiedPeerRegistry', () => {
   })
 
   it('expires bindings and requires reauthentication', () => {
-    const registry = new VerifiedPeerRegistry(10, 2, 1)
+    const registry = new VerifiedPeerRegistry(() => Date.now(), 10, 2, 1)
     const first = registry.register('peer')
     return new Promise<void>((resolve) =>
       setTimeout(() => {
@@ -41,7 +41,7 @@ describe('VerifiedPeerRegistry', () => {
   })
 
   it('does not expire a binding while an operation retains its lease', () => {
-    const registry = new VerifiedPeerRegistry(2, 2, 1)
+    const registry = new VerifiedPeerRegistry(() => Date.now(), 2, 2, 1)
     const token = registry.register('active')
     expect(typeof token).toBe('string')
     expect(registry.retain(token as string)).toBe(true)
@@ -57,7 +57,7 @@ describe('VerifiedPeerRegistry', () => {
   it('retain() does not purge the exact token it is about to retain (round-2 regression)', () => {
     vi.useFakeTimers()
     try {
-      const registry = new VerifiedPeerRegistry(4, 4, 1) // maxBindingAgeMs=1: any elapsed tick is "expired"
+      const registry = new VerifiedPeerRegistry(() => Date.now(), 4, 4, 1) // maxBindingAgeMs=1: any elapsed tick is "expired"
       const token = registry.register('peer')
       vi.advanceTimersByTime(5) // idle past maxBindingAgeMs before the binding is ever retained
       // A naive purge-then-lookup retain() would delete this binding here and return false.
@@ -71,7 +71,7 @@ describe('VerifiedPeerRegistry', () => {
   it('force-expires a retained binding after its hard lifetime', () => {
     vi.useFakeTimers()
     try {
-      const registry = new VerifiedPeerRegistry(10, 2, 10)
+      const registry = new VerifiedPeerRegistry(() => Date.now(), 10, 2, 10)
       const token = registry.register('retained')
       expect(registry.retain(token as string)).toBe(true)
       vi.advanceTimersByTime(1_001)

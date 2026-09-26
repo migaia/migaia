@@ -5,8 +5,8 @@ import { readEndpointDebugSnapshot } from '../../src/core/internal/test-observer
 import { connect } from '../../src/core/middleware/connect.js'
 import { codec } from '../../src/core/middleware/codec.js'
 import { framer } from '../../src/core/middleware/framer.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../../src/core/transport-constants.js'
-import type { IWebRpcInboundMessage } from '../../src/core/transport.js'
+import { RpcPlatform, RpcTransportOwnership } from '../../src/core/transport-constants.js'
+import type { IRpcInboundMessage } from '../../src/core/transport.js'
 import { fullRuntimeOwnerKeys } from './fixtures/tree-shaking/runtime-owner-topology.js'
 import { createStringFramer, type IRpcFrameContext } from '../../src/contract/framing/index.js'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
@@ -221,7 +221,7 @@ describe('endpoint test-only lifecycle observer', () => {
 
   it('requires public endpoints to preserve opaque custom frames through both sources with the same key', async () => {
     /** Captures the public endpoint subscriber so the fixture injects real transport ingress. */
-    let receive: ((message: IWebRpcInboundMessage) => void) | undefined
+    let receive: ((message: IRpcInboundMessage) => void) | undefined
     /** Identifies physical source A independently from the equal custom frame key. */
     const sourceA = Object.freeze({ id: 'opaque-a' })
     /** Identifies physical source B independently from the equal custom frame key. */
@@ -230,12 +230,12 @@ describe('endpoint test-only lifecycle observer', () => {
     const received: string[] = []
     /** Supplies one real multiplexed public transport with a captured subscriber. */
     const serverTransport = {
-      platform: WebRpcPlatform.memory,
+      platform: RpcPlatform.memory,
       topology: 'multiplexed' as const,
-      ownership: WebRpcTransportOwnership.borrowed,
+      ownership: RpcTransportOwnership.borrowed,
       sourceProof: (source: unknown) => source === sourceA || source === sourceB,
       send: () => undefined,
-      subscribe(listener: (message: IWebRpcInboundMessage) => void) {
+      subscribe(listener: (message: IRpcInboundMessage) => void) {
         receive = listener
         return () => {
           receive = undefined

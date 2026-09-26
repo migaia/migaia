@@ -5,11 +5,7 @@ import {
   readPluginHostDisposalProvenance
 } from '@migaia/plugin-host'
 import type { IPluginHostCore } from '@migaia/plugin-host'
-import {
-  createEndpoint,
-  WebRpcLifecycleError,
-  type IWebRpcTransport
-} from '../../src/core/index.js'
+import { createEndpoint, RpcLifecycleError, type IRpcTransport } from '../../src/core/index.js'
 import { translateEndpointDisposalError } from '../../src/core/internal/disposal-translation.js'
 import { connect } from '../../src/core/middleware/connect.js'
 
@@ -143,7 +139,7 @@ describe('composed endpoint root disposal boundary', () => {
   it('translates host cleanup while preserving raw cause, child identity, and Promise identity', async () => {
     const endpointPrimary = new Error('unsubscribe failed')
     const primaryStack = endpointPrimary.stack
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       platform: 'Memory',
       ownership: 'borrowed',
       send() {},
@@ -164,7 +160,7 @@ describe('composed endpoint root disposal boundary', () => {
     expect(second).toBe(first)
 
     const failure = await first.catch((error: unknown) => error)
-    expect(failure).toBeInstanceOf(WebRpcLifecycleError)
+    expect(failure).toBeInstanceOf(RpcLifecycleError)
     expect(failure).toMatchObject({
       source: '@migaia/rpc/core',
       code: 'ENDPOINT_DISPOSED',
@@ -189,7 +185,7 @@ describe('composed endpoint root disposal boundary', () => {
     const secondCleanup = new Error('transport error unsubscribe failed')
     const firstStack = firstCleanup.stack
     const secondStack = secondCleanup.stack
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       platform: 'Memory',
       ownership: 'borrowed',
       send() {},
@@ -217,7 +213,7 @@ describe('composed endpoint root disposal boundary', () => {
     const second = endpoint.dispose()
     expect(second).toBe(first)
     const failure = await first.catch((error: unknown) => error)
-    expect(failure).toBeInstanceOf(WebRpcLifecycleError)
+    expect(failure).toBeInstanceOf(RpcLifecycleError)
     expect(failure).toMatchObject({
       source: '@migaia/rpc/core',
       code: 'ENDPOINT_DISPOSED',
@@ -240,12 +236,12 @@ describe('composed endpoint root disposal boundary', () => {
 
   it('returns an already-existing nested lifecycle error by exact identity', async () => {
     const nestedPrimary = new Error('nested cleanup failed')
-    const nestedLifecycleError = new WebRpcLifecycleError(
+    const nestedLifecycleError = new RpcLifecycleError(
       'Endpoint disposal completed with cleanup errors',
       nestedPrimary,
       [{ resource: 'nested root', error: nestedPrimary }]
     )
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       platform: 'Memory',
       ownership: 'borrowed',
       send() {},

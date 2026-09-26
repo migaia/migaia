@@ -132,7 +132,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
     const outboundAttachmentSource = SOURCES['../../src/core/internal/outbound-attachment.ts']
     expect(senderSource).toBeDefined()
     expect(outboundAttachmentSource).toBeDefined()
-    expect(senderSource).toContain('class WebRpcOutboundSender')
+    expect(senderSource).toContain('class RpcOutboundSender')
     expect(senderSource).not.toContain('WebRpcOutboundPipeline')
     expect(senderSource).not.toMatch(/\b(?:stage|next)\s*:/)
     expect(importSpecifiers(outboundAttachmentSource)).toContain('./outbound-sender.js')

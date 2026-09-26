@@ -4,21 +4,21 @@ import { createComposedEndpoint } from '../../src/core/composed.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
 import { createFullEndpoint } from '../../src/core/full.js'
 import { defineRpcFeature } from '../../src/core/internal/define-rpc-feature.js'
-import { WebRpcErrorCode } from '../../src/core/errors.js'
+import { RpcCoreErrorCode } from '../../src/core/errors.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
-import type { IWebRpcCoreConfig } from '../../src/core/composed.js'
-import type { IWebRpcPluginInstallScope } from '../../src/core/typing.js'
+import type { IRpcCoreConfig } from '../../src/core/composed.js'
+import type { IRpcPluginInstallScope } from '../../src/core/typing.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { InboundIdentityCoordinator } from '../../src/core/internal/inbound-identity.js'
-import { WebRpcVariationCoordinator } from '../../src/core/internal/variation-coordinator.js'
+import { RpcVariationCoordinator } from '../../src/core/internal/variation-coordinator.js'
 
 let configSequence = 0
 
 /** Builds a minimal composition config while exposing subscription side effects. */
 function createConfig(
   onSubscribe: () => void,
-  extraMiddlewares: readonly IWebRpcCoreConfig['middlewares'][number][] = []
-): IWebRpcCoreConfig {
+  extraMiddlewares: readonly IRpcCoreConfig['middlewares'][number][] = []
+): IRpcCoreConfig {
   const [transport] = createMemoryTransportPair()
   return {
     id: `topology-${++configSequence}`,
@@ -34,7 +34,7 @@ function createConfig(
 }
 
 /** Creates a first-party native prepare root whose cleanup is owned by the real construction scope. */
-function definePrepareRoot(install: (scope: IWebRpcPluginInstallScope) => object) {
+function definePrepareRoot(install: (scope: IRpcPluginInstallScope) => object) {
   return defineRpcFeature(
     {
       publicKeys: [],
@@ -56,6 +56,7 @@ describe('composition topology and rollback', () => {
   it('admits one shared source identity lease and rejects forged source proof', async () => {
     const accepted = {}
     const coordinator = new InboundIdentityCoordinator({
+      now: () => Date.now(),
       platform: 'Memory',
       sourceProof: (source) => source === accepted
     })
@@ -90,6 +91,7 @@ describe('composition topology and rollback', () => {
     let verifyCalls = 0
     let resolveVerify: ((value: boolean) => void) | undefined
     const coordinator = new InboundIdentityCoordinator({
+      now: () => Date.now(),
       platform: 'Memory',
       sourceProof: (value) => {
         proofCalls += 1
@@ -151,6 +153,7 @@ describe('composition topology and rollback', () => {
   it('reuses an established lease for source-less inbound messages', async () => {
     let verifyCalls = 0
     const coordinator = new InboundIdentityCoordinator({
+      now: () => Date.now(),
       platform: 'Memory',
       connect: {
         verify: async () => {
@@ -174,6 +177,7 @@ describe('composition topology and rollback', () => {
   it('admits a deferred verification once and denies a pending receipt replay', async () => {
     let resolveVerify: ((value: boolean) => void) | undefined
     const coordinator = new InboundIdentityCoordinator({
+      now: () => Date.now(),
       platform: 'Memory',
       connect: {
         verify: () =>
@@ -200,6 +204,7 @@ describe('composition topology and rollback', () => {
     const rejection = new Error('verify rejection')
     let rejectVerify: ((reason: unknown) => void) | undefined
     const coordinator = new InboundIdentityCoordinator({
+      now: () => Date.now(),
       platform: 'Memory',
       connect: {
         verify: () =>
@@ -226,6 +231,7 @@ describe('composition topology and rollback', () => {
     let proofCalls = 0
     let coordinator: InboundIdentityCoordinator
     coordinator = new InboundIdentityCoordinator({
+      now: () => Date.now(),
       platform: 'Memory',
       sourceProof: () => {
         proofCalls += 1
@@ -240,6 +246,7 @@ describe('composition topology and rollback', () => {
   it('reuses only the exact logical and physical identity tuple', async () => {
     let verifies = 0
     const coordinator = new InboundIdentityCoordinator({
+      now: () => Date.now(),
       platform: 'Memory',
       connect: {
         verify: async () => {
@@ -299,8 +306,8 @@ describe('composition topology and rollback', () => {
       data: null,
       inbound: { data: null, source: {} }
     }
-    const owner = new InboundIdentityCoordinator({ platform: 'Memory' })
-    const foreign = new InboundIdentityCoordinator({ platform: 'Memory' })
+    const owner = new InboundIdentityCoordinator({ now: () => Date.now(), platform: 'Memory' })
+    const foreign = new InboundIdentityCoordinator({ now: () => Date.now(), platform: 'Memory' })
     const prepared = owner.prepareSource(request.inbound)!
     await expect(foreign.admitPrepared(prepared, request)).resolves.toBeUndefined()
     await expect(owner.admitPrepared({ ...prepared }, request)).resolves.toBeUndefined()
@@ -314,7 +321,10 @@ describe('composition topology and rollback', () => {
   })
 
   it('keeps variation route ownership single-provider and replay-admitted', async () => {
-    const coordinator = new WebRpcVariationCoordinator(() => Date.now())
+    const coordinator = new RpcVariationCoordinator(
+      () => Date.now(),
+      () => Date.now()
+    )
     const received: string[] = []
     coordinator.register('abort', (_message, peerKey) => {
       received.push(peerKey)
@@ -406,7 +416,7 @@ describe('composition topology and rollback', () => {
         createConfig(() => subscriptions++),
         { 'first-party-blocked': blocked, 'first-party-conflicting': conflicting }
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(subscriptions).toBe(0)
     expect(installations).toBe(0)
   })
@@ -424,7 +434,7 @@ describe('composition topology and rollback', () => {
       *[Symbol.iterator](): IterableIterator<never> {
         throw new Error('iterator failure')
       }
-    } as unknown as Readonly<Record<string, import('../../src/core/feature.js').IWebRpcFeature>>
+    } as unknown as Readonly<Record<string, import('../../src/core/feature.js').IRpcFeature>>
 
     await expect(
       createComposedEndpoint(
@@ -432,7 +442,7 @@ describe('composition topology and rollback', () => {
         hostile
       )
     ).rejects.toMatchObject({
-      code: WebRpcErrorCode.invalidConfig
+      code: RpcCoreErrorCode.invalidConfig
     })
     expect(subscriptions).toBe(0)
   })
@@ -460,7 +470,7 @@ describe('composition topology and rollback', () => {
         createConfig(() => subscriptions++),
         { 'first-party-dependent': dependent }
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(subscriptions).toBe(0)
   })
 
@@ -487,16 +497,16 @@ describe('composition topology and rollback', () => {
       createComposedEndpoint(
         createConfig(() => subscriptions++),
         [root] as unknown as Readonly<
-          Record<string, import('../../src/core/feature.js').IWebRpcFeature>
+          Record<string, import('../../src/core/feature.js').IRpcFeature>
         >
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     await expect(
       createComposedEndpoint(
         createConfig(() => subscriptions++),
         { 'first-party-malformed': malformed }
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(subscriptions).toBe(0)
   })
 
@@ -676,7 +686,7 @@ describe('composition topology and rollback', () => {
       },
       () =>
         Object.freeze({
-          prepare: (scope: IWebRpcPluginInstallScope) => {
+          prepare: (scope: IRpcPluginInstallScope) => {
             scope.own('first', () => {
               disposed.push('first')
             })
@@ -699,7 +709,7 @@ describe('composition topology and rollback', () => {
       },
       () =>
         Object.freeze({
-          prepare: (scope: IWebRpcPluginInstallScope) => {
+          prepare: (scope: IRpcPluginInstallScope) => {
             scope.own('second', () => {
               disposed.push('second')
             })

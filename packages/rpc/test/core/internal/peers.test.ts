@@ -3,7 +3,7 @@ import { PeerRegistry } from '../../../src/core/internal/peers.js'
 
 describe('PeerRegistry', () => {
   it('bounds learned peers without evicting configured targets', () => {
-    const peers = new PeerRegistry<string>(2)
+    const peers = new PeerRegistry<string>(() => Date.now(), 2)
     peers.add('configured', true)
     peers.add('one')
     peers.add('two')
@@ -12,7 +12,7 @@ describe('PeerRegistry', () => {
   })
 
   it('clears all peer state at endpoint disposal', () => {
-    const peers = new PeerRegistry<string>()
+    const peers = new PeerRegistry<string>(() => Date.now())
     peers.add('configured', true)
     peers.add('learned')
     peers.clear()
@@ -20,7 +20,7 @@ describe('PeerRegistry', () => {
   })
 
   it('expires learned peers while retaining configured targets', async () => {
-    const peers = new PeerRegistry<string>(10, 10)
+    const peers = new PeerRegistry<string>(() => Date.now(), 10, 10)
     peers.add('configured', true)
     peers.add('learned')
     await new Promise((resolve) => setTimeout(resolve, 20))

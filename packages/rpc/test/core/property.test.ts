@@ -218,7 +218,7 @@ describe('property invariants', () => {
     fc.assert(
       fc.property(fc.boolean(), fc.boolean(), (abortClosing, staleGeneration) => {
         const closing = new AbortController()
-        const scope = new OperationScope(7, false, closing.signal)
+        const scope = new OperationScope(7, false, closing.signal, () => Date.now())
         if (abortClosing) closing.abort()
         const generation = staleGeneration ? 8 : 7
         if (abortClosing || staleGeneration)

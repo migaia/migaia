@@ -68,6 +68,6 @@ describe('authentication middleware', () => {
         endpointId: 'endpoint',
         platform: 'Memory'
       })
-    ).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED', name: 'WebRpcAuthenticationError' })
+    ).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED', name: 'RpcAuthenticationError' })
   })
 })

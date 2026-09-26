@@ -8,7 +8,7 @@ import { defineFeature } from '../../../src/core/feature.js'
 import { readEndpointDebugSnapshot } from '../../../src/core/internal/test-observer.js'
 import {
   createFirstPartyRoots,
-  type IWebRpcFirstPartyRootName
+  type IRpcFirstPartyRootName
 } from '../../../src/core/internal/first-party-roots.js'
 import {
   clientRuntimeOwnerKeys,
@@ -83,7 +83,7 @@ describe('WRC-B01 static composition contracts', () => {
 
   it('accepts every pair with one canonical outbound dependency closure', async () => {
     const core = await import('../../../src/core/composed.js')
-    const roots: readonly IWebRpcFirstPartyRootName[] = [
+    const roots: readonly IRpcFirstPartyRootName[] = [
       'first-party-outbound',
       'first-party-provider',
       'first-party-discovery',
@@ -243,7 +243,7 @@ describe('WRC-B01 static composition contracts', () => {
 
   it('constructs and disposes each remaining valid native singleton root', async () => {
     const core = await import('../../../src/core/composed.js')
-    const roots: readonly IWebRpcFirstPartyRootName[] = [
+    const roots: readonly IRpcFirstPartyRootName[] = [
       'first-party-discovery',
       'first-party-control',
       'first-party-chunk'

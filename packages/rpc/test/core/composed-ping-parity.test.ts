@@ -5,14 +5,14 @@ import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { ping } from '../../src/core/middleware/ping.js'
 import { uuid } from '../../src/core/middleware/uuid.js'
-import { WebRpcError, WebRpcContractError } from '../../src/core/errors.js'
+import { RpcError, RpcContractError } from '../../src/core/errors.js'
 import {
   readEndpointDebugSnapshot,
   registerEndpointTimePortObserver,
-  type IWebRpcTimePortEvent
+  type IRpcTimePortEvent
 } from '../../src/core/internal/test-observer.js'
-import type { IWebRpcAbortSignal } from '../../src/core/typing.js'
-import type { IWebRpcTransport } from '../../src/core/transport.js'
+import type { IRpcAbortSignal } from '../../src/core/typing.js'
+import type { IRpcTransport } from '../../src/core/transport.js'
 
 /**
  * Regression gate for `SOL-CB-R7-P1-001`/`SOL-CB-R7-P1-002`: exercises the composed root
@@ -48,9 +48,9 @@ describe('composed root ping() parity', () => {
       } catch (error) {
         thrown = error
       }
-      expect(thrown).toBeInstanceOf(WebRpcError)
-      expect((thrown as WebRpcError).code).toBe('MIDDLEWARE_MISSING')
-      expect((thrown as WebRpcError).message).toBe('ping middleware is not installed')
+      expect(thrown).toBeInstanceOf(RpcError)
+      expect((thrown as RpcError).code).toBe('MIDDLEWARE_MISSING')
+      expect((thrown as RpcError).message).toBe('ping middleware is not installed')
     } finally {
       await client.dispose()
     }
@@ -70,9 +70,9 @@ describe('composed root ping() parity', () => {
       } catch (error) {
         thrown = error
       }
-      expect(thrown).toBeInstanceOf(WebRpcContractError)
-      expect((thrown as WebRpcContractError).code).toBe('CONTRACT_INVALID')
-      expect((thrown as WebRpcContractError).message).toBe(
+      expect(thrown).toBeInstanceOf(RpcContractError)
+      expect((thrown as RpcContractError).code).toBe('CONTRACT_INVALID')
+      expect((thrown as RpcContractError).message).toBe(
         'targetId must be a non-empty identifier within the limit'
       )
     } finally {
@@ -142,7 +142,7 @@ describe('composed root ping() parity', () => {
     const fixedNow = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
     const [baseClientTransport, serverTransport] = createMemoryTransportPair()
     const taskIds: string[] = []
-    const clientTransport: IWebRpcTransport = {
+    const clientTransport: IRpcTransport = {
       ...baseClientTransport,
       send(message, options) {
         const candidate = message as { readonly kind?: unknown; readonly id?: unknown }
@@ -188,7 +188,7 @@ describe('composed root ping() parity', () => {
   it('rejects a reused UUID before overwriting the first timeout-disabled ping', async () => {
     const [clientTransport] = createMemoryTransportPair()
     let sendCount = 0
-    const instrumentedTransport: IWebRpcTransport = {
+    const instrumentedTransport: IRpcTransport = {
       ...clientTransport,
       send(message, options) {
         sendCount += 1
@@ -204,13 +204,13 @@ describe('composed root ping() parity', () => {
         uuid({ generate: ({ variation }) => `${variation}-constant` })
       ] as const
     })
-    const timeEvents: IWebRpcTimePortEvent[] = []
+    const timeEvents: IRpcTimePortEvent[] = []
     const unregisterTimeObserver = registerEndpointTimePortObserver(client, (event) => {
       timeEvents.push(event)
     })
     let firstAbortAddCount = 0
     let firstAbortRemoveCount = 0
-    const firstSignal: IWebRpcAbortSignal = {
+    const firstSignal: IRpcAbortSignal = {
       aborted: false,
       addEventListener: () => {
         firstAbortAddCount += 1
@@ -221,7 +221,7 @@ describe('composed root ping() parity', () => {
     }
     let collisionAbortAddCount = 0
     let collisionAbortRemoveCount = 0
-    const collisionSignal: IWebRpcAbortSignal = {
+    const collisionSignal: IRpcAbortSignal = {
       aborted: false,
       addEventListener: () => {
         collisionAbortAddCount += 1

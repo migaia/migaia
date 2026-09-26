@@ -1,20 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createComposedEndpoint, type IWebRpcCoreConfig } from '../../src/core/composed.js'
+import { createComposedEndpoint, type IRpcCoreConfig } from '../../src/core/composed.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createClientFirstPartyRoots } from '../../src/core/internal/client-first-party-roots.js'
 import { createProviderFirstPartyRoots } from '../../src/core/internal/provider-first-party-roots.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { defineMiddleware } from '../../src/core/middleware.js'
 import { defineFeature } from '@migaia/plugin-host'
-import type {
-  IWebRpcMiddleware,
-  IWebRpcPlugin,
-  IWebRpcPluginInstallResult
-} from '../../src/core/typing.js'
-import type { IWebRpcHookEvent } from '../../src/core/typing.js'
-import type { IWebRpcPluginConstraint } from '../../src/core/internal/plugin-contract.js'
+import type { IRpcMiddleware, IRpcPlugin, IRpcPluginInstallResult } from '../../src/core/typing.js'
+import type { IRpcHookEvent } from '../../src/core/typing.js'
+import type { IRpcPluginConstraint } from '../../src/core/internal/plugin-contract.js'
 import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
-import { WebRpcErrorCode } from '../../src/core/errors.js'
+import { RpcCoreErrorCode } from '../../src/core/errors.js'
 
 type IObservedHost = {
   readonly config: { readonly get: (path: string) => unknown }
@@ -38,7 +34,7 @@ const observed = vi.hoisted(() => ({
   batches: [] as IObservedBatch[],
   disposals: [] as IObservedDisposal[],
   events: [] as string[],
-  hookEvents: [] as IWebRpcHookEvent[],
+  hookEvents: [] as IRpcHookEvent[],
   throwFromHook: false,
   hosts: [] as IObservedHost[],
   views: [] as IObservedView[]
@@ -73,7 +69,7 @@ vi.mock('../../src/core/internal/web-rpc-plugin-host.js', async () => {
     )
     const wrapped = Object.freeze({
       ...host,
-      installBatch: async (plugins: readonly IWebRpcPluginConstraint[]) => {
+      installBatch: async (plugins: readonly IRpcPluginConstraint[]) => {
         observed.events.push('host:installBatch')
         observed.batches.push({ host: wrapped, names: plugins.map((plugin) => plugin.name) })
         const view = await host.installBatch(plugins)
@@ -121,8 +117,8 @@ let configSequence = 0
 /** Creates a transport whose physical subscription remains observable during composition. */
 function createConfig(
   onSubscribe: () => void,
-  middlewares: readonly IWebRpcMiddleware[] = [connect()]
-): IWebRpcCoreConfig {
+  middlewares: readonly IRpcMiddleware[] = [connect()]
+): IRpcCoreConfig {
   const [transport] = createMemoryTransportPair()
   return {
     id: `transaction-contract-${configSequence++}`,
@@ -161,8 +157,8 @@ function createSharedMiddleware(
   key: PropertyKey,
   value: unknown,
   dispose: () => void
-): IWebRpcPlugin {
-  const result: IWebRpcPluginInstallResult = {
+): IRpcPlugin {
+  const result: IRpcPluginInstallResult = {
     extension: {},
     ports: { [key]: value }
   }
@@ -250,7 +246,7 @@ describe('MET-RED-007 Host rollback ownership', () => {
     const host = observed.hosts[0]!
     expect(Object.hasOwn(host, 'transactionExtension')).toBe(false)
     expect(() => host.getPort(sharedKey)).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.endpointDisposed })
+      expect.objectContaining({ code: RpcCoreErrorCode.endpointDisposed })
     )
     expect(observed.disposals).toHaveLength(1)
     expect(new Set(observed.disposals.map(({ host: disposedHost }) => disposedHost)).size).toBe(1)
@@ -261,7 +257,7 @@ describe('MET-RED-016 activation boundary', () => {
   it('proves transport subscription is deferred until the complete Host batch commits', async () => {
     let subscriptions = 0
     let installSubscriptionCount = -1
-    const observer: IWebRpcPlugin = {
+    const observer: IRpcPlugin = {
       name: 'transaction-install-observer',
       metadata: { claims: emptyClaims },
       install: () => {
@@ -286,7 +282,7 @@ describe('MET-RED-016 activation boundary', () => {
   it('proves failed install keeps transport unsubscribed and activation uncommitted', async () => {
     let subscriptions = 0
     let installSubscriptionCount = -1
-    const observer: IWebRpcPlugin = {
+    const observer: IRpcPlugin = {
       name: 'transaction-install-observer',
       metadata: { claims: emptyClaims },
       install: () => {
@@ -400,7 +396,7 @@ describe('MET-RED-031 construction and disposal race', () => {
         reject(error)
       }
     })
-    const delayed: IWebRpcPlugin = {
+    const delayed: IRpcPlugin = {
       name: 'transaction-delayed-failure',
       metadata: { claims: emptyClaims },
       install: (scope) => {
@@ -489,7 +485,7 @@ describe('MET-RED-031 construction and disposal race', () => {
     const pendingInstall = new Promise<never>((_resolve, reject) => {
       rejectLate = reject
     })
-    const delayed: IWebRpcPlugin = {
+    const delayed: IRpcPlugin = {
       name: 'transaction-throwing-diagnostic',
       metadata: { claims: emptyClaims },
       install: (scope) => {
