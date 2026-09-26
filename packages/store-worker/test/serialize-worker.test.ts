@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WEBRPC_SOURCE, WebRpcLifecycleError } from '@migaia/rpc/core'
+import { RPC_CORE_ERROR_SOURCE, RpcLifecycleError } from '@migaia/rpc/core'
 import { StoreWorkerErrorCode } from '../src/error-code.js'
 import { workerParser } from '../src/serialize/worker.js'
 import { transferablesOf } from '../src/serialize/transferables.js'
@@ -113,8 +113,8 @@ describe('workerParser lifecycle', () => {
     expect(second).toBe(first)
     const failure = await first.catch((error: unknown) => error)
     expect(failure).toMatchObject({
-      name: 'WebRpcLifecycleError',
-      source: WEBRPC_SOURCE,
+      name: 'RpcLifecycleError',
+      source: RPC_CORE_ERROR_SOURCE,
       code: 'ENDPOINT_DISPOSED',
       cause: endpointPrimary
     })
@@ -124,7 +124,7 @@ describe('workerParser lifecycle', () => {
 
   it('collects endpoint and terminate cleanup failures under cleanupFailed', async () => {
     const endpointPrimary = new Error('endpoint cleanup failed')
-    const endpointCleanupError = new WebRpcLifecycleError(
+    const endpointCleanupError = new RpcLifecycleError(
       'Endpoint disposal completed with cleanup errors',
       endpointPrimary,
       [{ resource: 'transport subscription', error: endpointPrimary }]
@@ -154,7 +154,7 @@ describe('workerParser lifecycle', () => {
     expect(cleanupErrors).toHaveLength(2)
     expect(cleanupErrors[0]).toBe(endpointCleanupError)
     expect(cleanupErrors[0]).toMatchObject({
-      source: WEBRPC_SOURCE,
+      source: RPC_CORE_ERROR_SOURCE,
       code: 'ENDPOINT_DISPOSED',
       cause: endpointPrimary,
       cleanupErrors: [{ resource: 'transport subscription', error: endpointPrimary }]
@@ -184,8 +184,8 @@ describe('workerParser lifecycle', () => {
     const parser = workerParser({ worker, terminateOnDispose: true })
 
     await expect(parser.dispose?.()).rejects.toMatchObject({
-      name: 'WebRpcLifecycleError',
-      source: WEBRPC_SOURCE,
+      name: 'RpcLifecycleError',
+      source: RPC_CORE_ERROR_SOURCE,
       code: 'ENDPOINT_DISPOSED',
       message: 'Endpoint disposal completed with cleanup errors',
       cause: endpointPrimary,

@@ -10,7 +10,7 @@ import {
 } from '@migaia/serialize'
 import { isUint8Array } from '@migaia/utils/bytes'
 import type { IWebWorkerLikePort } from '@migaia/rpc/browser/adapters/web-worker'
-import { WebRpcLifecycleError } from '@migaia/rpc/core'
+import { RpcLifecycleError } from '@migaia/rpc/core'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from '../worker-contract.js'
 import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.js'
 import {
@@ -370,8 +370,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   ): Promise<ISerializeChunk> => {
     try {
       const endpoint = await client
-      if (disposePromise !== undefined)
-        throw new WebRpcLifecycleError(StoreWorkerErrorText.disposed)
+      if (disposePromise !== undefined) throw new RpcLifecycleError(StoreWorkerErrorText.disposed)
       const result = (await endpoint.request(
         { phase, chunk },
         { signal: context.signal, transfer: transferablesOf(chunk, resolvedOwnership) }
@@ -457,8 +456,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
     void ensureFrameSubscription()
       .then(() => client)
       .then((endpoint) => {
-        if (disposePromise !== undefined)
-          throw new WebRpcLifecycleError(StoreWorkerErrorText.disposed)
+        if (disposePromise !== undefined) throw new RpcLifecycleError(StoreWorkerErrorText.disposed)
         return endpoint.request(
           {
             phase: WorkerSerializePhase.encode,
@@ -480,7 +478,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   }
 
   const disposeOnce = async (): Promise<void> => {
-    const terminalError = new WebRpcLifecycleError(StoreWorkerErrorText.disposed)
+    const terminalError = new RpcLifecycleError(StoreWorkerErrorText.disposed)
     for (const queue of streams.values()) queue.fail(terminalError)
     streams.clear()
     let endpointError: unknown
@@ -489,9 +487,9 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
       await endpoint.close()
     } catch (error) {
       endpointError =
-        error instanceof WebRpcLifecycleError
+        error instanceof RpcLifecycleError
           ? error
-          : new WebRpcLifecycleError('Endpoint disposal completed with cleanup errors', error, [
+          : new RpcLifecycleError('Endpoint disposal completed with cleanup errors', error, [
               { resource: 'transport subscription', error }
             ])
     }

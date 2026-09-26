@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
-import { WebRpcRemoteError, type IWebRpcAbortSignal, type IWebRpcEndpoint } from '@migaia/rpc/core'
+import { RpcRemoteError, type IRpcAbortSignal, type IRpcEndpoint } from '@migaia/rpc/core'
 import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
 import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
@@ -79,10 +79,8 @@ function installLinkedSerializeWorkerHandler(
 }
 
 /** Minimal endpoint double — `toManagedRpcHandler` only ever calls `.dispose()`. */
-const mockEndpoint = (
-  dispose: () => Promise<void>
-): IWebRpcEndpoint<'worker', 'automatic', false> =>
-  ({ dispose }) as unknown as IWebRpcEndpoint<'worker', 'automatic', false>
+const mockEndpoint = (dispose: () => Promise<void>): IRpcEndpoint<'worker', 'automatic', false> =>
+  ({ dispose }) as unknown as IRpcEndpoint<'worker', 'automatic', false>
 
 describe('A8 store-worker exports', () => {
   it('exports only the canonical byte ownership vocabulary', () => {
@@ -115,9 +113,9 @@ describe('A8 store-worker exports', () => {
         ])
       ).resolves.toEqual(['reply:two', 'reply:three'])
       const received = await adapter.request('failure').catch((error: unknown) => error)
-      expect(received).toBeInstanceOf(WebRpcRemoteError)
+      expect(received).toBeInstanceOf(RpcRemoteError)
       expect(received).toMatchObject({
-        name: 'WebRpcRemoteError',
+        name: 'RpcRemoteError',
         message: 'Provider failed',
         source: '@migaia/rpc/core',
         code: 'INTERNAL',
@@ -149,9 +147,9 @@ describe('A8 store-worker exports', () => {
     const adapter = new WorkerAdapter(port)
     try {
       const received = await adapter.request('nested-error').catch((error: unknown) => error)
-      expect(received).toBeInstanceOf(WebRpcRemoteError)
+      expect(received).toBeInstanceOf(RpcRemoteError)
       expect(received).toMatchObject({
-        name: 'WebRpcRemoteError',
+        name: 'RpcRemoteError',
         message: 'Provider failed',
         source: '@migaia/rpc/core',
         code: 'INTERNAL',
@@ -185,7 +183,7 @@ describe('A8 store-worker exports', () => {
 
   it('caller abort reaches a real provider context signal and late settlement is ignored', async () => {
     const port = createLinkedWorkerPort()
-    let providerSignal: IWebRpcAbortSignal | undefined
+    let providerSignal: IRpcAbortSignal | undefined
     let lateResolve!: () => void
     installLinkedWorkerHandler(port, async (_payload, context) => {
       providerSignal = context.signal
@@ -372,7 +370,7 @@ describe('A8 store-worker exports', () => {
     const pending = iterator.next()
     const firstDispose = worker.dispose!() as Promise<void>
     expect(worker.dispose!()).toBe(firstDispose)
-    await expect(pending).rejects.toMatchObject({ name: 'WebRpcLifecycleError' })
+    await expect(pending).rejects.toMatchObject({ name: 'RpcLifecycleError' })
     await firstDispose
     expect(sends).toBe(0)
   })
@@ -529,8 +527,8 @@ describe('A8 store-worker exports', () => {
   })
 
   it('close rejects late messages while an already-admitted dispatch drains', async () => {
-    let resolveEndpoint!: (endpoint: IWebRpcEndpoint<'worker', 'automatic', false>) => void
-    const endpoint = new Promise<IWebRpcEndpoint<'worker', 'automatic', false>>((resolve) => {
+    let resolveEndpoint!: (endpoint: IRpcEndpoint<'worker', 'automatic', false>) => void
+    const endpoint = new Promise<IRpcEndpoint<'worker', 'automatic', false>>((resolve) => {
       resolveEndpoint = resolve
     })
     const delivered: unknown[] = []
@@ -549,8 +547,8 @@ describe('A8 store-worker exports', () => {
   })
 
   it('dispose races an admitted dispatch without duplicate cleanup or leaked pending count', async () => {
-    let resolveEndpoint!: (endpoint: IWebRpcEndpoint<'worker', 'automatic', false>) => void
-    const endpoint = new Promise<IWebRpcEndpoint<'worker', 'automatic', false>>((resolve) => {
+    let resolveEndpoint!: (endpoint: IRpcEndpoint<'worker', 'automatic', false>) => void
+    const endpoint = new Promise<IRpcEndpoint<'worker', 'automatic', false>>((resolve) => {
       resolveEndpoint = resolve
     })
     let disposeCalls = 0

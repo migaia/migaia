@@ -1,4 +1,4 @@
-import type { IWebRpcEndpoint } from '@migaia/rpc/core'
+import type { IRpcEndpoint } from '@migaia/rpc/core'
 
 /**
  * Worker 侧托管的 RPC 消息处理器。
@@ -20,7 +20,7 @@ export type IManagedRpcHandler = {
 }
 
 type IManagedEndpoint<TTargetId extends string = string> = Pick<
-  IWebRpcEndpoint<TTargetId, 'automatic', false>,
+  IRpcEndpoint<TTargetId, 'automatic', false>,
   'dispose'
 >
 
