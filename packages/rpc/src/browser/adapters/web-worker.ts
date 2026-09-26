@@ -1,0 +1,183 @@
+import type { IWebRpcSendOptions, IWebRpcTransport } from '../../core/transport.js'
+import { safeString } from '../../core/internal/safe-value.js'
+import {
+  createListenerFailureState,
+  drainListenerFailures,
+  observeListener,
+  registerListeners,
+  releaseListenerRegistration,
+  reportListenerFailure
+} from '../../core/internal/listener-safety.js'
+import { createMessageListenerHub } from '../../core/internal/message-listener-hub.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../../core/transport-constants.js'
+import { WebRpcErrorCode } from '../../core/errors.js'
+
+/**
+ * Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or
+ * `SharedWorker.port` all satisfy this. Deliberately not `Worker` itself: shared workers and ports
+ * must not use a mutable `onmessage` slot (that would silently steal another listener's
+ * subscription), and this file has no other DOM dependency beyond the ambient
+ * `Transferable`/`MessageEvent` types.
+ */
+export type IWebWorkerLikePort = {
+  postMessage(message: unknown, transfer?: readonly Transferable[]): void
+  addEventListener(
+    type: 'message' | 'error' | 'messageerror',
+    listener: (event: MessageEvent<unknown> | Event) => void
+  ): void
+  removeEventListener(
+    type: 'message' | 'error' | 'messageerror',
+    listener: (event: MessageEvent<unknown> | Event) => void
+  ): void
+}
+
+/** Static metadata for a dedicated worker channel whose peer is known by construction. */
+export type IWebWorkerTransportOptions = {
+  readonly peerId?: string
+  readonly origin?: string
+}
+
+/**
+ * Wraps a Worker/MessagePort-like object as an `RpcTransport`. `error` and `messageerror` (script
+ * failure, structured-clone failure) have no message payload of their own — they're surfaced
+ * through `onTransportError`, which the endpoint uses to fail every pending call at once instead of
+ * leaving them hanging with no response ever coming.
+ */
+export function createWebWorkerTransport(
+  port: IWebWorkerLikePort,
+  options: IWebWorkerTransportOptions = {}
+): IWebRpcTransport<unknown, Transferable> {
+  const messageListeners = createMessageListenerHub<{
+    data: unknown
+    origin?: string
+    source?: unknown
+  }>()
+  const errorListeners = new Set<(error: unknown) => void>()
+  const listenerErrors = new Set<(error: unknown) => void>()
+  const secondaryFailures = createListenerFailureState()
+
+  const emitTransportError = (error: unknown): void => {
+    reportListenerFailure(error, errorListeners, secondaryFailures)
+  }
+
+  // `event` is an external boundary — a real MessageEvent never throws
+  // reading `.data`, but a hostile/mocked event object (or a getter that
+  // itself throws) must not be allowed to escape as an uncaught exception
+  // from inside the port's own event dispatch. Routed through
+  // `onTransportError` rather than silently dropped: a message that could
+  // not even be read is exactly the kind of thing pending callers need to
+  // know happened, not have quietly vanish.
+  const onMessage = (event: MessageEvent<unknown> | Event): void => {
+    let data: unknown
+    let origin: string | undefined
+    let source: unknown
+    try {
+      data = (event as MessageEvent<unknown> | undefined)?.data
+      const eventOrigin = (event as { origin?: unknown }).origin
+      origin = typeof eventOrigin === 'string' ? eventOrigin : undefined
+      source = (event as { source?: unknown }).source
+    } catch (error) {
+      emitTransportError(new Error(`[rpc] worker message could not be read: ${safeString(error)}`))
+      return
+    }
+    messageListeners.dispatch({ data, origin, source }, (listener, message) => {
+      observeListener(
+        () => listener(message),
+        (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
+        secondaryFailures
+      )
+    })
+  }
+  const onFailure =
+    (reason: string) =>
+    (event: Event): void => {
+      let detail: string
+      try {
+        detail = safeString(
+          (event as unknown as { message?: string } | undefined)?.message || reason,
+          reason
+        )
+      } catch {
+        detail = reason
+      }
+      emitTransportError(new Error(`[rpc] worker ${reason}: ${detail}`))
+    }
+  const onError = onFailure('failed')
+  const onMessageError = onFailure('could not deserialize a message')
+
+  return {
+    platform: WebRpcPlatform.worker,
+    topology: 'exclusive',
+    ownership: WebRpcTransportOwnership.borrowed,
+    peerId: options.peerId,
+    origin: options.origin,
+    send(message, options?: IWebRpcSendOptions<Transferable>) {
+      port.postMessage(message, options?.transfer)
+    },
+    // Attached lazily on first subscriber, detached once the last one
+    // leaves — a client that closes must not leave the underlying port
+    // still holding real listeners it can no longer reach.
+    subscribe(listener) {
+      messageListeners.add(listener, () =>
+        registerListeners(
+          [
+            {
+              add: () => port.addEventListener('message', onMessage),
+              remove: () => port.removeEventListener('message', onMessage)
+            }
+          ],
+          { code: WebRpcErrorCode.transport, secondaryFailures }
+        )
+      )
+      return () => {
+        if (!messageListeners.has(listener)) return
+        releaseListenerRegistration(
+          messageListeners.size === 1 ? [() => port.removeEventListener('message', onMessage)] : [],
+          () => messageListeners.remove(listener, () => undefined),
+          { code: WebRpcErrorCode.transport, secondaryFailures }
+        )
+      }
+    },
+    onTransportError(listener) {
+      if (errorListeners.size === 0) {
+        registerListeners(
+          [
+            {
+              add: () => port.addEventListener('error', onError),
+              remove: () => port.removeEventListener('error', onError)
+            },
+            {
+              add: () => port.addEventListener('messageerror', onMessageError),
+              remove: () => port.removeEventListener('messageerror', onMessageError)
+            }
+          ],
+          { code: WebRpcErrorCode.transport, secondaryFailures }
+        )
+      }
+      errorListeners.add(listener)
+      return () => {
+        if (!errorListeners.has(listener)) return
+        releaseListenerRegistration(
+          errorListeners.size === 1
+            ? [
+                () => port.removeEventListener('error', onError),
+                () => port.removeEventListener('messageerror', onMessageError)
+              ]
+            : [],
+          () => {
+            errorListeners.delete(listener)
+          },
+          { code: WebRpcErrorCode.transport, secondaryFailures }
+        )
+      }
+    },
+    onListenerError(listener) {
+      listenerErrors.add(listener)
+      return () => {
+        const deleted = listenerErrors.delete(listener)
+        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        return deleted
+      }
+    }
+  }
+}
