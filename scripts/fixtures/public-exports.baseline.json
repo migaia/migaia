@@ -23,9 +23,6 @@
         "buildCapabilityTopology",
         "createTopologyIndex"
       ],
-      "./graph/dynamic": [
-        "createDynamicCapabilityGraph"
-      ],
       "./graph/dependency": [
         "DependencyAction",
         "DependencyEdgeStatus",
@@ -39,6 +36,9 @@
         "planResume",
         "planTeardown",
         "resolveInstallSet"
+      ],
+      "./graph/dynamic": [
+        "createDynamicCapabilityGraph"
       ]
     },
     "@migaia/event-subscriber": {
@@ -308,8 +308,8 @@
         "ResourceStatus"
       ]
     },
-    "@migaia/rpc-contract": {
-      ".": [
+    "@migaia/rpc": {
+      "./contract": [
         "RpcContractErrorCode",
         "createDescriptor",
         "deserializeRpcError",
@@ -318,20 +318,130 @@
         "rpcProtocolV1",
         "serializeRpcError"
       ],
-      "./v1": [
+      "./contract/v1": [
         "default",
         "normalizeRpcEnvelope",
         "rpcProtocol"
       ],
-      "./framing": [
+      "./contract/framing": [
         "bindRpcFrameIngress",
         "createBinaryFramer",
         "createReassembler",
         "createStringFramer",
         "messageFramerV1"
       ],
-      "./framing/v1": [
+      "./contract/framing/v1": [
         "messageFramer"
+      ],
+      "./core": [
+        "WEBRPC_SOURCE",
+        "WebRpcAbortError",
+        "WebRpcAuthenticationError",
+        "WebRpcCandidateStatus",
+        "WebRpcChunkError",
+        "WebRpcConfigurationError",
+        "WebRpcConstructionError",
+        "WebRpcContractError",
+        "WebRpcEndpointStatus",
+        "WebRpcError",
+        "WebRpcErrorCode",
+        "WebRpcLifecycleError",
+        "WebRpcOperation",
+        "WebRpcPlatform",
+        "WebRpcProtocolError",
+        "WebRpcRemoteError",
+        "WebRpcSchemaValidationError",
+        "WebRpcSerializationError",
+        "WebRpcTimeoutError",
+        "WebRpcTransportEncoding",
+        "WebRpcTransportError",
+        "WebRpcTransportOwnership",
+        "WebRpcTransportTopology",
+        "abort",
+        "authentication",
+        "codec",
+        "connect",
+        "contract",
+        "createEndpoint",
+        "createFullEndpoint",
+        "createFullOneWayEndpoint",
+        "defineFeature",
+        "defineMiddleware",
+        "deserializeError",
+        "framer",
+        "hooks",
+        "isWebRpcError",
+        "ping",
+        "protocol",
+        "reachError",
+        "serializeError",
+        "timeout",
+        "uuid"
+      ],
+      "./core/composed": [
+        "createComposedEndpoint"
+      ],
+      "./core/client": [
+        "createClientEndpoint"
+      ],
+      "./core/provider": [
+        "createProviderEndpoint"
+      ],
+      "./core/full": [
+        "createFullEndpoint",
+        "createFullOneWayEndpoint"
+      ],
+      "./core/transport-constants": [
+        "WebRpcCandidateStatus",
+        "WebRpcEndpointStatus",
+        "WebRpcOperation",
+        "WebRpcPlatform",
+        "WebRpcTransportEncoding",
+        "WebRpcTransportOwnership",
+        "WebRpcTransportTopology"
+      ],
+      "./core/features/outbound": [
+        "createOutboundFeature"
+      ],
+      "./core/features/one-way": [
+        "createOneWayFeature"
+      ],
+      "./core/features/provider": [
+        "createProviderFeature"
+      ],
+      "./core/features/discovery": [
+        "createDiscoveryFeature"
+      ],
+      "./core/features/control": [
+        "createControlFeature"
+      ],
+      "./core/adapters/memory": [
+        "createMemoryTransportPair"
+      ],
+      "./core/adapters/message-port": [
+        "createBrowserMessagePortTransport",
+        "createNodeMessagePortTransport"
+      ],
+      "./browser/adapters/window": [
+        "createWindowMessageTransport"
+      ],
+      "./browser/adapters/web-worker": [
+        "createWebWorkerTransport"
+      ],
+      "./browser/adapters/shared-worker": [
+        "createSharedWorkerTransport"
+      ],
+      "./browser/adapters/service-worker": [
+        "createServiceWorkerTransport"
+      ],
+      "./browser/adapters/broadcast-channel": [
+        "createBroadcastChannelTransport"
+      ],
+      "./browser/adapters/web-transport": [
+        "createWebTransportDatagramTransport"
+      ],
+      "./browser/adapters/rtc-data-channel": [
+        "createRtcDataChannelTransport"
       ]
     },
     "@migaia/serialize": {
@@ -1027,118 +1137,6 @@
         "formatInteger",
         "formatNumber",
         "formatPercent"
-      ]
-    },
-    "@migaia/web-rpc": {
-      ".": [
-        "WEBRPC_SOURCE",
-        "WebRpcAbortError",
-        "WebRpcAuthenticationError",
-        "WebRpcCandidateStatus",
-        "WebRpcChunkError",
-        "WebRpcConfigurationError",
-        "WebRpcConstructionError",
-        "WebRpcContractError",
-        "WebRpcEndpointStatus",
-        "WebRpcError",
-        "WebRpcErrorCode",
-        "WebRpcLifecycleError",
-        "WebRpcOperation",
-        "WebRpcPlatform",
-        "WebRpcProtocolError",
-        "WebRpcRemoteError",
-        "WebRpcSchemaValidationError",
-        "WebRpcSerializationError",
-        "WebRpcTimeoutError",
-        "WebRpcTransportEncoding",
-        "WebRpcTransportError",
-        "WebRpcTransportOwnership",
-        "WebRpcTransportTopology",
-        "abort",
-        "authentication",
-        "codec",
-        "connect",
-        "contract",
-        "createEndpoint",
-        "createFullEndpoint",
-        "createFullOneWayEndpoint",
-        "defineFeature",
-        "defineMiddleware",
-        "deserializeError",
-        "framer",
-        "hooks",
-        "isWebRpcError",
-        "ping",
-        "protocol",
-        "reachError",
-        "serializeError",
-        "timeout",
-        "uuid"
-      ],
-      "./core": [
-        "createComposedEndpoint"
-      ],
-      "./client": [
-        "createClientEndpoint"
-      ],
-      "./provider": [
-        "createProviderEndpoint"
-      ],
-      "./full": [
-        "createFullEndpoint",
-        "createFullOneWayEndpoint"
-      ],
-      "./transport-constants": [
-        "WebRpcCandidateStatus",
-        "WebRpcEndpointStatus",
-        "WebRpcOperation",
-        "WebRpcPlatform",
-        "WebRpcTransportEncoding",
-        "WebRpcTransportOwnership",
-        "WebRpcTransportTopology"
-      ],
-      "./features/outbound": [
-        "createOutboundFeature"
-      ],
-      "./features/one-way": [
-        "createOneWayFeature"
-      ],
-      "./features/provider": [
-        "createProviderFeature"
-      ],
-      "./features/discovery": [
-        "createDiscoveryFeature"
-      ],
-      "./features/control": [
-        "createControlFeature"
-      ],
-      "./adapters/window": [
-        "createWindowMessageTransport"
-      ],
-      "./adapters/message-port": [
-        "createBrowserMessagePortTransport",
-        "createNodeMessagePortTransport"
-      ],
-      "./adapters/web-worker": [
-        "createWebWorkerTransport"
-      ],
-      "./adapters/broadcast-channel": [
-        "createBroadcastChannelTransport"
-      ],
-      "./adapters/memory": [
-        "createMemoryTransportPair"
-      ],
-      "./adapters/shared-worker": [
-        "createSharedWorkerTransport"
-      ],
-      "./adapters/service-worker": [
-        "createServiceWorkerTransport"
-      ],
-      "./adapters/rtc-data-channel": [
-        "createRtcDataChannelTransport"
-      ],
-      "./adapters/web-transport": [
-        "createWebTransportDatagramTransport"
       ]
     }
   }

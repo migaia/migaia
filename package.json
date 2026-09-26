@@ -20,7 +20,7 @@
     "website:preview": "cd website && bun run preview",
     "@logger": "pnpm --filter ./packages/logger run",
     "@event-subscriber": "pnpm --filter ./packages/event-subscriber run",
-    "@web-rpc": "pnpm --filter ./packages/web-rpc run",
+    "@rpc": "pnpm --filter ./packages/rpc run",
     "@plugin-host": "pnpm --filter ./packages/plugin-host run",
     "@storage-web": "pnpm --filter ./packages/storage-web run",
     "@capability": "pnpm --filter ./packages/capability run",
