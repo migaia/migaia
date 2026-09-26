@@ -62,6 +62,7 @@ const messagePackByteVectors: readonly IByteVector[] = [
 /** Convert a binary result into the stable lowercase spelling used by vector fixtures. */
 const toHex = (value: Uint8Array): string => Buffer.from(value).toString('hex')
 
+/** A5 keeps the three binary codec interoperability checks passing across the peer move. */
 describe('independent codec interoperability', () => {
   it('T10 matches native JSON for every canonical vector', () => {
     const codec = defineJsonCodec({ version: canonicalDocument.version })
