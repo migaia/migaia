@@ -1,7 +1,7 @@
 import type { IRuntime } from '@migaia/reactive'
 import { defaultRuntime } from '@migaia/reactive'
 import { Resource, type IResourceOptions } from '@migaia/resource'
-import type { IWebRpcAbortSignal } from '@migaia/rpc/core'
+import type { IRpcAbortSignal } from '@migaia/rpc/core'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from './worker-contract.js'
 import type { IWebWorkerLikePort } from '@migaia/rpc/browser/adapters/web-worker'
 import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js'
@@ -52,12 +52,12 @@ function snapshotWorkerClientOptions(options: object): {
 
 /** Captures per-request cancellation and transfer policy before asynchronous endpoint admission. */
 function snapshotWorkerRequestOptions(options: object): {
-  readonly signal?: IWebRpcAbortSignal
+  readonly signal?: IRpcAbortSignal
   readonly transfer?: readonly Transferable[]
 } {
   try {
     return {
-      signal: (options as { readonly signal?: IWebRpcAbortSignal }).signal,
+      signal: (options as { readonly signal?: IRpcAbortSignal }).signal,
       transfer: (options as { readonly transfer?: readonly Transferable[] }).transfer
     }
   } catch (error) {
@@ -99,14 +99,14 @@ export class WorkerAdapter {
 
   request<Input, Output>(
     payload: Input,
-    options: { signal?: IWebRpcAbortSignal; transfer?: readonly Transferable[] } = {}
+    options: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[] } = {}
   ): Promise<Output> {
     if (this.#disposed)
       return Promise.reject(
         createStoreWorkerError(StoreWorkerErrorCode.adapterDisposed, StoreWorkerErrorText.disposed)
       )
     let requestOptions: {
-      readonly signal?: IWebRpcAbortSignal
+      readonly signal?: IRpcAbortSignal
       readonly transfer?: readonly Transferable[]
     }
     try {
@@ -147,7 +147,7 @@ export class WorkerAdapter {
 }
 
 export function createWorkerHandler<Input, Output>(
-  compute: (payload: Input, context: { signal: IWebRpcAbortSignal }) => Output | Promise<Output>,
+  compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>,
   postMessage: (message: unknown) => void,
   options: { readonly timeoutMs?: number } = {}
 ): IManagedRpcHandler {
@@ -184,7 +184,7 @@ export function createWorkerHandler<Input, Output>(
   )
   const endpointPromise = endpoint.then((readyEndpoint) => {
     const unsubscribe = readyEndpoint.onRequest(WorkerRpcIdentity.call, (payload, signal) =>
-      compute(payload as Input, { signal: signal as IWebRpcAbortSignal })
+      compute(payload as Input, { signal: signal as IRpcAbortSignal })
     )
     return {
       dispose: async () => {

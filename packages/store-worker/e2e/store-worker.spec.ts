@@ -31,7 +31,7 @@ test('Worker failure retains canonical remote outer and meaningful native cause 
   const messages = await page.evaluate(() => window.runStoreWorkerErrorScenario())
   expect(messages).toEqual([
     {
-      name: 'WebRpcRemoteError',
+      name: 'RpcRemoteError',
       message: 'Provider failed',
       source: '@migaia/rpc/core',
       code: 'INTERNAL',
