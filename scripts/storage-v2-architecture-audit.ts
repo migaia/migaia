@@ -165,7 +165,7 @@ const requiredTargetedRuleContract = [
       '@migaia/storage-web',
       '@migaia/store-persist',
       '@migaia/store-worker',
-      '@migaia/web-rpc'
+      '@migaia/rpc'
     ],
     pathPattern: '^src/',
     sourcePatterns: ['instanceof\\s+(?:Uint8Array|ArrayBuffer)\\b']

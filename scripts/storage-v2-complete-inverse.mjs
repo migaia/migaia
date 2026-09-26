@@ -271,7 +271,7 @@ const d47BuildPackages = [
   'capability',
   'resource',
   'serialize',
-  'web-rpc'
+  'rpc'
 ]
 
 /** Runs one build command and retains both bounded diagnostic streams. */

@@ -156,7 +156,45 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
-  packages/rpc-contract: {}
+  packages/rpc:
+    dependencies:
+      '@migaia/capability':
+        specifier: workspace:^
+        version: link:../capability
+      '@migaia/event-subscriber':
+        specifier: workspace:^
+        version: link:../event-subscriber
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      cborg:
+        specifier: 6.1.1
+        version: 6.1.1
+      elysia:
+        specifier: 1.4.30
+        version: 1.4.30(@sinclair/typebox@0.34.52)(exact-mirror@1.2.4)(file-type@22.0.2(supports-color@7.2.0))(openapi-types@12.1.3)(typescript@6.0.2)
+      msgpackr:
+        specifier: 2.1.0
+        version: 2.1.0
+      protobufjs:
+        specifier: 8.8.0
+        version: 8.8.0
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
   packages/serialize:
     dependencies:
@@ -235,9 +273,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/web-rpc':
+      '@migaia/rpc':
         specifier: workspace:^
-        version: link:../web-rpc
+        version: link:../rpc
       '@vitest/coverage-v8':
         specifier: 4.1.10
         version: 4.1.10(vitest@4.1.10)
@@ -515,18 +553,15 @@ importers:
       '@migaia/resource':
         specifier: workspace:^
         version: link:../resource
-      '@migaia/rpc-contract':
+      '@migaia/rpc':
         specifier: workspace:^
-        version: link:../rpc-contract
+        version: link:../rpc
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
-      '@migaia/web-rpc':
-        specifier: workspace:^
-        version: link:../web-rpc
     devDependencies:
       '@playwright/test':
         specifier: ^1.62.1
@@ -576,49 +611,6 @@ importers:
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
   packages/wasm: {}
-
-  packages/web-rpc:
-    dependencies:
-      '@migaia/capability':
-        specifier: workspace:^
-        version: link:../capability
-      '@migaia/event-subscriber':
-        specifier: workspace:^
-        version: link:../event-subscriber
-      '@migaia/lifecycle':
-        specifier: workspace:^
-        version: link:../lifecycle
-      '@migaia/plugin-host':
-        specifier: workspace:^
-        version: link:../plugin-host
-      '@migaia/rpc-contract':
-        specifier: workspace:^
-        version: link:../rpc-contract
-      '@migaia/serialize':
-        specifier: workspace:^
-        version: link:../serialize
-      '@migaia/utils':
-        specifier: workspace:^
-        version: link:../utils
-    devDependencies:
-      cborg:
-        specifier: 6.1.1
-        version: 6.1.1
-      elysia:
-        specifier: 1.4.30
-        version: 1.4.30(@sinclair/typebox@0.34.52)(exact-mirror@1.2.4)(file-type@22.0.2(supports-color@7.2.0))(openapi-types@12.1.3)(typescript@6.0.2)
-      msgpackr:
-        specifier: 2.1.0
-        version: 2.1.0
-      protobufjs:
-        specifier: 8.8.0
-        version: 8.8.0
-      typescript:
-        specifier: ~6.0.2
-        version: 6.0.2
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
   website:
     dependencies:

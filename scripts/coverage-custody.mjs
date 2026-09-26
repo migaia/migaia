@@ -37,28 +37,14 @@ const BASELINE_RESET_TEST_TRANSFORMS = Object.freeze([
     ])
   }),
   Object.freeze({
-    path: 'packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts',
-    replace: Object.freeze([
-      "  const relative = module.replace(`${workspaceRoot}/`, '')\n",
-      "  const relative = module.includes('/packages/')\n    ? module.slice(module.indexOf('/packages/') + 1)\n    : module\n"
-    ])
-  }),
-  Object.freeze({
-    path: 'packages/web-rpc/test/tree-shaking/b11-attribution.test.ts',
-    replace: Object.freeze([
-      "  const relative = module.replace(`${workspaceRoot}/`, '')\n",
-      "  const relative = module.includes('/packages/')\n    ? module.slice(module.indexOf('/packages/') + 1)\n    : module\n"
-    ])
-  }),
-  Object.freeze({
-    path: 'packages/web-rpc/test/tree-shaking/core-retained-causal.test.ts',
+    path: 'packages/rpc/test/core/tree-shaking/core-retained-causal.test.ts',
     replace: Object.freeze([
       "  const workspaceRoot = resolve(import.meta.dirname, '../../../..')\n  const relative = module.startsWith(`${workspaceRoot}/`)\n    ? module.slice(workspaceRoot.length + 1)\n    : module\n",
       "  const relative = module.includes('/packages/')\n    ? module.slice(module.indexOf('/packages/') + 1)\n    : module\n"
     ])
   }),
   Object.freeze({
-    path: 'packages/web-rpc/test/tree-shaking/core-retained-causal.mjs',
+    path: 'packages/rpc/test/core/tree-shaking/core-retained-causal.mjs',
     replace: Object.freeze([
       '  const relativeModule = module.startsWith(`${workspaceDirectory}/`)\n    ? module.slice(workspaceDirectory.length + 1)\n    : module\n',
       "  const relativeModule = module.includes('/packages/')\n    ? module.slice(module.indexOf('/packages/') + 1)\n    : module\n"

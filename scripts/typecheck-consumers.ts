@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDirectory = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const repositoryRoot = resolve(scriptDirectory, '..');
 const consumerNodeModules = resolve(repositoryRoot, 'fixtures/consumers/node_modules');
-const webRpcPackage = resolve(repositoryRoot, 'packages/web-rpc');
+const rpcPackage = resolve(repositoryRoot, 'packages/rpc');
 const eventSubscriberPackage = resolve(repositoryRoot, 'packages/event-subscriber');
 const projects = [
   'node',
@@ -35,8 +35,8 @@ const packageChecks = [
     root: eventSubscriberPackage
   },
   {
-    name: '@migaia/web-rpc',
-    root: webRpcPackage
+    name: '@migaia/rpc',
+    root: rpcPackage
   }
 ];
 
@@ -58,7 +58,7 @@ function runPnpm(args) {
  */
 function buildCheckedPackages() {
   runPnpm(['--filter', './packages/event-subscriber', 'run', 'build']);
-  runPnpm(['--filter', './packages/web-rpc', 'run', 'build']);
+  runPnpm(['--filter', './packages/rpc', 'run', 'build']);
 }
 
 /** Returns the absolute target of a symlink without following non-link paths. */
@@ -152,7 +152,7 @@ function cleanupPackageLinks(createdLinks) {
 }
 
 /**
- * Runs every consumer typecheck with web-rpc resolved through its package exports map. The
+ * Runs every consumer typecheck with rpc resolved through its package exports map. The
  * temporary link is deliberately scoped to this command so `paths` cannot hide an invalid public
  * subpath and no generated fixture state is committed.
  */
