@@ -82,7 +82,7 @@ function installLinkedSerializeWorkerHandler(
 const mockEndpoint = (dispose: () => Promise<void>): IRpcEndpoint<'worker', 'automatic', false> =>
   ({ dispose }) as unknown as IRpcEndpoint<'worker', 'automatic', false>
 
-describe('A8 store-worker exports', () => {
+describe('A8/A9 store-worker exports', () => {
   it('exports only the canonical byte ownership vocabulary', () => {
     expect(storeWorker.WorkerByteOwnership).toEqual({ copy: 'copy', transfer: 'transfer' })
     expect('Worker' + 'Ownership' in storeWorker).toBe(false)
