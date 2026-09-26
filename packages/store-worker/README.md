@@ -61,7 +61,7 @@ adapter.dispose();
 
 实例方法：
 
-- `request<Input, Output>(payload: Input, options?: { signal?: IWebRpcAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回
+- `request<Input, Output>(payload: Input, options?: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回
 - `disposed`(只读 getter)—— 是否已 `close()`/`dispose()`
 - `close(): void` —— 同步标记不可用(幂等)，此后 `request()` 立即拒绝，但不释放底层 endpoint
 - `dispose(): Promise<void>` —— 唯一异步释放入口：先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`；失败会 reject，重复调用复用同一个 Promise
@@ -92,7 +92,7 @@ self.onmessage = (event) => {
 
 签名：`<Input, Output>(compute, postMessage, options?) => IManagedRpcHandler`。
 
-- `compute: (payload: Input, context: { signal: IWebRpcAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error
+- `compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error
 - `postMessage: (message: unknown) => void`（必填）—— Worker 侧发消息回主线程的函数，通常传 `(message) => self.postMessage(message)`
 - `options.timeoutMs?: number` —— Worker 侧对每次请求处理设的超时，默认不设
 

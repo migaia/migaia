@@ -109,7 +109,7 @@ class WorkerAdapter {
 
 ```ts
 function createWorkerHandler<Input, Output>(
-  compute: (payload: Input, context: { signal: IWebRpcAbortSignal }) => Output | Promise<Output>,
+  compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>,
   postMessage: (message: unknown) => void,
   options?: { readonly timeoutMs?: number }
 ): ManagedRpcHandler;
@@ -140,7 +140,7 @@ await handler.dispose(); // 先 close()，再等底层端点初始化并 dispose
 
 - **`handler(message)`**：`disposed === true` 时直接返回 `Promise<void>`（resolve），不会处理也不会报错——这是有意的静默丢弃：`close()`/`dispose()` 之后 Worker 可能还会因为消息队列里的残留消息被再调用一次，不应该因此抛错。
 - **`pendingCount`**：每次调用 `handler(message)` admission 时 +1，等待 endpoint 并同步交付消息后 -1。它是 inbound dispatch 指标，**不代表 provider compute 已完成**，也不能作为 `Worker.terminate()` 的 quiescence 门禁；真正的 provider drain/cleanup 由 Web RPC endpoint 拥有，终止前必须等待 `handler.dispose()` 完成。
-- **`close()` vs `dispose()`**：`close()` 同步标记 `disposed = true`，只负责"停止接受新消息"，不触发任何用户清理；`dispose()` 是唯一异步释放入口，内部先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`，清理失败时会把错误 reject 出来（错误形态与 `@migaia/rpc/core` 的 `endpoint.dispose()` 一致，是 `WebRpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——`close()` 重复调用是无操作；`dispose()` 多次调用复用同一个 Promise，不会重复触发清理。
+- **`close()` vs `dispose()`**：`close()` 同步标记 `disposed = true`，只负责"停止接受新消息"，不触发任何用户清理；`dispose()` 是唯一异步释放入口，内部先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`，清理失败时会把错误 reject 出来（错误形态与 `@migaia/rpc/core` 的 `endpoint.dispose()` 一致，是 `RpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——`close()` 重复调用是无操作；`dispose()` 多次调用复用同一个 Promise，不会重复触发清理。
 
 ---
 
@@ -336,7 +336,7 @@ throw createStoreWorkerAggregateError(
 
 签名：`(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string) => AggregateError`。构造 `AggregateError(errors, message)`，`errors` 原样保留在结果的 `errors` 字段（顺序不变），同样贴上 `(source, code)` 身份。包内唯一的实际调用点是 `workerParser().dispose()`——endpoint 清理与 `terminateOnDispose: true` 时的 `worker.terminate()` 若同时失败，两个原始错误都会被保留在 `errors[]` 里，不会只保留其中一个。
 
-`STORE_WORKER_SOURCE`（`'@migaia/store-worker'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误（例如把它和 `@migaia/rpc/core` 的 `WebRpcError`——`source: '@migaia/rpc/core'`——区分开）。
+`STORE_WORKER_SOURCE`（`'@migaia/store-worker'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误（例如把它和 `@migaia/rpc/core` 的 `RpcError`——`source: '@migaia/rpc/core'`——区分开）。
 
 ---
 
@@ -366,7 +366,7 @@ type IByteOwnership = 'copy' | 'transfer';
 
 ### 8.1 通用 RPC 错误
 
-`WorkerAdapter.request()`、`workerComputed` 内部、`createSerializeWorkerHandler` 之外的路径，抛出的错误都是标准 `@migaia/rpc/core` 的 `WebRpcError`（`METHOD_NOT_FOUND`、`DEADLINE_EXCEEDED`、`TRANSPORT`、`CANCELLED` 等），完整错误码表见 [`@migaia/rpc/core` 的 USEGUIDE](../rpc/USEGUIDE.md#8-错误处理)。判断时按 `error.code` 分支，不要依赖 `error.message` 或具体子类。
+`WorkerAdapter.request()`、`workerComputed` 内部、`createSerializeWorkerHandler` 之外的路径，抛出的错误都是标准 `@migaia/rpc/core` 的 `RpcError`（`PROVIDER_NOT_FOUND`、`DEADLINE_EXCEEDED`、`TRANSPORT`、`CANCELLED` 等），完整错误码表见 [`@migaia/rpc/core` 的 USEGUIDE](../rpc/USEGUIDE.md#8-错误处理)。判断时按 `error.code` 分支，不要依赖 `error.message` 或具体子类。
 
 ### 8.2 `workerParser` 的 abort 特殊处理
 

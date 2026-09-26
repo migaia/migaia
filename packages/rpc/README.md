@@ -32,9 +32,9 @@ The frozen default `rpcV1` aggregates the named V1 exports. The contract entry�
 
 如果你需要在两段**互相隔离、不能直接调用对方函数**的 JavaScript 代码之间通信——比如主页面和 iframe、主线程和 Worker、多个浏览器标签页之间——通常只能用 `postMessage`/`onmessage` 这种"发消息、猜是谁发的、手动对应请求和响应"的原始方式。写多了你会发现自己在反复造轮子：怎么把"调用一个方法并拿到返回值"这件事伪装成同步函数调用的样子？怎么知道这条消息是回复哪个请求的？对方老半天不回怎么办？消息太大发不过去怎么拆？谁能证明这条消息真的是我认识的那个 iframe 发的，而不是页面里被注入的恶意脚本冒充的？
 
-`@migaia/rpc/core` 就是把这些问题一次性解决掉的库。它在任意一种"能发消息、能收消息"的传输通道上，包出一层**类型安全的双向 RPC**：一端用 `provide(method, handler)` 注册方法，另一端用 `await endpoint.send(targetId, method, data)` 调用，写法和调本地异步函数几乎一样，超时、鉴权、分片、断线检测、多接收端负载均衡这些细节全部由框架处理。
+`@migaia/rpc/core` 就是把这些问题一次性解决掉的库。它在当前支持的"能发消息、能收消息"的传输通道上，包出一层**类型安全的双向 RPC**：一端用 `provide(method, handler)` 注册方法，另一端用 `await endpoint.send(targetId, method, data)` 调用，写法和调本地异步函数几乎一样，超时、鉴权、分片、断线检测、多接收端负载均衡这些细节全部由框架处理。
 
-这个包的 endpoint 核心**不关心你在什么环境运行**——核心入口不绑定 DOM、React、Store、Node 或某个具体宿主 API。真正“怎么发消息、怎么收消息”被抽成 `Transport`（传输适配器）；浏览器、Worker 和 Node MessagePort 代码只存在于按需导入的 adapter 子路径。官方提供 9 组适配器，也可以为 WebSocket、Electron IPC 或业务总线实现自己的 `IWebRpcTransport`。
+这个包的 endpoint 核心**不关心你在什么环境运行**——核心入口不绑定 DOM、React、Store、Node 或某个具体宿主 API。真正“怎么发消息、怎么收消息”被抽成 `Transport`（传输适配器）；浏览器、Worker 和 Node MessagePort 代码只存在于按需导入的 adapter 子路径。官方提供 9 组适配器，也可以为当前已声明的平台实现自己的 `IRpcTransport`；WebSocket、Electron IPC 等新平台值由后续设计处理。
 
 ### 2. 适合什么场景
 
@@ -52,13 +52,13 @@ The frozen default `rpcV1` aggregates the named V1 exports. The contract entry�
 
 ### 3. 用了之后能得到什么
 
-- **类型安全的端到端调用**：`send<T>(targetId, method, data)` 的返回值类型、`provide()` 里 `ctx.data` 的类型都可以通过 `IWebRpcMethodSchema`（配合 zod / valibot 等任意实现了 `parse()` 的校验库）在运行时强校验，而不只是编译期的自我欺骗。
+- **类型安全的端到端调用**：`send<T>(targetId, method, data)` 的返回值类型、`provide()` 里 `ctx.data` 的类型都可以通过 `IRpcMethodSchema`（配合 zod / valibot 等任意实现了 `parse()` 的校验库）在运行时强校验，而不只是编译期的自我欺骗。
 - **双向调用**：不是"客户端发请求、服务端只能回响应"的单向模型——每一端既可以是调用方也可以是被调用方，`provide()` 和 `send()` 在同一个 `endpoint` 上共存。
 - **请求超时**：`timeout()` 中间件统一管理请求 deadline；每个请求只发送一次，避免隐含的 at-least-once 语义。
 - **鉴权与加密**：`authentication()` 中间件对每一帧（包括分片帧、控制帧）做签名/验签、加解密，`connect()` 中间件对"这条消息真的来自我认识的那个 peer 吗"做验证，不是只信任 `senderId` 这个可以被伪造的字符串字段。
 - **大消息自动分片**：`framer()` 层在发送侧按字节预算自动切分、接收侧自动重组，并从并发消息数、单 peer 消息数、分片数、分片大小、缓冲区总量、重组超时六个维度限制资源占用，防止恶意/异常大消息把内存打爆。
 - **多接收端的服务发现与负载均衡**：同一个 `targetId` 背后可以有多个存活的接收端（比如多个 SharedWorker tab），框架自动维护"谁还活着"的路由表，未指定接收端时对活跃接收端做首次成功即返回的竞速调用；也支持手动模式精确控制发现/注册/固定路由。
-- **统一的错误处理**：跨包错误都带稳定的 `(source, code)`；原生 `TypeError`/`RangeError`/`AggregateError` 和远端 `WebRpcRemoteError` 保留自己的运行时类型，调用方可先用 `isWebRpcError()`/结构化 `code` 分支，再按需检查原生类型。
+- **统一的错误处理**：跨包错误都带稳定的 `(source, code)`；原生 `TypeError`/`RangeError`/`AggregateError` 和远端 `RpcRemoteError` 保留自己的运行时类型，调用方可先用 `isRpcError()`/结构化 `code` 分支，再按需检查原生类型。
 - **可控的生命周期**：`dispose()` 保证按预期顺序清理中间件、传输连接、进行中的请求，任何一步清理失败都会被收集而不是让后续清理步骤中断。
 
 ### 4. 安装
@@ -177,18 +177,19 @@ endpoint.provide('add', (ctx) => {
 })
 ```
 
-全部配置项（`IWebRpcFactoryConfig`）：
+全部配置项（`IRpcFactoryConfig`）：
 
 - `id: string`（必填）—— 本端在整个通信拓扑里的唯一标识，出现在每条消息的 `senderId` 字段（不是身份凭证）；长度受 `contract().maxIdentifierLength` 限制（默认 128，即使不装 `contract()` 也生效）
-- `middlewares: readonly IWebRpcPlugin[]`（必填）—— 至少要包含 `connect()`，否则构造直接抛 `MIDDLEWARE_MISSING`
-- `transport?: IWebRpcTransport` —— 也可以只在 `connect({ transport })` 里提供，二选一即可
+- `middlewares: readonly IRpcPlugin[]`（必填）—— 至少要包含 `connect()`，否则构造直接抛 `MIDDLEWARE_MISSING`
+- `transport?: IRpcTransport` —— 也可以只在 `connect({ transport })` 里提供，二选一即可
 - `targetIds?: readonly string[]` —— 已知对端 id 的预声明，非必需；自动发现模式下首次 `send`/`dispatch`/`ping` 未知 `targetId` 会懒查询
-- `provider?: Readonly<Record<string, IWebRpcProvider>>` —— 构造时批量注册的方法集合，等价于逐个调用 `provide()`
+- `provider?: Readonly<Record<string, IRpcProvider>>` —— 构造时批量注册的方法集合，等价于逐个调用 `provide()`
 - `providerLimits?: { maxGlobal?: number; maxPerPeer?: number }` —— provider 并发上限，默认 `256/64`；超限立即返回 `OVERLOADED`，不排队
 - `replay?: { maxEntries?: number; ttlMs?: number }` —— 出站请求 id 重放保护窗口，默认容量 4096、TTL 310 秒
-- `construction?: { signal?: IWebRpcAbortSignal; timeoutMs?: number | false }` —— 构造期本身的取消/超时；取消/超时后仍会正确回滚已安装成功的中间件
+- `construction?: { signal?: IRpcAbortSignal; timeoutMs?: number | false }` —— 构造期本身的取消/超时；取消/超时后仍会正确回滚已安装成功的中间件
+- `scheduler?: IUtilsScheduler` —— 端点和 PluginHost 共用的时钟与定时器；未提供时使用系统调度器。`now()` 须返回非负安全整数毫秒时间戳，`schedule()` 须返回可取消任务；非法配置以 `INVALID_CONFIG` 拒绝
 
-`middlewares` 接受由 `defineMiddleware` 或首方 middleware 工厂创建的原生定义；它们与 Feature 一起作为同一个 PluginHost 批次安装，资源清理由 `core.own()` 归属。0.x 的 `IWebRpcMiddlewareContext`/`install(context)` 形状已移除；继续传入旧形状会在任何传输副作用前以 `INVALID_CONFIG` 拒绝。
+`middlewares` 接受由 `defineMiddleware` 或首方 middleware 工厂创建的原生定义；它们与 Feature 一起作为同一个 PluginHost 批次安装，资源清理由 `core.own()` 归属。0.x 的 `IRpcMiddlewareContext`/`install(context)` 形状已移除；继续传入旧形状会在任何传输副作用前以 `INVALID_CONFIG` 拒绝。
 
 #### 7.4 自定义原生 Feature 与 Middleware
 
@@ -232,7 +233,7 @@ endpoint.metricEndpointId()
 endpoint.provide('greet', (ctx) => ctx.success(`hello, ${ctx.data}`))
 ```
 
-`fn` 收到的 `IWebRpcContext` 全部字段：`data: unknown`（已过 `contract()` schema 校验，如果配置了的话）、`signal: IWebRpcAbortSignal`（调用方取消时触发）、`success(data?, { transfer? })`、`failed(message, code)`、`dispatchTo({ id?, method, data })`（主动向调用方推一条单向消息）。返回 `this`，可以链式调用。
+`fn` 收到的 `IRpcContext` 全部字段：`data: unknown`（已过 `contract()` schema 校验，如果配置了的话）、`signal: IRpcAbortSignal`（调用方取消时触发）、`success(data?, { transfer? })`、`failed(message, code)`、`dispatchTo({ id?, method, data })`（主动向调用方推一条单向消息）。返回 `this`，可以链式调用。
 
 **`endpoint.send<T>(targetId, method, data, options?)`｜5 秒上手** —— 发起一次双向调用并等待结果：
 
@@ -240,7 +241,7 @@ endpoint.provide('greet', (ctx) => ctx.success(`hello, ${ctx.data}`))
 const sum = await endpoint.send<number>('server', 'add', { a: 1, b: 2 })
 ```
 
-`options?: ISendOptions` 全部字段：`signal?: IWebRpcAbortSignal`（需要装 `abort()` 中间件）、`timeoutMs?: number | false`（覆盖 `timeout()` 中间件的默认值）、`transfer?: readonly unknown[]`（零拷贝转移列表）。
+`options?: ISendOptions` 全部字段：`signal?: IRpcAbortSignal`（需要装 `abort()` 中间件）、`timeoutMs?: number | false`（覆盖 `timeout()` 中间件的默认值）、`transfer?: readonly unknown[]`（零拷贝转移列表）。
 
 **`endpoint.sendAll<T>(method, data, options?)`｜5 秒上手** —— 向当前全部已知/存活对端发起同一次调用：
 
@@ -248,7 +249,7 @@ const sum = await endpoint.send<number>('server', 'add', { a: 1, b: 2 })
 const { fulfilled, rejected } = await endpoint.sendAll<number>('ping-check', undefined)
 ```
 
-`options` 同 `send`。返回 `IWebRpcFanoutResult<T>`（`{ fulfilled, rejected }`，两者都是**空原型对象**，查找必须用 `Object.hasOwn()`，不能用 `in`——完整 key 编码规则见 [USEGUIDE §6](./USEGUIDE.md#6-endpoint-公开-api-参考)）。对一个已释放的 endpoint 调用 `sendAll` 会稳定失败，即使当前没有任何已知对端。
+`options` 同 `send`。返回 `IRpcFanoutResult<T>`（`{ fulfilled, rejected }`，两者都是**空原型对象**，查找必须用 `Object.hasOwn()`，不能用 `in`——完整 key 编码规则见 [USEGUIDE §6](./USEGUIDE.md#6-endpoint-公开-api-参考)）。对一个已释放的 endpoint 调用 `sendAll` 会稳定失败，即使当前没有任何已知对端。
 
 **`endpoint.dispatch(targetId, method, data)` / `dispatchAll(method, data)`｜3 秒上手** —— 单向通知，不等待响应，同步返回（内部异步执行）：
 
@@ -266,7 +267,7 @@ const off = endpoint.on('cache-invalidated', (ctx) => console.log(ctx.data))
 off() // 取消订阅
 ```
 
-`listener: IWebRpcEventListener`（`(context: IWebRpcContext) => void | Promise<void>`），无其他选项；返回取消订阅函数。
+`listener: IRpcEventListener`（`(context: IRpcContext) => void | Promise<void>`），无其他选项；返回取消订阅函数。
 
 **`endpoint.hooks.on(listener)`｜3 秒上手** —— 运行时动态订阅生命周期事件，等价于 `hooks()` 中间件的 `listeners` 配置项：
 
@@ -280,7 +281,7 @@ const off = endpoint.hooks.on((event) => console.log(event.name, event.at))
 await endpoint.dispose()
 ```
 
-无参数，幂等（可安全多次调用），失败时抛 `WebRpcLifecycleError`（`cleanupErrors` 逐项列出哪个资源没清理干净），完整语义见 [USEGUIDE §9](./USEGUIDE.md#9-生命周期与资源释放)。
+无参数，幂等（可安全多次调用），失败时抛 `RpcLifecycleError`（`cleanupErrors` 逐项列出哪个资源没清理干净），完整语义见 [USEGUIDE §9](./USEGUIDE.md#9-生命周期与资源释放)。
 
 **`endpoint.connect` / `endpoint.discovery`** —— 服务发现的读写控制，自动模式下只读（`getServerList`/`pinReceiver`/`unpinReceiver`），手动模式下额外有 `query`/`onQuery`/`register`/`unregister`/`ping`，完整参考见 [USEGUIDE §7](./USEGUIDE.md#7-服务发现自动模式与手动模式)。
 
@@ -312,7 +313,7 @@ contract({
 })
 ```
 
-全部选项：`version?: string`（本端协议版本号）、`acceptVersions?: string[]`（接受的对端版本号，默认只接受自己声明的 `version`）、`maxIdentifierLength?: number`（`id`/`targetId`/method 等标识符最大长度，**默认 128**，不装这个中间件时同样生效默认值）、`schemas?: Record<string, { params: IWebRpcSchema; result: IWebRpcSchema }>`（未覆盖的方法名不做校验，按方法名精确匹配）。建议总是加，否则契约不匹配问题会在业务代码里才暴露。
+全部选项：`version?: string`（本端协议版本号）、`acceptVersions?: string[]`（接受的对端版本号，默认只接受自己声明的 `version`）、`maxIdentifierLength?: number`（`id`/`targetId`/method 等标识符最大长度，**默认 128**，不装这个中间件时同样生效默认值）、`schemas?: Record<string, { params: IRpcSchema; result: IRpcSchema }>`（未覆盖的方法名不做校验，按方法名精确匹配）。建议总是加，否则契约不匹配问题会在业务代码里才暴露。
 
 **`codec(descriptor)`｜3 秒上手** —— 定义消息信封的编码/解码方式：
 
@@ -332,7 +333,7 @@ connect({
 })
 ```
 
-全部选项：`transport?: IWebRpcTransport`（工厂层已提供 `transport` 时可省略）、`useBaseIdVerifyOnly?: boolean`（**默认 `true`**：只用适配器提供的 `peerId`/`origin` 做基础校验；设为 `false` 时 `identifier` 变为必需）、`identifier?: (context) => boolean | Promise<boolean>`（`useBaseIdVerifyOnly: false` 时必须提供）、`uniqueTargetId?: string | ((context) => string | Promise<string>)`（同一 `targetId` 下多接收端的路由标识，**不是凭证**）、`discoveryMode?: 'automatic' | 'manual'`（默认 `'automatic'`）、`receiverSelector?: (serverList, context) => string | undefined | Promise<string | undefined>`（自定义多接收端选路）。
+全部选项：`transport?: IRpcTransport`（工厂层已提供 `transport` 时可省略）、`useBaseIdVerifyOnly?: boolean`（**默认 `true`**：只用适配器提供的 `peerId`/`origin` 做基础校验；设为 `false` 时 `identifier` 变为必需）、`identifier?: (context) => boolean | Promise<boolean>`（`useBaseIdVerifyOnly: false` 时必须提供）、`uniqueTargetId?: string | ((context) => string | Promise<string>)`（同一 `targetId` 下多接收端的路由标识，**不是凭证**）、`discoveryMode?: 'automatic' | 'manual'`（默认 `'automatic'`）、`receiverSelector?: (serverList, context) => string | undefined | Promise<string | undefined>`（自定义多接收端选路）。
 
 **`authentication(config)`｜10 秒上手** —— 对每一帧（含分片帧、ping/pong/abort 控制帧）做签名/验签、加解密：
 
@@ -368,7 +369,7 @@ ping()
 const alive = await endpoint.ping('server') // 对端不可达、超时或调用信号取消时返回 false
 ```
 
-无配置项。`ping(targetId, receiverId?, options?)` 的 `options?: { timeoutMs?: number; signal?: IWebRpcAbortSignal }`。公开方法同时要求 control Feature 和 `ping()` middleware；缺任一层时，精确类型都不会承诺该方法。
+无配置项。`ping(targetId, receiverId?, options?)` 的 `options?: { timeoutMs?: number; signal?: IRpcAbortSignal }`。公开方法同时要求 control Feature 和 `ping()` middleware；缺任一层时，精确类型都不会承诺该方法。
 
 **`abort()`｜3 秒上手** —— 让 `send()`/`sendAll()` 支持 `options.signal` 取消：
 
@@ -387,7 +388,7 @@ controller.abort()
 hooks({ listeners: (event) => console.log(event.name), onHookError: (err) => console.error(err) })
 ```
 
-全部选项：`listeners?: IWebRpcHook | readonly IWebRpcHook[]`、`onHookError?: (error, event) => void`（监听器自身抛错时的兜底，防止一个写错的日志监听器影响主流程）。完整事件表见 [USEGUIDE §10](./USEGUIDE.md#10-可观测性hooks-事件参考)。
+全部选项：`listeners?: IRpcHook | readonly IRpcHook[]`、`onHookError?: (error, event) => void`（监听器自身抛错时的兜底，防止一个写错的日志监听器影响主流程）。完整事件表见 [USEGUIDE §10](./USEGUIDE.md#10-可观测性hooks-事件参考)。
 
 **`uuid(config?)`｜3 秒上手** —— 自定义请求/消息 id 的生成策略：
 
@@ -400,6 +401,8 @@ uuid({ generate: (ctx) => myTraceIdGenerator(ctx.variation) })
 ---
 
 ### Core 适配器
+
+自定义 adapter 从 `@migaia/rpc/core/transport-kit` 导入 `IRpcTransport`、`IRpcSendOptions`、`RpcPlatform`、`RpcTransportOwnership` 及监听器管理原语；错误类和 `RpcCoreErrorCode` 从 `@migaia/rpc/core` 导入。该子路径是 adapter 的公开依赖边界。
 
 **`createMemoryTransportPair()`｜3 秒上手** —— `@migaia/rpc/core/adapters/memory`，单元测试/本地联调专用，不依赖任何浏览器 API：
 
@@ -423,23 +426,23 @@ const transport = createBrowserMessagePortTransport(port, { ownership: 'borrowed
 
 ```ts
 import {
-  isWebRpcError,
-  WebRpcErrorCode,
+  isRpcError,
+  RpcCoreErrorCode,
   serializeError,
   deserializeError,
   reachError
 } from '@migaia/rpc/core'
 ```
 
-**错误处理｜5 秒上手** —— 所有跨包失败都带稳定的 `(source, code)`；部分失败保留原生 `TypeError`、`RangeError`、`AggregateError` 或 `WebRpcRemoteError` 类型：
+**错误处理｜5 秒上手** —— 所有跨包失败都带稳定的 `(source, code)`；部分失败保留原生 `TypeError`、`RangeError`、`AggregateError` 或 `RpcRemoteError` 类型：
 
 ```ts
 try {
   await endpoint.send('server', 'add', { a: 1, b: 2 })
 } catch (error) {
-  if (isWebRpcError(error)) {
+  if (isRpcError(error)) {
     switch (error.code) {
-      case WebRpcErrorCode.deadlineExceeded:
+      case RpcCoreErrorCode.deadlineExceeded:
         /* 超时 */ break
       default: /* 兜底 */
     }
@@ -447,7 +450,7 @@ try {
 }
 ```
 
-业务分支应优先使用 `isWebRpcError(error)` 后检查 `source` / `code`，不要匹配可能变化的 `message`；需要区分入参类型错误或聚合清理失败时，再检查保留下来的原生错误类型。错误码全表与各类错误的完整语义见 [USEGUIDE §8](./USEGUIDE.md#8-错误处理)。
+业务分支应优先使用 `isRpcError(error)` 后检查 `source` / `code`，不要匹配可能变化的 `message`；需要区分入参类型错误或聚合清理失败时，再检查保留下来的原生错误类型。错误码全表与各类错误的完整语义见 [USEGUIDE §8](./USEGUIDE.md#8-错误处理)。
 
 **`serializeError`｜5 秒上手** —— 把任意错误（含 `cause`/`AggregateError` 链）转成可安全 `postMessage`/`JSON.stringify` 的数据结构：
 
@@ -455,7 +458,7 @@ try {
 const wire = serializeError(new Error('outer', { cause: new Error('inner') }))
 ```
 
-单参数 `error: unknown`，无选项；图深度上限 64、节点数上限 1024，超限抛 `WebRpcSerializationError`（`PAYLOAD_INVALID`）。
+单参数 `error: unknown`，无选项；图深度上限 64、节点数上限 1024，超限抛 `RpcSerializationError`（`PAYLOAD_INVALID`）。
 
 **`deserializeError`｜5 秒上手** —— 逆操作，从 wire 数据重建出真正的 `Error` 实例（按 `name` 还原对应原生子类）：
 
@@ -471,7 +474,7 @@ const restored = deserializeError(wire)
 for (const node of reachError(topLevelError)) console.error(node)
 ```
 
-单参数 `error: unknown`，无选项；和序列化使用同一安全预算，图超过 64 层或 1024 个节点、或 hostile getter 读取失败时会抛带 `PAYLOAD_INVALID` 的 `WebRpcSerializationError`，不会返回不完整遍历。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。此外主入口还整体导出传输与契约常量，用于替代手写字符串字面量，完整清单见 [USEGUIDE §15](./USEGUIDE.md#15-协议常量与类型工具)。
+单参数 `error: unknown`，无选项；和序列化使用同一安全预算，图超过 64 层或 1024 个节点、或 hostile getter 读取失败时会抛带 `PAYLOAD_INVALID` 的 `RpcSerializationError`，不会返回不完整遍历。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。此外主入口还整体导出传输与契约常量，用于替代手写字符串字面量，完整清单见 [USEGUIDE §15](./USEGUIDE.md#15-协议常量与类型工具)。
 
 ---
 
@@ -634,7 +637,7 @@ const result = await resultPromise
 4. **响应大小超限、连接被动断开这类"传输层失败"和"业务失败"是两种错误**，规范上区分为 `TRANSPORT`、`DEADLINE_EXCEEDED` 等 code，判断时按 `error.code` 分支，不要依赖 `error.message` 或 `error instanceof` 具体子类。
 5. **`Window.postMessage` 无法可靠探测对方窗口被关闭**——依赖 `timeoutMs`（默认有限超时）或显式的宿主生命周期信号，不要假设"没报错就代表还活着"；`createWindowMessageTransport` 的 `target` 是必填字段，没有默认值。
 6. **`dispose()` 是幂等的、会等待全部清理完成才 settle**；某一步清理失败不会阻止其余步骤执行，失败信息汇总在抛出的错误的 `cleanupErrors` 里，每一项都带着资源名，方便定位是哪个中间件或传输没清理干净。
-7. **自定义传输必须准确声明 `topology`**（`exclusive` / `multiplexed` / `broadcast`），且 `platform` 必须是内置枚举值之一（`WebRpcPlatform` 常量表列出的 7 个值）。声明为 `multiplexed` 的传输必须提供 peer/source 身份或显式校验，框架不会把它当成"只有一个发送方"的独占通道来信任。
+7. **自定义传输必须准确声明 `topology`**（`exclusive` / `multiplexed` / `broadcast`），且 `platform` 必须是内置枚举值之一（`RpcPlatform` 常量表列出的 7 个值）。声明为 `multiplexed` 的传输必须提供 peer/source 身份或显式校验，框架不会把它当成"只有一个发送方"的独占通道来信任。
 8. **回调函数不依赖 `this`**。中间件 `install`、`provider`、`verifier`、pipeline 回调都以裸函数形式被调用（框架内部明确不使用 `bind`/`call`/`apply`），请用箭头函数或闭包捕获状态。
 9. **framer descriptor 的容量限制不是"不设置就不限"**——六个维度里有五个（并发消息数、单 peer 消息数、分片数、分片字节、重组超时）自带内置默认值，只有 `chunkSize`/`maxMessageBytes` 才是真正的"未设不限"。
 10. **Feature 决定“有没有这个公开方法”，layer descriptor 决定“这个能力怎样工作”**。分片由 framing layer 负责，控制面由 control Feature 与 `ping()` middleware 共同提供；类型会对缺失的条件能力 fail closed。
@@ -732,6 +735,6 @@ const transport = createWebTransportDatagramTransport({
 
 单参数 `{ writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> }`，无其他选项。datagram 无内建分帧，codec/framer descriptors 需自行处理帧边界；`close()` 才会真正取消内部持久 reader，取消订阅不会。
 
-> 用不了官方适配器？实现 `IWebRpcTransport`（只有 `send`/`subscribe` 两个必需方法）就能接入任意自定义通道，见 [USEGUIDE.md](./USEGUIDE.md#5-自定义传输适配器)。
+> 用不了官方适配器？实现 `IRpcTransport`（只有 `send`/`subscribe` 两个必需方法）就能接入任意自定义通道，见 [USEGUIDE.md](./USEGUIDE.md#5-自定义传输适配器)。
 
 ---

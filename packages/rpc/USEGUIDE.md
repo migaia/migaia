@@ -72,7 +72,7 @@ Endpoint 代表通信链路里“我方”这一端。它实际具备哪些方�
 Transport 是最底层的抽象，只关心"把一个消息对象发出去"和"收到消息对象时通知我"，完全不理解 RPC 语义（不知道什么是请求、响应、超时）。它的最小接口只有两个必需方法：
 
 ```ts
-type IWebRpcTransport = {
+type IRpcTransport = {
   send(message: unknown, options?: { transfer?: readonly unknown[] }): void | Promise<void>
   subscribe(
     listener: (message: {
@@ -129,20 +129,20 @@ Feature 与 Middleware 必须分开理解：Feature 返回的 surface 才会投�
 `provider` 是通过 `endpoint.provide(method, fn)` 注册的函数，签名固定为：
 
 ```ts
-type IWebRpcProvider = (
-  context: IWebRpcContext
-) => IWebRpcProviderResult | Promise<IWebRpcProviderResult>
+type IRpcProvider = (
+  context: IRpcContext
+) => IRpcProviderResult | Promise<IRpcProviderResult>
 
-type IWebRpcContext = {
+type IRpcContext = {
   readonly data: unknown // 调用方传入的参数（已经过 contract() 的 schema 校验，如果配置了的话）
-  readonly signal: IWebRpcAbortSignal // 调用方取消时会触发
-  success(data?: unknown, options?: { transfer?: readonly unknown[] }): IWebRpcProviderResult
-  failed(message: string, code: string): IWebRpcProviderResult
+  readonly signal: IRpcAbortSignal // 调用方取消时会触发
+  success(data?: unknown, options?: { transfer?: readonly unknown[] }): IRpcProviderResult
+  failed(message: string, code: string): IRpcProviderResult
   dispatchTo(input: { id?: string; method: string; data: unknown }): void // 主动向调用方推一条单向消息
 }
 ```
 
-`contract()` 中间件负责声明协议版本号，以及（可选）每个方法的 `params`/`result` schema——`IWebRpcSchema` 只要求一个 `parse(value): T` 方法，所以 zod、valibot、arktype 等任何实现了这个最小接口的校验库都能直接用：
+`contract()` 中间件负责声明协议版本号，以及（可选）每个方法的 `params`/`result` schema——`IRpcSchema` 只要求一个 `parse(value): T` 方法，所以 zod、valibot、arktype 等任何实现了这个最小接口的校验库都能直接用：
 
 ```ts
 contract({
@@ -156,11 +156,11 @@ contract({
 })
 ```
 
-配置了 schema 后，参数和返回值在跨越网络边界时都会被强校验，校验失败抛 `WebRpcSchemaValidationError`（`code: 'SCHEMA_INVALID'`），而不是让格式错误的数据静默流入业务逻辑。
+配置了 schema 后，参数和返回值在跨越网络边界时都会被强校验，校验失败抛 `RpcSchemaValidationError`（`code: 'SCHEMA_INVALID'`），而不是让格式错误的数据静默流入业务逻辑。
 
 #### 1.6 Adapter（适配器）
 
-适配器是"某个具体宿主 API"和 `IWebRpcTransport` 接口之间的胶水代码，比如 `createWebWorkerTransport(worker)` 把一个 `Worker` 实例包装成 `IWebRpcTransport`。适配器不在包的主入口导出（避免把浏览器专属代码打进不需要它们的 bundle），需要按需从子路径引入，完整参考见 [§4](#4-传输适配器详细参考)。
+适配器是"某个具体宿主 API"和 `IRpcTransport` 接口之间的胶水代码，比如 `createWebWorkerTransport(worker)` 把一个 `Worker` 实例包装成 `IRpcTransport`。适配器不在包的主入口导出（避免把浏览器专属代码打进不需要它们的 bundle），需要按需从子路径引入，完整参考见 [§4](#4-传输适配器详细参考)。
 
 ---
 
@@ -254,16 +254,19 @@ endpoint.endpointId()
 #### 2.4 完整构造配置
 
 ```ts
-type IWebRpcFactoryConfig<TTargetId extends string = string> = {
+import type { IUtilsScheduler } from '@migaia/utils/promise'
+
+type IRpcFactoryConfig<TTargetId extends string = string> = {
   readonly id: string // 必需：本端在整个通信拓扑里的唯一标识
   readonly targetIds?: readonly TTargetId[] // 已知的对端 id 列表（自动发现模式下可省略，首次 send 会懒查询）
-  readonly transport?: IWebRpcTransport // 实际收发消息用的传输适配器
-  readonly provider?: Readonly<Record<string, IWebRpcProvider>> // 构造时就注册好的方法集合，等价于逐个调用 provide()
+  readonly transport?: IRpcTransport // 实际收发消息用的传输适配器
+  readonly provider?: Readonly<Record<string, IRpcProvider>> // 构造时就注册好的方法集合，等价于逐个调用 provide()
   readonly providerLimits?: { readonly maxGlobal?: number; readonly maxPerPeer?: number } // provider 并发上限，默认 256/64，超限立即 OVERLOADED
-  readonly middlewares: readonly IWebRpcPlugin[] // 必需：必须包含且只能包含一个 connect()；其他 middleware 按需
+  readonly middlewares: readonly IRpcPlugin[] // 必需：必须包含且只能包含一个 connect()；其他 middleware 按需
   readonly replay?: { readonly maxEntries?: number; readonly ttlMs?: number } // 出站请求 id 的重放保护窗口容量与 TTL
+  readonly scheduler?: IUtilsScheduler // 可注入时钟与定时器；默认使用系统调度器
   readonly construction?: {
-    readonly signal?: IWebRpcAbortSignal // 构造期取消
+    readonly signal?: IRpcAbortSignal // 构造期取消
     readonly timeoutMs?: number | false // 构造期超时，false 表示不限时
   }
 }
@@ -272,14 +275,15 @@ type IWebRpcFactoryConfig<TTargetId extends string = string> = {
 - **`id`**：整个通信拓扑里必须唯一。它出现在每一条消息的 `senderId` 字段里，但**不是身份凭证**——见 [§11](#11-安全注意事项)。
 - **`targetIds`**：只是"我已知这些 id"的预声明，不是必需的。自动发现模式下，第一次对未知 `targetId` 调用 `send`/`dispatch`/`ping` 会触发一次懒查询并缓存结果；`endpoint.discovery` 暴露的远端快照永远不包含 endpoint 自己。
 - **`transport`**：可以在工厂配置或 `connect({ transport })` 中提供；两处都提供时必须是同一个对象。没有可解析出的 transport、或出现冲突，会在订阅消息前以 `INVALID_CONFIG` 失败。
-- **中间件迁移**：`middlewares` 接受 `defineMiddleware` 或首方工厂返回的原生定义，并在同一个 PluginHost 批次中安装。旧版 `IWebRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义定义在第三个参数声明 Feature 引用，通过 `core.features` 读取依赖，并用 `core.own()` 归属清理。
+- **中间件迁移**：`middlewares` 接受 `defineMiddleware` 或首方工厂返回的原生定义，并在同一个 PluginHost 批次中安装。旧版 `IRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义定义在第三个参数声明 Feature 引用，通过 `core.features` 读取依赖，并用 `core.own()` 归属清理。
 - **`provider`**：等价于在 `createEndpoint` 返回前，对每一项调用一次 `endpoint.provide(method, fn)`；纯粹是"少写几行"的便利写法。
 - **`replay`**：出站请求/消息 id 会在一个有界窗口内保留，防止重放攻击复用同一个 id 让已完成的请求再跑一次 provider。普通请求的 id 在整个 TTL 内都不释放（哪怕响应已经收到）——这是有意为之，防止晚到的重复响应复活一个"看起来还在等"的旧请求；dispatch-only（单向通知）的 id 在发送结算后立即释放，因为它天生不会有响应需要防重放。默认容量 4096、TTL 310 秒；高频单向通知场景一般不需要调大，持续的双向请求量很大时可以按需调整。
 - **`construction.signal` / `construction.timeoutMs`**：构造 `createEndpoint()` 本身也是异步的（要跑完全部中间件的 `install()`），可以用这两个字段取消或限时。取消会 reject 构造过程，并且仍然会清理已经安装成功的中间件（不会留下半初始化的资源）。中间件的 `install(context)` 会收到同一个 `signal`，如果中间件自己的初始化工作是可取消的，应该监听它。
+- **`scheduler`**：可注入 `@migaia/utils/promise` 的 `IUtilsScheduler`，同一对象供 endpoint 与 PluginHost 使用；未注入时使用系统调度器。`now()` 必须返回非负安全整数的毫秒时间戳，`schedule(callback, delayMs)` 必须返回含 `cancel()` 的任务；不合法的 scheduler 会在构造期以 `INVALID_CONFIG` 拒绝。注入手动调度器时，构造超时、请求 deadline、重放窗口及发出的 `sentAt` 均受同一时钟控制。
 
 #### 2.5 PluginHost 的边界
 
-Feature 与 middleware 的安装、依赖顺序、回滚和释放由包内的 PluginHost 统一管理；WebRPC 没有再实现一套平行生命周期系统。这个 PluginHost 是实现所有者，不是额外公开给业务代码的 endpoint API：业务代码只持有投影后的冻结 endpoint，并通过 `dispose()` 释放整棵资源。
+Feature 与 middleware 的安装、依赖顺序、回滚和释放由包内的 PluginHost 统一管理；RPC core 没有再实现一套平行生命周期系统。这个 PluginHost 是实现所有者，不是额外公开给业务代码的 endpoint API：业务代码只持有投影后的冻结 endpoint，并通过 `dispose()` 释放整棵资源。
 
 因此不要依赖 Feature 安装顺序、内部 shared key 或内部 attachment 类。公开稳定边界是 package export map、endpoint 方法、middleware 配置、错误 `(source, code)` 与文档声明的生命周期语义。
 
@@ -294,11 +298,11 @@ contract({
   version?: string;               // 本端使用的协议版本号
   acceptVersions?: string[];      // 接受的对端版本号列表（默认只接受自己声明的 version）
   maxIdentifierLength?: number;   // senderId/targetId/method 等标识符的最大长度，默认 128
-  schemas?: Record<string, { params: IWebRpcSchema; result: IWebRpcSchema }>;
+  schemas?: Record<string, { params: IRpcSchema; result: IRpcSchema }>;
 })
 ```
 
-版本不匹配时对端请求会被拒绝（`CONTRACT_VERSION_UNSUPPORTED`）。`schemas` 未覆盖的方法名不做参数/返回值校验——按方法名精确匹配，没有通配符。`maxIdentifierLength` **默认 128**，且这个默认值不依赖是否安装了 `contract()` 中间件——`createEndpoint` 内部读取 `contract` capability 时统一 `?? 128`，即使完全不装 `contract()`，`senderId`/`targetId`/`taskId`/`method`/`receiverId` 这些标识符字段也一律按 128 字符上限校验。传入非正安全整数会在构造期抛 `INVALID_CONFIG`。
+版本不匹配时对端请求会被拒绝。`schemas` 未覆盖的方法名不做参数/返回值校验——按方法名精确匹配，没有通配符。`maxIdentifierLength` **默认 128**，且这个默认值不依赖是否安装了 `contract()` 中间件——`createEndpoint` 内部读取 `contract` capability 时统一 `?? 128`，即使完全不装 `contract()`，`senderId`/`targetId`/`taskId`/`method`/`receiverId` 这些标识符字段也一律按 128 字符上限校验。传入非正安全整数会在构造期抛 `INVALID_CONFIG`。
 
 #### 3.2 `codec(descriptor)`
 
@@ -318,9 +322,9 @@ codec({
 
 ```ts
 connect({
-  transport?: IWebRpcTransport;   // 工厂层已经提供 transport 时可省略
+  transport?: IRpcTransport;   // 工厂层已经提供 transport 时可省略
   useBaseIdVerifyOnly?: boolean;  // 默认 true：只用适配器提供的 peerId/origin 做基础校验
-  identifier?: (context: IWebRpcConnectContext) => boolean | Promise<boolean>; // useBaseIdVerifyOnly: false 时必须提供
+  identifier?: (context: IRpcConnectContext) => boolean | Promise<boolean>; // useBaseIdVerifyOnly: false 时必须提供
   uniqueTargetId?: string | ((context) => string | Promise<string>); // 见下方说明，不是凭证
   discoveryMode?: 'automatic' | 'manual';  // 默认 automatic
   receiverSelector?: (serverList, context) => string | undefined | Promise<string | undefined>; // 自定义多接收端选路
@@ -346,7 +350,7 @@ authentication({
 
 对**每一帧**（包括分片帧和 ping/pong/abort 这类控制帧）做保护，不是只保护业务请求/响应。`context` 里的 `direction: 'outbound' | 'inbound'` 告诉你当前是在处理发送还是接收方向。通道本身不可信（比如匿名 BroadcastChannel、未加密的 WebRTC 通道）时应当配置这个中间件；启用后，`Transfer` 列表（如 `ArrayBuffer` 的零拷贝转移）不再受支持，因为加密/签名要求先拿到序列化后的字节。
 
-**成对校验规则（构造期强制，均抛 `INVALID_CONFIG`）**：`encrypt`/`decrypt` 必须同时提供或同时不提供，只给一个会被拒绝；`sign`/`verify` 同理。两对里至少要配置一对（`encrypt`+`decrypt`，或 `sign`+`verify`，或两对都配），完全不给任何一个函数同样会被拒绝——`authentication()` 存在的意义就是至少做一种保护，空配置没有意义。出站顺序固定是先 `encrypt` 后 `sign`（`protect`），入站顺序固定是先 `verify` 后 `decrypt`（`unprotect`），与配置的字段顺序无关。任一 transform 在执行期抛出的异常都会被统一包装成 `WebRpcAuthenticationError`（`code: 'AUTHENTICATION_FAILED'`）。
+**成对校验规则（构造期强制，均抛 `INVALID_CONFIG`）**：`encrypt`/`decrypt` 必须同时提供或同时不提供，只给一个会被拒绝；`sign`/`verify` 同理。两对里至少要配置一对（`encrypt`+`decrypt`，或 `sign`+`verify`，或两对都配），完全不给任何一个函数同样会被拒绝——`authentication()` 存在的意义就是至少做一种保护，空配置没有意义。出站顺序固定是先 `encrypt` 后 `sign`（`protect`），入站顺序固定是先 `verify` 后 `decrypt`（`unprotect`），与配置的字段顺序无关。任一 transform 在执行期抛出的异常都会被统一包装成 `RpcAuthenticationError`（`code: 'AUTHENTICATION_FAILED'`）。
 
 #### 3.5 `framer(descriptor?)`
 
@@ -389,8 +393,8 @@ timeout({
 
 ```ts
 hooks({
-  listeners?: IWebRpcHook | readonly IWebRpcHook[];
-  onHookError?: (error: unknown, event: IWebRpcHookEvent) => void;
+  listeners?: IRpcHook | readonly IRpcHook[];
+  onHookError?: (error: unknown, event: IRpcHookEvent) => void;
 })
 ```
 
@@ -426,29 +430,26 @@ const [transportA, transportB] = createMemoryTransportPair()
 
 ### 5. 自定义传输适配器
 
-只需要实现 `IWebRpcTransport` 接口（完整字段见 [§1.2](#12-transport传输)），最小实现只有两个必需方法：
+从公开的 `@migaia/rpc/core/transport-kit` 获取 adapter 原语并实现 `IRpcTransport`（完整字段见 [§1.2](#12-transport传输)）。下面以已声明的 MessagePort 平台为例；新平台值由后续设计处理。最小实现只有两个必需方法：
 
 ```ts
-import type { IWebRpcTransport } from '@migaia/rpc/core'
+import { RpcPlatform, type IRpcTransport } from '@migaia/rpc/core/transport-kit'
 
-function createMyTransport(socket: MyRawSocket): IWebRpcTransport {
+function createMyTransport(port: MessagePort): IRpcTransport {
   return {
-    platform: 'Memory', // 没有贴切的内置值时可以选一个语义最接近的
+    platform: RpcPlatform.messagePort,
     topology: 'exclusive', // 如实声明拓扑，见 §1.2
     send(message) {
-      socket.write(JSON.stringify(message))
+      port.postMessage(message)
     },
     subscribe(listener) {
-      const onData = (raw: string) => listener({ data: JSON.parse(raw) })
-      socket.on('data', onData)
-      return () => socket.off('data', onData)
+      const onMessage = (event: MessageEvent) => listener({ data: event.data })
+      port.addEventListener('message', onMessage)
+      port.start()
+      return () => port.removeEventListener('message', onMessage)
     },
     close() {
-      socket.close()
-    },
-    onTransportError(listener) {
-      socket.on('error', listener)
-      return () => socket.off('error', listener)
+      port.close()
     }
   }
 }
@@ -457,8 +458,8 @@ function createMyTransport(socket: MyRawSocket): IWebRpcTransport {
 要点：
 
 - `topology` 必须如实反映这条通道的复用情况，声明错误会破坏框架的身份信任假设（见 §1.2 表格）。
-- `platform` 只是一个描述性标签（用于 hooks 事件、日志），选一个语义最接近的内置值即可，不影响功能。
-- `close`/`onTransportError`/`onListenerError` 都是可选的，但强烈建议实现：没有 `onTransportError` 时，底层连接异常断开不会让挂起请求主动失败，只能干等超时。
+- `platform` 用于 hooks 事件与日志，目前须取 `RpcPlatform` 中的已声明值；新增平台值由后续 SDD 裁定。
+- `close`/`onTransportError`/`onListenerError` 都是可选的；有底层连接错误事件的通道应实现 `onTransportError`，否则异常断开不会让挂起请求主动失败，只能等超时。
 - 所有传给你的回调（中间件 `install`、`provider`、`verifier`）都以裸函数形式调用，不依赖 `this`，请用箭头函数或闭包捕获状态。
 
 ---
@@ -468,40 +469,40 @@ function createMyTransport(socket: MyRawSocket): IWebRpcTransport {
 下列是 full preset 的最大公开表面。client、provider 和自定义组合只拥有 [§2](#2-入口预设feature-组合与构造配置) 所列子集；读取一个未选择 Feature 的方法得到 `undefined`，TypeScript 的精确入口类型也不会声明它。
 
 ```ts
-type IWebRpcEndpoint<TTargetId extends string = string> = {
-  provide(method: string, provider: IWebRpcProvider): IWebRpcEndpoint<TTargetId>
-  on(event: string, listener: IWebRpcEventListener): () => void
+type IRpcEndpoint<TTargetId extends string = string> = {
+  provide(method: string, provider: IRpcProvider): IRpcEndpoint<TTargetId>
+  on(event: string, listener: IRpcEventListener): () => void
   send<T>(targetId: TTargetId, method: string, data: unknown, options?: ISendOptions): Promise<T>
-  sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IWebRpcFanoutResult<T>>
+  sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IRpcFanoutResult<T>>
   dispatch(targetId: TTargetId, method: string, data: unknown): void
   dispatchAll(method: string, data: unknown): void
-  ping(targetId: TTargetId, receiverId?: string, options?: IWebRpcPingOptions): Promise<boolean> // control Feature + ping() middleware
-  pingAll(): Promise<IWebRpcFanoutResult<boolean>> // control Feature + ping() middleware
-  readonly connect: IWebRpcConnectControlForMode<TTargetId, TMode>
-  readonly discovery: IWebRpcDiscoveryControl<TTargetId>
-  readonly hooks: { on(listener: IWebRpcHook): () => void }
+  ping(targetId: TTargetId, receiverId?: string, options?: IRpcPingOptions): Promise<boolean> // control Feature + ping() middleware
+  pingAll(): Promise<IRpcFanoutResult<boolean>> // control Feature + ping() middleware
+  readonly connect: IRpcConnectControlForMode<TTargetId, TMode>
+  readonly discovery: IRpcDiscoveryControl<TTargetId>
+  readonly hooks: { on(listener: IRpcHook): () => void }
   dispose(): Promise<void>
 }
 ```
 
 | 方法                                                  | 参数类型                                                                                                                                                                            | 同步/异步                                                                                                                                  | 说明                                                                                                                                    |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `provide(method, fn)`                                 | `method: string`；`fn: IWebRpcProvider`（即 `(context: IWebRpcContext) => IWebRpcProviderResult \| Promise<IWebRpcProviderResult>`）                                                | 同步（直接返回 `this`）                                                                                                                    | 注册一个方法处理函数，返回 `this` 以支持链式调用；`method` 重复注册会抛错                                                               |
-| `on(event, listener)`                                 | `event: string`；`listener: IWebRpcEventListener`（即 `(context: IWebRpcContext) => void \| Promise<void>`）                                                                        | 同步（直接返回取消订阅函数）                                                                                                               | 监听对端通过 `dispatch()`/`dispatchAll()` 发来的单向通知，返回取消订阅函数                                                              |
-| `send<T>(targetId, method, data, options?)`           | `targetId: TTargetId`；`method: string`；`data: unknown`；`options?: ISendOptions`（`{ signal?: IWebRpcAbortSignal; timeoutMs?: number \| false; transfer?: readonly unknown[] }`） | 异步（返回 `Promise<T>`）                                                                                                                  | 发起一次双向调用并等待结果；`options` 支持 `signal`（需要 `abort()` 中间件）、`timeoutMs`（覆盖默认超时）、`transfer`（零拷贝转移列表） |
-| `sendAll<T>(method, data, options?)`                  | `method: string`；`data: unknown`；`options?: ISendOptions`                                                                                                                         | 异步（返回 `Promise<IWebRpcFanoutResult<T>>`）                                                                                             | 向当前全部已知/存活的对端发起同一次调用，返回按目标聚合的结果集，见下方 `IWebRpcFanoutResult`                                           |
+| `provide(method, fn)`                                 | `method: string`；`fn: IRpcProvider`（即 `(context: IRpcContext) => IRpcProviderResult \| Promise<IRpcProviderResult>`）                                                | 同步（直接返回 `this`）                                                                                                                    | 注册一个方法处理函数，返回 `this` 以支持链式调用；`method` 重复注册会抛错                                                               |
+| `on(event, listener)`                                 | `event: string`；`listener: IRpcEventListener`（即 `(context: IRpcContext) => void \| Promise<void>`）                                                                        | 同步（直接返回取消订阅函数）                                                                                                               | 监听对端通过 `dispatch()`/`dispatchAll()` 发来的单向通知，返回取消订阅函数                                                              |
+| `send<T>(targetId, method, data, options?)`           | `targetId: TTargetId`；`method: string`；`data: unknown`；`options?: ISendOptions`（`{ signal?: IRpcAbortSignal; timeoutMs?: number \| false; transfer?: readonly unknown[] }`） | 异步（返回 `Promise<T>`）                                                                                                                  | 发起一次双向调用并等待结果；`options` 支持 `signal`（需要 `abort()` 中间件）、`timeoutMs`（覆盖默认超时）、`transfer`（零拷贝转移列表） |
+| `sendAll<T>(method, data, options?)`                  | `method: string`；`data: unknown`；`options?: ISendOptions`                                                                                                                         | 异步（返回 `Promise<IRpcFanoutResult<T>>`）                                                                                             | 向当前全部已知/存活的对端发起同一次调用，返回按目标聚合的结果集，见下方 `IRpcFanoutResult`                                           |
 | `dispatch(targetId, method, data)`                    | `targetId: TTargetId`；`method: string`；`data: unknown`                                                                                                                            | 同步（返回 `void`）                                                                                                                        | 单向通知，不等待、不产生响应，同步返回（内部异步执行）                                                                                  |
 | `dispatchAll(method, data)`                           | `method: string`；`data: unknown`                                                                                                                                                   | 同步（返回 `void`）                                                                                                                        | 单向广播给全部已知/存活对端                                                                                                             |
-| `ping(targetId, receiverId?, options?)` / `pingAll()` | `targetId: string`；`receiverId?: string`；`options?: IWebRpcPingOptions`（`{ timeoutMs?: number; signal?: IWebRpcAbortSignal }`）；`pingAll()` 无参数                              | 异步（分别返回 `Promise<boolean>` / `Promise<IWebRpcFanoutResult<boolean>>`）                                                              | 存活探测；不可达/超时/传输失败/调用取消返回 `false`，本地契约和生命周期错误仍抛出                                                       |
+| `ping(targetId, receiverId?, options?)` / `pingAll()` | `targetId: string`；`receiverId?: string`；`options?: IRpcPingOptions`（`{ timeoutMs?: number; signal?: IRpcAbortSignal }`）；`pingAll()` 无参数                              | 异步（分别返回 `Promise<boolean>` / `Promise<IRpcFanoutResult<boolean>>`）                                                              | 存活探测；不可达/超时/传输失败/调用取消返回 `false`，本地契约和生命周期错误仍抛出                                                       |
 | `connect`                                             | 不适用（只读属性，非函数；其下各方法各自的参数见 §7）                                                                                                                               | 视情况（`getServerList`/`pinReceiver`/`unpinReceiver`/`onQuery`/`register` 是同步方法，`query`/`unregister`/`ping` 返回 `Promise`，见 §7） | 服务发现的读写控制，自动模式下只读（`getServerList`/`pinReceiver`/`unpinReceiver`），手动模式下额外有查询/注册控制，见 §7               |
 | `discovery`                                           | 不适用（只读属性，非函数）                                                                                                                                                          | 同步（暴露的 `getServerList`/`pinReceiver`/`unpinReceiver` 均为同步方法，不返回 `Promise`）                                                | 只读的远端服务发现快照，等价于 `connect` 的只读子集，命名上更强调"这是给调试/观测用的"                                                  |
-| `hooks.on(listener)`                                  | `listener: IWebRpcHook`（即 `(event: IWebRpcHookEvent) => void \| Promise<void>`）                                                                                                  | 同步（直接返回取消订阅函数）                                                                                                               | 运行时动态订阅生命周期事件，等价于 `hooks()` 中间件的 `listeners` 配置项                                                                |
+| `hooks.on(listener)`                                  | `listener: IRpcHook`（即 `(event: IRpcHookEvent) => void \| Promise<void>`）                                                                                                  | 同步（直接返回取消订阅函数）                                                                                                               | 运行时动态订阅生命周期事件，等价于 `hooks()` 中间件的 `listeners` 配置项                                                                |
 | `dispose()`                                           | 无参数                                                                                                                                                                              | 异步（返回 `Promise<void>`）                                                                                                               | 释放 endpoint，见 [§9](#9-生命周期与资源释放)                                                                                           |
 
-`IWebRpcFanoutResult<T>`：
+`IRpcFanoutResult<T>`：
 
 ```ts
-type IWebRpcFanoutResult<T> = {
+type IRpcFanoutResult<T> = {
   readonly fulfilled: Partial<Record<string, T>> // key → 成功结果
   readonly rejected: Partial<Record<string, unknown>> // key → 失败原因
 }
@@ -547,29 +548,29 @@ endpoint.connect.ping(candidate, options?);            // 对某个候选做纯�
 
 ### 8. 错误处理
 
-所有跨包失败都携带稳定、不本地化的 `(source, code)`，但**不保证都是 `WebRpcError` 类实例**。参数和边界校验会保留原生 `TypeError` / `RangeError`，多项失败会保留 `AggregateError`，对端业务失败是 `WebRpcRemoteError`；这些对象仍会附加 WebRPC 的错误身份。业务逻辑应优先按 `source` / `code` 分支，不要匹配可能变化的 `message`，需要原生语义时再用 `instanceof TypeError` / `AggregateError`。
+所有跨包失败都携带稳定、不本地化的 `(source, code)`，但**不保证都是 `RpcError` 类实例**。参数和边界校验会保留原生 `TypeError` / `RangeError`，多项失败会保留 `AggregateError`，对端业务失败是 `RpcRemoteError`；这些对象仍会附加 RPC core 的错误身份。业务逻辑应优先按 `source` / `code` 分支，不要匹配可能变化的 `message`，需要原生语义时再用 `instanceof TypeError` / `AggregateError`。
 
 ```ts
 import {
-  WEBRPC_SOURCE,
-  isWebRpcError,
-  WebRpcErrorCode,
-  WebRpcConfigurationError,
-  WebRpcProtocolError,
-  WebRpcContractError,
-  WebRpcTransportError,
-  WebRpcChunkError
+  RPC_CORE_ERROR_SOURCE,
+  isRpcError,
+  RpcCoreErrorCode,
+  RpcConfigurationError,
+  RpcProtocolError,
+  RpcContractError,
+  RpcTransportError,
+  RpcChunkError
 } from '@migaia/rpc/core'
 
 try {
   await endpoint.send('server', 'add', { a: 1, b: 2 })
 } catch (error) {
-  if (isWebRpcError(error)) {
+  if (isRpcError(error)) {
     switch (error.code) {
-      case WebRpcErrorCode.deadlineExceeded:
+      case RpcCoreErrorCode.deadlineExceeded:
         // 超时，由调用方按业务策略处理
         break
-      case WebRpcErrorCode.authenticationFailed:
+      case RpcCoreErrorCode.authenticationFailed:
         // 鉴权失败，通常应提示配置问题
         break
       default:
@@ -579,7 +580,7 @@ try {
 }
 ```
 
-`WEBRPC_SOURCE` 是稳定 source 常量。`WebRpcConfigurationError`、`WebRpcProtocolError`、`WebRpcContractError`、`WebRpcTransportError` 与 `WebRpcChunkError` 是按失败域细分的公开子类；它们便于日志/框架适配器做粗粒度归类，但业务恢复仍应以 `(source, code)` 为准，因为原生 `TypeError`、`RangeError`、`AggregateError` 也可能携带同一错误身份。
+`RPC_CORE_ERROR_SOURCE` 是稳定 source 常量。`RpcConfigurationError`、`RpcProtocolError`、`RpcContractError`、`RpcTransportError` 与 `RpcChunkError` 是按失败域细分的公开子类；它们便于日志/框架适配器做粗粒度归类，但业务恢复仍应以 `(source, code)` 为准，因为原生 `TypeError`、`RangeError`、`AggregateError` 也可能携带同一错误身份。
 
 #### 错误码完整参考
 
@@ -587,19 +588,11 @@ try {
 | ----------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `MIDDLEWARE_DUPLICATED`                               | 同一个中间件被重复安装                                            | 检查 `middlewares` 数组，构造期问题，修配置                                              |
 | `MIDDLEWARE_MISSING`                                  | 调用了需要某个中间件（如 `ping`）但没安装它的方法                 | 补齐对应中间件                                                                           |
-| `PLUGIN_INSTALL_FAILED`                               | 某个中间件的 `install()` 执行时抛出异常（`cause` 挂原始安装异常） | 检查该中间件的工厂实现/配置；安装失败是稳定错误，不要对同一描述符重试                    |
 | `INVALID_CONFIG`                                      | `createEndpoint()` 配置本身不合法（含读取配置字段时抛出的异常）   | 修配置；这类错误在任何中间件产生副作用**之前**抛出                                       |
 | `PROVIDER_DUPLICATED`                                 | 同一个方法名被 `provide()` 注册了两次                             | 检查方法名是否冲突                                                                       |
-| `UUID_UNAVAILABLE` / `UUID_INVALID` / `UUID_CONFLICT` | 自定义 `uuid()` 中间件生成的 id 不合法或冲突                      | 检查自定义生成函数的实现                                                                 |
 | `PROTOCOL_INVALID`                                    | 协议编解码失败                                                    | 检查 codec descriptor 的 `encode`/`decode` 实现或对端协议是否一致                        |
-| `PROTOCOL_UNSUPPORTED`                                | 协议输出类型和传输要求的 `encodedType` 不匹配                     | 调整 codec descriptor/`encodedType` 配置                                                 |
-| `PROTOCOL_DECRYPT_FAILED`                             | `authentication()` 的解密/验签失败                                | 通常代表消息被篡改或密钥不匹配，不建议重试                                               |
 | `CONTRACT_INVALID`                                    | 契约配置本身不合法                                                | 检查 `contract()` 配置                                                                   |
-| `CONTRACT_VERSION_UNSUPPORTED`                        | 对端协议版本不在可接受范围                                        | 升级/降级到兼容版本                                                                      |
 | `PAYLOAD_INVALID`                                     | 序列化/反序列化失败，或分片校验失败                               | 检查发送的数据是否可序列化                                                               |
-| `PAYLOAD_TOO_LARGE`                                   | 消息超过 framer descriptor 配置的大小上限                         | 调大限制或减小消息体积                                                                   |
-| `METHOD_NOT_FOUND`                                    | 调用了对端没有 `provide()` 的方法名                               | 检查方法名拼写、确认对端已注册                                                           |
-| `PROVIDER_NOT_FOUND`                                  | provider 执行器在入站处理阶段解析不到目标 method 的 provider      | 检查 method 是否已 `provide()`；与 `METHOD_NOT_FOUND` 语义相邻但是独立的错误码，不可重试 |
 | `PROVIDER_NOT_SETTLED`                                | provider 函数没有正确返回 `success()`/`failed()` 结果             | 检查 provider 实现                                                                       |
 | `INTERNAL`                                            | 框架内部未分类错误                                                | 附带原始 `cause`，需要具体排查                                                           |
 | `TARGET_UNKNOWN`                                      | 目标 `targetId` 未知且发现失败                                    | 确认目标 id 正确、对端在线                                                               |
@@ -610,20 +603,14 @@ try {
 | `PROVIDER_CONTEXT_EXPIRED`                            | provider 在其 `context` 已过期后才尝试结算                        | 检查 provider 是否有异步逻辑跑得太久                                                     |
 | `TRANSPORT`                                           | 底层传输发送/接收失败                                             | 传输层问题，检查连接状态                                                                 |
 | `AUTHENTICATION_FAILED`                               | `authentication()`/`connect()` 校验未通过                         | 安全相关，不建议自动重试                                                                 |
-| `UNAUTHENTICATED` / `FORBIDDEN`                       | 权限相关拒绝                                                      | 检查鉴权配置或用户权限                                                                   |
-| `UNAVAILABLE`                                         | 依赖的能力当前不可用                                              | 检查前置条件                                                                             |
 | `SCHEMA_INVALID`                                      | `contract()` 配置的 schema 校验未通过                             | 检查参数/返回值是否符合约定的 schema                                                     |
 | `CAPABILITY_CONFLICT`                                 | 多个中间件/配置之间的能力声明冲突                                 | 检查中间件组合是否合理                                                                   |
 | `OVERLOADED`                                          | 出站 id 账本、并发限制等资源预算耗尽                              | 降低发送频率或调大对应限制（如 `replay.maxEntries`）                                     |
 | `CHUNK_INVALID`                                       | 分片帧不合法                                                      | 检查 framer descriptor 自定义 `split`/`byteLength` 实现                                  |
-| `CHUNK_TOO_LARGE`                                     | 单条消息或单个分片超过配置上限                                    | 调整 framer descriptor 限制                                                              |
-| `CHUNK_CAPACITY_EXCEEDED`                             | 并发重组数量/缓冲区超限                                           | 降低并发大消息发送量或调大限制                                                           |
-| `CHUNK_RECEIVE_TIMEOUT`                               | 分片重组在 `assemblyTimeoutMs` 内未收全                           | 检查网络稳定性，或调大超时                                                               |
-| `CHUNK_ACK_TIMEOUT`                                   | 分片确认超时（预留字段，当前分片层不做确认应答）                  | 见 framer descriptor 说明——分片层是尽力而为传递                                          |
 
-`WebRpcRemoteError` 专门代表"对端 provider 主动调用 `ctx.failed(message, code)` 返回的业务失败"，其 `data` 字段携带 provider 传回的附加数据。它继承原生 `Error` 而不是 `WebRpcError`，但仍有 `source` / `code`，所以 `isWebRpcError()` 能按结构识别它。
+`RpcRemoteError` 专门代表"对端 provider 主动调用 `ctx.failed(message, code)` 返回的业务失败"，其 `data` 字段携带 provider 传回的附加数据。它继承原生 `Error` 而不是 `RpcError`，但仍有 `source` / `code`，所以 `isRpcError()` 能按结构识别它。
 
-`WebRpcConstructionError`/`WebRpcLifecycleError`/`WebRpcAbortError`/`WebRpcTimeoutError` 这几个子类在特定场景下会额外携带 `cleanupErrors`（构造/释放过程中，各个资源各自的清理失败详情，见 [§9](#9-生命周期与资源释放)）或 `cleanupPromise`（清理仍在进行中时可以 await 的句柄）。
+`RpcConstructionError`/`RpcLifecycleError`/`RpcAbortError`/`RpcTimeoutError` 这几个子类在特定场景下会额外携带 `cleanupErrors`（构造/释放过程中，各个资源各自的清理失败详情，见 [§9](#9-生命周期与资源释放)）或 `cleanupPromise`（清理仍在进行中时可以 await 的句柄）。
 
 ---
 
@@ -633,14 +620,14 @@ try {
 
 1. **立即结算全部进行中的请求**——不会让调用方永远挂起等一个再也不会有结果的 Promise。
 2. **立即让入站的 provider 执行上下文失效**——释放过程中新到达的请求不会被处理。
-3. **按预期顺序清理**：中间件卸载、传输连接关闭、发现注册表清理等，任何一步失败都会被收集而不是让后续清理中断，最终如果有失败会以 `WebRpcLifecycleError` reject，其 `cleanupErrors` 是一个数组，每一项都保留了具体是哪个资源清理失败（`{ resource: string; error: unknown }`），方便定位到底是中间件、订阅、接收端注销通知，还是自己拥有的传输释放出了问题。
+3. **按预期顺序清理**：中间件卸载、传输连接关闭、发现注册表清理等，任何一步失败都会被收集而不是让后续清理中断，最终如果有失败会以 `RpcLifecycleError` reject，其 `cleanupErrors` 是一个数组，每一项都保留了具体是哪个资源清理失败（`{ resource: string; error: unknown }`），方便定位到底是中间件、订阅、接收端注销通知，还是自己拥有的传输释放出了问题。
 4. **幂等**：`dispose()` 可以安全地调用多次，后续调用复用第一次的清理结果，不会重复执行清理逻辑或产生新的副作用。
 
 ```ts
 try {
   await endpoint.dispose()
 } catch (error) {
-  if (error instanceof WebRpcLifecycleError) {
+  if (error instanceof RpcLifecycleError) {
     for (const { resource, error: cause } of error.cleanupErrors ?? []) {
       console.error(`清理 ${resource} 失败：`, cause)
     }
@@ -648,16 +635,16 @@ try {
 }
 ```
 
-构造期的取消/失败（`WebRpcConstructionError`/`WebRpcAbortError`）同样携带清理信息——即便构造还没完成就被取消，已经安装成功的那部分中间件依然会被正确回滚，不会留下半初始化的资源。
+构造期的取消/失败（`RpcConstructionError`/`RpcAbortError`）同样携带清理信息——即便构造还没完成就被取消，已经安装成功的那部分中间件依然会被正确回滚，不会留下半初始化的资源。
 
 ---
 
 ### 10. 可观测性：hooks 事件参考
 
-通过 `hooks()` 中间件的 `listeners` 或 `endpoint.hooks.on(listener)` 订阅。每个事件都是 `IWebRpcHookEvent`：
+通过 `hooks()` 中间件的 `listeners` 或 `endpoint.hooks.on(listener)` 订阅。每个事件都是 `IRpcHookEvent`：
 
 ```ts
-type IWebRpcHookEvent = {
+type IRpcHookEvent = {
   readonly name: string
   readonly at: number // 事件发生时间戳
   readonly localId: string // 本端 id
@@ -890,7 +877,7 @@ framing layer 决定是否安装分片帧运行时所有者；`framer()` descrip
 **Q：调用报 `TARGET_UNKNOWN`，但对端明明在线。**
 自动发现模式下确认对端确实 `provide()` 了对应方法、`id` 拼写一致；跨源场景确认 `targetOrigin`/`connect` 的身份校验没有把合法请求也拒绝了。手动模式下确认调用方已经 `register()` 过这个接收端。
 
-**Q：大消息发送失败，报 `PAYLOAD_TOO_LARGE` 或 `CHUNK_TOO_LARGE`。**
+**Q：大消息发送失败，报 `FRAME_LIMIT_EXCEEDED`。**
 检查 framer descriptor 的 `chunkSize`/`maxMessageBytes` 是否够用；已经是 `Uint8Array` 的消息不支持自动分片，需要传输通道本身能处理大二进制，或者在业务层手动切分。
 
 **Q：`dispose()` reject 了，应用要怎么继续？**
@@ -912,42 +899,42 @@ core 入口导出 wire discriminant、transport 元数据和诊断使用的稳�
 
 ```ts
 import {
-  type IWebRpcTransport,
-  WebRpcPlatform,
-  WebRpcTransportTopology,
-  WebRpcTransportOwnership,
-  WebRpcTransportEncoding,
-  WebRpcEndpointStatus,
-  WebRpcDebugPhase
+  type IRpcTransport,
+  RpcPlatform,
+  RpcTransportTopology,
+  RpcTransportOwnership,
+  RpcTransportEncoding,
+  RpcEndpointStatus,
+  RpcDebugPhase
 } from '@migaia/rpc/core'
 
 const transport = {
-  platform: WebRpcPlatform.worker,
-  topology: WebRpcTransportTopology.exclusive,
-  ownership: WebRpcTransportOwnership.borrowed,
-  encodedType: WebRpcTransportEncoding.any,
+  platform: RpcPlatform.worker,
+  topology: RpcTransportTopology.exclusive,
+  ownership: RpcTransportOwnership.borrowed,
+  encodedType: RpcTransportEncoding.any,
   send,
   subscribe
-} satisfies IWebRpcTransport
+} satisfies IRpcTransport
 ```
 
 公开常量与用途：
 
 | 常量                        | 用途                                         |
 | --------------------------- | -------------------------------------------- |
-| `WebRpcPlatform`            | adapter 平台标签                             |
-| `WebRpcTransportTopology`   | exclusive/multiplexed/broadcast 信任拓扑     |
-| `WebRpcTransportOwnership`  | owned/borrowed 资源释放契约                  |
-| `WebRpcTransportEncoding`   | any/string/uint8array 编码声明               |
-| `WebRpcOperation`           | send/dispatch/ping 接收端选择操作            |
-| `WebRpcControlKind`         | request/dispatch/ping/discovery 资源准入类别 |
-| `WebRpcCandidateStatus`     | active/stale/unregistered 发现候选状态       |
-| `WebRpcEndpointStatus`      | 发现元数据中的 endpoint 准入状态             |
-| `WebRpcDebugPhase`          | 测试/诊断快照的 active/disposed 生命周期阶段 |
-| `WebRpcContractFailureKind` | schema 校验诊断分类                          |
-| `WebRpcChunkEvent`          | chunk.rejected/chunk.expired hook 名         |
+| `RpcPlatform`            | adapter 平台标签                             |
+| `RpcTransportTopology`   | exclusive/multiplexed/broadcast 信任拓扑     |
+| `RpcTransportOwnership`  | owned/borrowed 资源释放契约                  |
+| `RpcTransportEncoding`   | any/string/uint8array 编码声明               |
+| `RpcOperation`           | send/dispatch/ping 接收端选择操作            |
+| `RpcControlKind`         | request/dispatch/ping/discovery 资源准入类别 |
+| `RpcCandidateStatus`     | active/stale/unregistered 发现候选状态       |
+| `RpcEndpointStatus`      | 发现元数据中的 endpoint 准入状态             |
+| `RpcDebugPhase`          | 测试/诊断快照的 active/disposed 生命周期阶段 |
+| `RpcContractFailureKind` | schema 校验诊断分类                          |
+| `RpcChunkEvent`          | chunk.rejected/chunk.expired hook 名         |
 
-类型通过 core 入口统一导出，包括 `IWebRpcFactoryConfig`、`IWebRpcEndpoint`、`IWebRpcTransport`、`IWebRpcProvider`、`IWebRpcContext`、`IWebRpcHookEvent` 和各常量对应的值联合类型。Adapter 自己的宿主形状类型从对应 adapter 子路径导入，避免让 core 入口承担 DOM/Node 类型。
+类型通过 core 入口统一导出，包括 `IRpcFactoryConfig`、`IRpcEndpoint`、`IRpcTransport`、`IRpcProvider`、`IRpcContext`、`IRpcHookEvent` 和各常量对应的值联合类型。Adapter 自己的宿主形状类型从对应 adapter 子路径导入，避免让 core 入口承担 DOM/Node 类型。
 
 ### 16. 跨端错误序列化
 
@@ -974,7 +961,7 @@ for (const node of reachError(restored)) {
 
 反序列化会恢复 `AggregateError`、`TypeError`、`RangeError`、`SyntaxError`、`ReferenceError`、`URIError`、`EvalError`；运行时存在 `DOMException` 时恢复标准 `AbortError`，其他名称恢复为 `Error` 并保留原始 `name`。接收方得到的是新的本地错误对象，不应期待与发送方对象保持 `===` 身份。
 
-三个函数都执行安全快照，不信任对象 getter。错误图最大深度 64、最大节点数 1024；超预算、循环 wire 图或字段形状非法时，操作会抛 `WebRpcSerializationError`，`code` 为 `PAYLOAD_INVALID`，不会静默截断。`reachError()` 是诊断遍历工具，也受同样边界保护。
+三个函数都执行安全快照，不信任对象 getter。错误图最大深度 64、最大节点数 1024；超预算、循环 wire 图或字段形状非法时，操作会抛 `RpcSerializationError`，`code` 为 `PAYLOAD_INVALID`，不会静默截断。`reachError()` 是诊断遍历工具，也受同样边界保护。
 
 ### 17. 构建、格式化与测试
 
