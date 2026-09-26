@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -7,7 +7,8 @@ import {
   checkErrorRegistry,
   collectErrorRegistry,
   REGISTRY_END,
-  REGISTRY_START
+  REGISTRY_START,
+  repositoryRoot
 } from '../error-registry.mjs'
 
 /** Creates the smallest repository shape understood by the registry collector. */
@@ -59,4 +60,45 @@ test('accepts an absent ignored registry after validating declaration JSDoc', ()
     console.warn = originalWarn
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('uses a layer ERROR_SOURCE and falls back to the package name', () => {
+  const root = createFixture(
+    "export const ExampleErrorCode = {\n  /** Raised when the root input is invalid. */\n  rootInvalid: 'ROOT_INVALID'\n} as const\n"
+  )
+  try {
+    const packageRoot = join(root, 'packages/example')
+    writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name: '@fixture/a' }))
+    mkdirSync(join(packageRoot, 'src/x'), { recursive: true })
+    writeFileSync(
+      join(packageRoot, 'src/x/error-code.ts'),
+      "export const ERROR_SOURCE = '@fixture/a/custom'\nexport const LayerErrorCode = {\n  /** Raised when the layer input is invalid. */\n  layerInvalid: 'LAYER_INVALID'\n} as const\n"
+    )
+    assert.deepEqual(
+      collectErrorRegistry(root).map(({ source, code }) => ({ source, code })),
+      [
+        { source: '@fixture/a', code: 'ROOT_INVALID' },
+        { source: '@fixture/a/custom', code: 'LAYER_INVALID' }
+      ]
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('maps merged RPC codes and preserves capability graph ownership', () => {
+  const frozen = JSON.parse(
+    readFileSync(join(repositoryRoot, 'packages/rpc/test/fixtures/legacy-error-codes.json'), 'utf8')
+  )
+  const rows = collectErrorRegistry()
+  const codes = (source) => rows.filter((row) => row.source === source).map((row) => row.code)
+  assert.deepEqual(codes('@migaia/rpc/contract'), frozen.contract)
+  assert.deepEqual(codes('@migaia/rpc/core'), frozen.core)
+  assert.equal(codes('@migaia/capability/graph').length, 15)
+  assert.deepEqual(codes('@migaia/rpc-contract'), [])
+  assert.deepEqual(codes('@migaia/web-rpc'), [])
+  assert.doesNotMatch(
+    readFileSync(join(repositoryRoot, 'scripts/error-registry.mjs'), 'utf8'),
+    /capability\/src\/graph/
+  )
 })

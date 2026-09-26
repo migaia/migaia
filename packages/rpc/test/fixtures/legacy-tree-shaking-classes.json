@@ -1,0 +1,19 @@
+{
+  "packages/web-rpc/test/tree-shaking-authorization.mjs": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking-baseline.mjs": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking-canonical-build.mjs": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking-provenance.mjs": "retire: historical custody",
+  "packages/web-rpc/test/tree-shaking-retained.mjs": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking/approved-migration-candidate.test.ts": "retire: historical custody",
+  "packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking/core-retained-causal.mjs": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking/core-retained-causal.test.ts": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking/delivery-successor-transaction.mjs": "retire: historical custody",
+  "packages/web-rpc/test/tree-shaking/delivery-successor-transaction.test.ts": "retire: historical custody",
+  "packages/web-rpc/test/tree-shaking/intended-cost-custody.mjs": "retire: historical custody",
+  "packages/web-rpc/test/tree-shaking/intended-cost-custody.test.ts": "retire: historical custody",
+  "packages/web-rpc/test/tree-shaking/provenance.test.ts": "retire: historical custody",
+  "packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking/slim-attachment-hardening.test.ts": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts": "retain: RPC behavior"
+}
