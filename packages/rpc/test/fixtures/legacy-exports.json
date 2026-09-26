@@ -1,0 +1,164 @@
+{
+  "@migaia/rpc/contract": {
+    "legacy": "@migaia/rpc-contract",
+    "names": [
+      "RpcContractErrorCode",
+      "createDescriptor",
+      "deserializeRpcError",
+      "normalizePortable",
+      "normalizeRpcEnvelope",
+      "rpcProtocolV1",
+      "serializeRpcError"
+    ]
+  },
+  "@migaia/rpc/contract/v1": {
+    "legacy": "@migaia/rpc-contract/v1",
+    "names": ["default", "normalizeRpcEnvelope", "rpcProtocol"]
+  },
+  "@migaia/rpc/contract/framing": {
+    "legacy": "@migaia/rpc-contract/framing",
+    "names": [
+      "bindRpcFrameIngress",
+      "createBinaryFramer",
+      "createReassembler",
+      "createStringFramer",
+      "messageFramerV1"
+    ]
+  },
+  "@migaia/rpc/contract/framing/v1": {
+    "legacy": "@migaia/rpc-contract/framing/v1",
+    "names": ["messageFramer"]
+  },
+  "@migaia/rpc/core": {
+    "legacy": "@migaia/web-rpc",
+    "names": [
+      "WEBRPC_SOURCE",
+      "WebRpcAbortError",
+      "WebRpcAuthenticationError",
+      "WebRpcCandidateStatus",
+      "WebRpcChunkError",
+      "WebRpcConfigurationError",
+      "WebRpcConstructionError",
+      "WebRpcContractError",
+      "WebRpcEndpointStatus",
+      "WebRpcError",
+      "WebRpcErrorCode",
+      "WebRpcLifecycleError",
+      "WebRpcOperation",
+      "WebRpcPlatform",
+      "WebRpcProtocolError",
+      "WebRpcRemoteError",
+      "WebRpcSchemaValidationError",
+      "WebRpcSerializationError",
+      "WebRpcTimeoutError",
+      "WebRpcTransportEncoding",
+      "WebRpcTransportError",
+      "WebRpcTransportOwnership",
+      "WebRpcTransportTopology",
+      "abort",
+      "authentication",
+      "codec",
+      "connect",
+      "contract",
+      "createEndpoint",
+      "createFullEndpoint",
+      "createFullOneWayEndpoint",
+      "defineFeature",
+      "defineMiddleware",
+      "deserializeError",
+      "framer",
+      "hooks",
+      "isWebRpcError",
+      "ping",
+      "protocol",
+      "reachError",
+      "serializeError",
+      "timeout",
+      "uuid"
+    ]
+  },
+  "@migaia/rpc/core/composed": {
+    "legacy": "@migaia/web-rpc/core",
+    "names": ["createComposedEndpoint"]
+  },
+  "@migaia/rpc/core/client": {
+    "legacy": "@migaia/web-rpc/client",
+    "names": ["createClientEndpoint"]
+  },
+  "@migaia/rpc/core/provider": {
+    "legacy": "@migaia/web-rpc/provider",
+    "names": ["createProviderEndpoint"]
+  },
+  "@migaia/rpc/core/full": {
+    "legacy": "@migaia/web-rpc/full",
+    "names": ["createFullEndpoint", "createFullOneWayEndpoint"]
+  },
+  "@migaia/rpc/core/transport-constants": {
+    "legacy": "@migaia/web-rpc/transport-constants",
+    "names": [
+      "WebRpcCandidateStatus",
+      "WebRpcEndpointStatus",
+      "WebRpcOperation",
+      "WebRpcPlatform",
+      "WebRpcTransportEncoding",
+      "WebRpcTransportOwnership",
+      "WebRpcTransportTopology"
+    ]
+  },
+  "@migaia/rpc/core/features/outbound": {
+    "legacy": "@migaia/web-rpc/features/outbound",
+    "names": ["createOutboundFeature"]
+  },
+  "@migaia/rpc/core/features/one-way": {
+    "legacy": "@migaia/web-rpc/features/one-way",
+    "names": ["createOneWayFeature"]
+  },
+  "@migaia/rpc/core/features/provider": {
+    "legacy": "@migaia/web-rpc/features/provider",
+    "names": ["createProviderFeature"]
+  },
+  "@migaia/rpc/core/features/discovery": {
+    "legacy": "@migaia/web-rpc/features/discovery",
+    "names": ["createDiscoveryFeature"]
+  },
+  "@migaia/rpc/core/features/control": {
+    "legacy": "@migaia/web-rpc/features/control",
+    "names": ["createControlFeature"]
+  },
+  "@migaia/rpc/browser/adapters/window": {
+    "legacy": "@migaia/web-rpc/adapters/window",
+    "names": ["createWindowMessageTransport"]
+  },
+  "@migaia/rpc/core/adapters/message-port": {
+    "legacy": "@migaia/web-rpc/adapters/message-port",
+    "names": ["createBrowserMessagePortTransport", "createNodeMessagePortTransport"]
+  },
+  "@migaia/rpc/browser/adapters/web-worker": {
+    "legacy": "@migaia/web-rpc/adapters/web-worker",
+    "names": ["createWebWorkerTransport"]
+  },
+  "@migaia/rpc/browser/adapters/broadcast-channel": {
+    "legacy": "@migaia/web-rpc/adapters/broadcast-channel",
+    "names": ["createBroadcastChannelTransport"]
+  },
+  "@migaia/rpc/core/adapters/memory": {
+    "legacy": "@migaia/web-rpc/adapters/memory",
+    "names": ["createMemoryTransportPair"]
+  },
+  "@migaia/rpc/browser/adapters/shared-worker": {
+    "legacy": "@migaia/web-rpc/adapters/shared-worker",
+    "names": ["createSharedWorkerTransport"]
+  },
+  "@migaia/rpc/browser/adapters/service-worker": {
+    "legacy": "@migaia/web-rpc/adapters/service-worker",
+    "names": ["createServiceWorkerTransport"]
+  },
+  "@migaia/rpc/browser/adapters/rtc-data-channel": {
+    "legacy": "@migaia/web-rpc/adapters/rtc-data-channel",
+    "names": ["createRtcDataChannelTransport"]
+  },
+  "@migaia/rpc/browser/adapters/web-transport": {
+    "legacy": "@migaia/web-rpc/adapters/web-transport",
+    "names": ["createWebTransportDatagramTransport"]
+  }
+}

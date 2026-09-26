@@ -1,0 +1,68 @@
+{
+  "rpc-contract": {
+    "lines": {
+      "covered": 290,
+      "total": 367,
+      "pct": 79.01
+    },
+    "statements": {
+      "covered": 314,
+      "total": 413,
+      "pct": 76.02
+    },
+    "functions": {
+      "covered": 48,
+      "total": 57,
+      "pct": 84.21
+    },
+    "branches": {
+      "covered": 270,
+      "total": 385,
+      "pct": 70.12
+    }
+  },
+  "web-rpc": {
+    "lines": {
+      "covered": 4303,
+      "total": 4729,
+      "pct": 90.99
+    },
+    "statements": {
+      "covered": 4707,
+      "total": 5284,
+      "pct": 89.08
+    },
+    "functions": {
+      "covered": 1201,
+      "total": 1328,
+      "pct": 90.43
+    },
+    "branches": {
+      "covered": 2772,
+      "total": 3252,
+      "pct": 85.23
+    }
+  },
+  "capability": {
+    "lines": {
+      "covered": 959,
+      "total": 1054,
+      "pct": 90.98
+    },
+    "statements": {
+      "covered": 1039,
+      "total": 1163,
+      "pct": 89.33
+    },
+    "functions": {
+      "covered": 185,
+      "total": 205,
+      "pct": 90.24
+    },
+    "branches": {
+      "covered": 430,
+      "total": 520,
+      "pct": 82.69
+    }
+  }
+}
