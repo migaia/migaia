@@ -33,13 +33,15 @@ const firstSentence = (body) => {
   return (boundary < 0 ? text : text.slice(0, boundary + 1)).replaceAll('|', '\\|').trim()
 }
 
-/** Reads one package source identifier, including capability's graph submodule. */
-const sourceFor = (file, root) => {
+/** Reads a layer source declaration, falling back to its package identity. */
+const sourceFor = (file) => {
+  /** Optional layer-specific source exported by this error code declaration. */
+  const declaredSource = readFileSync(file, 'utf8').match(/^export const ERROR_SOURCE = '([^']+)'/m)?.[1]
+  if (declaredSource) return declaredSource
+  /** Package directory containing this error code declaration. */
   const packageDirectory = file.slice(0, file.indexOf('/src/') + 0)
   const manifest = JSON.parse(readFileSync(join(packageDirectory, 'package.json'), 'utf8'))
-  return file.endsWith('/capability/src/graph/error-code.ts')
-    ? `${manifest.name}/graph`
-    : manifest.name
+  return manifest.name
 }
 
 /** Parses every `(source, code, scenario)` row and rejects missing entry JSDoc. */
@@ -51,7 +53,7 @@ export const collectErrorRegistry = (root = repositoryRoot) => {
   const entryPattern =
     /(?:\/\*\*([\s\S]*?)\*\/\s*)?([A-Za-z][A-Za-z0-9]*)\s*:\s*'([A-Z][A-Z0-9_]*)'/g
   for (const file of files) {
-    const source = sourceFor(file, root)
+    const source = sourceFor(file)
     const text = readFileSync(file, 'utf8')
     for (const match of text.matchAll(entryPattern)) {
       const scenario = firstSentence(match[1] ?? '')
