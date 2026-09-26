@@ -1,23 +1,23 @@
 import {
-  WebRpcContractError,
-  WebRpcError,
-  WebRpcErrorCode,
-  WebRpcLifecycleError,
-  WebRpcTransportError
+  RpcContractError,
+  RpcError,
+  RpcCoreErrorCode,
+  RpcLifecycleError,
+  RpcTransportError
 } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import { WebRpcVariation } from '../semantic-constants.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import { RpcVariation } from '../semantic-constants.js'
 import type { IRpcEnvelope } from '../../contract/index.js'
-import { WebRpcRoutingProfile } from './routing-data.js'
-import type { IWebRpcAbortSignal, IWebRpcFanoutResult } from '../typing.js'
-import type { IWebRpcUuidConfig } from '../typing.js'
+import { RpcRoutingProfile } from './routing-data.js'
+import type { IRpcAbortSignal, IRpcFanoutResult } from '../typing.js'
+import type { IRpcUuidConfig } from '../typing.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type {
-  IWebRpcDiscoveryResolverPort,
-  IWebRpcOutboundOperationsPort,
-  IWebRpcTimePort,
-  IWebRpcVariationCoordinatorPort
+  IRpcDiscoveryResolverPort,
+  IRpcOutboundOperationsPort,
+  IRpcTimePort,
+  IRpcVariationCoordinatorPort
 } from './plugin-shared-keys.js'
 import { assertTimeout } from './outbound-attachment.js'
 import { allocateRpcId } from './id.js'
@@ -27,23 +27,23 @@ import type { IEndpointTimer } from './time-port.js'
 /** Caller-facing ping options mirroring the legacy per-call timeout/abort contract. */
 type IPingOptions = {
   readonly timeoutMs?: number | false
-  readonly signal?: IWebRpcAbortSignal
+  readonly signal?: IRpcAbortSignal
 }
 
 /** Exact shared ports consumed by the native control attachment. */
-export type IWebRpcControlPorts = {
-  readonly outboundOperations: IWebRpcOutboundOperationsPort
-  readonly discoveryResolver: IWebRpcDiscoveryResolverPort
-  readonly time: IWebRpcTimePort
-  readonly variationCoordinator: IWebRpcVariationCoordinatorPort
+export type IRpcControlPorts = {
+  readonly outboundOperations: IRpcOutboundOperationsPort
+  readonly discoveryResolver: IRpcDiscoveryResolverPort
+  readonly time: IRpcTimePort
+  readonly variationCoordinator: IRpcVariationCoordinatorPort
 }
 
 /** Owns ping correlation and variation subhandlers without claiming a second variation route. */
-export class WebRpcControlAttachment {
+export class RpcControlAttachment {
   /** Canonical endpoint lifecycle and owner registry; it exposes no outbound attachment state. */
   readonly #kernel: IEndpointKernelHost
   /** Four package-owned narrow ports used for all control behavior. */
-  readonly #ports: IWebRpcControlPorts
+  readonly #ports: IRpcControlPorts
   /** Immutable endpoint identifier snapshotted from the prepared construction result. */
   readonly #id: string
   /** Immutable fanout targets snapshotted before source configuration can mutate. */
@@ -60,7 +60,7 @@ export class WebRpcControlAttachment {
   /** Upper bound for `targetId`/`receiverId` length, shared with the canonical contract capability. */
   readonly #maxIdentifierLength: number
   /** Prepared UUID capability reused for collision-safe control correlation IDs. */
-  readonly #uuid: IWebRpcUuidConfig
+  readonly #uuid: IRpcUuidConfig
   /** Application contract version carried by canonical variation route metadata. */
   readonly #applicationVersion: string
   /** Resolves a per-call timeout override against the canonical timeout capability default. */
@@ -69,7 +69,7 @@ export class WebRpcControlAttachment {
   /** Installs control owner through the outbound variation port. */
   constructor(
     kernel: IEndpointKernelHost,
-    ports: IWebRpcControlPorts,
+    ports: IRpcControlPorts,
     prepared: IPreparedEndpoint<string>
   ) {
     this.#kernel = kernel
@@ -89,8 +89,8 @@ export class WebRpcControlAttachment {
     const releases: Array<() => void> = []
     try {
       for (const [variation, handler] of [
-        [WebRpcVariation.ping, (message: unknown) => this.#receivePing(message)],
-        [WebRpcVariation.pong, (message: unknown) => this.#receivePong(message)]
+        [RpcVariation.ping, (message: unknown) => this.#receivePing(message)],
+        [RpcVariation.pong, (message: unknown) => this.#receivePong(message)]
       ] as const) {
         const release = ports.variationCoordinator.admit({
           operation: 'register',
@@ -98,9 +98,9 @@ export class WebRpcControlAttachment {
           handler
         })
         if (typeof release !== 'function')
-          throw new WebRpcError(
-            WebRpcErrorCode.invalidConfig,
-            WebRpcErrorText.endpointModuleDependencyMissing
+          throw new RpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RpcCoreErrorText.endpointModuleDependencyMissing
           )
         releases.push(release)
       }
@@ -115,7 +115,7 @@ export class WebRpcControlAttachment {
   /** Returns only control-owned operations; root event/hook ownership remains outbound-owned. */
   surface(): {
     ping: (targetId: string, receiverId?: string, options?: IPingOptions) => Promise<boolean>
-    pingAll: () => Promise<IWebRpcFanoutResult<boolean>>
+    pingAll: () => Promise<IRpcFanoutResult<boolean>>
     dispose: () => void
   } {
     return {
@@ -128,7 +128,7 @@ export class WebRpcControlAttachment {
   /** Validates a caller-facing identifier against the shared contract-capability domain. */
   #validateIdentifier(value: string, label: string): void {
     if (typeof value !== 'string' || value.length === 0 || value.length > this.#maxIdentifierLength)
-      throw new WebRpcContractError(WebRpcErrorText.identifierInvalid(label))
+      throw new RpcContractError(RpcCoreErrorText.identifierInvalid(label))
   }
 
   /**
@@ -140,10 +140,7 @@ export class WebRpcControlAttachment {
     this.#validateIdentifier(targetId, 'targetId')
     if (receiverId !== undefined) this.#validateIdentifier(receiverId, 'receiverId')
     if (!this.#pingEnabled)
-      throw new WebRpcError(
-        WebRpcErrorCode.middlewareMissing,
-        WebRpcErrorText.pingMiddlewareMissing
-      )
+      throw new RpcError(RpcCoreErrorCode.middlewareMissing, RpcCoreErrorText.pingMiddlewareMissing)
     const timeoutMs = this.#resolveTimeout(options?.timeoutMs)
     assertTimeout(timeoutMs)
     if (options?.signal?.aborted) return Promise.resolve(false)
@@ -179,7 +176,7 @@ export class WebRpcControlAttachment {
           this.#ports.outboundOperations.send({
             kind: 'frame',
             message: this.#variationEnvelope(
-              WebRpcVariation.ping,
+              RpcVariation.ping,
               taskId,
               targetId,
               selected.receiverId
@@ -190,9 +187,7 @@ export class WebRpcControlAttachment {
           settle(false)
           try {
             const reportError =
-              error instanceof WebRpcTransportError && error.cause !== undefined
-                ? error.cause
-                : error
+              error instanceof RpcTransportError && error.cause !== undefined ? error.cause : error
             this.#ports.outboundOperations.send({ kind: 'report', error: reportError })
           } catch {
             // The canonical report owner isolates diagnostics; a report failure must not create
@@ -207,19 +202,19 @@ export class WebRpcControlAttachment {
    * legacy fanout contract: results are keyed by the canonical `fanoutDeliveryKey` tagged shape and
    * accumulated into a `createSafeRecord` dictionary (a plain `{}` here would let an
    * attacker-controlled `__proto__`-shaped target silently mutate the accumulator's prototype
-   * instead of appearing as a delivery result), and a `WebRpcLifecycleError` raised by any
-   * individual `ping()` (construction/dispose racing the fanout) is rethrown rather than folded
-   * into the per-target result, exactly like legacy `sendAll`/`pingAll`. Per-receiver keys are not
-   * produced here: this composed `pingAll` fans out over the statically configured target list, not
-   * a discovery-resolved receiver set — the same disclosed gap as `sendAll` above.
+   * instead of appearing as a delivery result), and a `RpcLifecycleError` raised by any individual
+   * `ping()` (construction/dispose racing the fanout) is rethrown rather than folded into the
+   * per-target result, exactly like legacy `sendAll`/`pingAll`. Per-receiver keys are not produced
+   * here: this composed `pingAll` fans out over the statically configured target list, not a
+   * discovery-resolved receiver set — the same disclosed gap as `sendAll` above.
    */
-  async pingAll(): Promise<IWebRpcFanoutResult<boolean>> {
+  async pingAll(): Promise<IRpcFanoutResult<boolean>> {
     const results = await Promise.allSettled(
       this.#targetIds.map(async (targetId) => [targetId, await this.ping(targetId)] as const)
     )
     const lifecycleFailure = results.find(
       (result): result is PromiseRejectedResult =>
-        result.status === 'rejected' && result.reason instanceof WebRpcLifecycleError
+        result.status === 'rejected' && result.reason instanceof RpcLifecycleError
     )
     if (lifecycleFailure) throw lifecycleFailure.reason
     const fulfilled = createSafeRecord<boolean>()
@@ -257,7 +252,7 @@ export class WebRpcControlAttachment {
     void this.#ports.outboundOperations
       .send({
         kind: 'frame',
-        message: this.#variationEnvelope(WebRpcVariation.pong, taskId, senderId, senderId)
+        message: this.#variationEnvelope(RpcVariation.pong, taskId, senderId, senderId)
       })
       .catch((error) => this.#ports.outboundOperations.send({ kind: 'report', error }))
   }
@@ -276,7 +271,7 @@ export class WebRpcControlAttachment {
 
   /** Builds the one canonical variation envelope used by ping and pong traffic. */
   #variationEnvelope(
-    variation: (typeof WebRpcVariation)[keyof typeof WebRpcVariation],
+    variation: (typeof RpcVariation)[keyof typeof RpcVariation],
     taskId: string,
     targetId: string,
     receiverId: string
@@ -286,7 +281,7 @@ export class WebRpcControlAttachment {
       id: taskId,
       data: {
         webRpc: {
-          profile: WebRpcRoutingProfile,
+          profile: RpcRoutingProfile,
           type: 'variation',
           applicationVersion: this.#applicationVersion,
           senderId: this.#id,

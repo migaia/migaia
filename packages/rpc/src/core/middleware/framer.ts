@@ -1,7 +1,7 @@
 import type { IRpcFrameAcceptResult, IRpcFramer } from '../../contract/index.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcPlugin, IWebRpcPluginInstallResult } from '../typing.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 
 /**
  * Structural framer floor preserves a concrete descriptor's input and frame union through plugin
@@ -15,14 +15,14 @@ type IFramerDescriptor = Omit<IRpcFramer<unknown, unknown, string, number>, 'fra
 /** Creates a framing-owned plugin; framing remains independent of semantic envelopes and codecs. */
 export function framer<TDescriptor extends IFramerDescriptor>(
   descriptor: TDescriptor
-): IWebRpcPlugin<{ readonly framer: TDescriptor }> {
+): IRpcPlugin<{ readonly framer: TDescriptor }> {
   if (
     !descriptor ||
     typeof descriptor !== 'object' ||
     typeof descriptor.frame !== 'function' ||
     typeof descriptor.accept !== 'function'
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.framerDescriptorInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.framerDescriptorInvalid)
   return Object.freeze({
     name: 'framer',
     framer: descriptor,
@@ -36,7 +36,7 @@ export function framer<TDescriptor extends IFramerDescriptor>(
         activator: false
       })
     }),
-    install: (): IWebRpcPluginInstallResult => ({
+    install: (): IRpcPluginInstallResult => ({
       extension: Object.freeze({ framer: descriptor }),
       ports: Object.freeze({})
     })

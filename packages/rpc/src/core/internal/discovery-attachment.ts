@@ -1,56 +1,57 @@
+import { RpcPlatform } from '../transport-constants.js'
 import {
-  WebRpcAbortError,
-  WebRpcContractError,
-  WebRpcError,
-  WebRpcErrorCode,
-  WebRpcLifecycleError,
-  WebRpcTimeoutError
+  RpcAbortError,
+  RpcContractError,
+  RpcError,
+  RpcCoreErrorCode,
+  RpcLifecycleError,
+  RpcTimeoutError
 } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import type {
-  IWebRpcConnectControl,
-  IWebRpcDiscoveryControl,
-  IWebRpcDiscoveryCandidate,
-  IWebRpcAbortSignal,
-  IWebRpcInboundDiscoveryQuery,
-  IWebRpcServerMetadata,
-  IWebRpcPlatform,
-  IWebRpcConnectCapability,
-  IWebRpcHookEvent,
-  IWebRpcUuidConfig
+  IRpcConnectControl,
+  IRpcDiscoveryControl,
+  IRpcDiscoveryCandidate,
+  IRpcAbortSignal,
+  IRpcInboundDiscoveryQuery,
+  IRpcServerMetadata,
+  IRpcPlatform,
+  IRpcConnectCapability,
+  IRpcHookEvent,
+  IRpcUuidConfig
 } from '../typing.js'
 import {
   normalizeRpcEnvelope,
   type IRpcEnvelope,
   type IRpcPortableValue
 } from '../../contract/index.js'
-import { WebRpcRoutingProfile, WebRpcRoutingType, type IWebRpcRoutingData } from './routing-data.js'
-import type { IWebRpcInboundMessage } from '../transport.js'
+import { RpcRoutingProfile, RpcRoutingType, type IRpcRoutingData } from './routing-data.js'
+import type { IRpcInboundMessage } from '../transport.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IOutboundReceiver } from './outbound-attachment.js'
 import type { IInboundIdentityAdmission } from './inbound-identity.js'
 import type {
-  IWebRpcInboundIdentityPort,
-  IWebRpcOutboundOperationsPort,
-  IWebRpcTimePort,
-  IWebRpcEndpointTimer
+  IRpcInboundIdentityPort,
+  IRpcOutboundOperationsPort,
+  IRpcTimePort,
+  IRpcEndpointTimer
 } from './plugin-shared-keys.js'
 import { DiscoveryRegistry } from './discovery-registry.js'
 import { RequestReplayLedger } from './request-replay-ledger.js'
 import { safeRead, tupleKey } from './safe-value.js'
 import { raceWithAsyncControl } from './async-control.js'
-import type { IWebRpcDiscoveryCleanupFaults } from './test-observer.js'
+import type { IRpcDiscoveryCleanupFaults } from './test-observer.js'
 import { allocateRpcId } from './id.js'
 
 /** Narrow ports consumed by the native discovery attachment. */
 type IDiscoveryPorts = {
-  readonly inboundIdentity: IWebRpcInboundIdentityPort
-  readonly outboundOperations: IWebRpcOutboundOperationsPort
-  readonly time: IWebRpcTimePort
+  readonly inboundIdentity: IRpcInboundIdentityPort
+  readonly outboundOperations: IRpcOutboundOperationsPort
+  readonly time: IRpcTimePort
   readonly candidatePing: (
-    candidate: IWebRpcDiscoveryCandidate<string>,
-    options?: { readonly timeoutMs?: number; readonly signal?: IWebRpcAbortSignal }
+    candidate: IRpcDiscoveryCandidate<string>,
+    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
   ) => Promise<boolean>
 }
 
@@ -63,7 +64,7 @@ type IDiscoveryIdentity = {
 /** Opaque manual query state retained by the discovery owner until the application settles it. */
 type IManualDiscoveryWaiter<TTargetId extends string> = {
   readonly targetId: TTargetId
-  readonly candidates: IWebRpcDiscoveryCandidate<TTargetId>[]
+  readonly candidates: IRpcDiscoveryCandidate<TTargetId>[]
   readonly candidateKeys: Set<string>
   readonly candidatePeerCounts: Map<string, number>
 }
@@ -75,7 +76,7 @@ type IAutomaticDiscoveryWaiter = {
   readonly reject: (error: unknown) => void
   references: number
   taskId?: string
-  timer?: IWebRpcEndpointTimer
+  timer?: IRpcEndpointTimer
   sessionDeadlineAt?: number
   settled: boolean
 }
@@ -87,12 +88,12 @@ type IManualInboundQuery = {
   readonly targetId: string
   readonly verifiedPeerKey: string
   readonly data: unknown
-  readonly platform: IWebRpcPlatform
+  readonly platform: IRpcPlatform
   readonly origin?: string
 }
 
 /** Owns discovery protocol frames and the canonical discovery registry on one kernel. */
-export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
+export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Narrow shared ports used for identity admission, frame emission and clock reads. */
   readonly #ports: IDiscoveryPorts
   /** Endpoint identity facts copied from the prepared construction snapshot. */
@@ -106,7 +107,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Release handles for both discovery protocol routes. */
   readonly #releaseRoutes: readonly (() => void)[]
   /** Stable public controls projected after installation. */
-  readonly #controls: IWebRpcConnectControl<TTargetId> & IWebRpcDiscoveryControl<TTargetId>
+  readonly #controls: IRpcConnectControl<TTargetId> & IRpcDiscoveryControl<TTargetId>
   /** Stable configured identity included in automatic discovery responses. */
   readonly #uniqueTargetId: string | undefined
   /** Immutable discovery mode captured from the prepared endpoint snapshot. */
@@ -114,9 +115,9 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Immutable identifier contract captured from the prepared endpoint snapshot. */
   readonly #maxIdentifierLength: number
   /** Immutable UUID capability used only for discovery correlation IDs. */
-  readonly #uuid: IWebRpcUuidConfig
+  readonly #uuid: IRpcUuidConfig
   /** Optional receiver selector retained as executable connect configuration. */
-  readonly #receiverSelector: IWebRpcConnectCapability['receiverSelector']
+  readonly #receiverSelector: IRpcConnectCapability['receiverSelector']
   /** Contract version retained for discovery negotiation envelopes. */
   readonly #applicationVersion: string
   /** Compatible versions retained for discovery negotiation envelopes. */
@@ -125,7 +126,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   readonly #multipleReceiverSnapshots = new Map<TTargetId, string>()
   /** Manual query listeners are discovery-owner state, not endpoint state. */
   readonly #manualQueryListeners = new Set<
-    (query: IWebRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
+    (query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
   >()
   /** Monotonic local receiver suffix used for non-broadcast receiver identity. */
   #nextReceiverId = 0
@@ -155,7 +156,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#identity = Object.freeze({
       id: prepared.id,
       receiverId:
-        kernel.platform === 'BroadcastChannel' && uniqueTargetId !== undefined
+        kernel.platform === RpcPlatform.broadcastChannel && uniqueTargetId !== undefined
           ? `${prepared.id}:${uniqueTargetId}`
           : prepared.id
     })
@@ -184,7 +185,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#releaseRoutes = [
       kernel.registerRoute('discovery', (message) => this.#receiveDiscovery(message))
     ]
-    const baseControls: IWebRpcDiscoveryControl<TTargetId> = Object.freeze({
+    const baseControls: IRpcDiscoveryControl<TTargetId> = Object.freeze({
       getServerList: (targetId?: TTargetId) => this.#getServerList(targetId),
       pinReceiver: (targetId: TTargetId, receiverId: string) =>
         this.pinReceiver(targetId, receiverId),
@@ -195,30 +196,30 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         ? {
             query: (
               targetId: TTargetId,
-              options?: { readonly timeoutMs?: number; readonly signal?: IWebRpcAbortSignal }
+              options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
             ) => this.#manualQuery(targetId, options),
             onQuery: (
-              listener: (query: IWebRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
+              listener: (query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
             ) => {
               this.#assertActive()
               if (typeof listener !== 'function')
-                throw new WebRpcError(
-                  WebRpcErrorCode.invalidConfig,
+                throw new RpcError(
+                  RpcCoreErrorCode.invalidConfig,
                   'query listener must be a function'
                 )
               return this.addManualQueryListener(listener)
             },
-            register: (candidate: IWebRpcDiscoveryCandidate<TTargetId>) =>
+            register: (candidate: IRpcDiscoveryCandidate<TTargetId>) =>
               this.#manualRegister(candidate),
             unregister: (targetId: TTargetId, receiverId?: string) =>
               this.#manualUnregister(targetId, receiverId),
             ...(prepared.options.features?.ping
               ? {
                   ping: (
-                    candidate: IWebRpcDiscoveryCandidate<TTargetId>,
+                    candidate: IRpcDiscoveryCandidate<TTargetId>,
                     options?: {
                       readonly timeoutMs?: number
-                      readonly signal?: IWebRpcAbortSignal
+                      readonly signal?: IRpcAbortSignal
                     }
                   ) => this.#manualPing(candidate, options)
                 }
@@ -232,11 +233,11 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Registers one manual listener while enforcing the one-listener contract. */
   addManualQueryListener(
-    listener: (query: IWebRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
+    listener: (query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
   ): () => void {
     if (this.#manualQueryListeners.size > 0)
-      throw new WebRpcError(
-        WebRpcErrorCode.capabilityConflict,
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityConflict,
         'only one manual query listener may be registered'
       )
     this.#manualQueryListeners.add(listener)
@@ -245,10 +246,10 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Reads the one manual query listener for inbound dispatch. */
   getManualQueryListener():
-    | ((query: IWebRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>)
+    | ((query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>)
     | undefined {
     return this.#manualQueryListeners.values().next().value as
-      | ((query: IWebRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>)
+      | ((query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>)
       | undefined
   }
 
@@ -259,12 +260,12 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   }
 
   /** Returns active and stale-aware remote receiver metadata. */
-  getServerList(targetId?: TTargetId): readonly IWebRpcServerMetadata<TTargetId>[] {
+  getServerList(targetId?: TTargetId): readonly IRpcServerMetadata<TTargetId>[] {
     this.#assertActive()
     const now = this.#ports.time.now()
     return Object.freeze(
       this.#registry
-        .remoteSnapshot<IWebRpcServerMetadata<TTargetId>>()
+        .remoteSnapshot<IRpcServerMetadata<TTargetId>>()
         .map(([, entry]) => entry)
         .filter((entry) => targetId === undefined || entry.targetId === targetId)
         .sort((left, right) =>
@@ -292,20 +293,20 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#validateIdentifier(targetId, 'targetId')
     this.#validateIdentifier(receiverId, 'receiverId')
     if (
-      this.#kernel.platform === 'BroadcastChannel' &&
+      this.#kernel.platform === RpcPlatform.broadcastChannel &&
       receiverId === String(targetId) &&
       this.#uniqueTargetId === undefined
     )
-      throw new WebRpcError(
-        WebRpcErrorCode.targetNotIdentifiable,
+      throw new RpcError(
+        RpcCoreErrorCode.targetNotIdentifiable,
         `BroadcastChannel target is not individually identifiable: ${targetId}`
       )
     const entry = this.#registry
-      .remoteSnapshot<IWebRpcServerMetadata<TTargetId>>()
+      .remoteSnapshot<IRpcServerMetadata<TTargetId>>()
       .map(([, candidate]) => candidate)
       .find((candidate) => candidate.targetId === targetId && candidate.receiverId === receiverId)
     if (!entry || entry.status !== 'active')
-      throw new WebRpcError(WebRpcErrorCode.targetUnknown, `Unknown receiver: ${receiverId}`)
+      throw new RpcError(RpcCoreErrorCode.targetUnknown, `Unknown receiver: ${receiverId}`)
     this.#registry.pin(targetId, receiverId)
     this.#registry.clearPinLost(targetId)
     this.#registry.setRemote(tupleKey(targetId, receiverId), { ...entry, pinned: true })
@@ -323,7 +324,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#validateIdentifier(targetId, 'targetId')
     this.#registry.unpin(targetId)
     this.#registry.clearPinLost(targetId)
-    for (const [key, remote] of this.#registry.remoteSnapshot<IWebRpcServerMetadata<TTargetId>>())
+    for (const [key, remote] of this.#registry.remoteSnapshot<IRpcServerMetadata<TTargetId>>())
       if (remote.targetId === targetId) this.#registry.setRemote(key, { ...remote, pinned: false })
     this.#emit({ name: 'connect.receiver-unpinned', code: 'RECEIVER_UNPINNED', targetId })
   }
@@ -368,7 +369,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Updates receiver activity without exposing registry ownership. */
   touchRemoteReceiver(targetId: string, receiverId: string): void {
     const key = tupleKey(targetId, receiverId)
-    const entry = this.#registry.getRemote<IWebRpcServerMetadata<TTargetId>>(key)
+    const entry = this.#registry.getRemote<IRpcServerMetadata<TTargetId>>(key)
     if (entry?.status === 'active')
       this.#registry.setRemote(key, { ...entry, lastSeenAt: this.#ports.time.now() })
   }
@@ -376,7 +377,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Checks receiver ownership for inbound route validation. */
   ownsReceiver(targetId: string, receiverId: string): boolean {
     return this.#registry
-      .localSnapshot<IWebRpcServerMetadata<TTargetId>>()
+      .localSnapshot<IRpcServerMetadata<TTargetId>>()
       .some(
         (entry) =>
           entry.targetId === targetId &&
@@ -408,7 +409,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   }
 
   /** Returns connect/discovery controls backed by the one registry owner. */
-  get controls(): IWebRpcConnectControl<TTargetId> & IWebRpcDiscoveryControl<TTargetId> {
+  get controls(): IRpcConnectControl<TTargetId> & IRpcDiscoveryControl<TTargetId> {
     return this.#controls
   }
 
@@ -444,7 +445,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Checks whether a discovery replay key has already completed. */
   hasCompletedTask(key: string): boolean {
-    return this.#replay.has(key)
+    return this.#replay.has(key, this.#kernel.time.scheduler.now())
   }
 
   /** Returns local receiver metadata for endpoint disposal reporting. */
@@ -456,7 +457,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   ensureLocalReceiver(targetId: TTargetId): string {
     this.#assertActive()
     this.#validateIdentifier(targetId, 'targetId')
-    const existing = this.#registry.getLocal<IWebRpcServerMetadata<TTargetId>>(targetId)
+    const existing = this.#registry.getLocal<IRpcServerMetadata<TTargetId>>(targetId)
     if (existing?.status === 'active') return existing.receiverId
     const now = Math.max(this.#ports.time.now(), (existing?.registeredAt ?? 0) + 1)
     const receiverId = this.#identity.receiverId
@@ -468,7 +469,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       lastSeenAt: now,
       pinned: false,
       status: 'active'
-    } satisfies IWebRpcServerMetadata<TTargetId>)
+    } satisfies IRpcServerMetadata<TTargetId>)
     this.#emit({
       name: 'connect.receiver-registered',
       code: 'RECEIVER_REGISTERED',
@@ -493,8 +494,8 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       })
     }
     if (entry?.status !== 'active')
-      throw new WebRpcError(
-        WebRpcErrorCode.targetUnknown,
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
         `Pinned receiver is unavailable: ${receiverId}`
       )
   }
@@ -519,12 +520,13 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     targetId: TTargetId,
     operation: string,
     timeoutMs?: number | false,
-    signal?: IWebRpcAbortSignal
+    signal?: IRpcAbortSignal
   ): Promise<{ readonly receiverId?: string; readonly verifiedPeerKey?: string }> {
     const pinned = this.#registry.getPin(targetId)
     if (pinned !== undefined || !this.#receiverSelector) return this.receiverForTarget(targetId)
     const serverList = this.getServerList(targetId)
     const selected = await raceWithAsyncControl({
+      time: this.#kernel.time,
       operation: () =>
         Promise.resolve(
           this.#receiverSelector!(serverList, {
@@ -535,23 +537,23 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         ),
       timeoutMs,
       signals: [this.#kernel.closingSignal, ...(signal ? [signal] : [])],
-      createTimeoutError: () => new WebRpcTimeoutError(),
-      createAbortError: () => new WebRpcAbortError(),
+      createTimeoutError: () => new RpcTimeoutError(),
+      createAbortError: () => new RpcAbortError(),
       onDiagnostic: (error) =>
-        this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error })
+        this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
     })
     if (selected === undefined) return this.receiverForTarget(targetId)
     if (typeof selected !== 'string')
-      throw new WebRpcError(
-        WebRpcErrorCode.targetUnknown,
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
         'receiverSelector returned an invalid receiver'
       )
     const entry = serverList.find(
       (candidate) => candidate.receiverId === selected && candidate.status === 'active'
     )
     if (!entry)
-      throw new WebRpcError(
-        WebRpcErrorCode.targetUnknown,
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
         `receiverSelector returned an unavailable receiver: ${selected}`
       )
     return {
@@ -564,7 +566,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   async discoverTargetIfNeeded(
     targetId: TTargetId,
     timeoutMs: number | false = 1000,
-    signal?: IWebRpcAbortSignal
+    signal?: IRpcAbortSignal
   ): Promise<void> {
     this.#assertActive()
     if (this.#kernel.topology === 'exclusive') return
@@ -600,24 +602,25 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     targetId: TTargetId,
     waiter: IAutomaticDiscoveryWaiter,
     timeoutMs: number | false,
-    signal?: IWebRpcAbortSignal
+    signal?: IRpcAbortSignal
   ): Promise<void> {
     if (waiter.references >= this.limits.maxWaitersPerSession)
       return Promise.reject(
-        new WebRpcError(WebRpcErrorCode.overloaded, WebRpcErrorText.discoveryWaiterLimit)
+        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.discoveryWaiterLimit)
       )
     waiter.references += 1
     return raceWithAsyncControl({
+      time: this.#kernel.time,
       operation: () => waiter.promise,
       timeoutMs,
       signals: [this.#kernel.closingSignal, ...(signal ? [signal] : [])],
-      createTimeoutError: () => new WebRpcTimeoutError(),
+      createTimeoutError: () => new RpcTimeoutError(),
       createAbortError: (reason) =>
         this.#kernel.closingSignal.aborted
-          ? new WebRpcLifecycleError(WebRpcErrorText.endpointDisposed)
-          : new WebRpcAbortError(undefined, undefined, reason),
+          ? new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+          : new RpcAbortError(undefined, undefined, reason),
       onDiagnostic: (error) =>
-        this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error })
+        this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
     }).finally(() => {
       waiter.references -= 1
       if (waiter.references > 0 || waiter.settled) return
@@ -629,7 +632,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         this.#registry.deleteResponseCount(waiter.taskId)
         this.#clearAutomaticTimer(waiter.taskId, waiter)
       }
-      waiter.reject(new WebRpcError(WebRpcErrorCode.targetUnknown, `Unknown target: ${targetId}`))
+      waiter.reject(new RpcError(RpcCoreErrorCode.targetUnknown, `Unknown target: ${targetId}`))
     })
   }
 
@@ -637,7 +640,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   #automaticDiscovery(
     targetId: TTargetId,
     timeoutMs: number | false,
-    signal?: IWebRpcAbortSignal
+    signal?: IRpcAbortSignal
   ): Promise<void> {
     this.#assertActive()
     const key = String(targetId)
@@ -684,7 +687,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     )
     if (!this.#registry.setWaiter(key, waiter)) {
       return Promise.reject(
-        new WebRpcError(WebRpcErrorCode.overloaded, WebRpcErrorText.discoveryWaiterLimit)
+        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.discoveryWaiterLimit)
       )
     }
     try {
@@ -696,8 +699,8 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#scheduleAutomaticTimer(taskId, waiter, sessionTimeoutMs, targetId)
       void this.#sendFrame(taskId, {
         webRpc: {
-          profile: WebRpcRoutingProfile,
-          type: WebRpcRoutingType.discoveryQuery,
+          profile: RpcRoutingProfile,
+          type: RpcRoutingType.discoveryQuery,
           applicationVersion: this.#applicationVersion,
           senderId: this.#identity.id,
           targetId,
@@ -738,7 +741,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#registry.deleteResponseCount(taskId)
       if (this.#registry.deleteTask(taskId)) {
         this.#registry.deleteWaiter(String(targetId))
-        waiter.reject(new WebRpcError(WebRpcErrorCode.targetUnknown, `Unknown target: ${targetId}`))
+        waiter.reject(new RpcError(RpcCoreErrorCode.targetUnknown, `Unknown target: ${targetId}`))
       }
     }, delayMs)
     this.#registry.setTimer(taskId, waiter.timer)
@@ -761,9 +764,9 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   #activeReceivers(
     targetId: TTargetId,
     pinned: string | undefined
-  ): readonly IWebRpcServerMetadata<TTargetId>[] {
+  ): readonly IRpcServerMetadata<TTargetId>[] {
     return this.#registry
-      .remoteSnapshot<IWebRpcServerMetadata<TTargetId>>()
+      .remoteSnapshot<IRpcServerMetadata<TTargetId>>()
       .map(([, value]) => value)
       .filter(
         (value) =>
@@ -776,21 +779,21 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Executes manual discovery against the same authenticated query path without exposing internals. */
   async #manualQuery(
     targetId: TTargetId,
-    options?: { readonly timeoutMs?: number; readonly signal?: IWebRpcAbortSignal }
-  ): Promise<readonly IWebRpcDiscoveryCandidate<TTargetId>[]> {
+    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
+  ): Promise<readonly IRpcDiscoveryCandidate<TTargetId>[]> {
     this.#assertManualMode()
     this.#validateIdentifier(targetId, 'targetId')
     const timeoutMs = options?.timeoutMs ?? 1000
     if (!Number.isFinite(timeoutMs) || timeoutMs < 0)
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
         'discovery timeout must be finite and non-negative'
       )
     if (options?.signal?.aborted)
-      throw new WebRpcError(WebRpcErrorCode.cancelled, 'Discovery aborted')
+      throw new RpcError(RpcCoreErrorCode.cancelled, 'Discovery aborted')
     const taskId = this.#makeId(targetId)
     return new Promise((resolve, reject) => {
-      const settleResolve = (value: readonly IWebRpcDiscoveryCandidate<TTargetId>[]): void => {
+      const settleResolve = (value: readonly IRpcDiscoveryCandidate<TTargetId>[]): void => {
         resolve(value)
       }
       const settleReject = (error: unknown): void => {
@@ -812,7 +815,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#registry.setManualWaiter(taskId, waiter)
       if (options?.signal) {
         const onAbort = (): void => {
-          const abortError = new WebRpcError(WebRpcErrorCode.cancelled, 'Discovery aborted')
+          const abortError = new RpcError(RpcCoreErrorCode.cancelled, 'Discovery aborted')
           try {
             this.#registry.rejectManualWaiter(taskId, abortError)
           } catch (error) {
@@ -823,7 +826,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
               this.#registry.deleteManualWaiter(taskId)
               settleReject(abortError)
             }
-            this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error })
+            this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
           }
         }
         ;(waiter as { onAbort?: () => void }).onAbort = onAbort
@@ -842,8 +845,8 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           if (this.#registry.getManualWaiter(taskId) !== waiter) return
           return this.#sendFrame(taskId, {
             webRpc: {
-              profile: WebRpcRoutingProfile,
-              type: WebRpcRoutingType.discoveryQuery,
+              profile: RpcRoutingProfile,
+              type: RpcRoutingType.discoveryQuery,
               applicationVersion: this.#applicationVersion,
               senderId: this.#identity.id,
               targetId,
@@ -863,16 +866,16 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
               this.#registry.deleteManualWaiter(taskId)
               settleReject(error)
             }
-            this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error: cleanupError })
+            this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error: cleanupError })
           }
         })
     })
   }
   /** Adds an explicitly accepted manual candidate to remote discovery state. */
-  #manualRegister(candidate: IWebRpcDiscoveryCandidate<TTargetId>): void {
+  #manualRegister(candidate: IRpcDiscoveryCandidate<TTargetId>): void {
     this.#assertManualMode()
     if (!candidate || typeof candidate !== 'object')
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'discovery candidate is invalid')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'discovery candidate is invalid')
     const candidateRecord = this.#registry.getCandidate(candidate as object) as
       | { expiresAt: number; registered: boolean; revoked: boolean }
       | undefined
@@ -882,28 +885,28 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       candidateRecord.revoked ||
       candidateRecord.registered
     )
-      throw new WebRpcError(
-        WebRpcErrorCode.targetUnknown,
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
         'discovery candidate was not produced by a verified manual query'
       )
     this.#validateIdentifier(candidate.targetId, 'targetId')
     if (typeof candidate.receiverId !== 'string')
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
         'discovery candidate receiverId is invalid'
       )
     try {
       this.#validateIdentifier(candidate.receiverId, 'receiverId')
     } catch {
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
         'discovery candidate receiverId is invalid'
       )
     }
     const uniqueTargetId = this.#registry.getCandidateUniqueId(candidate as object)
     const key = tupleKey(candidate.targetId, candidate.receiverId)
     if (this.#registry.isCandidateRevoked(key))
-      throw new WebRpcError(WebRpcErrorCode.targetUnknown, 'discovery candidate was revoked')
+      throw new RpcError(RpcCoreErrorCode.targetUnknown, 'discovery candidate was revoked')
     if (
       !this.#registry.hasRemote(key) &&
       this.receiverCount(candidate.targetId) >= this.limits.maxReceiversPerTarget
@@ -914,16 +917,16 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         targetId: candidate.targetId,
         receiverId: candidate.receiverId
       })
-      throw new WebRpcError(WebRpcErrorCode.targetUnknown, 'receiver limit exceeded')
+      throw new RpcError(RpcCoreErrorCode.targetUnknown, 'receiver limit exceeded')
     }
     const now = this.#ports.time.now()
-    const previous = this.#registry.getRemote<IWebRpcServerMetadata<TTargetId>>(key)
+    const previous = this.#registry.getRemote<IRpcServerMetadata<TTargetId>>(key)
     const candidateProof = this.#registry.getCandidate(candidate as object) as
       | { verifiedPeerKey?: string }
       | undefined
     if (candidateProof?.verifiedPeerKey === undefined)
-      throw new WebRpcError(
-        WebRpcErrorCode.targetUnknown,
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
         'verified discovery binding is no longer available'
       )
     if (
@@ -943,7 +946,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         candidateProof.verifiedPeerKey
       )
     )
-      throw new WebRpcError(WebRpcErrorCode.targetUnknown, 'remote discovery target limit exceeded')
+      throw new RpcError(RpcCoreErrorCode.targetUnknown, 'remote discovery target limit exceeded')
     candidateRecord.registered = true
     if (previous?.status !== 'active')
       this.#emit({
@@ -960,7 +963,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#validateIdentifier(targetId, 'targetId')
     if (receiverId !== undefined) this.#validateIdentifier(receiverId, 'receiverId')
     const keysToRevoke: string[] = []
-    for (const [key, entry] of this.#registry.remoteSnapshot<IWebRpcServerMetadata<TTargetId>>()) {
+    for (const [key, entry] of this.#registry.remoteSnapshot<IRpcServerMetadata<TTargetId>>()) {
       if (
         entry.targetId === targetId &&
         (receiverId === undefined || entry.receiverId === receiverId) &&
@@ -970,16 +973,16 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     }
     for (const key of keysToRevoke)
       if (!this.#registry.canRevokeCandidate(key, this.limits.maxManualRevokedCandidates))
-        throw new WebRpcError(WebRpcErrorCode.overloaded, 'manual revocation capacity exceeded')
-    const removed: IWebRpcServerMetadata<TTargetId>[] = []
-    for (const [key, entry] of this.#registry.remoteSnapshot<IWebRpcServerMetadata<TTargetId>>()) {
+        throw new RpcError(RpcCoreErrorCode.overloaded, 'manual revocation capacity exceeded')
+    const removed: IRpcServerMetadata<TTargetId>[] = []
+    for (const [key, entry] of this.#registry.remoteSnapshot<IRpcServerMetadata<TTargetId>>()) {
       if (
         entry.targetId === targetId &&
         (receiverId === undefined || entry.receiverId === receiverId)
       ) {
         this.#registry.deleteRemote(key)
         if (!this.#registry.revokeCandidate(key, this.limits.maxManualRevokedCandidates))
-          throw new WebRpcError(WebRpcErrorCode.overloaded, 'manual revocation capacity exceeded')
+          throw new RpcError(RpcCoreErrorCode.overloaded, 'manual revocation capacity exceeded')
         removed.push(entry)
       }
     }
@@ -1004,18 +1007,18 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   }
   /** Pings a manually selected receiver through normal authenticated routing. */
   async #manualPing(
-    candidate: IWebRpcDiscoveryCandidate<TTargetId>,
-    options?: { readonly timeoutMs?: number; readonly signal?: IWebRpcAbortSignal }
+    candidate: IRpcDiscoveryCandidate<TTargetId>,
+    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
   ): Promise<boolean> {
     this.#assertManualMode()
     if (!candidate || typeof candidate !== 'object')
-      throw new WebRpcError(
-        WebRpcErrorCode.targetUnknown,
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
         'discovery candidate was not produced by a verified manual query'
       )
     if (typeof candidate.receiverId !== 'string')
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
         'discovery candidate receiverId is invalid'
       )
     const candidateRecord = this.#registry.getCandidate(candidate as object) as
@@ -1027,19 +1030,19 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       candidateRecord.revoked ||
       this.#registry.isCandidateRevoked(tupleKey(candidate.targetId, candidate.receiverId))
     )
-      throw new WebRpcError(
-        WebRpcErrorCode.targetUnknown,
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
         'discovery candidate was not produced by a verified manual query'
       )
-    return this.#ports.candidatePing(candidate as IWebRpcDiscoveryCandidate<string>, options)
+    return this.#ports.candidatePing(candidate as IRpcDiscoveryCandidate<string>, options)
   }
 
   /** Handles both inbound discovery protocol branches after endpoint identity verification. */
   async handleInboundDiscovery(
     envelope: IRpcEnvelope,
-    route: IWebRpcRoutingData,
+    route: IRpcRoutingData,
     verifiedPeerKey: string,
-    source?: IWebRpcInboundMessage<unknown>
+    source?: IRpcInboundMessage<unknown>
   ): Promise<void> {
     if (
       envelope.kind !== 'discovery' ||
@@ -1048,7 +1051,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       return
     if (route.webRpc.manual && this.#mode !== 'manual') return
-    if (route.webRpc.type === WebRpcRoutingType.discoveryQuery) {
+    if (route.webRpc.type === RpcRoutingType.discoveryQuery) {
       if (route.webRpc.manual && this.#mode === 'manual') {
         const replayKey = tupleKey(
           'manual-query',
@@ -1056,7 +1059,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           route.webRpc.senderId,
           envelope.id
         )
-        if (this.#replay.has(replayKey)) {
+        if (this.#replay.has(replayKey, this.#kernel.time.scheduler.now())) {
           this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_REPLAY' })
           return
         }
@@ -1074,7 +1077,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           this.#emit({ name: 'failure', code: 'MANUAL_QUERY_LIMIT' })
           return
         }
-        if (!this.#replay.admit(replayKey, verifiedPeerKey)) {
+        if (!this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())) {
           this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
           return
         }
@@ -1102,13 +1105,13 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           this.#ports.time.setTimeout(() => {
             this.#deleteInboundDiscoveryTimer(queryKey)
             if (!this.#registry.deleteInboundQuery(queryKey)) return
-            this.#replay.admit(replayKey, verifiedPeerKey)
+            this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
             this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_EXPIRED' })
           }, this.limits.manualInboundQueryTtlMs)
         )
         const listener = this.getManualQueryListener()
         if (listener) {
-          const handle: IWebRpcInboundDiscoveryQuery<TTargetId> = Object.freeze({
+          const handle: IRpcInboundDiscoveryQuery<TTargetId> = Object.freeze({
             targetId: this.#identity.id as TTargetId,
             data: queryData,
             platform: this.#kernel.platform,
@@ -1119,10 +1122,10 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           })
           try {
             void Promise.resolve(listener(handle)).catch((error) =>
-              this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error })
+              this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
             )
           } catch (error) {
-            this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error })
+            this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
           }
         }
         return
@@ -1133,11 +1136,11 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         route.webRpc.senderId,
         envelope.id
       )
-      if (this.#replay.has(replayKey)) {
+      if (this.#replay.has(replayKey, this.#kernel.time.scheduler.now())) {
         this.#emit({ name: 'authentication.rejected', code: 'DISCOVERY_QUERY_REPLAY' })
         return
       }
-      if (!this.#replay.canAdmit(replayKey, verifiedPeerKey)) {
+      if (!this.#replay.canAdmit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())) {
         this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
         return
       }
@@ -1145,16 +1148,16 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
         return
       }
-      if (!this.#replay.admit(replayKey, verifiedPeerKey)) {
+      if (!this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())) {
         this.#registry.deleteAdmission(replayKey)
         this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
         return
       }
       const receiverId = this.ensureLocalReceiver(this.#identity.id as TTargetId)
-      const response: IWebRpcRoutingData = {
+      const response: IRpcRoutingData = {
         webRpc: {
-          profile: WebRpcRoutingProfile,
-          type: WebRpcRoutingType.discoveryResponse,
+          profile: RpcRoutingProfile,
+          type: RpcRoutingType.discoveryResponse,
           applicationVersion: this.#applicationVersion,
           senderId: this.#identity.id,
           targetId: route.webRpc.senderId,
@@ -1168,7 +1171,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           : { payload: { __unique_id__: this.#uniqueTargetId } })
       }
       void this.#sendFrame(envelope.id, response).catch((error: unknown) =>
-        this.#emit({ name: 'transport.failure', code: WebRpcErrorCode.transport, error })
+        this.#emit({ name: 'transport.failure', code: RpcCoreErrorCode.transport, error })
       )
       return
     }
@@ -1188,7 +1191,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       try {
         this.#validateIdentifier(route.webRpc.receiverId, 'receiverId')
       } catch (error) {
-        this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig, error })
+        this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig, error })
         return
       }
       const candidateUniqueId =
@@ -1198,9 +1201,9 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       if (candidateUniqueId !== undefined && typeof candidateUniqueId !== 'string') {
         this.#emit({
           name: 'failure',
-          code: WebRpcErrorCode.invalidConfig,
-          error: new WebRpcError(
-            WebRpcErrorCode.invalidConfig,
+          code: RpcCoreErrorCode.invalidConfig,
+          error: new RpcError(
+            RpcCoreErrorCode.invalidConfig,
             'discovery candidate uniqueTargetId must be a string'
           )
         })
@@ -1210,12 +1213,12 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         try {
           this.#validateIdentifier(candidateUniqueId, 'uniqueTargetId')
         } catch (error) {
-          this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig, error })
+          this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig, error })
           return
         }
       }
       if (
-        this.#kernel.platform === 'BroadcastChannel' &&
+        this.#kernel.platform === RpcPlatform.broadcastChannel &&
         route.webRpc.receiverId !==
           (candidateUniqueId === undefined
             ? route.webRpc.resolvedTargetId
@@ -1268,13 +1271,13 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       return
     if (typeof route.webRpc.receiverId !== 'string') {
-      this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig })
+      this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig })
       return
     }
     try {
       this.#validateIdentifier(route.webRpc.receiverId, 'receiverId')
     } catch (error) {
-      this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig, error })
+      this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig, error })
       return
     }
     const uniqueTargetId =
@@ -1283,18 +1286,18 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         : undefined
     if (uniqueTargetId !== undefined) {
       if (typeof uniqueTargetId !== 'string') {
-        this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig })
+        this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig })
         return
       }
       try {
         this.#validateIdentifier(uniqueTargetId, 'uniqueTargetId')
       } catch (error) {
-        this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig, error })
+        this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig, error })
         return
       }
     }
     if (
-      this.#kernel.platform === 'BroadcastChannel' &&
+      this.#kernel.platform === RpcPlatform.broadcastChannel &&
       route.webRpc.receiverId !==
         (uniqueTargetId === undefined
           ? route.webRpc.resolvedTargetId
@@ -1306,7 +1309,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#registry.setResponseCount(envelope.id, responseCount)
     if (
       responseCount === 2 &&
-      this.#kernel.platform === 'BroadcastChannel' &&
+      this.#kernel.platform === RpcPlatform.broadcastChannel &&
       uniqueTargetId === undefined
     )
       this.#emit({
@@ -1320,7 +1323,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       })
     const remoteKey = tupleKey(resolvedTargetId, receiverId)
     const now = this.#ports.time.now()
-    this.#registry.purgeRemote<IWebRpcServerMetadata<TTargetId>>(
+    this.#registry.purgeRemote<IRpcServerMetadata<TTargetId>>(
       (entry) => entry.status === 'active' && now - entry.lastSeenAt >= this.#receiverStaleAfterMs,
       (entry) => entry.pinned || this.#registry.getPin(entry.targetId) === entry.receiverId
     )
@@ -1336,7 +1339,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       })
       return
     }
-    const previousRemote = this.#registry.getRemote<IWebRpcServerMetadata<TTargetId>>(remoteKey)
+    const previousRemote = this.#registry.getRemote<IRpcServerMetadata<TTargetId>>(remoteKey)
     if (
       !this.#registry.setRemoteWithBinding(
         remoteKey,
@@ -1367,7 +1370,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Admits one automatic query within the discovery owner limits. */
   #admitAutomaticDiscovery(peerKey: string, taskKey: string): boolean {
-    this.#replay.purge()
+    this.#replay.purge(this.#kernel.time.scheduler.now())
     if (this.#registry.admissionSize() >= this.limits.maxAutomaticAdmissions) return false
     let peerAdmissions = 0
     for (const [, entry] of this.#registry.admissionSnapshot())
@@ -1388,13 +1391,11 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     const query = this.#registry.takeInboundQuery(key) as IManualInboundQuery | undefined
     if (!query) return false
     if (reason !== undefined && typeof reason !== 'string')
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
-        'query rejection reason must be a string'
-      )
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'query rejection reason must be a string')
     this.#replay.admit(
       tupleKey('manual-query', query.verifiedPeerKey, query.senderId, query.queryId),
-      query.verifiedPeerKey
+      query.verifiedPeerKey,
+      this.#kernel.time.scheduler.now()
     )
     const receiverId = accepted
       ? this.ensureLocalReceiver(this.#identity.id as TTargetId)
@@ -1418,8 +1419,8 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           }
     await this.#sendFrame(query.queryId, {
       webRpc: {
-        profile: WebRpcRoutingProfile,
-        type: WebRpcRoutingType.discoveryResponse,
+        profile: RpcRoutingProfile,
+        type: RpcRoutingType.discoveryResponse,
         applicationVersion: this.#applicationVersion,
         senderId: this.#identity.id,
         targetId: query.senderId,
@@ -1448,7 +1449,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   }
 
   /** Disposes registry state and route ownership during reverse composition cleanup. */
-  dispose(faults?: IWebRpcDiscoveryCleanupFaults): void {
+  dispose(faults?: IRpcDiscoveryCleanupFaults): void {
     if (this.#disposed) {
       if (this.#hasDisposeError) throw this.#disposeError
       return
@@ -1478,7 +1479,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     const replayError = faults?.replay?.[0]
     if (replayError !== undefined) cleanupErrors.push(replayError)
     cleanupErrors.push(
-      ...this.#registry.closeAndCollect(new WebRpcLifecycleError(WebRpcErrorText.endpointDisposed))
+      ...this.#registry.closeAndCollect(new RpcLifecycleError(RpcCoreErrorText.endpointDisposed))
     )
     for (const registryError of faults?.registry ?? []) cleanupErrors.push(registryError)
     if (cleanupErrors.length === 1) {
@@ -1494,9 +1495,9 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   }
 
   /** Returns immutable active receiver metadata for one target or all targets. */
-  #getServerList(targetId?: TTargetId): readonly IWebRpcServerMetadata<TTargetId>[] {
+  #getServerList(targetId?: TTargetId): readonly IRpcServerMetadata<TTargetId>[] {
     return this.#registry
-      .remoteSnapshot<IWebRpcServerMetadata<TTargetId>>()
+      .remoteSnapshot<IRpcServerMetadata<TTargetId>>()
       .map(([, value]) => value)
       .filter((value) => targetId === undefined || value.targetId === targetId)
   }
@@ -1505,8 +1506,8 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   async #receiveQuery(message: unknown): Promise<void> {
     const record = message as {
       envelope?: IRpcEnvelope
-      route?: IWebRpcRoutingData
-      inbound?: IWebRpcInboundMessage
+      route?: IRpcRoutingData
+      inbound?: IRpcInboundMessage
       admission?: IInboundIdentityAdmission
     }
     const envelope = record.envelope
@@ -1515,7 +1516,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       !envelope ||
       envelope.kind !== 'discovery' ||
       typeof envelope.id !== 'string' ||
-      route?.webRpc.type !== WebRpcRoutingType.discoveryQuery ||
+      route?.webRpc.type !== RpcRoutingType.discoveryQuery ||
       route.webRpc.targetId !== this.#identity.id
     )
       return
@@ -1530,12 +1531,13 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       route.webRpc.senderId,
       envelope.id
     )
-    if (!this.#replay.admit(replayKey, record.admission.token)) return
+    if (!this.#replay.admit(replayKey, record.admission.token, this.#kernel.time.scheduler.now()))
+      return
     const receiverId = this.ensureLocalReceiver(this.#identity.id as TTargetId)
     await this.#sendFrame(envelope.id, {
       webRpc: {
-        profile: WebRpcRoutingProfile,
-        type: WebRpcRoutingType.discoveryResponse,
+        profile: RpcRoutingProfile,
+        type: RpcRoutingType.discoveryResponse,
         applicationVersion: this.#applicationVersion,
         senderId: this.#identity.id,
         targetId: route.webRpc.senderId,
@@ -1554,8 +1556,8 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   async #receiveResponse(message: unknown): Promise<void> {
     const record = message as {
       envelope?: IRpcEnvelope
-      route?: IWebRpcRoutingData
-      inbound?: IWebRpcInboundMessage
+      route?: IRpcRoutingData
+      inbound?: IRpcInboundMessage
       admission?: IInboundIdentityAdmission
     }
     const envelope = record.envelope
@@ -1564,7 +1566,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       !envelope ||
       envelope.kind !== 'discovery' ||
       typeof envelope.id !== 'string' ||
-      route?.webRpc.type !== WebRpcRoutingType.discoveryResponse ||
+      route?.webRpc.type !== RpcRoutingType.discoveryResponse ||
       route.webRpc.targetId !== this.#identity.id ||
       typeof route.webRpc.resolvedTargetId !== 'string'
     )
@@ -1584,7 +1586,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#validateIdentifier(route.webRpc.receiverId, 'receiverId')
     const key = tupleKey(route.webRpc.resolvedTargetId, route.webRpc.receiverId)
     const now = this.#ports.time.now()
-    this.#registry.purgeRemote<IWebRpcServerMetadata<TTargetId>>(
+    this.#registry.purgeRemote<IRpcServerMetadata<TTargetId>>(
       (entry) => entry.status === 'active' && now - entry.lastSeenAt >= this.#receiverStaleAfterMs,
       (entry) => entry.pinned || this.#registry.getPin(entry.targetId) === entry.receiverId
     )
@@ -1626,14 +1628,14 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   async #receiveDiscovery(message: unknown): Promise<void> {
     const record = message as {
       envelope?: IRpcEnvelope
-      route?: IWebRpcRoutingData
-      inbound?: IWebRpcInboundMessage
+      route?: IRpcRoutingData
+      inbound?: IRpcInboundMessage
       admission?: IInboundIdentityAdmission
     }
     const envelope = record.envelope
     const route = record.route
     if (envelope?.kind !== 'discovery' || !route) return
-    if (route.webRpc.type === WebRpcRoutingType.discoveryQuery) {
+    if (route.webRpc.type === RpcRoutingType.discoveryQuery) {
       await this.#receiveQuery({
         envelope,
         route,
@@ -1642,7 +1644,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       })
       return
     }
-    if (route.webRpc.type !== WebRpcRoutingType.discoveryResponse) return
+    if (route.webRpc.type !== RpcRoutingType.discoveryResponse) return
     /** Response routing requires a concrete target before it can touch discovery state. */
     const resolvedTargetId = route.webRpc.resolvedTargetId
     if (typeof resolvedTargetId !== 'string') return
@@ -1655,7 +1657,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   }
 
   /** Sends discovery through the canonical semantic envelope and WebRPC route profile. */
-  #sendFrame(id: string, route: IWebRpcRoutingData): Promise<void> {
+  #sendFrame(id: string, route: IRpcRoutingData): Promise<void> {
     return this.#ports.outboundOperations.send({
       kind: 'frame',
       message: normalizeRpcEnvelope({
@@ -1677,13 +1679,13 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   #assertManualMode(): void {
     this.#assertActive()
     if (this.#mode !== 'manual')
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'manual discovery is unavailable')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'manual discovery is unavailable')
   }
 
   /** Validates one wire identifier against the prepared contract snapshot. */
   #validateIdentifier(value: string, label: string): void {
     if (typeof value !== 'string' || value.length === 0 || value.length > this.#maxIdentifierLength)
-      throw new WebRpcContractError(`${label} must be a non-empty identifier within the limit`)
+      throw new RpcContractError(`${label} must be a non-empty identifier within the limit`)
   }
 
   /** Allocates one collision-checked discovery correlation ID without a second ledger owner. */
@@ -1702,7 +1704,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   }
 
   /** Emits one discovery diagnostic through the canonical outbound hook owner. */
-  #emit(event: Omit<IWebRpcHookEvent, 'at' | 'localId'>): void {
+  #emit(event: Omit<IRpcHookEvent, 'at' | 'localId'>): void {
     this.#ports.outboundOperations.send({ kind: 'diagnostic', event })
   }
 

@@ -1,10 +1,10 @@
-import type { IWebRpcProvider } from '../typing.js'
+import type { IRpcProvider } from '../typing.js'
 import { messageFramer } from '../../contract/framing/v1.js'
-import type { IWebRpcSelectedComponents } from './endpoint-options.js'
+import type { IRpcSelectedComponents } from './endpoint-options.js'
 
 /** Snapshot of endpoint-owned lifecycle state exposed only to package tests. */
-export type IWebRpcEndpointDebugSnapshot = {
-  readonly phase: (typeof WebRpcDebugPhase)[keyof typeof WebRpcDebugPhase]
+export type IRpcEndpointDebugSnapshot = {
+  readonly phase: (typeof RpcDebugPhase)[keyof typeof RpcDebugPhase]
   readonly pending: number
   readonly pingPending: number
   readonly activeControllers: number
@@ -33,9 +33,7 @@ export type IWebRpcEndpointDebugSnapshot = {
 }
 
 /** Projects only the proven stateless native message framer; custom framing state remains opaque. */
-export function readSelectedFramerChunks(
-  components: IWebRpcSelectedComponents
-): number | undefined {
+export function readSelectedFramerChunks(components: IRpcSelectedComponents): number | undefined {
   const framer = components.framer
   return framer.frame === messageFramer.frame &&
     framer.accept === messageFramer.accept &&
@@ -45,21 +43,21 @@ export function readSelectedFramerChunks(
 }
 
 /** Immutable provider registration fact recorded at the canonical registry boundary. */
-export type IWebRpcProviderRegistration = {
+export type IRpcProviderRegistration = {
   readonly method: string
-  readonly provider: IWebRpcProvider
+  readonly provider: IRpcProvider
 }
 
-type IEndpointSnapshotReader = () => IWebRpcEndpointDebugSnapshot
+type IEndpointSnapshotReader = () => IRpcEndpointDebugSnapshot
 
 /** Passive time-port events used to verify endpoint-local clock ownership without controlling it. */
-export type IWebRpcTimePortEvent =
+export type IRpcTimePortEvent =
   | { readonly kind: 'now'; readonly value: number }
   | { readonly kind: 'setTimeout'; readonly delayMs: number; readonly timer: object }
   | { readonly kind: 'clearTimeout'; readonly timer: object }
 
 /** Immutable fault inputs used only by package-owned discovery lifecycle tests. */
-export type IWebRpcDiscoveryCleanupFaults = {
+export type IRpcDiscoveryCleanupFaults = {
   readonly route?: readonly unknown[]
   readonly replay?: readonly unknown[]
   readonly registry?: readonly unknown[]
@@ -75,9 +73,9 @@ export function getEndpointDebugSnapshotReader(
 }
 
 const readers = new WeakMap<object, IEndpointSnapshotReader>()
-const discoveryCleanupFaults = new WeakMap<object, IWebRpcDiscoveryCleanupFaults>()
+const discoveryCleanupFaults = new WeakMap<object, IRpcDiscoveryCleanupFaults>()
 const endpointTimePorts = new WeakMap<object, object>()
-const endpointTimePortObservers = new WeakMap<object, (event: IWebRpcTimePortEvent) => void>()
+const endpointTimePortObservers = new WeakMap<object, (event: IRpcTimePortEvent) => void>()
 
 /** Associates the canonical endpoint with its existing kernel time port for package tests only. */
 export function registerEndpointTimePortOwner(endpoint: object, timePort: object): void {
@@ -87,7 +85,7 @@ export function registerEndpointTimePortOwner(endpoint: object, timePort: object
 /** Registers one passive observer; registration cannot allocate, mutate, or dispose time state. */
 export function registerEndpointTimePortObserver(
   endpoint: object,
-  observer: (event: IWebRpcTimePortEvent) => void
+  observer: (event: IRpcTimePortEvent) => void
 ): () => void {
   const timePort = endpointTimePorts.get(endpoint)
   if (timePort === undefined) return () => undefined
@@ -99,7 +97,7 @@ export function registerEndpointTimePortObserver(
 }
 
 /** Reports a passive event without allowing diagnostics to affect clock or timer semantics. */
-export function reportEndpointTimePortEvent(timePort: object, event: IWebRpcTimePortEvent): void {
+export function reportEndpointTimePortEvent(timePort: object, event: IRpcTimePortEvent): void {
   const observer = endpointTimePortObservers.get(timePort)
   if (observer === undefined) return
   try {
@@ -112,7 +110,7 @@ export function reportEndpointTimePortEvent(timePort: object, event: IWebRpcTime
 /** Registers immutable discovery cleanup faults for one exact endpoint test transaction. */
 export function registerDiscoveryCleanupFaults(
   endpoint: object,
-  faults: IWebRpcDiscoveryCleanupFaults
+  faults: IRpcDiscoveryCleanupFaults
 ): () => void {
   const snapshot = Object.freeze({
     ...(faults.route === undefined ? {} : { route: Object.freeze([...faults.route]) }),
@@ -129,13 +127,13 @@ export function registerDiscoveryCleanupFaults(
 /** Reads immutable faults for the exact endpoint; copied or unrelated objects fail closed. */
 export function readDiscoveryCleanupFaults(
   endpoint: unknown
-): IWebRpcDiscoveryCleanupFaults | undefined {
+): IRpcDiscoveryCleanupFaults | undefined {
   if (typeof endpoint !== 'object' || endpoint === null) return undefined
   return discoveryCleanupFaults.get(endpoint)
 }
 type IProviderRegistrationObservationState = {
   readonly token: object
-  readonly entries: IWebRpcProviderRegistration[]
+  readonly entries: IRpcProviderRegistration[]
 }
 
 const providerRegistrationObservations = new WeakMap<
@@ -173,9 +171,7 @@ export function registerEndpointDebugSnapshot(
 }
 
 /** Reads an endpoint lifecycle snapshot without adding it to the public API. */
-export function readEndpointDebugSnapshot(
-  endpoint: object
-): IWebRpcEndpointDebugSnapshot | undefined {
+export function readEndpointDebugSnapshot(endpoint: object): IRpcEndpointDebugSnapshot | undefined {
   return readers.get(endpoint)?.()
 }
 
@@ -193,7 +189,7 @@ export function registerProviderRegistrationObservation(transaction: object): ()
 export function recordProviderRegistration(
   transaction: unknown,
   method: string,
-  provider: IWebRpcProvider
+  provider: IRpcProvider
 ): void {
   if (typeof transaction !== 'object' || transaction === null) return
   const observation = providerRegistrationObservations.get(transaction)
@@ -203,7 +199,7 @@ export function recordProviderRegistration(
 /** Reads a frozen copy for the exact transaction identity; absent or copied keys fail closed. */
 export function readProviderRegistrationObservation(
   transaction: unknown
-): readonly IWebRpcProviderRegistration[] | undefined {
+): readonly IRpcProviderRegistration[] | undefined {
   if (typeof transaction !== 'object' || transaction === null) return undefined
   const observation = providerRegistrationObservations.get(transaction)
   return observation ? Object.freeze([...observation.entries]) : undefined
@@ -262,4 +258,4 @@ export function readProviderResultDisposalObservation(
     results: Object.freeze([...observation.results])
   })
 }
-import { WebRpcDebugPhase } from '../protocol-constants.js'
+import { RpcDebugPhase } from '../semantic-constants.js'

@@ -1,6 +1,6 @@
-import { WebRpcErrorCode, WebRpcTransportError } from '../errors.js'
-import type { IWebRpcTransport } from '../transport.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../errors.js'
+import type { IRpcTransport } from '../transport.js'
+import { RpcPlatform, RpcTransportOwnership } from '../transport-constants.js'
 import {
   createListenerFailureState,
   drainListenerFailures,
@@ -13,7 +13,7 @@ import {
   type IMessageListenerHub
 } from '../internal/message-listener-hub.js'
 
-export type IMemoryTransport = IWebRpcTransport & {
+export type IMemoryTransport = IRpcTransport & {
   /**
    * Tears down the whole pair — closing either side closes both; after this, `send()` on either
    * throws.
@@ -50,11 +50,11 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
     secondaryFailures: ReturnType<typeof createListenerFailureState>,
     remoteSecondaryFailures: ReturnType<typeof createListenerFailureState>
   ): IMemoryTransport => ({
-    platform: WebRpcPlatform.memory,
+    platform: RpcPlatform.memory,
     topology: 'exclusive',
-    ownership: WebRpcTransportOwnership.borrowed,
+    ownership: RpcTransportOwnership.borrowed,
     send(message) {
-      if (closed) throw new WebRpcTransportError('[rpc] memory transport is closed')
+      if (closed) throw new RpcTransportError('[rpc] memory transport is closed')
       queueMicrotask(() => {
         // Closed between send() and delivery — the other side is gone,
         // there is nobody left to deliver to.
@@ -72,7 +72,7 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       incoming.add(listener, () => undefined)
       return () => {
         const deleted = incoming.remove(listener, () => undefined)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
@@ -93,7 +93,7 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       listenersA.clear(() => undefined)
       listenersB.clear(() => undefined)
       closeResult = drainTerminalListenerFailures([], {
-        code: WebRpcErrorCode.transport,
+        code: RpcCoreErrorCode.transport,
         secondaryFailures: [secondaryFailuresA, secondaryFailuresB]
       })
       return closeResult
@@ -105,7 +105,7 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       errors.add(listener)
       return () => {
         const deleted = errors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
@@ -113,7 +113,7 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }

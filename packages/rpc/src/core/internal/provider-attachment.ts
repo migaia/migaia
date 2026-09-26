@@ -1,20 +1,21 @@
-import { WebRpcConfigurationError, WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcMessageKind, WebRpcVariation } from '../semantic-constants.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcEventListener, IWebRpcProvider } from '../typing.js'
+import { RpcPlatform } from '../transport-constants.js'
+import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcMessageKind, RpcVariation } from '../semantic-constants.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
   normalizeRpcEnvelope,
   type IRpcEnvelope,
   type IRpcSerializedError
 } from '../../contract/index.js'
-import { WebRpcRoutingProfile, type IWebRpcRoutingData } from './routing-data.js'
+import { RpcRoutingProfile, type IRpcRoutingData } from './routing-data.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IInboundIdentityAdmission } from './inbound-identity.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type {
-  IWebRpcInboundIdentityPort,
-  IWebRpcOutboundOperationsPort,
-  IWebRpcVariationCoordinatorPort
+  IRpcInboundIdentityPort,
+  IRpcOutboundOperationsPort,
+  IRpcVariationCoordinatorPort
 } from './plugin-shared-keys.js'
 import { ProviderAdmissionRegistry } from './provider-admission.js'
 import { assertContractMethod } from './contract.js'
@@ -25,7 +26,7 @@ import { tupleKey } from './safe-value.js'
 import {
   readSelectedFramerChunks,
   recordProviderRegistration,
-  type IWebRpcEndpointDebugSnapshot
+  type IRpcEndpointDebugSnapshot
 } from './test-observer.js'
 
 /** Inbound transport metadata retained only for identity admission. */
@@ -36,14 +37,14 @@ type IProviderInbound = {
 }
 
 /** Native provider ports admitted from the one outbound feature owner. */
-export type IWebRpcProviderPorts = {
-  readonly outboundOperations: IWebRpcOutboundOperationsPort
-  readonly inboundIdentity: IWebRpcInboundIdentityPort
-  readonly variationCoordinator: IWebRpcVariationCoordinatorPort
+export type IRpcProviderPorts = {
+  readonly outboundOperations: IRpcOutboundOperationsPort
+  readonly inboundIdentity: IRpcInboundIdentityPort
+  readonly variationCoordinator: IRpcVariationCoordinatorPort
 }
 
 /** Canonical provider attachment with an inseparable replay/admission/identity/executor closure. */
-export class WebRpcProviderAttachment {
+export class RpcProviderAttachment {
   /** Provider and event callback ownership. */
   readonly #registry = new ProviderRegistry()
   /** Completed request replay ownership. */
@@ -55,9 +56,9 @@ export class WebRpcProviderAttachment {
   /** Provider execution owner. */
   readonly #executor: ProviderExecutor<string>
   /** Narrow outbound facts and operations owned by the outbound feature. */
-  readonly #outbound: IWebRpcOutboundOperationsPort
+  readonly #outbound: IRpcOutboundOperationsPort
   /** Verified variation and cancellation owner. */
-  readonly #variations: IWebRpcVariationCoordinatorPort
+  readonly #variations: IRpcVariationCoordinatorPort
   /** Kernel lifecycle operations remain owned by the composed endpoint. */
   readonly #kernel: IEndpointKernelHost
   /** Immutable endpoint identity snapshot used by provider request admission. */
@@ -78,7 +79,7 @@ export class WebRpcProviderAttachment {
   /** Installs the complete provider security closure before the receiver becomes active. */
   constructor(
     kernel: IEndpointKernelHost,
-    ports: IWebRpcProviderPorts,
+    ports: IRpcProviderPorts,
     prepared: IPreparedEndpoint<string>
   ) {
     this.#kernel = kernel
@@ -89,7 +90,7 @@ export class WebRpcProviderAttachment {
     this.#targetIds = Object.freeze([...(prepared.options.targetIds ?? [])])
     const uniqueTargetId = prepared.options.connect?.uniqueTargetId
     this.#receiverId =
-      kernel.platform === 'BroadcastChannel' && typeof uniqueTargetId === 'string'
+      kernel.platform === RpcPlatform.broadcastChannel && typeof uniqueTargetId === 'string'
         ? `${prepared.id}:${uniqueTargetId}`
         : prepared.id
     this.#abortEnabled = prepared.options.features?.abort === true
@@ -100,6 +101,7 @@ export class WebRpcProviderAttachment {
     this.#transaction = kernel
     this.#replay = new RequestReplayLedger(4096, 1024, 310_000)
     this.#executor = new ProviderExecutor({
+      now: () => kernel.time.scheduler.now(),
       id: this.#id,
       registry: this.#registry,
       controllers: this.#controllers,
@@ -120,11 +122,15 @@ export class WebRpcProviderAttachment {
         this.#outbound.send({ kind: 'report', error, code })
       },
       isReplay: (request, peerKey) =>
-        this.#replay.has(tupleKey(peerKey, request.route.webRpc.senderId, request.envelope.id)),
+        this.#replay.has(
+          tupleKey(peerKey, request.route.webRpc.senderId, request.envelope.id),
+          kernel.time.scheduler.now()
+        ),
       admitReplay: (request, peerKey) =>
         this.#replay.admit(
           tupleKey(peerKey, request.route.webRpc.senderId, request.envelope.id),
-          peerKey
+          peerKey,
+          kernel.time.scheduler.now()
         ),
       consumePendingAbort: (key) =>
         this.#variations.admit({ operation: 'consumeAbort', key }) as {
@@ -138,10 +144,10 @@ export class WebRpcProviderAttachment {
     kernel.registerOwner('provider-admission', this.#admission)
     kernel.registerOwner('provider-controllers', this.#controllers)
     kernel.registerOwner('provider-executor', this.#executor)
-    kernel.registerRoute(WebRpcMessageKind.request, (message) => this.#receiveRequest(message))
+    kernel.registerRoute(RpcMessageKind.request, (message) => this.#receiveRequest(message))
     this.#releaseAbortHandler = this.#variations.admit({
       operation: 'register',
-      variation: WebRpcVariation.abort,
+      variation: RpcVariation.abort,
       handler: (message, peerKey) => this.#receiveAbort(message, peerKey)
     }) as () => void
     for (const [method, provider] of snapshotProviderEntries(prepared.providers))
@@ -149,28 +155,25 @@ export class WebRpcProviderAttachment {
   }
 
   /** Registers one provider and preserves duplicate-owner failure semantics. */
-  provide(method: string, provider: IWebRpcProvider): this {
+  provide(method: string, provider: IRpcProvider): this {
     this.#kernel.assertActive()
     if (typeof method !== 'string' || method.length === 0 || typeof provider !== 'function')
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
-        WebRpcErrorText.providerDescriptorInvalid
-      )
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.providerDescriptorInvalid)
     if (!this.#registry.register(method, provider))
-      throw new WebRpcError(
-        WebRpcErrorCode.providerDuplicated,
-        WebRpcErrorText.providerDuplicated(method)
+      throw new RpcError(
+        RpcCoreErrorCode.providerDuplicated,
+        RpcCoreErrorText.providerDuplicated(method)
       )
     recordProviderRegistration(this.#transaction, method, provider)
     return this
   }
 
   /** Registers an inbound dispatch listener in the same provider registry as request handlers. */
-  on(event: string, listener: IWebRpcEventListener): () => void {
+  on(event: string, listener: IRpcEventListener): () => void {
     this.#kernel.assertActive()
     assertContractMethod(event)
     if (typeof listener !== 'function')
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.eventListenerInvalid)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.eventListenerInvalid)
     return this.#registry.listen(event, listener)
   }
 
@@ -193,12 +196,12 @@ export class WebRpcProviderAttachment {
   }
 
   /** Extends outbound live counts with the provider security closure's current ownership. */
-  debugSnapshot(): IWebRpcEndpointDebugSnapshot {
+  debugSnapshot(): IRpcEndpointDebugSnapshot {
     /**
      * Keeps provider-only counters available to provider RED evidence without widening the
      * enumerable endpoint snapshot consumed by the pre-existing B12b04 exact-shape contracts.
      */
-    const snapshot: IWebRpcEndpointDebugSnapshot = {
+    const snapshot: IRpcEndpointDebugSnapshot = {
       phase: this.#kernel.state === 'disposed' ? 'disposed' : 'active',
       pending: 0,
       pingPending: 0,
@@ -251,7 +254,7 @@ export class WebRpcProviderAttachment {
    */
   #receiveAbort(message: unknown, peerKey: string): void {
     if (!this.#abortEnabled) return
-    const record = message as { envelope?: IRpcEnvelope; route?: IWebRpcRoutingData }
+    const record = message as { envelope?: IRpcEnvelope; route?: IRpcRoutingData }
     const envelope = record.envelope
     const route = record.route
     if (envelope?.kind !== 'variation' || route?.webRpc.type !== 'variation') return
@@ -269,7 +272,7 @@ export class WebRpcProviderAttachment {
   async #receiveRequest(message: unknown): Promise<void> {
     const record = message as {
       envelope?: IRpcEnvelope
-      route?: IWebRpcRoutingData
+      route?: IRpcRoutingData
       inbound?: IProviderInbound
       admission?: IInboundIdentityAdmission
     }
@@ -306,7 +309,7 @@ function toCanonicalResponse(response: unknown): IRpcEnvelope {
     readonly sentAt: number
   }
   const route = {
-    profile: WebRpcRoutingProfile,
+    profile: RpcRoutingProfile,
     type: 'response' as const,
     applicationVersion: current.version,
     senderId: current.senderId,
@@ -330,8 +333,8 @@ function toCanonicalResponse(response: unknown): IRpcEnvelope {
     kind: 'response',
     ok: false,
     id: current.taskId,
-    code: current.code ?? WebRpcErrorCode.internal,
-    message: current.message ?? WebRpcErrorText.remoteRequestFailed,
+    code: current.code ?? RpcCoreErrorCode.internal,
+    message: current.message ?? RpcCoreErrorText.remoteRequestFailed,
     data: {
       webRpc: route,
       ...(current.data === undefined ? {} : { payload: current.data })
@@ -342,11 +345,11 @@ function toCanonicalResponse(response: unknown): IRpcEnvelope {
 
 /** Snapshots provider entries once and preserves the original getter failure as the cause. */
 function snapshotProviderEntries(
-  providers: Readonly<Record<string, IWebRpcProvider>> | undefined
-): readonly (readonly [string, IWebRpcProvider])[] {
+  providers: Readonly<Record<string, IRpcProvider>> | undefined
+): readonly (readonly [string, IRpcProvider])[] {
   try {
     return Object.entries(providers ?? {})
   } catch (error) {
-    throw new WebRpcConfigurationError(WebRpcErrorText.providerDescriptorInvalid, error)
+    throw new RpcConfigurationError(RpcCoreErrorText.providerDescriptorInvalid, error)
   }
 }

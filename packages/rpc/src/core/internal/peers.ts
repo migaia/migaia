@@ -1,24 +1,27 @@
-import { tagWebRpcError, WebRpcErrorCode } from '../errors.js'
+import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
 export class PeerRegistry<T extends string = string> {
   readonly #configured = new Set<T>()
   readonly #learned = new Map<T, number>()
   readonly #maxLearned: number
   readonly #learnedTtlMs: number
+  /** Caller-provided clock for peer discovery expiration. */
+  readonly #now: () => number
 
-  constructor(maxLearned = 1024, learnedTtlMs = 300_000) {
+  constructor(now: () => number, maxLearned = 1024, learnedTtlMs = 300_000) {
     if (!Number.isSafeInteger(maxLearned) || maxLearned < 1)
-      throw tagWebRpcError(
+      throw tagRpcError(
         new TypeError('maxLearned must be a positive safe integer'),
-        WebRpcErrorCode.invalidConfig
+        RpcCoreErrorCode.invalidConfig
       )
     if (!Number.isSafeInteger(learnedTtlMs) || learnedTtlMs < 1)
-      throw tagWebRpcError(
+      throw tagRpcError(
         new TypeError('learnedTtlMs must be a positive safe integer'),
-        WebRpcErrorCode.invalidConfig
+        RpcCoreErrorCode.invalidConfig
       )
     this.#maxLearned = maxLearned
     this.#learnedTtlMs = learnedTtlMs
+    this.#now = now
   }
 
   add(id: T, configured = false): void {
@@ -34,7 +37,7 @@ export class PeerRegistry<T extends string = string> {
       if (oldest !== undefined) this.#learned.delete(oldest)
     }
     this.#learned.delete(id)
-    this.#learned.set(id, Date.now())
+    this.#learned.set(id, this.#now())
   }
   snapshot(): readonly T[] {
     this.#purgeLearned()
@@ -65,7 +68,7 @@ export class PeerRegistry<T extends string = string> {
 
   /** Removes learned peers whose authentication knowledge has expired. */
   #purgeLearned(): void {
-    const cutoff = Date.now() - this.#learnedTtlMs
+    const cutoff = this.#now() - this.#learnedTtlMs
     for (const [id, learnedAt] of this.#learned) {
       if (learnedAt <= cutoff) this.#learned.delete(id)
     }

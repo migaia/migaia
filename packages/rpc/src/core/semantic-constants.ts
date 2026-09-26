@@ -5,7 +5,7 @@
  * These values remain stable for existing WebRPC peers; new contract endpoints use the
  * runtime-neutral `@migaia/rpc/contract` envelope directly.
  */
-export const WebRpcMessageKind = {
+export const RpcMessageKind = {
   discoveryQuery: 'discovery-query',
   discoveryResponse: 'discovery-response',
   request: 'request',
@@ -15,14 +15,20 @@ export const WebRpcMessageKind = {
 } as const
 
 /** Stable control variations retained for the legacy adapter boundary. */
-export const WebRpcVariation = {
+export const RpcVariation = {
   abort: 'abort',
   ping: 'ping',
   pong: 'pong'
 } as const
 
+/** Structured failure kind carried by schema validation diagnostics. */
+export const RpcContractFailureKind = { schemaValidation: 'schema-validation' } as const
+
+/** Test-only endpoint lifecycle snapshot phases. */
+export const RpcDebugPhase = { active: 'active', disposed: 'disposed' } as const
+
 /** Legacy message discriminant value used by adapter internals. */
-export type IWebRpcMessageKind = (typeof WebRpcMessageKind)[keyof typeof WebRpcMessageKind]
+export type IRpcMessageKind = (typeof RpcMessageKind)[keyof typeof RpcMessageKind]
 
 /** Legacy variation value used by adapter internals. */
-export type IWebRpcVariation = (typeof WebRpcVariation)[keyof typeof WebRpcVariation]
+export type IRpcVariation = (typeof RpcVariation)[keyof typeof RpcVariation]

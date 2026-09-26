@@ -1,12 +1,12 @@
-import { WebRpcError, WebRpcErrorCode, WebRpcSchemaValidationError } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcContractConfig } from '../typing.js'
+import { RpcError, RpcCoreErrorCode, RpcSchemaValidationError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcContractConfig } from '../typing.js'
 import { safeRead, safeString } from './safe-value.js'
-import { WebRpcContractFailureKind } from '../protocol-constants.js'
+import { RpcContractFailureKind } from '../semantic-constants.js'
 
 /** Validates one contract payload and preserves schema-library issues in the public error. */
 export function validateContractData(
-  config: IWebRpcContractConfig,
+  config: IRpcContractConfig,
   method: string,
   side: 'params' | 'result',
   data: unknown
@@ -62,10 +62,10 @@ export function validateContractData(
     } catch {
       causeMessage = 'Schema validation failed'
     }
-    throw new WebRpcSchemaValidationError(
+    throw new RpcSchemaValidationError(
       `Schema validation failed for ${method} ${side}`,
       {
-        kind: WebRpcContractFailureKind.schemaValidation,
+        kind: RpcContractFailureKind.schemaValidation,
         method,
         side,
         issues: normalizedIssues?.length ? normalizedIssues : [{ path: [], message: causeMessage }]
@@ -78,6 +78,6 @@ export function validateContractData(
 /** Validates public operation names at the existing contract-validation boundary. */
 export function assertContractMethod(method: string): string {
   if (typeof method !== 'string' || method.length === 0)
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.methodInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.methodInvalid)
   return method
 }

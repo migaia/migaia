@@ -1,15 +1,16 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../../core/transport.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../../core/transport-constants.js'
-import { WebRpcError, WebRpcErrorCode } from '../../core/errors.js'
+import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
 import {
+  RpcPlatform,
+  RpcTransportOwnership,
   createListenerFailureState,
+  createMessageListenerHub,
   drainListenerFailures,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
   reportListenerFailure
-} from '../../core/internal/listener-safety.js'
-import { createMessageListenerHub } from '../../core/internal/message-listener-hub.js'
+} from '../../core/transport-kit.js'
+import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'
 
 /** Outbound Window-like target that owns postMessage delivery. */
 export type IWindowMessageTarget = {
@@ -34,7 +35,7 @@ export type IWindowMessageTransportOptions = {
 /** Adapts distinct outbound and inbound Window owners without weakening source proof. */
 export function createWindowMessageTransport(
   options: IWindowMessageTransportOptions
-): IWebRpcTransport<unknown, Transferable> {
+): IRpcTransport<unknown, Transferable> {
   const target = options.target
   const receiver =
     options.receiver ??
@@ -45,18 +46,18 @@ export function createWindowMessageTransport(
     options.targetOrigin ??
     (globalThis as unknown as { location?: { origin?: unknown } }).location?.origin
   if (!receiver)
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'receiver is required outside a window-like realm'
     )
   if (typeof targetOrigin !== 'string' || targetOrigin.length === 0)
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'targetOrigin must be explicit; use "*" only intentionally'
     )
   if (targetOrigin === '*' && options.allowUnsafeTargetOrigin !== true)
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'wildcard targetOrigin requires allowUnsafeTargetOrigin'
     )
   const listeners = createMessageListenerHub<{
@@ -87,13 +88,13 @@ export function createWindowMessageTransport(
     )
   }
   return {
-    platform: WebRpcPlatform.iframe,
+    platform: RpcPlatform.iframe,
     topology: 'multiplexed',
-    ownership: WebRpcTransportOwnership.borrowed,
+    ownership: RpcTransportOwnership.borrowed,
     sourceProof: (source, origin) =>
       source === target && (targetOrigin === '*' || origin === targetOrigin),
     ...(targetOrigin === '*' ? {} : { origin: targetOrigin }),
-    send(message, options?: IWebRpcSendOptions<Transferable>) {
+    send(message, options?: IRpcSendOptions<Transferable>) {
       target.postMessage(message, targetOrigin, options?.transfer)
     },
     subscribe(listener) {
@@ -105,7 +106,7 @@ export function createWindowMessageTransport(
               remove: () => receiver.removeEventListener('message', onMessage)
             }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       )
       return () => {
@@ -113,7 +114,7 @@ export function createWindowMessageTransport(
         releaseListenerRegistration(
           listeners.size === 1 ? [() => receiver.removeEventListener('message', onMessage)] : [],
           () => listeners.remove(listener, () => undefined),
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -124,7 +125,7 @@ export function createWindowMessageTransport(
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }

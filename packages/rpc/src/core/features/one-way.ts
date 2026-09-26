@@ -1,4 +1,4 @@
-import type { IWebRpcFeature } from '../feature.js'
+import type { IRpcFeature } from '../feature.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from '../internal/define-rpc-feature.js'
 import type {
@@ -11,7 +11,7 @@ import type {
  * Optional transfer elements whose identity/order reach the canonical sender; that sender captures
  * the caller list into its own immutable snapshot before physical transport.
  */
-export type IWebRpcOneWayOptions = Readonly<{ transfer?: readonly unknown[] }>
+export type IRpcOneWayOptions = Readonly<{ transfer?: readonly unknown[] }>
 
 /** Public surface added only when callers select the one-way endpoint preset. */
 export type IOneWaySurface = Readonly<{
@@ -19,21 +19,21 @@ export type IOneWaySurface = Readonly<{
     targetId: string,
     method: string,
     data: unknown,
-    options?: IWebRpcOneWayOptions
+    options?: IRpcOneWayOptions
   ) => Promise<void>
 }>
 
 /** Native optional one-way Feature reuses the direct outbound capability rather than shared lookup. */
 export const createOneWayFeature = (
-  outboundCapability: IWebRpcFeature<IOutboundCapability>
-): IWebRpcFeature<
+  outboundCapability: IRpcFeature<IOutboundCapability>
+): IRpcFeature<
   IOneWayCapability,
-  { readonly outbound: IWebRpcFeature<IOutboundCapability> },
+  { readonly outbound: IRpcFeature<IOutboundCapability> },
   IEndpointCapabilitiesFeatureExpose
 > =>
   defineRpcFeature<
     IOneWayCapability,
-    { readonly outbound: IWebRpcFeature<IOutboundCapability> },
+    { readonly outbound: IRpcFeature<IOutboundCapability> },
     IEndpointCapabilitiesFeatureExpose
   >(
     {
@@ -50,7 +50,7 @@ export const createOneWayFeature = (
     (_core, dependencies) => {
       let installation: IOneWayInstallation | undefined
       const prepare = (
-        scope: import('../typing.js').IWebRpcPluginInstallScope
+        scope: import('../typing.js').IRpcPluginInstallScope
       ): IOneWayInstallation => {
         if (installation) return installation
         const outbound = dependencies.outbound.prepare(scope)

@@ -1,5 +1,5 @@
 import { safeRead, safeString } from './internal/safe-value.js'
-import { WEBRPC_SOURCE, WebRpcErrorCode, WebRpcSerializationError } from './errors.js'
+import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode, RpcSerializationError } from './errors.js'
 import type { IRpcSerializedError } from '../contract/index.js'
 
 /** Maximum error-graph depth accepted by either boundary direction. */
@@ -76,7 +76,7 @@ function readArrayOnce(value: unknown): readonly unknown[] | undefined {
       result.push((value as readonly unknown[])[index])
     return result
   } catch (cause) {
-    if (cause instanceof WebRpcSerializationError) throw cause
+    if (cause instanceof RpcSerializationError) throw cause
     throwMalformedSerializedError(cause)
   }
 }
@@ -91,7 +91,7 @@ function readAggregateEntries(value: unknown): readonly unknown[] | undefined {
     if (!(value instanceof AggregateError)) return undefined
     aggregateValue = value.errors
   } catch (cause) {
-    throw new WebRpcSerializationError(SERIALIZED_ERROR_GRAPH_INVALID, cause)
+    throw new RpcSerializationError(SERIALIZED_ERROR_GRAPH_INVALID, cause)
   }
   return readArrayOnce(aggregateValue)
 }
@@ -277,7 +277,7 @@ export function serializeErrorForRpc(error: unknown): IRpcSerializedError {
   const serialized = serializeError(error)
   return projectSerializedErrorForRpc(
     serialized.source.length === 0 || serialized.code.length === 0
-      ? { ...serialized, source: WEBRPC_SOURCE, code: WebRpcErrorCode.internal }
+      ? { ...serialized, source: RPC_CORE_ERROR_SOURCE, code: RpcCoreErrorCode.internal }
       : serialized,
     0
   )
@@ -534,5 +534,5 @@ export function deserializeError(serialized: ISerializedError): Error {
 
 /** Throws existing coded payload error for malformed or over-budget graphs. */
 function throwMalformedSerializedError(cause?: unknown): never {
-  throw new WebRpcSerializationError(SERIALIZED_ERROR_GRAPH_INVALID, cause)
+  throw new RpcSerializationError(SERIALIZED_ERROR_GRAPH_INVALID, cause)
 }

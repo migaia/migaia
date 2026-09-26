@@ -1,9 +1,9 @@
-import { WebRpcDiscoveryAttachment } from '../internal/discovery-attachment.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
-import type { IWebRpcEndpoint } from '../typing.js'
-import type { IWebRpcFeature } from '../feature.js'
+import { RpcDiscoveryAttachment } from '../internal/discovery-attachment.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import { RpcPortName } from '../internal/plugin-shared-keys.js'
+import type { IRpcEndpoint } from '../typing.js'
+import type { IRpcFeature } from '../feature.js'
 import type {
   IDiscoveryCapability,
   IDiscoveryInstallation,
@@ -15,24 +15,24 @@ import {
   readDiscoveryCleanupFaults,
   readSelectedFramerChunks,
   registerEndpointDebugSnapshot,
-  type IWebRpcEndpointDebugSnapshot
+  type IRpcEndpointDebugSnapshot
 } from '../internal/test-observer.js'
 
 /** Public discovery controls contributed by the selected discovery token. */
-export type IDiscoverySurface = Pick<IWebRpcEndpoint, 'connect' | 'discovery'>
+export type IDiscoverySurface = Pick<IRpcEndpoint, 'connect' | 'discovery'>
 
 /** Native discovery factory; creation is deferred to the capability Plugin installation scope. */
 export const createDiscoveryFeature = (
-  outboundCapability: IWebRpcFeature<IOutboundCapability>
-): IWebRpcFeature<
+  outboundCapability: IRpcFeature<IOutboundCapability>
+): IRpcFeature<
   IDiscoveryCapability,
-  { readonly outbound: IWebRpcFeature<IOutboundCapability> },
+  { readonly outbound: IRpcFeature<IOutboundCapability> },
   IEndpointCapabilitiesFeatureExpose
 > =>
   (() => {
     const feature = defineRpcFeature<
       IDiscoveryCapability,
-      { readonly outbound: IWebRpcFeature<IOutboundCapability> },
+      { readonly outbound: IRpcFeature<IOutboundCapability> },
       IEndpointCapabilitiesFeatureExpose
     >(
       {
@@ -49,24 +49,24 @@ export const createDiscoveryFeature = (
       (core, dependencies) => {
         let installation: IDiscoverySurface | undefined
         let preparedInstallation: IDiscoveryInstallation | undefined
-        let attachment: WebRpcDiscoveryAttachment | undefined
+        let attachment: RpcDiscoveryAttachment | undefined
         const prepare = (
-          scope: import('../typing.js').IWebRpcPluginInstallScope
+          scope: import('../typing.js').IRpcPluginInstallScope
         ): IDiscoveryInstallation => {
           if (preparedInstallation) return preparedInstallation
           const outbound = dependencies.outbound.prepare(scope)
           const prepared = core.featureExpose.getPrepared()
           const kernel = core.featureExpose.getKernel()
-          attachment = new WebRpcDiscoveryAttachment(kernel, prepared, {
+          attachment = new RpcDiscoveryAttachment(kernel, prepared, {
             inboundIdentity: outbound.inboundIdentity,
             outboundOperations: outbound.outboundOperations,
             time: core.featureExpose.getTime(),
             candidatePing: (candidate, options) => {
               const candidatePing = core.featureExpose.getCandidatePing()
               if (!candidatePing)
-                throw new WebRpcError(
-                  WebRpcErrorCode.middlewareMissing,
-                  WebRpcErrorText.endpointModuleDependencyMissing
+                throw new RpcError(
+                  RpcCoreErrorCode.middlewareMissing,
+                  RpcCoreErrorText.endpointModuleDependencyMissing
                 )
               return candidatePing.ping(candidate, options)
             }
@@ -100,7 +100,7 @@ export const createDiscoveryFeature = (
                 resources: kernel.resources.size,
                 owners: kernel.ownerKeys,
                 discovery: attachment!.debugSnapshot()
-              }) satisfies IWebRpcEndpointDebugSnapshot
+              }) satisfies IRpcEndpointDebugSnapshot
           )
           preparedInstallation = Object.freeze({
             public: publicSurface,
@@ -111,12 +111,12 @@ export const createDiscoveryFeature = (
         }
         const ports = (): Readonly<Record<PropertyKey, unknown>> => {
           if (!installation)
-            throw new WebRpcError(
-              WebRpcErrorCode.invalidConfig,
-              WebRpcErrorText.endpointModuleDependencyMissing
+            throw new RpcError(
+              RpcCoreErrorCode.invalidConfig,
+              RpcCoreErrorText.endpointModuleDependencyMissing
             )
           return Object.freeze({
-            [WebRpcPortName.discoveryResolver]: Object.freeze({
+            [RpcPortName.discoveryResolver]: Object.freeze({
               resolve: (id: string) => attachment!.resolveReceiver(id)
             })
           })

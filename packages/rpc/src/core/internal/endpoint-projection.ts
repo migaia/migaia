@@ -1,5 +1,5 @@
-import { WebRpcError, WebRpcErrorCode, WebRpcLifecycleError } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcError, RpcCoreErrorCode, RpcLifecycleError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import { registerComposedDisposalPromises } from './composed-disposal-observer.js'
 
 /** Inputs owned by the composition shell for one immutable public endpoint projection. */
@@ -59,10 +59,10 @@ export function createEndpointProjection(
       values.set(key, descriptor.value)
     }
   } catch (error) {
-    if (error instanceof WebRpcError) throw error
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
-      WebRpcErrorText.endpointModuleInvalid,
+    if (error instanceof RpcError) throw error
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.endpointModuleInvalid,
       error
     )
   }
@@ -121,10 +121,10 @@ function readHostKeys(host: object): readonly string[] {
     if (keys.some((key) => typeof key !== 'string')) throw projectionError()
     return keys.filter((key): key is string => typeof key === 'string')
   } catch (error) {
-    if (error instanceof WebRpcError) throw error
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
-      WebRpcErrorText.endpointModuleInvalid,
+    if (error instanceof RpcError) throw error
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.endpointModuleInvalid,
       error
     )
   }
@@ -153,8 +153,8 @@ function defineValue(target: Record<string, unknown>, key: string, value: unknow
 }
 
 /** Uses the package's existing invalid-composition contract for every projection rejection. */
-function projectionError(): WebRpcError {
-  return new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+function projectionError(): RpcError {
+  return new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /**
@@ -194,6 +194,6 @@ function asEndpointDisposed(error: unknown): unknown {
       (error as { code?: unknown }).code === 'HOST_DISPOSED') &&
     (error as { source?: unknown }).source === '@migaia/plugin-host'
   )
-    return new WebRpcLifecycleError(WebRpcErrorText.endpointDisposed, error)
+    return new RpcLifecycleError(RpcCoreErrorText.endpointDisposed, error)
   return error
 }

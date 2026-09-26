@@ -1,19 +1,19 @@
-import { WebRpcCanonicalChunkAttachment } from '../internal/canonical-chunk-attachment.js'
-import { defineFeature, type IWebRpcFeature } from '../feature.js'
+import { RpcCanonicalChunkAttachment } from '../internal/canonical-chunk-attachment.js'
+import { defineFeature, type IRpcFeature } from '../feature.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
-import type { IWebRpcPluginInstallScope } from '../typing.js'
+import type { IRpcPluginInstallScope } from '../typing.js'
 
 /** Creates the native chunk Feature with the existing attachment and root ResourceScope owner. */
-export const createCanonicalChunkFeature = (): IWebRpcFeature<
+export const createCanonicalChunkFeature = (): IRpcFeature<
   Readonly<{
-    readonly prepare: (scope: IWebRpcPluginInstallScope) => WebRpcCanonicalChunkAttachment
+    readonly prepare: (scope: IRpcPluginInstallScope) => RpcCanonicalChunkAttachment
   }>,
   Record<never, never>,
   IEndpointCapabilitiesFeatureExpose
 > =>
   defineFeature<
     Readonly<{
-      readonly prepare: (scope: IWebRpcPluginInstallScope) => WebRpcCanonicalChunkAttachment
+      readonly prepare: (scope: IRpcPluginInstallScope) => RpcCanonicalChunkAttachment
     }>,
     Record<never, never>,
     IEndpointCapabilitiesFeatureExpose
@@ -21,11 +21,11 @@ export const createCanonicalChunkFeature = (): IWebRpcFeature<
     publicKeys: [],
     install: (core) => {
       /** Defers attachment allocation to the endpoint-capabilities Plugin installation stage. */
-      let attachment: WebRpcCanonicalChunkAttachment | undefined
-      const prepare = (scope: IWebRpcPluginInstallScope): WebRpcCanonicalChunkAttachment => {
+      let attachment: RpcCanonicalChunkAttachment | undefined
+      const prepare = (scope: IRpcPluginInstallScope): RpcCanonicalChunkAttachment => {
         if (attachment) return attachment
         const prepared = core.featureExpose.getPrepared()
-        const created = new WebRpcCanonicalChunkAttachment(
+        const created = new RpcCanonicalChunkAttachment(
           core.featureExpose.getKernel(),
           prepared.options.components?.framer
         )

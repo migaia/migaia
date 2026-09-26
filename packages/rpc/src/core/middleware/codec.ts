@@ -1,7 +1,7 @@
 import type { ICodec } from '@migaia/serialize/codec'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcPlugin, IWebRpcPluginInstallResult } from '../typing.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 
 /** Structural codec floor preserves a concrete descriptor's callable variance through plugin typing. */
 type ICodecDescriptor = Omit<ICodec<unknown, unknown>, 'encode' | 'decode'> & {
@@ -12,14 +12,14 @@ type ICodecDescriptor = Omit<ICodec<unknown, unknown>, 'encode' | 'decode'> & {
 /** Creates a format-owned codec plugin for consumers migrating off codec-shaped protocol(). */
 export function codec<TDescriptor extends ICodecDescriptor>(
   descriptor: TDescriptor
-): IWebRpcPlugin<{ readonly codec: TDescriptor }> {
+): IRpcPlugin<{ readonly codec: TDescriptor }> {
   if (
     !descriptor ||
     typeof descriptor !== 'object' ||
     typeof descriptor.encode !== 'function' ||
     typeof descriptor.decode !== 'function'
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return Object.freeze({
     name: 'codec',
     codec: descriptor,
@@ -33,7 +33,7 @@ export function codec<TDescriptor extends ICodecDescriptor>(
         activator: false
       })
     }),
-    install: (): IWebRpcPluginInstallResult => ({
+    install: (): IRpcPluginInstallResult => ({
       extension: Object.freeze({ codec: descriptor }),
       ports: Object.freeze({})
     })

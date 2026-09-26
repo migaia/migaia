@@ -1,10 +1,10 @@
-import { WebRpcControlAttachment } from '../internal/control-attachment.js'
-import type { IWebRpcCandidatePingPort } from '../internal/plugin-shared-keys.js'
-import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcEndpoint } from '../typing.js'
-import type { IWebRpcFeature } from '../feature.js'
+import { RpcControlAttachment } from '../internal/control-attachment.js'
+import type { IRpcCandidatePingPort } from '../internal/plugin-shared-keys.js'
+import { RpcPortName } from '../internal/plugin-shared-keys.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcEndpoint } from '../typing.js'
+import type { IRpcFeature } from '../feature.js'
 import type {
   IControlCapability,
   IControlInstallation,
@@ -13,28 +13,28 @@ import type {
 } from '../internal/feature-contract.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from '../internal/define-rpc-feature.js'
-import { WebRpcControlRole, WebRpcControlRoleSchema } from '../internal/plugin-contract.js'
+import { RpcControlRole, RpcControlRoleSchema } from '../internal/plugin-contract.js'
 
 /** Optional control methods present when corresponding control middleware is installed. */
-export type IControlSurface = Partial<Pick<IWebRpcEndpoint, 'ping' | 'pingAll'>>
+export type IControlSurface = Partial<Pick<IRpcEndpoint, 'ping' | 'pingAll'>>
 
 /** Native control capability prepared after outbound and discovery have established their ports. */
 export const createControlFeature = (
-  outboundCapability: IWebRpcFeature<IOutboundCapability>,
-  discoveryCapability: IWebRpcFeature<IDiscoveryCapability>
-): IWebRpcFeature<
+  outboundCapability: IRpcFeature<IOutboundCapability>,
+  discoveryCapability: IRpcFeature<IDiscoveryCapability>
+): IRpcFeature<
   IControlCapability,
   {
-    readonly outbound: IWebRpcFeature<IOutboundCapability>
-    readonly discovery: IWebRpcFeature<IDiscoveryCapability>
+    readonly outbound: IRpcFeature<IOutboundCapability>
+    readonly discovery: IRpcFeature<IDiscoveryCapability>
   },
   IEndpointCapabilitiesFeatureExpose
 > =>
   defineRpcFeature<
     IControlCapability,
     {
-      readonly outbound: IWebRpcFeature<IOutboundCapability>
-      readonly discovery: IWebRpcFeature<IDiscoveryCapability>
+      readonly outbound: IRpcFeature<IOutboundCapability>
+      readonly discovery: IRpcFeature<IDiscoveryCapability>
     },
     IEndpointCapabilitiesFeatureExpose
   >(
@@ -48,18 +48,18 @@ export const createControlFeature = (
         exposedKeys: [],
         activator: false
       },
-      sharedConsumes: WebRpcControlRoleSchema[WebRpcControlRole.control].sharedConsumes
+      sharedConsumes: RpcControlRoleSchema[RpcControlRole.control].sharedConsumes
     },
     (core, dependencies) => {
       let installation: IControlInstallation | undefined
-      let candidatePing: IWebRpcCandidatePingPort | undefined
+      let candidatePing: IRpcCandidatePingPort | undefined
       const prepare = (
-        scope: import('../typing.js').IWebRpcPluginInstallScope
+        scope: import('../typing.js').IRpcPluginInstallScope
       ): IControlInstallation => {
         if (installation) return installation
         const outbound = dependencies.outbound.prepare(scope)
         const discovery = dependencies.discovery.prepare(scope)
-        const attachment = new WebRpcControlAttachment(
+        const attachment = new RpcControlAttachment(
           core.featureExpose.getKernel(),
           Object.freeze({
             outboundOperations: outbound.outboundOperations,
@@ -81,11 +81,11 @@ export const createControlFeature = (
       }
       const ports = (): Readonly<Record<PropertyKey, unknown>> => {
         if (!candidatePing)
-          throw new WebRpcError(
-            WebRpcErrorCode.invalidConfig,
-            WebRpcErrorText.endpointModuleDependencyMissing
+          throw new RpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RpcCoreErrorText.endpointModuleDependencyMissing
           )
-        return Object.freeze({ [WebRpcPortName.candidatePing]: candidatePing })
+        return Object.freeze({ [RpcPortName.candidatePing]: candidatePing })
       }
       return Object.freeze({ prepare, ports })
     },

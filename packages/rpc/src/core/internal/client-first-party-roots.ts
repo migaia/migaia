@@ -1,9 +1,9 @@
 import { createCanonicalChunkFeature } from '../features/canonical-chunk.js'
 import { createOutboundFeature } from '../features/outbound.js'
-import { registerFirstPartyPublicRoots, type IWebRpcFirstPartyRoots } from './first-party-roots.js'
+import { registerFirstPartyPublicRoots, type IRpcFirstPartyRoots } from './first-party-roots.js'
 
 /** Explicit declaration shape keeps opaque PluginHost feature brands out of public `.d.ts` output. */
-type IClientFirstPartyRoots = IWebRpcFirstPartyRoots<
+type IClientFirstPartyRoots = IRpcFirstPartyRoots<
   Readonly<{
     readonly 'first-party-chunk': ReturnType<typeof createCanonicalChunkFeature>
     readonly 'first-party-outbound': ReturnType<typeof createOutboundFeature>

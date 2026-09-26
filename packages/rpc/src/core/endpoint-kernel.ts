@@ -1,22 +1,19 @@
-import {
-  WebRpcConstructionError,
-  WebRpcError,
-  WebRpcErrorCode,
-  WebRpcLifecycleError
-} from './errors.js'
-import { WebRpcErrorText } from './error-text.js'
+import { RpcConstructionError, RpcError, RpcCoreErrorCode, RpcLifecycleError } from './errors.js'
+import { RpcCoreErrorText } from './error-text.js'
 import { ResourceScope } from './internal/resource-scope.js'
 import { safeRead, safeString } from './internal/safe-value.js'
 import { createEndpointTimePort, type IEndpointTimePort } from './internal/time-port.js'
 import type {
-  IWebRpcInboundMessage,
-  IWebRpcSendOptions,
-  IWebRpcTransport,
-  IWebRpcTransportEncoding,
-  IWebRpcTransportOwnership,
-  IWebRpcTransportTopology
+  IRpcInboundMessage,
+  IRpcSendOptions,
+  IRpcTransport,
+  IRpcTransportEncoding,
+  IRpcTransportOwnership,
+  IRpcTransportTopology
 } from './transport.js'
-import type { IWebRpcPlatform } from './typing.js'
+import type { IRpcPlatform } from './typing.js'
+import { RpcPlatform } from './transport-constants.js'
+import { systemScheduler, type IUtilsScheduler } from '@migaia/utils/promise'
 
 /** Canonical lifecycle states owned by one endpoint kernel. */
 export const EndpointKernelState = {
@@ -48,7 +45,7 @@ export type IEndpointKernelTransportSnapshot = Readonly<{
 
 /** Failure and receive callbacks supplied by the temporarily adapted full endpoint. */
 export type IEndpointKernelCallbacks = {
-  readonly receive: (message: IWebRpcInboundMessage<unknown>) => void | Promise<void>
+  readonly receive: (message: IRpcInboundMessage<unknown>) => void | Promise<void>
   readonly transportError: (error: unknown) => void
   readonly listenerError: (error: unknown) => void
   readonly receiveError: (error: unknown) => void
@@ -64,12 +61,12 @@ export type IEndpointKernelActivation = {
 
 /** Feature-neutral transport, routing, lifecycle, and resource ports. */
 export type IEndpointKernelHost = {
-  readonly transport: IWebRpcTransport
-  readonly platform: IWebRpcPlatform
-  readonly topology: IWebRpcTransportTopology | undefined
+  readonly transport: IRpcTransport
+  readonly platform: IRpcPlatform
+  readonly topology: IRpcTransportTopology | undefined
   readonly origin: string | undefined
-  readonly encodedType: IWebRpcTransportEncoding | undefined
-  readonly ownership: IWebRpcTransportOwnership | undefined
+  readonly encodedType: IRpcTransportEncoding | undefined
+  readonly ownership: IRpcTransportOwnership | undefined
   readonly resources: ResourceScope
   readonly time: IEndpointTimePort
   readonly closingSignal: AbortSignal
@@ -81,7 +78,7 @@ export type IEndpointKernelHost = {
   assertActive(generation?: number): void
   send<Message, Transfer>(
     message: Message,
-    options?: IWebRpcSendOptions<Transfer>
+    options?: IRpcSendOptions<Transfer>
   ): void | Promise<void>
   registerRoute(kind: string, route: IEndpointKernelRoute): () => void
   registerOwner(key: string, owner: object): void
@@ -96,21 +93,21 @@ export type IEndpointKernelHost = {
  */
 class EndpointKernel implements IEndpointKernelHost {
   /** Physical transport retained for context-safe method invocation and adapter metadata. */
-  readonly #transport: IWebRpcTransport
+  readonly #transport: IRpcTransport
   /** Validated platform snapshot used by protocol and authentication context. */
-  readonly #platform: IWebRpcPlatform
+  readonly #platform: IRpcPlatform
   /** Validated adapter topology snapshot used by routing policy. */
-  readonly #topology: IWebRpcTransportTopology | undefined
+  readonly #topology: IRpcTransportTopology | undefined
   /** Validated adapter origin snapshot used by identity policy. */
   readonly #origin: string | undefined
   /** Validated wire encoding snapshot used by protocol compatibility checks. */
-  readonly #encodedType: IWebRpcTransportEncoding | undefined
+  readonly #encodedType: IRpcTransportEncoding | undefined
   /** Validated transport ownership snapshot controlling terminal close. */
-  readonly #ownership: IWebRpcTransportOwnership | undefined
+  readonly #ownership: IRpcTransportOwnership | undefined
   /** Root lifecycle owner shared with the endpoint resource coordinator. */
   readonly #resources = new ResourceScope()
   /** Endpoint-local immutable clock/timer capability; all attachment timers drain through it. */
-  readonly #time = createEndpointTimePort()
+  readonly #time: IEndpointTimePort
   /** Aborts in-flight operations synchronously when closing starts. */
   readonly #closing = new AbortController()
   /** Constant-time decoded-frame route ownership table for selected attachments. */
@@ -122,7 +119,12 @@ class EndpointKernel implements IEndpointKernelHost {
   /** Invalidates callbacks captured before close without allocating per callback. */
   #generation = 0
   /** Snapshots and validates transport metadata without subscribing or allocating feature owners. */
-  constructor(transport: IWebRpcTransport, snapshot?: IEndpointKernelTransportSnapshot) {
+  constructor(
+    transport: IRpcTransport,
+    snapshot: IEndpointKernelTransportSnapshot | undefined,
+    scheduler: IUtilsScheduler
+  ) {
+    this.#time = createEndpointTimePort(scheduler)
     const transportSnapshot = snapshot ?? readTransportSnapshot(transport)
     const {
       send: transportSend,
@@ -137,21 +139,21 @@ class EndpointKernel implements IEndpointKernelHost {
       ownership
     } = transportSnapshot
     if (typeof transportSend !== 'function' || typeof transportSubscribe !== 'function')
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
-        WebRpcErrorText.transportDescriptorInvalid
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.transportDescriptorInvalid
       )
     if (
       (transportClose !== undefined && typeof transportClose !== 'function') ||
       (onTransportError !== undefined && typeof onTransportError !== 'function') ||
       (onListenerError !== undefined && typeof onListenerError !== 'function')
     )
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
-        WebRpcErrorText.transportDescriptorInvalid
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.transportDescriptorInvalid
       )
     if (
-      !isWebRpcPlatform(platform) ||
+      !isRpcPlatform(platform) ||
       (topology !== undefined &&
         topology !== 'exclusive' &&
         topology !== 'multiplexed' &&
@@ -163,9 +165,9 @@ class EndpointKernel implements IEndpointKernelHost {
         encodedType !== 'uint8array') ||
       (ownership !== undefined && ownership !== 'owned' && ownership !== 'borrowed')
     )
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
-        WebRpcErrorText.transportIdentityDescriptorInvalid
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.transportIdentityDescriptorInvalid
       )
     this.#transport = transport
     this.#platform = platform
@@ -182,7 +184,7 @@ class EndpointKernel implements IEndpointKernelHost {
   }
 
   /** Returns the physical transport without transferring its ownership. */
-  get transport(): IWebRpcTransport {
+  get transport(): IRpcTransport {
     return this.#transport
   }
 
@@ -192,12 +194,12 @@ class EndpointKernel implements IEndpointKernelHost {
   }
 
   /** Returns the immutable validated platform snapshot. */
-  get platform(): IWebRpcPlatform {
+  get platform(): IRpcPlatform {
     return this.#platform
   }
 
   /** Returns the immutable validated topology snapshot. */
-  get topology(): IWebRpcTransportTopology | undefined {
+  get topology(): IRpcTransportTopology | undefined {
     return this.#topology
   }
 
@@ -207,12 +209,12 @@ class EndpointKernel implements IEndpointKernelHost {
   }
 
   /** Returns the immutable validated encoding snapshot. */
-  get encodedType(): IWebRpcTransportEncoding | undefined {
+  get encodedType(): IRpcTransportEncoding | undefined {
     return this.#encodedType
   }
 
   /** Returns the immutable validated ownership snapshot. */
-  get ownership(): IWebRpcTransportOwnership | undefined {
+  get ownership(): IRpcTransportOwnership | undefined {
     return this.#ownership
   }
 
@@ -252,7 +254,7 @@ class EndpointKernel implements IEndpointKernelHost {
    */
   activate(activation: IEndpointKernelActivation): void {
     if (this.#state !== EndpointKernelState.constructing)
-      throw new WebRpcLifecycleError(WebRpcErrorText.endpointDisposed)
+      throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     try {
       this.#resources.addSync('transport subscription', activation.unsubscribe)
       if (activation.unsubscribeTransportError)
@@ -275,8 +277,8 @@ class EndpointKernel implements IEndpointKernelHost {
           this.#state = EndpointKernelState.disposed
         }
       )
-      throw new WebRpcConstructionError(
-        safeString(safeRead(error, 'message'), WebRpcErrorText.endpointRegistrationFailed),
+      throw new RpcConstructionError(
+        safeString(safeRead(error, 'message'), RpcCoreErrorText.endpointRegistrationFailed),
         error,
         [],
         cleanupPromise
@@ -287,18 +289,18 @@ class EndpointKernel implements IEndpointKernelHost {
   /** Rejects work after closing or when its captured generation is stale. */
   assertActive(generation?: number): void {
     if (generation !== undefined && generation !== this.#generation)
-      throw new WebRpcLifecycleError(WebRpcErrorText.endpointDisposed)
+      throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (
       this.#state !== EndpointKernelState.constructing &&
       this.#state !== EndpointKernelState.active
     )
-      throw new WebRpcLifecycleError(WebRpcErrorText.endpointDisposed)
+      throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
   }
 
   /** Sends through the canonical transport while preserving class-instance method context. */
   send<Message, Transfer>(
     message: Message,
-    options?: IWebRpcSendOptions<Transfer>
+    options?: IRpcSendOptions<Transfer>
   ): void | Promise<void> {
     this.assertActive()
     return this.#transport.send(message, options)
@@ -308,7 +310,7 @@ class EndpointKernel implements IEndpointKernelHost {
   registerRoute(kind: string, route: IEndpointKernelRoute): () => void {
     this.assertActive()
     if (this.#routes.has(kind))
-      throw new WebRpcError(WebRpcErrorCode.capabilityConflict, WebRpcErrorText.endpointRouteOwned)
+      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
     this.#routes.set(kind, route)
     let registered = true
     return () => {
@@ -322,7 +324,7 @@ class EndpointKernel implements IEndpointKernelHost {
   registerOwner(key: string, owner: object): void {
     this.assertActive()
     if (this.#owners.has(key))
-      throw new WebRpcError(WebRpcErrorCode.capabilityConflict, WebRpcErrorText.endpointOwnerOwned)
+      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointOwnerOwned)
     this.#owners.set(key, owner)
   }
 
@@ -361,14 +363,15 @@ class EndpointKernel implements IEndpointKernelHost {
 
 /** Creates the one feature-neutral kernel without subscribing or constructing feature owners. */
 export function createEndpointKernel(
-  transport: IWebRpcTransport,
-  snapshot?: IEndpointKernelTransportSnapshot
+  transport: IRpcTransport,
+  snapshot?: IEndpointKernelTransportSnapshot,
+  scheduler: IUtilsScheduler = systemScheduler
 ): IEndpointKernelHost {
-  return new EndpointKernel(transport, snapshot)
+  return new EndpointKernel(transport, snapshot, scheduler)
 }
 
 /** Captures each transport descriptor field once when no bootstrap snapshot is available. */
-function readTransportSnapshot(transport: IWebRpcTransport): IEndpointKernelTransportSnapshot {
+function readTransportSnapshot(transport: IRpcTransport): IEndpointKernelTransportSnapshot {
   return Object.freeze({
     send: safeRead<unknown>(transport, 'send'),
     subscribe: safeRead<unknown>(transport, 'subscribe'),
@@ -384,14 +387,6 @@ function readTransportSnapshot(transport: IWebRpcTransport): IEndpointKernelTran
 }
 
 /** Narrows a hostile transport platform descriptor to the public platform domain. */
-function isWebRpcPlatform(value: unknown): value is IWebRpcPlatform {
-  return [
-    'Worker',
-    'Iframe',
-    'BroadcastChannel',
-    'MessagePort',
-    'Memory',
-    'WebTransport',
-    'RTCDataChannel'
-  ].includes(value as string)
+function isRpcPlatform(value: unknown): value is IRpcPlatform {
+  return Object.values(RpcPlatform).includes(value as IRpcPlatform)
 }

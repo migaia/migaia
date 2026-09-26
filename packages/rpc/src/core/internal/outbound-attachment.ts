@@ -1,22 +1,23 @@
+import { RpcPlatform } from '../transport-constants.js'
 import {
-  WebRpcAbortError,
-  WebRpcContractError,
-  WebRpcError,
-  WebRpcErrorCode,
-  WebRpcLifecycleError,
-  WebRpcRemoteError,
-  WebRpcTimeoutError
+  RpcAbortError,
+  RpcContractError,
+  RpcError,
+  RpcCoreErrorCode,
+  RpcLifecycleError,
+  RpcRemoteError,
+  RpcTimeoutError
 } from '../errors.js'
-import { WebRpcMessageKind } from '../semantic-constants.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcMessageKind } from '../semantic-constants.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import type {
-  IWebRpcFanoutResult,
-  IWebRpcHook,
-  IWebRpcHookEvent,
-  IWebRpcAuthenticationCapability,
-  IWebRpcContractCapability,
-  IWebRpcTimeoutCapability,
-  IWebRpcUuidConfig,
+  IRpcFanoutResult,
+  IRpcHook,
+  IRpcHookEvent,
+  IRpcAuthenticationCapability,
+  IRpcContractCapability,
+  IRpcTimeoutCapability,
+  IRpcUuidConfig,
   ISendOptions
 } from '../typing.js'
 import { assertContractMethod as assertMethod, validateContractData } from './contract.js'
@@ -28,21 +29,21 @@ import {
 } from '../../contract/index.js'
 import { serializeRpcError } from '../../contract/error.js'
 import { deserializeErrorFromRpc } from '../error-serialization.js'
-import { normalizeWebRpcRoutingData, WebRpcRoutingProfile } from './routing-data.js'
+import { normalizeWebRpcRoutingData, RpcRoutingProfile } from './routing-data.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
-import type { IWebRpcInboundMessage } from '../transport.js'
+import type { IRpcInboundMessage } from '../transport.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import { HookRegistry } from './hooks.js'
 import { allocateRpcId } from './id.js'
 import { PendingRegistry } from './pending.js'
-import { WebRpcOutboundSender } from './outbound-sender.js'
+import { RpcOutboundSender } from './outbound-sender.js'
 import { ReplayWindow } from './replay.js'
 import { OperationScope } from './operation-scope.js'
 import { InboundIdentityCoordinator, type IInboundIdentityAdmission } from './inbound-identity.js'
-import { WebRpcVariationCoordinator } from './variation-coordinator.js'
+import { RpcVariationCoordinator } from './variation-coordinator.js'
 import { createSafeRecord, fanoutDeliveryKey } from './safe-value.js'
-import { readSelectedFramerChunks, type IWebRpcEndpointDebugSnapshot } from './test-observer.js'
-import type { IWebRpcDiscoveryResolverPort } from './plugin-shared-keys.js'
+import { readSelectedFramerChunks, type IRpcEndpointDebugSnapshot } from './test-observer.js'
+import type { IRpcDiscoveryResolverPort } from './plugin-shared-keys.js'
 import type { IEndpointTimer } from './time-port.js'
 import { createEndpointTransportActivation } from './transport-activation.js'
 
@@ -76,22 +77,22 @@ export type IOutboundAttachmentHost = {
     data: unknown,
     options?: { readonly transfer?: readonly unknown[] }
   ): Promise<void>
-  readonly hooks: { on(listener: IWebRpcHook): () => void }
+  readonly hooks: { on(listener: IRpcHook): () => void }
   emitFailure(error: unknown, code?: string): void
-  emitDiagnostic(event: Omit<IWebRpcHookEvent, 'at' | 'localId'>): void
+  emitDiagnostic(event: Omit<IRpcHookEvent, 'at' | 'localId'>): void
   readonly inboundIdentity: InboundIdentityCoordinator
-  readonly variations: WebRpcVariationCoordinator
+  readonly variations: RpcVariationCoordinator
   send<T>(targetId: string, method: string, data: unknown, options?: ISendOptions): Promise<T>
-  sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IWebRpcFanoutResult<T>>
+  sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IRpcFanoutResult<T>>
   dispatchAll(method: string, data: unknown): void
   setReceiverResolver(resolver: (targetId: string) => Promise<IOutboundReceiver>): void
   resolveReceiver(targetId: string, receiverId?: string): Promise<IOutboundReceiver>
   validate(method: string, side: 'params' | 'result', data: unknown): void
-  debugSnapshot(): IWebRpcEndpointDebugSnapshot
+  debugSnapshot(): IRpcEndpointDebugSnapshot
 }
 
 /** Canonical outbound/client owner attached to one endpoint kernel. */
-export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
+export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Validated endpoint identifier. */
   readonly id: string
   /** Stable local receiver identity used by multiplexed discovery routing. */
@@ -103,19 +104,19 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Contract version placed on outbound requests. */
   readonly #version: string
   /** Identifier generator snapshot installed by middleware. */
-  readonly #uuid: IWebRpcUuidConfig
+  readonly #uuid: IRpcUuidConfig
   /** Contract validation owner shared with provider execution. */
-  readonly #validateData: IWebRpcContractCapability['validateData']
+  readonly #validateData: IRpcContractCapability['validateData']
   /** Validated canonical descriptors retained for the endpoint lifetime. */
-  readonly #components: import('./endpoint-options.js').IWebRpcSelectedComponents
+  readonly #components: import('./endpoint-options.js').IRpcSelectedComponents
   /** Optional inbound/outbound protection capability. */
-  readonly #authentication: IWebRpcAuthenticationCapability | undefined
+  readonly #authentication: IRpcAuthenticationCapability | undefined
   /** Canonical dynamic timeout capability installed by middleware. */
-  readonly #timeout: IWebRpcTimeoutCapability
+  readonly #timeout: IRpcTimeoutCapability
   /** Enables caller abort semantics only when the abort capability is selected. */
   readonly #abortEnabled: boolean
   /** Outbound transport/protocol pipeline. */
-  readonly #pipeline: WebRpcOutboundSender
+  readonly #pipeline: RpcOutboundSender
   /** Active request settlements keyed by wire task id. */
   readonly #pending = new PendingRegistry<IOutboundPending>()
   /** Prevents active and recently released task-id reuse. */
@@ -125,7 +126,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Shared inbound source-proof/connect/binding owner for all selected features. */
   readonly inboundIdentity: InboundIdentityCoordinator
   /** Shared variation route and admission owner for optional feature handlers. */
-  readonly variations: WebRpcVariationCoordinator
+  readonly variations: RpcVariationCoordinator
   /** Pins each logical target to the first verified response source in the slim runtime. */
   readonly #responseBindings = new Map<string, string>()
   /** Optional discovery-backed receiver selector; target identity is safe default. */
@@ -133,9 +134,9 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     receiverId: targetId
   })
   /** Reads the later-installed discovery resolver without publishing a broad owner port. */
-  readonly #discoveryResolver: (() => IWebRpcDiscoveryResolverPort | undefined) | undefined
+  readonly #discoveryResolver: (() => IRpcDiscoveryResolverPort | undefined) | undefined
   /** Canonical hook failure reporter snapshotted during construction. */
-  readonly #hookErrorReporter: ((error: unknown, event: IWebRpcHookEvent) => void) | undefined
+  readonly #hookErrorReporter: ((error: unknown, event: IRpcHookEvent) => void) | undefined
   /** Indicates that activation installed the physical receiver. */
   #activated = false
   /** Stable feature-result disposal Promise; root kernel disposal is owned by the kernel plugin. */
@@ -145,14 +146,18 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   constructor(
     kernel: IEndpointKernelHost,
     prepared: IPreparedEndpoint<string>,
-    discoveryResolver?: () => IWebRpcDiscoveryResolverPort | undefined
+    discoveryResolver?: () => IRpcDiscoveryResolverPort | undefined
   ) {
     this.kernel = kernel
-    this.variations = new WebRpcVariationCoordinator(() => kernel.time.now())
+    this.variations = new RpcVariationCoordinator(
+      () => kernel.time.now(),
+      () => kernel.time.scheduler.now()
+    )
     this.#discoveryResolver = discoveryResolver
     this.id = prepared.id
     this.targetIds = Object.freeze([...(prepared.options.targetIds ?? [])])
     this.#replay = new ReplayWindow(
+      () => kernel.time.scheduler.now(),
       prepared.options.replay?.maxEntries,
       prepared.options.replay?.ttlMs
     )
@@ -160,12 +165,12 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     this.#version = contract.version ?? '1.0'
     const uniqueTargetId = prepared.options.connect?.uniqueTargetId
     this.receiverId =
-      kernel.platform === 'BroadcastChannel' && typeof uniqueTargetId === 'string'
+      kernel.platform === RpcPlatform.broadcastChannel && typeof uniqueTargetId === 'string'
         ? `${this.id}:${uniqueTargetId}`
         : this.id
     this.#validateData =
       'validateData' in contract && contract.validateData
-        ? (contract.validateData as IWebRpcContractCapability['validateData'])
+        ? (contract.validateData as IRpcContractCapability['validateData'])
         : (method, side, data) => validateContractData(contract, method, side, data)
     this.#uuid = prepared.options.uuid ?? {}
     this.#components = prepared.options.components!
@@ -178,10 +183,10 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
       ...timeout,
       resolveTimeout:
         'resolveTimeout' in timeout && timeout.resolveTimeout
-          ? (timeout.resolveTimeout as IWebRpcTimeoutCapability['resolveTimeout'])
+          ? (timeout.resolveTimeout as IRpcTimeoutCapability['resolveTimeout'])
           : (override) => (override === undefined ? timeoutDefault : override)
     }
-    this.#pipeline = new WebRpcOutboundSender(
+    this.#pipeline = new RpcOutboundSender(
       kernel,
       this.id,
       this.#components,
@@ -190,6 +195,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
       kernel.platform
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
+      now: () => kernel.time.scheduler.now(),
       connect:
         prepared.options.connect && 'verify' in prepared.options.connect
           ? prepared.options.connect
@@ -209,8 +215,8 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     for (const listener of normalizeHooks(prepared.options.hooks?.listeners))
       this.#hooks.add(listener)
     for (const event of prepared.options.initialHookEvents ?? []) this.#emit(event)
-    kernel.registerRoute(WebRpcMessageKind.response, (message) => this.#receiveResponse(message))
-    kernel.registerRoute(WebRpcMessageKind.variation, (message) => this.#receiveVariation(message))
+    kernel.registerRoute(RpcMessageKind.response, (message) => this.#receiveResponse(message))
+    kernel.registerRoute(RpcMessageKind.variation, (message) => this.#receiveVariation(message))
   }
 
   /** Routes one variation through the shared coordinator after identity admission. */
@@ -218,7 +224,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     const record = message as {
       envelope?: IRpcEnvelope
       route?: ReturnType<typeof normalizeWebRpcRoutingData>
-      inbound?: import('../transport.js').IWebRpcInboundMessage
+      inbound?: import('../transport.js').IRpcInboundMessage
       admission?: IInboundIdentityAdmission
     }
     const envelope = record.envelope
@@ -266,7 +272,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
         })
         if (accepted.status === 'pending') return
         if (accepted.status === 'rejected') {
-          this.emitFailure(accepted.error, WebRpcErrorCode.transport)
+          this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
           return
         }
         const decoded = this.#components.codec.decode(accepted.value)
@@ -274,7 +280,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
         try {
           envelope = this.#components.protocol.normalize(decoded)
         } catch (error) {
-          this.emitFailure(error, WebRpcErrorCode.transport)
+          this.emitFailure(error, RpcCoreErrorCode.transport)
           return
         }
         const route = normalizeWebRpcRoutingData(envelope.data)
@@ -303,7 +309,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
         }
       },
       transportError: (error) => this.#failAll(error),
-      listenerError: (error) => this.emitFailure(error, WebRpcErrorCode.transport),
+      listenerError: (error) => this.emitFailure(error, RpcCoreErrorCode.transport),
       receiveError: (error) => this.emitFailure(error)
     })
     this.kernel.activate(activation)
@@ -331,26 +337,28 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
         try {
           options.signal.removeEventListener('abort', probe)
         } catch {}
-        throw new WebRpcError(
-          WebRpcErrorCode.invalidConfig,
-          WebRpcErrorText.abortSignalInvalid,
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.abortSignalInvalid,
           error
         )
       }
       if (!this.#abortEnabled)
-        throw new WebRpcError(
-          WebRpcErrorCode.middlewareMissing,
-          WebRpcErrorText.abortMiddlewareMissing
+        throw new RpcError(
+          RpcCoreErrorCode.middlewareMissing,
+          RpcCoreErrorText.abortMiddlewareMissing
         )
       if (options.signal.aborted)
-        throw new WebRpcAbortError(undefined, undefined, options.signal.reason)
+        throw new RpcAbortError(undefined, undefined, options.signal.reason)
     }
     const timeoutMs = this.#timeout.resolveTimeout(options.timeoutMs)
     assertTimeout(timeoutMs)
-    const operation = new OperationScope(generation, timeoutMs, this.kernel.closingSignal)
+    const operation = new OperationScope(generation, timeoutMs, this.kernel.closingSignal, () =>
+      this.kernel.time.scheduler.now()
+    )
     const remaining = operation.remaining(timeoutMs)
     operation.assertActive(this.kernel.generation)
-    if (remaining === 0) throw new WebRpcTimeoutError()
+    if (remaining === 0) throw new RpcTimeoutError()
     return this.#requestOnce<T>(targetId, method, data, { ...options, timeoutMs: remaining }, [
       operation.signal,
       ...(options.signal ? [options.signal] : [])
@@ -370,7 +378,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     )
     if (!this.#replay.reserveId(taskId))
       return Promise.reject(
-        new WebRpcError(WebRpcErrorCode.overloaded, WebRpcErrorText.outboundReplayFull)
+        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
       )
     return new Promise<T>((resolve, reject) => {
       let timer: IEndpointTimer | undefined
@@ -416,7 +424,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
                 id: taskId,
                 data: {
                   webRpc: {
-                    profile: WebRpcRoutingProfile,
+                    profile: RpcRoutingProfile,
                     type: 'variation',
                     applicationVersion: this.#version,
                     senderId: this.id,
@@ -430,12 +438,12 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
               })
             )
           })
-          .catch((error) => this.emitFailure(error, WebRpcErrorCode.transport))
+          .catch((error) => this.emitFailure(error, RpcCoreErrorCode.transport))
       }
       const onAbort = (): void => {
         notifyRemoteAbort(registeredSignals.find((signal) => signal.aborted)?.reason)
         settleReject(
-          new WebRpcAbortError(
+          new RpcAbortError(
             undefined,
             undefined,
             registeredSignals.find((signal) => signal.aborted)?.reason
@@ -458,7 +466,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
         }
       } catch (error) {
         settleReject(
-          new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.abortSignalInvalid, error)
+          new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.abortSignalInvalid, error)
         )
         return
       }
@@ -466,7 +474,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
       if (options.timeoutMs !== false && options.timeoutMs !== undefined)
         timer = this.kernel.time.setTimeout(() => {
           notifyRemoteAbort()
-          settleReject(new WebRpcTimeoutError())
+          settleReject(new RpcTimeoutError())
         }, options.timeoutMs)
       void this.resolveReceiver(
         targetId,
@@ -480,7 +488,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
             method,
             data: {
               webRpc: {
-                profile: WebRpcRoutingProfile,
+                profile: RpcRoutingProfile,
                 type: 'request' as const,
                 applicationVersion: this.#version,
                 senderId: this.id,
@@ -500,7 +508,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Sends one dispatch-only request without creating pending response state. */
   dispatch(targetId: string, method: string, data: unknown): void {
     void this.#sendDispatchOnly(targetId, method, data).catch((error) =>
-      this.emitFailure(error, WebRpcErrorCode.transport)
+      this.emitFailure(error, RpcCoreErrorCode.transport)
     )
   }
 
@@ -529,7 +537,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#replay.hasReservedId(id)
     )
     if (!this.#replay.reserveId(taskId))
-      throw new WebRpcError(WebRpcErrorCode.overloaded, WebRpcErrorText.outboundReplayFull)
+      throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
     return Promise.resolve()
       .then(() => this.resolveReceiver(targetId))
       .then((receiver) =>
@@ -540,7 +548,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
             method,
             data: {
               webRpc: {
-                profile: WebRpcRoutingProfile,
+                profile: RpcRoutingProfile,
                 type: 'request' as const,
                 applicationVersion: this.#version,
                 senderId: this.id,
@@ -583,7 +591,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
    * results are keyed by the canonical `fanoutDeliveryKey` tagged shape and accumulated into a
    * `createSafeRecord` dictionary (a plain `{}` would let an attacker-controlled `__proto__`-shaped
    * target silently mutate the accumulator's prototype instead of appearing as a delivery result),
-   * and a `WebRpcLifecycleError` raised by any individual `send()` (construction/dispose racing the
+   * and a `RpcLifecycleError` raised by any individual `send()` (construction/dispose racing the
    * fanout) is rethrown rather than folded into the per-target result, exactly like legacy
    * `sendAll`/`pingAll` and this class's own `pingAll`. Per-receiver keys are not produced here:
    * this composed `sendAll` fans out over the statically configured target list, not a
@@ -594,7 +602,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     method: string,
     data: unknown,
     options?: ISendOptions
-  ): Promise<IWebRpcFanoutResult<T>> {
+  ): Promise<IRpcFanoutResult<T>> {
     const results = await Promise.allSettled(
       this.targetIds.map(
         async (targetId) => [targetId, await this.send<T>(targetId, method, data, options)] as const
@@ -602,7 +610,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     )
     const lifecycleFailure = results.find(
       (result): result is PromiseRejectedResult =>
-        result.status === 'rejected' && result.reason instanceof WebRpcLifecycleError
+        result.status === 'rejected' && result.reason instanceof RpcLifecycleError
     )
     if (lifecycleFailure) throw lifecycleFailure.reason
     const fulfilled = createSafeRecord<T>()
@@ -621,12 +629,12 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Returns the public hook registration surface. */
-  get hooks(): { on(listener: IWebRpcHook): () => void } {
+  get hooks(): { on(listener: IRpcHook): () => void } {
     return { on: (listener) => this.#hooks.add(listener) }
   }
 
   /** Reports one diagnostic without allowing reporter failure to re-enter runtime work. */
-  emitFailure(error: unknown, code: string = WebRpcErrorCode.internal): void {
+  emitFailure(error: unknown, code: string = RpcCoreErrorCode.internal): void {
     const event = { name: 'failure', at: this.kernel.time.now(), localId: this.id, error, code }
     this.#emit(event)
     try {
@@ -637,7 +645,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Emits one package-owned diagnostic through the canonical hook owner. */
-  emitDiagnostic(event: Omit<IWebRpcHookEvent, 'at' | 'localId'>): void {
+  emitDiagnostic(event: Omit<IRpcHookEvent, 'at' | 'localId'>): void {
     this.#emit(Object.freeze({ ...event, at: this.kernel.time.now(), localId: this.id }))
   }
 
@@ -647,7 +655,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Reads live package-private owner counts for hostile lifecycle verification. */
-  debugSnapshot(): IWebRpcEndpointDebugSnapshot {
+  debugSnapshot(): IRpcEndpointDebugSnapshot {
     return {
       phase: this.kernel.state === 'disposed' ? 'disposed' : 'active',
       pending: this.#pending.size,
@@ -677,7 +685,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     if (this.#featureDisposePromise) return this.#featureDisposePromise
     this.#featureDisposePromise = Promise.resolve().then(() => {
       this.kernel.beginClose()
-      this.#failAll(new WebRpcAbortError())
+      this.#failAll(new RpcAbortError())
       this.#responseBindings.clear()
       this.#hooks.clear()
       this.#replay.clear()
@@ -690,7 +698,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     const record = message as {
       envelope?: IRpcEnvelope
       route?: ReturnType<typeof normalizeWebRpcRoutingData>
-      inbound?: IWebRpcInboundMessage<unknown>
+      inbound?: IRpcInboundMessage<unknown>
       admission?: IInboundIdentityAdmission
     }
     const canonical = record.envelope
@@ -727,9 +735,9 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
       }
     } else
       pending.reject(
-        new WebRpcRemoteError(
-          canonical.code ?? WebRpcErrorCode.internal,
-          canonical.message ?? WebRpcErrorText.remoteRequestFailed,
+        new RpcRemoteError(
+          canonical.code ?? RpcCoreErrorCode.internal,
+          canonical.message ?? RpcCoreErrorText.remoteRequestFailed,
           route.payload,
           canonical.error === undefined ? undefined : deserializeErrorFromRpc(canonical.error)
         )
@@ -743,17 +751,15 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Emits a hook event while preserving the configured hook-error boundary. */
-  #emit(event: IWebRpcHookEvent): void {
+  #emit(event: IRpcHookEvent): void {
     this.#hooks.emit(event, this.#hookErrorReporter)
   }
 }
 
 /** Normalizes configured hook listeners into one immutable iteration snapshot. */
-function normalizeHooks(
-  value: IWebRpcHook | readonly IWebRpcHook[] | undefined
-): readonly IWebRpcHook[] {
+function normalizeHooks(value: IRpcHook | readonly IRpcHook[] | undefined): readonly IRpcHook[] {
   if (value === undefined) return []
-  return Object.freeze(Array.isArray(value) ? [...value] : [value as IWebRpcHook])
+  return Object.freeze(Array.isArray(value) ? [...value] : [value as IRpcHook])
 }
 
 /** Projects an abort reason through RPC portable/error owners before it crosses the wire. */
@@ -768,5 +774,5 @@ export function assertTimeout(timeoutMs: number | false | undefined): void {
     timeoutMs !== false &&
     (!Number.isFinite(timeoutMs) || timeoutMs < 0)
   )
-    throw new WebRpcContractError(WebRpcErrorText.timeoutInvalid)
+    throw new RpcContractError(RpcCoreErrorText.timeoutInvalid)
 }

@@ -1,12 +1,12 @@
 import type { IRpcPortableValue } from '../../contract/index.js'
-import { WebRpcVariation } from '../semantic-constants.js'
+import { RpcVariation } from '../semantic-constants.js'
 import { safeRead } from './safe-value.js'
 
 /** Stable discriminator for the WebRPC-owned route profile carried by canonical RPC envelopes. */
-export const WebRpcRoutingProfile = 'web-rpc.route.v1'
+export const RpcRoutingProfile = 'web-rpc.route.v1'
 
 /** Route tags selected by WebRPC after the generic RPC envelope has normalized. */
-export const WebRpcRoutingType = {
+export const RpcRoutingType = {
   request: 'request',
   response: 'response',
   discoveryQuery: 'discovery-query',
@@ -15,10 +15,10 @@ export const WebRpcRoutingType = {
 } as const
 
 /** One validated WebRPC routing record. Its payload stays owned by the caller's RPC contract. */
-export type IWebRpcRoutingData = {
+export type IRpcRoutingData = {
   readonly webRpc: {
-    readonly profile: typeof WebRpcRoutingProfile
-    readonly type: (typeof WebRpcRoutingType)[keyof typeof WebRpcRoutingType]
+    readonly profile: typeof RpcRoutingProfile
+    readonly type: (typeof RpcRoutingType)[keyof typeof RpcRoutingType]
     readonly applicationVersion: string
     readonly senderId: string
     readonly targetId: string
@@ -32,13 +32,13 @@ export type IWebRpcRoutingData = {
     readonly accepted?: boolean
     readonly message?: string
     readonly operation?: 'unregister'
-    readonly variation?: (typeof WebRpcVariation)[keyof typeof WebRpcVariation]
+    readonly variation?: (typeof RpcVariation)[keyof typeof RpcVariation]
   }
   readonly payload?: IRpcPortableValue
 }
 
 /** Reads one untrusted canonical data value once and returns only a legal route-tag field set. */
-export function normalizeWebRpcRoutingData(value: unknown): IWebRpcRoutingData | undefined {
+export function normalizeWebRpcRoutingData(value: unknown): IRpcRoutingData | undefined {
   if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined
   try {
     if (Object.keys(value).some((key) => key !== 'webRpc' && key !== 'payload')) return undefined
@@ -78,8 +78,8 @@ export function normalizeWebRpcRoutingData(value: unknown): IWebRpcRoutingData |
   const sentAt = safeRead<unknown>(webRpc, 'sentAt')
   const payload = safeRead<unknown>(value, 'payload')
   if (
-    profile !== WebRpcRoutingProfile ||
-    !Object.values(WebRpcRoutingType).includes(type as never) ||
+    profile !== RpcRoutingProfile ||
+    !Object.values(RpcRoutingType).includes(type as never) ||
     typeof applicationVersion !== 'string' ||
     typeof senderId !== 'string' ||
     typeof targetId !== 'string' ||
@@ -91,8 +91,8 @@ export function normalizeWebRpcRoutingData(value: unknown): IWebRpcRoutingData |
   if (!optional || !isLegalRouteFields(type, optional)) return undefined
   return Object.freeze({
     webRpc: Object.freeze({
-      profile: WebRpcRoutingProfile,
-      type: type as IWebRpcRoutingData['webRpc']['type'],
+      profile: RpcRoutingProfile,
+      type: type as IRpcRoutingData['webRpc']['type'],
       applicationVersion,
       senderId,
       targetId,
@@ -133,7 +133,7 @@ function readOptionalRouteFields(value: object): Record<string, unknown> | undef
     (result.message !== undefined && typeof result.message !== 'string') ||
     (result.operation !== undefined && result.operation !== 'unregister') ||
     (result.variation !== undefined &&
-      !Object.values(WebRpcVariation).includes(result.variation as never))
+      !Object.values(RpcVariation).includes(result.variation as never))
   )
     return undefined
   return result
@@ -158,9 +158,8 @@ function isLegalRouteFields(type: unknown, fields: Record<string, unknown>): boo
   }
   const allowed = legal[type as string]
   if (!allowed || Object.keys(fields).some((field) => !allowed.includes(field))) return false
-  if (type === WebRpcRoutingType.response) return typeof fields.method === 'string'
-  if (type === WebRpcRoutingType.discoveryResponse)
-    return typeof fields.resolvedTargetId === 'string'
-  if (type === WebRpcRoutingType.variation) return typeof fields.variation === 'string'
+  if (type === RpcRoutingType.response) return typeof fields.method === 'string'
+  if (type === RpcRoutingType.discoveryResponse) return typeof fields.resolvedTargetId === 'string'
+  if (type === RpcRoutingType.variation) return typeof fields.variation === 'string'
   return true
 }

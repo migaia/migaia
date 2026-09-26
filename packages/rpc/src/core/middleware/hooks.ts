@@ -1,7 +1,7 @@
-import type { IWebRpcHooksConfig, IWebRpcPlugin, IWebRpcPluginInstallResult } from '../typing.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
-import { WebRpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
+import type { IRpcHooksConfig, IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcPortName } from '../internal/plugin-shared-keys.js'
+import { RpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 import { createConstructionDiagnosticReporter } from '../internal/hooks.js'
 
@@ -15,29 +15,25 @@ const emptyClaims = Object.freeze({
 })
 
 /** Creates the native hooks role while retaining the public legacy middleware factory shape. */
-function createHooksPlugin(config: IWebRpcHooksConfig): IWebRpcPlugin {
+function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
   return Object.freeze({
     name: 'middleware:hooks',
     metadata: Object.freeze({
       claims: emptyClaims,
-      sharedProvides: WebRpcFirstPartyRoleSchema.hooks.sharedProvides,
-      sharedConsumes: WebRpcFirstPartyRoleSchema.hooks.sharedConsumes,
-      sharedOptionalConsumes: WebRpcFirstPartyRoleSchema.hooks.sharedOptionalConsumes
+      sharedProvides: RpcFirstPartyRoleSchema.hooks.sharedProvides,
+      sharedConsumes: RpcFirstPartyRoleSchema.hooks.sharedConsumes,
+      sharedOptionalConsumes: RpcFirstPartyRoleSchema.hooks.sharedOptionalConsumes
     }),
-    install: (): IWebRpcPluginInstallResult => {
+    install: (): IRpcPluginInstallResult => {
       if (!config || typeof config !== 'object' || Array.isArray(config))
-        throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'hooks descriptor is invalid')
-      let listenerValue: IWebRpcHooksConfig['listeners']
-      let onHookError: IWebRpcHooksConfig['onHookError']
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'hooks descriptor is invalid')
+      let listenerValue: IRpcHooksConfig['listeners']
+      let onHookError: IRpcHooksConfig['onHookError']
       try {
         listenerValue = config.listeners
         onHookError = config.onHookError
       } catch (error) {
-        throw new WebRpcError(
-          WebRpcErrorCode.invalidConfig,
-          'hooks descriptor is unreadable',
-          error
-        )
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'hooks descriptor is unreadable', error)
       }
       try {
         const listeners =
@@ -47,15 +43,12 @@ function createHooksPlugin(config: IWebRpcHooksConfig): IWebRpcPlugin {
               ? [...listenerValue]
               : [listenerValue]
         if (listeners.some((listener) => typeof listener !== 'function'))
-          throw new WebRpcError(
-            WebRpcErrorCode.invalidConfig,
+          throw new RpcError(
+            RpcCoreErrorCode.invalidConfig,
             'hooks.listeners must contain functions'
           )
         if (onHookError !== undefined && typeof onHookError !== 'function')
-          throw new WebRpcError(
-            WebRpcErrorCode.invalidConfig,
-            'hooks.onHookError must be a function'
-          )
+          throw new RpcError(RpcCoreErrorCode.invalidConfig, 'hooks.onHookError must be a function')
         const port = Object.freeze({
           listeners: Object.freeze(listeners),
           ...(onHookError === undefined ? {} : { onHookError }),
@@ -63,16 +56,16 @@ function createHooksPlugin(config: IWebRpcHooksConfig): IWebRpcPlugin {
         })
         return {
           extension: Object.freeze({}),
-          ports: Object.freeze({ [WebRpcPortName.hooks]: port })
+          ports: Object.freeze({ [RpcPortName.hooks]: port })
         }
       } catch (error) {
-        if (error instanceof WebRpcError) throw error
-        throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'hooks descriptor is invalid', error)
+        if (error instanceof RpcError) throw error
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'hooks descriptor is invalid', error)
       }
     }
   })
 }
 
 /** Creates a hooks middleware whose config is read only during Host installation. */
-export const hooks = (config: IWebRpcHooksConfig = {}): IWebRpcPlugin =>
+export const hooks = (config: IRpcHooksConfig = {}): IRpcPlugin =>
   freezePlugin(createHooksPlugin(config))

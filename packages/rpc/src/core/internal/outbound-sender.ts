@@ -1,54 +1,54 @@
 import {
-  WebRpcAuthenticationError,
-  WebRpcErrorCode,
-  WebRpcLifecycleError,
-  WebRpcSerializationError,
-  WebRpcTransportError
+  RpcAuthenticationError,
+  RpcCoreErrorCode,
+  RpcLifecycleError,
+  RpcSerializationError,
+  RpcTransportError
 } from '../errors.js'
 import type {
-  IWebRpcAuthenticationCapability,
-  IWebRpcAuthenticationContext,
-  IWebRpcPlatform,
+  IRpcAuthenticationCapability,
+  IRpcAuthenticationContext,
+  IRpcPlatform,
   ISendOptions
 } from '../typing.js'
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js'
+import type { IRpcSendOptions, IRpcTransport } from '../transport.js'
 import { isUint8Array } from './safe-value.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcSelectedComponents } from './endpoint-options.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcSelectedComponents } from './endpoint-options.js'
 import type { IRpcEnvelope } from '../../contract/index.js'
 
 /** Minimal canonical send port consumed by the outbound owner. */
-export type IWebRpcOutboundTransport = {
-  readonly platform: IWebRpcPlatform
-  readonly encodedType?: IWebRpcTransport['encodedType']
-  send(message: unknown, options?: IWebRpcSendOptions): void | Promise<void>
-} & Partial<Omit<IWebRpcTransport, 'send' | 'platform' | 'encodedType'>>
+export type IRpcOutboundTransport = {
+  readonly platform: IRpcPlatform
+  readonly encodedType?: IRpcTransport['encodedType']
+  send(message: unknown, options?: IRpcSendOptions): void | Promise<void>
+} & Partial<Omit<IRpcTransport, 'send' | 'platform' | 'encodedType'>>
 
 /** Optional kernel lifecycle surface used to reject frames captured before endpoint close. */
-type IWebRpcOutboundLifecycle = Readonly<{
+type IRpcOutboundLifecycle = Readonly<{
   readonly generation: number
   assertActive(generation?: number): void
 }>
 
 /** Owns outbound protocol encoding, chunk framing, and transport error classification. */
-export class WebRpcOutboundSender {
-  readonly transport: IWebRpcOutboundTransport
+export class RpcOutboundSender {
+  readonly transport: IRpcOutboundTransport
   readonly id: string
-  readonly components: IWebRpcSelectedComponents
-  readonly authentication: IWebRpcAuthenticationCapability | undefined
+  readonly components: IRpcSelectedComponents
+  readonly authentication: IRpcAuthenticationCapability | undefined
   readonly onVariationFailure: (code: string, error: unknown) => void
   /** Captures the validated transport payload discriminant for every outbound frame. */
-  readonly #transportEncodedType: IWebRpcTransport['encodedType']
+  readonly #transportEncodedType: IRpcTransport['encodedType']
   /** Captures the kernel lifecycle once so every asynchronous send phase shares one generation. */
-  readonly #lifecycle: IWebRpcOutboundLifecycle | undefined
+  readonly #lifecycle: IRpcOutboundLifecycle | undefined
 
   constructor(
-    transport: IWebRpcOutboundTransport,
+    transport: IRpcOutboundTransport,
     id: string,
-    components: IWebRpcSelectedComponents,
+    components: IRpcSelectedComponents,
     onVariationFailure: (code: string, error: unknown) => void,
-    authentication?: IWebRpcAuthenticationCapability,
-    platform: IWebRpcPlatform = transport.platform
+    authentication?: IRpcAuthenticationCapability,
+    platform: IRpcPlatform = transport.platform
   ) {
     this.transport = transport
     this.id = id
@@ -56,10 +56,10 @@ export class WebRpcOutboundSender {
     this.authentication = authentication
     this.onVariationFailure = onVariationFailure
     this.#transportEncodedType = transport.encodedType
-    const lifecycle = transport as Partial<IWebRpcOutboundLifecycle>
+    const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
       typeof lifecycle.assertActive === 'function' && typeof lifecycle.generation === 'number'
-        ? (lifecycle as IWebRpcOutboundLifecycle)
+        ? (lifecycle as IRpcOutboundLifecycle)
         : undefined
     this.#authenticationContext = Object.freeze({
       direction: 'outbound',
@@ -69,7 +69,7 @@ export class WebRpcOutboundSender {
   }
 
   /** Stable context passed to every outbound authentication transform. */
-  readonly #authenticationContext: IWebRpcAuthenticationContext
+  readonly #authenticationContext: IRpcAuthenticationContext
 
   /** Encodes one semantic envelope once, then protects and sends each selected physical frame. */
   send(message: IRpcEnvelope, options?: ISendOptions): void | Promise<void> {
@@ -82,7 +82,7 @@ export class WebRpcOutboundSender {
       encoded = this.components.codec.encode(message)
       this.assertProtocolEncodedType(encoded)
     } catch (cause) {
-      throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodeFailed, cause)
+      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     let frames: readonly unknown[]
     try {
@@ -91,11 +91,11 @@ export class WebRpcOutboundSender {
         messageId: message.id
       })
     } catch (cause) {
-      throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodeFailed, cause)
+      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     this.#lifecycle?.assertActive(generation)
     if (hasTransfer && frames.length !== 1)
-      throw new WebRpcSerializationError(WebRpcErrorText.transferUnsupportedForChunking)
+      throw new RpcSerializationError(RpcCoreErrorText.transferUnsupportedForChunking)
     return this.#prepareFrames(frames, transfer, hasTransfer, generation).then((preparedFrames) => {
       this.#lifecycle?.assertActive(generation)
       return this.#sendPreparedFrames(preparedFrames, transfer, generation)
@@ -107,14 +107,14 @@ export class WebRpcOutboundSender {
     try {
       return Promise.resolve(this.send(message)).catch((error) => {
         const code =
-          error instanceof WebRpcAuthenticationError
-            ? WebRpcErrorCode.authenticationFailed
-            : WebRpcErrorCode.transport
+          error instanceof RpcAuthenticationError
+            ? RpcCoreErrorCode.authenticationFailed
+            : RpcCoreErrorCode.transport
         this.onVariationFailure(code, error)
         if (rejectOnFailure) throw error
       })
     } catch (error) {
-      this.onVariationFailure(WebRpcErrorCode.internal, error)
+      this.onVariationFailure(RpcCoreErrorCode.internal, error)
       return rejectOnFailure ? Promise.reject(error) : Promise.resolve()
     }
   }
@@ -126,7 +126,7 @@ export class WebRpcOutboundSender {
       (encodedType === 'string' && typeof value !== 'string') ||
       (encodedType === 'uint8array' && !isUint8Array(value))
     )
-      throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodedType(encodedType))
+      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodedType(encodedType))
   }
 
   /** Validates protected output against transport payload requirements. */
@@ -136,7 +136,7 @@ export class WebRpcOutboundSender {
       (encodedType === 'string' && typeof value !== 'string') ||
       (encodedType === 'uint8array' && !isUint8Array(value))
     )
-      throw new WebRpcAuthenticationError(WebRpcErrorText.protectedEncodedType(encodedType))
+      throw new RpcAuthenticationError(RpcCoreErrorText.protectedEncodedType(encodedType))
   }
 
   /** Captures one owned, immutable transfer-list snapshot before any encoding or framing work. */
@@ -145,21 +145,21 @@ export class WebRpcOutboundSender {
     try {
       transfer = options?.transfer
     } catch (cause) {
-      throw new WebRpcSerializationError(WebRpcErrorText.invalidTransferList, cause)
+      throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList, cause)
     }
     if (transfer === undefined) return undefined
     try {
       if (!Array.isArray(transfer))
-        throw new WebRpcSerializationError(WebRpcErrorText.invalidTransferList)
+        throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
       const transferLength = transfer.length
       if (!Number.isSafeInteger(transferLength))
-        throw new WebRpcSerializationError(WebRpcErrorText.invalidTransferList)
+        throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
       const snapshot: unknown[] = []
       for (let index = 0; index < transferLength; index += 1) snapshot.push(transfer[index])
       return Object.freeze(snapshot)
     } catch (cause) {
-      if (cause instanceof WebRpcSerializationError) throw cause
-      throw new WebRpcSerializationError(WebRpcErrorText.invalidTransferList, cause)
+      if (cause instanceof RpcSerializationError) throw cause
+      throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList, cause)
     }
   }
 
@@ -238,7 +238,7 @@ export class WebRpcOutboundSender {
   ): Promise<unknown> {
     if (this.authentication && hasTransfer)
       return Promise.reject(
-        new WebRpcAuthenticationError(WebRpcErrorText.transferUnsupportedWithAuthentication)
+        new RpcAuthenticationError(RpcCoreErrorText.transferUnsupportedWithAuthentication)
       )
     const authentication = this.authentication
     if (!authentication)
@@ -248,8 +248,8 @@ export class WebRpcOutboundSender {
           this.assertTransportEncodedType(value)
           return value
         } catch (cause) {
-          if (cause instanceof WebRpcLifecycleError) throw cause
-          throw new WebRpcTransportError(WebRpcErrorText.transportSendFailed, cause)
+          if (cause instanceof RpcLifecycleError) throw cause
+          throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
         }
       })
 
@@ -259,9 +259,9 @@ export class WebRpcOutboundSender {
         return authentication.protect(value, this.#authenticationContext)
       })
       .catch((cause) => {
-        if (cause instanceof WebRpcAuthenticationError) throw cause
-        if (cause instanceof WebRpcLifecycleError) throw cause
-        throw new WebRpcAuthenticationError(WebRpcErrorText.authenticationFailed, cause)
+        if (cause instanceof RpcAuthenticationError) throw cause
+        if (cause instanceof RpcLifecycleError) throw cause
+        throw new RpcAuthenticationError(RpcCoreErrorText.authenticationFailed, cause)
       })
       .then((protectedValue) => {
         try {
@@ -269,10 +269,10 @@ export class WebRpcOutboundSender {
           this.assertTransportEncodedType(protectedValue)
           return protectedValue
         } catch (cause) {
-          if (cause instanceof WebRpcAuthenticationError) throw cause
-          if (cause instanceof WebRpcLifecycleError) throw cause
-          throw new WebRpcAuthenticationError(
-            WebRpcErrorText.protectedEncodedType(this.#transportEncodedType ?? 'any'),
+          if (cause instanceof RpcAuthenticationError) throw cause
+          if (cause instanceof RpcLifecycleError) throw cause
+          throw new RpcAuthenticationError(
+            RpcCoreErrorText.protectedEncodedType(this.#transportEncodedType ?? 'any'),
             cause
           )
         }
@@ -295,9 +295,9 @@ export class WebRpcOutboundSender {
       })
       .then(() => undefined)
       .catch((cause) => {
-        if (cause instanceof WebRpcAuthenticationError) throw cause
-        if (cause instanceof WebRpcLifecycleError) throw cause
-        throw new WebRpcTransportError(WebRpcErrorText.transportSendFailed, cause)
+        if (cause instanceof RpcAuthenticationError) throw cause
+        if (cause instanceof RpcLifecycleError) throw cause
+        throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
       })
   }
 }

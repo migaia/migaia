@@ -1,16 +1,17 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../../core/transport.js'
-import { safeString } from '../../core/internal/safe-value.js'
+import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
 import {
+  RpcPlatform,
+  RpcTransportOwnership,
   createListenerFailureState,
+  createMessageListenerHub,
   drainListenerFailures,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
-  reportListenerFailure
-} from '../../core/internal/listener-safety.js'
-import { createMessageListenerHub } from '../../core/internal/message-listener-hub.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../../core/transport-constants.js'
-import { WebRpcErrorCode } from '../../core/errors.js'
+  reportListenerFailure,
+  safeString
+} from '../../core/transport-kit.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 
 /**
  * Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or
@@ -46,7 +47,7 @@ export type IWebWorkerTransportOptions = {
 export function createWebWorkerTransport(
   port: IWebWorkerLikePort,
   options: IWebWorkerTransportOptions = {}
-): IWebRpcTransport<unknown, Transferable> {
+): IRpcTransport<unknown, Transferable> {
   const messageListeners = createMessageListenerHub<{
     data: unknown
     origin?: string
@@ -106,12 +107,12 @@ export function createWebWorkerTransport(
   const onMessageError = onFailure('could not deserialize a message')
 
   return {
-    platform: WebRpcPlatform.worker,
+    platform: RpcPlatform.worker,
     topology: 'exclusive',
-    ownership: WebRpcTransportOwnership.borrowed,
+    ownership: RpcTransportOwnership.borrowed,
     peerId: options.peerId,
     origin: options.origin,
-    send(message, options?: IWebRpcSendOptions<Transferable>) {
+    send(message, options?: IRpcSendOptions<Transferable>) {
       port.postMessage(message, options?.transfer)
     },
     // Attached lazily on first subscriber, detached once the last one
@@ -126,7 +127,7 @@ export function createWebWorkerTransport(
               remove: () => port.removeEventListener('message', onMessage)
             }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       )
       return () => {
@@ -134,7 +135,7 @@ export function createWebWorkerTransport(
         releaseListenerRegistration(
           messageListeners.size === 1 ? [() => port.removeEventListener('message', onMessage)] : [],
           () => messageListeners.remove(listener, () => undefined),
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -151,7 +152,7 @@ export function createWebWorkerTransport(
               remove: () => port.removeEventListener('messageerror', onMessageError)
             }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
       errorListeners.add(listener)
@@ -167,7 +168,7 @@ export function createWebWorkerTransport(
           () => {
             errorListeners.delete(listener)
           },
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -175,7 +176,7 @@ export function createWebWorkerTransport(
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }

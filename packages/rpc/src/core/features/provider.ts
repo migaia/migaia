@@ -1,11 +1,11 @@
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
-import { WebRpcProviderAttachment } from '../internal/provider-attachment.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import { RpcPortName } from '../internal/plugin-shared-keys.js'
+import { RpcProviderAttachment } from '../internal/provider-attachment.js'
 import { registerEndpointDebugSnapshot } from '../internal/test-observer.js'
 import type { IOutboundSurface } from './outbound.js'
-import type { IWebRpcEventListener, IWebRpcProvider } from '../typing.js'
-import type { IWebRpcFeature } from '../feature.js'
+import type { IRpcEventListener, IRpcProvider } from '../typing.js'
+import type { IRpcFeature } from '../feature.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from '../internal/define-rpc-feature.js'
 import type {
@@ -16,28 +16,28 @@ import type {
 
 /** Provider preset surface includes selected outbound projection plus provider registration. */
 export type IProviderSurface = IOutboundSurface & {
-  on(event: string, listener: IWebRpcEventListener): () => void
+  on(event: string, listener: IRpcEventListener): () => void
   dispose(): Promise<void>
-  provide(method: string, provider: IWebRpcProvider): IProviderSurface
+  provide(method: string, provider: IRpcProvider): IProviderSurface
 }
 
 /** Native projection owns only provider registration; composition contributes outbound separately. */
 export type IProviderRegistrationSurface = Readonly<{
-  readonly provide: (method: string, provider: IWebRpcProvider) => IProviderRegistrationSurface
-  readonly on: (event: string, listener: IWebRpcEventListener) => () => void
+  readonly provide: (method: string, provider: IRpcProvider) => IProviderRegistrationSurface
+  readonly on: (event: string, listener: IRpcEventListener) => () => void
 }>
 
 /** Native provider Feature retains the request security closure under the construction scope. */
 export const createProviderFeature = (
-  outboundCapability: IWebRpcFeature<IOutboundCapability>
-): IWebRpcFeature<
+  outboundCapability: IRpcFeature<IOutboundCapability>
+): IRpcFeature<
   IProviderCapability,
-  { readonly outbound: IWebRpcFeature<IOutboundCapability> },
+  { readonly outbound: IRpcFeature<IOutboundCapability> },
   IEndpointCapabilitiesFeatureExpose
 > =>
   defineRpcFeature<
     IProviderCapability,
-    { readonly outbound: IWebRpcFeature<IOutboundCapability> },
+    { readonly outbound: IRpcFeature<IOutboundCapability> },
     IEndpointCapabilitiesFeatureExpose
   >(
     {
@@ -52,14 +52,14 @@ export const createProviderFeature = (
       }
     },
     (core, dependencies) => {
-      let attachment: WebRpcProviderAttachment | undefined
+      let attachment: RpcProviderAttachment | undefined
       let installation: IProviderInstallation | undefined
       const prepare = (
-        scope: import('../typing.js').IWebRpcPluginInstallScope
+        scope: import('../typing.js').IRpcPluginInstallScope
       ): IProviderInstallation => {
         if (installation) return installation
         const outbound = dependencies.outbound.prepare(scope)
-        attachment = new WebRpcProviderAttachment(
+        attachment = new RpcProviderAttachment(
           core.featureExpose.getKernel(),
           {
             outboundOperations: outbound.outboundOperations,
@@ -71,13 +71,13 @@ export const createProviderFeature = (
         scope.own(attachment, () => attachment!.dispose())
         const provider = attachment
         const publicSurface: IProviderRegistrationSurface & {
-          readonly on: (event: string, listener: IWebRpcEventListener) => () => void
+          readonly on: (event: string, listener: IRpcEventListener) => () => void
         } = Object.freeze({
-          provide: (method: string, value: IWebRpcProvider) => {
+          provide: (method: string, value: IRpcProvider) => {
             provider.provide(method, value)
             return publicSurface
           },
-          on: (event: string, listener: IWebRpcEventListener) => provider.on(event, listener)
+          on: (event: string, listener: IRpcEventListener) => provider.on(event, listener)
         })
         registerEndpointDebugSnapshot(publicSurface, () => attachment!.debugSnapshot())
         const preparedInstallation: IProviderInstallation = Object.freeze({ public: publicSurface })
@@ -86,12 +86,12 @@ export const createProviderFeature = (
       }
       const ports = (): Readonly<Record<PropertyKey, unknown>> => {
         if (!attachment)
-          throw new WebRpcError(
-            WebRpcErrorCode.invalidConfig,
-            WebRpcErrorText.endpointModuleDependencyMissing
+          throw new RpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RpcCoreErrorText.endpointModuleDependencyMissing
           )
         return Object.freeze({
-          [WebRpcPortName.providerCancellation]: Object.freeze({
+          [RpcPortName.providerCancellation]: Object.freeze({
             abort: (id: string) => attachment!.abort(id)
           })
         })

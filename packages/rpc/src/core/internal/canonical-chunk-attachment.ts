@@ -1,13 +1,13 @@
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcFramer } from '../../contract/index.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 
 /**
  * Owns selected-framer lifetime. Sole outbound receiver accepts physical frames, so this bridge
  * never registers a semantic chunk route or a second reassembly map.
  */
-export class WebRpcCanonicalChunkAttachment {
+export class RpcCanonicalChunkAttachment {
   /** Retains the first selected-framer close failure for root ResourceScope collection. */
   #closeError: unknown
   /** Distinguishes a caught `throw undefined` from no close failure. */
@@ -21,7 +21,7 @@ export class WebRpcCanonicalChunkAttachment {
     framer: Pick<IRpcFramer<unknown, unknown, string, number>, 'close'> | undefined
   ) {
     if (!framer)
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
     kernel.registerOwner('chunk-assembler', framer)
     const close = (): void => {
       if (this.#closed) return

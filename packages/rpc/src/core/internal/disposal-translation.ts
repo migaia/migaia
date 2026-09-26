@@ -1,7 +1,7 @@
 import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '@migaia/plugin-host'
-import { WebRpcLifecycleError } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcCleanupError } from '../errors.js'
+import { RpcLifecycleError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcCleanupError } from '../errors.js'
 
 /** Stable PluginHost cleanup-group label retained in the endpoint diagnostic contract. */
 const HOST_RESOURCE_DISPOSER_LABEL = 'resource disposer'
@@ -36,8 +36,8 @@ const isPluginHostAggregateContainer = (
 const findLifecycleError = (
   value: unknown,
   seen: Set<object> = new Set()
-): WebRpcLifecycleError | undefined => {
-  if (value instanceof WebRpcLifecycleError) return value
+): RpcLifecycleError | undefined => {
+  if (value instanceof RpcLifecycleError) return value
   if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined
   if (seen.has(value)) return undefined
   seen.add(value)
@@ -60,7 +60,7 @@ const findLifecycleError = (
 const flattenHostCleanupErrors = (
   value: unknown,
   seen: Set<object> = new Set()
-): readonly IWebRpcCleanupError[] => {
+): readonly IRpcCleanupError[] => {
   if (!value || (typeof value !== 'object' && typeof value !== 'function'))
     return [{ resource: HOST_RESOURCE_DISPOSER_LABEL, error: value }]
   if (seen.has(value)) return []
@@ -83,15 +83,15 @@ const flattenHostCleanupErrors = (
 /** Translates a PluginHost rejection before it crosses the composed endpoint boundary. */
 export const translateEndpointDisposalError = (
   error: unknown,
-  cleanupErrors: readonly IWebRpcCleanupError[] = []
-): WebRpcLifecycleError => {
+  cleanupErrors: readonly IRpcCleanupError[] = []
+): RpcLifecycleError => {
   const nestedLifecycleError = findLifecycleError(error)
   if (nestedLifecycleError) return nestedLifecycleError
   const hostCleanupErrors = flattenHostCleanupErrors(error)
   const labeledByIdentity = new Map(
     cleanupErrors.map((cleanupError) => [cleanupError.error, cleanupError] as const)
   )
-  const translatedCleanupErrors: IWebRpcCleanupError[] = []
+  const translatedCleanupErrors: IRpcCleanupError[] = []
   const seenLeaves = new Set<unknown>()
   for (const cleanupError of hostCleanupErrors) {
     if (seenLeaves.has(cleanupError.error)) continue
@@ -104,10 +104,10 @@ export const translateEndpointDisposalError = (
     translatedCleanupErrors.push(cleanupError)
   }
   if (translatedCleanupErrors.length > 0)
-    return new WebRpcLifecycleError(
-      WebRpcErrorText.endpointDisposalCleanupFailed,
+    return new RpcLifecycleError(
+      RpcCoreErrorText.endpointDisposalCleanupFailed,
       translatedCleanupErrors[0]?.error,
       translatedCleanupErrors
     )
-  return new WebRpcLifecycleError(WebRpcErrorText.endpointDisposalCleanupFailed, error)
+  return new RpcLifecycleError(RpcCoreErrorText.endpointDisposalCleanupFailed, error)
 }

@@ -1,5 +1,5 @@
 import { tupleKey } from './safe-value.js'
-import { tagWebRpcError, WebRpcErrorCode } from '../errors.js'
+import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
 /** Owns verified source bindings and issues unique, non-cryptographic identifiers. */
 export class VerifiedPeerRegistry {
@@ -17,9 +17,16 @@ export class VerifiedPeerRegistry {
   readonly #maxBindingsPerOrigin: number
   readonly #maxBindingAgeMs: number
   readonly #maxBindingLifetimeMs: number
+  /** Endpoint clock used for binding age without global time reads. */
+  readonly #now: () => number
   #nextToken = 0
 
-  constructor(maxBindings = 1024, maxBindingsPerOrigin = 128, maxBindingAgeMs = 300_000) {
+  constructor(
+    now: () => number,
+    maxBindings = 1024,
+    maxBindingsPerOrigin = 128,
+    maxBindingAgeMs = 300_000
+  ) {
     if (
       !Number.isSafeInteger(maxBindings) ||
       maxBindings < 1 ||
@@ -29,11 +36,12 @@ export class VerifiedPeerRegistry {
       maxBindingAgeMs < 1 ||
       maxBindingAgeMs > Number.MAX_SAFE_INTEGER / 100
     )
-      throw tagWebRpcError(
+      throw tagRpcError(
         new TypeError('binding limits must be positive safe integers'),
-        WebRpcErrorCode.invalidConfig
+        RpcCoreErrorCode.invalidConfig
       )
     this.#maxBindings = maxBindings
+    this.#now = now
     this.#maxBindingsPerOrigin = maxBindingsPerOrigin
     this.#maxBindingAgeMs = maxBindingAgeMs
     this.#maxBindingLifetimeMs = maxBindingAgeMs * 100
@@ -49,7 +57,7 @@ export class VerifiedPeerRegistry {
     const binding = tupleKey(senderId, peerId ?? '', origin ?? '', sourceToken ?? '')
     const existing = this.#bindings.get(binding)
     if (existing) {
-      const now = Date.now()
+      const now = this.#now()
       if (now - existing.createdAt < this.#maxBindingLifetimeMs) {
         this.#bindings.set(binding, { ...existing, verifiedAt: now })
         return existing.token
@@ -67,7 +75,7 @@ export class VerifiedPeerRegistry {
     )
       return false
     const token = `verified-peer-${++this.#nextToken}-${Math.random().toString(36).slice(2)}`
-    const now = Date.now()
+    const now = this.#now()
     this.#bindings.set(binding, {
       token,
       origin: bindingOrigin,
@@ -92,7 +100,7 @@ export class VerifiedPeerRegistry {
    * first — see WR-R3-1 in docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
    */
   retain(token: string): boolean {
-    const now = Date.now()
+    const now = this.#now()
     for (const [key, entry] of this.#bindings) {
       if (entry.token !== token) continue
       if (now - entry.createdAt >= this.#maxBindingLifetimeMs) {
@@ -120,7 +128,7 @@ export class VerifiedPeerRegistry {
     const binding = tupleKey(senderId, peerId ?? '', origin ?? '', sourceToken ?? '')
     const entry = this.#bindings.get(binding)
     if (!entry) return false
-    const now = Date.now()
+    const now = this.#now()
     if (
       now - entry.createdAt >= this.#maxBindingLifetimeMs ||
       (entry.refs === 0 && now - entry.verifiedAt >= this.#maxBindingAgeMs)
@@ -137,7 +145,7 @@ export class VerifiedPeerRegistry {
   }
 
   #purgeExpired(): void {
-    const now = Date.now()
+    const now = this.#now()
     for (const [key, entry] of this.#bindings)
       if (
         now - entry.createdAt >= this.#maxBindingLifetimeMs ||

@@ -6,12 +6,12 @@ import {
   type IFeatureOutputs,
   type IPluginConfig
 } from '@migaia/plugin-host'
-import { WebRpcConfigurationError, WebRpcError, WebRpcErrorCode } from './errors.js'
-import { WebRpcErrorText } from './error-text.js'
+import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from './errors.js'
+import { RpcCoreErrorText } from './error-text.js'
 import { runConstructionInstall } from './internal/construction-install.js'
 import { assertPluginInstallResult, freezePlugin } from './internal/plugin-descriptor.js'
-import type { IWebRpcPlugin, IWebRpcPluginMetadata } from './typing.js'
-import type { IWebRpcPluginCore, IWebRpcPluginInstallScope } from './internal/plugin-contract.js'
+import type { IRpcPlugin, IRpcPluginMetadata } from './typing.js'
+import type { IRpcPluginCore, IRpcPluginInstallScope } from './internal/plugin-contract.js'
 import { createWebRpcPortFeatureSet } from './internal/port-feature.js'
 
 /**
@@ -20,31 +20,31 @@ import { createWebRpcPortFeatureSet } from './internal/port-feature.js'
  */
 const nativeMiddlewares = new WeakSet<object>()
 /** Retains immutable declared component metadata without making it a runtime authority. */
-const nativeMiddlewarePolicies = new WeakMap<object, IWebRpcPluginMetadata>()
-const nativeMiddlewareComponents = new WeakMap<object, IWebRpcMiddlewareComponentPolicy>()
+const nativeMiddlewarePolicies = new WeakMap<object, IRpcPluginMetadata>()
+const nativeMiddlewareComponents = new WeakMap<object, IRpcMiddlewareComponentPolicy>()
 /**
  * Static object-form components consumed by endpoint bootstrap, never attached to a frozen host
  * token.
  */
-export type IWebRpcMiddlewareComponentPolicy = Readonly<
+export type IRpcMiddlewareComponentPolicy = Readonly<
   Pick<
-    IWebRpcPlugin,
+    IRpcPlugin,
     'transport' | 'protocol' | 'codec' | 'framer' | 'discoveryMode' | 'pingCapability'
   >
 >
 /** Type-only component contribution; runtime data remains in the immutable policy sidecar. */
 declare const webRpcMiddlewareComponents: unique symbol
-export type IWebRpcMiddlewareComponentContribution<TComponents extends object> = Readonly<{
+export type IRpcMiddlewareComponentContribution<TComponents extends object> = Readonly<{
   readonly [webRpcMiddlewareComponents]?: TComponents
 }>
 /** Direct PluginHost definition type for a native Middleware registration. */
-export type IWebRpcNativeMiddleware<
+export type IRpcNativeMiddleware<
   TExtension extends Record<string, unknown> = Record<never, never>,
   TPublic extends object = Record<never, never>,
   TFeatureExpose extends object = Record<never, never>,
   TFeatures extends IFeatureRecord = Record<never, never>
 > = IDefinedPluginConstraint<
-  IWebRpcPluginCore,
+  IRpcPluginCore,
   never,
   TExtension & TPublic,
   IPluginConfig,
@@ -55,7 +55,7 @@ export type IWebRpcNativeMiddleware<
 >
 
 /** Native descriptor keeps middleware lifecycle in the canonical PluginHost transaction. */
-export type IWebRpcMiddlewareDescriptor<
+export type IRpcMiddlewareDescriptor<
   TExtension extends Record<string, unknown> = Record<never, never>,
   TPublic extends object = Record<never, never>,
   TFeatureExpose extends object = Record<never, never>
@@ -70,24 +70,24 @@ export type IWebRpcMiddlewareDescriptor<
  * Public middleware core retains ordinary install scope without exposing Host-local projection
  * receivers.
  */
-export type IWebRpcMiddlewareCore<
+export type IRpcMiddlewareCore<
   TFeatures extends IFeatureRecord = Record<never, never>,
   TFeatureExpose extends object = Record<never, never>
 > = Readonly<{
-  readonly id: IWebRpcPluginCore['id']
-  readonly transport: IWebRpcPluginCore['transport']
-  readonly signal: IWebRpcPluginCore['signal']
-  readonly hooks: IWebRpcPluginCore['hooks']
-  readonly own: IWebRpcPluginInstallScope['own']
+  readonly id: IRpcPluginCore['id']
+  readonly transport: IRpcPluginCore['transport']
+  readonly signal: IRpcPluginCore['signal']
+  readonly hooks: IRpcPluginCore['hooks']
+  readonly own: IRpcPluginInstallScope['own']
   readonly features: IFeatureOutputs<TFeatures>
   readonly featureExpose: TFeatureExpose
 }>
 
 /** Defines a named native middleware Plugin; descriptor code runs per Host registration. */
 export function defineMiddleware<const TComponents extends object>(
-  definition: IWebRpcPlugin<TComponents>
-): IWebRpcNativeMiddleware &
-  IWebRpcMiddlewareComponentContribution<
+  definition: IRpcPlugin<TComponents>
+): IRpcNativeMiddleware &
+  IRpcMiddlewareComponentContribution<
     Pick<
       TComponents,
       Extract<
@@ -105,13 +105,13 @@ export function defineMiddleware<
 >(
   name: string,
   descriptorFactory: (
-    core: IWebRpcMiddlewareCore<TFeatures, TFeatureExpose>
-  ) => IWebRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose> &
+    core: IRpcMiddlewareCore<TFeatures, TFeatureExpose>
+  ) => IRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose> &
     (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
       ? unknown
       : { readonly featureExpose: () => TFeatureExpose }),
   featureRecord?: TFeatures
-): IWebRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>
+): IRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>
 export function defineMiddleware<
   TExtension extends Record<string, unknown> = Record<never, never>,
   TPublic extends object = Record<never, never>,
@@ -119,15 +119,15 @@ export function defineMiddleware<
   TFeatureExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object &
     IFeatureRecordRequiredExpose<TFeatures>
 >(
-  name: string | IWebRpcPlugin,
+  name: string | IRpcPlugin,
   descriptorFactory?: (
-    core: IWebRpcMiddlewareCore<TFeatures, TFeatureExpose>
-  ) => IWebRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose> &
+    core: IRpcMiddlewareCore<TFeatures, TFeatureExpose>
+  ) => IRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose> &
     (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
       ? unknown
       : { readonly featureExpose: () => TFeatureExpose }),
   featureRecord?: TFeatures
-): IWebRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures> {
+): IRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures> {
   if (typeof name === 'object' && name !== null) {
     const legacy = freezePlugin(name)
     const policy = snapshotMiddlewarePolicy(legacy.metadata)
@@ -137,7 +137,7 @@ export function defineMiddleware<
      * Capture validated legacy hooks once so later caller mutation cannot alter native
      * installation.
      */
-    const middleware = definePlugin<IWebRpcPluginCore, Record<string, unknown>>(
+    const middleware = definePlugin<IRpcPluginCore, Record<string, unknown>>(
       legacy.name,
       (core) => {
         const portRuntime = portFeatures.createRuntime()
@@ -156,7 +156,7 @@ export function defineMiddleware<
                     name: 'failure',
                     at: core.construction.time.now(),
                     localId: core.id,
-                    code: WebRpcErrorCode.internal,
+                    code: RpcCoreErrorCode.internal,
                     error
                   })
                 },
@@ -185,7 +185,7 @@ export function defineMiddleware<
     nativeMiddlewares.add(middleware)
     nativeMiddlewarePolicies.set(middleware, policy)
     const components: Pick<
-      IWebRpcPlugin,
+      IRpcPlugin,
       'transport' | 'protocol' | 'codec' | 'framer' | 'discoveryMode' | 'pingCapability'
     > = {}
     for (const key of [
@@ -200,14 +200,14 @@ export function defineMiddleware<
       if (property && 'value' in property) Object.assign(components, { [key]: property.value })
     }
     nativeMiddlewareComponents.set(middleware, Object.freeze(components))
-    return middleware as IWebRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>
+    return middleware as IRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>
   }
   if (!descriptorFactory)
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
   if (name.length === 0 || typeof descriptorFactory !== 'function')
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
   const middleware = definePlugin<
-    IWebRpcPluginCore,
+    IRpcPluginCore,
     TExtension,
     never,
     string,
@@ -219,9 +219,9 @@ export function defineMiddleware<
     name,
     (core) => {
       /** Scope is absent while the synchronous descriptor factory executes. */
-      let installScope: IWebRpcPluginInstallScope | undefined
-      const requireInstallScope = (): IWebRpcPluginInstallScope => {
-        if (!installScope) throw new WebRpcConfigurationError(WebRpcErrorText.endpointModuleInvalid)
+      let installScope: IRpcPluginInstallScope | undefined
+      const requireInstallScope = (): IRpcPluginInstallScope => {
+        if (!installScope) throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
         return installScope
       }
       const middlewareCore = {
@@ -237,7 +237,7 @@ export function defineMiddleware<
         get featureExpose(): TFeatureExpose {
           return core.featureExpose as TFeatureExpose
         }
-      } satisfies IWebRpcMiddlewareCore<TFeatures, TFeatureExpose>
+      } satisfies IRpcMiddlewareCore<TFeatures, TFeatureExpose>
       const descriptor = descriptorFactory(Object.freeze(middlewareCore))
       const install = descriptor.install
       const expose = descriptor.expose
@@ -259,7 +259,7 @@ export function defineMiddleware<
                         name: 'failure',
                         at: core.construction.time.now(),
                         localId: core.id,
-                        code: WebRpcErrorCode.internal,
+                        code: RpcCoreErrorCode.internal,
                         error
                       })
                     },
@@ -300,7 +300,7 @@ export function defineMiddleware<
     featureRecord
   )
   nativeMiddlewares.add(middleware)
-  return middleware as unknown as IWebRpcNativeMiddleware<
+  return middleware as unknown as IRpcNativeMiddleware<
     TExtension,
     TPublic,
     TFeatureExpose,
@@ -309,7 +309,7 @@ export function defineMiddleware<
 }
 
 /** Snapshots static object-form claims before endpoint composition observes caller-owned metadata. */
-function snapshotMiddlewarePolicy(metadata: IWebRpcPluginMetadata): IWebRpcPluginMetadata {
+function snapshotMiddlewarePolicy(metadata: IRpcPluginMetadata): IRpcPluginMetadata {
   return Object.freeze({
     claims: Object.freeze({
       routes: Object.freeze([...metadata.claims.routes]),
@@ -335,7 +335,7 @@ function snapshotMiddlewarePolicy(metadata: IWebRpcPluginMetadata): IWebRpcPlugi
 function assertDeclaredKeys(expected: readonly PropertyKey[], value: object): void {
   const actual = Reflect.ownKeys(value)
   if (actual.length !== expected.length || actual.some((key) => !expected.includes(key)))
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /**
@@ -346,7 +346,7 @@ export const isDefinedMiddleware = (value: unknown): value is ReturnType<typeof 
   typeof value === 'object' && value !== null && nativeMiddlewares.has(value)
 
 /** Returns static middleware policy captured at definition time for composition admission. */
-export const readDefinedMiddlewarePolicy = (value: unknown): IWebRpcPluginMetadata | undefined =>
+export const readDefinedMiddlewarePolicy = (value: unknown): IRpcPluginMetadata | undefined =>
   typeof value === 'object' && value !== null ? nativeMiddlewarePolicies.get(value) : undefined
 
 /** Returns immutable object-form component policy without mutating PluginHost's frozen token. */

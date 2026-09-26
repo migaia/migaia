@@ -1,25 +1,26 @@
 import type {
-  IWebRpcAuthenticationCapability,
-  IWebRpcConnectCapability,
-  IWebRpcConnectConfig,
-  IWebRpcContractCapability,
-  IWebRpcContractConfig,
-  IWebRpcFeatureConfig,
-  IWebRpcHookEvent,
-  IWebRpcHooksConfig,
-  IWebRpcProtocolCapability,
-  IWebRpcProtocolConfig,
-  IWebRpcProviderLimits,
-  IWebRpcTimeoutCapability,
-  IWebRpcTimeoutConfig,
-  IWebRpcUuidConfig
+  IRpcAuthenticationCapability,
+  IRpcConnectCapability,
+  IRpcConnectConfig,
+  IRpcContractCapability,
+  IRpcContractConfig,
+  IRpcFeatureConfig,
+  IRpcHookEvent,
+  IRpcHooksConfig,
+  IRpcProtocolCapability,
+  IRpcProtocolConfig,
+  IRpcProviderLimits,
+  IRpcTimeoutCapability,
+  IRpcTimeoutConfig,
+  IRpcUuidConfig
 } from '../typing.js'
 import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '../../contract/index.js'
 import type { IRpcBoundFrameIngress } from '../../contract/framing/index.js'
 import type { ICodec } from '@migaia/serialize/codec'
+import type { IUtilsScheduler } from '@migaia/utils/promise'
 
 /** Immutable descriptor snapshot consumed by the one composed endpoint pipeline. */
-export type IWebRpcSelectedComponents = Readonly<{
+export type IRpcSelectedComponents = Readonly<{
   readonly protocol: IRpcProtocol<IRpcEnvelope, string, number>
   readonly codec: ICodec<IRpcEnvelope, unknown>
   readonly framer: IRpcFramer<unknown, unknown, string, number>
@@ -33,19 +34,21 @@ export type IWebRpcSelectedComponents = Readonly<{
 }>
 
 /** Canonical normalized endpoint options produced by middleware/config bootstrap. */
-export type IWebRpcEndpointOptions<TTargetId extends string> = {
+export type IRpcEndpointOptions<TTargetId extends string> = {
+  /** Original caller scheduler, preserved without copying for endpoint and Host ownership. */
+  injectedScheduler?: IUtilsScheduler
   /** Descriptors selected once before Host installation drives the canonical byte pipeline. */
-  components?: IWebRpcSelectedComponents
-  contract?: IWebRpcContractConfig | IWebRpcContractCapability
-  uuid?: IWebRpcUuidConfig
-  protocol?: IWebRpcProtocolConfig | IWebRpcProtocolCapability
-  authentication?: IWebRpcAuthenticationCapability
-  timeout?: IWebRpcTimeoutConfig | IWebRpcTimeoutCapability
-  hooks?: IWebRpcHooksConfig
+  components?: IRpcSelectedComponents
+  contract?: IRpcContractConfig | IRpcContractCapability
+  uuid?: IRpcUuidConfig
+  protocol?: IRpcProtocolConfig | IRpcProtocolCapability
+  authentication?: IRpcAuthenticationCapability
+  timeout?: IRpcTimeoutConfig | IRpcTimeoutCapability
+  hooks?: IRpcHooksConfig
   targetIds?: readonly TTargetId[]
-  providerLimits?: IWebRpcProviderLimits
-  connect?: IWebRpcConnectConfig | IWebRpcConnectCapability
-  features?: IWebRpcFeatureConfig
-  initialHookEvents?: readonly IWebRpcHookEvent[]
+  providerLimits?: IRpcProviderLimits
+  connect?: IRpcConnectConfig | IRpcConnectCapability
+  features?: IRpcFeatureConfig
+  initialHookEvents?: readonly IRpcHookEvent[]
   replay?: { readonly maxEntries?: number; readonly ttlMs?: number }
 }

@@ -1,4 +1,4 @@
-import { tagWebRpcError, WebRpcErrorCode } from '../errors.js'
+import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
 /** Owns bounded active outbound identifiers and released replay tombstones. */
 export class ReplayWindow {
@@ -8,20 +8,23 @@ export class ReplayWindow {
   readonly #releasedIds = new Map<string, number>()
   readonly #maxEntries: number
   readonly #ttlMs: number
+  /** Endpoint clock for replay tombstone expiration. */
+  readonly #now: () => number
 
-  constructor(maxEntries = 4096, ttlMs = 310_000) {
+  constructor(now: () => number, maxEntries = 4096, ttlMs = 310_000) {
     if (
       !Number.isSafeInteger(maxEntries) ||
       maxEntries < 1 ||
       !Number.isSafeInteger(ttlMs) ||
       ttlMs < 1
     )
-      throw tagWebRpcError(
+      throw tagRpcError(
         new TypeError('replay limits must be positive safe integers'),
-        WebRpcErrorCode.invalidConfig
+        RpcCoreErrorCode.invalidConfig
       )
     this.#maxEntries = maxEntries
     this.#ttlMs = ttlMs
+    this.#now = now
   }
 
   /** Tests whether an outbound identifier remains reserved. */
@@ -42,7 +45,7 @@ export class ReplayWindow {
   /** Moves an active identifier to a TTL-bounded tombstone after settlement. */
   releaseId(id: string): void {
     if (!this.#activeIds.delete(id)) return
-    this.#releasedIds.set(id, Date.now())
+    this.#releasedIds.set(id, this.#now())
   }
 
   /**
@@ -74,7 +77,7 @@ export class ReplayWindow {
 
   /** Removes only released tombstones whose replay retention window elapsed. */
   #purgeReleasedIds(): void {
-    const now = Date.now()
+    const now = this.#now()
     for (const [key, releasedAt] of this.#releasedIds)
       if (now - releasedAt >= this.#ttlMs) this.#releasedIds.delete(key)
   }

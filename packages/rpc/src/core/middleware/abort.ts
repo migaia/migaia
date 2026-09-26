@@ -1,7 +1,7 @@
-import type { IWebRpcPlugin, IWebRpcPluginInstallResult } from '../typing.js'
-import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
+import type { IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
+import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
-const abortPlugin: IWebRpcPlugin = Object.freeze({
+const abortPlugin: IRpcPlugin = Object.freeze({
   name: 'middleware:abort',
   metadata: Object.freeze({
     claims: Object.freeze({
@@ -12,13 +12,13 @@ const abortPlugin: IWebRpcPlugin = Object.freeze({
       exposedKeys: [],
       activator: false
     }),
-    sharedProvides: [WebRpcPortName.abort]
+    sharedProvides: [RpcPortName.abort]
   }),
-  install: (): IWebRpcPluginInstallResult => ({
+  install: (): IRpcPluginInstallResult => ({
     extension: Object.freeze({}),
-    ports: Object.freeze({ [WebRpcPortName.abort]: Object.freeze({ enabled: true }) })
+    ports: Object.freeze({ [RpcPortName.abort]: Object.freeze({ enabled: true }) })
   })
 })
 
 /** Creates the native abort-enable plugin used directly by the factory composer. */
-export const abort = (): IWebRpcPlugin => freezePlugin(abortPlugin)
+export const abort = (): IRpcPlugin => freezePlugin(abortPlugin)

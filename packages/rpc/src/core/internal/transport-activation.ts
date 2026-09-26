@@ -1,5 +1,5 @@
 import type { IEndpointKernelActivation, IEndpointKernelCallbacks } from '../endpoint-kernel.js'
-import type { IWebRpcTransport } from '../transport.js'
+import type { IRpcTransport } from '../transport.js'
 
 /**
  * Creates the one quarantined transport subscription used by both the legacy endpoint and the
@@ -7,7 +7,7 @@ import type { IWebRpcTransport } from '../transport.js'
  * every disposer, so synchronous adapter callbacks cannot escape construction.
  */
 export function createEndpointTransportActivation(
-  transport: IWebRpcTransport,
+  transport: IRpcTransport,
   callbacks: IEndpointKernelCallbacks
 ): IEndpointKernelActivation {
   let committed = false

@@ -1,6 +1,6 @@
-import { WebRpcErrorCode, WebRpcTransportError } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcSendOptions, IRpcTransport } from '../transport.js'
 import { safeRead, safeString } from '../internal/safe-value.js'
 import {
   collectListenerFailure,
@@ -14,7 +14,7 @@ import {
   reportListenerFailure
 } from '../internal/listener-safety.js'
 import { createMessageListenerHub } from '../internal/message-listener-hub.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
+import { RpcPlatform, RpcTransportOwnership } from '../transport-constants.js'
 
 /**
  * Structural shape of Node's `worker_threads.MessagePort` (and close enough to `EventEmitter`
@@ -47,7 +47,7 @@ export type IBrowserMessagePortTransportOptions = {
 export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = unknown>(
   port: IBrowserMessagePortLike<TTransfer, TEvent>,
   options: IBrowserMessagePortTransportOptions = {}
-): IWebRpcTransport<unknown, TTransfer> {
+): IRpcTransport<unknown, TTransfer> {
   const messageListeners = createMessageListenerHub<{ data: unknown }>()
   const errorListeners = new Set<(error: unknown) => void>()
   const listenerErrors = new Set<(error: unknown) => void>()
@@ -70,18 +70,18 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     reportListenerFailure(error, errorListeners, secondaryFailures)
   }
   return {
-    platform: WebRpcPlatform.messagePort,
+    platform: RpcPlatform.messagePort,
     topology: 'exclusive',
     ownership,
     get closed() {
       return closed
     },
-    send(message, options?: IWebRpcSendOptions<TTransfer>) {
-      if (closed) throw new WebRpcTransportError('[rpc] browser message port is closed')
+    send(message, options?: IRpcSendOptions<TTransfer>) {
+      if (closed) throw new RpcTransportError('[rpc] browser message port is closed')
       port.postMessage(message, options?.transfer)
     },
     subscribe(listener) {
-      if (closed) throw new WebRpcTransportError('[rpc] browser message port is closed')
+      if (closed) throw new RpcTransportError('[rpc] browser message port is closed')
       messageListeners.add(listener, () =>
         registerListeners(
           [
@@ -95,7 +95,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
             },
             { add: () => port.start(), remove: () => undefined }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       )
       return () => {
@@ -110,7 +110,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
           () => {
             messageListeners.remove(listener, () => undefined)
           },
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -130,8 +130,8 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
         }
       }
       closeResult = drainTerminalListenerFailures(cleanupErrors, {
-        code: WebRpcErrorCode.transport,
-        message: WebRpcErrorText.messagePortCleanupFailed,
+        code: RpcCoreErrorCode.transport,
+        message: RpcCoreErrorText.messagePortCleanupFailed,
         secondaryFailures,
         aggregateSingle: true
       })
@@ -141,7 +141,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       errorListeners.add(listener)
       return () => {
         const deleted = errorListeners.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
@@ -149,7 +149,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }
@@ -160,7 +160,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
  * Wraps a Node `worker_threads.MessagePort` (or anything with the same shape) as a web-rpc
  * transport.
  */
-export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWebRpcTransport {
+export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpcTransport {
   const messageListeners = createMessageListenerHub<{ data: unknown }>()
   const errorListeners = new Set<(error: unknown) => void>()
   const listenerErrors = new Set<(error: unknown) => void>()
@@ -198,21 +198,21 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
   }
 
   return {
-    platform: WebRpcPlatform.messagePort,
+    platform: RpcPlatform.messagePort,
     topology: 'exclusive',
-    ownership: WebRpcTransportOwnership.borrowed,
+    ownership: RpcTransportOwnership.borrowed,
     get closed() {
       return closed
     },
-    send(message, options?: IWebRpcSendOptions) {
-      if (closed) throw new WebRpcTransportError('[rpc] message port is closed')
+    send(message, options?: IRpcSendOptions) {
+      if (closed) throw new RpcTransportError('[rpc] message port is closed')
       port.postMessage(message, options?.transfer)
     },
     // Lazily attached/detached the same way as the web-worker adapter —
     // a client that closes must not leave the underlying port still
     // referencing listeners it can no longer reach.
     subscribe(listener) {
-      if (closed) throw new WebRpcTransportError('[rpc] message port is closed')
+      if (closed) throw new RpcTransportError('[rpc] message port is closed')
       messageListeners.add(listener, () =>
         registerListeners(
           [
@@ -221,7 +221,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
               remove: () => port.off('message', onMessage)
             }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       )
       return () => {
@@ -231,7 +231,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
           () => {
             messageListeners.remove(listener, () => undefined)
           },
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -248,7 +248,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
               remove: () => port.off('close', onClose)
             }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       errorListeners.add(listener)
       if (terminalError !== undefined) {
@@ -267,7 +267,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
           () => {
             errorListeners.delete(listener)
           },
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -275,7 +275,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }

@@ -1,16 +1,16 @@
-import { WebRpcAuthenticationError, WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
+import { RpcAuthenticationError, RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 import type {
-  IWebRpcAuthenticationCapability,
-  IWebRpcAuthenticationConfig,
-  IWebRpcAuthenticationTransform,
-  IWebRpcPlugin
+  IRpcAuthenticationCapability,
+  IRpcAuthenticationConfig,
+  IRpcAuthenticationTransform,
+  IRpcPlugin
 } from '../typing.js'
 
 /** Installs optional per-frame encryption and signing transforms. */
-export const authentication = (config: IWebRpcAuthenticationConfig): IWebRpcPlugin => {
-  const plugin: IWebRpcPlugin = {
+export const authentication = (config: IRpcAuthenticationConfig): IRpcPlugin => {
+  const plugin: IRpcPlugin = {
     name: 'authentication',
     metadata: {
       claims: {
@@ -21,11 +21,11 @@ export const authentication = (config: IWebRpcAuthenticationConfig): IWebRpcPlug
         exposedKeys: [],
         activator: false
       },
-      sharedProvides: [WebRpcPortName.authentication]
+      sharedProvides: [RpcPortName.authentication]
     },
     install: () => ({
       extension: {},
-      ports: { [WebRpcPortName.authentication]: createAuthenticationCapability(config) }
+      ports: { [RpcPortName.authentication]: createAuthenticationCapability(config) }
     })
   }
   return freezePlugin(plugin)
@@ -33,66 +33,66 @@ export const authentication = (config: IWebRpcAuthenticationConfig): IWebRpcPlug
 
 /** Validates one immutable authentication snapshot and creates its complete typed port. */
 function createAuthenticationCapability(
-  config: IWebRpcAuthenticationConfig
-): IWebRpcAuthenticationCapability {
+  config: IRpcAuthenticationConfig
+): IRpcAuthenticationCapability {
   if (!config || typeof config !== 'object' || Array.isArray(config))
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'authentication descriptor is invalid')
-  let encrypt: IWebRpcAuthenticationTransform | undefined
-  let decrypt: IWebRpcAuthenticationTransform | undefined
-  let sign: IWebRpcAuthenticationTransform | undefined
-  let verify: IWebRpcAuthenticationTransform | undefined
-  let encodedType: IWebRpcAuthenticationConfig['encodedType']
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'authentication descriptor is invalid')
+  let encrypt: IRpcAuthenticationTransform | undefined
+  let decrypt: IRpcAuthenticationTransform | undefined
+  let sign: IRpcAuthenticationTransform | undefined
+  let verify: IRpcAuthenticationTransform | undefined
+  let encodedType: IRpcAuthenticationConfig['encodedType']
   try {
     ;({ encrypt, decrypt, sign, verify, encodedType } = config)
   } catch (error) {
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'authentication descriptor is unreadable',
       error
     )
   }
   for (const [name, transform] of Object.entries({ encrypt, decrypt, sign, verify }))
     if (transform !== undefined && typeof transform !== 'function')
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
         `authentication.${name} must be a function`
       )
   if (!!encrypt !== !!decrypt)
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'authentication encrypt/decrypt must be configured together'
     )
   if (!!sign !== !!verify)
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'authentication sign/verify must be configured together'
     )
   if (!encrypt && !sign)
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'authentication requires encryption or signing transforms'
     )
   if (encodedType !== undefined && !['any', 'string', 'uint8array'].includes(encodedType))
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'authentication.encodedType is invalid')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'authentication.encodedType is invalid')
 
   /** Runs outbound encryption before signing. */
-  const protect: IWebRpcAuthenticationTransform = async (value, context) => {
+  const protect: IRpcAuthenticationTransform = async (value, context) => {
     try {
       const encrypted = encrypt ? await encrypt(value, context) : value
       return sign ? await sign(encrypted, context) : encrypted
     } catch (error) {
-      if (error instanceof WebRpcAuthenticationError) throw error
-      throw new WebRpcAuthenticationError('Outbound frame authentication failed', error)
+      if (error instanceof RpcAuthenticationError) throw error
+      throw new RpcAuthenticationError('Outbound frame authentication failed', error)
     }
   }
   /** Runs inbound verification before decryption. */
-  const unprotect: IWebRpcAuthenticationTransform = async (value, context) => {
+  const unprotect: IRpcAuthenticationTransform = async (value, context) => {
     try {
       const verified = verify ? await verify(value, context) : value
       return decrypt ? await decrypt(verified, context) : verified
     } catch (error) {
-      if (error instanceof WebRpcAuthenticationError) throw error
-      throw new WebRpcAuthenticationError('Inbound frame authentication failed', error)
+      if (error instanceof RpcAuthenticationError) throw error
+      throw new RpcAuthenticationError('Inbound frame authentication failed', error)
     }
   }
   return Object.freeze({
