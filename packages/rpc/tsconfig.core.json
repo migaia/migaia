@@ -1,0 +1,39 @@
+{
+  // Standalone check (not part of `tsc -b`'s root build graph — this
+  // verifies a *property*, not app buildability): the RPC core
+  // (composed endpoint/errors/transport/internal adapters) must typecheck with
+  // no DOM, Worker, or Node lib/types at all — see `ambient.d.ts` for why
+  // AbortController/AbortSignal specifically are still available. If this
+  // stops passing, something in core started depending on a host-specific
+  // global, which breaks "importable independent of Store, DOM, or Node".
+  // Run via `pnpm --filter ./packages/rpc run typecheck:core`.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "types": [],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/core/ambient.d.ts",
+    "src/core/composed.ts",
+    "src/core/endpoint-kernel.ts",
+    "src/core/errors.ts",
+    "src/core/error-code.ts",
+    "src/core/error-text.ts",
+    "src/core/transport.ts",
+    "src/core/typing.ts",
+    "src/core/adapters/memory.ts",
+    "src/core/adapters/message-port.ts"
+  ]
+}

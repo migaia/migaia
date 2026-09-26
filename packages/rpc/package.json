@@ -1,0 +1,157 @@
+{
+  "name": "@migaia/rpc",
+  "version": "0.0.7",
+  "private": true,
+  "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "USEGUIDE.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./contract": {
+      "types": "./dist/contract/index.d.ts",
+      "default": "./dist/contract/index.js"
+    },
+    "./contract/v1": {
+      "types": "./dist/contract/v1/index.d.ts",
+      "default": "./dist/contract/v1/index.js"
+    },
+    "./contract/framing": {
+      "types": "./dist/contract/framing/index.d.ts",
+      "default": "./dist/contract/framing/index.js"
+    },
+    "./contract/framing/v1": {
+      "types": "./dist/contract/framing/v1.d.ts",
+      "default": "./dist/contract/framing/v1.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./core/composed": {
+      "types": "./dist/core/composed.d.ts",
+      "default": "./dist/core/composed.js"
+    },
+    "./core/client": {
+      "types": "./dist/core/client.d.ts",
+      "default": "./dist/core/client.js"
+    },
+    "./core/provider": {
+      "types": "./dist/core/provider.d.ts",
+      "default": "./dist/core/provider.js"
+    },
+    "./core/full": {
+      "types": "./dist/core/full.d.ts",
+      "default": "./dist/core/full.js"
+    },
+    "./core/transport-constants": {
+      "types": "./dist/core/transport-constants.d.ts",
+      "default": "./dist/core/transport-constants.js"
+    },
+    "./core/features/outbound": {
+      "types": "./dist/core/features/outbound.d.ts",
+      "default": "./dist/core/features/outbound.js"
+    },
+    "./core/features/one-way": {
+      "types": "./dist/core/features/one-way.d.ts",
+      "default": "./dist/core/features/one-way.js"
+    },
+    "./core/features/provider": {
+      "types": "./dist/core/features/provider.d.ts",
+      "default": "./dist/core/features/provider.js"
+    },
+    "./core/features/discovery": {
+      "types": "./dist/core/features/discovery.d.ts",
+      "default": "./dist/core/features/discovery.js"
+    },
+    "./core/features/control": {
+      "types": "./dist/core/features/control.d.ts",
+      "default": "./dist/core/features/control.js"
+    },
+    "./core/adapters/memory": {
+      "types": "./dist/core/adapters/memory.d.ts",
+      "default": "./dist/core/adapters/memory.js"
+    },
+    "./core/adapters/message-port": {
+      "types": "./dist/core/adapters/message-port.d.ts",
+      "default": "./dist/core/adapters/message-port.js"
+    },
+    "./browser/adapters/window": {
+      "types": "./dist/browser/adapters/window.d.ts",
+      "default": "./dist/browser/adapters/window.js"
+    },
+    "./browser/adapters/web-worker": {
+      "types": "./dist/browser/adapters/web-worker.d.ts",
+      "default": "./dist/browser/adapters/web-worker.js"
+    },
+    "./browser/adapters/shared-worker": {
+      "types": "./dist/browser/adapters/shared-worker.d.ts",
+      "default": "./dist/browser/adapters/shared-worker.js"
+    },
+    "./browser/adapters/service-worker": {
+      "types": "./dist/browser/adapters/service-worker.d.ts",
+      "default": "./dist/browser/adapters/service-worker.js"
+    },
+    "./browser/adapters/broadcast-channel": {
+      "types": "./dist/browser/adapters/broadcast-channel.d.ts",
+      "default": "./dist/browser/adapters/broadcast-channel.js"
+    },
+    "./browser/adapters/web-transport": {
+      "types": "./dist/browser/adapters/web-transport.d.ts",
+      "default": "./dist/browser/adapters/web-transport.js"
+    },
+    "./browser/adapters/rtc-data-channel": {
+      "types": "./dist/browser/adapters/rtc-data-channel.d.ts",
+      "default": "./dist/browser/adapters/rtc-data-channel.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "fmt": "oxfmt src test e2e",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:contract": "tsc --noEmit -p tsconfig.contract.json",
+    "typecheck:core": "tsc --noEmit -p tsconfig.core.json",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
+    "lint": "oxlint src test e2e",
+    "test": "vitest run --coverage",
+    "test:tree-shaking-baseline": "node test/core/tree-shaking-baseline.mjs",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "test:packed": "pnpm build && node test/core/packed-export-smoke.mjs",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/capability": "workspace:^",
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/serialize": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "cborg": "6.1.1",
+    "elysia": "1.4.30",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
