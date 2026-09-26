@@ -71,14 +71,24 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "2.14.0",
     "@migaia/lifecycle": "workspace:^",
-    "@migaia/utils": "workspace:^",
-    "@msgpack/msgpack": "3.1.3",
-    "cbor-x": "1.6.6"
+    "@migaia/utils": "workspace:^"
+  },
+  "peerDependencies": {
+    "@bufbuild/protobuf": "^2.14.0",
+    "@msgpack/msgpack": "^3.1.3",
+    "cbor-x": "^1.6.6"
+  },
+  "peerDependenciesMeta": {
+    "@bufbuild/protobuf": { "optional": true },
+    "@msgpack/msgpack": { "optional": true },
+    "cbor-x": { "optional": true }
   },
   "devDependencies": {
+    "@bufbuild/protobuf": "2.14.0",
+    "@msgpack/msgpack": "3.1.3",
     "cborg": "6.1.1",
+    "cbor-x": "1.6.6",
     "msgpackr": "2.1.0",
     "protobufjs": "8.8.0",
     "typescript": "~6.0.2",
