@@ -84,7 +84,7 @@ const mockEndpoint = (
 ): IWebRpcEndpoint<'worker', 'automatic', false> =>
   ({ dispose }) as unknown as IWebRpcEndpoint<'worker', 'automatic', false>
 
-describe('store-worker exports', () => {
+describe('A8 store-worker exports', () => {
   it('exports only the canonical byte ownership vocabulary', () => {
     expect(storeWorker.WorkerByteOwnership).toEqual({ copy: 'copy', transfer: 'transfer' })
     expect('Worker' + 'Ownership' in storeWorker).toBe(false)
