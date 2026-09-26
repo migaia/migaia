@@ -1,3 +1,4 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.js'
 import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.js'
 
@@ -35,7 +36,5 @@ export function createContractError(code: IRpcContractErrorCode, cause?: unknown
   const error = RANGE_CODES.has(code)
     ? new RangeError(TEXT_BY_CODE[code], options)
     : new TypeError(TEXT_BY_CODE[code], options)
-  Object.defineProperty(error, 'source', { value: RPC_CONTRACT_SOURCE, enumerable: true })
-  Object.defineProperty(error, 'code', { value: code, enumerable: true })
-  return error
+  return attachErrorIdentity(error, { source: RPC_CONTRACT_SOURCE, code })
 }
