@@ -85,6 +85,38 @@ import {
 
 包有四个导出入口：主入口 `.`（上面这份完整列表）、`./core`（静态复用 lifecycle abort leaf 的纯协议子集）、`./plugins`（内置 JSON 插件）、`./registry`（仅 registry 实现面）。四者的精确导出面见 [§11](#11-子路径导出面corepluginsregistry)。
 
+二进制 codec 使用可选 peer，按需安装。仅使用主入口、`/codec` 或 `codecs/json` 无需安装以下库。缺少对应 peer 时，Node 在导入 codec 子路径时抛 `ERR_MODULE_NOT_FOUND`，其他子路径仍可加载。
+
+### @migaia/serialize/codecs/protobuf
+
+需要安装 `@bufbuild/protobuf`：
+
+```bash
+pnpm add @bufbuild/protobuf
+```
+
+缺少该 peer 时，导入此子路径抛 `ERR_MODULE_NOT_FOUND`，消息包含 `@bufbuild/protobuf`。
+
+### @migaia/serialize/codecs/message-pack
+
+需要安装 `@msgpack/msgpack`：
+
+```bash
+pnpm add @msgpack/msgpack
+```
+
+缺少该 peer 时，导入此子路径抛 `ERR_MODULE_NOT_FOUND`，消息包含 `@msgpack/msgpack`。
+
+### @migaia/serialize/codecs/cbor
+
+需要安装 `cbor-x`：
+
+```bash
+pnpm add cbor-x
+```
+
+缺少该 peer 时，导入此子路径抛 `ERR_MODULE_NOT_FOUND`，消息包含 `cbor-x`。
+
 运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `ISerializeAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?, addEventListener, removeEventListener }`），不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。
 
 ---

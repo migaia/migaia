@@ -16,6 +16,38 @@ pnpm add @migaia/serialize
 
 依赖 `@migaia/lifecycle`（异步作用域、调度器、AbortController）与 `@migaia/utils`（Base64/UTF-8 底层算法、错误身份标注）。
 
+以下三个二进制 codec 使用可选 peer；只用主入口、`/codec` 或 JSON codec 时无需安装它们。缺少 peer 时，import 对应子路径会由 Node 抛出 `ERR_MODULE_NOT_FOUND`，其他子路径仍可加载。
+
+### @migaia/serialize/codecs/protobuf
+
+需要安装 `@bufbuild/protobuf`：
+
+```bash
+pnpm add @bufbuild/protobuf
+```
+
+缺少该 peer 时，导入此子路径会抛 `ERR_MODULE_NOT_FOUND`，错误消息包含 `@bufbuild/protobuf`。
+
+### @migaia/serialize/codecs/message-pack
+
+需要安装 `@msgpack/msgpack`：
+
+```bash
+pnpm add @msgpack/msgpack
+```
+
+缺少该 peer 时，导入此子路径会抛 `ERR_MODULE_NOT_FOUND`，错误消息包含 `@msgpack/msgpack`。
+
+### @migaia/serialize/codecs/cbor
+
+需要安装 `cbor-x`：
+
+```bash
+pnpm add cbor-x
+```
+
+缺少该 peer 时，导入此子路径会抛 `ERR_MODULE_NOT_FOUND`，错误消息包含 `cbor-x`。
+
 ## 目录
 
 - [`.`：主入口（chunk 协议、registry、stream、Base64、错误、格式常量）](#主入口)
