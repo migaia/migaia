@@ -62,7 +62,7 @@ test('accepts an absent ignored registry after validating declaration JSDoc', ()
   }
 })
 
-test('uses a layer ERROR_SOURCE and falls back to the package name', () => {
+test('A5 uses a layer ERROR_SOURCE and falls back to the package name', () => {
   const root = createFixture(
     "export const ExampleErrorCode = {\n  /** Raised when the root input is invalid. */\n  rootInvalid: 'ROOT_INVALID'\n} as const\n"
   )
@@ -86,7 +86,7 @@ test('uses a layer ERROR_SOURCE and falls back to the package name', () => {
   }
 })
 
-test('maps merged RPC codes and preserves capability graph ownership', () => {
+test('A5 maps merged RPC codes and preserves capability graph ownership', () => {
   const frozen = JSON.parse(
     readFileSync(join(repositoryRoot, 'packages/rpc/test/fixtures/legacy-error-codes.json'), 'utf8')
   )
