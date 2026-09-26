@@ -296,8 +296,9 @@ export const systemScheduler: IUtilsScheduler = {
       },
       unref: () => {
         unrefRequested = true
-        const unref = (handle as unknown as { unref?: unknown } | undefined)?.unref
-        if (typeof unref === 'function') unref()
+        /** Native timer remains the receiver required by Node's unref method. */
+        const nativeHandle = handle as unknown as { unref?: () => void } | undefined
+        if (typeof nativeHandle?.unref === 'function') nativeHandle.unref()
       }
     }
     const scheduleNext = (): void => {
