@@ -1,3 +1,4 @@
+import { isUint8Array } from '@migaia/utils/bytes'
 import { RpcContractErrorCode } from './error-code.js'
 import { createContractError } from './contract-error.js'
 import { RPC_CONTRACT_SOURCE } from './error-text.js'
@@ -5,19 +6,6 @@ import type { IRpcPortableBytes, IRpcPortableRecord, IRpcPortableValue } from '.
 
 const RESERVED = '$rpc'
 const MAX_DEPTH = 64
-
-/** Detect a Uint8Array from this or another JavaScript realm without accepting other views. */
-function isUint8Array(value: object): value is Uint8Array {
-  if (value instanceof Uint8Array) return true
-  try {
-    return (
-      ArrayBuffer.isView(value) &&
-      (value as { readonly [Symbol.toStringTag]?: unknown })[Symbol.toStringTag] === 'Uint8Array'
-    )
-  } catch {
-    return false
-  }
-}
 
 /** Validate the unpadded base64url spelling, including unused-bit canonicality. */
 function isCanonicalBase64url(value: string): boolean {
@@ -68,7 +56,7 @@ export function normalizePortable(
     default:
       throw createContractError(RpcContractErrorCode.invalidEnvelope)
   }
-  /** Whether the value is a byte array; classification runs guarded because `instanceof` can trap. */
+  /** Whether the value has genuine Uint8Array slots; nearby checks may still trap. */
   let bytes: boolean
   try {
     bytes = isUint8Array(value)

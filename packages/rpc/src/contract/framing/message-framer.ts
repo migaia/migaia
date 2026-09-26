@@ -1,3 +1,4 @@
+import { isUint8Array } from '@migaia/utils/bytes'
 import { createDescriptor } from '../protocol.js'
 import { registerNativeRpcFrameIngress, type IRpcNativeFrameOutputDomain } from './reassembler.js'
 import { RpcContractErrorCode } from '../error-code.js'
@@ -411,19 +412,6 @@ function snapshotFrame(value: IFrame): IFrameSnapshot | undefined {
     count: value.count,
     length: value.length,
     data: value.data
-  }
-}
-
-/** Detect a Uint8Array from this or another JavaScript realm for binary frame input. */
-function isUint8Array(value: object): value is Uint8Array {
-  if (value instanceof Uint8Array) return true
-  try {
-    return (
-      ArrayBuffer.isView(value) &&
-      (value as { readonly [Symbol.toStringTag]?: unknown })[Symbol.toStringTag] === 'Uint8Array'
-    )
-  } catch {
-    return false
   }
 }
 
