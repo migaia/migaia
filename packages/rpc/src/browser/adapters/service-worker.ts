@@ -1,16 +1,17 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../../core/transport.js'
-import { safeRead } from '../../core/internal/safe-value.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../../core/transport-constants.js'
-import { WebRpcErrorCode } from '../../core/errors.js'
+import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
 import {
+  RpcPlatform,
+  RpcTransportOwnership,
   createListenerFailureState,
+  createMessageListenerHub,
   drainListenerFailures,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
-  reportListenerFailure
-} from '../../core/internal/listener-safety.js'
-import { createMessageListenerHub } from '../../core/internal/message-listener-hub.js'
+  reportListenerFailure,
+  safeRead
+} from '../../core/transport-kit.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 
 /** Outbound ServiceWorker or Client target. */
 export type IServiceWorkerMessageTarget = {
@@ -33,7 +34,7 @@ export type IServiceWorkerTransportOptions = {
 /** Wraps distinct ServiceWorker send and receive owners. */
 export function createServiceWorkerTransport(
   options: IServiceWorkerTransportOptions
-): IWebRpcTransport<unknown, Transferable> {
+): IRpcTransport<unknown, Transferable> {
   const { target, receiver } = options
   const peerId = options.peerId ?? target.id
   /** Preserves the adapter's existing physical-source admission boundary. */
@@ -70,12 +71,12 @@ export function createServiceWorkerTransport(
     })
   }
   return {
-    platform: WebRpcPlatform.worker,
+    platform: RpcPlatform.worker,
     topology: 'multiplexed',
-    ownership: WebRpcTransportOwnership.borrowed,
+    ownership: RpcTransportOwnership.borrowed,
     peerId,
     sourceProof,
-    send(message, options?: IWebRpcSendOptions<Transferable>) {
+    send(message, options?: IRpcSendOptions<Transferable>) {
       target.postMessage(message, options?.transfer)
     },
     subscribe(listener) {
@@ -87,7 +88,7 @@ export function createServiceWorkerTransport(
               remove: () => receiver.removeEventListener('message', onMessage)
             }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       )
       return () => {
@@ -95,7 +96,7 @@ export function createServiceWorkerTransport(
         releaseListenerRegistration(
           listeners.size === 1 ? [() => receiver.removeEventListener('message', onMessage)] : [],
           () => listeners.remove(listener, () => undefined),
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -103,7 +104,7 @@ export function createServiceWorkerTransport(
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
@@ -111,7 +112,7 @@ export function createServiceWorkerTransport(
       transportErrors.add(listener)
       return () => {
         const deleted = transportErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }

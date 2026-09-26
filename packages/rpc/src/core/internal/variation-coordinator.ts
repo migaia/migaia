@@ -1,11 +1,11 @@
-import type { IWebRpcVariation } from '../semantic-constants.js'
+import type { IRpcVariation } from '../semantic-constants.js'
 import { VariationAdmissionRegistry } from './variation-admission.js'
 
 /** Private handler port for one verified variation subkind. */
 export type IVariationHandler = (message: unknown, peerKey: string) => void | Promise<void>
 
 /** Canonical variation route, replay, admission, and subkind dispatch owner. */
-export class WebRpcVariationCoordinator {
+export class RpcVariationCoordinator {
   /** Shared replay/admission owner for all variation subkinds. */
   readonly #admission: VariationAdmissionRegistry
   /** Abort-before-request tombstones retained by the canonical variation owner. */
@@ -14,27 +14,30 @@ export class WebRpcVariationCoordinator {
     { readonly expiresAt: number; readonly reason: unknown }
   >()
   /** Single-provider typed variation handlers. */
-  readonly #handlers = new Map<IWebRpcVariation, IVariationHandler>()
+  readonly #handlers = new Map<IRpcVariation, IVariationHandler>()
 
   /**
    * Canonical clock read; sourced from the endpoint-local time port, never the host wall-clock
    * directly.
    */
   readonly #now: () => number
+  /** Unobserved clock read for the admission ledger; preserves time-port observer events. */
+  readonly #timestamp: () => number
 
   /** Creates one coordinator; feature handlers are registered before kernel activation. */
-  constructor(now: () => number, admission?: VariationAdmissionRegistry) {
+  constructor(now: () => number, timestamp: () => number, admission?: VariationAdmissionRegistry) {
     this.#now = now
+    this.#timestamp = timestamp
     this.#admission = admission ?? new VariationAdmissionRegistry()
   }
 
   /** Reports whether a variation handler is currently admitted without changing ownership. */
   admit(key: string): boolean {
-    return this.#handlers.has(key as IWebRpcVariation)
+    return this.#handlers.has(key as IRpcVariation)
   }
 
   /** Registers one handler and rejects duplicate subkind ownership. */
-  register(variation: IWebRpcVariation, handler: IVariationHandler): () => void {
+  register(variation: IRpcVariation, handler: IVariationHandler): () => void {
     if (this.#handlers.has(variation))
       throw new TypeError(`variation handler already registered: ${variation}`)
     this.#handlers.set(variation, handler)
@@ -45,13 +48,13 @@ export class WebRpcVariationCoordinator {
 
   /** Admits and dispatches one variation after shared identity verification. */
   async dispatch(
-    variation: IWebRpcVariation,
+    variation: IRpcVariation,
     key: string,
     message: unknown,
     peerKey: string
   ): Promise<boolean> {
     const handler = this.#handlers.get(variation)
-    if (!handler || !this.#admission.admit(peerKey, key)) return false
+    if (!handler || !this.#admission.admit(peerKey, key, this.#timestamp())) return false
     await handler(message, peerKey)
     return true
   }

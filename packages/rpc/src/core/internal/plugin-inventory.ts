@@ -4,30 +4,22 @@ import type {
   IEndpointMiddlewareSnapshot,
   IPreparedEndpoint
 } from './endpoint-bootstrap.js'
-import type { IWebRpcPluginClaims } from '../typing.js'
-import type { IWebRpcPluginDescriptor } from './plugin-descriptor.js'
-import type {
-  IWebRpcPluginConstraint,
-  IWebRpcPluginCore,
-  IWebRpcPluginHostCore
-} from './plugin-contract.js'
+import type { IRpcPluginClaims } from '../typing.js'
+import type { IRpcPluginDescriptor } from './plugin-descriptor.js'
+import type { IRpcPluginConstraint, IRpcPluginCore, IRpcPluginHostCore } from './plugin-contract.js'
 import { runConstructionInstall } from './construction-install.js'
 import { assertPluginInstallResult } from './plugin-descriptor.js'
-import {
-  WebRpcPortName,
-  type IWebRpcHooksPort,
-  type IWebRpcTimePort
-} from './plugin-shared-keys.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import type { IWebRpcCleanupError } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcHookEvent } from '../typing.js'
-import type { IWebRpcClaimAdmission } from './feature-policy.js'
+import { RpcPortName, type IRpcHooksPort, type IRpcTimePort } from './plugin-shared-keys.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import type { IRpcCleanupError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcHookEvent } from '../typing.js'
+import type { IRpcClaimAdmission } from './feature-policy.js'
 import { definePlugin } from '@migaia/plugin-host'
 import { createWebRpcPortFeatureSet } from './port-feature.js'
 
 /** Fixed production batch positions exposed only to bounded internal failure injection tests. */
-export type IWebRpcPluginRole =
+export type IRpcPluginRole =
   | { readonly kind: 'kernel' }
   | { readonly kind: 'middleware'; readonly index: number; readonly name: string }
   | { readonly kind: 'middleware-finalize' }
@@ -35,52 +27,52 @@ export type IWebRpcPluginRole =
   | { readonly kind: 'activation' }
 
 /** Runtime batch state observed only by bounded production parity tests. */
-export type IWebRpcComposedRuntimeState = {
+export type IRpcComposedRuntimeState = {
   readonly routeKeys: readonly string[]
   readonly activated: boolean
 }
 
 /** One direct Host definition plus only the WebRPC claims required for static parity checks. */
-export type IWebRpcNativePluginBatchEntry = Readonly<{
-  readonly role: IWebRpcPluginRole
-  readonly definition: IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
-  readonly admission: IWebRpcClaimAdmission
+export type IRpcNativePluginBatchEntry = Readonly<{
+  readonly role: IRpcPluginRole
+  readonly definition: IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }
+  readonly admission: IRpcClaimAdmission
 }>
 
 /** A domain-admitted native Feature definition inserted before the single activation role. */
-export type IWebRpcNativeFeatureDefinition = Readonly<{
+export type IRpcNativeFeatureDefinition = Readonly<{
   readonly key: string
-  readonly definition: IWebRpcPluginConstraint & { readonly claims?: IWebRpcPluginClaims }
-  readonly admission: IWebRpcClaimAdmission
+  readonly definition: IRpcPluginConstraint & { readonly claims?: IRpcPluginClaims }
+  readonly admission: IRpcClaimAdmission
 }>
 
 /** Native composition inputs; Host remains the only identity, topology, and lifecycle owner. */
-export type IWebRpcNativePluginBatchOptions = {
+export type IRpcNativePluginBatchOptions = {
   readonly kernel: IEndpointKernelHost
   readonly deferred: IDeferredPreparedEndpoint<string>
   readonly middlewareSnapshots: readonly IEndpointMiddlewareSnapshot[]
-  readonly hookEvents: IWebRpcHookEvent[]
+  readonly hookEvents: IRpcHookEvent[]
   readonly onPrepared: (prepared: IPreparedEndpoint<string>) => void
   readonly onActivationCommitted: () => void
   readonly onActivationRolledBack?: () => void
   readonly onNativeFeatureActivate?: () => void
-  readonly onRootDisposalErrors?: (errors: readonly IWebRpcCleanupError[]) => void
+  readonly onRootDisposalErrors?: (errors: readonly IRpcCleanupError[]) => void
   readonly onActivationPreflight?: (
-    state: IWebRpcComposedRuntimeState,
+    state: IRpcComposedRuntimeState,
     getPort: (key: PropertyKey) => unknown
   ) => void | Promise<void>
   /** Bounded test seam wraps one middleware body inside its existing construction scope. */
   readonly transformMiddlewareInstall?: (
-    role: IWebRpcPluginRole,
-    install: IWebRpcPluginDescriptor['install']
-  ) => IWebRpcPluginDescriptor['install']
+    role: IRpcPluginRole,
+    install: IRpcPluginDescriptor['install']
+  ) => IRpcPluginDescriptor['install']
   /** Native Features are definitions in the same Host transaction, never a side graph. */
-  readonly featureDefinitions?: readonly IWebRpcNativeFeatureDefinition[]
+  readonly featureDefinitions?: readonly IRpcNativeFeatureDefinition[]
   /** Bounded test seam observes or replaces one direct Host definition without a descriptor path. */
   readonly transformDefinition?: (
-    role: IWebRpcPluginRole,
-    definition: IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
-  ) => IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
+    role: IRpcPluginRole,
+    definition: IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }
+  ) => IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }
 }
 
 /**
@@ -93,9 +85,9 @@ export type IWebRpcNativePluginBatchOptions = {
  * create endpoint descriptors, translated installations, or a second dependency graph.
  */
 export function buildNativePluginBatch(
-  options: IWebRpcNativePluginBatchOptions
-): readonly IWebRpcNativePluginBatchEntry[] {
-  const emptyClaims: IWebRpcPluginClaims = Object.freeze({
+  options: IRpcNativePluginBatchOptions
+): readonly IRpcNativePluginBatchEntry[] {
+  const emptyClaims: IRpcPluginClaims = Object.freeze({
     routes: Object.freeze([]),
     provides: Object.freeze([]),
     consumes: Object.freeze([]),
@@ -103,11 +95,11 @@ export function buildNativePluginBatch(
     exposedKeys: Object.freeze([]),
     activator: false
   })
-  const entries: IWebRpcNativePluginBatchEntry[] = []
+  const entries: IRpcNativePluginBatchEntry[] = []
   const add = (
-    role: IWebRpcPluginRole,
-    definition: IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims },
-    admission: IWebRpcClaimAdmission
+    role: IRpcPluginRole,
+    definition: IRpcPluginConstraint & { readonly claims: IRpcPluginClaims },
+    admission: IRpcClaimAdmission
   ): void => {
     entries.push(
       Object.freeze({
@@ -122,7 +114,7 @@ export function buildNativePluginBatch(
     nativeDefinition(
       'kernel',
       emptyClaims,
-      [WebRpcPortName.time],
+      [RpcPortName.time],
       [],
       async (core) => {
         core.onDispose(async () => {
@@ -147,14 +139,14 @@ export function buildNativePluginBatch(
         return {}
       },
       () => ({
-        [WebRpcPortName.time]: Object.freeze({
+        [RpcPortName.time]: Object.freeze({
           now: () => options.kernel.time.now(),
           setTimeout: options.kernel.time.setTimeout,
           clearTimeout: options.kernel.time.clearTimeout
-        } satisfies IWebRpcTimePort)
+        } satisfies IRpcTimePort)
       })
     ),
-    { name: 'kernel', claims: emptyClaims, sharedProvides: [WebRpcPortName.time] }
+    { name: 'kernel', claims: emptyClaims, sharedProvides: [RpcPortName.time] }
   )
   options.middlewareSnapshots.forEach((snapshot, index) => {
     const role = {
@@ -164,23 +156,19 @@ export function buildNativePluginBatch(
     }
     if (snapshot.kind === 'native') {
       const metadata = snapshot.metadata
-      add(
-        role,
-        snapshot.plugin as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims },
-        {
-          name: snapshot.plugin.name,
-          claims: metadata?.claims ?? emptyClaims,
-          sharedProvides: metadata?.sharedProvides,
-          sharedConsumes: metadata?.sharedConsumes,
-          sharedOptionalConsumes: metadata?.sharedOptionalConsumes
-        }
-      )
+      add(role, snapshot.plugin as IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }, {
+        name: snapshot.plugin.name,
+        claims: metadata?.claims ?? emptyClaims,
+        sharedProvides: metadata?.sharedProvides,
+        sharedConsumes: metadata?.sharedConsumes,
+        sharedOptionalConsumes: metadata?.sharedOptionalConsumes
+      })
       return
     }
     const middleware = snapshot.plugin
     const install =
       options.transformMiddlewareInstall?.(role, middleware.install) ?? middleware.install
-    let result: import('../typing.js').IWebRpcPluginInstallResult | undefined
+    let result: import('../typing.js').IRpcPluginInstallResult | undefined
     add(
       role,
       nativeDefinition(
@@ -189,7 +177,7 @@ export function buildNativePluginBatch(
         middleware.metadata.sharedProvides ?? [],
         middleware.metadata.sharedConsumes ?? [],
         async (core) => {
-          const hooksPort = core.getPort(WebRpcPortName.hooks) as IWebRpcHooksPort | undefined
+          const hooksPort = core.getPort(RpcPortName.hooks) as IRpcHooksPort | undefined
           const constructionReporter = hooksPort?.reportConstructionDiagnostic
           const installed = await runConstructionInstall(
             {
@@ -204,7 +192,7 @@ export function buildNativePluginBatch(
                       name: 'failure',
                       at: core.construction.time.now(),
                       localId: core.id,
-                      code: WebRpcErrorCode.internal,
+                      code: RpcCoreErrorCode.internal,
                       error
                     })
                 : (error) =>
@@ -212,7 +200,7 @@ export function buildNativePluginBatch(
                       name: 'failure',
                       at: core.construction.time.now(),
                       localId: core.id,
-                      code: WebRpcErrorCode.internal,
+                      code: RpcCoreErrorCode.internal,
                       error
                     }),
               registerScope: (_scope, close, awaitClose) => {
@@ -256,12 +244,13 @@ export function buildNativePluginBatch(
       'middleware-finalize',
       emptyClaims,
       [],
-      [WebRpcPortName.connect],
+      [RpcPortName.connect],
       async (core) => {
         const prepared = await options.deferred.finalize(
           options.hookEvents,
           (operation) => Promise.resolve(operation()),
-          core.getPort
+          core.getPort,
+          () => options.kernel.time.scheduler.now()
         )
         options.onPrepared(prepared)
         return {}
@@ -271,23 +260,23 @@ export function buildNativePluginBatch(
       name: 'middleware-finalize',
       claims: emptyClaims,
       sharedProvides: [],
-      sharedConsumes: [WebRpcPortName.connect],
+      sharedConsumes: [RpcPortName.connect],
       sharedOptionalConsumes: [
-        WebRpcPortName.protocol,
-        WebRpcPortName.contract,
-        WebRpcPortName.authentication,
-        WebRpcPortName.timeout,
-        WebRpcPortName.abort,
-        WebRpcPortName.hooks,
-        WebRpcPortName.ping,
-        WebRpcPortName.uuid
+        RpcPortName.protocol,
+        RpcPortName.contract,
+        RpcPortName.authentication,
+        RpcPortName.timeout,
+        RpcPortName.abort,
+        RpcPortName.hooks,
+        RpcPortName.ping,
+        RpcPortName.uuid
       ]
     }
   )
   options.featureDefinitions?.forEach((feature, index) => {
     add(
       { kind: 'feature', index, key: feature.key },
-      feature.definition as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims },
+      feature.definition as IRpcPluginConstraint & { readonly claims: IRpcPluginClaims },
       feature.admission
     )
   })
@@ -321,12 +310,12 @@ export function buildNativePluginBatch(
 /** Creates a direct domain definition; PluginHost still owns the feature graph and instances. */
 function nativeDefinition(
   name: string,
-  claims: IWebRpcPluginClaims,
+  claims: IRpcPluginClaims,
   sharedProvides: readonly PropertyKey[],
   sharedConsumes: readonly PropertyKey[],
-  install: (core: IWebRpcPluginCore & IWebRpcPluginHostCore) => unknown | Promise<unknown>,
+  install: (core: IRpcPluginCore & IRpcPluginHostCore) => unknown | Promise<unknown>,
   ports?: () => Record<PropertyKey, unknown>
-): IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims } {
+): IRpcPluginConstraint & { readonly claims: IRpcPluginClaims } {
   /** Feature declarations are immutable; their cells are allocated per registration below. */
   const portFeatures = createWebRpcPortFeatureSet(sharedProvides)
   const runtimes = new WeakMap<object, ReturnType<typeof portFeatures.createRuntime>>()
@@ -343,15 +332,15 @@ function nativeDefinition(
     sharedProvides,
     sharedConsumes,
     features: portFeatures.features,
-    featureExpose: (core: IWebRpcPluginCore & IWebRpcPluginHostCore) => runtimeFor(core).expose,
-    install: async (core: IWebRpcPluginCore & IWebRpcPluginHostCore) => {
+    featureExpose: (core: IRpcPluginCore & IRpcPluginHostCore) => runtimeFor(core).expose,
+    install: async (core: IRpcPluginCore & IRpcPluginHostCore) => {
       const output = await install(core)
       const runtime = runtimeFor(core)
       runtime.publish(ports?.() ?? {})
       core.publishPortFeatures(runtime.outputs)
       return output as Record<string, unknown>
     }
-  }) as IWebRpcPluginConstraint & { readonly claims: IWebRpcPluginClaims }
+  }) as IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }
 }
 
 /** Re-materializes legacy middleware output as Host-compatible configurable data properties. */
@@ -363,7 +352,7 @@ function copyExtensionOutput(
   for (const key of publicKeys) {
     const descriptor = Object.getOwnPropertyDescriptor(source, key)
     if (!descriptor || !('value' in descriptor))
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
     Object.defineProperty(output, key, {
       configurable: true,
       enumerable: true,

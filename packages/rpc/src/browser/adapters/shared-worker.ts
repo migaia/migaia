@@ -1,15 +1,16 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../../core/transport.js'
+import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
 import {
+  RpcPlatform,
+  RpcTransportOwnership,
   createListenerFailureState,
+  createMessageListenerHub,
   drainListenerFailures,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
   reportListenerFailure
-} from '../../core/internal/listener-safety.js'
-import { createMessageListenerHub } from '../../core/internal/message-listener-hub.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../../core/transport-constants.js'
-import { WebRpcErrorCode } from '../../core/errors.js'
+} from '../../core/transport-kit.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 
 /** Minimal SharedWorker port surface accepted by the adapter. */
 export type ISharedWorkerPort = {
@@ -28,7 +29,7 @@ export type ISharedWorkerPort = {
 /** Wraps a SharedWorker's `port` without importing DOM or worker globals at runtime. */
 export function createSharedWorkerTransport(
   port: ISharedWorkerPort
-): IWebRpcTransport<unknown, Transferable> {
+): IRpcTransport<unknown, Transferable> {
   const listeners = createMessageListenerHub<{
     data: unknown
     origin?: string
@@ -66,10 +67,10 @@ export function createSharedWorkerTransport(
     )
   }
   return {
-    platform: WebRpcPlatform.worker,
+    platform: RpcPlatform.worker,
     topology: 'exclusive',
-    ownership: WebRpcTransportOwnership.borrowed,
-    send(message, options?: IWebRpcSendOptions<Transferable>) {
+    ownership: RpcTransportOwnership.borrowed,
+    send(message, options?: IRpcSendOptions<Transferable>) {
       port.postMessage(message, options?.transfer)
     },
     subscribe(listener) {
@@ -86,7 +87,7 @@ export function createSharedWorkerTransport(
               remove: () => port.removeEventListener('messageerror', onError)
             }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       )
       return () => {
@@ -99,7 +100,7 @@ export function createSharedWorkerTransport(
               ]
             : [],
           () => listeners.remove(listener, () => undefined),
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -107,7 +108,7 @@ export function createSharedWorkerTransport(
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
@@ -115,7 +116,7 @@ export function createSharedWorkerTransport(
       transportErrors.add(listener)
       return () => {
         const deleted = transportErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }

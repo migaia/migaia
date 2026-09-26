@@ -1,25 +1,21 @@
 import { definePlugin, type IFeatureRecord } from '@migaia/plugin-host'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import {
   readFeaturePolicy,
-  type IWebRpcClaimAdmission,
-  type IWebRpcFeaturePolicy
+  type IRpcClaimAdmission,
+  type IRpcFeaturePolicy
 } from './feature-policy.js'
 import { runConstructionInstall } from './construction-install.js'
-import type { IWebRpcFeature } from '../feature.js'
-import type { IWebRpcPluginConstraint, IWebRpcPluginCore } from './plugin-contract.js'
-import type { IRpcFeatureExpose, IWebRpcOutboundCommandObservation } from './feature-contract.js'
-import {
-  WebRpcPortName,
-  type IWebRpcCandidatePingPort,
-  type IWebRpcTimePort
-} from './plugin-shared-keys.js'
+import type { IRpcFeature } from '../feature.js'
+import type { IRpcPluginConstraint, IRpcPluginCore } from './plugin-contract.js'
+import type { IRpcFeatureExpose, IRpcOutboundCommandObservation } from './feature-contract.js'
+import { RpcPortName, type IRpcCandidatePingPort, type IRpcTimePort } from './plugin-shared-keys.js'
 import {
   getEndpointDebugSnapshotReader,
   registerDiscoveryCleanupFaults,
   registerEndpointDebugSnapshot,
-  type IWebRpcDiscoveryCleanupFaults
+  type IRpcDiscoveryCleanupFaults
 } from './test-observer.js'
 import { createWebRpcPortFeatureSet } from './port-feature.js'
 
@@ -28,22 +24,20 @@ export type IEndpointCapabilitiesFeatureExpose = IRpcFeatureExpose
 
 /** Named public shape prevents private PluginHost feature-brand details leaking into declarations. */
 export type IEndpointCapabilitiesPlugin = Readonly<{
-  readonly definition: IWebRpcPluginConstraint
+  readonly definition: IRpcPluginConstraint
   readonly getPublicKeys: () => readonly string[]
   readonly getSnapshotReader: () => ReturnType<typeof getEndpointDebugSnapshotReader> | undefined
   readonly getOn: () => ((event: string, listener: unknown) => unknown) | undefined
-  readonly getHooks: () =>
-    | { on(listener: import('../typing.js').IWebRpcHook): () => void }
-    | undefined
-  readonly propagateDiscoveryCleanupFaults: (faults: IWebRpcDiscoveryCleanupFaults) => void
+  readonly getHooks: () => { on(listener: import('../typing.js').IRpcHook): () => void } | undefined
+  readonly propagateDiscoveryCleanupFaults: (faults: IRpcDiscoveryCleanupFaults) => void
   readonly activate: () => void
 }>
 
 /** One capability Feature definition and its domain admission for the canonical Host batch. */
 export type IEndpointCapabilitiesBatchFeature = Readonly<{
   readonly plugin: IEndpointCapabilitiesPlugin
-  readonly admission: IWebRpcClaimAdmission | undefined
-  readonly firstPartyPolicies: readonly IWebRpcFeaturePolicy[]
+  readonly admission: IRpcClaimAdmission | undefined
+  readonly firstPartyPolicies: readonly IRpcFeaturePolicy[]
 }>
 
 /**
@@ -52,7 +46,7 @@ export type IEndpointCapabilitiesBatchFeature = Readonly<{
  */
 type IEndpointCapabilitiesContext = Pick<IRpcFeatureExpose, 'getKernel' | 'getPrepared'> & {
   /** Bounded internal observer receives actual outbound attachment command results. */
-  readonly observeOutboundCommand?: (observation: IWebRpcOutboundCommandObservation) => void
+  readonly observeOutboundCommand?: (observation: IRpcOutboundCommandObservation) => void
   /**
    * Transforms the exact descriptor output before PluginHost publishes it; production leaves it
    * absent.
@@ -64,13 +58,13 @@ type IEndpointCapabilitiesContext = Pick<IRpcFeatureExpose, 'getKernel' | 'getPr
   /** Test-only seam wraps a named native prepare operation without cloning its Feature definition. */
   readonly transformFeaturePrepare?: (
     name: string,
-    prepare: (scope: import('../typing.js').IWebRpcPluginInstallScope) => unknown
-  ) => (scope: import('../typing.js').IWebRpcPluginInstallScope) => unknown | Promise<unknown>
+    prepare: (scope: import('../typing.js').IRpcPluginInstallScope) => unknown
+  ) => (scope: import('../typing.js').IRpcPluginInstallScope) => unknown | Promise<unknown>
 }
 
 /** Builds the sole native custom-Feature bridge before endpoint activation. */
 export const createEndpointCapabilitiesPlugin = (
-  roots: Readonly<Record<string, IWebRpcFeature>>,
+  roots: Readonly<Record<string, IRpcFeature>>,
   context: IEndpointCapabilitiesContext,
   prepareRoots: readonly string[] = [],
   activateRoots: readonly string[] = [],
@@ -82,7 +76,7 @@ export const createEndpointCapabilitiesPlugin = (
   const portFeatures = createWebRpcPortFeatureSet(providedPortNames)
   /** One installation-owned key snapshot becomes available before the activation Plugin runs. */
   let publicKeys: readonly string[] = Object.freeze([])
-  let hooks: { on(listener: import('../typing.js').IWebRpcHook): () => void } | undefined
+  let hooks: { on(listener: import('../typing.js').IRpcHook): () => void } | undefined
   /** Installation results supply first-party public surfaces without exposing capability methods. */
   const preparedOutputs: Record<string, unknown> = Object.create(null)
   /** Invokes prepared first-party attachment activation only from the final activation Plugin. */
@@ -92,7 +86,7 @@ export const createEndpointCapabilitiesPlugin = (
   /** Retains the provider listener owner without widening the public capability projection. */
   let on: ((event: string, listener: unknown) => unknown) | undefined
   const definition = definePlugin<
-    IWebRpcPluginCore,
+    IRpcPluginCore,
     Record<never, never>,
     never,
     string,
@@ -121,7 +115,7 @@ export const createEndpointCapabilitiesPlugin = (
                 name: 'failure',
                 at: core.construction.time.now(),
                 localId: core.id,
-                code: WebRpcErrorCode.internal,
+                code: RpcCoreErrorCode.internal,
                 error
               })
             },
@@ -137,9 +131,9 @@ export const createEndpointCapabilitiesPlugin = (
               const output = core.features[name]
               const prepare = output && (output as { readonly prepare?: unknown }).prepare
               if (typeof prepare !== 'function')
-                throw new WebRpcError(
-                  WebRpcErrorCode.invalidConfig,
-                  WebRpcErrorText.endpointModuleInvalid
+                throw new RpcError(
+                  RpcCoreErrorCode.invalidConfig,
+                  RpcCoreErrorText.endpointModuleInvalid
                 )
               const transformedPrepare = context.transformFeaturePrepare?.(name, prepare) ?? prepare
               preparedOutputs[name] = await transformedPrepare(scope)
@@ -159,9 +153,9 @@ export const createEndpointCapabilitiesPlugin = (
           const output = core.features[name]
           const activateFeature = output && (output as { readonly activate?: unknown }).activate
           if (typeof activateFeature !== 'function')
-            throw new WebRpcError(
-              WebRpcErrorCode.invalidConfig,
-              WebRpcErrorText.endpointModuleInvalid
+            throw new RpcError(
+              RpcCoreErrorCode.invalidConfig,
+              RpcCoreErrorText.endpointModuleInvalid
             )
           activateFeature()
         }
@@ -173,27 +167,27 @@ export const createEndpointCapabilitiesPlugin = (
           const output = core.features[name]
           const createPorts = output && (output as { readonly ports?: unknown }).ports
           if (typeof createPorts !== 'function')
-            throw new WebRpcError(
-              WebRpcErrorCode.invalidConfig,
-              WebRpcErrorText.endpointModuleInvalid
+            throw new RpcError(
+              RpcCoreErrorCode.invalidConfig,
+              RpcCoreErrorText.endpointModuleInvalid
             )
           const values = createPorts()
           if (!values || typeof values !== 'object')
-            throw new WebRpcError(
-              WebRpcErrorCode.invalidConfig,
-              WebRpcErrorText.endpointModuleInvalid
+            throw new RpcError(
+              RpcCoreErrorCode.invalidConfig,
+              RpcCoreErrorText.endpointModuleInvalid
             )
           for (const key of Reflect.ownKeys(values)) {
             if (key in ports)
-              throw new WebRpcError(
-                WebRpcErrorCode.capabilityConflict,
-                WebRpcErrorText.endpointModuleDuplicated
+              throw new RpcError(
+                RpcCoreErrorCode.capabilityConflict,
+                RpcCoreErrorText.endpointModuleDuplicated
               )
             const descriptor = Object.getOwnPropertyDescriptor(values, key)
             if (!descriptor || !('value' in descriptor))
-              throw new WebRpcError(
-                WebRpcErrorCode.invalidConfig,
-                WebRpcErrorText.endpointModuleInvalid
+              throw new RpcError(
+                RpcCoreErrorCode.invalidConfig,
+                RpcCoreErrorText.endpointModuleInvalid
               )
             Object.defineProperty(ports, key, descriptor)
           }
@@ -214,14 +208,14 @@ export const createEndpointCapabilitiesPlugin = (
           for (const key of keys) {
             const descriptor = Object.getOwnPropertyDescriptor(projectionSource, key)
             if (!descriptor || !('value' in descriptor))
-              throw new WebRpcError(
-                WebRpcErrorCode.invalidConfig,
-                WebRpcErrorText.endpointModuleInvalid
+              throw new RpcError(
+                RpcCoreErrorCode.invalidConfig,
+                RpcCoreErrorText.endpointModuleInvalid
               )
             if (key in projection)
-              throw new WebRpcError(
-                WebRpcErrorCode.capabilityConflict,
-                WebRpcErrorText.endpointModuleDuplicated
+              throw new RpcError(
+                RpcCoreErrorCode.capabilityConflict,
+                RpcCoreErrorText.endpointModuleDuplicated
               )
             Object.defineProperty(projection, key, {
               configurable: false,
@@ -268,9 +262,9 @@ export const createEndpointCapabilitiesPlugin = (
             ...portRuntime.expose,
             getKernel: context.getKernel,
             getPrepared: context.getPrepared,
-            getTime: () => core.getPort(WebRpcPortName.time) as IWebRpcTimePort,
+            getTime: () => core.getPort(RpcPortName.time) as IRpcTimePort,
             getCandidatePing: () =>
-              core.getPort(WebRpcPortName.candidatePing) as IWebRpcCandidatePingPort | undefined,
+              core.getPort(RpcPortName.candidatePing) as IRpcCandidatePingPort | undefined,
             ...(context.observeOutboundCommand
               ? { observeOutboundCommand: context.observeOutboundCommand }
               : {})
@@ -280,13 +274,13 @@ export const createEndpointCapabilitiesPlugin = (
     Object.freeze({ ...roots, ...portFeatures.features }) as IFeatureRecord
   )
   return Object.freeze({
-    definition: definition as IWebRpcPluginConstraint,
+    definition: definition as IRpcPluginConstraint,
     getPublicKeys: (): readonly string[] => publicKeys,
     getSnapshotReader: () => snapshotReader,
     getOn: () => on,
     getHooks: () => hooks,
     /** Transfers endpoint-scoped test fault injection to native discovery's exact disposal owner. */
-    propagateDiscoveryCleanupFaults: (faults: IWebRpcDiscoveryCleanupFaults): void => {
+    propagateDiscoveryCleanupFaults: (faults: IRpcDiscoveryCleanupFaults): void => {
       for (const output of Object.values(preparedOutputs)) {
         const target = (output as { readonly cleanupTarget?: unknown }).cleanupTarget
         if (typeof target === 'object' && target !== null)
@@ -302,7 +296,7 @@ export const createEndpointCapabilitiesPlugin = (
  * topology, instances, and disposal remain owned by the PluginHost definition returned above.
  */
 export const createEndpointCapabilitiesBatchFeature = (
-  roots: Readonly<Record<string, IWebRpcFeature>>,
+  roots: Readonly<Record<string, IRpcFeature>>,
   context: IEndpointCapabilitiesContext,
   prepareRoots: readonly string[] = [],
   activateRoots: readonly string[] = [],
@@ -348,19 +342,17 @@ export const createEndpointCapabilitiesBatchFeature = (
 }
 
 /** Returns the stable port Feature names contributed by selected first-party roots. */
-function getFirstPartyPortNames(
-  roots: Readonly<Record<string, IWebRpcFeature>>
-): readonly string[] {
+function getFirstPartyPortNames(roots: Readonly<Record<string, IRpcFeature>>): readonly string[] {
   return Object.freeze([
     ...(roots['first-party-outbound']
       ? [
-          WebRpcPortName.inboundIdentity,
-          WebRpcPortName.variationCoordinator,
-          WebRpcPortName.outboundOperations
+          RpcPortName.inboundIdentity,
+          RpcPortName.variationCoordinator,
+          RpcPortName.outboundOperations
         ]
       : []),
-    ...(roots['first-party-discovery'] ? [WebRpcPortName.discoveryResolver] : []),
-    ...(roots['first-party-control'] ? [WebRpcPortName.candidatePing] : []),
-    ...(roots['first-party-provider'] ? [WebRpcPortName.providerCancellation] : [])
+    ...(roots['first-party-discovery'] ? [RpcPortName.discoveryResolver] : []),
+    ...(roots['first-party-control'] ? [RpcPortName.candidatePing] : []),
+    ...(roots['first-party-provider'] ? [RpcPortName.providerCancellation] : [])
   ])
 }

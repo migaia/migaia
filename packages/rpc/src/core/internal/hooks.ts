@@ -1,14 +1,14 @@
 import { createEventChannel } from '@migaia/event-subscriber'
-import type { IWebRpcHook, IWebRpcHookEvent } from '../typing.js'
+import type { IRpcHook, IRpcHookEvent } from '../typing.js'
 
 /** Reports one listener failure without allowing diagnostics to re-enter listener dispatch. */
-export type IWebRpcHookFailureReporter = (error: unknown, event: IWebRpcHookEvent) => void
+export type IRpcHookFailureReporter = (error: unknown, event: IRpcHookEvent) => void
 
 /** Dispatches one listener and contains both sync throws and async rejections. */
 export function dispatchHookListener(
-  listener: IWebRpcHook,
-  event: IWebRpcHookEvent,
-  onError?: IWebRpcHookFailureReporter
+  listener: IRpcHook,
+  event: IRpcHookEvent,
+  onError?: IRpcHookFailureReporter
 ): void {
   const report = (error: unknown): void => {
     try {
@@ -26,9 +26,9 @@ export function dispatchHookListener(
 
 /** Creates a detached construction reporter from one immutable listener snapshot. */
 export function createConstructionDiagnosticReporter(
-  listeners: readonly IWebRpcHook[],
-  onError?: IWebRpcHookFailureReporter
-): (event: IWebRpcHookEvent) => void {
+  listeners: readonly IRpcHook[],
+  onError?: IRpcHookFailureReporter
+): (event: IRpcHookEvent) => void {
   const listenerSnapshot = Object.freeze([...listeners])
   return (event): void => {
     for (const listener of listenerSnapshot) dispatchHookListener(listener, event, onError)
@@ -38,9 +38,9 @@ export function createConstructionDiagnosticReporter(
 /** Owns hook subscription and failure isolation for one endpoint runtime. */
 export class HookRegistry {
   /** Event-subscriber channel owning hook registration and snapshot dispatch. */
-  readonly #channel = createEventChannel<IWebRpcHookEvent>({ report: () => undefined })
+  readonly #channel = createEventChannel<IRpcHookEvent>({ report: () => undefined })
   /** Maps legacy hook identities to event-subscriber registrations for Set semantics. */
-  readonly #registrations = new Map<IWebRpcHook, () => void>()
+  readonly #registrations = new Map<IRpcHook, () => void>()
 
   /** Returns the number of registered hooks for test-only lifecycle inspection. */
   get size(): number {
@@ -48,7 +48,7 @@ export class HookRegistry {
   }
 
   /** Adds a hook and returns its idempotent disposer. */
-  add(listener: IWebRpcHook): () => void {
+  add(listener: IRpcHook): () => void {
     const existing = this.#registrations.get(listener)
     if (existing) {
       return () => {
@@ -75,7 +75,7 @@ export class HookRegistry {
   }
 
   /** Emits an event while isolating synchronous and asynchronous hook failures. */
-  emit(event: IWebRpcHookEvent, onError?: (error: unknown, event: IWebRpcHookEvent) => void): void {
+  emit(event: IRpcHookEvent, onError?: (error: unknown, event: IRpcHookEvent) => void): void {
     const previousReport = this.#activeReport
     this.#activeReport = onError
     try {
@@ -86,5 +86,5 @@ export class HookRegistry {
   }
 
   /** Stores the report callback for the synchronous dispatch window only. */
-  #activeReport?: (error: unknown, event: IWebRpcHookEvent) => void
+  #activeReport?: (error: unknown, event: IRpcHookEvent) => void
 }

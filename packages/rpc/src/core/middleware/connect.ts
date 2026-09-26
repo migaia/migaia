@@ -1,22 +1,23 @@
+import { RpcPlatform } from '../transport-constants.js'
 import type {
-  IWebRpcConnectCapability,
-  IWebRpcConnectConfig,
-  IWebRpcDiscoveryMode,
-  IWebRpcPlugin
+  IRpcConnectCapability,
+  IRpcConnectConfig,
+  IRpcDiscoveryMode,
+  IRpcPlugin
 } from '../typing.js'
-import type { IWebRpcTransport } from '../transport.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
+import type { IRpcTransport } from '../transport.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { safeRead } from '../internal/safe-value.js'
-import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
+import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 
-export type IConnectConfig = IWebRpcConnectConfig
-export type IConnectMiddleware<TMode extends IWebRpcDiscoveryMode> = IWebRpcPlugin & {
+export type IConnectConfig = IRpcConnectConfig
+export type IConnectMiddleware<TMode extends IRpcDiscoveryMode> = IRpcPlugin & {
   readonly discoveryMode: TMode
 }
 
 /** Creates one native connect plugin with discovery and transport metadata on its descriptor. */
-export const connect = <TMode extends IWebRpcDiscoveryMode = 'automatic'>(
+export const connect = <TMode extends IRpcDiscoveryMode = 'automatic'>(
   config: IConnectConfig & { readonly discoveryMode?: TMode } = {}
 ): IConnectMiddleware<TMode> => {
   if (!config || typeof config !== 'object' || Array.isArray(config)) {
@@ -26,7 +27,7 @@ export const connect = <TMode extends IWebRpcDiscoveryMode = 'automatic'>(
       discoveryMode: 'automatic' as TMode
     }) as IConnectMiddleware<TMode>
   }
-  let configuredTransport: IWebRpcTransport | undefined
+  let configuredTransport: IRpcTransport | undefined
   let configuredIdentifier: IConnectConfig['identifier']
   let configuredBaseMode: IConnectConfig['useBaseIdVerifyOnly']
   let configuredUniqueTargetId: IConnectConfig['uniqueTargetId']
@@ -46,18 +47,18 @@ export const connect = <TMode extends IWebRpcDiscoveryMode = 'automatic'>(
       discoveryMode: 'automatic' as TMode
     }) as IConnectMiddleware<TMode>
   }
-  const plugin: IWebRpcPlugin = {
+  const plugin: IRpcPlugin = {
     name: 'connect',
     discoveryMode: (configuredDiscoveryMode ?? 'automatic') as TMode,
     transport: configuredTransport,
     metadata: {
       claims: emptyClaims(),
-      sharedProvides: [WebRpcPortName.connect]
+      sharedProvides: [RpcPortName.connect]
     },
     install: ({ id, transport }) => ({
       extension: {},
       ports: {
-        [WebRpcPortName.connect]: createConnectCapability(
+        [RpcPortName.connect]: createConnectCapability(
           id,
           transport,
           configuredIdentifier,
@@ -75,13 +76,13 @@ export const connect = <TMode extends IWebRpcDiscoveryMode = 'automatic'>(
 /** Validates one frozen connect snapshot and creates its complete typed shared port. */
 function createConnectCapability(
   id: string,
-  transport: IWebRpcTransport,
+  transport: IRpcTransport,
   identifier: IConnectConfig['identifier'],
   useBaseIdVerifyOnly: IConnectConfig['useBaseIdVerifyOnly'],
   uniqueTargetId: IConnectConfig['uniqueTargetId'],
   configuredDiscoveryMode: IConnectConfig['discoveryMode'],
   receiverSelector: IConnectConfig['receiverSelector']
-): IWebRpcConnectCapability {
+): IRpcConnectCapability {
   const discoveryMode = configuredDiscoveryMode ?? 'automatic'
   const transportTopology = safeRead<'exclusive' | 'multiplexed' | 'broadcast'>(
     transport,
@@ -93,17 +94,17 @@ function createConnectCapability(
     transportTopology !== 'multiplexed' &&
     transportTopology !== 'broadcast'
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'transport topology is invalid')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'transport topology is invalid')
   if (discoveryMode !== 'automatic' && discoveryMode !== 'manual')
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'connect.discoveryMode is invalid')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect.discoveryMode is invalid')
   if (receiverSelector !== undefined && typeof receiverSelector !== 'function')
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'connect.receiverSelector must be a function'
     )
   if (useBaseIdVerifyOnly === false && !identifier)
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'connect identifier is required when base verification is disabled'
     )
   const effectiveUniqueTargetId =
@@ -120,29 +121,29 @@ function createConnectCapability(
       ? uniqueTargetId
       : undefined
   if (!transport || (typeof transport !== 'object' && typeof transport !== 'function'))
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'connect transport is required')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect transport is required')
   const transportSend = safeRead<unknown>(transport, 'send')
   const transportSubscribe = safeRead<unknown>(transport, 'subscribe')
   if (typeof transportSend !== 'function' || typeof transportSubscribe !== 'function')
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'connect transport must provide send and subscribe functions'
     )
   if (useBaseIdVerifyOnly !== undefined && typeof useBaseIdVerifyOnly !== 'boolean')
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'connect.useBaseIdVerifyOnly must be a boolean'
     )
   if (identifier !== undefined && typeof identifier !== 'function')
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'connect identifier must be a function')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect identifier must be a function')
   const transportPeerId = safeRead<unknown>(transport, 'peerId')
   const transportOrigin = safeRead<unknown>(transport, 'origin')
   if (
     (transportPeerId !== undefined && typeof transportPeerId !== 'string') ||
     (transportOrigin !== undefined && typeof transportOrigin !== 'string')
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'transport identity descriptor is invalid')
-  const capability: IWebRpcConnectCapability = {
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'transport identity descriptor is invalid')
+  const capability: IRpcConnectCapability = {
     identifier,
     useBaseIdVerifyOnly,
     uniqueTargetId: effectiveUniqueTargetId,
@@ -159,14 +160,16 @@ function createConnectCapability(
         ((context.source !== undefined && context.source !== null) ||
           safeRead(context.data, '__unique_id__') !== undefined)
       const anonymousBroadcast =
-        context.platform === 'BroadcastChannel' && peerId === undefined && context.source == null
+        context.platform === RpcPlatform.broadcastChannel &&
+        peerId === undefined &&
+        context.source == null
       const exclusiveBinding =
         (transportTopology === 'exclusive' ||
           (transportTopology === undefined &&
             context.platform !== undefined &&
-            context.platform !== 'Worker' &&
-            context.platform !== 'BroadcastChannel' &&
-            context.platform !== 'Iframe')) &&
+            context.platform !== RpcPlatform.worker &&
+            context.platform !== RpcPlatform.broadcastChannel &&
+            context.platform !== RpcPlatform.iframe)) &&
         context.targetId === id
       const baseVerified =
         context.targetId === id &&
@@ -184,7 +187,7 @@ function createConnectCapability(
 }
 
 /** Builds the fixed empty static claim set used by middleware plugins. */
-function emptyClaims(): IWebRpcPlugin['metadata']['claims'] {
+function emptyClaims(): IRpcPlugin['metadata']['claims'] {
   return {
     routes: [],
     provides: [],
@@ -196,15 +199,15 @@ function emptyClaims(): IWebRpcPlugin['metadata']['claims'] {
 }
 
 /** Builds an invalid native plugin while preserving the factory's deferred error timing. */
-function invalidConnectPlugin(message: string, cause?: unknown): IWebRpcPlugin {
+function invalidConnectPlugin(message: string, cause?: unknown): IRpcPlugin {
   return {
     name: 'connect',
     metadata: {
       claims: emptyClaims(),
-      sharedProvides: [WebRpcPortName.connect]
+      sharedProvides: [RpcPortName.connect]
     },
     install: () => {
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, message, cause)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, message, cause)
     }
   }
 }

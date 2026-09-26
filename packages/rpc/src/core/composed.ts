@@ -1,13 +1,13 @@
 import {
-  WebRpcConstructionError,
-  WebRpcError,
-  WebRpcErrorCode,
-  type IWebRpcCleanupError
+  RpcConstructionError,
+  RpcError,
+  RpcCoreErrorCode,
+  type IRpcCleanupError
 } from './errors.js'
-import { WebRpcErrorText } from './error-text.js'
+import { RpcCoreErrorText } from './error-text.js'
 import {
   buildNativePluginBatch,
-  type IWebRpcComposedRuntimeState
+  type IRpcComposedRuntimeState
 } from './internal/plugin-inventory.js'
 import { createConstructionControl } from './internal/construction-install.js'
 import {
@@ -19,10 +19,10 @@ import {
   preflightFeatureClaims,
   readFeaturePolicy
 } from './internal/feature-policy.js'
-import { createWebRpcPluginHost, type IWebRpcPluginHost } from './internal/web-rpc-plugin-host.js'
+import { createWebRpcPluginHost, type IRpcPluginHost } from './internal/web-rpc-plugin-host.js'
 import {
   readFirstPartyPublicRoots,
-  type IWebRpcPublicFirstPartyRootNames
+  type IRpcPublicFirstPartyRootNames
 } from './internal/first-party-roots.js'
 import {
   type IDeferredPreparedEndpoint,
@@ -43,21 +43,21 @@ import {
 import { createEndpointProjection } from './internal/endpoint-projection.js'
 import type {
   IFactoryPingCapability,
-  IWebRpcEndpoint,
-  IWebRpcFactoryConfig,
-  IWebRpcMiddleware,
-  IWebRpcProvider,
-  IWebRpcPingEndpointSurface,
-  IWebRpcAbortSignal,
-  IWebRpcHookEvent
+  IRpcEndpoint,
+  IRpcFactoryConfig,
+  IRpcMiddleware,
+  IRpcProvider,
+  IRpcPingEndpointSurface,
+  IRpcAbortSignal,
+  IRpcHookEvent
 } from './typing.js'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IPluginConstraint } from '@migaia/plugin-host'
-import type { IWebRpcFeature, IWebRpcFeatureSurface } from './feature.js'
+import type { IRpcFeature, IRpcFeatureSurface } from './feature.js'
 import { readWebRpcPortFeature } from './internal/port-feature.js'
 
 /** Runtime-neutral configuration accepted by the composition kernel. */
-export type IWebRpcCoreConfig = Omit<IWebRpcFactoryConfig, 'features'> & {
+export type IRpcCoreConfig = Omit<IRpcFactoryConfig, 'features'> & {
   /** Internal normalized view omits optional custom features from legacy fixtures. */
   readonly features?: undefined
 }
@@ -65,26 +65,26 @@ export type IWebRpcCoreConfig = Omit<IWebRpcFactoryConfig, 'features'> & {
 /** Composes selected first-party modules while preserving existing endpoint ownership. */
 async function createComposedEndpointRuntime<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
-    readonly features?: import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>
+  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+    readonly features?: import('./feature.js').IRpcFiniteFeatureTuple<TFeatures>
   },
-  modulesOrRoots: Readonly<Record<string, IWebRpcFeature>>
+  modulesOrRoots: Readonly<Record<string, IRpcFeature>>
 ): Promise<
-  IWebRpcKernelSurface &
-    IWebRpcFeatureSurface<TFeatures> &
-    IWebRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
+  IRpcKernelSurface &
+    IRpcFeatureSurface<TFeatures> &
+    IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
 > {
-  let featureRoots: readonly IWebRpcFeature[] = []
+  let featureRoots: readonly IRpcFeature[] = []
   /** Records only this composition's explicitly public first-party roots. */
   let publicFirstPartyRoots: readonly string[] = []
   let capabilityPlugin: ReturnType<typeof createEndpointCapabilitiesPlugin> | undefined
   try {
     featureRoots = snapshotFeatureTuple(config.features)
     inspectFeatures(
-      featureRoots.reduce<Record<string, IWebRpcFeature>>((roots, feature, index) => {
+      featureRoots.reduce<Record<string, IRpcFeature>>((roots, feature, index) => {
         roots[`feature-${index}`] = feature
         return roots
       }, Object.create(null))
@@ -105,17 +105,17 @@ async function createComposedEndpointRuntime<
       (feature) => readFeaturePolicy(feature).publicKeys ?? []
     )
     if (declaredFeatureKeys.some((key) => reservedKeys.has(key)))
-      throw new WebRpcError(
-        WebRpcErrorCode.capabilityConflict,
-        WebRpcErrorText.endpointModuleDuplicated
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityConflict,
+        RpcCoreErrorText.endpointModuleDuplicated
       )
     if (new Set(declaredFeatureKeys).size !== declaredFeatureKeys.length)
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleDuplicated)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleDuplicated)
   } catch (error) {
-    if (error instanceof WebRpcError) throw error
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
-      WebRpcErrorText.endpointModuleInvalid,
+    if (error instanceof RpcError) throw error
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.endpointModuleInvalid,
       error
     )
   }
@@ -140,29 +140,35 @@ async function createComposedEndpointRuntime<
     { requireCompleteGraph: false }
   )
   let kernel: IEndpointKernelHost | undefined
-  let host: IWebRpcPluginHost | undefined
+  let host: IRpcPluginHost | undefined
   let hostExtensions: Readonly<Record<string, unknown>> | undefined
   let resolvedPorts: ReadonlyMap<PropertyKey, unknown> | undefined
   let construction: ReturnType<typeof createConstructionControl> | undefined
   let prepared: IPreparedEndpoint<TTargetId> | undefined
-  let rootCleanupErrors: IWebRpcCleanupError[] = []
+  let rootCleanupErrors: IRpcCleanupError[] = []
   let publicKeys: readonly string[] = []
   try {
-    kernel = createEndpointKernel(deferred.transport, deferred.transportSnapshot)
+    kernel = createEndpointKernel(
+      deferred.transport,
+      deferred.transportSnapshot,
+      deferred.injectedScheduler
+    )
     const constructionConfig = deferred.construction
     const constructionSignal =
-      constructionConfig?.signal ?? (new AbortController().signal as IWebRpcAbortSignal)
+      constructionConfig?.signal ?? (new AbortController().signal as IRpcAbortSignal)
     construction = createConstructionControl({
       signal: constructionSignal,
-      timeoutMs: constructionConfig?.timeoutMs
+      timeoutMs: constructionConfig?.timeoutMs,
+      time: kernel.time
     })
-    const hookEvents: IWebRpcHookEvent[] = []
+    const hookEvents: IRpcHookEvent[] = []
     host = createWebRpcPluginHost(
       deferred.id,
       deferred.transport,
       construction,
-      (event: IWebRpcHookEvent) => hookEvents.push(event),
+      (event: IRpcHookEvent) => hookEvents.push(event),
       {
+        scheduler: deferred.injectedScheduler,
         execution: {
           mutationTimeoutMs: constructionConfig?.timeoutMs ?? false,
           pipelineDrainTimeoutMs: constructionConfig?.timeoutMs ?? false
@@ -173,18 +179,18 @@ async function createComposedEndpointRuntime<
     let activationCommitted = false
     let activationPreflight:
       | ((
-          state: IWebRpcComposedRuntimeState,
+          state: IRpcComposedRuntimeState,
           host: { readonly getPort: (key: PropertyKey) => unknown }
         ) => void)
       | undefined
     const activationKernel = kernel
     /** Only direct callers supply first-party Features; retired tokens cannot mint native owners. */
-    const firstPartyRoots = modulesOrRoots as Readonly<Record<string, IWebRpcFeature>>
+    const firstPartyRoots = modulesOrRoots as Readonly<Record<string, IRpcFeature>>
     publicFirstPartyRoots = readFirstPartyPublicRoots(firstPartyRoots)
-    const capabilityRoots: Record<string, IWebRpcFeature> = Object.assign(
+    const capabilityRoots: Record<string, IRpcFeature> = Object.assign(
       Object.create(null),
       firstPartyRoots,
-      featureRoots.reduce<Record<string, IWebRpcFeature>>((roots, feature, index) => {
+      featureRoots.reduce<Record<string, IRpcFeature>>((roots, feature, index) => {
         roots[`feature-${index}`] = feature
         return roots
       }, Object.create(null))
@@ -198,9 +204,9 @@ async function createComposedEndpointRuntime<
               getKernel: () => activationKernel,
               getPrepared: () => {
                 if (!prepared)
-                  throw new WebRpcError(
-                    WebRpcErrorCode.invalidConfig,
-                    WebRpcErrorText.endpointModuleInvalid
+                  throw new RpcError(
+                    RpcCoreErrorCode.invalidConfig,
+                    RpcCoreErrorText.endpointModuleInvalid
                   )
                 return prepared as IPreparedEndpoint<string>
               }
@@ -262,7 +268,7 @@ async function createComposedEndpointRuntime<
     preflightFeatureClaims(admissions)
     const activationHost = host
     if (!activationHost || !activationKernel)
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
     activationPreflight = (state, candidateHost) => {
       const capabilityKeys = capabilityPlugin?.getPublicKeys() ?? []
       const dynamicKeys = [...capabilityKeys, ...activationHost.readNativeMiddlewareKeys()]
@@ -287,9 +293,9 @@ async function createComposedEndpointRuntime<
         ) ||
         new Set(dynamicKeys).size !== dynamicKeys.length
       )
-        throw new WebRpcError(
-          WebRpcErrorCode.capabilityConflict,
-          WebRpcErrorText.endpointModuleDuplicated
+        throw new RpcError(
+          RpcCoreErrorCode.capabilityConflict,
+          RpcCoreErrorText.endpointModuleDuplicated
         )
       publicKeys = [...publicKeys, ...dynamicKeys.filter((key) => !publicKeys.includes(key))]
       assertFeatureClaimParity(admissions, candidateHost, activationKernel, {
@@ -320,7 +326,7 @@ async function createComposedEndpointRuntime<
       try {
         await host.dispose()
       } catch (error) {
-        throw new WebRpcConstructionError(WebRpcErrorText.endpointModuleInvalid, primary, [
+        throw new RpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
           { resource: 'plugin-host', error }
         ])
       }
@@ -335,8 +341,8 @@ async function createComposedEndpointRuntime<
           error instanceof AggregateError ? [...error.errors] : [error]
         )
         if (rollbackErrors.length > 0)
-          throw new WebRpcConstructionError(
-            WebRpcErrorText.endpointModuleInvalid,
+          throw new RpcConstructionError(
+            RpcCoreErrorText.endpointModuleInvalid,
             cause,
             rollbackErrors.map((error, index) => ({
               resource: `endpoint-module-${index}`,
@@ -353,7 +359,7 @@ async function createComposedEndpointRuntime<
           await kernel.resources.releaseAll()
           kernel.completeDispose()
         } catch (error) {
-          throw new WebRpcConstructionError(WebRpcErrorText.endpointModuleInvalid, primary, [
+          throw new RpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
             { resource: 'endpoint-kernel', error }
           ])
         }
@@ -366,8 +372,8 @@ async function createComposedEndpointRuntime<
           cleanupErrors.push({ resource: 'transport', error })
         }
       if (cleanupErrors.length > 0)
-        throw new WebRpcConstructionError(
-          WebRpcErrorText.endpointModuleInvalid,
+        throw new RpcConstructionError(
+          RpcCoreErrorText.endpointModuleInvalid,
           primary,
           cleanupErrors
         )
@@ -381,7 +387,7 @@ async function createComposedEndpointRuntime<
     [hostExtensions]
       .map((value) => getEndpointDebugSnapshotReader(value as object))
       .find((reader): reader is NonNullable<typeof reader> => reader !== undefined)
-  const hookOwner = hostExtensions as { hooks?: IWebRpcEndpoint['hooks'] } | undefined
+  const hookOwner = hostExtensions as { hooks?: IRpcEndpoint['hooks'] } | undefined
   const nativeOn = capabilityPlugin?.getOn()
   const nativeHooks = capabilityPlugin?.getHooks()
   let publicSurface: object
@@ -398,7 +404,7 @@ async function createComposedEndpointRuntime<
       ...(publicFirstPartyRoots.includes('first-party-provider') && nativeOn
         ? {
             on: (...args: readonly unknown[]) =>
-              nativeOn(args[0] as string, args[1] as Parameters<IWebRpcEndpoint['on']>[1])
+              nativeOn(args[0] as string, args[1] as Parameters<IRpcEndpoint['on']>[1])
           }
         : {}),
       ...(publicFirstPartyRoots.includes('first-party-outbound') &&
@@ -416,7 +422,7 @@ async function createComposedEndpointRuntime<
     try {
       await host!.dispose()
     } catch (error) {
-      throw new WebRpcConstructionError(WebRpcErrorText.endpointModuleInvalid, primary, [
+      throw new RpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
         { resource: 'plugin-host', error }
       ])
     }
@@ -424,9 +430,9 @@ async function createComposedEndpointRuntime<
   }
   registerEndpointTimePortOwner(publicSurface, kernel.time)
   if (snapshotReader) registerEndpointDebugSnapshot(publicSurface, snapshotReader)
-  return publicSurface as IWebRpcKernelSurface &
-    IWebRpcFeatureSurface<TFeatures> &
-    IWebRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
+  return publicSurface as IRpcKernelSurface &
+    IRpcFeatureSurface<TFeatures> &
+    IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
 }
 
 import type {
@@ -439,36 +445,31 @@ import type {
 
 /** Public composition accepts only native Feature roots and native Middleware declared in config. */
 type IPublicCallable = {
-  <
-    const TConfig extends ICheckedInput,
-    const TRoots extends Readonly<Record<string, IWebRpcFeature>>
-  >(
+  <const TConfig extends ICheckedInput, const TRoots extends Readonly<Record<string, IRpcFeature>>>(
     config: TConfig & IChecked<TConfig>,
     firstPartyRoots: TRoots
   ): Promise<
     IRecursiveProvideSurface<
-      IWebRpcKernelSurface &
-        IWebRpcFeatureSurface<IFeatures<TConfig>> &
-        IWebRpcRootProjection<TRoots> &
-        IWebRpcPingEndpointSurface<IFactoryPingCapability<IMiddlewares<TConfig>>>
+      IRpcKernelSurface &
+        IRpcFeatureSurface<IFeatures<TConfig>> &
+        IRpcRootProjection<TRoots> &
+        IRpcPingEndpointSurface<IFactoryPingCapability<IMiddlewares<TConfig>>>
     >
   >
   <
     TTargetId extends string = string,
-    TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-    TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[],
-    TRoots extends Readonly<Record<string, IWebRpcFeature>> = Readonly<
-      Record<string, IWebRpcFeature>
-    >
+    TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+    TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[],
+    TRoots extends Readonly<Record<string, IRpcFeature>> = Readonly<Record<string, IRpcFeature>>
   >(
     config: ILegacyDefault<TTargetId, TMiddlewares, TFeatures>,
     firstPartyRoots: TRoots
   ): Promise<
     IRecursiveProvideSurface<
-      IWebRpcKernelSurface &
-        IWebRpcFeatureSurface<TFeatures> &
-        IWebRpcRootProjection<TRoots> &
-        IWebRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
+      IRpcKernelSurface &
+        IRpcFeatureSurface<TFeatures> &
+        IRpcRootProjection<TRoots> &
+        IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
     >
   >
 }
@@ -488,9 +489,9 @@ function resolveMiddlewarePorts(
   handles.forEach((handle, index) => {
     for (const name of admissions[index]?.sharedProvides ?? []) {
       if (typeof name !== 'string' || ports.has(name))
-        throw new WebRpcError(
-          WebRpcErrorCode.capabilityConflict,
-          WebRpcErrorText.endpointModuleDuplicated
+        throw new RpcError(
+          RpcCoreErrorCode.capabilityConflict,
+          RpcCoreErrorText.endpointModuleDuplicated
         )
       ports.set(name, readWebRpcPortFeature(handle.getFeature(name as never)))
     }
@@ -506,9 +507,9 @@ function mergeMiddlewareExtensions(
   for (const handle of handles)
     for (const key of Reflect.ownKeys(handle.extensions)) {
       if (typeof key !== 'string' || Object.hasOwn(merged, key))
-        throw new WebRpcError(
-          WebRpcErrorCode.capabilityConflict,
-          WebRpcErrorText.endpointModuleDuplicated
+        throw new RpcError(
+          RpcCoreErrorCode.capabilityConflict,
+          RpcCoreErrorText.endpointModuleDuplicated
         )
       Object.defineProperty(merged, key, {
         configurable: false,
@@ -522,17 +523,17 @@ function mergeMiddlewareExtensions(
 
 /** Snapshots the optional feature tuple before endpoint preparation can cause side effects. */
 function snapshotFeatureTuple(
-  features: readonly IWebRpcFeature[] | undefined
-): readonly IWebRpcFeature[] {
+  features: readonly IRpcFeature[] | undefined
+): readonly IRpcFeature[] {
   if (features === undefined) return []
   if (!Array.isArray(features))
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
   try {
     return Object.freeze([...features])
   } catch (error) {
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
-      WebRpcErrorText.endpointModuleInvalid,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.endpointModuleInvalid,
       error
     )
   }
@@ -541,17 +542,17 @@ function snapshotFeatureTuple(
 /** Rejects retired iterable module inputs before endpoint preparation or Host construction. */
 function assertNativeRootRecord(
   value: unknown
-): asserts value is Readonly<Record<string, IWebRpcFeature>> {
+): asserts value is Readonly<Record<string, IRpcFeature>> {
   if (
     Array.isArray(value) ||
     (typeof value === 'object' && value !== null && Symbol.iterator in value)
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /** Mirrors the runtime branch: only private first-party roots prepare then project `public`. */
-type IWebRpcFeatureRootSurface<TName extends string, TFeature> =
-  TFeature extends IWebRpcFeature<infer TOutput>
+type IRpcFeatureRootSurface<TName extends string, TFeature> =
+  TFeature extends IRpcFeature<infer TOutput>
     ? TName extends `first-party-${string}`
       ? TOutput extends { readonly prepare: (...args: readonly never[]) => infer TPrepared }
         ? TPrepared extends { readonly public: infer TPublic extends object }
@@ -562,21 +563,18 @@ type IWebRpcFeatureRootSurface<TName extends string, TFeature> =
     : Record<never, never>
 
 /** Intersects only explicitly selected roots; private closure dependencies never widen this type. */
-export type IWebRpcRootProjection<TRoots extends Readonly<Record<string, IWebRpcFeature>>> =
+export type IRpcRootProjection<TRoots extends Readonly<Record<string, IRpcFeature>>> =
   IUnionToIntersection<
     {
-      [TName in IWebRpcPublicFirstPartyRootNames<TRoots>]: IWebRpcFeatureRootSurface<
-        TName,
-        TRoots[TName]
-      >
-    }[IWebRpcPublicFirstPartyRootNames<TRoots>]
+      [TName in IRpcPublicFirstPartyRootNames<TRoots>]: IRpcFeatureRootSurface<TName, TRoots[TName]>
+    }[IRpcPublicFirstPartyRootNames<TRoots>]
   >
 
 /** Reprojects the completed endpoint so detached `provide()` remains fluent over every surface. */
 export type IRecursiveProvideSurface<TSurface extends object> = Omit<TSurface, 'provide'> &
   ('provide' extends keyof TSurface
     ? {
-        provide(method: string, provider: IWebRpcProvider): IRecursiveProvideSurface<TSurface>
+        provide(method: string, provider: IRpcProvider): IRecursiveProvideSurface<TSurface>
       }
     : {})
 
@@ -586,4 +584,4 @@ type IUnionToIntersection<T> = (T extends unknown ? (value: T) => void : never) 
   ? I
   : never
 
-export type IWebRpcKernelSurface = Pick<IWebRpcEndpoint, 'dispose'>
+export type IRpcKernelSurface = Pick<IRpcEndpoint, 'dispose'>

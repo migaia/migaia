@@ -3,7 +3,7 @@
  * Keeping these messages here prevents the pipeline from becoming a second owner of public error
  * text.
  */
-export const WebRpcErrorText = {
+export const RpcCoreErrorText = {
   /** Stable construction-hook event name consumed by endpoint diagnostics. */
   componentShadowed: 'component-shadowed',
   /** Stable descriptor diagnostics used by native contract component middleware. */
@@ -27,10 +27,6 @@ export const WebRpcErrorText = {
   listenerCleanupFailed: 'listener cleanup failed',
   /** Stable aggregate text for browser and Node MessagePort terminal cleanup failures. */
   messagePortCleanupFailed: '[rpc] message port cleanup failed',
-  /** Stable aggregate text when RTC subscription setup and its rollback both fail. */
-  rtcSubscriptionCleanupFailed: 'subscription setup failed',
-  /** Stable aggregate text when WebTransport terminal cleanup reports multiple failures. */
-  webTransportCleanupFailed: 'WebTransport close failed',
   /** Stable conflict text when two attachments claim the same decoded frame kind. */
   endpointRouteOwned: 'endpoint route is already owned',
   /** Stable conflict text when two attachments claim the same runtime owner. */
@@ -60,6 +56,8 @@ export const WebRpcErrorText = {
   abortSignalInvalid: 'abort signal is invalid',
   /** Stable timeout-domain validation shared by legacy and slim outbound runtimes. */
   timeoutInvalid: 'timeoutMs must be false or a non-negative finite number',
+  /** Injected clocks must produce valid wire timestamps and own endpoint timer scheduling. */
+  schedulerInvalid: 'scheduler must provide now, schedule, and a non-negative epoch millisecond',
   /** Stable fallback when a remote failure omits its public message. */
   remoteRequestFailed: 'Remote request failed',
   /** Stable validation failure for malformed provider registration input. */

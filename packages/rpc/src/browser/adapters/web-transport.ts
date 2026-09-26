@@ -1,17 +1,19 @@
-import { WebRpcErrorCode, WebRpcTransportError, tagWebRpcError } from '../../core/errors.js'
-import { WebRpcErrorText } from '../../core/error-text.js'
-import type { IWebRpcTransport } from '../../core/transport.js'
-import { isUint8Array } from '../../core/internal/safe-value.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../../core/transport-constants.js'
+import type { IRpcTransport } from '../../core/transport-kit.js'
 import {
+  RpcPlatform,
+  RpcTransportOwnership,
   collectListenerFailure,
   createListenerFailureState,
+  createMessageListenerHub,
   drainListenerFailures,
   drainTerminalListenerFailures,
   observeListener,
-  reportListenerFailure
-} from '../../core/internal/listener-safety.js'
-import { createMessageListenerHub } from '../../core/internal/message-listener-hub.js'
+  reportListenerFailure,
+  tagRpcError
+} from '../../core/transport-kit.js'
+import { isUint8Array } from '@migaia/utils/bytes'
+import { RpcCoreErrorCode, RpcTransportError } from '../../core/errors.js'
+import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Minimal datagram surface accepted by the WebTransport adapter. */
 export type IWebTransportDatagrams = {
@@ -22,7 +24,7 @@ export type IWebTransportDatagrams = {
 /** Wraps WebTransport datagrams; protocol middleware owns encoding and decoding. */
 export function createWebTransportDatagramTransport(
   datagrams: IWebTransportDatagrams
-): IWebRpcTransport<Uint8Array> {
+): IRpcTransport<Uint8Array> {
   const writer = datagrams.writable.getWriter()
   const listeners = createMessageListenerHub<{ data: Uint8Array }>()
   const listenerErrors = new Set<(error: unknown) => void>()
@@ -85,24 +87,24 @@ export function createWebTransportDatagramTransport(
     }
   }
   return {
-    platform: WebRpcPlatform.webTransport,
+    platform: RpcPlatform.webTransport,
     topology: 'exclusive',
     encodedType: 'uint8array',
-    ownership: WebRpcTransportOwnership.owned,
+    ownership: RpcTransportOwnership.owned,
     get closed() {
       return closed
     },
     send(message) {
-      if (closed) throw new WebRpcTransportError('WebTransport is closed')
+      if (closed) throw new RpcTransportError('WebTransport is closed')
       if (!isUint8Array(message))
-        throw tagWebRpcError(
+        throw tagRpcError(
           new TypeError('WebTransport requires Uint8Array encoded messages'),
-          WebRpcErrorCode.invalidConfig
+          RpcCoreErrorCode.invalidConfig
         )
       return writer.write(message)
     },
     subscribe(listener) {
-      if (closed) throw new WebRpcTransportError('WebTransport is closed')
+      if (closed) throw new RpcTransportError('WebTransport is closed')
       listeners.add(listener, () => undefined)
       if (!readPromise) {
         readPromise = read().finally(() => {
@@ -114,7 +116,7 @@ export function createWebTransportDatagramTransport(
       }
       return () => {
         const deleted = listeners.remove(listener, () => undefined)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
@@ -148,8 +150,8 @@ export function createWebTransportDatagramTransport(
           errors.push(error)
         }
         await drainTerminalListenerFailures(errors, {
-          code: WebRpcErrorCode.transport,
-          message: WebRpcErrorText.webTransportCleanupFailed,
+          code: RpcCoreErrorCode.transport,
+          message: BrowserRpcErrorText.webTransportCleanupFailed,
           secondaryFailures
         })
       })()
@@ -166,7 +168,7 @@ export function createWebTransportDatagramTransport(
       }
       return () => {
         const deleted = transportErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
@@ -174,7 +176,7 @@ export function createWebTransportDatagramTransport(
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }

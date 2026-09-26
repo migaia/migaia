@@ -1,7 +1,7 @@
 /** UTF-8 primitives are owned by Utils; this module keeps WebRPC imports package-private. */
 import { splitUtf8 as splitCanonical, utf8ByteLength } from '@migaia/utils/bytes'
-import { WebRpcErrorCode, tagWebRpcError } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcCoreErrorCode, tagRpcError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 
 export { utf8ByteLength }
 
@@ -12,9 +12,9 @@ export function splitUtf8(value: string, maxBytes: number): readonly string[] {
     return value.length === 0 ? [] : chunks
   } catch (error) {
     if (error instanceof RangeError)
-      throw tagWebRpcError(
-        new RangeError(WebRpcErrorText.utf8ChunkBudgetInvalid),
-        WebRpcErrorCode.invalidConfig
+      throw tagRpcError(
+        new RangeError(RpcCoreErrorText.utf8ChunkBudgetInvalid),
+        RpcCoreErrorCode.invalidConfig
       )
     throw error
   }

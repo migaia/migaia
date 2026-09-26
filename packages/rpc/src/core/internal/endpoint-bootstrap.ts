@@ -1,69 +1,77 @@
-import { WebRpcPortName } from './plugin-shared-keys.js'
+import { RpcPortName } from './plugin-shared-keys.js'
 import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '../../contract/index.js'
 import { rpcProtocol as rpcProtocolV1 } from '../../contract/v1/protocol.js'
 import { identityCodecV1, type ICodec } from '@migaia/serialize/codec'
 import { bindRpcFrameIngress } from '../../contract/framing/index.js'
 import { messageFramerV1 } from '../../contract/framing/message-framer.js'
-import { WebRpcAbortError, WebRpcError, WebRpcErrorCode, WebRpcTimeoutError } from '../errors.js'
+import {
+  RpcAbortError,
+  RpcConfigurationError,
+  RpcError,
+  RpcCoreErrorCode,
+  RpcTimeoutError
+} from '../errors.js'
+import type { IUtilsScheduler } from '@migaia/utils/promise'
 import { safeRead } from './safe-value.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import type {
-  IWebRpcAbortCapability,
-  IWebRpcTimeoutCapability,
-  IWebRpcFactoryConfig,
-  IWebRpcPingCapability,
-  IWebRpcHookEvent,
-  IWebRpcPlatform,
-  IWebRpcConnectCapability,
-  IWebRpcAuthenticationCapability,
-  IWebRpcContractCapability,
-  IWebRpcHooksConfig,
-  IWebRpcUuidConfig,
-  IWebRpcProtocolCapability,
-  IWebRpcPlugin,
-  IWebRpcMiddleware,
-  IWebRpcProvider,
-  IWebRpcProviderLimits
+  IRpcAbortCapability,
+  IRpcTimeoutCapability,
+  IRpcFactoryConfig,
+  IRpcPingCapability,
+  IRpcHookEvent,
+  IRpcPlatform,
+  IRpcConnectCapability,
+  IRpcAuthenticationCapability,
+  IRpcContractCapability,
+  IRpcHooksConfig,
+  IRpcUuidConfig,
+  IRpcProtocolCapability,
+  IRpcPlugin,
+  IRpcMiddleware,
+  IRpcProvider,
+  IRpcProviderLimits
 } from '../typing.js'
-import type { IWebRpcTransport } from '../transport.js'
+import type { IRpcTransport } from '../transport.js'
+import { RpcPlatform } from '../transport-constants.js'
 import type { IEndpointKernelTransportSnapshot } from '../endpoint-kernel.js'
-import type { IWebRpcFeature } from '../feature.js'
+import type { IRpcFeature } from '../feature.js'
 import {
   isDefinedMiddleware,
   readDefinedMiddlewareComponents,
   readDefinedMiddlewarePolicy,
-  type IWebRpcMiddlewareComponentPolicy
+  type IRpcMiddlewareComponentPolicy
 } from '../middleware.js'
-import type { IWebRpcPluginConstraint } from './plugin-contract.js'
-import type { IWebRpcEndpointOptions, IWebRpcSelectedComponents } from './endpoint-options.js'
-import type { IWebRpcHooksPort } from './plugin-shared-keys.js'
+import type { IRpcPluginConstraint } from './plugin-contract.js'
+import type { IRpcEndpointOptions, IRpcSelectedComponents } from './endpoint-options.js'
+import type { IRpcHooksPort } from './plugin-shared-keys.js'
 
 /** Canonical validated factory snapshot consumed by WebRPC attachments. */
 export type IPreparedEndpoint<TTargetId extends string> = {
   readonly id: string
-  readonly transport: IWebRpcTransport
-  readonly providers: Readonly<Record<string, IWebRpcProvider>> | undefined
-  readonly providerLimits?: IWebRpcProviderLimits
-  readonly options: IWebRpcEndpointOptions<TTargetId>
+  readonly transport: IRpcTransport
+  readonly providers: Readonly<Record<string, IRpcProvider>> | undefined
+  readonly providerLimits?: IRpcProviderLimits
+  readonly options: IRpcEndpointOptions<TTargetId>
 }
 
 /** Immutable middleware metadata captured before the composed Host batch mutates state. */
 export type IEndpointLegacyMiddlewareSnapshot = {
   readonly kind: 'legacy'
   readonly name: string
-  readonly plugin: IWebRpcPlugin
-  readonly transport?: IWebRpcTransport
+  readonly plugin: IRpcPlugin
+  readonly transport?: IRpcTransport
 }
 /** Native middleware retains its PluginHost definition for same-order batch installation. */
 export type IEndpointNativeMiddlewareSnapshot = {
   readonly kind: 'native'
   readonly name: string
-  readonly plugin: IWebRpcPluginConstraint
+  readonly plugin: IRpcPluginConstraint
   /** Object-form metadata is fixed at definition time and admitted before installation. */
-  readonly metadata?: IWebRpcPlugin['metadata']
+  readonly metadata?: IRpcPlugin['metadata']
   /** Object-form components are fixed at definition time outside PluginHost's frozen token. */
-  readonly components?: IWebRpcMiddlewareComponentPolicy
-  readonly transport?: IWebRpcTransport
+  readonly components?: IRpcMiddlewareComponentPolicy
+  readonly transport?: IRpcTransport
 }
 export type IEndpointMiddlewareSnapshot =
   | IEndpointLegacyMiddlewareSnapshot
@@ -72,18 +80,21 @@ export type IEndpointMiddlewareSnapshot =
 /** Deferred bootstrap result used by the Host-owned composed path. */
 export type IDeferredPreparedEndpoint<TTargetId extends string = string> = {
   readonly id: string
-  readonly transport: IWebRpcTransport
+  readonly transport: IRpcTransport
   /** Complete descriptor snapshot consumed by the feature-neutral kernel. */
   readonly transportSnapshot: IEndpointKernelTransportSnapshot
-  readonly providers: Readonly<Record<string, IWebRpcProvider>> | undefined
-  readonly providerLimits: IWebRpcProviderLimits | undefined
+  readonly providers: Readonly<Record<string, IRpcProvider>> | undefined
+  readonly providerLimits: IRpcProviderLimits | undefined
   /** Construction controls snapshotted with the other outer configuration fields. */
-  readonly construction: IWebRpcFactoryConfig['construction']
+  readonly construction: IRpcFactoryConfig['construction']
+  /** Caller scheduler, snapshotted once and forwarded by identity to kernel and PluginHost. */
+  readonly injectedScheduler: IUtilsScheduler | undefined
   readonly middlewareSnapshots: readonly IEndpointMiddlewareSnapshot[]
   readonly finalize: (
-    hookEvents: IWebRpcHookEvent[],
+    hookEvents: IRpcHookEvent[],
     runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
-    getPort: (key: PropertyKey) => unknown
+    getPort: (key: PropertyKey) => unknown,
+    now: () => number
   ) => Promise<IPreparedEndpoint<TTargetId>>
 }
 
@@ -91,34 +102,35 @@ export type IDeferredPreparedEndpoint<TTargetId extends string = string> = {
 async function finalizePreparedEndpoint<TTargetId extends string>(
   factoryId: string,
   factoryTargetIds: readonly TTargetId[] | undefined,
-  factoryProvider: Readonly<Record<string, IWebRpcProvider>> | undefined,
-  factoryProviderLimits: IWebRpcProviderLimits | undefined,
-  factoryReplay: IWebRpcFactoryConfig['replay'],
-  transport: IWebRpcTransport,
-  platform: IWebRpcPlatform,
+  factoryProvider: Readonly<Record<string, IRpcProvider>> | undefined,
+  factoryProviderLimits: IRpcProviderLimits | undefined,
+  factoryReplay: IRpcFactoryConfig['replay'],
+  transport: IRpcTransport,
+  platform: IRpcPlatform,
   encodedType: string | undefined,
-  _construction: IWebRpcFactoryConfig['construction'],
-  components: IWebRpcSelectedComponents,
-  installHookEvents: IWebRpcHookEvent[],
+  _construction: IRpcFactoryConfig['construction'],
+  components: IRpcSelectedComponents,
+  installHookEvents: IRpcHookEvent[],
   runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
-  getPort: (key: PropertyKey) => unknown
+  getPort: (key: PropertyKey) => unknown,
+  now: () => number
 ): Promise<IPreparedEndpoint<TTargetId>> {
-  const installedConnect = getPort(WebRpcPortName.connect) as IWebRpcConnectCapability | undefined
+  const installedConnect = getPort(RpcPortName.connect) as IRpcConnectCapability | undefined
   if (!installedConnect)
-    throw new WebRpcError(WebRpcErrorCode.middlewareMissing, 'connect middleware is required')
+    throw new RpcError(RpcCoreErrorCode.middlewareMissing, 'connect middleware is required')
   let connectCapability = installedConnect
-  const authenticationCapability = getPort(WebRpcPortName.authentication) as
-    | IWebRpcAuthenticationCapability
+  const authenticationCapability = getPort(RpcPortName.authentication) as
+    | IRpcAuthenticationCapability
     | undefined
-  const contractCapability = getPort(WebRpcPortName.contract) as
+  const contractCapability = getPort(RpcPortName.contract) as
     | { readonly maxIdentifierLength?: number }
     | undefined
-  const timeoutCapability = getPort(WebRpcPortName.timeout) as IWebRpcTimeoutCapability | undefined
-  const abortCapability = getPort(WebRpcPortName.abort) as IWebRpcAbortCapability | undefined
-  const pingCapability = getPort(WebRpcPortName.ping) as IWebRpcPingCapability | undefined
-  const uuidCapability = getPort(WebRpcPortName.uuid) as IWebRpcUuidConfig | undefined
-  const hooksPort = getPort(WebRpcPortName.hooks) as IWebRpcHooksPort | undefined
-  const hooksCapability: IWebRpcHooksConfig | undefined = hooksPort
+  const timeoutCapability = getPort(RpcPortName.timeout) as IRpcTimeoutCapability | undefined
+  const abortCapability = getPort(RpcPortName.abort) as IRpcAbortCapability | undefined
+  const pingCapability = getPort(RpcPortName.ping) as IRpcPingCapability | undefined
+  const uuidCapability = getPort(RpcPortName.uuid) as IRpcUuidConfig | undefined
+  const hooksPort = getPort(RpcPortName.hooks) as IRpcHooksPort | undefined
+  const hooksCapability: IRpcHooksConfig | undefined = hooksPort
     ? Object.freeze({
         listeners: hooksPort.listeners,
         ...(hooksPort.onHookError === undefined ? {} : { onHookError: hooksPort.onHookError })
@@ -127,8 +139,8 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   for (const diagnostic of components.shadowed)
     hooksPort?.reportConstructionDiagnostic?.(
       Object.freeze({
-        name: WebRpcErrorText.componentShadowed,
-        at: Date.now(),
+        name: RpcCoreErrorText.componentShadowed,
+        at: now(),
         localId: factoryId,
         contract: diagnostic
       })
@@ -140,8 +152,8 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
     factoryId.length > maxIdentifierLength ||
     factoryTargetIds?.some((targetId) => targetId.length > maxIdentifierLength)
   )
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'id and targetIds must fit the configured identifier limit'
     )
   if (installedConnect.uniqueTargetIdFactory) {
@@ -153,9 +165,9 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
         )
       )
     } catch (error) {
-      if (error instanceof WebRpcAbortError || error instanceof WebRpcTimeoutError) throw error
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
+      if (error instanceof RpcAbortError || error instanceof RpcTimeoutError) throw error
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
         'connect.uniqueTargetId factory failed',
         error
       )
@@ -172,22 +184,22 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   )
   if (
     connectCapability.uniqueTargetId !== undefined &&
-    platform === 'BroadcastChannel' &&
+    platform === RpcPlatform.broadcastChannel &&
     [factoryId, ...normalizedTargetIds].some(
       (targetId) => `${targetId}:${connectCapability.uniqueTargetId}`.length > maxIdentifierLength
     )
   ) {
     installHookEvents.push({
       name: 'connect.unique-target-id.ignored',
-      at: Date.now(),
+      at: now(),
       localId: factoryId,
       code: 'UNIQUE_TARGET_ID_DERIVED_ID_TOO_LONG'
     })
     connectCapability = { ...connectCapability, uniqueTargetId: undefined }
   }
   if (!isDirectedCompatible(components, authenticationCapability, encodedType))
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
       'outbound frame and transport encoded types are incompatible'
     )
   return {
@@ -196,9 +208,9 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
     providers: factoryProvider,
     providerLimits: factoryProviderLimits,
     options: {
-      contract: getPort(WebRpcPortName.contract) as IWebRpcContractCapability | undefined,
+      contract: getPort(RpcPortName.contract) as IRpcContractCapability | undefined,
       uuid: uuidCapability,
-      protocol: getPort(WebRpcPortName.protocol) as IWebRpcProtocolCapability | undefined,
+      protocol: getPort(RpcPortName.protocol) as IRpcProtocolCapability | undefined,
       authentication: authenticationCapability,
       timeout: timeoutCapability,
       hooks: hooksCapability,
@@ -218,18 +230,18 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
 /** Validates and snapshots config before the single PluginHost construction batch. */
 export function prepareEndpoint<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
+  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
   options: { readonly deferMiddlewareInstall: true }
 ): Promise<IDeferredPreparedEndpoint<TTargetId>>
 export async function prepareEndpoint<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
+  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
   _options: { readonly deferMiddlewareInstall: true }
 ): Promise<IDeferredPreparedEndpoint<TTargetId>> {
   let factoryId: unknown
@@ -238,14 +250,16 @@ export async function prepareEndpoint<
   let factoryTransport: unknown
   let factoryProvider: unknown
   let factoryProviderLimits: unknown
-  let construction: IWebRpcFactoryConfig['construction']
-  let factoryReplay: IWebRpcFactoryConfig['replay']
-  let factoryProtocol: IWebRpcFactoryConfig['protocol']
-  let factoryCodec: IWebRpcFactoryConfig['codec']
-  let factoryFramer: IWebRpcFactoryConfig['framer']
+  let construction: IRpcFactoryConfig['construction']
+  /** Original injected scheduler value captured with all other outer configuration fields. */
+  let factoryScheduler: unknown
+  let factoryReplay: IRpcFactoryConfig['replay']
+  let factoryProtocol: IRpcFactoryConfig['protocol']
+  let factoryCodec: IRpcFactoryConfig['codec']
+  let factoryFramer: IRpcFactoryConfig['framer']
   try {
     if (!config || typeof config !== 'object' || Array.isArray(config))
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'factory descriptor is invalid')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'factory descriptor is invalid')
     factoryId = config.id
     factoryMiddlewares = config.middlewares
     factoryTargetIds = config.targetIds
@@ -253,6 +267,7 @@ export async function prepareEndpoint<
     factoryProvider = config.provider
     factoryProviderLimits = config.providerLimits
     construction = config.construction
+    factoryScheduler = config.scheduler
     // Snapshotted here with everything else, not read again later at endpoint-construction
     // time: reading it late (past middleware install) means a hostile `replay` getter would
     // surface its error only after side effects already ran, instead of being rejected
@@ -263,38 +278,52 @@ export async function prepareEndpoint<
     factoryCodec = config.codec
     factoryFramer = config.framer
   } catch (error) {
-    if (error instanceof WebRpcError) throw error
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'factory descriptor is unreadable', error)
+    if (error instanceof RpcError) throw error
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'factory descriptor is unreadable', error)
   }
   if (typeof factoryId !== 'string' || factoryId.length === 0)
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'id must be a non-empty string')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'id must be a non-empty string')
+  let injectedScheduler: IUtilsScheduler | undefined
+  if (factoryScheduler !== undefined) {
+    try {
+      const scheduler = factoryScheduler as IUtilsScheduler
+      const now = scheduler?.now
+      const schedule = scheduler?.schedule
+      if (!scheduler || typeof now !== 'function' || typeof schedule !== 'function')
+        throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
+      const instant = scheduler.now()
+      if (!Number.isSafeInteger(instant) || instant < 0)
+        throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
+      injectedScheduler = scheduler
+    } catch (error) {
+      if (error instanceof RpcConfigurationError) throw error
+      throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid, error)
+    }
+  }
   try {
     if (!Array.isArray(factoryMiddlewares))
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'middlewares must be an array')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'middlewares must be an array')
     if (factoryTargetIds !== undefined && !Array.isArray(factoryTargetIds))
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'targetIds must be an array')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'targetIds must be an array')
     if (
       (factoryTargetIds as readonly unknown[] | undefined)?.some(
         (targetId) => typeof targetId !== 'string' || targetId.length === 0
       )
     )
-      throw new WebRpcError(
-        WebRpcErrorCode.invalidConfig,
-        'targetIds must contain non-empty strings'
-      )
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'targetIds must contain non-empty strings')
   } catch (error) {
-    if (error instanceof WebRpcError) throw error
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'factory collection is unreadable', error)
+    if (error instanceof RpcError) throw error
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'factory collection is unreadable', error)
   }
   let middlewareSnapshots: IEndpointMiddlewareSnapshot[]
   try {
-    middlewareSnapshots = (factoryMiddlewares as readonly IWebRpcPlugin[]).map((middleware) => {
+    middlewareSnapshots = (factoryMiddlewares as readonly IRpcPlugin[]).map((middleware) => {
       const name = safeRead<unknown>(middleware, 'name')
       if (isDefinedMiddleware(middleware)) {
         if (typeof name !== 'string' || name.length === 0)
-          throw new WebRpcError(
-            WebRpcErrorCode.invalidConfig,
-            WebRpcErrorText.middlewareMustBePlugin
+          throw new RpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RpcCoreErrorText.middlewareMustBePlugin
           )
         const componentPolicy = readDefinedMiddlewareComponents(middleware)
         const middlewareTransport = componentPolicy?.transport
@@ -302,10 +331,10 @@ export async function prepareEndpoint<
         return Object.freeze({
           kind: 'native' as const,
           name,
-          plugin: middleware as unknown as IWebRpcPluginConstraint,
+          plugin: middleware as unknown as IRpcPluginConstraint,
           ...(middlewareTransport === undefined
             ? {}
-            : { transport: middlewareTransport as IWebRpcTransport }),
+            : { transport: middlewareTransport as IRpcTransport }),
           ...(metadata === undefined ? {} : { metadata }),
           ...(componentPolicy === undefined ? {} : { components: componentPolicy })
         })
@@ -330,7 +359,7 @@ export async function prepareEndpoint<
               ...(protocol === undefined ? {} : { protocol }),
               ...(codec === undefined ? {} : { codec }),
               ...(framer === undefined ? {} : { framer })
-            } as unknown as IWebRpcPlugin)
+            } as unknown as IRpcPlugin)
           : undefined
       if (
         typeof name !== 'string' ||
@@ -339,38 +368,35 @@ export async function prepareEndpoint<
         (middlewareTransport !== undefined &&
           (!middlewareTransport || typeof middlewareTransport !== 'object'))
       )
-        throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.middlewareMustBePlugin)
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.middlewareMustBePlugin)
       return {
         kind: 'legacy' as const,
         name: name as string,
         plugin,
-        transport: middlewareTransport as IWebRpcTransport | undefined
+        transport: middlewareTransport as IRpcTransport | undefined
       }
     })
     const names = new Set<string>()
     for (const middleware of middlewareSnapshots) {
       if (names.has(middleware.name))
-        throw new WebRpcError(
-          WebRpcErrorCode.middlewareDuplicated,
+        throw new RpcError(
+          RpcCoreErrorCode.middlewareDuplicated,
           `Duplicate middleware: ${middleware.name}`
         )
       names.add(middleware.name)
     }
   } catch (error) {
-    if (error instanceof WebRpcError) throw error
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'middlewares are unreadable', error)
+    if (error instanceof RpcError) throw error
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'middlewares are unreadable', error)
   }
   const transportCandidates = middlewareSnapshots.flatMap((item) =>
     item.transport === undefined ? [] : [item.transport]
   )
   if (transportCandidates.length > 1)
-    throw new WebRpcError(WebRpcErrorCode.capabilityConflict, WebRpcErrorText.endpointRouteOwned)
-  const transport = (factoryTransport as IWebRpcTransport | undefined) ?? transportCandidates[0]
+    throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
+  const transport = (factoryTransport as IRpcTransport | undefined) ?? transportCandidates[0]
   if (!transport)
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
-      'connect middleware must provide transport'
-    )
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect middleware must provide transport')
   const send = safeRead<unknown>(transport, 'send')
   const subscribe = safeRead<unknown>(transport, 'subscribe')
   const close = safeRead<unknown>(transport, 'close')
@@ -396,22 +422,14 @@ export async function prepareEndpoint<
   if (
     typeof send !== 'function' ||
     typeof subscribe !== 'function' ||
-    ![
-      'Worker',
-      'Iframe',
-      'BroadcastChannel',
-      'MessagePort',
-      'Memory',
-      'WebTransport',
-      'RTCDataChannel'
-    ].includes(platform as string) ||
+    !Object.values(RpcPlatform).includes(platform as IRpcPlatform) ||
     (encodedType !== undefined &&
       encodedType !== 'any' &&
       encodedType !== 'string' &&
       encodedType !== 'uint8array') ||
     (ownership !== undefined && ownership !== 'owned' && ownership !== 'borrowed')
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'transport descriptor is invalid')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'transport descriptor is invalid')
   const components = selectWebRpcComponents({
     protocol: factoryProtocol,
     codec: factoryCodec,
@@ -428,25 +446,27 @@ export async function prepareEndpoint<
     id: factoryId as string,
     transport,
     transportSnapshot,
-    providers: factoryProvider as IWebRpcFactoryConfig<TTargetId>['provider'],
-    providerLimits: factoryProviderLimits as IWebRpcFactoryConfig<TTargetId>['providerLimits'],
+    providers: factoryProvider as IRpcFactoryConfig<TTargetId>['provider'],
+    providerLimits: factoryProviderLimits as IRpcFactoryConfig<TTargetId>['providerLimits'],
     construction,
+    injectedScheduler,
     middlewareSnapshots: Object.freeze(middlewareSnapshots.map((item) => Object.freeze(item))),
-    finalize: async (installHookEvents, runConstruction, getPort) => {
+    finalize: async (installHookEvents, runConstruction, getPort, now) => {
       const prepared = await finalizePreparedEndpoint(
         factoryId as string,
         factoryTargetIds as readonly TTargetId[] | undefined,
-        factoryProvider as IWebRpcFactoryConfig<TTargetId>['provider'],
-        factoryProviderLimits as IWebRpcFactoryConfig<TTargetId>['providerLimits'],
+        factoryProvider as IRpcFactoryConfig<TTargetId>['provider'],
+        factoryProviderLimits as IRpcFactoryConfig<TTargetId>['providerLimits'],
         factoryReplay,
         transport,
-        platform as IWebRpcPlatform,
+        platform as IRpcPlatform,
         encodedType as string | undefined,
         construction,
         components,
         installHookEvents,
         runConstruction,
-        getPort
+        getPort,
+        now
       )
       return {
         ...prepared,
@@ -462,12 +482,12 @@ function selectWebRpcComponents(
     readonly protocol?: unknown
     readonly codec?: unknown
     readonly framer?: unknown
-    readonly candidates?: readonly Pick<IWebRpcPlugin, 'protocol' | 'codec' | 'framer'>[]
+    readonly candidates?: readonly Pick<IRpcPlugin, 'protocol' | 'codec' | 'framer'>[]
     readonly transportShadow?: Readonly<{ readonly winner: object; readonly shadowed: object }>
   }>
-): IWebRpcSelectedComponents {
+): IRpcSelectedComponents {
   const candidates = input.candidates ?? []
-  const shadowed: IWebRpcSelectedComponents['shadowed'][number][] = []
+  const shadowed: IRpcSelectedComponents['shadowed'][number][] = []
   const select = (
     name: 'protocol' | 'codec' | 'framer',
     topLevel: unknown,
@@ -478,7 +498,7 @@ function selectWebRpcComponents(
       return value === undefined ? [] : [value]
     })
     if (contributed.length > 1)
-      throw new WebRpcError(WebRpcErrorCode.capabilityConflict, WebRpcErrorText.endpointRouteOwned)
+      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
     return Object.freeze({
       value: topLevel ?? contributed[0] ?? fallback,
       ...(topLevel !== undefined && contributed[0] !== undefined
@@ -518,7 +538,7 @@ function selectWebRpcComponents(
       })
     )
   if (!isCompatible(codec, framer))
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return Object.freeze({
     protocol,
     codec,
@@ -535,7 +555,7 @@ function snapshotIdentity(
   const id = readDescriptorField(value, 'id')
   const version = readDescriptorField(value, 'version')
   if (!isDescriptorIdentity(id, version) || typeof version !== 'number')
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return Object.freeze({ id, version })
 }
 
@@ -545,9 +565,9 @@ function readDescriptorField(value: unknown, field: string): unknown {
     if (!value || typeof value !== 'object') return undefined
     return (value as Record<string, unknown>)[field]
   } catch (cause) {
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
-      WebRpcErrorText.codecDescriptorInvalid,
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.codecDescriptorInvalid,
       cause
     )
   }
@@ -564,7 +584,7 @@ function snapshotProtocol(value: unknown): IRpcProtocol<IRpcEnvelope, string, nu
     readDescriptorField(value, 'encode') !== undefined ||
     readDescriptorField(value, 'decode') !== undefined
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return Object.freeze({
     id,
     version,
@@ -585,7 +605,7 @@ function snapshotCodec(value: unknown): ICodec<IRpcEnvelope, unknown> {
     !isDescriptorIdentity(id, version) ||
     !isEncodedType(encodedType)
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return Object.freeze({
     id,
     version,
@@ -612,7 +632,7 @@ function snapshotFramer(value: unknown): IRpcFramer<unknown, unknown, string, nu
     !isEncodedType(inputEncodedType) ||
     !isEncodedType(outputEncodedType)
   )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.framerDescriptorInvalid)
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.framerDescriptorInvalid)
   return Object.freeze({
     id,
     version,
@@ -653,8 +673,8 @@ function isCompatible(
  * native carrier-or-fragment output is mixed until authentication proves a concrete carrier.
  */
 function isDirectedCompatible(
-  components: IWebRpcSelectedComponents,
-  authentication: IWebRpcAuthenticationCapability | undefined,
+  components: IRpcSelectedComponents,
+  authentication: IRpcAuthenticationCapability | undefined,
   transportEncodedType: string | undefined
 ): boolean {
   if (!isCompatible(components.codec, components.framer)) return false

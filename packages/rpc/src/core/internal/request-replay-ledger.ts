@@ -1,5 +1,5 @@
 import { createStringLeaseRegistry, type ILeaseRegistry } from '@migaia/lifecycle'
-import { tagWebRpcError, WebRpcErrorCode } from '../errors.js'
+import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
 /** Non-evicting replay ledger for business requests. */
 export class RequestReplayLedger {
@@ -40,9 +40,9 @@ export class RequestReplayLedger {
       maxEntriesPerPeer < 1 ||
       ttlMs < 1
     )
-      throw tagWebRpcError(
+      throw tagRpcError(
         new TypeError('request replay limits must be positive safe integers'),
-        WebRpcErrorCode.invalidConfig
+        RpcCoreErrorCode.invalidConfig
       )
     this.#maxEntries = maxEntries
     this.#maxEntriesPerPeer = maxEntriesPerPeer
@@ -52,7 +52,7 @@ export class RequestReplayLedger {
   }
 
   /** Returns true for a fresh tombstone, otherwise admits and records the key. */
-  admit(key: string, peerKey: string, now = Date.now()): boolean {
+  admit(key: string, peerKey: string, now: number): boolean {
     this.#purge(now)
     if (this.#rejected.has(key)) return false
     if (this.#completed.has(key)) return false
@@ -76,13 +76,13 @@ export class RequestReplayLedger {
   }
 
   /** Tests whether a fresh tombstone exists without changing it. */
-  has(key: string, now = Date.now()): boolean {
+  has(key: string, now: number): boolean {
     this.#purge(now)
     return this.#completed.has(key)
   }
 
   /** Checks replay capacity before a caller consumes a separate admission quota. */
-  canAdmit(key: string, peerKey: string, now = Date.now()): boolean {
+  canAdmit(key: string, peerKey: string, now: number): boolean {
     this.#purge(now)
     if (this.#rejected.has(key) || this.#completed.has(key)) return false
     const peerCount = this.#peerCounts.count(peerKey)
@@ -105,7 +105,7 @@ export class RequestReplayLedger {
   }
 
   /** Purges expired tombstones under the endpoint resource owner. */
-  purge(now = Date.now()): void {
+  purge(now: number): void {
     this.#purge(now)
   }
 

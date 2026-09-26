@@ -1,25 +1,23 @@
 import { createComposedEndpoint, type IRecursiveProvideSurface } from './composed.js'
 import { createProviderFirstPartyRoots } from './internal/provider-first-party-roots.js'
-import type { IWebRpcKernelSurface } from './composed.js'
+import type { IRpcKernelSurface } from './composed.js'
 import type { IProviderSurface } from './features/provider.js'
-import type { IWebRpcFeature, IWebRpcFeatureSurface } from './feature.js'
-import type { IWebRpcFactoryConfig, IWebRpcMiddleware } from './typing.js'
+import type { IRpcFeature, IRpcFeatureSurface } from './feature.js'
+import type { IRpcFactoryConfig, IRpcMiddleware } from './typing.js'
 
 /** Internal bridge retains the public provider call's generic feature tuple through composition. */
 type IProviderComposition = {
   <
     TTargetId extends string,
-    TMiddlewares extends readonly IWebRpcMiddleware[],
-    TFeatures extends readonly IWebRpcFeature[]
+    TMiddlewares extends readonly IRpcMiddleware[],
+    TFeatures extends readonly IRpcFeature[]
   >(
-    config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
-      readonly features?: import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>
+    config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+      readonly features?: import('./feature.js').IRpcFiniteFeatureTuple<TFeatures>
     },
     roots: ReturnType<typeof createProviderFirstPartyRoots>
   ): Promise<
-    IRecursiveProvideSurface<
-      IWebRpcKernelSurface & IProviderSurface & IWebRpcFeatureSurface<TFeatures>
-    >
+    IRecursiveProvideSurface<IRpcKernelSurface & IProviderSurface & IRpcFeatureSurface<TFeatures>>
   >
 }
 
@@ -29,24 +27,20 @@ const composeProviderEndpoint = createComposedEndpoint as unknown as IProviderCo
 /** Creates one provider runtime whose token includes the inseparable outbound closure. */
 function createProviderEndpointRuntime<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
-    readonly features?: import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>
+  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+    readonly features?: import('./feature.js').IRpcFiniteFeatureTuple<TFeatures>
   }
 ): Promise<
-  IRecursiveProvideSurface<
-    IWebRpcKernelSurface & IProviderSurface & IWebRpcFeatureSurface<TFeatures>
-  >
+  IRecursiveProvideSurface<IRpcKernelSurface & IProviderSurface & IRpcFeatureSurface<TFeatures>>
 > {
   return composeProviderEndpoint<TTargetId, TMiddlewares, TFeatures>(
     config,
     createProviderFirstPartyRoots()
   ) as Promise<
-    IRecursiveProvideSurface<
-      IWebRpcKernelSurface & IProviderSurface & IWebRpcFeatureSurface<TFeatures>
-    >
+    IRecursiveProvideSurface<IRpcKernelSurface & IProviderSurface & IRpcFeatureSurface<TFeatures>>
   >
 }
 
@@ -58,19 +52,17 @@ type IPublicCallable = {
     config: TConfig & IChecked<TConfig>
   ): Promise<
     IRecursiveProvideSurface<
-      IWebRpcKernelSurface & IProviderSurface & IWebRpcFeatureSurface<IFeatures<TConfig>>
+      IRpcKernelSurface & IProviderSurface & IRpcFeatureSurface<IFeatures<TConfig>>
     >
   >
   <
     TTargetId extends string = string,
-    TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-    TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+    TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+    TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
   >(
     config: ILegacyDefault<TTargetId, TMiddlewares, TFeatures>
   ): Promise<
-    IRecursiveProvideSurface<
-      IWebRpcKernelSurface & IProviderSurface & IWebRpcFeatureSurface<TFeatures>
-    >
+    IRecursiveProvideSurface<IRpcKernelSurface & IProviderSurface & IRpcFeatureSurface<TFeatures>>
   >
 }
 

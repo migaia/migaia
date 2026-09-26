@@ -1,4 +1,4 @@
-import type { IWebRpcFeature } from '../feature.js'
+import type { IRpcFeature } from '../feature.js'
 import { createCanonicalChunkFeature } from '../features/canonical-chunk.js'
 import { createControlFeature } from '../features/control.js'
 import { createDiscoveryFeature } from '../features/discovery.js'
@@ -7,7 +7,7 @@ import { createOutboundFeature } from '../features/outbound.js'
 import { createProviderFeature } from '../features/provider.js'
 
 /** Names identify selected package-owned roots without carrying legacy EndpointModule tokens. */
-export type IWebRpcFirstPartyRootName =
+export type IRpcFirstPartyRootName =
   | 'first-party-chunk'
   | 'first-party-outbound'
   | 'first-party-discovery'
@@ -25,7 +25,7 @@ type IFirstPartyRootValues = Readonly<{
   readonly 'first-party-one-way': ReturnType<typeof createOneWayFeature>
 }>
 /** Includes only actual closure dependencies required by the selected roots. */
-type IFirstPartyClosureNames<TSelected extends IWebRpcFirstPartyRootName> =
+type IFirstPartyClosureNames<TSelected extends IRpcFirstPartyRootName> =
   | TSelected
   | (TSelected extends
       | 'first-party-outbound'
@@ -44,23 +44,23 @@ type IFirstPartyClosureNames<TSelected extends IWebRpcFirstPartyRootName> =
       : never)
   | (TSelected extends 'first-party-control' ? 'first-party-discovery' : never)
 /** Native record type preserves concrete values; selection itself remains a separate brand. */
-type IFirstPartyRootsFor<TSelected extends IWebRpcFirstPartyRootName> = Pick<
+type IFirstPartyRootsFor<TSelected extends IRpcFirstPartyRootName> = Pick<
   IFirstPartyRootValues,
   IFirstPartyClosureNames<TSelected>
 >
 /** Projects only selected public roots that are present in the concrete closure record. */
-type IFirstPartyPublicRootNames<TSelected extends IWebRpcFirstPartyRootName> = Extract<
+type IFirstPartyPublicRootNames<TSelected extends IRpcFirstPartyRootName> = Extract<
   TSelected | ('first-party-provider' extends TSelected ? 'first-party-outbound' : never),
   keyof IFirstPartyRootsFor<TSelected>
 >
 
 /** Adds provider's public outbound projection while keeping the selected root union precise. */
-function selectPublicRoots<TSelected extends IWebRpcFirstPartyRootName>(
+function selectPublicRoots<TSelected extends IRpcFirstPartyRootName>(
   selected: ReadonlySet<TSelected>
 ): readonly IFirstPartyPublicRootNames<TSelected>[]
 function selectPublicRoots(
-  selected: ReadonlySet<IWebRpcFirstPartyRootName>
-): readonly IWebRpcFirstPartyRootName[] {
+  selected: ReadonlySet<IRpcFirstPartyRootName>
+): readonly IRpcFirstPartyRootName[] {
   const values = [...selected]
   return selected.has('first-party-provider') ? [...values, 'first-party-outbound'] : values
 }
@@ -73,52 +73,49 @@ const publicRootNames = new WeakMap<object, readonly string[]>()
 declare const firstPartyPublicRootsBrand: unique symbol
 
 /** Retains the explicit public root selection in the type system without creating runtime state. */
-export type IWebRpcFirstPartyRoots<
-  TRoots extends Readonly<Record<string, IWebRpcFeature>>,
+export type IRpcFirstPartyRoots<
+  TRoots extends Readonly<Record<string, IRpcFeature>>,
   TPublicRoots extends string
 > = TRoots & Readonly<{ readonly [firstPartyPublicRootsBrand]: TPublicRoots }>
 
 /** Extracts only roots selected for endpoint projection; unbranded external records remain explicit. */
-export type IWebRpcPublicFirstPartyRootNames<TRoots> =
-  TRoots extends IWebRpcFirstPartyRoots<
-    Readonly<Record<string, IWebRpcFeature>>,
-    infer TPublicRoots
-  >
+export type IRpcPublicFirstPartyRootNames<TRoots> =
+  TRoots extends IRpcFirstPartyRoots<Readonly<Record<string, IRpcFeature>>, infer TPublicRoots>
     ? TPublicRoots
     : Extract<keyof TRoots, string>
 
 /** Attaches the public selection to a native closure without turning it into a second graph. */
 export function registerFirstPartyPublicRoots<
-  T extends Readonly<Record<string, IWebRpcFeature>>,
+  T extends Readonly<Record<string, IRpcFeature>>,
   TPublicRoots extends string
->(roots: T, selected: readonly TPublicRoots[]): IWebRpcFirstPartyRoots<T, TPublicRoots> {
+>(roots: T, selected: readonly TPublicRoots[]): IRpcFirstPartyRoots<T, TPublicRoots> {
   publicRootNames.set(roots, Object.freeze([...selected]))
-  return roots as IWebRpcFirstPartyRoots<T, TPublicRoots>
+  return roots as IRpcFirstPartyRoots<T, TPublicRoots>
 }
 
 /** Reads the explicit root selection; unmarked caller records remain fully public by contract. */
 export function readFirstPartyPublicRoots(
-  roots: Readonly<Record<string, IWebRpcFeature>>
+  roots: Readonly<Record<string, IRpcFeature>>
 ): readonly string[] {
   return publicRootNames.get(roots) ?? Object.keys(roots)
 }
 
 /** Builds only the selected native Feature closure; dependencies remain private PluginHost edges. */
-export function createFirstPartyRoots<const TSelected extends IWebRpcFirstPartyRootName>(
+export function createFirstPartyRoots<const TSelected extends IRpcFirstPartyRootName>(
   selected: ReadonlySet<TSelected>
-): IWebRpcFirstPartyRoots<IFirstPartyRootsFor<TSelected>, IFirstPartyPublicRootNames<TSelected>> {
+): IRpcFirstPartyRoots<IFirstPartyRootsFor<TSelected>, IFirstPartyPublicRootNames<TSelected>> {
   /**
    * Runtime closure construction may query every known root while its return type retains
    * TSelected.
    */
-  const selectedRoots: ReadonlySet<IWebRpcFirstPartyRootName> = selected
+  const selectedRoots: ReadonlySet<IRpcFirstPartyRootName> = selected
   const outboundRequired = [
     'first-party-outbound',
     'first-party-discovery',
     'first-party-control',
     'first-party-provider',
     'first-party-one-way'
-  ].some((name) => selectedRoots.has(name as IWebRpcFirstPartyRootName))
+  ].some((name) => selectedRoots.has(name as IRpcFirstPartyRootName))
   const needsChunk = outboundRequired || selectedRoots.has('first-party-chunk')
   const chunk = needsChunk ? createCanonicalChunkFeature() : undefined
   const outbound = chunk && outboundRequired ? createOutboundFeature(chunk) : undefined
@@ -146,9 +143,7 @@ export function createFirstPartyRoots<const TSelected extends IWebRpcFirstPartyR
   return registerFirstPartyPublicRoots<
     IFirstPartyRootsFor<TSelected>,
     IFirstPartyPublicRootNames<TSelected>
-  >(roots as IFirstPartyRootsFor<TSelected>, [
-    ...new Set(publicSelection)
-  ]) as IWebRpcFirstPartyRoots<
+  >(roots as IFirstPartyRootsFor<TSelected>, [...new Set(publicSelection)]) as IRpcFirstPartyRoots<
     IFirstPartyRootsFor<TSelected>,
     IFirstPartyPublicRootNames<TSelected>
   >

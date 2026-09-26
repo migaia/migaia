@@ -1,44 +1,44 @@
 import { defineFeature, type IFeature, type IFeatureRecord } from '@migaia/plugin-host'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 
 /** Deferred original port value published by one middleware registration. */
-export type IWebRpcPortFeature<T = unknown> = Readonly<{
+export type IRpcPortFeature<T = unknown> = Readonly<{
   get(): T
 }>
 
 /** Registration-local exposure used by each named port Feature. */
-type IWebRpcPortFeatureExpose = Readonly<{
-  getPortFeature(name: string): IWebRpcPortFeature
+type IRpcPortFeatureExpose = Readonly<{
+  getPortFeature(name: string): IRpcPortFeature
 }>
 
 /** Prepared port Feature set owned by one middleware definition. */
-export type IWebRpcPortFeatureSet = Readonly<{
+export type IRpcPortFeatureSet = Readonly<{
   readonly features: IFeatureRecord
-  createRuntime(): IWebRpcPortFeatureRuntime
+  createRuntime(): IRpcPortFeatureRuntime
 }>
 
 /** Registration-local cells used by one middleware installation. */
-export type IWebRpcPortFeatureRuntime = Readonly<{
-  readonly expose: IWebRpcPortFeatureExpose
-  readonly outputs: Readonly<Record<string, IWebRpcPortFeature>>
+export type IRpcPortFeatureRuntime = Readonly<{
+  readonly expose: IRpcPortFeatureExpose
+  readonly outputs: Readonly<Record<string, IRpcPortFeature>>
   publish(ports: Readonly<Record<PropertyKey, unknown>>): void
 }>
 
 /** Creates one Feature per declared port while keeping publication registration-local. */
 export const createWebRpcPortFeatureSet = (
   names: readonly PropertyKey[] = []
-): IWebRpcPortFeatureSet => {
-  const features: Record<string, IFeature<IWebRpcPortFeatureExpose, IWebRpcPortFeature>> = {}
+): IRpcPortFeatureSet => {
+  const features: Record<string, IFeature<IRpcPortFeatureExpose, IRpcPortFeature>> = {}
   const featureNames: string[] = []
   for (const candidate of names) {
     if (typeof candidate !== 'string' || candidate.length === 0 || featureNames.includes(candidate))
-      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
     featureNames.push(candidate)
     features[candidate] = defineFeature<
-      IWebRpcPortFeatureExpose,
+      IRpcPortFeatureExpose,
       Record<never, never>,
-      IWebRpcPortFeature
+      IRpcPortFeature
     >((core) => core.featureExpose.getPortFeature(candidate))
   }
   return Object.freeze({
@@ -47,18 +47,18 @@ export const createWebRpcPortFeatureSet = (
       /** Cells are immutable outputs; only their closure-backed value changes once. */
       const cells = new Map<
         string,
-        { readonly output: IWebRpcPortFeature; publish(value: unknown): void }
+        { readonly output: IRpcPortFeature; publish(value: unknown): void }
       >()
-      const outputs: Record<string, IWebRpcPortFeature> = {}
+      const outputs: Record<string, IRpcPortFeature> = {}
       for (const name of featureNames) {
         let present = false
         let value: unknown
         const output = Object.freeze({
           get: () => {
             if (!present)
-              throw new WebRpcError(
-                WebRpcErrorCode.invalidConfig,
-                WebRpcErrorText.endpointModuleInvalid
+              throw new RpcError(
+                RpcCoreErrorCode.invalidConfig,
+                RpcCoreErrorText.endpointModuleInvalid
               )
             return value
           }
@@ -68,9 +68,9 @@ export const createWebRpcPortFeatureSet = (
           output,
           publish: (next) => {
             if (present)
-              throw new WebRpcError(
-                WebRpcErrorCode.capabilityConflict,
-                WebRpcErrorText.endpointModuleDuplicated
+              throw new RpcError(
+                RpcCoreErrorCode.capabilityConflict,
+                RpcCoreErrorText.endpointModuleDuplicated
               )
             value = next
             present = true
@@ -82,9 +82,9 @@ export const createWebRpcPortFeatureSet = (
           getPortFeature: (name: string) => {
             const cell = cells.get(name)
             if (!cell)
-              throw new WebRpcError(
-                WebRpcErrorCode.invalidConfig,
-                WebRpcErrorText.endpointModuleInvalid
+              throw new RpcError(
+                RpcCoreErrorCode.invalidConfig,
+                RpcCoreErrorText.endpointModuleInvalid
               )
             return cell.output
           }
@@ -93,9 +93,9 @@ export const createWebRpcPortFeatureSet = (
         publish: (ports: Readonly<Record<PropertyKey, unknown>>) => {
           for (const [name, cell] of cells) {
             if (!Object.hasOwn(ports, name))
-              throw new WebRpcError(
-                WebRpcErrorCode.invalidConfig,
-                WebRpcErrorText.endpointModuleInvalid
+              throw new RpcError(
+                RpcCoreErrorCode.invalidConfig,
+                RpcCoreErrorText.endpointModuleInvalid
               )
             cell.publish(ports[name])
           }
@@ -107,11 +107,7 @@ export const createWebRpcPortFeatureSet = (
 
 /** Reads a resolved port Feature output returned by a PluginHost handle. */
 export const readWebRpcPortFeature = <T>(value: unknown): T => {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    typeof (value as IWebRpcPortFeature).get !== 'function'
-  )
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
-  return (value as IWebRpcPortFeature<T>).get()
+  if (!value || typeof value !== 'object' || typeof (value as IRpcPortFeature).get !== 'function')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+  return (value as IRpcPortFeature<T>).get()
 }

@@ -1,5 +1,6 @@
-import { tagWebRpcError, WebRpcErrorCode } from '../errors.js'
+import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 import { reportDiagnostic } from './diagnostic-reporter.js'
+import type { IEndpointTimePort } from './time-port.js'
 
 /** Minimal cancellation signal shape shared by browser, worker and Node consumers. */
 export type IAbortSignal = {
@@ -9,106 +10,16 @@ export type IAbortSignal = {
   removeEventListener(type: 'abort', listener: () => void): void
 }
 
-/** Detaches Node-compatible timers from process liveness when supported. */
-export function unrefTimer<T extends ReturnType<typeof setTimeout>>(timer: T): T {
-  ;(timer as T & { unref?: () => void }).unref?.()
-  return timer
-}
-
-/** Creates an idempotently clearable runtime timer owned by async-control. */
-export function createRuntimeTimer(
-  task: () => void,
-  delayMs: number
-): { readonly clear: () => void } {
-  const timer = unrefTimer(setTimeout(task, delayMs))
-  let cleared = false
-  return {
-    clear: () => {
-      if (cleared) return
-      cleared = true
-      clearTimeout(timer)
-    }
-  }
-}
-
-/** Waits for a delay while remaining cancellable by any supplied signal. */
-export function waitWithSignal(
-  delayMs: number,
-  signals: readonly IAbortSignal[],
-  createAbortError: (reason?: unknown) => Error,
-  onDiagnostic?: (error: unknown) => void
-): Promise<void> {
-  if (!Number.isFinite(delayMs) || delayMs < 0)
-    throw tagWebRpcError(new TypeError('delay must be non-negative'), WebRpcErrorCode.invalidConfig)
-  return new Promise((resolve, reject) => {
-    try {
-      if (signals.some((signal) => signal.aborted)) {
-        reject(createAbortError(signals.find((signal) => signal.aborted)?.reason))
-        return
-      }
-    } catch (error) {
-      reject(error)
-      return
-    }
-    let settled = false
-    let timer: { readonly clear: () => void } | undefined
-    const finish = (callback: () => void): void => {
-      if (settled) return
-      settled = true
-      try {
-        timer?.clear()
-      } catch (error) {
-        reportDiagnostic(onDiagnostic, error)
-      }
-      for (const signal of signals) {
-        try {
-          signal.removeEventListener('abort', onAbort)
-        } catch (error) {
-          reportDiagnostic(onDiagnostic, error)
-        }
-      }
-      try {
-        callback()
-      } catch (error) {
-        reject(error)
-      }
-    }
-    const onAbort = (): void =>
-      finish(() => reject(createAbortError(signals.find((signal) => signal.aborted)?.reason)))
-    const registeredSignals: IAbortSignal[] = []
-    try {
-      for (const signal of signals) {
-        if (settled) break
-        signal.addEventListener('abort', onAbort, { once: true })
-        registeredSignals.push(signal)
-      }
-    } catch (error) {
-      for (const signal of registeredSignals) {
-        try {
-          signal.removeEventListener('abort', onAbort)
-        } catch {}
-      }
-      reject(error)
-      return
-    }
-    if (settled) return
-    try {
-      timer = createRuntimeTimer(() => finish(resolve), delayMs)
-    } catch (error) {
-      finish(() => reject(error))
-    }
-  })
-}
-
 /** Races an operation against timeout/abort controls while cleaning every loser. */
 export function raceWithAsyncControl<T>(options: {
+  /** Endpoint-owned timer capability; never falls back to host globals. */
+  readonly time: Pick<IEndpointTimePort, 'setTimeout'>
   /** A lazy operation avoids starting external side effects before cancellation checks. */
   readonly operation: () => PromiseLike<T>
   readonly timeoutMs?: number | false
   readonly signals?: readonly IAbortSignal[]
   readonly createTimeoutError: () => Error
   readonly createAbortError: (reason?: unknown) => Error
-  readonly createTimer?: (task: () => void, delayMs: number) => { readonly clear: () => void }
   readonly onTimeout?: () => void | Promise<void>
   /** Closes the owning resource scope when timer setup itself fails. */
   readonly onSetupFailure?: (error: unknown) => void | Promise<void>
@@ -121,9 +32,9 @@ export function raceWithAsyncControl<T>(options: {
     (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 0)
   )
     return Promise.reject(
-      tagWebRpcError(
+      tagRpcError(
         new TypeError('timeout must be false or a non-negative finite number'),
-        WebRpcErrorCode.invalidConfig
+        RpcCoreErrorCode.invalidConfig
       )
     )
   return new Promise<T>((resolve, reject) => {
@@ -170,7 +81,7 @@ export function raceWithAsyncControl<T>(options: {
     if (settled) return
     if (options.timeoutMs !== undefined && options.timeoutMs !== false) {
       try {
-        const createdTimer = (options.createTimer ?? createRuntimeTimer)(() => {
+        const createdTimer = options.time.setTimeout(() => {
           try {
             const timeoutEffect = options.onTimeout?.()
             void Promise.resolve(timeoutEffect).catch((error) => {

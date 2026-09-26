@@ -6,43 +6,43 @@ export {
 } from './full.js'
 export {
   defineFeature,
-  type IWebRpcFeature,
-  type IWebRpcFeatureDefinition,
-  type IWebRpcFeatureSurface
+  type IRpcFeature,
+  type IRpcFeatureDefinition,
+  type IRpcFeatureSurface
 } from './feature.js'
 export {
   defineMiddleware,
-  type IWebRpcMiddlewareCore,
-  type IWebRpcMiddlewareDescriptor,
-  type IWebRpcNativeMiddleware
+  type IRpcMiddlewareCore,
+  type IRpcMiddlewareDescriptor,
+  type IRpcNativeMiddleware
 } from './middleware.js'
 export type * from './typing.js'
 export * from './transport-constants.js'
 export {
-  WebRpcErrorCode,
-  WebRpcError,
-  WebRpcSchemaValidationError,
-  WebRpcConfigurationError,
-  WebRpcConstructionError,
-  WebRpcLifecycleError,
-  WebRpcSerializationError,
-  WebRpcProtocolError,
-  WebRpcContractError,
-  WebRpcTransportError,
-  WebRpcAuthenticationError,
-  WebRpcChunkError,
-  WebRpcRemoteError,
-  WebRpcAbortError,
-  WebRpcTimeoutError,
-  isWebRpcError,
-  WEBRPC_SOURCE
+  RpcCoreErrorCode,
+  RpcError,
+  RpcSchemaValidationError,
+  RpcConfigurationError,
+  RpcConstructionError,
+  RpcLifecycleError,
+  RpcSerializationError,
+  RpcProtocolError,
+  RpcContractError,
+  RpcTransportError,
+  RpcAuthenticationError,
+  RpcChunkError,
+  RpcRemoteError,
+  RpcAbortError,
+  RpcTimeoutError,
+  isRpcError,
+  RPC_CORE_ERROR_SOURCE
 } from './errors.js'
-export type { IWebRpcErrorCode, IWebRpcError, IWebRpcCleanupError } from './errors.js'
+export type { IRpcCoreErrorCode, IRpcError, IRpcCleanupError } from './errors.js'
 export {
   serializeError,
   deserializeError,
   reachError,
   type ISerializedError
 } from './error-serialization.js'
-export type { IWebRpcTransport, IWebRpcSendOptions, IWebRpcTransportTopology } from './transport.js'
+export type { IRpcTransport, IRpcSendOptions, IRpcTransportTopology } from './transport.js'
 export * from './middleware/index.js'

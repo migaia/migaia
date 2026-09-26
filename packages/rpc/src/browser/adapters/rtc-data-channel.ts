@@ -1,20 +1,22 @@
-import { WebRpcErrorCode, WebRpcTransportError, tagWebRpcError } from '../../core/errors.js'
-import { WebRpcErrorText } from '../../core/error-text.js'
-import type { IWebRpcTransport } from '../../core/transport.js'
-import { safeRead } from '../../core/internal/safe-value.js'
+import type { IRpcTransport } from '../../core/transport-kit.js'
 import {
-  collectListenerFailure,
+  RpcPlatform,
+  RpcTransportOwnership,
   collectListenerCleanupFailures,
-  createListenerFailureState,
+  collectListenerFailure,
   createListenerFailure,
+  createListenerFailureState,
+  createMessageListenerHub,
   drainListenerFailures,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
-  reportListenerFailure
-} from '../../core/internal/listener-safety.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../../core/transport-constants.js'
-import { createMessageListenerHub } from '../../core/internal/message-listener-hub.js'
+  reportListenerFailure,
+  safeRead,
+  tagRpcError
+} from '../../core/transport-kit.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../../core/errors.js'
+import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Minimal RTCDataChannel surface accepted by the adapter. */
 export type IRTCDataChannel = {
@@ -31,7 +33,7 @@ export type IRTCDataChannel = {
 }
 
 /** Uses the reliable ordered data channel as a string-message transport. */
-export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpcTransport {
+export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport {
   if (
     !channel ||
     typeof channel !== 'object' ||
@@ -40,14 +42,14 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
     typeof channel.addEventListener !== 'function' ||
     typeof channel.removeEventListener !== 'function'
   )
-    throw tagWebRpcError(
+    throw tagRpcError(
       new TypeError('RTCDataChannel must expose readyState and terminal event listeners'),
-      WebRpcErrorCode.invalidConfig
+      RpcCoreErrorCode.invalidConfig
     )
   if (channel.readyState !== 'open' && channel.readyState !== 'closed')
-    throw tagWebRpcError(
+    throw tagRpcError(
       new TypeError('RTCDataChannel must be open before transport construction'),
-      WebRpcErrorCode.invalidConfig
+      RpcCoreErrorCode.invalidConfig
     )
   const listeners = createMessageListenerHub<{ data: unknown }>()
   const listenerErrors = new Set<(error: unknown) => void>()
@@ -74,7 +76,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
           remove: () => channel.removeEventListener('error', onTerminal)
         }
       ],
-      { code: WebRpcErrorCode.transport, secondaryFailures }
+      { code: RpcCoreErrorCode.transport, secondaryFailures }
     )
     terminalListenersInstalled = true
   }
@@ -103,25 +105,25 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
     const error = event instanceof Error ? event : new Error('RTCDataChannel closed')
     terminalError = error
     const failure = createListenerFailure([error, ...cleanupErrors], {
-      code: WebRpcErrorCode.transport,
-      message: WebRpcErrorText.rtcSubscriptionCleanupFailed
+      code: RpcCoreErrorCode.transport,
+      message: BrowserRpcErrorText.rtcSubscriptionCleanupFailed
     })
     reportListenerFailure(failure, transportErrors, secondaryFailures)
   }
   return {
-    platform: WebRpcPlatform.rtcDataChannel,
+    platform: RpcPlatform.rtcDataChannel,
     topology: 'exclusive',
-    ownership: WebRpcTransportOwnership.borrowed,
+    ownership: RpcTransportOwnership.borrowed,
     get closed() {
       return closed
     },
     encodedType: 'string',
     send(message) {
-      if (closed) throw new WebRpcTransportError('RTCDataChannel is closed')
+      if (closed) throw new RpcTransportError('RTCDataChannel is closed')
       channel.send(typeof message === 'string' ? message : JSON.stringify(message))
     },
     subscribe(listener) {
-      if (closed) throw new WebRpcTransportError('RTCDataChannel is closed')
+      if (closed) throw new RpcTransportError('RTCDataChannel is closed')
       listeners.add(listener, () => {
         installTerminalListeners()
         try {
@@ -134,8 +136,8 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
           ])
           if (cleanupErrors.length === 0) terminalListenersInstalled = false
           drainListenerFailures([error, ...cleanupErrors], {
-            code: WebRpcErrorCode.transport,
-            message: WebRpcErrorText.rtcSubscriptionCleanupFailed,
+            code: RpcCoreErrorCode.transport,
+            message: BrowserRpcErrorText.rtcSubscriptionCleanupFailed,
             secondaryFailures
           })
         }
@@ -160,7 +162,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
             listeners.remove(listener, () => undefined)
             if (isFinal && transportErrors.size === 0) terminalListenersInstalled = false
           },
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -168,7 +170,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
@@ -197,7 +199,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
             transportErrors.delete(listener)
             if (isFinal) terminalListenersInstalled = false
           },
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     }

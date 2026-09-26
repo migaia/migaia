@@ -1,43 +1,37 @@
-import type { IWebRpcError } from './errors.js'
-import type { IWebRpcTransport } from './transport.js'
-import type { IWebRpcFeature } from './feature.js'
-import type {
-  IWebRpcMiddlewareComponentContribution,
-  IWebRpcNativeMiddleware
-} from './middleware.js'
+import type { IRpcError } from './errors.js'
+import type { IRpcTransport } from './transport.js'
+import type { IRpcFeature } from './feature.js'
+import type { IRpcMiddlewareComponentContribution, IRpcNativeMiddleware } from './middleware.js'
 import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '../contract/index.js'
 import type { ICodec } from '@migaia/serialize/codec'
-import type { IWebRpcPlatformValue as IProtocolWebRpcPlatform } from './transport-constants.js'
-import type { IWebRpcCandidateStatus, IWebRpcOperation } from './transport-constants.js'
+import type { IRpcPlatformValue as IProtocolWebRpcPlatform } from './transport-constants.js'
+import type { IRpcCandidateStatus, IRpcOperation } from './transport-constants.js'
 
-export type IWebRpcProviderResult =
+export type IRpcProviderResult =
   | { readonly ok: true; readonly data?: unknown; readonly transfer?: readonly unknown[] }
   | { readonly ok: false; readonly message: string; readonly code: string }
-export type IWebRpcContext = {
+export type IRpcContext = {
   readonly data: unknown
-  readonly signal: IWebRpcAbortSignal
-  success(
-    data?: unknown,
-    options?: { readonly transfer?: readonly unknown[] }
-  ): IWebRpcProviderResult
-  failed(message: string, code: string): IWebRpcProviderResult
+  readonly signal: IRpcAbortSignal
+  success(data?: unknown, options?: { readonly transfer?: readonly unknown[] }): IRpcProviderResult
+  failed(message: string, code: string): IRpcProviderResult
   dispatchTo(input: { readonly id?: string; readonly method: string; readonly data: unknown }): void
 }
-export type IWebRpcProvider = (
-  context: IWebRpcContext
-) => IWebRpcProviderResult | Promise<IWebRpcProviderResult>
+export type IRpcProvider = (
+  context: IRpcContext
+) => IRpcProviderResult | Promise<IRpcProviderResult>
 /** Bounded provider execution admission; excess requests fail immediately. */
-export type IWebRpcProviderLimits = {
+export type IRpcProviderLimits = {
   readonly maxGlobal?: number
   readonly maxPerPeer?: number
 }
-export type IWebRpcEventListener = (context: IWebRpcContext) => void | Promise<void>
+export type IRpcEventListener = (context: IRpcContext) => void | Promise<void>
 export type ISendOptions = {
-  readonly signal?: IWebRpcAbortSignal
+  readonly signal?: IRpcAbortSignal
   readonly timeoutMs?: number | false
   readonly transfer?: readonly unknown[]
 }
-export type IWebRpcHookEvent = {
+export type IRpcHookEvent = {
   readonly name: string
   readonly at: number
   readonly localId: string
@@ -52,199 +46,194 @@ export type IWebRpcHookEvent = {
   readonly ambiguous?: boolean
   readonly responseCount?: number
 }
-export type IWebRpcHook = (event: IWebRpcHookEvent) => void | Promise<void>
-export type IWebRpcSchemaIssue = {
+export type IRpcHook = (event: IRpcHookEvent) => void | Promise<void>
+export type IRpcSchemaIssue = {
   readonly path: readonly (string | number)[]
   readonly message: string
   readonly code?: string
 }
-export type IWebRpcSchema<T = unknown> = { parse(value: unknown): T }
-export type IWebRpcMethodSchema = {
-  readonly params: IWebRpcSchema
-  readonly result: IWebRpcSchema
+export type IRpcSchema<T = unknown> = { parse(value: unknown): T }
+export type IRpcMethodSchema = {
+  readonly params: IRpcSchema
+  readonly result: IRpcSchema
 }
-export type IWebRpcContractConfig = {
+export type IRpcContractConfig = {
   readonly version?: string
   readonly acceptVersions?: readonly string[]
   readonly maxIdentifierLength?: number
-  readonly schemas?: Readonly<Record<string, IWebRpcMethodSchema>>
+  readonly schemas?: Readonly<Record<string, IRpcMethodSchema>>
 }
 /** Executable contract capability installed by contract middleware. */
-export type IWebRpcContractCapability = IWebRpcContractConfig & {
+export type IRpcContractCapability = IRpcContractConfig & {
   readonly validateData: (method: string, side: 'params' | 'result', data: unknown) => void
 }
-export type IWebRpcUuidContext = {
+export type IRpcUuidContext = {
   readonly variation: 'task' | 'message' | 'variation'
   readonly senderId: string
   readonly targetId?: string
 }
-export type IWebRpcUuidConfig = { readonly generate?: (context: IWebRpcUuidContext) => string }
-export type IWebRpcProtocolConfig = {
+export type IRpcUuidConfig = { readonly generate?: (context: IRpcUuidContext) => string }
+export type IRpcProtocolConfig = {
   readonly encode?: (value: unknown) => unknown
   readonly decode?: (value: unknown) => unknown
   readonly encodedType?: 'any' | 'string' | 'uint8array'
 }
 /** Normalized protocol capability installed by protocol middleware. */
-export type IWebRpcProtocolCapability = {
+export type IRpcProtocolCapability = {
   readonly encode: (value: unknown) => unknown
   readonly decode: (value: unknown) => unknown
   readonly encodedType?: 'any' | 'string' | 'uint8array'
   readonly identity?: boolean
 }
-export type IWebRpcAuthenticationContext = {
+export type IRpcAuthenticationContext = {
   readonly direction: 'outbound' | 'inbound'
   readonly endpointId: string
-  readonly platform: IWebRpcPlatform
+  readonly platform: IRpcPlatform
 }
-export type IWebRpcAuthenticationTransform = (
+export type IRpcAuthenticationTransform = (
   value: unknown,
-  context: IWebRpcAuthenticationContext
+  context: IRpcAuthenticationContext
 ) => unknown | Promise<unknown>
-export type IWebRpcAuthenticationConfig = {
-  readonly encrypt?: IWebRpcAuthenticationTransform
-  readonly decrypt?: IWebRpcAuthenticationTransform
-  readonly sign?: IWebRpcAuthenticationTransform
-  readonly verify?: IWebRpcAuthenticationTransform
+export type IRpcAuthenticationConfig = {
+  readonly encrypt?: IRpcAuthenticationTransform
+  readonly decrypt?: IRpcAuthenticationTransform
+  readonly sign?: IRpcAuthenticationTransform
+  readonly verify?: IRpcAuthenticationTransform
   readonly encodedType?: 'any' | 'string' | 'uint8array'
 }
 /** Executable per-frame protection installed by authentication middleware. */
-export type IWebRpcAuthenticationCapability = {
+export type IRpcAuthenticationCapability = {
   readonly enabled: true
   readonly encodedType: 'any' | 'string' | 'uint8array'
-  readonly protect: IWebRpcAuthenticationTransform
-  readonly unprotect: IWebRpcAuthenticationTransform
+  readonly protect: IRpcAuthenticationTransform
+  readonly unprotect: IRpcAuthenticationTransform
 }
-export type IWebRpcTimeoutConfig = {
+export type IRpcTimeoutConfig = {
   readonly timeoutMs?: number | false
 }
 /** Executable timeout capability installed by timeout middleware. */
-export type IWebRpcTimeoutCapability = IWebRpcTimeoutConfig & {
+export type IRpcTimeoutCapability = IRpcTimeoutConfig & {
   readonly resolveTimeout: (override?: number | false) => number | false | undefined
 }
-export type IWebRpcHooksConfig = {
-  readonly listeners?: IWebRpcHook | readonly IWebRpcHook[]
-  readonly onHookError?: (error: unknown, event: IWebRpcHookEvent) => void
+export type IRpcHooksConfig = {
+  readonly listeners?: IRpcHook | readonly IRpcHook[]
+  readonly onHookError?: (error: unknown, event: IRpcHookEvent) => void
 }
-export type IWebRpcConnectContext = {
+export type IRpcConnectContext = {
   readonly senderId: string
   readonly targetId: string
   readonly peerId?: string
   readonly origin?: string
   readonly source?: unknown
   readonly data?: unknown
-  readonly platform?: IWebRpcPlatform
+  readonly platform?: IRpcPlatform
   readonly topology?: 'exclusive' | 'multiplexed' | 'broadcast'
 }
-export type IWebRpcUniqueTargetIdContext = {
+export type IRpcUniqueTargetIdContext = {
   readonly endpointId: string
-  readonly platform: IWebRpcPlatform
+  readonly platform: IRpcPlatform
 }
-export type IWebRpcConnectConfig = {
+export type IRpcConnectConfig = {
   /** Optional when factory.transport supplies the canonical transport. */
-  readonly transport?: IWebRpcTransport
+  readonly transport?: IRpcTransport
   readonly useBaseIdVerifyOnly?: boolean
   readonly uniqueTargetId?:
     | string
-    | ((context: IWebRpcUniqueTargetIdContext) => string | Promise<string>)
+    | ((context: IRpcUniqueTargetIdContext) => string | Promise<string>)
   readonly discoveryMode?: 'automatic' | 'manual'
-  readonly identifier?: (context: IWebRpcConnectContext) => boolean | Promise<boolean>
+  readonly identifier?: (context: IRpcConnectContext) => boolean | Promise<boolean>
   readonly receiverSelector?: (
-    serverList: readonly IWebRpcServerMetadata[],
+    serverList: readonly IRpcServerMetadata[],
     context: {
       readonly endpointId: string
       readonly targetId: string
-      readonly operation: IWebRpcOperation
+      readonly operation: IRpcOperation
     }
   ) => string | undefined | Promise<string | undefined>
 }
-export type IWebRpcAutomaticConnectControl<TTargetId extends string = string> = Pick<
-  IWebRpcConnectControl<TTargetId>,
+export type IRpcAutomaticConnectControl<TTargetId extends string = string> = Pick<
+  IRpcConnectControl<TTargetId>,
   'getServerList' | 'pinReceiver' | 'unpinReceiver'
 >
-export type IWebRpcManualConnectControl<TTargetId extends string = string> =
-  IWebRpcAutomaticConnectControl<TTargetId> &
+export type IRpcManualConnectControl<TTargetId extends string = string> =
+  IRpcAutomaticConnectControl<TTargetId> &
     Required<
-      Pick<
-        IWebRpcConnectControl<TTargetId>,
-        'query' | 'onQuery' | 'register' | 'unregister' | 'ping'
-      >
+      Pick<IRpcConnectControl<TTargetId>, 'query' | 'onQuery' | 'register' | 'unregister' | 'ping'>
     >
-export type IWebRpcDiscoveryMode = 'automatic' | 'manual'
-export type IWebRpcConnectControlForMode<
+export type IRpcDiscoveryMode = 'automatic' | 'manual'
+export type IRpcConnectControlForMode<
   TTargetId extends string,
-  TMode extends IWebRpcDiscoveryMode
+  TMode extends IRpcDiscoveryMode
 > = TMode extends 'manual'
-  ? IWebRpcManualConnectControl<TTargetId>
-  : IWebRpcAutomaticConnectControl<TTargetId>
+  ? IRpcManualConnectControl<TTargetId>
+  : IRpcAutomaticConnectControl<TTargetId>
 /** Executable peer-verification capability installed by connect middleware. */
-export type IWebRpcConnectCapability = Omit<IWebRpcConnectConfig, 'uniqueTargetId'> & {
+export type IRpcConnectCapability = Omit<IRpcConnectConfig, 'uniqueTargetId'> & {
   readonly uniqueTargetId?: string
-  readonly uniqueTargetIdFactory?: (
-    context: IWebRpcUniqueTargetIdContext
-  ) => string | Promise<string>
-  readonly verify: (context: IWebRpcConnectContext) => boolean | Promise<boolean>
+  readonly uniqueTargetIdFactory?: (context: IRpcUniqueTargetIdContext) => string | Promise<string>
+  readonly verify: (context: IRpcConnectContext) => boolean | Promise<boolean>
 }
-export type IWebRpcPlatform = IProtocolWebRpcPlatform
-export type IWebRpcServerMetadata<TTargetId extends string = string> = {
+export type IRpcPlatform = IProtocolWebRpcPlatform
+export type IRpcServerMetadata<TTargetId extends string = string> = {
   readonly targetId: TTargetId
   readonly receiverId: string
   readonly uniqueTargetId?: string
-  readonly platform: IWebRpcPlatform
+  readonly platform: IRpcPlatform
   readonly origin?: string
   readonly registeredAt: number
   readonly lastSeenAt: number
   readonly pinned: boolean
-  readonly status: IWebRpcCandidateStatus
+  readonly status: IRpcCandidateStatus
 }
-export type IWebRpcConnectControl<TTargetId extends string = string> = {
-  readonly getServerList: (targetId?: TTargetId) => readonly IWebRpcServerMetadata<TTargetId>[]
+export type IRpcConnectControl<TTargetId extends string = string> = {
+  readonly getServerList: (targetId?: TTargetId) => readonly IRpcServerMetadata<TTargetId>[]
   readonly pinReceiver: (targetId: TTargetId, receiverId: string) => void
   readonly unpinReceiver: (targetId: TTargetId) => void
   query?: (
     targetId: TTargetId,
-    options?: { readonly timeoutMs?: number; readonly signal?: IWebRpcAbortSignal }
-  ) => Promise<readonly IWebRpcDiscoveryCandidate<TTargetId>[]>
+    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
+  ) => Promise<readonly IRpcDiscoveryCandidate<TTargetId>[]>
   onQuery?: (
-    listener: (query: IWebRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
+    listener: (query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
   ) => () => void
-  register?: (candidate: IWebRpcDiscoveryCandidate<TTargetId>) => void
+  register?: (candidate: IRpcDiscoveryCandidate<TTargetId>) => void
   unregister?: (targetId: TTargetId, receiverId?: string) => Promise<void>
   ping?: (
-    candidate: IWebRpcDiscoveryCandidate<TTargetId>,
-    options?: { readonly timeoutMs?: number; readonly signal?: IWebRpcAbortSignal }
+    candidate: IRpcDiscoveryCandidate<TTargetId>,
+    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
   ) => Promise<boolean>
 }
-export type IWebRpcInboundDiscoveryQuery<TTargetId extends string = string> = {
+export type IRpcInboundDiscoveryQuery<TTargetId extends string = string> = {
   readonly targetId: TTargetId
   readonly data: unknown
-  readonly platform: IWebRpcPlatform
+  readonly platform: IRpcPlatform
   readonly origin?: string
   readonly accept: (data?: unknown) => Promise<boolean>
   readonly reject: (reason?: string) => Promise<boolean>
 }
-export type IWebRpcDiscoveryCandidate<TTargetId extends string = string> = {
+export type IRpcDiscoveryCandidate<TTargetId extends string = string> = {
   readonly queryId: string
   readonly targetId: TTargetId
   readonly receiverId?: string
   readonly data: unknown
-  readonly platform: IWebRpcPlatform
+  readonly platform: IRpcPlatform
   readonly origin?: string
 }
-export type IWebRpcDiscoveryControl<TTargetId extends string = string> = {
-  readonly getServerList: (targetId?: TTargetId) => readonly IWebRpcServerMetadata<TTargetId>[]
+export type IRpcDiscoveryControl<TTargetId extends string = string> = {
+  readonly getServerList: (targetId?: TTargetId) => readonly IRpcServerMetadata<TTargetId>[]
   readonly pinReceiver: (targetId: TTargetId, receiverId: string) => void
   readonly unpinReceiver: (targetId: TTargetId) => void
 }
-export type IWebRpcFeatureConfig = { readonly abort?: boolean; readonly ping?: boolean }
-export type IWebRpcAbortCapability = { readonly enabled: true }
-export type IWebRpcPingCapability = { readonly enabled: true }
-export type IWebRpcFanoutResult<TResult> = {
+export type IRpcFeatureConfig = { readonly abort?: boolean; readonly ping?: boolean }
+export type IRpcAbortCapability = { readonly enabled: true }
+export type IRpcPingCapability = { readonly enabled: true }
+export type IRpcFanoutResult<TResult> = {
   readonly fulfilled: Partial<Record<string, TResult>>
   readonly rejected: Partial<Record<string, unknown>>
 }
 
 /** Static claims admitted before a WebRPC plugin crosses the Host boundary. */
-export type IWebRpcPluginClaims = {
+export type IRpcPluginClaims = {
   readonly routes: readonly string[]
   readonly provides: readonly string[]
   readonly consumes: readonly string[]
@@ -254,35 +243,35 @@ export type IWebRpcPluginClaims = {
 }
 
 /** Immutable metadata used by the composer to admit one domain plugin. */
-export type IWebRpcPluginMetadata = {
-  readonly claims: IWebRpcPluginClaims
+export type IRpcPluginMetadata = {
+  readonly claims: IRpcPluginClaims
   readonly sharedProvides?: readonly PropertyKey[]
   readonly sharedConsumes?: readonly PropertyKey[]
   readonly sharedOptionalConsumes?: readonly PropertyKey[]
 }
 
 /** Host-neutral scope exposed to one WebRPC plugin install body. */
-export type IWebRpcPluginInstallScope = {
+export type IRpcPluginInstallScope = {
   readonly id: string
-  readonly transport: IWebRpcTransport
-  readonly signal: IWebRpcAbortSignal
-  readonly hooks: (event: IWebRpcHookEvent) => void
+  readonly transport: IRpcTransport
+  readonly signal: IRpcAbortSignal
+  readonly hooks: (event: IRpcHookEvent) => void
   readonly getPort: (key: PropertyKey) => unknown
   own<T>(resource: T, release: () => void | Promise<void>): T
 }
 
 /** Immutable extension/shared result returned by a WebRPC plugin install. */
-export type IWebRpcPluginInstallResult = {
+export type IRpcPluginInstallResult = {
   readonly extension: Readonly<Record<string, unknown>>
   readonly ports: Readonly<Record<PropertyKey, unknown>>
 }
 
 /** Public item contract used by migrated middleware without widening its component contribution. */
-export type IWebRpcPlugin<TComponents extends object = {}> = {
+export type IRpcPlugin<TComponents extends object = {}> = {
   readonly name: string
-  readonly metadata: IWebRpcPluginMetadata
+  readonly metadata: IRpcPluginMetadata
   /** Discovery mode retained on the native descriptor for factory conditional typing. */
-  readonly discoveryMode?: IWebRpcDiscoveryMode
+  readonly discoveryMode?: IRpcDiscoveryMode
   /** Ping capability retained on the native descriptor for factory conditional typing. */
   readonly pingCapability?: true
   /** Runtime component slots stay opaque until tuple selection proves their exact contribution. */
@@ -291,26 +280,28 @@ export type IWebRpcPlugin<TComponents extends object = {}> = {
   readonly codec?: unknown
   readonly framer?: unknown
   readonly install: (
-    scope: IWebRpcPluginInstallScope
-  ) => IWebRpcPluginInstallResult | Promise<IWebRpcPluginInstallResult>
+    scope: IRpcPluginInstallScope
+  ) => IRpcPluginInstallResult | Promise<IRpcPluginInstallResult>
 } & Readonly<TComponents>
 
 /** One factory tuple may contain legacy WebRPC middleware or direct PluginHost middleware. */
-export type IWebRpcMiddleware = IWebRpcPlugin | IWebRpcNativeMiddleware
-export type IWebRpcFactoryConfig<
+export type IRpcMiddleware = IRpcPlugin | IRpcNativeMiddleware
+export type IRpcFactoryConfig<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[],
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[],
   TEnvelope extends IRpcEnvelope = IRpcEnvelope,
   TEncoded = unknown,
   TFrame = TEncoded
 > = {
   /** Stable local endpoint identity included in every routed protocol envelope. */
   readonly id: string
+  /** Endpoint clock and timers; the same injected instance also drives PluginHost deadlines. */
+  readonly scheduler?: import('@migaia/utils/promise').IUtilsScheduler
   /** Optional known-peer seed; automatic discovery may resolve additional target ids lazily. */
   readonly targetIds?: readonly TTargetId[]
   /** Transport receives exactly the selected framer output, except an explicit opaque sink. */
-  readonly transport?: IWebRpcTransport<TFrame>
+  readonly transport?: IRpcTransport<TFrame>
   /** Semantic descriptor feeding the codec edge in the canonical endpoint pipeline. */
   readonly protocol?: IRpcProtocol<TEnvelope, string, number>
   /** Codec whose output must match the selected framer input exactly. */
@@ -318,9 +309,9 @@ export type IWebRpcFactoryConfig<
   /** Framer whose output is the value delivered to the selected transport. */
   readonly framer?: IRpcFramer<TEncoded, TFrame, string, number>
   /** Initial provider methods registered before endpoint construction completes. */
-  readonly provider?: Readonly<Record<string, IWebRpcProvider>>
+  readonly provider?: Readonly<Record<string, IRpcProvider>>
   /** Provider concurrency budgets; defaults to 256 global and 64 per peer. */
-  readonly providerLimits?: IWebRpcProviderLimits
+  readonly providerLimits?: IRpcProviderLimits
   /** Bounds outbound identifier replay reservations for this endpoint. */
   readonly replay?: {
     /** Maximum retained outbound request identifiers; defaults to 4096. */
@@ -335,7 +326,7 @@ export type IWebRpcFactoryConfig<
   /** Cancellation and deadline controls for middleware installation and rollback. */
   readonly construction?: {
     /** Aborts construction while still rolling back every installed middleware. */
-    readonly signal?: IWebRpcAbortSignal
+    readonly signal?: IRpcAbortSignal
     /** Bounds endpoint construction, or disables the deadline when explicitly `false`. */
     readonly timeoutMs?: number | false
   }
@@ -346,11 +337,10 @@ export type IWebRpcFactoryConfig<
  * capability from an ordinary `connect()` descriptor.
  */
 type INativeMiddlewareComponentContribution<TMiddleware> =
-  TMiddleware extends IWebRpcNativeMiddleware &
-    IWebRpcMiddlewareComponentContribution<infer TComponents>
+  TMiddleware extends IRpcNativeMiddleware & IRpcMiddlewareComponentContribution<infer TComponents>
     ? TComponents
     : never
-export type IFactoryDiscoveryMode<TMiddlewares extends readonly IWebRpcMiddleware[]> = [
+export type IFactoryDiscoveryMode<TMiddlewares extends readonly IRpcMiddleware[]> = [
   Extract<
     TMiddlewares[number] | INativeMiddlewareComponentContribution<TMiddlewares[number]>,
     { readonly discoveryMode: 'manual' }
@@ -369,58 +359,54 @@ type IRequiredPingCapability<TMiddleware> = TMiddleware extends object
     : false
   : false
 /** Selects the public ping surface only when a middleware actually requires that capability. */
-export type IFactoryPingCapability<TMiddlewares extends readonly IWebRpcMiddleware[]> =
+export type IFactoryPingCapability<TMiddlewares extends readonly IRpcMiddleware[]> =
   true extends IRequiredPingCapability<
     TMiddlewares[number] | INativeMiddlewareComponentContribution<TMiddlewares[number]>
   >
     ? true
     : false
-export type IWebRpcPingEndpointSurface<TPing extends boolean> = boolean extends TPing
+export type IRpcPingEndpointSurface<TPing extends boolean> = boolean extends TPing
   ? {
-      ping(targetId: string, receiverId?: string, options?: IWebRpcPingOptions): Promise<boolean>
-      pingAll(): Promise<IWebRpcFanoutResult<boolean>>
+      ping(targetId: string, receiverId?: string, options?: IRpcPingOptions): Promise<boolean>
+      pingAll(): Promise<IRpcFanoutResult<boolean>>
     }
   : TPing extends true
     ? {
-        ping(targetId: string, receiverId?: string, options?: IWebRpcPingOptions): Promise<boolean>
-        pingAll(): Promise<IWebRpcFanoutResult<boolean>>
+        ping(targetId: string, receiverId?: string, options?: IRpcPingOptions): Promise<boolean>
+        pingAll(): Promise<IRpcFanoutResult<boolean>>
       }
     : {}
-export type IWebRpcPingOptions = {
+export type IRpcPingOptions = {
   readonly timeoutMs?: number | false
-  readonly signal?: IWebRpcAbortSignal
+  readonly signal?: IRpcAbortSignal
 }
-export type IWebRpcEndpoint<
+export type IRpcEndpoint<
   TTargetId extends string = string,
-  TMode extends IWebRpcDiscoveryMode = 'automatic',
+  TMode extends IRpcDiscoveryMode = 'automatic',
   TPing extends boolean = boolean
 > = {
-  provide(method: string, provider: IWebRpcProvider): IWebRpcEndpoint<TTargetId, TMode, TPing>
-  on(event: string, listener: IWebRpcEventListener): () => void
+  provide(method: string, provider: IRpcProvider): IRpcEndpoint<TTargetId, TMode, TPing>
+  on(event: string, listener: IRpcEventListener): () => void
   send<T>(targetId: TTargetId, method: string, data: unknown, options?: ISendOptions): Promise<T>
-  sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IWebRpcFanoutResult<T>>
+  sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IRpcFanoutResult<T>>
   dispatch(targetId: TTargetId, method: string, data: unknown): void
   dispatchAll(method: string, data: unknown): void
-  readonly connect: IWebRpcConnectControlForMode<TTargetId, TMode>
-  readonly discovery: IWebRpcDiscoveryControl<TTargetId>
-  readonly hooks: { on(listener: IWebRpcHook): () => void }
+  readonly connect: IRpcConnectControlForMode<TTargetId, TMode>
+  readonly discovery: IRpcDiscoveryControl<TTargetId>
+  readonly hooks: { on(listener: IRpcHook): () => void }
   dispose(): Promise<void>
-} & IWebRpcPingEndpointSurface<TPing>
-export type IWebRpcEndpointFactory = <
+} & IRpcPingEndpointSurface<TPing>
+export type IRpcEndpointFactory = <
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[]
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares>
+  config: IRpcFactoryConfig<TTargetId, TMiddlewares>
 ) => Promise<
-  IWebRpcEndpoint<
-    TTargetId,
-    IFactoryDiscoveryMode<TMiddlewares>,
-    IFactoryPingCapability<TMiddlewares>
-  >
+  IRpcEndpoint<TTargetId, IFactoryDiscoveryMode<TMiddlewares>, IFactoryPingCapability<TMiddlewares>>
 >
-export type IWebRpcPublicError = IWebRpcError
+export type IRpcPublicError = IRpcError
 /** Structural cancellation signal used by the public API without requiring DOM typings. */
-export type IWebRpcAbortSignal = {
+export type IRpcAbortSignal = {
   readonly aborted: boolean
   readonly reason?: unknown
   addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void

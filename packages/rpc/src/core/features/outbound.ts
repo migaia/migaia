@@ -1,29 +1,29 @@
-import { WebRpcOutboundAttachment } from '../internal/outbound-attachment.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcOutboundAttachment } from '../internal/outbound-attachment.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import { registerEndpointDebugSnapshot } from '../internal/test-observer.js'
-import type { IWebRpcFeature } from '../feature.js'
+import type { IRpcFeature } from '../feature.js'
 import { createCanonicalChunkFeature } from './canonical-chunk.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from '../internal/define-rpc-feature.js'
 import type {
   IOutboundCapability,
   IOutboundInstallation,
-  IWebRpcOutboundCommandObservation
+  IRpcOutboundCommandObservation
 } from '../internal/feature-contract.js'
-import type { IWebRpcEndpoint } from '../typing.js'
+import type { IRpcEndpoint } from '../typing.js'
 import {
-  WebRpcPortName,
-  type IWebRpcDiscoveryResolverPort,
-  type IWebRpcInboundIdentityPort,
-  type IWebRpcIdentityCommand,
-  type IWebRpcOutboundOperationsPort,
-  type IWebRpcResponseOutboundCommand,
-  type IWebRpcSynchronousOutboundCommand,
-  type IWebRpcOutboundCommand,
-  type IWebRpcOutboundSend,
-  type IWebRpcVariationAdmissionRequest,
-  type IWebRpcVariationCoordinatorPort
+  RpcPortName,
+  type IRpcDiscoveryResolverPort,
+  type IRpcInboundIdentityPort,
+  type IRpcIdentityCommand,
+  type IRpcOutboundOperationsPort,
+  type IRpcResponseOutboundCommand,
+  type IRpcSynchronousOutboundCommand,
+  type IRpcOutboundCommand,
+  type IRpcOutboundSend,
+  type IRpcVariationAdmissionRequest,
+  type IRpcVariationCoordinatorPort
 } from '../internal/plugin-shared-keys.js'
 
 /**
@@ -31,14 +31,14 @@ import {
  * pipeline.
  */
 export type IOutboundSurface = Pick<
-  IWebRpcEndpoint,
+  IRpcEndpoint,
   'send' | 'sendAll' | 'dispatch' | 'dispatchAll' | 'hooks'
 >
 
 /** Creates the native outbound Feature; allocation waits for endpoint-capabilities installation. */
 export const createOutboundFeature = (
   canonicalChunk: ReturnType<typeof createCanonicalChunkFeature>
-): IWebRpcFeature<
+): IRpcFeature<
   IOutboundCapability,
   { readonly canonicalChunk: ReturnType<typeof createCanonicalChunkFeature> },
   IEndpointCapabilitiesFeatureExpose
@@ -61,24 +61,24 @@ export const createOutboundFeature = (
         }
       },
       (core, dependencies) => {
-        let attachment: WebRpcOutboundAttachment | undefined
-        let resolver: IWebRpcDiscoveryResolverPort | undefined
+        let attachment: RpcOutboundAttachment | undefined
+        let resolver: IRpcDiscoveryResolverPort | undefined
         let installation: IOutboundInstallation | undefined
-        const requireAttachment = (): WebRpcOutboundAttachment => {
+        const requireAttachment = (): RpcOutboundAttachment => {
           if (!attachment)
-            throw new WebRpcError(
-              WebRpcErrorCode.invalidConfig,
-              WebRpcErrorText.endpointModuleInvalid
+            throw new RpcError(
+              RpcCoreErrorCode.invalidConfig,
+              RpcCoreErrorText.endpointModuleInvalid
             )
           return attachment
         }
         const prepare = (
-          scope: import('../typing.js').IWebRpcPluginInstallScope
+          scope: import('../typing.js').IRpcPluginInstallScope
         ): IOutboundInstallation => {
           if (installation) return installation
           dependencies.canonicalChunk.prepare(scope)
           const prepared = core.featureExpose.getPrepared()
-          attachment = new WebRpcOutboundAttachment(
+          attachment = new RpcOutboundAttachment(
             core.featureExpose.getKernel(),
             prepared,
             () => resolver
@@ -90,25 +90,23 @@ export const createOutboundFeature = (
             core.featureExpose.observeOutboundCommand
           )
           const publicSurface: IOutboundSurface = Object.freeze({
-            send: <T>(...args: Parameters<IWebRpcEndpoint['send']>) => attachment!.send<T>(...args),
-            sendAll: <T>(...args: Parameters<IWebRpcEndpoint['sendAll']>) =>
+            send: <T>(...args: Parameters<IRpcEndpoint['send']>) => attachment!.send<T>(...args),
+            sendAll: <T>(...args: Parameters<IRpcEndpoint['sendAll']>) =>
               attachment!.sendAll<T>(...args),
-            dispatch: (...args: Parameters<IWebRpcEndpoint['dispatch']>) =>
+            dispatch: (...args: Parameters<IRpcEndpoint['dispatch']>) =>
               attachment!.dispatch(...args),
-            dispatchAll: (...args: Parameters<IWebRpcEndpoint['dispatchAll']>) =>
+            dispatchAll: (...args: Parameters<IRpcEndpoint['dispatchAll']>) =>
               attachment!.dispatchAll(...args),
             hooks: attachment!.hooks
           })
           registerEndpointDebugSnapshot(publicSurface, () => attachment!.debugSnapshot())
           installation = Object.freeze({
             public: publicSurface,
-            inboundIdentity: ports[WebRpcPortName.inboundIdentity] as IWebRpcInboundIdentityPort,
-            outboundOperations: ports[
-              WebRpcPortName.outboundOperations
-            ] as IWebRpcOutboundOperationsPort,
+            inboundIdentity: ports[RpcPortName.inboundIdentity] as IRpcInboundIdentityPort,
+            outboundOperations: ports[RpcPortName.outboundOperations] as IRpcOutboundOperationsPort,
             variationCoordinator: ports[
-              WebRpcPortName.variationCoordinator
-            ] as IWebRpcVariationCoordinatorPort,
+              RpcPortName.variationCoordinator
+            ] as IRpcVariationCoordinatorPort,
             activate: () => attachment!.activate()
           })
           return installation
@@ -120,16 +118,16 @@ export const createOutboundFeature = (
           activate: () => requireAttachment().activate(),
           ports,
           getHooks: () => requireAttachment().hooks,
-          connectResolver: (port: IWebRpcDiscoveryResolverPort) => {
+          connectResolver: (port: IRpcDiscoveryResolverPort) => {
             resolver = port
           },
-          send: <T>(...args: Parameters<IWebRpcEndpoint['send']>) =>
+          send: <T>(...args: Parameters<IRpcEndpoint['send']>) =>
             requireAttachment().send<T>(...args),
-          sendAll: <T>(...args: Parameters<IWebRpcEndpoint['sendAll']>) =>
+          sendAll: <T>(...args: Parameters<IRpcEndpoint['sendAll']>) =>
             requireAttachment().sendAll<T>(...args),
-          dispatch: (...args: Parameters<IWebRpcEndpoint['dispatch']>) =>
+          dispatch: (...args: Parameters<IRpcEndpoint['dispatch']>) =>
             requireAttachment().dispatch(...args),
-          dispatchAll: (...args: Parameters<IWebRpcEndpoint['dispatchAll']>) =>
+          dispatchAll: (...args: Parameters<IRpcEndpoint['dispatchAll']>) =>
             requireAttachment().dispatchAll(...args)
         })
       },
@@ -140,17 +138,15 @@ export const createOutboundFeature = (
 
 /** Publishes the original narrow outbound ports from the canonical attachment owner. */
 function createOutboundSharedPorts(
-  owner: WebRpcOutboundAttachment,
-  observeOutboundCommand?: (observation: IWebRpcOutboundCommandObservation) => void
+  owner: RpcOutboundAttachment,
+  observeOutboundCommand?: (observation: IRpcOutboundCommandObservation) => void
 ): Readonly<Record<PropertyKey, unknown>> {
-  const verify: IWebRpcInboundIdentityPort['verify'] = (command: IWebRpcIdentityCommand) => {
+  const verify: IRpcInboundIdentityPort['verify'] = (command: IRpcIdentityCommand) => {
     if (command.operation === 'admit') return owner.inboundIdentity.admit(command.request)
     if (command.operation === 'retain') return owner.inboundIdentity.retain(command.token)
     owner.inboundIdentity.release(command.token)
   }
-  const admit: IWebRpcVariationCoordinatorPort['admit'] = (
-    value: IWebRpcVariationAdmissionRequest
-  ) => {
+  const admit: IRpcVariationCoordinatorPort['admit'] = (value: IRpcVariationAdmissionRequest) => {
     if (value.operation === 'register')
       return owner.variations.register(value.variation, value.handler)
     if (value.operation === 'consumeAbort') return owner.variations.consumeAbort(value.key)
@@ -158,9 +154,9 @@ function createOutboundSharedPorts(
       return owner.variations.abort(value.key, value.controller, value.expiresAt, value.reason)
     return undefined
   }
-  function send(command: IWebRpcResponseOutboundCommand): Promise<void>
-  function send(command: IWebRpcSynchronousOutboundCommand): void
-  function send(command: IWebRpcOutboundCommand): Promise<void> | void {
+  function send(command: IRpcResponseOutboundCommand): Promise<void>
+  function send(command: IRpcSynchronousOutboundCommand): void
+  function send(command: IRpcOutboundCommand): Promise<void> | void {
     const observe = (result: void | Promise<void>, error?: unknown): void => {
       if (!observeOutboundCommand) return
       try {
@@ -168,7 +164,7 @@ function createOutboundSharedPorts(
           Object.freeze({ command, result, ...(error === undefined ? {} : { error }) })
         )
       } catch (observerError) {
-        owner.emitFailure(observerError, WebRpcErrorCode.internal)
+        owner.emitFailure(observerError, RpcCoreErrorCode.internal)
       }
     }
     try {
@@ -211,14 +207,14 @@ function createOutboundSharedPorts(
     }
   }
   return Object.freeze({
-    [WebRpcPortName.inboundIdentity]: Object.freeze({
+    [RpcPortName.inboundIdentity]: Object.freeze({
       verify
-    } satisfies IWebRpcInboundIdentityPort),
-    [WebRpcPortName.variationCoordinator]: Object.freeze({
+    } satisfies IRpcInboundIdentityPort),
+    [RpcPortName.variationCoordinator]: Object.freeze({
       admit
-    } satisfies IWebRpcVariationCoordinatorPort),
-    [WebRpcPortName.outboundOperations]: Object.freeze({
-      send: send as IWebRpcOutboundSend
-    } satisfies IWebRpcOutboundOperationsPort)
+    } satisfies IRpcVariationCoordinatorPort),
+    [RpcPortName.outboundOperations]: Object.freeze({
+      send: send as IRpcOutboundSend
+    } satisfies IRpcOutboundOperationsPort)
   })
 }

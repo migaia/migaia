@@ -1,7 +1,7 @@
-import type { IWebRpcPlugin, IWebRpcPluginInstallResult, IWebRpcUuidConfig } from '../typing.js'
-import { WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
-import { WebRpcPortName } from '../internal/plugin-shared-keys.js'
+import type { IRpcPlugin, IRpcPluginInstallResult, IRpcUuidConfig } from '../typing.js'
+import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
+import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 
 const emptyClaims = Object.freeze({
@@ -14,34 +14,34 @@ const emptyClaims = Object.freeze({
 })
 
 /** Creates the native UUID role with an immutable install-time generator snapshot. */
-function createUuidPlugin(config: IWebRpcUuidConfig): IWebRpcPlugin {
+function createUuidPlugin(config: IRpcUuidConfig): IRpcPlugin {
   return Object.freeze({
     name: 'middleware:uuid',
     metadata: Object.freeze({
       claims: emptyClaims,
-      sharedProvides: WebRpcFirstPartyRoleSchema.uuid.sharedProvides,
-      sharedConsumes: WebRpcFirstPartyRoleSchema.uuid.sharedConsumes,
-      sharedOptionalConsumes: WebRpcFirstPartyRoleSchema.uuid.sharedOptionalConsumes
+      sharedProvides: RpcFirstPartyRoleSchema.uuid.sharedProvides,
+      sharedConsumes: RpcFirstPartyRoleSchema.uuid.sharedConsumes,
+      sharedOptionalConsumes: RpcFirstPartyRoleSchema.uuid.sharedOptionalConsumes
     }),
-    install: (): IWebRpcPluginInstallResult => {
+    install: (): IRpcPluginInstallResult => {
       if (!config || typeof config !== 'object' || Array.isArray(config))
-        throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'uuid descriptor is invalid')
-      let generate: IWebRpcUuidConfig['generate']
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'uuid descriptor is invalid')
+      let generate: IRpcUuidConfig['generate']
       try {
         generate = config.generate
       } catch (error) {
-        throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'uuid descriptor is unreadable', error)
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'uuid descriptor is unreadable', error)
       }
       if (generate !== undefined && typeof generate !== 'function')
-        throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'uuid generate must be a function')
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'uuid generate must be a function')
       return {
         extension: Object.freeze({}),
-        ports: Object.freeze({ [WebRpcPortName.uuid]: Object.freeze({ generate }) })
+        ports: Object.freeze({ [RpcPortName.uuid]: Object.freeze({ generate }) })
       }
     }
   })
 }
 
 /** Creates a UUID middleware whose generator is read only during Host installation. */
-export const uuid = (config: IWebRpcUuidConfig = {}): IWebRpcPlugin =>
+export const uuid = (config: IRpcUuidConfig = {}): IRpcPlugin =>
   freezePlugin(createUuidPlugin(config))

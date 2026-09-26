@@ -1,18 +1,18 @@
 import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle'
-import { WebRpcAbortError, WebRpcConfigurationError, WebRpcTimeoutError } from '../errors.js'
-import { WebRpcErrorText } from '../error-text.js'
+import { RpcAbortError, RpcConfigurationError, RpcTimeoutError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import { raceWithAsyncControl } from './async-control.js'
-import type { IWebRpcAbortSignal, IWebRpcHookEvent } from '../typing.js'
-import type { IWebRpcTransport } from '../transport.js'
-import { createEndpointTimePort, type IEndpointTimePort } from './time-port.js'
-import type { IWebRpcPluginInstallScope } from './plugin-contract.js'
+import type { IRpcAbortSignal, IRpcHookEvent } from '../typing.js'
+import type { IRpcTransport } from '../transport.js'
+import type { IEndpointTimePort } from './time-port.js'
+import type { IRpcPluginInstallScope } from './plugin-contract.js'
 
 /** Clock capability used to calculate one construction deadline across all plugin installs. */
-export type IWebRpcConstructionTime = IEndpointTimePort
+export type IRpcConstructionTime = IEndpointTimePort
 
 /** Immutable batch-entry construction signal and absolute deadline snapshot. */
-export type IWebRpcConstructionControl = {
-  readonly signal: IWebRpcAbortSignal
+export type IRpcConstructionControl = {
+  readonly signal: IRpcAbortSignal
   readonly time: IEndpointTimePort
   readonly deadlineAt: number | undefined
   remaining(): number | false | undefined
@@ -21,35 +21,23 @@ export type IWebRpcConstructionControl = {
 
 /** Creates the one construction control shared by every plugin in a batch. */
 export function createConstructionControl(options: {
-  readonly signal: IWebRpcAbortSignal
+  readonly signal: IRpcAbortSignal
   readonly timeoutMs?: number | false
-  readonly time?: IWebRpcConstructionTime
-}): IWebRpcConstructionControl {
+  readonly time: IRpcConstructionTime
+}): IRpcConstructionControl {
   const timeoutMs = options.timeoutMs
   if (
     timeoutMs !== undefined &&
     timeoutMs !== false &&
     (!Number.isFinite(timeoutMs) || timeoutMs < 0)
   )
-    throw new WebRpcConfigurationError(WebRpcErrorText.timeoutInvalid)
-  /** Snapshot the optional time capability once so hostile getters cannot change ownership. */
-  const suppliedTime = options.time
-  /** Whether this control owns the default endpoint time port and must dispose it. */
-  const ownsTime = suppliedTime === undefined
-  const time = suppliedTime ?? createEndpointTimePort()
+    throw new RpcConfigurationError(RpcCoreErrorText.timeoutInvalid)
+  /** Construction borrows the kernel-owned time capability. */
+  const time = options.time
   /** Snapshot the caller signal once so construction observes one source identity. */
   const sourceSignal = options.signal
-  let deadlineAt: number | undefined
-  try {
-    deadlineAt = timeoutMs === undefined || timeoutMs === false ? undefined : time.now() + timeoutMs
-  } catch (error) {
-    if (ownsTime) {
-      try {
-        time.dispose()
-      } catch {}
-    }
-    throw error
-  }
+  const deadlineAt =
+    timeoutMs === undefined || timeoutMs === false ? undefined : time.now() + timeoutMs
   const controller = new AbortController()
   const onSourceAbort = (): void => controller.abort(sourceSignal.reason)
   try {
@@ -66,10 +54,9 @@ export function createConstructionControl(options: {
       sourceSignal.removeEventListener('abort', onSourceAbort)
     } catch {}
     controller.abort()
-    if (ownsTime) time.dispose()
   }
   return Object.freeze({
-    signal: controller.signal as IWebRpcAbortSignal,
+    signal: controller.signal as IRpcAbortSignal,
     time,
     deadlineAt,
     remaining: (): number | false | undefined =>
@@ -79,11 +66,11 @@ export function createConstructionControl(options: {
 }
 
 /** Construction budget and host registration required by the one-plugin install gate. */
-export type IWebRpcConstructionInstallOptions = {
+export type IRpcConstructionInstallOptions = {
   readonly id: string
-  readonly transport: IWebRpcTransport
-  readonly control: IWebRpcConstructionControl
-  readonly hooks: (event: IWebRpcHookEvent) => void
+  readonly transport: IRpcTransport
+  readonly control: IRpcConstructionControl
+  readonly hooks: (event: IRpcHookEvent) => void
   readonly getPort?: (key: PropertyKey) => unknown
   readonly report?: (error: unknown) => void
   readonly registerScope: (
@@ -95,8 +82,8 @@ export type IWebRpcConstructionInstallOptions = {
 
 /** Runs one plugin body under the absolute construction gate and late-resource ownership scope. */
 export function runConstructionInstall<T>(
-  options: IWebRpcConstructionInstallOptions,
-  install: (scope: IWebRpcPluginInstallScope) => T | PromiseLike<T>
+  options: IRpcConstructionInstallOptions,
+  install: (scope: IRpcPluginInstallScope) => T | PromiseLike<T>
 ): Promise<T> {
   const report = (error: unknown): void => {
     try {
@@ -175,21 +162,21 @@ export function runConstructionInstall<T>(
   if (options.control.signal.aborted) {
     closeGate()
     options.control.close()
-    return Promise.reject(new WebRpcAbortError(undefined, undefined, options.control.signal.reason))
+    return Promise.reject(new RpcAbortError(undefined, undefined, options.control.signal.reason))
   }
   if (timeoutMs === 0) {
     closeGate()
     options.control.close()
-    return Promise.reject(new WebRpcTimeoutError())
+    return Promise.reject(new RpcTimeoutError())
   }
   return raceWithAsyncControl({
+    time: options.control.time,
     operation: start,
     timeoutMs,
     signals: [options.control.signal],
     onTimeout: closeGate,
-    createTimeoutError: () => new WebRpcTimeoutError(),
-    createAbortError: (reason) => new WebRpcAbortError(undefined, undefined, reason),
-    createTimer: (task, delayMs) => options.control.time.setTimeout(task, delayMs),
+    createTimeoutError: () => new RpcTimeoutError(),
+    createAbortError: (reason) => new RpcAbortError(undefined, undefined, reason),
     onSetupFailure: () => closeGate(),
     onDiagnostic: report
   })

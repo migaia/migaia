@@ -3,8 +3,8 @@ import {
   type IFeatureFactory,
   type IFeatureRecord
 } from '@migaia/plugin-host'
-import type { IWebRpcFeature } from '../feature.js'
-import type { IWebRpcPluginClaims } from '../typing.js'
+import type { IRpcFeature } from '../feature.js'
+import type { IRpcPluginClaims } from '../typing.js'
 import { registerPrivateFeaturePolicy } from './feature-policy.js'
 
 /**
@@ -19,14 +19,14 @@ export const defineRpcFeature = <
   policy: Readonly<{
     readonly publicKeys: readonly string[]
     readonly conflicts?: readonly string[]
-    readonly claims: IWebRpcPluginClaims
+    readonly claims: IRpcPluginClaims
     /** Shared inputs required by this native root's own preparation boundary. */
     readonly sharedConsumes?: readonly PropertyKey[]
   }>,
   install: IFeatureFactory<TExpose, TDependencies, TSurface>,
   dependencies: TDependencies
-): IWebRpcFeature<TSurface, TDependencies, TExpose> => {
+): IRpcFeature<TSurface, TDependencies, TExpose> => {
   const feature = defineNativeFeature(install, dependencies)
   registerPrivateFeaturePolicy(feature, policy, policy.claims)
-  return feature as IWebRpcFeature<TSurface, TDependencies, TExpose>
+  return feature as IRpcFeature<TSurface, TDependencies, TExpose>
 }

@@ -1,12 +1,17 @@
-import { WebRpcErrorText } from '../error-text.js'
-import { WEBRPC_SOURCE, WebRpcErrorCode, tagWebRpcError, type IWebRpcErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
+import {
+  RPC_CORE_ERROR_SOURCE,
+  RpcCoreErrorCode,
+  tagRpcError,
+  type IRpcCoreErrorCode
+} from '../errors.js'
 
 /** Canonical WebRPC codes accepted on an already package-tagged native error. */
-const WEBRPC_ERROR_CODES: ReadonlySet<unknown> = new Set(Object.values(WebRpcErrorCode))
+const RPC_ERROR_CODES: ReadonlySet<unknown> = new Set(Object.values(RpcCoreErrorCode))
 
 /** Describes how a listener boundary identifies and surfaces collected failures. */
 export type IListenerFailureBoundary = Readonly<{
-  code?: IWebRpcErrorCode
+  code?: IRpcCoreErrorCode
   message?: string
   secondaryFailures?: IListenerFailureState | readonly IListenerFailureState[]
   aggregateSingle?: boolean
@@ -126,10 +131,10 @@ function hasWebRpcErrorIdentity(error: Error): boolean {
   return (
     source !== undefined &&
     'value' in source &&
-    source.value === WEBRPC_SOURCE &&
+    source.value === RPC_CORE_ERROR_SOURCE &&
     code !== undefined &&
     'value' in code &&
-    WEBRPC_ERROR_CODES.has(code.value)
+    RPC_ERROR_CODES.has(code.value)
   )
 }
 
@@ -152,13 +157,13 @@ export function createListenerFailure(
   boundary: IListenerFailureBoundary = {}
 ): Error | undefined {
   if (errors.length === 0) return undefined
-  const code = boundary.code ?? WebRpcErrorCode.internal
+  const code = boundary.code ?? RpcCoreErrorCode.internal
   if (errors.length === 1 && boundary.aggregateSingle !== true && errors[0] instanceof Error) {
     if (hasWebRpcErrorIdentity(errors[0])) return errors[0]
-    return tagWebRpcError(errors[0], code)
+    return tagRpcError(errors[0], code)
   }
-  return tagWebRpcError(
-    new AggregateError(errors, boundary.message ?? WebRpcErrorText.listenerCleanupFailed),
+  return tagRpcError(
+    new AggregateError(errors, boundary.message ?? RpcCoreErrorText.listenerCleanupFailed),
     code
   )
 }
@@ -205,7 +210,7 @@ export function registerListeners(
   } catch (error) {
     drainListenerFailures([error, ...collectListenerCleanupFailures(registered)], {
       ...boundary,
-      message: boundary.message ?? WebRpcErrorText.listenerRegistrationCleanupFailed
+      message: boundary.message ?? RpcCoreErrorText.listenerRegistrationCleanupFailed
     })
   }
 }

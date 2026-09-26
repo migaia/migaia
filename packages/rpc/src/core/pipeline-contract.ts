@@ -1,9 +1,9 @@
 import { rpcProtocolV1, type IRpcEnvelope } from '../contract/index.js'
 import type { identityCodecV1 } from '@migaia/serialize/codec'
 import type { messageFramerV1 } from '../contract/framing/index.js'
-import type { IWebRpcFactoryConfig, IWebRpcMiddleware } from './typing.js'
-import type { IWebRpcFeature, IWebRpcFiniteFeatureTuple } from './feature.js'
-import type { IWebRpcTransport, IWebRpcSendOptions } from './transport.js'
+import type { IRpcFactoryConfig, IRpcMiddleware } from './typing.js'
+import type { IRpcFeature, IRpcFiniteFeatureTuple } from './feature.js'
+import type { IRpcTransport, IRpcSendOptions } from './transport.js'
 
 /** Extracts the first parameter of a callback without widening it to unknown. */
 type IArg<T> = T extends (value: infer TValue, ...rest: never[]) => unknown ? TValue : never
@@ -36,7 +36,7 @@ type IComponent<T, TKey extends PropertyKey, TDefault> = T extends {
   : IMiddlewareContribution<IMiddlewares<T>, TKey, TDefault>
 type ICodec<T> = IComponent<T, 'codec', typeof identityCodecV1>
 type IFramer<T> = IComponent<T, 'framer', typeof messageFramerV1>
-type ITransport<T> = IComponent<T, 'transport', IWebRpcTransport<unknown>>
+type ITransport<T> = IComponent<T, 'transport', IRpcTransport<unknown>>
 type IEnvelope<T> =
   IComponent<T, 'protocol', typeof rpcProtocolV1> extends {
     readonly normalize: infer TValue
@@ -79,13 +79,13 @@ type IAnyComponent<T> =
 
 /** Retains configured middleware tuple precision. */
 export type IMiddlewares<T> = T extends {
-  readonly middlewares: infer TValue extends readonly IWebRpcMiddleware[]
+  readonly middlewares: infer TValue extends readonly IRpcMiddleware[]
 }
   ? TValue
   : readonly []
 /** Retains configured custom-feature tuple precision. */
 export type IFeatures<T> = T extends {
-  readonly features: infer TValue extends readonly IWebRpcFeature[]
+  readonly features: infer TValue extends readonly IRpcFeature[]
 }
   ? TValue
   : readonly []
@@ -96,32 +96,32 @@ export type ITarget<T> = T extends { readonly targetIds: readonly (infer TValue 
 
 /** Input shape for public factories before directed pipeline compatibility is proven. */
 export type ICheckedInput = Omit<
-  IWebRpcFactoryConfig,
+  IRpcFactoryConfig,
   'protocol' | 'codec' | 'framer' | 'transport' | 'features' | 'middlewares'
 > & {
   readonly protocol?: unknown
   readonly codec?: unknown
   readonly framer?: unknown
   readonly transport?: unknown
-  readonly middlewares: readonly IWebRpcMiddleware[]
-  readonly features?: readonly IWebRpcFeature[]
+  readonly middlewares: readonly IRpcMiddleware[]
+  readonly features?: readonly IRpcFeature[]
 }
 
 /** Retains explicit default-factory calls while fixing their send boundary to semantic envelopes. */
 export type ILegacyDefault<
   TTarget extends string,
-  TMiddlewares extends readonly IWebRpcMiddleware[],
-  TFeatures extends readonly IWebRpcFeature[]
+  TMiddlewares extends readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[]
 > = Omit<
-  IWebRpcFactoryConfig<TTarget, TMiddlewares, TFeatures>,
+  IRpcFactoryConfig<TTarget, TMiddlewares, TFeatures>,
   'protocol' | 'codec' | 'framer' | 'transport'
 > & {
   readonly protocol?: never
   readonly codec?: never
   readonly framer?: never
-  readonly features?: IWebRpcFiniteFeatureTuple<TFeatures>
-  readonly transport?: Omit<IWebRpcTransport<unknown>, 'send'> & {
-    readonly send: (value: IRpcEnvelope, options?: IWebRpcSendOptions) => void | Promise<void>
+  readonly features?: IRpcFiniteFeatureTuple<TFeatures>
+  readonly transport?: Omit<IRpcTransport<unknown>, 'send'> & {
+    readonly send: (value: IRpcEnvelope, options?: IRpcSendOptions) => void | Promise<void>
   }
 }
 
@@ -134,7 +134,7 @@ export type IChecked<TConfig> =
         ? [IFrameOutput<TConfig>] extends [ISend<TConfig>]
           ? [IIncoming<TConfig>] extends [IAcceptInput<TConfig>]
             ? IEqual<IAccepted<TConfig>, IDecodeInput<TConfig>> extends true
-              ? { readonly features?: IWebRpcFiniteFeatureTuple<IFeatures<TConfig>> }
+              ? { readonly features?: IRpcFiniteFeatureTuple<IFeatures<TConfig>> }
               : never
             : never
           : never

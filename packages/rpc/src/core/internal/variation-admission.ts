@@ -26,7 +26,7 @@ export class VariationAdmissionRegistry {
   }
 
   /** Atomically admits one unique variation before invoking its handler. */
-  admit(peerKey: string, key: string, now = Date.now()): boolean {
+  admit(peerKey: string, key: string, now: number): boolean {
     this.purge(now)
     if (!this.#replay.canAdmit(key, peerKey, now)) return false
     if (this.#total >= this.#maxTotal) return false
@@ -43,7 +43,7 @@ export class VariationAdmissionRegistry {
   }
 
   /** Consumes only bounded admission budget, preserving legacy control-owner semantics. */
-  admitBudget(peerKey: string, now = Date.now()): boolean {
+  admitBudget(peerKey: string, now: number): boolean {
     this.purge(now)
     if (this.#total >= this.#maxTotal) return false
     const current = this.#admissions.get(peerKey)
@@ -67,7 +67,7 @@ export class VariationAdmissionRegistry {
   }
 
   /** Purges replay entries and resets expired admission windows. */
-  purge(now = Date.now()): void {
+  purge(now: number): void {
     this.#replay.purge(now)
     if (now - this.#windowStartedAt >= this.#windowMs) {
       this.#admissions.clear()

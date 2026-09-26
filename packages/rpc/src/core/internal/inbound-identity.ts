@@ -2,9 +2,9 @@ import { VerifiedPeerRegistry } from './identity.js'
 import { SourceIdentityRegistry } from './source-identity.js'
 import { tupleKey } from './safe-value.js'
 import { recordInboundIdentityRelease } from './test-observer.js'
-import type { IWebRpcConnectCapability } from '../typing.js'
-import type { IWebRpcInboundMessage, IWebRpcTransportTopology } from '../transport.js'
-import type { IWebRpcPlatform } from '../typing.js'
+import type { IRpcConnectCapability } from '../typing.js'
+import type { IRpcInboundMessage, IRpcTransportTopology } from '../transport.js'
+import type { IRpcPlatform } from '../typing.js'
 
 /** Result of shared inbound identity admission; token is leased until release. */
 export type IInboundIdentityAdmission = {
@@ -27,7 +27,7 @@ export type IInboundIdentityRequest = {
   readonly senderId: string
   readonly targetId: string
   readonly data: unknown
-  readonly inbound?: IWebRpcInboundMessage
+  readonly inbound?: IRpcInboundMessage
 }
 
 /** Narrow lifecycle-neutral identity surface shared with chunk and D95 consumers. */
@@ -47,12 +47,12 @@ export class InboundIdentityCoordinator {
   /** Verified binding and reference-count owner. */
   readonly #peers: VerifiedPeerRegistry
   /** Adapter/connect verification snapshot shared by all inbound features. */
-  readonly #connect: IWebRpcConnectCapability | undefined
+  readonly #connect: IRpcConnectCapability | undefined
   /** Adapter source proof is the first fail-closed admission check. */
   readonly #sourceProof: ((source: unknown, origin?: string) => boolean) | undefined
   /** Platform and topology context passed to connect verification. */
-  readonly #platform: IWebRpcPlatform
-  readonly #topology: IWebRpcTransportTopology | undefined
+  readonly #platform: IRpcPlatform
+  readonly #topology: IRpcTransportTopology | undefined
   /** Discovery-established peer leases reused by later frames on source-less transports. */
   readonly #established = new Map<string, string>()
   /** Exact prepared receipts prevent copied, foreign, or replayed source admission. */
@@ -62,17 +62,19 @@ export class InboundIdentityCoordinator {
 
   /** Creates one endpoint-local identity owner without subscribing or allocating feature state. */
   constructor(options: {
-    readonly connect?: IWebRpcConnectCapability
+    /** Endpoint clock forwarded to the verified binding registry. */
+    readonly now: () => number
+    readonly connect?: IRpcConnectCapability
     readonly sourceProof?: (source: unknown, origin?: string) => boolean
-    readonly platform: IWebRpcPlatform
-    readonly topology?: IWebRpcTransportTopology
+    readonly platform: IRpcPlatform
+    readonly topology?: IRpcTransportTopology
     readonly peers?: VerifiedPeerRegistry
   }) {
     this.#connect = options.connect
     this.#sourceProof = options.sourceProof
     this.#platform = options.platform
     this.#topology = options.topology
-    this.#peers = options.peers ?? new VerifiedPeerRegistry()
+    this.#peers = options.peers ?? new VerifiedPeerRegistry(options.now)
   }
 
   /** Reports whether a stable peer token is a valid identity value without creating a lease. */

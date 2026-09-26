@@ -1,9 +1,9 @@
-import type { IWebRpcEventListener, IWebRpcProvider } from '../typing.js'
+import type { IRpcEventListener, IRpcProvider } from '../typing.js'
 
 /** Owns provider and event routing tables for one endpoint. */
 export class ProviderRegistry {
-  readonly providers = new Map<string, IWebRpcProvider>()
-  readonly events = new Map<string, IWebRpcEventListener[]>()
+  readonly providers = new Map<string, IRpcProvider>()
+  readonly events = new Map<string, IRpcEventListener[]>()
 
   /** Removes all application callbacks during endpoint disposal. */
   clear(): void {
@@ -11,14 +11,14 @@ export class ProviderRegistry {
     this.events.clear()
   }
   /** Registers a provider and rejects duplicate method ownership. */
-  register(method: string, provider: IWebRpcProvider): boolean {
+  register(method: string, provider: IRpcProvider): boolean {
     if (this.providers.has(method)) return false
     this.providers.set(method, provider)
     return true
   }
 
   /** Registers an event listener and returns its idempotent disposer. */
-  listen(event: string, listener: IWebRpcEventListener): () => void {
+  listen(event: string, listener: IRpcEventListener): () => void {
     const listeners = this.events.get(event) ?? []
     listeners.push(listener)
     this.events.set(event, listeners)
@@ -32,12 +32,12 @@ export class ProviderRegistry {
   }
 
   /** Looks up an inbound provider. */
-  getProvider(method: string): IWebRpcProvider | undefined {
+  getProvider(method: string): IRpcProvider | undefined {
     return this.providers.get(method)
   }
 
   /** Returns listeners for one event without exposing the registry map. */
-  getListeners(event: string): readonly IWebRpcEventListener[] | undefined {
+  getListeners(event: string): readonly IRpcEventListener[] | undefined {
     return this.events.get(event)
   }
 }

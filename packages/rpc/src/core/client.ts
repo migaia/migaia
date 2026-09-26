@@ -1,24 +1,24 @@
 import { createComposedEndpoint } from './composed.js'
 import { createClientFirstPartyRoots } from './internal/client-first-party-roots.js'
-import type { IWebRpcKernelSurface } from './composed.js'
+import type { IRpcKernelSurface } from './composed.js'
 import type { IOutboundSurface } from './features/outbound.js'
-import type { IWebRpcFeature, IWebRpcFeatureSurface } from './feature.js'
-import type { IWebRpcFactoryConfig, IWebRpcMiddleware } from './typing.js'
+import type { IRpcFeature, IRpcFeatureSurface } from './feature.js'
+import type { IRpcFactoryConfig, IRpcMiddleware } from './typing.js'
 
 /** Creates client preset using the statically selected outbound feature. */
 function createClientEndpointRuntime<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
-    readonly features?: import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>
+  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+    readonly features?: import('./feature.js').IRpcFiniteFeatureTuple<TFeatures>
   }
-): Promise<IWebRpcKernelSurface & IOutboundSurface & IWebRpcFeatureSurface<TFeatures>> {
+): Promise<IRpcKernelSurface & IOutboundSurface & IRpcFeatureSurface<TFeatures>> {
   return createComposedEndpoint(
-    config as unknown as IWebRpcFactoryConfig<string, readonly IWebRpcMiddleware[], readonly []>,
+    config as unknown as IRpcFactoryConfig<string, readonly IRpcMiddleware[], readonly []>,
     createClientFirstPartyRoots()
-  ) as Promise<IWebRpcKernelSurface & IOutboundSurface & IWebRpcFeatureSurface<TFeatures>>
+  ) as Promise<IRpcKernelSurface & IOutboundSurface & IRpcFeatureSurface<TFeatures>>
 }
 
 import type { IChecked, ICheckedInput, IFeatures, ILegacyDefault } from './pipeline-contract.js'
@@ -27,14 +27,14 @@ import type { IChecked, ICheckedInput, IFeatures, ILegacyDefault } from './pipel
 type IPublicCallable = {
   <const TConfig extends ICheckedInput>(
     config: TConfig & IChecked<TConfig>
-  ): Promise<IWebRpcKernelSurface & IOutboundSurface & IWebRpcFeatureSurface<IFeatures<TConfig>>>
+  ): Promise<IRpcKernelSurface & IOutboundSurface & IRpcFeatureSurface<IFeatures<TConfig>>>
   <
     TTargetId extends string = string,
-    TMiddlewares extends readonly IWebRpcMiddleware[] = readonly IWebRpcMiddleware[],
-    TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+    TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+    TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
   >(
     config: ILegacyDefault<TTargetId, TMiddlewares, TFeatures>
-  ): Promise<IWebRpcKernelSurface & IOutboundSurface & IWebRpcFeatureSurface<TFeatures>>
+  ): Promise<IRpcKernelSurface & IOutboundSurface & IRpcFeatureSurface<TFeatures>>
 }
 
 /** Checked public boundary delegates to the existing client runtime. */

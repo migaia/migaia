@@ -1,19 +1,20 @@
-import type { IWebRpcTransport } from '../../core/transport.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../../core/transport-constants.js'
-import { WebRpcErrorCode } from '../../core/errors.js'
+import type { IRpcTransport } from '../../core/transport-kit.js'
 import {
+  RpcPlatform,
+  RpcTransportOwnership,
   collectListenerFailure,
   createListenerFailureState,
+  createMessageListenerHub,
   drainListenerFailures,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
   reportListenerFailure
-} from '../../core/internal/listener-safety.js'
-import { createMessageListenerHub } from '../../core/internal/message-listener-hub.js'
+} from '../../core/transport-kit.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 
 /** Adapts BroadcastChannel for tab-to-tab and storage-backed coordination. */
-export function createBroadcastChannelTransport(channel: BroadcastChannel): IWebRpcTransport {
+export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport {
   const listeners = createMessageListenerHub<{
     data: unknown
     origin?: string
@@ -43,9 +44,9 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
     })
   }
   return {
-    platform: WebRpcPlatform.broadcastChannel,
+    platform: RpcPlatform.broadcastChannel,
     topology: 'broadcast',
-    ownership: WebRpcTransportOwnership.borrowed,
+    ownership: RpcTransportOwnership.borrowed,
     send(message) {
       channel.postMessage(message)
     },
@@ -58,7 +59,7 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
               remove: () => channel.removeEventListener('message', onMessage)
             }
           ],
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       )
       return () => {
@@ -66,7 +67,7 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
         releaseListenerRegistration(
           listeners.size === 1 ? [() => channel.removeEventListener('message', onMessage)] : [],
           () => listeners.remove(listener, () => undefined),
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -85,7 +86,7 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
             remove: () => channel.removeEventListener('messageerror', wrapper)
           }
         ],
-        { code: WebRpcErrorCode.transport, secondaryFailures }
+        { code: RpcCoreErrorCode.transport, secondaryFailures }
       )
       transportErrorWrappers.add(wrapper)
       return () => {
@@ -95,7 +96,7 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
           () => {
             transportErrorWrappers.delete(wrapper)
           },
-          { code: WebRpcErrorCode.transport, secondaryFailures }
+          { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
@@ -103,7 +104,7 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
       listenerErrors.add(listener)
       return () => {
         const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     }
