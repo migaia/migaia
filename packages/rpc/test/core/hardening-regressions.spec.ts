@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEndpoint } from '../../src/core/index.js'
 import { connect } from '../../src/core/middleware/connect.js'
-import type { IWebRpcTransport } from '../../src/core/transport.js'
+import type { IRpcTransport } from '../../src/core/transport.js'
 import { splitUtf8 } from '../../src/core/internal/utf8.js'
 import { ReplayWindow } from '../../src/core/internal/replay.js'
 import { VerifiedPeerRegistry } from '../../src/core/internal/identity.js'
@@ -24,7 +24,7 @@ describe('#1 splitUtf8 会产出超过 maxBytes 的分片，接收端必然拒�
 
 describe('#2 ReplayWindow 出站 id 账本满了之后不再记录', () => {
   it('容量用尽后 reserveId 恒为 false，调用方只能抛 overloaded', () => {
-    const replay = new ReplayWindow(4, 310_000)
+    const replay = new ReplayWindow(() => Date.now(), 4, 310_000)
     expect(replay.reserveId('a')).toBe(true)
     expect(replay.reserveId('b')).toBe(true)
     expect(replay.reserveId('c')).toBe(true)
@@ -38,7 +38,7 @@ describe('#2 ReplayWindow 出站 id 账本满了之后不再记录', () => {
 
 describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍序列化但不再声称 opaque，见类注释）', () => {
   it('token 保留可观测的自增序列号（随机后缀只增加熵，不隐藏计数）', () => {
-    const registry = new VerifiedPeerRegistry()
+    const registry = new VerifiedPeerRegistry(() => Date.now())
     const first = registry.register('sender-1', 'peer', 'https://a.example')
     const second = registry.register('sender-2', 'peer', 'https://b.example')
     expect(first).toMatch(/^verified-peer-1-/)
@@ -46,7 +46,7 @@ describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍�
   })
 
   it('容量按 origin 分桶，refs>0 的 binding 在硬上限内不被 idle-TTL 回收（不代表永不回收，见下一条 hard-lifetime 用例）', () => {
-    const registry = new VerifiedPeerRegistry(1024, 2, 1)
+    const registry = new VerifiedPeerRegistry(() => Date.now(), 1024, 2, 1)
     const a = registry.register('s1', '', 'https://x.example') as string
     const b = registry.register('s2', '', 'https://x.example') as string
     registry.retain(a)
@@ -58,7 +58,7 @@ describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍�
   it('WR5 修复验证：origin 容量最终会被 hard lifetime 强制释放，不是永久自锁', () => {
     vi.useFakeTimers()
     try {
-      const registry = new VerifiedPeerRegistry(1024, 2, 1) // maxBindingLifetimeMs = 1*100 = 100ms
+      const registry = new VerifiedPeerRegistry(() => Date.now(), 1024, 2, 1) // maxBindingLifetimeMs = 1*100 = 100ms
       const a = registry.register('s1', '', 'https://x.example') as string
       const b = registry.register('s2', '', 'https://x.example') as string
       registry.retain(a)
@@ -75,7 +75,7 @@ describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍�
   it('WR-R3-1 修复：retain() 自身在命中 token 后也会检查 hard lifetime，不再需要先调 has() 才能触发回收', () => {
     vi.useFakeTimers()
     try {
-      const registry = new VerifiedPeerRegistry(10, 2, 10) // maxBindingLifetimeMs = 10*100 = 1000ms
+      const registry = new VerifiedPeerRegistry(() => Date.now(), 10, 2, 10) // maxBindingLifetimeMs = 10*100 = 1000ms
       const token = registry.register('retained') as string
       expect(registry.retain(token)).toBe(true)
       vi.advanceTimersByTime(1_001) // 越过 hard lifetime，且不调用 has()
@@ -179,7 +179,7 @@ describe('second adversarial pass (R3, fixed)', () => {
   it('WR-R3-1 fixed: retain() enforces the hard binding lifetime even when called directly (not only via has())', () => {
     vi.useFakeTimers()
     try {
-      const registry = new VerifiedPeerRegistry(10, 10, 10)
+      const registry = new VerifiedPeerRegistry(() => Date.now(), 10, 10, 10)
       const token = registry.register('peer') as string
       vi.advanceTimersByTime(1_001)
       // No has() call in between — this exercises retain()'s own enforcement, not a side effect
@@ -191,7 +191,7 @@ describe('second adversarial pass (R3, fixed)', () => {
   })
 
   it('WR-R3-2 fixed: factory reads replay config in the upfront snapshot, before any middleware side effects', async () => {
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       platform: 'Memory',
       send() {},
       subscribe() {

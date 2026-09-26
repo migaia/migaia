@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { allocateRpcId } from '../../../src/core/internal/id.js'
-import type { IWebRpcUuidConfig } from '../../../src/core/typing.js'
+import type { IRpcUuidConfig } from '../../../src/core/typing.js'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -23,7 +23,7 @@ describe('allocateRpcId', () => {
         if (reads === 1) return () => 'first'
         throw new Error('second getter read')
       }
-    } as unknown as IWebRpcUuidConfig
+    } as unknown as IRpcUuidConfig
 
     expect(allocateRpcId(config, 'message', 'sender', 'target', () => false)).toBe(
       'MESSAGE:sender:first'
@@ -37,7 +37,7 @@ describe('allocateRpcId', () => {
       get generate() {
         throw cause
       }
-    } as unknown as IWebRpcUuidConfig
+    } as unknown as IRpcUuidConfig
 
     expect(() => allocateRpcId(config, 'message', 'sender', 'target', () => false)).toThrow(
       expect.objectContaining({
@@ -57,7 +57,7 @@ describe('allocateRpcId', () => {
   })
 
   it('rejects a configured non-callable generator before invoking it', () => {
-    const config = { generate: 42 } as unknown as IWebRpcUuidConfig
+    const config = { generate: 42 } as unknown as IRpcUuidConfig
 
     expect(() => allocateRpcId(config, 'message', 'sender', 'target', () => false)).toThrow(
       expect.objectContaining({
@@ -69,7 +69,7 @@ describe('allocateRpcId', () => {
 
   it('codes a generator invocation failure and preserves an Error cause', () => {
     const cause = new Error('generator invocation')
-    const config: IWebRpcUuidConfig = {
+    const config: IRpcUuidConfig = {
       generate: () => {
         throw cause
       }
@@ -86,7 +86,7 @@ describe('allocateRpcId', () => {
 
   it('codes a non-Error generator invocation failure and preserves the thrown value', () => {
     const cause = Object.freeze({ reason: 'hostile generator failure' })
-    const config: IWebRpcUuidConfig = {
+    const config: IRpcUuidConfig = {
       generate: () => {
         throw cause
       }
@@ -102,7 +102,7 @@ describe('allocateRpcId', () => {
     (result) => {
       const config = {
         generate: () => result
-      } as IWebRpcUuidConfig
+      } as IRpcUuidConfig
 
       expect(() => allocateRpcId(config, 'task', 'sender', 'target', () => false)).toThrow(
         expect.objectContaining({
@@ -116,7 +116,7 @@ describe('allocateRpcId', () => {
   it('rejects a Promise returned by a synchronous generator as an invalid result', () => {
     const config = {
       generate: () => Promise.resolve('async-id')
-    } as unknown as IWebRpcUuidConfig
+    } as unknown as IRpcUuidConfig
 
     expect(() => allocateRpcId(config, 'message', 'sender', 'target', () => false)).toThrow(
       expect.objectContaining({
@@ -127,7 +127,7 @@ describe('allocateRpcId', () => {
   })
 
   it('rejects a generated identifier collision', () => {
-    const config: IWebRpcUuidConfig = { generate: () => 'collision' }
+    const config: IRpcUuidConfig = { generate: () => 'collision' }
 
     expect(() => allocateRpcId(config, 'message', 'sender', 'target', () => true)).toThrow(
       expect.objectContaining({

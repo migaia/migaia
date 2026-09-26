@@ -24,11 +24,24 @@ const retiredSuites = new Set([
   'delivery-successor-transaction.test.ts',
   'intended-cost-custody.test.ts'
 ])
+/** Exact historical titles retired by rpc-layering R5 after deleting unused control code. */
+const retiredLayeringTitles = new Set([
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry purges expired unordered aborts before applying its hard cap',
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry deduplicates control tasks before they reach the wire owner',
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry keeps variation admission in the control owner',
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry does not consume variation quota when replay capacity is full',
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry requires a boolean lease decision and skips tombstones when retain rejects',
+  'packages/web-rpc/test/internal/async-control.test.ts::async control removes abort listeners when delay completes',
+  'packages/web-rpc/test/internal/async-control.test.ts::async control rolls back earlier delay listeners when a later registration fails',
+  'packages/web-rpc/test/internal/async-control.test.ts::async control observes delay listener cleanup failures without replacing the result',
+  'packages/web-rpc/test/internal-ownership-boundaries.test.ts::internal ownership boundary semantics keeps control and variation admission duplicate-safe and expiry-aware'
+])
 
-/** Map a frozen title to its required new file and unchanged test name. */
+/** Map each non-retired frozen title to its required current file and test name. */
 function migratedTitle(title: string): string | undefined {
   const [file, name] = title.split('::')
-  if (retiredSuites.has(file.split('/').at(-1) ?? '')) return undefined
+  if (retiredSuites.has(file.split('/').at(-1) ?? '') || retiredLayeringTitles.has(title))
+    return undefined
   let path: string
   if (file.startsWith('packages/rpc-contract/test/')) {
     path = file.replace('packages/rpc-contract/test/', 'packages/rpc/test/contract/')
@@ -40,10 +53,15 @@ function migratedTitle(title: string): string | undefined {
   } else {
     path = file.replace('packages/web-rpc/test/', 'packages/rpc/test/core/')
   }
-  const mappedName = name.replace(
-    'publishes only runtime-neutral root/framing exports and dependencies',
-    'publishes only runtime-neutral contract/framing exports with an explicit dependency allowlist'
-  )
+  const mappedName = name
+    .replace(
+      'publishes only runtime-neutral root/framing exports and dependencies',
+      'publishes only runtime-neutral contract/framing exports with an explicit dependency allowlist'
+    )
+    .replace('tagWebRpcError keeps', 'tagRpcError keeps')
+    .replace('38 unique codes', '22 unique codes')
+    .replace('a WebRpcLifecycleError', 'a RpcLifecycleError')
+    .replace('real WebRpcPluginHost Promise', 'real RpcPluginHost Promise')
   return `${path}::${mappedName}`
 }
 
@@ -109,8 +127,8 @@ describe('A7 migrated suite parity', () => {
     for (const file of testSources(join(packageRoot, 'test'))) {
       for (const literal of stringsIn(file)) {
         if (
-          /^(?:\.\.?\/)*src\/(?!contract\/|core\/|browser\/)/.test(literal) ||
-          /packages\/(?:rpc|web-rpc|rpc-contract)\/src\/(?!contract\/|core\/|browser\/)/.test(
+          /^(?:\.\.?\/)*src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$))/.test(literal) ||
+          /packages\/(?:rpc|web-rpc|rpc-contract)\/src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$))/.test(
             literal
           ) ||
           literal.includes(['src/core/', 'core.ts'].join('')) ||

@@ -1,25 +1,25 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  WebRpcAuthenticationError,
-  WebRpcError,
-  WebRpcErrorCode,
-  WebRpcSerializationError
+  RpcAuthenticationError,
+  RpcError,
+  RpcCoreErrorCode,
+  RpcSerializationError
 } from '../../../src/core/errors.js'
-import { WebRpcOutboundSender } from '../../../src/core/internal/outbound-sender.js'
-import { WebRpcErrorText } from '../../../src/core/error-text.js'
-import type { IWebRpcAuthenticationTransform } from '../../../src/core/typing.js'
-import type { IWebRpcTransport } from '../../../src/core/transport.js'
+import { RpcOutboundSender } from '../../../src/core/internal/outbound-sender.js'
+import { RpcCoreErrorText } from '../../../src/core/error-text.js'
+import type { IRpcAuthenticationTransform } from '../../../src/core/typing.js'
+import type { IRpcTransport } from '../../../src/core/transport.js'
 import { rpcProtocol, type IRpcEnvelope } from '../../../src/contract/v1/index.js'
 import { bindRpcFrameIngress } from '../../../src/contract/framing/index.js'
 import { messageFramer } from '../../../src/contract/framing/v1.js'
-import type { IWebRpcSelectedComponents } from '../../../src/core/internal/endpoint-options.js'
+import type { IRpcSelectedComponents } from '../../../src/core/internal/endpoint-options.js'
 
 /** Builds the same selected component boundary production passes to the outbound sender. */
 function selectedStringComponents(
   encode: (value: IRpcEnvelope) => string,
   decode: (value: unknown) => IRpcEnvelope = (value) => rpcProtocol.normalize(value),
-  framer: IWebRpcSelectedComponents['framer'] = messageFramer
-): IWebRpcSelectedComponents {
+  framer: IRpcSelectedComponents['framer'] = messageFramer
+): IRpcSelectedComponents {
   return {
     protocol: rpcProtocol,
     codec: { id: 'test-string', version: 1, encodedType: 'string', encode, decode },
@@ -32,15 +32,15 @@ function selectedStringComponents(
 /** Creates a guarded test descriptor that proves sender behavior across selected physical frames. */
 function selectedTwoFrameComponents(
   encode: (value: IRpcEnvelope) => string
-): IWebRpcSelectedComponents {
-  const framer: IWebRpcSelectedComponents['framer'] = {
+): IRpcSelectedComponents {
+  const framer: IRpcSelectedComponents['framer'] = {
     id: 'sender-test',
     version: 1,
     inputEncodedType: 'string',
     outputEncodedType: 'string',
     frame(value, context) {
       if (typeof value !== 'string')
-        throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodedType('string'))
+        throw new RpcSerializationError(RpcCoreErrorText.protocolEncodedType('string'))
       const frame = messageFramer.frame(value, context)
       return [...frame, ...frame]
     },
@@ -58,8 +58,8 @@ function selectedTwoFrameComponents(
 function selectedFailingFramerComponents(
   encode: (value: IRpcEnvelope) => string,
   failure: unknown
-): IWebRpcSelectedComponents {
-  const framer: IWebRpcSelectedComponents['framer'] = {
+): IRpcSelectedComponents {
+  const framer: IRpcSelectedComponents['framer'] = {
     id: 'sender-failing-test',
     version: 1,
     inputEncodedType: 'string',
@@ -98,8 +98,8 @@ function canonicalRequest(id = 'task'): IRpcEnvelope {
 
 describe('outbound sender encoded type boundary', () => {
   it('preserves a semantic encode error before framing', () => {
-    const admissionError = new WebRpcError(WebRpcErrorCode.overloaded, 'outbound capacity')
-    const pipeline = new WebRpcOutboundSender(
+    const admissionError = new RpcError(RpcCoreErrorCode.overloaded, 'outbound capacity')
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -121,7 +121,7 @@ describe('outbound sender encoded type boundary', () => {
     } catch (error) {
       thrown = error
     }
-    expect(thrown).toMatchObject({ code: WebRpcErrorCode.payloadInvalid, cause: admissionError })
+    expect(thrown).toMatchObject({ code: RpcCoreErrorCode.payloadInvalid, cause: admissionError })
   })
 
   it('prepares every authenticated selected frame before sending and retains first observed failure', async () => {
@@ -129,9 +129,9 @@ describe('outbound sender encoded type boundary', () => {
     let protectCalls = 0
     let rejectFirst: ((error: unknown) => void) | undefined
     let rejectSecond: ((error: unknown) => void) | undefined
-    const firstAuthenticationError = new WebRpcAuthenticationError('first authentication failure')
-    const secondAuthenticationError = new WebRpcAuthenticationError('second authentication failure')
-    const pipeline = new WebRpcOutboundSender(
+    const firstAuthenticationError = new RpcAuthenticationError('first authentication failure')
+    const secondAuthenticationError = new RpcAuthenticationError('second authentication failure')
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -169,8 +169,8 @@ describe('outbound sender encoded type boundary', () => {
   })
 
   it('keeps an authentication failure reachable through the sender boundary', async () => {
-    const authenticationError = new WebRpcAuthenticationError('authentication failure')
-    const pipeline = new WebRpcOutboundSender(
+    const authenticationError = new RpcAuthenticationError('authentication failure')
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -202,7 +202,7 @@ describe('outbound sender encoded type boundary', () => {
     {
       label: 'throws synchronously',
       createProtect:
-        (cause: Error): IWebRpcAuthenticationTransform =>
+        (cause: Error): IRpcAuthenticationTransform =>
         () => {
           throw cause
         }
@@ -210,20 +210,20 @@ describe('outbound sender encoded type boundary', () => {
     {
       label: 'rejects asynchronously',
       createProtect:
-        (cause: Error): IWebRpcAuthenticationTransform =>
+        (cause: Error): IRpcAuthenticationTransform =>
         () =>
           Promise.reject(cause)
     },
     {
       label: 'returns an invalid encoded value',
-      createProtect: (): IWebRpcAuthenticationTransform => () => 42
+      createProtect: (): IRpcAuthenticationTransform => () => 42
     }
   ])(
     'H-T18 classifies unchunked authentication $label as AUTHENTICATION_FAILED',
     async ({ label, createProtect }) => {
       const cause = new Error(`authentication ${label}`)
       let sends = 0
-      const pipeline = new WebRpcOutboundSender(
+      const pipeline = new RpcOutboundSender(
         {
           platform: 'Memory' as const,
           encodedType: 'string',
@@ -258,7 +258,7 @@ describe('outbound sender encoded type boundary', () => {
     {
       label: 'throws synchronously',
       createProtect:
-        (cause: Error): IWebRpcAuthenticationTransform =>
+        (cause: Error): IRpcAuthenticationTransform =>
         () => {
           throw cause
         }
@@ -266,20 +266,20 @@ describe('outbound sender encoded type boundary', () => {
     {
       label: 'rejects asynchronously',
       createProtect:
-        (cause: Error): IWebRpcAuthenticationTransform =>
+        (cause: Error): IRpcAuthenticationTransform =>
         () =>
           Promise.reject(cause)
     },
     {
       label: 'returns an invalid encoded value',
-      createProtect: (): IWebRpcAuthenticationTransform => () => 42
+      createProtect: (): IRpcAuthenticationTransform => () => 42
     }
   ])(
     'does not send framed messages when authentication $label',
     async ({ label, createProtect }) => {
       const cause = new Error(`frame authentication ${label}`)
       let sends = 0
-      const pipeline = new WebRpcOutboundSender(
+      const pipeline = new RpcOutboundSender(
         {
           platform: 'Memory' as const,
           encodedType: 'string',
@@ -311,7 +311,7 @@ describe('outbound sender encoded type boundary', () => {
   )
 
   it('preserves a class transport receiver for ordinary and chunked sends', async () => {
-    class PrivateTransport implements IWebRpcTransport {
+    class PrivateTransport implements IRpcTransport {
       #sendCount = 0
 
       readonly platform = 'Memory' as const
@@ -332,11 +332,11 @@ describe('outbound sender encoded type boundary', () => {
 
     const transport = new PrivateTransport()
     const components = selectedStringComponents(() => 'payload')
-    const pipeline = new WebRpcOutboundSender(transport, 'a', components, () => undefined)
+    const pipeline = new RpcOutboundSender(transport, 'a', components, () => undefined)
 
     await pipeline.send(canonicalRequest())
 
-    const secondPipeline = new WebRpcOutboundSender(
+    const secondPipeline = new RpcOutboundSender(
       transport,
       'a',
       selectedTwoFrameComponents(() => 'payload'),
@@ -357,7 +357,7 @@ describe('outbound sender encoded type boundary', () => {
       }
     })
     const sent: Array<{ value: unknown; transfer?: readonly unknown[] }> = []
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -400,7 +400,7 @@ describe('outbound sender encoded type boundary', () => {
     const physicalFailure = new Error('physical send failed')
     /** Rejects the held physical send only after the caller mutation assertions run. */
     let rejectPhysicalSend: ((reason?: unknown) => void) | undefined
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -433,13 +433,13 @@ describe('outbound sender encoded type boundary', () => {
       () => undefined,
       (error: unknown) => error
     )
-    expect(failure).toMatchObject({ code: WebRpcErrorCode.transport })
+    expect(failure).toMatchObject({ code: RpcCoreErrorCode.transport })
     expect((failure as { cause?: unknown }).cause).toBe(physicalFailure)
   })
 
   it('rejects a hostile transfer getter without sending', () => {
     let sends = 0
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -466,7 +466,7 @@ describe('outbound sender encoded type boundary', () => {
   it('reports one semantic encode failure before framing or transport send', async () => {
     let sends = 0
     const encodeError = new Error('frame encode failed')
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -483,14 +483,14 @@ describe('outbound sender encoded type boundary', () => {
       () => undefined
     )
 
-    expect(() => pipeline.send(canonicalRequest())).toThrow(WebRpcSerializationError)
+    expect(() => pipeline.send(canonicalRequest())).toThrow(RpcSerializationError)
     expect(sends).toBe(0)
   })
 
   it('protects variation frames through the authentication capability', async () => {
     let protectedValue: unknown
     let sentValue: unknown
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -520,7 +520,7 @@ describe('outbound sender encoded type boundary', () => {
 
   it('sends every physical frame selected by the canonical framer', async () => {
     const frames: unknown[] = []
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string' as const,
@@ -540,7 +540,7 @@ describe('outbound sender encoded type boundary', () => {
   it('encodes once and sends every frame produced by the selected framer', async () => {
     let encodes = 0
     const sends: unknown[] = []
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -563,7 +563,7 @@ describe('outbound sender encoded type boundary', () => {
 
   it('rejects a codec failure before send', () => {
     let sends = 0
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'any',
@@ -574,7 +574,7 @@ describe('outbound sender encoded type boundary', () => {
       },
       'a',
       selectedStringComponents(() => {
-        throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodedType('string'))
+        throw new RpcSerializationError(RpcCoreErrorText.protocolEncodedType('string'))
       }),
       () => undefined
     )
@@ -582,7 +582,7 @@ describe('outbound sender encoded type boundary', () => {
     expect(sends).toBe(0)
   })
   it('normalizes a synchronous transport throw into a rejected promise', async () => {
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'any',
@@ -600,7 +600,7 @@ describe('outbound sender encoded type boundary', () => {
     })
   })
   it('reports transport failure when any selected frame send fails', async () => {
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -619,7 +619,7 @@ describe('outbound sender encoded type boundary', () => {
     let rejectFirst: ((error: unknown) => void) | undefined
     let resolveSecond: (() => void) | undefined
     const firstFailure = new Error('first frame failed')
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -663,7 +663,7 @@ describe('outbound sender encoded type boundary', () => {
     const frameError = new Error('frame encode failed')
     let encodes = 0
     let sends = 0
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -686,7 +686,7 @@ describe('outbound sender encoded type boundary', () => {
     } catch (error) {
       thrown = error
     }
-    expect(thrown).toMatchObject({ code: WebRpcErrorCode.payloadInvalid, cause: frameError })
+    expect(thrown).toMatchObject({ code: RpcCoreErrorCode.payloadInvalid, cause: frameError })
     expect(encodes).toBe(1)
     expect(sends).toBe(0)
   })
@@ -694,7 +694,7 @@ describe('outbound sender encoded type boundary', () => {
   it('does not send when the selected codec rejects before framing', () => {
     const failure = new Error('selected codec failed')
     let sends = 0
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -709,13 +709,13 @@ describe('outbound sender encoded type boundary', () => {
       }),
       () => undefined
     )
-    expect(() => pipeline.send(canonicalRequest())).toThrow(WebRpcSerializationError)
+    expect(() => pipeline.send(canonicalRequest())).toThrow(RpcSerializationError)
     expect(sends).toBe(0)
   })
   it('does not send when a selected framer rejects', () => {
     const failure = new Error('selected framer failed')
     let sends = 0
-    const pipeline = new WebRpcOutboundSender(
+    const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
@@ -734,7 +734,7 @@ describe('outbound sender encoded type boundary', () => {
     } catch (error) {
       thrown = error
     }
-    expect(thrown).toMatchObject({ code: WebRpcErrorCode.payloadInvalid, cause: failure })
+    expect(thrown).toMatchObject({ code: RpcCoreErrorCode.payloadInvalid, cause: failure })
     expect(sends).toBe(0)
   })
 })

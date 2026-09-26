@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { createMemoryTransportPair } from '../../../src/core/adapters/memory.js'
 import { createFullEndpoint } from '../../../src/core/full.js'
 import { defineFeature } from '../../../src/core/feature.js'
-import { createComposedEndpoint, type IWebRpcCoreConfig } from '../../../src/core/composed.js'
-import { WebRpcErrorCode } from '../../../src/core/errors.js'
+import { createComposedEndpoint, type IRpcCoreConfig } from '../../../src/core/composed.js'
+import { RpcCoreErrorCode } from '../../../src/core/errors.js'
 import { connect } from '../../../src/core/middleware/connect.js'
 
 let configSequence = 0
 
 /** Creates a memory configuration whose subscription is observable before any install side effect. */
-function createConfig(onSubscribe: () => void): IWebRpcCoreConfig {
+function createConfig(onSubscribe: () => void): IRpcCoreConfig {
   const [transport] = createMemoryTransportPair()
   return {
     id: `topology-adapter-${++configSequence}`,
@@ -68,7 +68,7 @@ describe('capability topology adapter', () => {
         [] as never
       )
     ).rejects.toMatchObject({
-      code: WebRpcErrorCode.invalidConfig
+      code: RpcCoreErrorCode.invalidConfig
     })
     expect(subscriptions).toBe(0)
     expect(installs).toBe(0)

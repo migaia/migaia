@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createDescriptor, serializeRpcError } from '../../src/contract/index.js'
 import { ERROR_SOURCE as contractSource } from '../../src/contract/error-code.js'
-import { createEndpoint, WebRpcError } from '../../src/core/index.js'
+import { createEndpoint, RpcError } from '../../src/core/index.js'
 import { ERROR_SOURCE as coreSource } from '../../src/core/error-code.js'
 import { createWindowMessageTransport } from '../../src/browser/adapters/window.js'
 
@@ -25,7 +25,7 @@ describe('A4 source continuity through merged layers', () => {
     } catch (error) {
       caught = error
     }
-    expect(caught).toBeInstanceOf(WebRpcError)
+    expect(caught).toBeInstanceOf(RpcError)
     expect(caught).toMatchObject({ source: coreSource, code: 'INVALID_CONFIG' })
     expect(coreSource).toBe('@migaia/rpc/core')
     expect(serializeRpcError(caught as Error).source).toBe(coreSource)
@@ -40,7 +40,7 @@ describe('A4 source continuity through merged layers', () => {
     } catch (error) {
       caught = error
     }
-    expect(caught).toBeInstanceOf(WebRpcError)
+    expect(caught).toBeInstanceOf(RpcError)
     expect(caught).toMatchObject({ source: coreSource, code: 'INVALID_CONFIG' })
   })
 })

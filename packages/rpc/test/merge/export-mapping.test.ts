@@ -7,6 +7,16 @@ import legacyExports from '../fixtures/legacy-exports.json'
 /** Package root whose manifest and built files define the new public surface. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
+/** Applies the layered core naming decision to the frozen merge export snapshot. */
+function layeredName(name: string): string {
+  if (name === 'WEBRPC_SOURCE') return 'RPC_CORE_ERROR_SOURCE'
+  if (name === 'WebRpcErrorCode') return 'RpcCoreErrorCode'
+  if (name.startsWith('WebRpc')) return `Rpc${name.slice('WebRpc'.length)}`
+  if (name.startsWith('isWebRpc')) return `isRpc${name.slice('isWebRpc'.length)}`
+  if (name.startsWith('tagWebRpc')) return `tagRpc${name.slice('tagWebRpc'.length)}`
+  return name
+}
+
 /** Walk compiled core files to reject a second copy of the contract implementation. */
 function compiledCoreFiles(directory: string): string[] {
   if (!existsSync(directory)) return []
@@ -17,12 +27,12 @@ function compiledCoreFiles(directory: string): string[] {
 }
 
 describe('A1 merged public exports', () => {
-  it('preserves all 24 runtime export name sets through manifest resolution', async () => {
+  it('preserves the merged runtime export sets and the layered transport kit', async () => {
     const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
       exports: Record<string, { default: string; types: string }>
     }
-    const expected = Object.keys(legacyExports).sort()
-    expect(expected).toHaveLength(24)
+    const expected = [...Object.keys(legacyExports), '@migaia/rpc/core/transport-kit'].sort()
+    expect(expected).toHaveLength(25)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )
@@ -42,7 +52,11 @@ describe('A1 merged public exports', () => {
       expect(
         Object.keys(await import(pathToFileURL(join(packageRoot, relative)).href)).sort(),
         name
-      ).toEqual(baseline.names)
+      ).toEqual(
+        name.startsWith('@migaia/rpc/core')
+          ? baseline.names.map(layeredName).sort()
+          : baseline.names
+      )
       // A leaf export maps to its own source path; index entries map to directory roots.
       expect(relative, name).toBe(expectedRelative)
     }

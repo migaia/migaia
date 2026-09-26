@@ -1,3 +1,4 @@
+import { systemScheduler } from '@migaia/utils/promise'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -13,25 +14,25 @@ import { createProviderEndpoint } from '../../../src/core/provider.js'
 import { createClientFirstPartyRoots } from '../../../src/core/internal/client-first-party-roots.js'
 import {
   createFirstPartyRoots,
-  type IWebRpcFirstPartyRootName
+  type IRpcFirstPartyRootName
 } from '../../../src/core/internal/first-party-roots.js'
 import { authentication } from '../../../src/core/middleware/authentication.js'
 import { readEndpointDebugSnapshot } from '../../../src/core/internal/test-observer.js'
-import { WebRpcCanonicalChunkAttachment as WebRpcChunkAttachment } from '../../../src/core/internal/canonical-chunk-attachment.js'
-import { WebRpcDiscoveryAttachment } from '../../../src/core/internal/discovery-attachment.js'
+import { RpcCanonicalChunkAttachment as RpcChunkAttachment } from '../../../src/core/internal/canonical-chunk-attachment.js'
+import { RpcDiscoveryAttachment } from '../../../src/core/internal/discovery-attachment.js'
 import { createEndpointTimePort } from '../../../src/core/internal/time-port.js'
 import { connect } from '../../../src/core/middleware/connect.js'
 import { abort } from '../../../src/core/middleware/abort.js'
-import { WebRpcVariation } from '../../../src/core/semantic-constants.js'
+import { RpcVariation } from '../../../src/core/semantic-constants.js'
 import { SourceIdentityRegistry } from '../../../src/core/internal/source-identity.js'
-import { WebRpcVariationCoordinator } from '../../../src/core/internal/variation-coordinator.js'
-import { WebRpcOutboundAttachment } from '../../../src/core/internal/outbound-attachment.js'
+import { RpcVariationCoordinator } from '../../../src/core/internal/variation-coordinator.js'
+import { RpcOutboundAttachment } from '../../../src/core/internal/outbound-attachment.js'
 import { prepareEndpoint } from '../../../src/core/internal/endpoint-bootstrap.js'
-import { WebRpcPortName } from '../../../src/core/internal/plugin-shared-keys.js'
-import type { IWebRpcTransport } from '../../../src/core/transport.js'
+import { RpcPortName } from '../../../src/core/internal/plugin-shared-keys.js'
+import type { IRpcTransport } from '../../../src/core/transport.js'
 import type {
-  IWebRpcOutboundCommand,
-  IWebRpcOutboundOperationsPort
+  IRpcOutboundCommand,
+  IRpcOutboundOperationsPort
 } from '../../../src/core/internal/plugin-shared-keys.js'
 import {
   clientRuntimeOwnerKeys,
@@ -153,25 +154,28 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     expect(identities.token('peer')).toBe('source-string:peer')
 
     let now = 10
-    const coordinator = new WebRpcVariationCoordinator(() => now)
+    const coordinator = new RpcVariationCoordinator(
+      () => now,
+      () => Date.now()
+    )
     const received: string[] = []
-    const release = coordinator.register(WebRpcVariation.abort, (_message, peerKey) => {
+    const release = coordinator.register(RpcVariation.abort, (_message, peerKey) => {
       received.push(peerKey)
     })
-    expect(() => coordinator.register(WebRpcVariation.abort, () => undefined)).toThrow()
+    expect(() => coordinator.register(RpcVariation.abort, () => undefined)).toThrow()
     await expect(
-      coordinator.dispatch(WebRpcVariation.ping, 'missing-handler', {}, 'peer')
+      coordinator.dispatch(RpcVariation.ping, 'missing-handler', {}, 'peer')
     ).resolves.toBe(false)
-    await expect(
-      coordinator.dispatch(WebRpcVariation.abort, 'abort-task', {}, 'peer')
-    ).resolves.toBe(true)
-    await expect(
-      coordinator.dispatch(WebRpcVariation.abort, 'abort-task', {}, 'peer')
-    ).resolves.toBe(false)
+    await expect(coordinator.dispatch(RpcVariation.abort, 'abort-task', {}, 'peer')).resolves.toBe(
+      true
+    )
+    await expect(coordinator.dispatch(RpcVariation.abort, 'abort-task', {}, 'peer')).resolves.toBe(
+      false
+    )
     expect(received).toEqual(['peer'])
 
     release()
-    const replacementRelease = coordinator.register(WebRpcVariation.abort, () => undefined)
+    const replacementRelease = coordinator.register(RpcVariation.abort, () => undefined)
     release()
     replacementRelease()
 
@@ -193,7 +197,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
   it('closes endpoint-local timer callback and disposed-port branches', () => {
     vi.useFakeTimers()
     try {
-      const port = createEndpointTimePort()
+      const port = createEndpointTimePort(systemScheduler)
       const fired = vi.fn()
       const timer = port.setTimeout(fired, 5)
       const cancelled = port.setTimeout(vi.fn(), 5)
@@ -257,7 +261,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         middlewares: [connect({ transport: customTransport })]
       },
       createFirstPartyRoots(
-        new Set<IWebRpcFirstPartyRootName>([
+        new Set<IRpcFirstPartyRootName>([
           'first-party-chunk',
           'first-party-outbound',
           'first-party-provider',
@@ -336,7 +340,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
      * pair.
      */
     let forge = true
-    const forgedTransport: IWebRpcTransport = {
+    const forgedTransport: IRpcTransport = {
       ...clientBase,
       send: (value, options) =>
         clientBase.send(forge ? { ...(value as object), signature: 'forged' } : value, options)
@@ -394,7 +398,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
       })
       forge = false
       const [goodClientBase, goodServerTransport] = createMemoryTransportPair()
-      const goodClientTransport: IWebRpcTransport = {
+      const goodClientTransport: IRpcTransport = {
         ...goodClientBase,
         send: (value, options) =>
           goodClientBase.send(
@@ -515,7 +519,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
       ...messageFramer,
       close: (reason?: unknown) => reasons.push(reason)
     }
-    new WebRpcChunkAttachment(kernel, framer)
+    new RpcChunkAttachment(kernel, framer)
     expect(kernel.ownerKeys).toContain('chunk-assembler')
     await expect(kernel.dispatchRoute('chunk', {})).resolves.toBe(false)
     const reason = new Error('B11 bridge close')
@@ -538,9 +542,10 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     const prepared = await deferred.finalize(
       [],
       async (operation) => await operation(),
-      (key) => (key === WebRpcPortName.connect ? connectPort : undefined)
+      (key) => (key === RpcPortName.connect ? connectPort : undefined),
+      () => Date.now()
     )
-    const outbound = new WebRpcOutboundAttachment(kernel, prepared)
+    const outbound = new RpcOutboundAttachment(kernel, prepared)
     let sentQueryTask = ''
     const peerRelease = peerTransport.subscribe(({ data }) => {
       const frame = data as { readonly kind?: unknown; readonly id?: unknown }
@@ -566,7 +571,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         }
       })
     })
-    const attachment = new WebRpcDiscoveryAttachment(kernel, prepared, {
+    const attachment = new RpcDiscoveryAttachment(kernel, prepared, {
       inboundIdentity: {
         verify: (command) => {
           if (command.operation === 'admit') return outbound.inboundIdentity.admit(command.request)
@@ -575,7 +580,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         }
       },
       outboundOperations: {
-        send: ((command: IWebRpcOutboundCommand) => {
+        send: ((command: IRpcOutboundCommand) => {
           if (command.kind === 'response' || command.kind === 'frame')
             return outbound.sendFrame(command.message, command.transfer)
           if (command.kind === 'dispatch')
@@ -585,7 +590,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
           if (command.kind === 'diagnostic') return outbound.emitDiagnostic(command.event)
           if (command.kind === 'report') return outbound.emitFailure(command.error, command.code)
           return undefined
-        }) as IWebRpcOutboundOperationsPort['send']
+        }) as IRpcOutboundOperationsPort['send']
       },
       time: kernel.time,
       candidatePing: async () => false

@@ -9,10 +9,10 @@ import {
   timeout,
   uuid
 } from '../../../src/core/middleware/index.js'
-import type { IWebRpcPluginInstallResult } from '../../../src/core/typing.js'
+import type { IRpcPluginInstallResult } from '../../../src/core/typing.js'
 import { installPlugin, pluginScope } from './helpers.js'
-import { WebRpcErrorCode } from '../../../src/core/errors.js'
-import { WebRpcPortName } from '../../../src/core/internal/plugin-shared-keys.js'
+import { RpcCoreErrorCode } from '../../../src/core/errors.js'
+import { RpcPortName } from '../../../src/core/internal/plugin-shared-keys.js'
 
 describe('middleware capabilities', () => {
   it('installs concrete capability values for every built-in middleware', async () => {
@@ -36,12 +36,12 @@ describe('middleware capabilities', () => {
     expect(values.has('timeoutCapability')).toBe(true)
     expect(values.get('abortCapability')).toEqual({ enabled: true })
     expect(values.get('pingCapability')).toEqual({ enabled: true })
-    const protocolResult = protocol().install(pluginScope()) as IWebRpcPluginInstallResult
+    const protocolResult = protocol().install(pluginScope()) as IRpcPluginInstallResult
     const contractResult = contract({ version: '1' }).install(
       pluginScope()
-    ) as IWebRpcPluginInstallResult
-    expect(protocolResult.ports[WebRpcPortName.protocol]).toBeDefined()
-    expect(contractResult.ports[WebRpcPortName.contract]).toBeDefined()
+    ) as IRpcPluginInstallResult
+    expect(protocolResult.ports[RpcPortName.protocol]).toBeDefined()
+    expect(contractResult.ports[RpcPortName.contract]).toBeDefined()
   })
 
   it('rejects invalid middleware configuration during installation', async () => {
@@ -53,19 +53,19 @@ describe('middleware capabilities', () => {
   })
   it('rejects null built-in middleware descriptors with INVALID_CONFIG', () => {
     expect(() => protocol(null as never).install(pluginScope())).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
     expect(() => installPlugin(hooks(null as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
     expect(() => installPlugin(timeout(null as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
     expect(() => installPlugin(uuid(null as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
     expect(() => installPlugin(connect(null as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
   it('rejects unreadable protocol descriptors with INVALID_CONFIG', () => {
@@ -78,7 +78,7 @@ describe('middleware capabilities', () => {
       }
     )
     expect(() => protocol(unreadable as never).install(pluginScope())).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
   it('rejects unreadable hooks descriptors with INVALID_CONFIG', () => {
@@ -91,7 +91,7 @@ describe('middleware capabilities', () => {
       }
     )
     expect(() => installPlugin(hooks(unreadable as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
   it('rejects unreadable timeout descriptors with INVALID_CONFIG', () => {
@@ -104,7 +104,7 @@ describe('middleware capabilities', () => {
       }
     )
     expect(() => installPlugin(timeout(unreadable as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
   it('rejects unreadable uuid descriptors with INVALID_CONFIG', () => {
@@ -117,7 +117,7 @@ describe('middleware capabilities', () => {
       }
     )
     expect(() => installPlugin(uuid(unreadable as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
   it('rejects unreadable connect descriptors with INVALID_CONFIG', () => {
@@ -130,7 +130,7 @@ describe('middleware capabilities', () => {
       }
     )
     expect(() => installPlugin(connect(unreadable as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
 })

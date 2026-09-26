@@ -1,5 +1,7 @@
+import { systemScheduler } from '@migaia/utils/promise'
+import { createEndpointTimePort } from '../../src/core/internal/time-port.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createComposedEndpoint, type IWebRpcCoreConfig } from '../../src/core/composed.js'
+import { createComposedEndpoint, type IRpcCoreConfig } from '../../src/core/composed.js'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
@@ -7,14 +9,14 @@ import { defineRpcFeature } from '../../src/core/internal/define-rpc-feature.js'
 import { defineFeature } from '../../src/core/feature.js'
 import { createFirstPartyRoots } from '../../src/core/internal/first-party-roots.js'
 import { createEndpointProjection } from '../../src/core/internal/endpoint-projection.js'
-import { WebRpcErrorCode, WebRpcLifecycleError } from '../../src/core/errors.js'
+import { RpcCoreErrorCode, RpcLifecycleError } from '../../src/core/errors.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { createConstructionControl } from '../../src/core/internal/construction-install.js'
 import { createWebRpcPluginHost } from '../../src/core/internal/web-rpc-plugin-host.js'
 import { ReplayWindow } from '../../src/core/internal/replay.js'
 import { PeerRegistry } from '../../src/core/internal/peers.js'
 import { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
-import type { IWebRpcAbortSignal, IWebRpcPlugin } from '../../src/core/typing.js'
+import type { IRpcAbortSignal, IRpcPlugin } from '../../src/core/typing.js'
 import { createStringFramer } from '../../src/contract/framing/index.js'
 
 type IBuildCapabilityTopology =
@@ -51,8 +53,8 @@ function source(path: string): string {
 /** Creates a transport configuration whose physical subscription is observable. */
 function createConfig(
   onSubscribe: () => void,
-  middlewares: readonly IWebRpcPlugin[] = [connect()]
-): IWebRpcCoreConfig {
+  middlewares: readonly IRpcPlugin[] = [connect()]
+): IRpcCoreConfig {
   const [transport] = createMemoryTransportPair()
   return {
     id: `duplicate-owner-${Math.random()}`,
@@ -177,7 +179,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
     const host = createWebRpcPluginHost(
       'candidate-007',
       transport,
-      createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
+      createConstructionControl({
+        time: createEndpointTimePort(systemScheduler),
+        signal: new AbortController().signal as IRpcAbortSignal
+      }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
@@ -227,9 +232,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
     let now = 100
     let disposed = 0
     const control = createConstructionControl({
-      signal: new AbortController().signal as IWebRpcAbortSignal,
+      signal: new AbortController().signal as IRpcAbortSignal,
       timeoutMs: 50,
       time: {
+        scheduler: systemScheduler,
         now: () => now,
         setTimeout: () => ({ clear: () => undefined }),
         clearTimeout: (timer) => timer.clear(),
@@ -247,7 +253,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('proves MET-RED-011 keeps replay admission in ReplayWindow', () => {
-    const replay = new ReplayWindow(2, 1_000)
+    const replay = new ReplayWindow(() => Date.now(), 2, 1_000)
     expect(replay.reserveId('candidate-011')).toBe(true)
     expect(replay.reserveId('candidate-011')).toBe(false)
     replay.releaseId('candidate-011')
@@ -257,7 +263,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('proves MET-RED-012 keeps peer leases in PeerRegistry', () => {
-    const peers = new PeerRegistry<string>(2, 1_000)
+    const peers = new PeerRegistry<string>(() => Date.now(), 2, 1_000)
     peers.add('configured', true)
     peers.add('learned')
     expect(peers.snapshot()).toEqual(['configured', 'learned'])
@@ -339,7 +345,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
         createConfig(() => undefined),
         { 'first-party-first': first, 'first-party-second': second }
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(installs).toBe(0)
   })
 
@@ -349,14 +355,20 @@ describe('candidate-specific duplicate-owner contracts', () => {
     const firstHost = createWebRpcPluginHost(
       'candidate-019-first',
       firstTransport,
-      createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
+      createConstructionControl({
+        time: createEndpointTimePort(systemScheduler),
+        signal: new AbortController().signal as IRpcAbortSignal
+      }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
     const secondHost = createWebRpcPluginHost(
       'candidate-019-second',
       secondTransport,
-      createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
+      createConstructionControl({
+        time: createEndpointTimePort(systemScheduler),
+        signal: new AbortController().signal as IRpcAbortSignal
+      }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
@@ -392,9 +404,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
   it('proves MET-RED-023 uses one absolute construction deadline', () => {
     let now = 1_000
     const control = createConstructionControl({
-      signal: new AbortController().signal as IWebRpcAbortSignal,
+      signal: new AbortController().signal as IRpcAbortSignal,
       timeoutMs: 100,
       time: {
+        scheduler: systemScheduler,
         now: () => now,
         setTimeout: () => ({ clear: () => undefined }),
         clearTimeout: (timer) => timer.clear(),
@@ -529,12 +542,13 @@ describe('candidate-specific duplicate-owner contracts', () => {
   it('proves MET-RED-030 uses canonical configuration error semantics', () => {
     expect(() =>
       createConstructionControl({
-        signal: new AbortController().signal as IWebRpcAbortSignal,
+        time: createEndpointTimePort(systemScheduler),
+        signal: new AbortController().signal as IRpcAbortSignal,
         timeoutMs: -1
       })
-    ).toThrow(expect.objectContaining({ code: WebRpcErrorCode.invalidConfig }))
+    ).toThrow(expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig }))
     expect(source('../../src/core/internal/construction-install.ts')).toContain(
-      'WebRpcConfigurationError'
+      'RpcConfigurationError'
     )
   })
 
@@ -544,7 +558,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
     const host = createWebRpcPluginHost(
       'candidate-032',
       transport,
-      createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
+      createConstructionControl({
+        time: createEndpointTimePort(systemScheduler),
+        signal: new AbortController().signal as IRpcAbortSignal
+      }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
       () => [{ resource: 'candidate-032', error: cleanup }]
@@ -560,7 +577,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     })
     const failure = await host.dispose().catch((error: unknown) => error)
     expect(failure).toMatchObject({
-      code: WebRpcErrorCode.endpointDisposed,
+      code: RpcCoreErrorCode.endpointDisposed,
       cause: cleanup,
       cleanupErrors: [{ resource: 'candidate-032', error: cleanup }]
     })
@@ -604,7 +621,10 @@ describe('MET-RED-022/035 projection and public lifecycle surface', () => {
     const webRpcHost = createWebRpcPluginHost(
       'duplicate-owner-disposal',
       hostTransport,
-      createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
+      createConstructionControl({
+        time: createEndpointTimePort(systemScheduler),
+        signal: new AbortController().signal as IRpcAbortSignal
+      }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
       () => [{ resource: 'resource disposer', error: cleanup }]
@@ -621,10 +641,10 @@ describe('MET-RED-022/035 projection and public lifecycle surface', () => {
     const hostDispose = webRpcHost.dispose()
     expect(webRpcHost.dispose()).toBe(hostDispose)
     const failure = await hostDispose.catch((error: unknown) => error)
-    expect(failure).toBeInstanceOf(WebRpcLifecycleError)
+    expect(failure).toBeInstanceOf(RpcLifecycleError)
     expect(failure).toMatchObject({
       source: '@migaia/rpc/core',
-      code: WebRpcErrorCode.endpointDisposed,
+      code: RpcCoreErrorCode.endpointDisposed,
       cause: cleanup,
       cleanupErrors: [{ resource: 'resource disposer', error: cleanup }]
     })
@@ -719,7 +739,7 @@ describe('MET-RED-003/024/039/040 capability topology admission', () => {
         createConfig(() => subscriptions++),
         { 'first-party-blocked': blocked, 'first-party-conflicting': conflicting }
       )
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(conflictInstalls).toBe(0)
     expect(subscriptions).toBe(0)
     expect(topologyMock.build).toHaveBeenCalled()

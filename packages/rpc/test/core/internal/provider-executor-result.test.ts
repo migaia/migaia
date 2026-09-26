@@ -1,14 +1,14 @@
 import { assert, describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope } from '../../../src/contract/index.js'
-import { WebRpcSchemaValidationError } from '../../../src/core/errors.js'
+import { RpcSchemaValidationError } from '../../../src/core/errors.js'
 import {
   ProviderExecutor,
   type IProviderRequestInput
 } from '../../../src/core/internal/provider-executor.js'
 import { ProviderAdmissionRegistry } from '../../../src/core/internal/provider-admission.js'
 import { ProviderRegistry } from '../../../src/core/internal/provider.js'
-import type { IWebRpcContext, IWebRpcProvider } from '../../../src/core/typing.js'
-import { WebRpcRoutingProfile } from '../../../src/core/internal/routing-data.js'
+import type { IRpcContext, IRpcProvider } from '../../../src/core/typing.js'
+import { RpcRoutingProfile } from '../../../src/core/internal/routing-data.js'
 
 /** Canonical provider input shared by executor behavior assertions. */
 /** Normalized fixture must remain a request before it enters the provider executor. */
@@ -23,7 +23,7 @@ const request: IProviderRequestInput = {
   envelope: requestEnvelope,
   route: {
     webRpc: {
-      profile: WebRpcRoutingProfile,
+      profile: RpcRoutingProfile,
       type: 'request',
       applicationVersion: '1.0',
       senderId: 'peer',
@@ -38,6 +38,7 @@ function makeExecutor(result: unknown, sent: unknown[]): ProviderExecutor<string
   const registry = new ProviderRegistry()
   registry.register('test', () => result as never)
   return new ProviderExecutor<string>({
+    now: () => Date.now(),
     id: 'host',
     registry,
     controllers: new Map(),
@@ -65,6 +66,7 @@ describe('ProviderExecutor result normalization', () => {
     const releaseBinding = vi.fn()
     const sent: unknown[] = []
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
       controllers: new Map(),
@@ -75,7 +77,7 @@ describe('ProviderExecutor result normalization', () => {
         sent.push(response)
       },
       validate: () => {
-        throw new WebRpcSchemaValidationError('invalid params', { field: 'data' })
+        throw new RpcSchemaValidationError('invalid params', { field: 'data' })
       },
       emitFailure: () => undefined,
       retainBinding: () => true,
@@ -93,6 +95,7 @@ describe('ProviderExecutor result normalization', () => {
     const admission = new ProviderAdmissionRegistry(1, 1)
     const releaseBinding = vi.fn()
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
       controllers: new Map(),
@@ -121,6 +124,7 @@ describe('ProviderExecutor result normalization', () => {
     registry.register('test', provider)
     const sent: unknown[] = []
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -156,6 +160,7 @@ describe('ProviderExecutor result normalization', () => {
     const registry = new ProviderRegistry()
     registry.register('test', (context) => context.success('ok', { transfer: [transfer] }))
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -185,6 +190,7 @@ describe('ProviderExecutor result normalization', () => {
     const registry = new ProviderRegistry()
     registry.register('test', (context) => context.failed('denied', 'DENIED'))
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -212,6 +218,7 @@ describe('ProviderExecutor result normalization', () => {
       return context.success()
     })
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -241,6 +248,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     const send = vi.fn()
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -265,6 +273,7 @@ describe('ProviderExecutor result normalization', () => {
     registry.register('test', provider)
     const replaySend = vi.fn()
     const replayExecutor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -282,6 +291,7 @@ describe('ProviderExecutor result normalization', () => {
 
     const overflowSend = vi.fn()
     const overflowExecutor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -303,6 +313,7 @@ describe('ProviderExecutor result normalization', () => {
   it('returns a stable failure when no provider owns the method', async () => {
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
       controllers: new Map(),
@@ -320,11 +331,11 @@ describe('ProviderExecutor result normalization', () => {
   })
 
   it('maps provider schema exceptions and invalid dispatch ids without leaking controllers', async () => {
-    const cases: IWebRpcProvider[] = [
+    const cases: IRpcProvider[] = [
       () => {
-        throw new WebRpcSchemaValidationError('result invalid', { result: true })
+        throw new RpcSchemaValidationError('result invalid', { result: true })
       },
-      (context: IWebRpcContext) => {
+      (context: IRpcContext) => {
         context.dispatchTo({ id: '', method: 'event', data: null })
         return context.success()
       }
@@ -336,6 +347,7 @@ describe('ProviderExecutor result normalization', () => {
       const sent: unknown[] = []
       const failures: Array<{ error: unknown; code: string }> = []
       const executor = new ProviderExecutor<string>({
+        now: () => Date.now(),
         id: 'host',
         registry,
         controllers,
@@ -356,7 +368,7 @@ describe('ProviderExecutor result normalization', () => {
             ok: false,
             code: 'SCHEMA_INVALID',
             serializedError: expect.objectContaining({
-              name: 'WebRpcSchemaValidationError',
+              name: 'RpcSchemaValidationError',
               code: 'SCHEMA_INVALID'
             })
           })
@@ -365,7 +377,7 @@ describe('ProviderExecutor result normalization', () => {
         expect(sent[0]).toEqual(
           expect.objectContaining({
             serializedError: expect.objectContaining({
-              name: 'WebRpcContractError',
+              name: 'RpcContractError',
               code: 'CONTRACT_INVALID'
             })
           })
@@ -387,6 +399,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -405,11 +418,12 @@ describe('ProviderExecutor result normalization', () => {
   })
 
   it('executes dispatch-only providers without emitting responses', async () => {
-    const provider = vi.fn((context: IWebRpcContext) => context.success('ignored'))
+    const provider = vi.fn((context: IRpcContext) => context.success('ignored'))
     const registry = new ProviderRegistry()
     registry.register('test', provider)
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
+      now: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),

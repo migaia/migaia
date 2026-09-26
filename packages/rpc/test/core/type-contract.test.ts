@@ -14,11 +14,11 @@ import { framer } from '../../src/core/middleware/framer.js'
 import { canonicalProtocol } from '../../src/core/middleware/canonical-protocol.js'
 import { ping } from '../../src/core/middleware/ping.js'
 import type { IMemoryTransport } from '../../src/core/adapters/memory.js'
-import type { IWebRpcPingOptions } from '../../src/core/typing.js'
-import type { IWebRpcFactoryConfig } from '../../src/core/typing.js'
+import type { IRpcPingOptions } from '../../src/core/typing.js'
+import type { IRpcFactoryConfig } from '../../src/core/typing.js'
 import type { IRpcEnvelope, IRpcProtocol, IRpcFramer } from '../../src/contract/index.js'
 import type { ICodec } from '@migaia/serialize/codec'
-import type { IWebRpcTransport } from '../../src/core/transport.js'
+import type { IRpcTransport } from '../../src/core/transport.js'
 import { createDescriptor, rpcProtocolV1, type IRpcStringFrame } from '../../src/contract/index.js'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { identityCodecV1 } from '@migaia/serialize/codec'
@@ -40,10 +40,10 @@ type IAutomaticEndpoint = Awaited<
 type IManualEndpoint = Awaited<
   ReturnType<typeof createEndpoint<'manual-target', IManualMiddlewareList>>
 >
-declare const opaque: IWebRpcTransport<unknown>
-declare const semantic: IWebRpcTransport<IRpcEnvelope>
-declare const text: IWebRpcTransport<string>
-declare const textFrames: IWebRpcTransport<string | IRpcStringFrame>
+declare const opaque: IRpcTransport<unknown>
+declare const semantic: IRpcTransport<IRpcEnvelope>
+declare const text: IRpcTransport<string>
+declare const textFrames: IRpcTransport<string | IRpcStringFrame>
 declare const legacyCustom: IRpcFramer<string, string, 'custom', 1>
 
 async function assertInferredFactoryContract(): Promise<void> {
@@ -105,7 +105,7 @@ void assertSelectedRootProjection
 it('YS19 rejects an untyped legacy tuple before native composition', async () => {
   /** The tuple models a JavaScript caller bypassing the root-record TypeScript signature. */
   const forgedRoots = [{}] as unknown as Readonly<
-    Record<string, import('../../src/core/feature.js').IWebRpcFeature>
+    Record<string, import('../../src/core/feature.js').IRpcFeature>
   >
   await expect(
     createComposedEndpoint(
@@ -116,7 +116,7 @@ it('YS19 rejects an untyped legacy tuple before native composition', async () =>
 })
 
 /** W1 proves the public async factory preserves each adjacent pipeline edge. */
-const validPipeline: IWebRpcFactoryConfig<
+const validPipeline: IRpcFactoryConfig<
   string,
   readonly [],
   readonly [],
@@ -129,9 +129,9 @@ const validPipeline: IWebRpcFactoryConfig<
   protocol: undefined as unknown as IRpcProtocol<IRpcEnvelope, string, number>,
   codec: undefined as unknown as ICodec<IRpcEnvelope, string>,
   framer: undefined as unknown as IRpcFramer<string, string, string, number>,
-  transport: undefined as unknown as IWebRpcTransport<string>
+  transport: undefined as unknown as IRpcTransport<string>
 }
-const invalidCodecInput: IWebRpcFactoryConfig<
+const invalidCodecInput: IRpcFactoryConfig<
   string,
   readonly [],
   readonly [],
@@ -143,7 +143,7 @@ const invalidCodecInput: IWebRpcFactoryConfig<
   // @ts-expect-error codec input must accept the selected protocol envelope.
   codec: undefined as unknown as ICodec<{ readonly value: string }, string>
 }
-const invalidFramerInput: IWebRpcFactoryConfig<
+const invalidFramerInput: IRpcFactoryConfig<
   string,
   readonly [],
   readonly [],
@@ -155,7 +155,7 @@ const invalidFramerInput: IWebRpcFactoryConfig<
   // @ts-expect-error framer input must equal codec output.
   framer: undefined as unknown as IRpcFramer<Uint8Array, string, string, number>
 }
-const invalidTransportInput: IWebRpcFactoryConfig<
+const invalidTransportInput: IRpcFactoryConfig<
   string,
   readonly [],
   readonly [],
@@ -165,7 +165,7 @@ const invalidTransportInput: IWebRpcFactoryConfig<
 > = {
   ...validPipeline,
   // @ts-expect-error transport input must equal framer output.
-  transport: undefined as unknown as IWebRpcTransport<Uint8Array>
+  transport: undefined as unknown as IRpcTransport<Uint8Array>
 }
 void [validPipeline, invalidCodecInput, invalidFramerInput, invalidTransportInput]
 
@@ -176,7 +176,7 @@ async function assertInferredPipelineEdges(): Promise<void> {
     protocol: rpcProtocolV1,
     codec: defineJsonCodec({ version: 1 }),
     framer: createStringFramer({ chunkBytes: 1024 }),
-    transport: undefined as unknown as IWebRpcTransport<
+    transport: undefined as unknown as IRpcTransport<
       ReturnType<ReturnType<typeof createStringFramer>['frame']>[number]
     >
   })
@@ -204,7 +204,7 @@ async function assertInferredPipelineEdges(): Promise<void> {
     protocol: rpcProtocolV1,
     codec: undefined as unknown as ICodec<IRpcEnvelope, string>,
     framer: undefined as unknown as IRpcFramer<string, string, string, number>,
-    transport: undefined as unknown as IWebRpcTransport<Uint8Array>
+    transport: undefined as unknown as IRpcTransport<Uint8Array>
   })
   void createDescriptor
 }
@@ -327,7 +327,7 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
   await createFullEndpoint({
     id: 'plugin-json-identity-binary',
     middlewares: [canonicalProtocol(rpcProtocolV1), codec(json), framer(messageFramerV1)] as const,
-    transport: undefined as unknown as IWebRpcTransport<Uint8Array>
+    transport: undefined as unknown as IRpcTransport<Uint8Array>
   })
   await createFullEndpoint({
     id: 'top-level-framer-overrides-plugin-binary',
@@ -424,7 +424,7 @@ describe('factory type contract', () => {
     expectTypeOf<'ping' extends keyof IAutomaticEndpoint ? true : false>().toEqualTypeOf<false>()
     expectTypeOf<'ping' extends keyof IManualEndpoint ? true : false>().toEqualTypeOf<true>()
     expectTypeOf<IManualEndpoint['ping']>().toEqualTypeOf<
-      (targetId: string, receiverId?: string, options?: IWebRpcPingOptions) => Promise<boolean>
+      (targetId: string, receiverId?: string, options?: IRpcPingOptions) => Promise<boolean>
     >()
   })
 

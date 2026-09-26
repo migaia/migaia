@@ -3,10 +3,10 @@ import {
   deserializeError,
   reachError,
   serializeError,
-  WebRpcErrorCode,
-  WebRpcLifecycleError,
-  WebRpcSerializationError,
-  WEBRPC_SOURCE,
+  RpcCoreErrorCode,
+  RpcLifecycleError,
+  RpcSerializationError,
+  RPC_CORE_ERROR_SOURCE,
   type ISerializedError
 } from '../../src/core/index.js'
 import {
@@ -18,7 +18,7 @@ describe('cross-realm error serialization', () => {
   it('reaches cause, cleanupErrors and AggregateError entries (E-T3)', () => {
     const root = new Error('root')
     const cleanup = new Error('cleanup')
-    const error = new WebRpcLifecycleError('lifecycle', root, [
+    const error = new RpcLifecycleError('lifecycle', root, [
       { resource: 'middleware', error: cleanup }
     ])
     const withCleanup = [...reachError(error)]
@@ -28,7 +28,7 @@ describe('cross-realm error serialization', () => {
     const first = new Error('first')
     const second = new Error('second')
     const aggregate = new AggregateError([first, second], 'aggregate')
-    const wrapped = new WebRpcLifecycleError('lifecycle2', aggregate, [])
+    const wrapped = new RpcLifecycleError('lifecycle2', aggregate, [])
     const reached = [...reachError(wrapped)]
     expect(reached.some((entry) => entry === aggregate)).toBe(true)
     expect(reached.some((entry) => entry === first)).toBe(true)
@@ -38,17 +38,17 @@ describe('cross-realm error serialization', () => {
   it('round-trips (source, code, name, message, stack, causes) losslessly (E-T4)', () => {
     const root = new Error('root')
     const cleanup = new Error('cleanup')
-    const error = new WebRpcLifecycleError('lifecycle failed', root, [
+    const error = new RpcLifecycleError('lifecycle failed', root, [
       { resource: 'middleware', error: cleanup }
     ])
     const serialized = serializeError(error)
-    expect(serialized.source).toBe(WEBRPC_SOURCE)
+    expect(serialized.source).toBe(RPC_CORE_ERROR_SOURCE)
     expect(serialized.code).toBe('ENDPOINT_DISPOSED')
-    expect(serialized.name).toBe('WebRpcLifecycleError')
+    expect(serialized.name).toBe('RpcLifecycleError')
     expect(serialized.causes?.map((entry) => entry.message)).toEqual(['root', 'cleanup'])
 
     const restored = deserializeError(serialized)
-    expect(restored.name).toBe('WebRpcLifecycleError')
+    expect(restored.name).toBe('RpcLifecycleError')
     expect(restored.message).toBe('lifecycle failed')
     expect(restored.stack).toBe(serialized.stack)
     expect(serializeError(restored)).toEqual(serialized)
@@ -159,7 +159,7 @@ describe('cross-realm error serialization', () => {
     ;(serialized as Record<string, unknown>)[key] = [serialized]
 
     expect(() => deserializeError(serialized)).toThrowError(
-      expect.objectContaining({ code: WebRpcErrorCode.payloadInvalid })
+      expect.objectContaining({ code: RpcCoreErrorCode.payloadInvalid })
     )
   })
 
@@ -181,7 +181,7 @@ describe('cross-realm error serialization', () => {
     }
 
     expect(() => deserializeError(serialized)).toThrowError(
-      expect.objectContaining({ code: WebRpcErrorCode.payloadInvalid })
+      expect.objectContaining({ code: RpcCoreErrorCode.payloadInvalid })
     )
   })
 
@@ -204,7 +204,7 @@ describe('cross-realm error serialization', () => {
 
     expect(() => serializeError(aggregate)).toThrowError(
       expect.objectContaining({
-        code: WebRpcErrorCode.payloadInvalid,
+        code: RpcCoreErrorCode.payloadInvalid,
         message: 'Serialized error graph exceeds safety limits or is malformed'
       })
     )
@@ -220,9 +220,9 @@ describe('cross-realm error serialization', () => {
 
     expect(() => serializeError(hostile)).toThrowError(
       expect.objectContaining({
-        constructor: WebRpcSerializationError,
-        source: WEBRPC_SOURCE,
-        code: WebRpcErrorCode.payloadInvalid,
+        constructor: RpcSerializationError,
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.payloadInvalid,
         cause: attackerError
       })
     )
@@ -240,9 +240,9 @@ describe('cross-realm error serialization', () => {
 
     expect(() => serializeError(hostile)).toThrowError(
       expect.objectContaining({
-        constructor: WebRpcSerializationError,
-        source: WEBRPC_SOURCE,
-        code: WebRpcErrorCode.payloadInvalid,
+        constructor: RpcSerializationError,
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.payloadInvalid,
         cause: attackerError
       })
     )
@@ -251,7 +251,7 @@ describe('cross-realm error serialization', () => {
   it('contains revoked source cleanupErrors arrays with the original cause', () => {
     const { proxy, revoke } = Proxy.revocable([], {})
     revoke()
-    const hostile = new WebRpcLifecycleError('hostile cleanup', undefined, [])
+    const hostile = new RpcLifecycleError('hostile cleanup', undefined, [])
     Object.defineProperty(hostile, 'cleanupErrors', { value: proxy })
 
     let thrown: unknown
@@ -261,10 +261,10 @@ describe('cross-realm error serialization', () => {
       thrown = error
     }
     expect(thrown).toMatchObject({
-      constructor: WebRpcSerializationError,
-      code: WebRpcErrorCode.payloadInvalid
+      constructor: RpcSerializationError,
+      code: RpcCoreErrorCode.payloadInvalid
     })
-    expect((thrown as WebRpcSerializationError).cause).toBeInstanceOf(TypeError)
+    expect((thrown as RpcSerializationError).cause).toBeInstanceOf(TypeError)
   })
 
   it.each(['causes', 'errors'] as const)(
@@ -287,10 +287,10 @@ describe('cross-realm error serialization', () => {
         thrown = error
       }
       expect(thrown).toMatchObject({
-        constructor: WebRpcSerializationError,
-        code: WebRpcErrorCode.payloadInvalid
+        constructor: RpcSerializationError,
+        code: RpcCoreErrorCode.payloadInvalid
       })
-      expect((thrown as WebRpcSerializationError).cause).toBeInstanceOf(TypeError)
+      expect((thrown as RpcSerializationError).cause).toBeInstanceOf(TypeError)
     }
   )
 
@@ -304,13 +304,13 @@ describe('cross-realm error serialization', () => {
         return (source as unknown as Record<PropertyKey, unknown>)[property]
       }
     })
-    const error = new WebRpcLifecycleError('hostile array', undefined, [])
+    const error = new RpcLifecycleError('hostile array', undefined, [])
     Object.defineProperty(error, 'cleanupErrors', { value: hostile })
 
     expect(() => serializeError(error)).toThrowError(
       expect.objectContaining({
-        constructor: WebRpcSerializationError,
-        code: WebRpcErrorCode.payloadInvalid,
+        constructor: RpcSerializationError,
+        code: RpcCoreErrorCode.payloadInvalid,
         cause: attackerError
       })
     )
@@ -329,9 +329,9 @@ describe('cross-realm error serialization', () => {
 
     expect(() => serializeError(hostile)).toThrowError(
       expect.objectContaining({
-        constructor: WebRpcSerializationError,
-        source: WEBRPC_SOURCE,
-        code: WebRpcErrorCode.payloadInvalid,
+        constructor: RpcSerializationError,
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.payloadInvalid,
         cause: attackerError
       })
     )

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
-import type { IWebRpcTransport } from '../../src/core/transport.js'
+import type { IRpcTransport } from '../../src/core/transport.js'
 import { readEndpointDebugSnapshot } from '../../src/core/internal/test-observer.js'
 import { PendingRegistry } from '../../src/core/internal/pending.js'
 import { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
@@ -12,7 +12,7 @@ type IQueuedFrame = {
   readonly source?: unknown
 }
 
-type IControlledTransport = IWebRpcTransport & {
+type IControlledTransport = IRpcTransport & {
   readonly queued: IQueuedFrame[]
   deliver(message: unknown): void
 }

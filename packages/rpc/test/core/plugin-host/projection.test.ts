@@ -1,16 +1,18 @@
+import { systemScheduler } from '@migaia/utils/promise'
+import { createEndpointTimePort } from '../../../src/core/internal/time-port.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createWebRpcPluginHost } from '../../../src/core/internal/web-rpc-plugin-host.js'
 import { createComposedEndpoint } from '../../../src/core/composed.js'
 import { defineFeature } from '../../../src/core/feature.js'
 import { createClientFirstPartyRoots } from '../../../src/core/internal/client-first-party-roots.js'
-import { WebRpcErrorCode, WebRpcLifecycleError } from '../../../src/core/errors.js'
-import { WebRpcErrorText } from '../../../src/core/error-text.js'
+import { RpcCoreErrorCode, RpcLifecycleError } from '../../../src/core/errors.js'
+import { RpcCoreErrorText } from '../../../src/core/error-text.js'
 import { connect } from '../../../src/core/middleware/connect.js'
 import { createMemoryTransportPair } from '../../../src/core/adapters/memory.js'
 import { createConstructionControl } from '../../../src/core/internal/construction-install.js'
 import { createEndpointProjection } from '../../../src/core/internal/endpoint-projection.js'
-import type { IWebRpcPluginConstraint } from '../../../src/core/internal/plugin-contract.js'
-import type { IWebRpcAbortSignal } from '../../../src/core/typing.js'
+import type { IRpcPluginConstraint } from '../../../src/core/internal/plugin-contract.js'
+import type { IRpcAbortSignal } from '../../../src/core/typing.js'
 
 /** Native output with an undefined public value must fail closed at the projection boundary. */
 const hostileProjectionFeature = defineFeature(() => Object.freeze({ forged: undefined }))
@@ -59,8 +61,8 @@ describe('canonical endpoint projection', () => {
   it.each(hostileHosts)('rejects %s host projection before publish', (_name, host) => {
     expect(() => createEndpointProjection(options(host))).toThrow(
       expect.objectContaining({
-        code: WebRpcErrorCode.invalidConfig,
-        message: WebRpcErrorText.endpointModuleInvalid
+        code: RpcCoreErrorCode.invalidConfig,
+        message: RpcCoreErrorText.endpointModuleInvalid
       })
     )
   })
@@ -74,8 +76,8 @@ describe('canonical endpoint projection', () => {
 
     expect(() => createEndpointProjection(options(host))).toThrow(
       expect.objectContaining({
-        code: WebRpcErrorCode.invalidConfig,
-        message: WebRpcErrorText.endpointModuleInvalid
+        code: RpcCoreErrorCode.invalidConfig,
+        message: RpcCoreErrorText.endpointModuleInvalid
       })
     )
   })
@@ -94,8 +96,8 @@ describe('canonical endpoint projection', () => {
       })
     ).toThrow(
       expect.objectContaining({
-        code: WebRpcErrorCode.invalidConfig,
-        message: WebRpcErrorText.endpointModuleInvalid
+        code: RpcCoreErrorCode.invalidConfig,
+        message: RpcCoreErrorText.endpointModuleInvalid
       })
     )
   })
@@ -123,8 +125,8 @@ describe('canonical endpoint projection', () => {
     )
     expect(() => createEndpointProjection(options(throwingHost))).toThrow(
       expect.objectContaining({
-        code: WebRpcErrorCode.invalidConfig,
-        message: WebRpcErrorText.endpointModuleInvalid
+        code: RpcCoreErrorCode.invalidConfig,
+        message: RpcCoreErrorText.endpointModuleInvalid
       })
     )
   })
@@ -151,8 +153,8 @@ describe('canonical endpoint projection', () => {
         createClientFirstPartyRoots()
       )
       await expect(construction).rejects.toMatchObject({
-        code: WebRpcErrorCode.invalidConfig,
-        message: WebRpcErrorText.endpointModuleInvalid
+        code: RpcCoreErrorCode.invalidConfig,
+        message: RpcCoreErrorText.endpointModuleInvalid
       })
       // 宿主由工厂产出而非类，没有原型可监视；它 dispose 的外部效应就是这一次 transport 关闭。
       expect(closeCalls).toBe(1)
@@ -201,20 +203,21 @@ describe('canonical endpoint projection', () => {
     expect(hostDispose).toHaveBeenCalledTimes(2)
   })
 
-  it('delegates to a real WebRpcPluginHost Promise and preserves translated disposal errors', async () => {
+  it('delegates to a real RpcPluginHost Promise and preserves translated disposal errors', async () => {
     const cleanup = new Error('integrated projection cleanup failed')
     const [transport] = createMemoryTransportPair()
     const host = createWebRpcPluginHost(
       'integrated-projection-host',
       transport,
       createConstructionControl({
-        signal: new AbortController().signal as IWebRpcAbortSignal
+        time: createEndpointTimePort(systemScheduler),
+        signal: new AbortController().signal as IRpcAbortSignal
       }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
       () => [{ resource: 'resource disposer', error: cleanup }]
     )
-    const plugin: IWebRpcPluginConstraint = {
+    const plugin: IRpcPluginConstraint = {
       name: 'integrated-projection-disposer',
       install: (core) => {
         core.onDispose(() => {
@@ -241,13 +244,13 @@ describe('canonical endpoint projection', () => {
       expect(endpoint.dispose()).toBe(first)
       expect(endpoint.dispose()).toBe(first)
       await expect(first).rejects.toMatchObject({
-        name: 'WebRpcLifecycleError',
+        name: 'RpcLifecycleError',
         source: '@migaia/rpc/core',
-        code: WebRpcErrorCode.endpointDisposed,
+        code: RpcCoreErrorCode.endpointDisposed,
         cause: cleanup,
         cleanupErrors: [{ resource: 'resource disposer', error: cleanup }]
       })
-      await expect(first).rejects.toBeInstanceOf(WebRpcLifecycleError)
+      await expect(first).rejects.toBeInstanceOf(RpcLifecycleError)
     } finally {
       await host.dispose().catch(() => undefined)
     }

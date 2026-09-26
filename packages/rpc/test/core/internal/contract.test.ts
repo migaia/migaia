@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { WebRpcSchemaValidationError } from '../../../src/core/errors.js'
+import { RpcSchemaValidationError } from '../../../src/core/errors.js'
 import { validateContractData } from '../../../src/core/internal/contract.js'
-import type { IWebRpcContractConfig } from '../../../src/core/typing.js'
+import type { IRpcContractConfig } from '../../../src/core/typing.js'
 
 describe('contract error normalization', () => {
   it('does not let hostile issue getters replace the stable schema error', () => {
@@ -68,7 +68,7 @@ describe('contract error normalization', () => {
     expect(() => validateContractData({}, 'missing', 'params', 1)).not.toThrow()
     expect(() =>
       validateContractData(
-        { schemas: { value: { params: {} } } } as unknown as IWebRpcContractConfig,
+        { schemas: { value: { params: {} } } } as unknown as IRpcContractConfig,
         'value',
         'params',
         1
@@ -96,7 +96,7 @@ describe('contract error normalization', () => {
   })
 
   it('snapshots normal schema issues and filters hostile path elements', () => {
-    let failure: WebRpcSchemaValidationError | undefined
+    let failure: RpcSchemaValidationError | undefined
     try {
       validateContractData(
         {
@@ -121,7 +121,7 @@ describe('contract error normalization', () => {
         null
       )
     } catch (error) {
-      failure = error as WebRpcSchemaValidationError
+      failure = error as RpcSchemaValidationError
     }
     expect(failure?.data).toEqual({
       kind: 'schema-validation',

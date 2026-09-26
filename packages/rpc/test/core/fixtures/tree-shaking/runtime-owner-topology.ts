@@ -69,7 +69,7 @@ import { createProviderEndpoint } from '../../../../src/core/provider.js'
 import { createClientFirstPartyRoots } from '../../../../src/core/internal/client-first-party-roots.js'
 import {
   createFirstPartyRoots,
-  type IWebRpcFirstPartyRootName
+  type IRpcFirstPartyRootName
 } from '../../../../src/core/internal/first-party-roots.js'
 import { readEndpointDebugSnapshot } from '../../../../src/core/internal/test-observer.js'
 import { connect } from '../../../../src/core/middleware/connect.js'
@@ -100,7 +100,7 @@ export async function observeRuntimeOwnerAllocation(): Promise<IRuntimeOwnerAllo
     return createComposedEndpoint(
       config,
       createFirstPartyRoots(
-        new Set<IWebRpcFirstPartyRootName>([
+        new Set<IRpcFirstPartyRootName>([
           'first-party-chunk',
           'first-party-outbound',
           'first-party-provider',

@@ -7,7 +7,7 @@ import { connect } from '../../../src/core/middleware/connect.js'
 import { hooks } from '../../../src/core/middleware/hooks.js'
 import { timeout } from '../../../src/core/middleware/timeout.js'
 import { readEndpointDebugSnapshot } from '../../../src/core/internal/test-observer.js'
-import type { IWebRpcInboundMessage, IWebRpcTransport } from '../../../src/core/transport.js'
+import type { IRpcInboundMessage, IRpcTransport } from '../../../src/core/transport.js'
 import type {
   IRpcEnvelope,
   IRpcPortableValue,
@@ -24,13 +24,13 @@ const flush = async (): Promise<void> => {
 
 /** Creates a manually driven multiplexed transport for hostile source-injection probes. */
 function createDrivenTransport(sourceProof: (source: unknown) => boolean = () => true): {
-  readonly transport: IWebRpcTransport
+  readonly transport: IRpcTransport
   readonly sent: unknown[]
-  readonly receive: (message: IWebRpcInboundMessage<unknown>) => void
+  readonly receive: (message: IRpcInboundMessage<unknown>) => void
 } {
   const sent: unknown[] = []
-  let listener: ((message: IWebRpcInboundMessage<unknown>) => void) | undefined
-  const transport: IWebRpcTransport = {
+  let listener: ((message: IRpcInboundMessage<unknown>) => void) | undefined
+  const transport: IRpcTransport = {
     platform: 'Memory',
     topology: 'multiplexed',
     sourceProof: (source) => sourceProof(source),

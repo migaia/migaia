@@ -1,25 +1,26 @@
+import { systemScheduler } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
-import { WebRpcAbortError, WebRpcTimeoutError } from '../../../src/core/errors.js'
-import type { IWebRpcTransport } from '../../../src/core/transport.js'
-import type { IWebRpcAbortSignal } from '../../../src/core/typing.js'
+import { RpcAbortError, RpcTimeoutError } from '../../../src/core/errors.js'
+import type { IRpcTransport } from '../../../src/core/transport.js'
+import type { IRpcAbortSignal } from '../../../src/core/typing.js'
 import {
   createConstructionControl,
   runConstructionInstall
 } from '../../../src/core/internal/construction-install.js'
 import { raceWithAsyncControl } from '../../../src/core/internal/async-control.js'
 import { createEndpointTimePort } from '../../../src/core/internal/time-port.js'
-import type { IWebRpcPluginConstraint } from '../../../src/core/internal/plugin-contract.js'
+import type { IRpcPluginConstraint } from '../../../src/core/internal/plugin-contract.js'
 import {
-  WebRpcPortName,
-  type IWebRpcProtocolPort
+  RpcPortName,
+  type IRpcProtocolPort
 } from '../../../src/core/internal/plugin-shared-keys.js'
 import {
   createWebRpcPluginHost,
-  type IWebRpcPluginHost
+  type IRpcPluginHost
 } from '../../../src/core/internal/web-rpc-plugin-host.js'
 
-const transport = {} as IWebRpcTransport
-const signal = new AbortController().signal as IWebRpcAbortSignal
+const transport = {} as IRpcTransport
+const signal = new AbortController().signal as IRpcAbortSignal
 
 /**
  * Exercises the host's synchronous primitive without restoring a WebRPC wrapper.
@@ -29,30 +30,30 @@ const signal = new AbortController().signal as IWebRpcAbortSignal
  * offer.
  */
 const installHostSyncForTest = (
-  host: IWebRpcPluginHost,
-  plugins: readonly IWebRpcPluginConstraint[]
+  host: IRpcPluginHost,
+  plugins: readonly IRpcPluginConstraint[]
 ): unknown => host.useSync(...(plugins as never))
 
 describe('B12a WebRPC PluginHost shell', () => {
   it('uses typed shared symbols and one host rollback transaction', async () => {
     let disposed = 0
-    let observed: IWebRpcProtocolPort | undefined
+    let observed: IRpcProtocolPort | undefined
     const host = createWebRpcPluginHost(
       'shell',
       transport,
-      createConstructionControl({ signal }),
+      createConstructionControl({ time: createEndpointTimePort(systemScheduler), signal }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
-    const protocolPort: IWebRpcProtocolPort = {
+    const protocolPort: IRpcProtocolPort = {
       encode: (value) => value,
       decode: (value) => value
     }
-    const provider: IWebRpcPluginConstraint = {
+    const provider: IRpcPluginConstraint = {
       name: 'provider',
       install: (core) => {
         core.publishPortFeatures({
-          [WebRpcPortName.protocol]: { get: () => protocolPort }
+          [RpcPortName.protocol]: { get: () => protocolPort }
         })
         core.onDispose(() => {
           disposed += 1
@@ -60,14 +61,14 @@ describe('B12a WebRPC PluginHost shell', () => {
         return {}
       }
     }
-    const consumer: IWebRpcPluginConstraint = {
+    const consumer: IRpcPluginConstraint = {
       name: 'consumer',
       install: (core) => {
-        observed = core.getPort(WebRpcPortName.protocol) as IWebRpcProtocolPort | undefined
+        observed = core.getPort(RpcPortName.protocol) as IRpcProtocolPort | undefined
         return {}
       }
     }
-    const failing: IWebRpcPluginConstraint = {
+    const failing: IRpcPluginConstraint = {
       name: 'failing',
       install: () => {
         throw new Error('install failure')
@@ -92,7 +93,11 @@ describe('B12a WebRPC PluginHost shell', () => {
       {
         id: 'shell',
         transport,
-        control: createConstructionControl({ signal, timeoutMs: 5 }),
+        control: createConstructionControl({
+          time: createEndpointTimePort(systemScheduler),
+          signal,
+          timeoutMs: 5
+        }),
         hooks: () => undefined,
         report,
         registerScope: (registered) => {
@@ -108,7 +113,7 @@ describe('B12a WebRPC PluginHost shell', () => {
       }
     )
 
-    await expect(install).rejects.toBeInstanceOf(WebRpcTimeoutError)
+    await expect(install).rejects.toBeInstanceOf(RpcTimeoutError)
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(scope).toBeDefined()
     expect(released).toBe(1)
@@ -122,7 +127,10 @@ describe('B12a WebRPC PluginHost shell', () => {
       {
         id: 'shell',
         transport,
-        control: createConstructionControl({ signal }),
+        control: createConstructionControl({
+          time: createEndpointTimePort(systemScheduler),
+          signal
+        }),
         hooks: () => undefined,
         registerScope: (registered) => {
           scope = registered
@@ -150,7 +158,10 @@ describe('B12a WebRPC PluginHost shell', () => {
         {
           id: 'shell',
           transport,
-          control: createConstructionControl({ signal: controller.signal as IWebRpcAbortSignal }),
+          control: createConstructionControl({
+            time: createEndpointTimePort(systemScheduler),
+            signal: controller.signal as IRpcAbortSignal
+          }),
           hooks: () => undefined,
           registerScope: () => undefined
         },
@@ -159,7 +170,7 @@ describe('B12a WebRPC PluginHost shell', () => {
           return undefined
         }
       )
-    ).rejects.toBeInstanceOf(WebRpcAbortError)
+    ).rejects.toBeInstanceOf(RpcAbortError)
     expect(started).toBe(false)
   })
 
@@ -168,18 +179,22 @@ describe('B12a WebRPC PluginHost shell', () => {
       aborted: false,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
-    } as unknown as IWebRpcAbortSignal
+    } as unknown as IRpcAbortSignal
 
-    expect(() => createConstructionControl({ signal: source, timeoutMs: -1 })).toThrow(
-      'timeoutMs must be false or a non-negative finite number'
-    )
+    expect(() =>
+      createConstructionControl({
+        time: createEndpointTimePort(systemScheduler),
+        signal: source,
+        timeoutMs: -1
+      })
+    ).toThrow('timeoutMs must be false or a non-negative finite number')
     expect(source.addEventListener).not.toHaveBeenCalled()
     expect(source.removeEventListener).not.toHaveBeenCalled()
   })
 
   it('does not subscribe when the injected construction clock throws', () => {
     const clockFailure = new Error('clock failed')
-    const endpointTime = createEndpointTimePort()
+    const endpointTime = createEndpointTimePort(systemScheduler)
     const time = Object.freeze({
       ...endpointTime,
       now: () => {
@@ -190,7 +205,7 @@ describe('B12a WebRPC PluginHost shell', () => {
       aborted: false,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
-    } as unknown as IWebRpcAbortSignal
+    } as unknown as IRpcAbortSignal
 
     expect(() => createConstructionControl({ signal: source, timeoutMs: 10, time })).toThrow(
       clockFailure
@@ -201,7 +216,7 @@ describe('B12a WebRPC PluginHost shell', () => {
 
   it('closes construction ownership when injected timer setup fails', async () => {
     const timerFailure = new Error('timer setup failed')
-    const endpointTime = createEndpointTimePort()
+    const endpointTime = createEndpointTimePort(systemScheduler)
     const time = Object.freeze({
       ...endpointTime,
       setTimeout: () => {
@@ -212,7 +227,7 @@ describe('B12a WebRPC PluginHost shell', () => {
       aborted: false,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
-    } as unknown as IWebRpcAbortSignal
+    } as unknown as IRpcAbortSignal
     const control = createConstructionControl({ signal: source, timeoutMs: 10, time })
     let registeredScope: { dispose(): Promise<readonly unknown[]> } | undefined
     let started = false
@@ -248,13 +263,15 @@ describe('B12a WebRPC PluginHost shell', () => {
       raceWithAsyncControl({
         operation: async () => 'completed',
         timeoutMs: 10,
-        createTimer: () => ({
-          clear: () => {
-            throw clearFailure
-          }
-        }),
-        createTimeoutError: () => new WebRpcTimeoutError(),
-        createAbortError: () => new WebRpcAbortError(),
+        time: {
+          setTimeout: () => ({
+            clear: () => {
+              throw clearFailure
+            }
+          })
+        },
+        createTimeoutError: () => new RpcTimeoutError(),
+        createAbortError: () => new RpcAbortError(),
         onDiagnostic: report
       })
     ).resolves.toBe('completed')
@@ -263,7 +280,7 @@ describe('B12a WebRPC PluginHost shell', () => {
 
   it('uses one absolute budget across sequential installs and never-settling work', async () => {
     let now = 100
-    const endpointTime = createEndpointTimePort()
+    const endpointTime = createEndpointTimePort(systemScheduler)
     const time = { ...endpointTime, now: () => now }
     const control = createConstructionControl({ signal, timeoutMs: 10, time })
     const first = await runConstructionInstall(
@@ -293,7 +310,7 @@ describe('B12a WebRPC PluginHost shell', () => {
           return 'late'
         }
       )
-    ).rejects.toBeInstanceOf(WebRpcTimeoutError)
+    ).rejects.toBeInstanceOf(RpcTimeoutError)
     expect(started).toBe(false)
 
     await expect(
@@ -301,13 +318,17 @@ describe('B12a WebRPC PluginHost shell', () => {
         {
           id: 'shell',
           transport,
-          control: createConstructionControl({ signal, timeoutMs: 5 }),
+          control: createConstructionControl({
+            time: createEndpointTimePort(systemScheduler),
+            signal,
+            timeoutMs: 5
+          }),
           hooks: () => undefined,
           registerScope: () => undefined
         },
         () => new Promise<never>(() => undefined)
       )
-    ).rejects.toBeInstanceOf(WebRpcTimeoutError)
+    ).rejects.toBeInstanceOf(RpcTimeoutError)
   })
 
   it('preserves registration failures and contains diagnostic reporter throws', async () => {
@@ -321,7 +342,10 @@ describe('B12a WebRPC PluginHost shell', () => {
         {
           id: 'shell',
           transport,
-          control: createConstructionControl({ signal }),
+          control: createConstructionControl({
+            time: createEndpointTimePort(systemScheduler),
+            signal
+          }),
           hooks: () => undefined,
           report,
           registerScope: () => {
@@ -339,7 +363,11 @@ describe('B12a WebRPC PluginHost shell', () => {
 
   it('closes externally disposed construction scopes before late resolve and ownership', async () => {
     let released = 0
-    const control = createConstructionControl({ signal, timeoutMs: 50 })
+    const control = createConstructionControl({
+      time: createEndpointTimePort(systemScheduler),
+      signal,
+      timeoutMs: 50
+    })
     const operation = runConstructionInstall(
       {
         id: 'shell',
@@ -357,27 +385,23 @@ describe('B12a WebRPC PluginHost shell', () => {
       }
     )
     control.close()
-    await expect(operation).rejects.toBeInstanceOf(WebRpcAbortError)
+    await expect(operation).rejects.toBeInstanceOf(RpcAbortError)
     await new Promise((resolve) => setTimeout(resolve, 25))
     expect(released).toBe(1)
   })
 
   it('keeps fixed kernel-to-activation order and prevents activation after rollback', async () => {
-    const createHost = (): IWebRpcPluginHost =>
+    const createHost = (): IRpcPluginHost =>
       createWebRpcPluginHost(
         'shell',
         transport,
-        createConstructionControl({ signal }),
+        createConstructionControl({ time: createEndpointTimePort(systemScheduler), signal }),
         () => undefined,
         { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       )
     const successEvents: string[] = []
     let subscriptions = 0
-    const role = (
-      events: string[],
-      name: string,
-      install: () => void
-    ): IWebRpcPluginConstraint => ({
+    const role = (events: string[], name: string, install: () => void): IRpcPluginConstraint => ({
       name,
       install: (core) => {
         events.push(name)
@@ -438,7 +462,7 @@ describe('B12a WebRPC PluginHost shell', () => {
     const host = createWebRpcPluginHost(
       'shell',
       transport,
-      createConstructionControl({ signal }),
+      createConstructionControl({ time: createEndpointTimePort(systemScheduler), signal }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
@@ -469,15 +493,15 @@ describe('B12a WebRPC PluginHost shell', () => {
     const diagnostic = vi.fn(() => {
       throw new Error('diagnostic')
     })
-    const createFailingHost = (): IWebRpcPluginHost =>
+    const createFailingHost = (): IRpcPluginHost =>
       createWebRpcPluginHost(
         'shell',
         transport,
-        createConstructionControl({ signal }),
+        createConstructionControl({ time: createEndpointTimePort(systemScheduler), signal }),
         () => undefined,
         { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, diagnostic }
       )
-    const rollbackPlugin = (name: string, error: Error): IWebRpcPluginConstraint => ({
+    const rollbackPlugin = (name: string, error: Error): IRpcPluginConstraint => ({
       name,
       install: (core) => {
         core.onDispose(() => {

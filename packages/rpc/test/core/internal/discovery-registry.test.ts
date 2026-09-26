@@ -478,7 +478,7 @@ describe('DiscoveryRegistry', () => {
   })
 
   it('keeps a remote identity valid across its TTL while DNS owns the lease', async () => {
-    const identity = new VerifiedPeerRegistry(4, 4, 1)
+    const identity = new VerifiedPeerRegistry(() => Date.now(), 4, 4, 1)
     const token = identity.register('peer')
     expect(typeof token).toBe('string')
     const registry = new DiscoveryRegistry({

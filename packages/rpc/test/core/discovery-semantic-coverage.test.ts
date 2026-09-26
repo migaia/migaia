@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createFullEndpoint } from '../../src/core/full.js'
-import { WebRpcError } from '../../src/core/errors.js'
+import { RpcError } from '../../src/core/errors.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { ping } from '../../src/core/middleware/ping.js'
-import type { IWebRpcDiscoveryCandidate, IWebRpcEndpoint } from '../../src/core/typing.js'
+import type { IRpcDiscoveryCandidate, IRpcEndpoint } from '../../src/core/typing.js'
 
-type IManualEndpoint = IWebRpcEndpoint<string, 'manual'> & {
+type IManualEndpoint = IRpcEndpoint<string, 'manual'> & {
   readonly dispose: () => Promise<void>
 }
 
@@ -42,7 +42,7 @@ async function disposePair(pair: IManualPair): Promise<void> {
 }
 
 /** Creates a candidate-shaped value that did not originate from a verified query. */
-function forgedCandidate(): IWebRpcDiscoveryCandidate<string> {
+function forgedCandidate(): IRpcDiscoveryCandidate<string> {
   return {
     queryId: 'forged-query',
     targetId: 'forged-target',
@@ -96,7 +96,7 @@ describe('discovery attachment semantic coverage', () => {
     const pair = await createManualPair('coverage-invalid-client', 'coverage-invalid-server')
     try {
       const removeListener = pair.server.connect.onQuery!(() => undefined)
-      expect(() => pair.server.connect.onQuery!(() => undefined)).toThrowError(WebRpcError)
+      expect(() => pair.server.connect.onQuery!(() => undefined)).toThrowError(RpcError)
       removeListener()
       await expect(
         pair.client.connect.query!('coverage-invalid-server', { timeoutMs: -1 })
@@ -117,7 +117,7 @@ describe('discovery attachment semantic coverage', () => {
     try {
       const before = pair.client.connect.getServerList()
       const forged = forgedCandidate()
-      expect(() => pair.client.connect.register!(forged)).toThrowError(WebRpcError)
+      expect(() => pair.client.connect.register!(forged)).toThrowError(RpcError)
       await expect(pair.client.connect.ping!(forged)).rejects.toMatchObject({
         code: 'TARGET_UNKNOWN'
       })

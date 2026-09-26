@@ -1,27 +1,29 @@
+import { systemScheduler } from '@migaia/utils/promise'
+import { createEndpointTimePort } from '../../src/core/internal/time-port.js'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { normalizeRpcEnvelope } from '../../src/contract/index.js'
 import { createStringFramer } from '../../src/contract/framing/index.js'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { WebRpcErrorCode } from '../../src/core/errors.js'
+import { RpcCoreErrorCode } from '../../src/core/errors.js'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { createComposedEndpoint } from '../../src/core/composed.js'
 import { createFullEndpoint } from '../../src/core/full.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
-import { type IWebRpcPluginDescriptor } from '../../src/core/internal/plugin-descriptor.js'
+import { type IRpcPluginDescriptor } from '../../src/core/internal/plugin-descriptor.js'
 import {
-  WebRpcControlRole,
-  WebRpcControlRoleSchema,
-  WebRpcProviderCancellationPortMetadata,
-  WebRpcProviderRole,
-  WebRpcProviderRoleSchema
+  RpcControlRole,
+  RpcControlRoleSchema,
+  RpcProviderCancellationPortMetadata,
+  RpcProviderRole,
+  RpcProviderRoleSchema
 } from '../../src/core/internal/plugin-contract.js'
 import {
-  WebRpcPortName,
-  type IWebRpcProviderCancellationPort,
-  type IWebRpcOutboundCommand,
-  type IWebRpcOutboundOperationsPort
+  RpcPortName,
+  type IRpcProviderCancellationPort,
+  type IRpcOutboundCommand,
+  type IRpcOutboundOperationsPort
 } from '../../src/core/internal/plugin-shared-keys.js'
 import { type IOutboundAttachmentHost } from '../../src/core/internal/outbound-attachment.js'
 import {
@@ -31,14 +33,14 @@ import {
   readProviderRegistrationObservation,
   registerInboundIdentityReleaseObservation,
   registerProviderRegistrationObservation,
-  type IWebRpcTimePortEvent
+  type IRpcTimePortEvent
 } from '../../src/core/internal/test-observer.js'
 import { readComposedDisposalPromises } from '../../src/core/internal/composed-disposal-observer.js'
 import { createConstructionControl } from '../../src/core/internal/construction-install.js'
 import { createEndpointCapabilitiesBatchFeature } from '../../src/core/internal/endpoint-capabilities-plugin.js'
 import {
   createFirstPartyRoots,
-  type IWebRpcFirstPartyRootName
+  type IRpcFirstPartyRootName
 } from '../../src/core/internal/first-party-roots.js'
 import {
   assertFeatureClaimParity,
@@ -47,7 +49,7 @@ import {
 } from '../../src/core/internal/feature-policy.js'
 import {
   createWebRpcPluginHost,
-  type IWebRpcPluginHost
+  type IRpcPluginHost
 } from '../../src/core/internal/web-rpc-plugin-host.js'
 import { createEndpointKernel } from '../../src/core/endpoint-kernel.js'
 import {
@@ -55,12 +57,8 @@ import {
   type IPreparedEndpoint
 } from '../../src/core/internal/endpoint-bootstrap.js'
 import { buildNativePluginBatch } from '../../src/core/internal/plugin-inventory.js'
-import type { IWebRpcOutboundCommandObservation } from '../../src/core/internal/feature-contract.js'
-import {
-  WebRpcError,
-  WebRpcLifecycleError,
-  WebRpcSchemaValidationError
-} from '../../src/core/errors.js'
+import type { IRpcOutboundCommandObservation } from '../../src/core/internal/feature-contract.js'
+import { RpcError, RpcLifecycleError, RpcSchemaValidationError } from '../../src/core/errors.js'
 import { authentication } from '../../src/core/middleware/authentication.js'
 import { abort } from '../../src/core/middleware/abort.js'
 import { connect } from '../../src/core/middleware/connect.js'
@@ -71,9 +69,9 @@ import { canonicalProtocol as protocol } from '../../src/core/middleware/canonic
 import { timeout } from '../../src/core/middleware/timeout.js'
 
 import { uuid } from '../../src/core/middleware/uuid.js'
-import type { IWebRpcCoreConfig } from '../../src/core/composed.js'
-import type { IWebRpcPlugin, IWebRpcProvider } from '../../src/core/typing.js'
-import type { IWebRpcTransport } from '../../src/core/transport.js'
+import type { IRpcCoreConfig } from '../../src/core/composed.js'
+import type { IRpcPlugin, IRpcProvider } from '../../src/core/typing.js'
+import type { IRpcTransport } from '../../src/core/transport.js'
 
 /** Builds one raw provider request for the real Host-installed transport seam. */
 function createProviderRequest(
@@ -118,9 +116,7 @@ async function settleProviderDelivery(): Promise<void> {
 }
 
 /** Builds a native root record for direct composition readers without reviving module arrays. */
-function createNativeRoots<const TName extends IWebRpcFirstPartyRootName>(
-  ...names: readonly TName[]
-) {
+function createNativeRoots<const TName extends IRpcFirstPartyRootName>(...names: readonly TName[]) {
   return createFirstPartyRoots(new Set(names))
 }
 
@@ -151,8 +147,8 @@ function createInboundProviderFrame(
 /** Creates the unchanged production provider endpoint used by every matrix row. */
 function createRealProvider(
   id: string,
-  transport: IWebRpcTransport,
-  providerMap: Readonly<Record<string, IWebRpcProvider>>,
+  transport: IRpcTransport,
+  providerMap: Readonly<Record<string, IRpcProvider>>,
   withAbort = false
 ) {
   return createProviderEndpoint({
@@ -164,32 +160,29 @@ function createRealProvider(
 }
 
 /** Builds a throwing transport configuration to prove pre-install config cutoff. */
-function createThrowingProviderConfig(
-  transport: IWebRpcTransport,
-  cause: Error
-): IWebRpcCoreConfig {
+function createThrowingProviderConfig(transport: IRpcTransport, cause: Error): IRpcCoreConfig {
   const config = {
     id: 'provider-config-host',
     transport,
     middlewares: [connect({ transport })],
-    get provider(): Readonly<Record<string, IWebRpcProvider>> {
+    get provider(): Readonly<Record<string, IRpcProvider>> {
       throw cause
     }
   }
-  return config as IWebRpcCoreConfig
+  return config as IRpcCoreConfig
 }
 
 type IActualAdmissionFixture = {
   readonly id: string
-  readonly descriptors: readonly IWebRpcPluginDescriptor[]
-  readonly claims: readonly IWebRpcPluginDescriptor['claims'][]
+  readonly descriptors: readonly IRpcPluginDescriptor[]
+  readonly claims: readonly IRpcPluginDescriptor['claims'][]
   readonly providerIndex: number
-  readonly clientTransport: IWebRpcTransport
-  readonly host: IWebRpcPluginHost
+  readonly clientTransport: IRpcTransport
+  readonly host: IRpcPluginHost
   readonly kernel: ReturnType<typeof createEndpointKernel>
   /** Reads immutable native root policy; it never creates a legacy descriptor or lifecycle owner. */
   readonly getNativeRootSharedConsumes: (
-    name: IWebRpcFirstPartyRootName
+    name: IRpcFirstPartyRootName
   ) => readonly PropertyKey[] | undefined
   readonly stats: {
     activeSubscriptions: number
@@ -198,7 +191,7 @@ type IActualAdmissionFixture = {
   }
   readonly install: () => Promise<void>
   readonly installDescriptors: (
-    descriptors: readonly IWebRpcPluginDescriptor[],
+    descriptors: readonly IRpcPluginDescriptor[],
     options?: { readonly parity?: boolean }
   ) => Promise<void>
   readonly getTranslatedInstallation: (name: string) => unknown
@@ -234,17 +227,17 @@ type IActualAdmissionFixture = {
 
 type IAdmissionFixtureOptions = {
   /** Selects package-owned native roots without evaluating retired module factories. */
-  readonly rootNames?: readonly IWebRpcFirstPartyRootName[]
+  readonly rootNames?: readonly IRpcFirstPartyRootName[]
   readonly endpointId?: string
   readonly transportPeerId?: string
-  readonly sourceProof?: IWebRpcTransport['sourceProof']
-  readonly connectConfig?: import('../../src/core/typing.js').IWebRpcConnectConfig
+  readonly sourceProof?: IRpcTransport['sourceProof']
+  readonly connectConfig?: import('../../src/core/typing.js').IRpcConnectConfig
   readonly transportSend?: (message: unknown) => void | Promise<void>
   readonly hookErrorReporter?: (error: unknown, event: unknown) => void
-  readonly contractConfig?: import('../../src/core/typing.js').IWebRpcContractConfig
-  readonly observeOutboundCommand?: (observation: IWebRpcOutboundCommandObservation) => void
+  readonly contractConfig?: import('../../src/core/typing.js').IRpcContractConfig
+  readonly observeOutboundCommand?: (observation: IRpcOutboundCommandObservation) => void
   readonly observeTransferredCleanup?: (pluginName: string) => void
-  readonly providerMap?: Readonly<Record<string, IWebRpcProvider>>
+  readonly providerMap?: Readonly<Record<string, IRpcProvider>>
   readonly observeProviderRegistration?: boolean
   /** Alters only the capability Feature shared output before the production parity gate. */
   readonly transformShared?: (
@@ -270,7 +263,7 @@ async function createActualAdmissionFixture(
       if (result !== undefined) return result
       return baseTransport.send(message)
     },
-    subscribe(listener: Parameters<IWebRpcTransport['subscribe']>[0]): () => void {
+    subscribe(listener: Parameters<IRpcTransport['subscribe']>[0]): () => void {
       stats.subscribeCalls += 1
       stats.activeSubscriptions += 1
       const unsubscribe = baseTransport.subscribe(listener)
@@ -283,9 +276,9 @@ async function createActualAdmissionFixture(
   const providerMap =
     options.providerMap ??
     ({
-      echo: (context: Parameters<IWebRpcProvider>[0]) => context.success('fixture')
-    } as Readonly<Record<string, IWebRpcProvider>>)
-  const config: IWebRpcCoreConfig = {
+      echo: (context: Parameters<IRpcProvider>[0]) => context.success('fixture')
+    } as Readonly<Record<string, IRpcProvider>>)
+  const config: IRpcCoreConfig = {
     id: endpointId,
     transport: composedTransport,
     middlewares: [
@@ -310,6 +303,7 @@ async function createActualAdmissionFixture(
     ? registerProviderRegistrationObservation(kernel)
     : () => undefined
   const construction = createConstructionControl({
+    time: createEndpointTimePort(systemScheduler),
     signal: new AbortController().signal
   })
   const host = createWebRpcPluginHost(
@@ -417,13 +411,13 @@ async function createActualAdmissionFixture(
         ...(admission.sharedOptionalConsumes === undefined
           ? {}
           : { sharedOptionalConsumes: admission.sharedOptionalConsumes })
-      }) as IWebRpcPluginDescriptor
+      }) as IRpcPluginDescriptor
   )
   const providerIndex = finalDescriptors.findIndex(
     (descriptor) => descriptor.name === 'endpoint-capabilities'
   )
   const claims = finalDescriptors.map((descriptor) => descriptor.claims)
-  let activeDescriptors: readonly IWebRpcPluginDescriptor[] = finalDescriptors
+  let activeDescriptors: readonly IRpcPluginDescriptor[] = finalDescriptors
   const snapshot = () => ({
     providerState: (() => {
       const debug = capabilityBatch.plugin.getSnapshotReader()?.()
@@ -434,7 +428,7 @@ async function createActualAdmissionFixture(
       }
     })(),
     hostKeys: [...Reflect.ownKeys(host)].sort(),
-    ports: Object.values(WebRpcPortName).map((key) => {
+    ports: Object.values(RpcPortName).map((key) => {
       try {
         return host.getPort(key)
       } catch {
@@ -455,7 +449,7 @@ async function createActualAdmissionFixture(
     resources: capabilityBatch.plugin.getSnapshotReader()?.().resources ?? kernel.resources.size
   })
   const installDescriptors = async (
-    nextDescriptors: readonly IWebRpcPluginDescriptor[],
+    nextDescriptors: readonly IRpcPluginDescriptor[],
     installOptions: { readonly parity?: boolean } = {}
   ): Promise<void> => {
     activeDescriptors = nextDescriptors
@@ -718,7 +712,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await expect(client.send('provider-error-host', 'fail', null)).rejects.toMatchObject({
-        code: WebRpcErrorCode.internal,
+        code: RpcCoreErrorCode.internal,
         cause: expect.objectContaining({
           message: primary.message,
           stack: primary.stack,
@@ -788,17 +782,17 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const [, serverTransport] = createMemoryTransportPair()
     let reads = 0
     const providerMap = {
-      echo: (context: Parameters<IWebRpcProvider>[0]) => context.success('snapshot')
+      echo: (context: Parameters<IRpcProvider>[0]) => context.success('snapshot')
     }
     const config = {
       id: 'provider-snapshot-host',
       transport: serverTransport,
       middlewares: [connect({ transport: serverTransport })],
-      get provider(): Readonly<Record<string, IWebRpcProvider>> {
+      get provider(): Readonly<Record<string, IRpcProvider>> {
         reads += 1
         return providerMap
       }
-    } as IWebRpcCoreConfig
+    } as IRpcCoreConfig
     const server = await createProviderEndpoint(config)
     try {
       expect(reads).toBe(1)
@@ -815,7 +809,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     await expect(
       createProviderEndpoint(createThrowingProviderConfig(serverTransport, cause))
     ).rejects.toMatchObject({
-      code: WebRpcErrorCode.invalidConfig,
+      code: RpcCoreErrorCode.invalidConfig,
       cause
     })
   })
@@ -823,9 +817,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T117 later invalid provider entry preserves primary failure and terminal residue', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     const invalidProvider = {
-      valid: (context: Parameters<IWebRpcProvider>[0]) => context.success('valid'),
+      valid: (context: Parameters<IRpcProvider>[0]) => context.success('valid'),
       invalid: undefined
-    } as unknown as Record<string, IWebRpcProvider>
+    } as unknown as Record<string, IRpcProvider>
     let failure: unknown
     try {
       await createProviderEndpoint({
@@ -838,9 +832,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       failure = error
     }
     expect(failure).toMatchObject({
-      name: 'WebRpcError',
+      name: 'RpcError',
       source: '@migaia/rpc/core',
-      code: WebRpcErrorCode.invalidConfig
+      code: RpcCoreErrorCode.invalidConfig
     })
 
     const fixture = await createActualAdmissionFixture({
@@ -862,9 +856,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
-          name: 'WebRpcError',
+          name: 'RpcError',
           source: '@migaia/rpc/core',
-          code: WebRpcErrorCode.invalidConfig
+          code: RpcCoreErrorCode.invalidConfig
         })
       })
       const observations = readProviderRegistrationObservation(fixture.kernel)
@@ -958,35 +952,35 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   })
 
   it('T122 contract: provider schema and cancellation metadata are frozen and candidate-independent', () => {
-    const schema = WebRpcProviderRoleSchema.provider
+    const schema = RpcProviderRoleSchema.provider
     expect(schema).toEqual({
-      sharedProvides: [WebRpcPortName.providerCancellation],
+      sharedProvides: [RpcPortName.providerCancellation],
       sharedConsumes: [
-        WebRpcPortName.outboundOperations,
-        WebRpcPortName.inboundIdentity,
-        WebRpcPortName.variationCoordinator
+        RpcPortName.outboundOperations,
+        RpcPortName.inboundIdentity,
+        RpcPortName.variationCoordinator
       ],
       publicKeys: ['provide'],
       exposedKeys: ['provide'],
       installOrder: ['outbound', 'provider']
     })
-    expect(Object.isFrozen(WebRpcProviderRole)).toBe(true)
-    expect(Reflect.ownKeys(WebRpcProviderRole)).toEqual(['provider'])
-    expect(Object.getOwnPropertyDescriptor(WebRpcProviderRole, 'provider')).toEqual({
+    expect(Object.isFrozen(RpcProviderRole)).toBe(true)
+    expect(Reflect.ownKeys(RpcProviderRole)).toEqual(['provider'])
+    expect(Object.getOwnPropertyDescriptor(RpcProviderRole, 'provider')).toEqual({
       value: 'provider',
       enumerable: true,
       configurable: false,
       writable: false
     })
-    expect(Object.isFrozen(WebRpcProviderRoleSchema)).toBe(true)
+    expect(Object.isFrozen(RpcProviderRoleSchema)).toBe(true)
     expect(Object.isFrozen(schema)).toBe(true)
     expect(Object.isFrozen(schema.sharedProvides)).toBe(true)
     expect(Object.isFrozen(schema.sharedConsumes)).toBe(true)
     expect(Object.isFrozen(schema.publicKeys)).toBe(true)
     expect(Object.isFrozen(schema.exposedKeys)).toBe(true)
     expect(Object.isFrozen(schema.installOrder)).toBe(true)
-    expect(Object.isFrozen(WebRpcProviderCancellationPortMetadata)).toBe(true)
-    expect(Reflect.ownKeys(WebRpcProviderRoleSchema)).toEqual(['provider'])
+    expect(Object.isFrozen(RpcProviderCancellationPortMetadata)).toBe(true)
+    expect(Reflect.ownKeys(RpcProviderRoleSchema)).toEqual(['provider'])
     expect(Reflect.ownKeys(schema)).toEqual([
       'sharedProvides',
       'sharedConsumes',
@@ -1014,36 +1008,36 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         writable: false
       })
     }
-    assertFrozenArray(schema.sharedProvides, [WebRpcPortName.providerCancellation])
+    assertFrozenArray(schema.sharedProvides, [RpcPortName.providerCancellation])
     assertFrozenArray(schema.sharedConsumes, [
-      WebRpcPortName.outboundOperations,
-      WebRpcPortName.inboundIdentity,
-      WebRpcPortName.variationCoordinator
+      RpcPortName.outboundOperations,
+      RpcPortName.inboundIdentity,
+      RpcPortName.variationCoordinator
     ])
     assertFrozenArray(schema.publicKeys, ['provide'])
     assertFrozenArray(schema.exposedKeys, ['provide'])
     assertFrozenArray(schema.installOrder, ['outbound', 'provider'])
-    expect(Reflect.ownKeys(WebRpcProviderCancellationPortMetadata)).toEqual([
+    expect(Reflect.ownKeys(RpcProviderCancellationPortMetadata)).toEqual([
       'ownKeys',
       'propertyDescriptor',
       'signature'
     ])
-    expect(WebRpcProviderCancellationPortMetadata).not.toHaveProperty('abort')
-    expect(WebRpcProviderCancellationPortMetadata.ownKeys).toEqual(['abort'])
-    expect(WebRpcProviderCancellationPortMetadata.signature).toEqual({
+    expect(RpcProviderCancellationPortMetadata).not.toHaveProperty('abort')
+    expect(RpcProviderCancellationPortMetadata.ownKeys).toEqual(['abort'])
+    expect(RpcProviderCancellationPortMetadata.signature).toEqual({
       kind: 'function',
       parameters: ['id'],
       returns: 'void'
     })
-    expect(WebRpcProviderCancellationPortMetadata.propertyDescriptor).toEqual({
+    expect(RpcProviderCancellationPortMetadata.propertyDescriptor).toEqual({
       enumerable: true,
       configurable: false,
       writable: false
     })
-    expect(Object.isFrozen(WebRpcProviderCancellationPortMetadata.ownKeys)).toBe(true)
-    expect(Object.isFrozen(WebRpcProviderCancellationPortMetadata.propertyDescriptor)).toBe(true)
-    expect(Object.isFrozen(WebRpcProviderCancellationPortMetadata.signature)).toBe(true)
-    expect(Object.isFrozen(WebRpcProviderCancellationPortMetadata.signature.parameters)).toBe(true)
+    expect(Object.isFrozen(RpcProviderCancellationPortMetadata.ownKeys)).toBe(true)
+    expect(Object.isFrozen(RpcProviderCancellationPortMetadata.propertyDescriptor)).toBe(true)
+    expect(Object.isFrozen(RpcProviderCancellationPortMetadata.signature)).toBe(true)
+    expect(Object.isFrozen(RpcProviderCancellationPortMetadata.signature.parameters)).toBe(true)
 
     const attack = (target: object, key: PropertyKey): void => {
       expect(() => {
@@ -1055,34 +1049,34 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       }).toThrow()
       expect(() => Object.setPrototypeOf(target, null)).toThrow()
     }
-    attack(WebRpcProviderRole, 'provider')
-    attack(WebRpcProviderRoleSchema, 'provider')
+    attack(RpcProviderRole, 'provider')
+    attack(RpcProviderRoleSchema, 'provider')
     attack(schema, 'sharedProvides')
-    attack(WebRpcProviderCancellationPortMetadata, 'ownKeys')
-    attack(WebRpcProviderCancellationPortMetadata.ownKeys, 0)
-    attack(WebRpcProviderCancellationPortMetadata.propertyDescriptor, 'enumerable')
-    attack(WebRpcProviderCancellationPortMetadata.signature, 'kind')
-    attack(WebRpcProviderCancellationPortMetadata.signature.parameters, 0)
+    attack(RpcProviderCancellationPortMetadata, 'ownKeys')
+    attack(RpcProviderCancellationPortMetadata.ownKeys, 0)
+    attack(RpcProviderCancellationPortMetadata.propertyDescriptor, 'enumerable')
+    attack(RpcProviderCancellationPortMetadata.signature, 'kind')
+    attack(RpcProviderCancellationPortMetadata.signature.parameters, 0)
     attack(schema.sharedProvides, 0)
     attack(schema.sharedConsumes, 0)
     attack(schema.publicKeys, 0)
     attack(schema.exposedKeys, 0)
     attack(schema.installOrder, 0)
-    expect(WebRpcProviderRole.provider).toBe('provider')
-    expect(WebRpcProviderCancellationPortMetadata).not.toHaveProperty('abort')
+    expect(RpcProviderRole.provider).toBe('provider')
+    expect(RpcProviderCancellationPortMetadata).not.toHaveProperty('abort')
   })
 
   it('T124 real provider snapshot reads outer config and every provider entry once', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     const reads: string[] = []
-    const providerMap = {} as Record<string, IWebRpcProvider>
+    const providerMap = {} as Record<string, IRpcProvider>
     for (const method of ['alpha', 'beta', 'gamma']) {
       Object.defineProperty(providerMap, method, {
         enumerable: true,
         configurable: true,
         get() {
           reads.push(method)
-          return (context: Parameters<IWebRpcProvider>[0]) => context.success(method)
+          return (context: Parameters<IRpcProvider>[0]) => context.success(method)
         }
       })
     }
@@ -1094,7 +1088,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         reads.push('provider')
         return providerMap
       }
-    } as IWebRpcCoreConfig
+    } as IRpcCoreConfig
     const server = await createProviderEndpoint(config)
     try {
       expect(reads).toEqual(['provider', 'alpha', 'beta', 'gamma'])
@@ -1117,7 +1111,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const framePrimary = new Error('hostile frame transport')
     const observerFailure = new Error('observer failure is contained')
     let transportCalls = 0
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       contractConfig: {
         schemas: {
@@ -1152,8 +1146,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     try {
       await fixture.install()
       const operations = fixture.host.getPort(
-        WebRpcPortName.outboundOperations
-      ) as IWebRpcOutboundOperationsPort
+        RpcPortName.outboundOperations
+      ) as IRpcOutboundOperationsPort
       const commandKinds: string[] = []
       commandKinds.push('dispatch')
       let dispatchFailure: unknown
@@ -1163,9 +1157,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         dispatchFailure = error
       }
       expect(dispatchFailure).toMatchObject({
-        name: 'WebRpcError',
+        name: 'RpcError',
         source: '@migaia/rpc/core',
-        code: WebRpcErrorCode.invalidConfig
+        code: RpcCoreErrorCode.invalidConfig
       })
       commandKinds.push('validate')
       let validateFailure: unknown
@@ -1174,18 +1168,18 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       } catch (error) {
         validateFailure = error
       }
-      expect(validateFailure).toBeInstanceOf(WebRpcSchemaValidationError)
+      expect(validateFailure).toBeInstanceOf(RpcSchemaValidationError)
       expect(validateFailure).toMatchObject({
-        name: 'WebRpcSchemaValidationError',
+        name: 'RpcSchemaValidationError',
         source: '@migaia/rpc/core',
-        code: WebRpcErrorCode.schemaInvalid,
+        code: RpcCoreErrorCode.schemaInvalid,
         cause: validateCause
       })
       commandKinds.push('report')
       const reportResult = operations.send({
         kind: 'report',
         error: reporterInput,
-        code: WebRpcErrorCode.internal
+        code: RpcCoreErrorCode.internal
       })
       expect(reportResult).toBeUndefined()
       expect(reporterCalls.filter((error) => error === reporterInput)).toHaveLength(1)
@@ -1196,9 +1190,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       })
       expect(responseResult).toBeInstanceOf(Promise)
       await expect(responseResult).rejects.toMatchObject({
-        name: 'WebRpcTransportError',
+        name: 'RpcTransportError',
         source: '@migaia/rpc/core',
-        code: WebRpcErrorCode.transport,
+        code: RpcCoreErrorCode.transport,
         cause: responsePrimary
       })
       expect(responseResult).toBe(observations[3]?.result)
@@ -1209,9 +1203,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       })
       expect(frameResult).toBeInstanceOf(Promise)
       await expect(frameResult).rejects.toMatchObject({
-        name: 'WebRpcTransportError',
+        name: 'RpcTransportError',
         source: '@migaia/rpc/core',
-        code: WebRpcErrorCode.transport,
+        code: RpcCoreErrorCode.transport,
         cause: framePrimary
       })
       expect(frameResult).toBe(observations[4]?.result)
@@ -1262,7 +1256,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   })
 
   it('T148 composed disposal observer fails closed for forged and separate endpoint instances', async () => {
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       platform: 'Memory',
       ownership: 'borrowed',
       send() {},
@@ -1390,10 +1384,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     try {
       await discoveryFixture.install()
       // Native capability assembly exposes real ports through the Host, not a descriptor copy.
-      expect(discoveryFixture.host.getPort(WebRpcPortName.discoveryResolver)).toBeDefined()
-      expect(discoveryFixture.host.getPort(WebRpcPortName.inboundIdentity)).toBeDefined()
-      expect(discoveryFixture.host.getPort(WebRpcPortName.outboundOperations)).toBeDefined()
-      expect(discoveryFixture.host.getPort(WebRpcPortName.time)).toBeDefined()
+      expect(discoveryFixture.host.getPort(RpcPortName.discoveryResolver)).toBeDefined()
+      expect(discoveryFixture.host.getPort(RpcPortName.inboundIdentity)).toBeDefined()
+      expect(discoveryFixture.host.getPort(RpcPortName.outboundOperations)).toBeDefined()
+      expect(discoveryFixture.host.getPort(RpcPortName.time)).toBeDefined()
       expect(Object.keys(client)).toEqual([
         'hooks',
         'dispose',
@@ -1444,7 +1438,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       transport,
       middlewares: [connect({ transport }), ping()]
     })
-    const timeEvents: IWebRpcTimePortEvent[] = []
+    const timeEvents: IRpcTimePortEvent[] = []
     const unregisterTimeObserver = registerEndpointTimePortObserver(endpoint, (event) => {
       timeEvents.push(event)
     })
@@ -1454,7 +1448,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       })
       await vi.advanceTimersByTimeAsync(0)
       const setEvents = timeEvents.filter(
-        (event): event is Extract<IWebRpcTimePortEvent, { readonly kind: 'setTimeout' }> =>
+        (event): event is Extract<IRpcTimePortEvent, { readonly kind: 'setTimeout' }> =>
           event.kind === 'setTimeout'
       )
       expect(setEvents).toHaveLength(2)
@@ -1473,7 +1467,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await expect(pending).resolves.toBe(false)
       await disposePromise
       const clearEvents = timeEvents.filter(
-        (event): event is Extract<IWebRpcTimePortEvent, { readonly kind: 'clearTimeout' }> =>
+        (event): event is Extract<IRpcTimePortEvent, { readonly kind: 'clearTimeout' }> =>
           event.kind === 'clearTimeout'
       )
       expect(clearEvents).toEqual(
@@ -1511,14 +1505,14 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       rootNames: ['first-party-control']
     })
     try {
-      const schema = WebRpcControlRoleSchema[WebRpcControlRole.control]
+      const schema = RpcControlRoleSchema[RpcControlRole.control]
       expect(fixture.getNativeRootSharedConsumes('first-party-control')).toEqual(
         schema.sharedConsumes
       )
       await fixture.install()
-      expect(fixture.host.getPort(WebRpcPortName.outboundOperations)).toBeDefined()
-      expect(fixture.host.getPort(WebRpcPortName.discoveryResolver)).toBeDefined()
-      expect(fixture.host.getPort(WebRpcPortName.candidatePing)).toBeDefined()
+      expect(fixture.host.getPort(RpcPortName.outboundOperations)).toBeDefined()
+      expect(fixture.host.getPort(RpcPortName.discoveryResolver)).toBeDefined()
+      expect(fixture.host.getPort(RpcPortName.candidatePing)).toBeDefined()
     } finally {
       await fixture.dispose()
     }
@@ -1531,7 +1525,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await fixture.install()
-      const candidatePing = fixture.host.getPort(WebRpcPortName.candidatePing) as {
+      const candidatePing = fixture.host.getPort(RpcPortName.candidatePing) as {
         readonly ping?: unknown
       }
       expect(typeof candidatePing.ping).toBe('function')
@@ -1546,7 +1540,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       rootNames: ['first-party-outbound', 'first-party-control'],
       transformShared: (published) => {
         const omitted = { ...published }
-        delete omitted[WebRpcPortName.variationCoordinator]
+        delete omitted[RpcPortName.variationCoordinator]
         return omitted
       }
     })
@@ -1575,9 +1569,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         code: 'PLUGIN_INSTALL_FAILED',
         failedName: 'endpoint-capabilities',
         cause: expect.objectContaining({
-          name: 'WebRpcError',
+          name: 'RpcError',
           source: '@migaia/rpc/core',
-          code: WebRpcErrorCode.invalidConfig
+          code: RpcCoreErrorCode.invalidConfig
         }),
         terminal: {
           hostKeys: [...HOST_SURFACE].sort(),
@@ -1608,11 +1602,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     try {
       await first.install()
       await second.install()
-      const firstPort = first.host.getPort(WebRpcPortName.outboundOperations)
-      const secondPort = second.host.getPort(WebRpcPortName.outboundOperations)
+      const firstPort = first.host.getPort(RpcPortName.outboundOperations)
+      const secondPort = second.host.getPort(RpcPortName.outboundOperations)
       expect(firstPort).not.toBe(secondPort)
-      expect(first.host.getPort(WebRpcPortName.outboundOperations)).toBe(firstPort)
-      expect(second.host.getPort(WebRpcPortName.outboundOperations)).toBe(secondPort)
+      expect(first.host.getPort(RpcPortName.outboundOperations)).toBe(firstPort)
+      expect(second.host.getPort(RpcPortName.outboundOperations)).toBe(secondPort)
     } finally {
       await first.dispose()
       await second.dispose()
@@ -1670,9 +1664,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   })
 
   it('T268 control role authority is deeply frozen with the exact contract shape', () => {
-    const role = WebRpcControlRoleSchema[WebRpcControlRole.control]
-    expect(Object.isFrozen(WebRpcControlRole)).toBe(true)
-    expect(Object.keys(WebRpcControlRole)).toEqual(['control'])
+    const role = RpcControlRoleSchema[RpcControlRole.control]
+    expect(Object.isFrozen(RpcControlRole)).toBe(true)
+    expect(Object.keys(RpcControlRole)).toEqual(['control'])
     expect(Object.keys(role)).toEqual([
       'sharedProvides',
       'sharedConsumes',
@@ -1680,12 +1674,12 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       'publicKeys',
       'exposedKeys'
     ])
-    expect(role.sharedProvides).toEqual([WebRpcPortName.candidatePing])
+    expect(role.sharedProvides).toEqual([RpcPortName.candidatePing])
     expect(role.sharedConsumes).toEqual([
-      WebRpcPortName.outboundOperations,
-      WebRpcPortName.discoveryResolver,
-      WebRpcPortName.time,
-      WebRpcPortName.variationCoordinator
+      RpcPortName.outboundOperations,
+      RpcPortName.discoveryResolver,
+      RpcPortName.time,
+      RpcPortName.variationCoordinator
     ])
     expect(role.sharedOptionalConsumes).toEqual([])
     expect(role.publicKeys).toEqual(['ping', 'pingAll'])
@@ -1703,7 +1697,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(Reflect.defineProperty(role, 'forged', { value: true })).toBe(false)
     expect(Reflect.deleteProperty(role, 'sharedConsumes')).toBe(false)
     expect(() => Object.setPrototypeOf(role, {})).toThrow()
-    expect(Reflect.defineProperty(role.sharedConsumes, '0', { value: WebRpcPortName.time })).toBe(
+    expect(Reflect.defineProperty(role.sharedConsumes, '0', { value: RpcPortName.time })).toBe(
       false
     )
     expect(Reflect.deleteProperty(role.publicKeys, '0')).toBe(false)
@@ -1838,7 +1832,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const cleanupOrder: string[] = []
     const firstCleanup = new Error('round-seventeen-first-control-cleanup')
     const secondCleanup = new Error('round-seventeen-second-control-cleanup')
-    const firstMiddleware: IWebRpcPlugin = {
+    const firstMiddleware: IRpcPlugin = {
       name: 'round-seventeen-first-control-cleanup',
       metadata: {
         claims: {
@@ -1858,7 +1852,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         return { extension: {}, ports: {} }
       }
     }
-    const secondMiddleware: IWebRpcPlugin = {
+    const secondMiddleware: IRpcPlugin = {
       name: 'round-seventeen-second-control-cleanup',
       metadata: {
         claims: {
@@ -1898,9 +1892,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       failure = error
     }
     expect(failure).toMatchObject({
-      name: 'WebRpcLifecycleError',
+      name: 'RpcLifecycleError',
       source: '@migaia/rpc/core',
-      code: WebRpcErrorCode.endpointDisposed,
+      code: RpcCoreErrorCode.endpointDisposed,
       cause: secondCleanup
     })
     const cleanupErrors = (failure as { readonly cleanupErrors?: readonly { error: unknown }[] })
@@ -1940,7 +1934,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     ).rejects.toThrow()
     expect(controlSource).not.toContain('outboundCompatibility')
     expect(chunkSource).not.toContain('outboundCompatibility')
-    expect(chunkSource).toContain('WebRpcCanonicalChunkAttachment')
+    expect(chunkSource).toContain('RpcCanonicalChunkAttachment')
     expect(chunkSource).not.toContain('WebRpcPortName.inboundIdentity')
     expect(chunkSource).not.toContain('WebRpcPortName.time')
   })
@@ -2028,7 +2022,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     } catch (error) {
       failure = error
     }
-    expect(failure).toBeInstanceOf(WebRpcLifecycleError)
+    expect(failure).toBeInstanceOf(RpcLifecycleError)
     expect(readEndpointDebugSnapshot(endpoint)).toMatchObject({
       phase: 'disposed',
       pending: 0,
@@ -2042,7 +2036,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T279 control abort and disposal race leaves no late pending state', async () => {
     const [baseTransport] = createMemoryTransportPair()
     let transportErrorCount = 0
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       ...baseTransport,
       onTransportError: (listener) =>
         baseTransport.onTransportError?.((error) => {
@@ -2103,7 +2097,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         reads.push('id')
         return 'round-twenty-snapshot'
       },
-      get middlewares(): readonly IWebRpcPlugin[] {
+      get middlewares(): readonly IRpcPlugin[] {
         reads.push('middlewares')
         return [connect({ transport }), ping()]
       },
@@ -2111,7 +2105,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         reads.push('targetIds')
         return targetIds
       },
-      get transport(): IWebRpcTransport {
+      get transport(): IRpcTransport {
         reads.push('transport')
         return transport
       },
@@ -2127,7 +2121,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         reads.push('construction')
         return undefined
       }
-    } as unknown as IWebRpcCoreConfig
+    } as unknown as IRpcCoreConfig
     const endpoint = await createComposedEndpoint(
       config,
       createNativeRoots('first-party-outbound', 'first-party-control')
@@ -2163,7 +2157,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     vi.useFakeTimers()
     const [baseClientTransport, serverTransport] = createMemoryTransportPair()
     const delayedFrames: unknown[] = []
-    const clientTransport: IWebRpcTransport = {
+    const clientTransport: IRpcTransport = {
       ...baseClientTransport,
       send(message: unknown): void {
         delayedFrames.push(message)
@@ -2365,7 +2359,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const clientTransport = {
       ...baseClientTransport,
       sourceProof: (source: unknown) => source === trustedSource,
-      subscribe(listener: Parameters<IWebRpcTransport['subscribe']>[0]): () => void {
+      subscribe(listener: Parameters<IRpcTransport['subscribe']>[0]): () => void {
         return baseClientTransport.subscribe((message) =>
           listener({ ...message, source: inboundSource })
         )
@@ -2470,7 +2464,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       transport,
       middlewares: [connect({ transport }), ping()]
     })
-    const timeEvents: IWebRpcTimePortEvent[] = []
+    const timeEvents: IRpcTimePortEvent[] = []
     const unregisterTimeObserver = registerEndpointTimePortObserver(endpoint, (event) => {
       timeEvents.push(event)
     })
@@ -2644,7 +2638,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   })
 
   it('T224 superseded copied bridge injection has no surviving shared-key seam', () => {
-    assertNoRemovedD95Key(Reflect.ownKeys(WebRpcPortName))
+    assertNoRemovedD95Key(Reflect.ownKeys(RpcPortName))
   })
 
   it('T225 superseded hostile bridge injection has no surviving publisher descriptor seam', async () => {
@@ -2850,11 +2844,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const second = await createActualAdmissionFixture({ endpointId: 'r71-port-second' })
     try {
       await Promise.all([first.install(), second.install()])
-      const firstPort = first.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const firstPort = first.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
-      const secondPort = second.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const secondPort = second.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       expect(firstPort).toBeDefined()
       expect(secondPort).toBeDefined()
@@ -2916,8 +2910,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const cancellation = fixture.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       expect(cancellation).toBeDefined()
       const taskId = 'r71-active-task-id'
@@ -3008,11 +3002,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     ])
     try {
       await Promise.all([first.install(), second.install()])
-      const firstPort = first.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const firstPort = first.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
-      const secondPort = second.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const secondPort = second.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       expect(firstPort).toBeDefined()
       expect(secondPort).toBeDefined()
@@ -3058,8 +3052,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const cancellation = fixture.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       cancellation?.abort('r71-before-registration-task')
       await fixture.clientTransport.send(
@@ -3084,8 +3078,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const fixture = await createActualAdmissionFixture({ endpointId: 'r71-after-completion' })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const cancellation = fixture.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       const taskId = 'r71-after-completion-task'
       await fixture.clientTransport.send(
@@ -3161,8 +3155,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const cancellation = fixture.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       const taskId = 'r71-same-tick-task'
       void fixture.clientTransport.send(
@@ -3217,7 +3211,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const releasePromise = new Promise<void>((resolve) => {
       release = resolve
     })
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       endpointId: 'r71-late-resolve',
       observeOutboundCommand: (observation) => observations.push(observation),
@@ -3236,8 +3230,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
     try {
       await fixture.install()
-      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const cancellation = fixture.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       const taskId = 'r71-late-resolve-task'
       void fixture.clientTransport.send(
@@ -3301,7 +3295,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const lateResult = new Promise<never>((_resolve, reject) => {
       rejectLate = reject
     })
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       endpointId: 'r71-late-reject',
       observeOutboundCommand: (observation) => observations.push(observation),
@@ -3320,8 +3314,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
     try {
       await fixture.install()
-      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const cancellation = fixture.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       const taskId = 'r71-late-reject-task'
       void fixture.clientTransport.send(
@@ -3341,7 +3335,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(reports[0]?.command).toEqual({
         error: latePrimary,
         kind: 'report',
-        code: WebRpcErrorCode.internal
+        code: RpcCoreErrorCode.internal
       })
       expect(
         messages.filter(
@@ -3433,8 +3427,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const fixture = await createActualAdmissionFixture({ endpointId: 'r71-forged-id' })
     try {
       await fixture.install()
-      const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
-        | IWebRpcProviderCancellationPort
+      const cancellation = fixture.host.getPort(RpcPortName.providerCancellation) as
+        | IRpcProviderCancellationPort
         | undefined
       const before = fixture.snapshot().providerState
       const invoke = cancellation?.abort as unknown as (id: unknown) => void
@@ -3523,8 +3517,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await fixture.install()
       const observation = registerFixtureIdentityReleaseObservation(fixture)
       try {
-        const cancellation = fixture.host.getPort(WebRpcPortName.providerCancellation) as
-          | IWebRpcProviderCancellationPort
+        const cancellation = fixture.host.getPort(RpcPortName.providerCancellation) as
+          | IRpcProviderCancellationPort
           | undefined
         const taskId = 'r71-identity-late-task'
         void fixture.clientTransport.send(
@@ -3578,7 +3572,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T208 provider failure releases one identity admission lease and preserves the raw report', async () => {
     const failure = new Error('r71 identity failure')
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       endpointId: 'r71-identity-failure',
       observeOutboundCommand: (observation) => observations.push(observation),
@@ -3607,7 +3601,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         expect(observations.find(({ command }) => command.kind === 'report')?.command).toEqual({
           error: failure,
           kind: 'report',
-          code: WebRpcErrorCode.internal
+          code: RpcCoreErrorCode.internal
         })
         expect(fixture.snapshot().providerState).toEqual({
           admission: 0,
@@ -3749,7 +3743,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T133 failed provider installation can retry with a fresh candidate snapshot', async () => {
     const [, failedTransport] = createMemoryTransportPair()
     const failedCause = new Error('failed provider candidate')
-    const failedProvider = {} as Record<string, IWebRpcProvider>
+    const failedProvider = {} as Record<string, IRpcProvider>
     Object.defineProperty(failedProvider, 'failed', {
       enumerable: true,
       get: () => {
@@ -3764,9 +3758,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         provider: failedProvider
       })
     ).rejects.toMatchObject({
-      name: 'WebRpcConfigurationError',
+      name: 'RpcConfigurationError',
       source: '@migaia/rpc/core',
-      code: WebRpcErrorCode.invalidConfig,
+      code: RpcCoreErrorCode.invalidConfig,
       cause: failedCause
     })
 
@@ -3784,7 +3778,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T134 hostile provider-map getter at first position preserves failedName and original cause', async () => {
     const cause = new Error('hostile alpha getter')
     const reads: string[] = []
-    const providerMap = {} as Record<string, IWebRpcProvider>
+    const providerMap = {} as Record<string, IRpcProvider>
     Object.defineProperty(providerMap, 'alpha', {
       enumerable: true,
       get: () => {
@@ -3806,9 +3800,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
-          name: 'WebRpcConfigurationError',
+          name: 'RpcConfigurationError',
           source: '@migaia/rpc/core',
-          code: WebRpcErrorCode.invalidConfig,
+          code: RpcCoreErrorCode.invalidConfig,
           cause
         })
       })
@@ -3847,12 +3841,12 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T135 hostile provider-map getter at middle position preserves failedName and original cause', async () => {
     const cause = new Error('hostile beta getter')
     const reads: string[] = []
-    const providerMap = {} as Record<string, IWebRpcProvider>
+    const providerMap = {} as Record<string, IRpcProvider>
     Object.defineProperty(providerMap, 'alpha', {
       enumerable: true,
       get: () => {
         reads.push('alpha')
-        return (context: Parameters<IWebRpcProvider>[0]) => context.success('alpha')
+        return (context: Parameters<IRpcProvider>[0]) => context.success('alpha')
       }
     })
     Object.defineProperty(providerMap, 'beta', {
@@ -3876,9 +3870,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
-          name: 'WebRpcConfigurationError',
+          name: 'RpcConfigurationError',
           source: '@migaia/rpc/core',
-          code: WebRpcErrorCode.invalidConfig,
+          code: RpcCoreErrorCode.invalidConfig,
           cause
         })
       })
@@ -3917,19 +3911,19 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T136 hostile provider-map getter at last position preserves failedName and original cause', async () => {
     const cause = new Error('hostile gamma getter')
     const reads: string[] = []
-    const providerMap = {} as Record<string, IWebRpcProvider>
+    const providerMap = {} as Record<string, IRpcProvider>
     Object.defineProperty(providerMap, 'alpha', {
       enumerable: true,
       get: () => {
         reads.push('alpha')
-        return (context: Parameters<IWebRpcProvider>[0]) => context.success('alpha')
+        return (context: Parameters<IRpcProvider>[0]) => context.success('alpha')
       }
     })
     Object.defineProperty(providerMap, 'beta', {
       enumerable: true,
       get: () => {
         reads.push('beta')
-        return (context: Parameters<IWebRpcProvider>[0]) => context.success('beta')
+        return (context: Parameters<IRpcProvider>[0]) => context.success('beta')
       }
     })
     Object.defineProperty(providerMap, 'gamma', {
@@ -3953,9 +3947,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
-          name: 'WebRpcConfigurationError',
+          name: 'RpcConfigurationError',
           source: '@migaia/rpc/core',
-          code: WebRpcErrorCode.invalidConfig,
+          code: RpcCoreErrorCode.invalidConfig,
           cause
         })
       })
@@ -3993,7 +3987,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T137 concurrent same-map transactions isolate passive observation cleanup', async () => {
     const providerMap = {
-      echo: (context: Parameters<IWebRpcProvider>[0]) => context.success('shared-candidate')
+      echo: (context: Parameters<IRpcProvider>[0]) => context.success('shared-candidate')
     }
     const [first, second] = await Promise.all([
       createActualAdmissionFixture({ providerMap, observeProviderRegistration: true }),
@@ -4129,7 +4123,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           kind: 'response',
           id: 'not-found',
           ok: false,
-          code: WebRpcErrorCode.providerNotFound
+          code: RpcCoreErrorCode.providerNotFound
         })
       )
     } finally {
@@ -4155,7 +4149,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           kind: 'response',
           id: 'not-settled',
           ok: false,
-          code: WebRpcErrorCode.providerNotSettled
+          code: RpcCoreErrorCode.providerNotSettled
         })
       )
     } finally {
@@ -4166,7 +4160,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T172 Host-installed reentrant duplicate request remains idempotent', async () => {
     let executions = 0
-    let clientTransport: IWebRpcTransport | undefined
+    let clientTransport: IRpcTransport | undefined
     const request = createProviderRequest('reentrant')
     const fixture = await createActualAdmissionFixture({
       providerMap: {
@@ -4242,7 +4236,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           kind: 'response',
           id: 'async-failure',
           ok: false,
-          code: WebRpcErrorCode.internal
+          code: RpcCoreErrorCode.internal
         })
       )
       expect(fixture.snapshot().activeSubscriptions).toBe(1)
@@ -4272,7 +4266,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           kind: 'response',
           id: 'transfer-overflow',
           ok: false,
-          code: WebRpcErrorCode.internal
+          code: RpcCoreErrorCode.internal
         })
       )
     } finally {
@@ -4441,7 +4435,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         messages.filter(
           (message) =>
             (message as { readonly kind?: unknown }).kind === 'response' &&
-            (message as { readonly code?: unknown }).code === WebRpcErrorCode.overloaded
+            (message as { readonly code?: unknown }).code === RpcCoreErrorCode.overloaded
         )
       ).toHaveLength(1)
       expect(fixture.snapshot().activeSubscriptions).toBe(1)
@@ -4491,11 +4485,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           (message as { readonly id?: unknown }).id === 'schema-failure'
       ) as { readonly code?: unknown; readonly error?: Record<string, unknown> } | undefined
       expect(executions).toBe(0)
-      expect(response).toMatchObject({ code: WebRpcErrorCode.schemaInvalid })
+      expect(response).toMatchObject({ code: RpcCoreErrorCode.schemaInvalid })
       expect(response?.error).toMatchObject({
-        name: 'WebRpcSchemaValidationError',
+        name: 'RpcSchemaValidationError',
         source: '@migaia/rpc/core',
-        code: WebRpcErrorCode.schemaInvalid,
+        code: RpcCoreErrorCode.schemaInvalid,
         stack: expect.any(String)
       })
       expect(fixture.snapshot().activeSubscriptions).toBe(1)
@@ -4546,7 +4540,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         expect.objectContaining({
           kind: 'response',
           id: 'late-rejection',
-          code: WebRpcErrorCode.internal
+          code: RpcCoreErrorCode.internal
         })
       )
       expect(fixture.snapshot().activeSubscriptions).toBe(1)
@@ -4685,7 +4679,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         expect.objectContaining({
           kind: 'response',
           id: 'r70-sync-failure',
-          code: WebRpcErrorCode.internal,
+          code: RpcCoreErrorCode.internal,
           message: 'Provider failed'
         })
       )
@@ -4835,9 +4829,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       ) as { readonly error?: { readonly cause?: Record<string, unknown> } } | undefined
       expect(response).toMatchObject({
         error: {
-          name: 'WebRpcSchemaValidationError',
+          name: 'RpcSchemaValidationError',
           source: '@migaia/rpc/core',
-          code: WebRpcErrorCode.schemaInvalid,
+          code: RpcCoreErrorCode.schemaInvalid,
           stack: expect.any(String)
         }
       })
@@ -4859,8 +4853,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T187 synchronous provider WebRPC error serializes primary and cause across the real seam', async () => {
     const cause = new Error('R70 serialized sync cause')
-    const primary = new WebRpcError(WebRpcErrorCode.internal, 'R70 serialized sync primary', cause)
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const primary = new RpcError(RpcCoreErrorCode.internal, 'R70 serialized sync primary', cause)
+    const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       observeOutboundCommand: (observation) => observations.push(observation),
       providerMap: {
@@ -4871,7 +4865,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     const messages: unknown[] = []
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
-    let report: Extract<IWebRpcOutboundCommand, { readonly kind: 'report' }> | undefined
+    let report: Extract<IRpcOutboundCommand, { readonly kind: 'report' }> | undefined
     let response: { readonly error?: { readonly cause?: Record<string, unknown> } } | undefined
     let terminal: ReturnType<IActualAdmissionFixture['snapshot']> | undefined
     let hostPromiseStable = false
@@ -4880,7 +4874,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await fixture.clientTransport.send(createProviderRequest('r70-sync-serialized'))
       await settleProviderDelivery()
       report = observations.find(({ command }) => command.kind === 'report')?.command as
-        | Extract<IWebRpcOutboundCommand, { readonly kind: 'report' }>
+        | Extract<IRpcOutboundCommand, { readonly kind: 'report' }>
         | undefined
       response = messages.find(
         (message) =>
@@ -4892,12 +4886,12 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await dispose
       terminal = fixture.snapshot()
       expect({ report, response, terminal, hostPromiseStable }).toMatchObject({
-        report: { code: WebRpcErrorCode.internal, error: primary, kind: 'report' },
+        report: { code: RpcCoreErrorCode.internal, error: primary, kind: 'report' },
         response: {
           error: {
-            name: 'WebRpcError',
+            name: 'RpcError',
             source: '@migaia/rpc/core',
-            code: WebRpcErrorCode.internal,
+            code: RpcCoreErrorCode.internal,
             message: primary.message,
             stack: primary.stack,
             cause: expect.objectContaining({
@@ -4925,8 +4919,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T188 asynchronous provider WebRPC error serializes primary and cause across the real seam', async () => {
     const cause = new Error('R70 serialized async cause')
-    const primary = new WebRpcError(WebRpcErrorCode.internal, 'R70 serialized async primary', cause)
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const primary = new RpcError(RpcCoreErrorCode.internal, 'R70 serialized async primary', cause)
+    const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       observeOutboundCommand: (observation) => observations.push(observation),
       providerMap: {
@@ -4938,7 +4932,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     const messages: unknown[] = []
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
-    let report: IWebRpcOutboundCommandObservation['command'] | undefined
+    let report: IRpcOutboundCommandObservation['command'] | undefined
     let response: { readonly error?: Record<string, unknown> } | undefined
     let terminal: ReturnType<IActualAdmissionFixture['snapshot']> | undefined
     let hostPromiseStable = false
@@ -4957,12 +4951,12 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await dispose
       terminal = fixture.snapshot()
       expect({ report, response, terminal, hostPromiseStable }).toMatchObject({
-        report: { code: WebRpcErrorCode.internal, error: primary, kind: 'report' },
+        report: { code: RpcCoreErrorCode.internal, error: primary, kind: 'report' },
         response: {
           error: {
-            name: 'WebRpcError',
+            name: 'RpcError',
             source: '@migaia/rpc/core',
-            code: WebRpcErrorCode.internal,
+            code: RpcCoreErrorCode.internal,
             message: primary.message,
             stack: primary.stack,
             cause: expect.objectContaining({
@@ -4990,7 +4984,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T189 post-terminal late WebRPC rejection reports native cause identity without response', async () => {
     const cause = new Error('R70 late native cause')
-    const primary = new WebRpcError(WebRpcErrorCode.internal, 'R70 late native primary', cause)
+    const primary = new RpcError(RpcCoreErrorCode.internal, 'R70 late native primary', cause)
     let started!: () => void
     let rejectLate!: (error: unknown) => void
     const startedPromise = new Promise<void>((resolve) => {
@@ -5042,7 +5036,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   })
 
   it('T190 invalid provider transfer shape preserves native contract failure and release', async () => {
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       observeOutboundCommand: (observation) => observations.push(observation),
       providerMap: {
@@ -5054,7 +5048,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     const messages: unknown[] = []
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
-    let report: Extract<IWebRpcOutboundCommand, { readonly kind: 'report' }> | undefined
+    let report: Extract<IRpcOutboundCommand, { readonly kind: 'report' }> | undefined
     let response: Record<string, unknown> | undefined
     let terminal: ReturnType<IActualAdmissionFixture['snapshot']> | undefined
     try {
@@ -5062,7 +5056,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await fixture.clientTransport.send(createProviderRequest('r70-invalid-transfer'))
       await settleProviderDelivery()
       report = observations.find(({ command }) => command.kind === 'report')?.command as
-        | Extract<IWebRpcOutboundCommand, { readonly kind: 'report' }>
+        | Extract<IRpcOutboundCommand, { readonly kind: 'report' }>
         | undefined
       response = messages.find(
         (message) =>
@@ -5085,11 +5079,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect({ report, response, terminal }).toMatchObject({
         report: {
           kind: 'report',
-          code: WebRpcErrorCode.internal,
+          code: RpcCoreErrorCode.internal,
           error: {
-            name: 'WebRpcContractError',
+            name: 'RpcContractError',
             source: '@migaia/rpc/core',
-            code: WebRpcErrorCode.contractInvalid,
+            code: RpcCoreErrorCode.contractInvalid,
             message: expect.any(String),
             stack: expect.any(String)
           }
@@ -5097,7 +5091,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         response: {
           kind: 'response',
           id: 'r70-invalid-transfer',
-          code: WebRpcErrorCode.internal,
+          code: RpcCoreErrorCode.internal,
           error: {
             name: reportError?.name,
             source: reportError?.source,
@@ -5152,9 +5146,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           (message as { readonly id?: unknown }).id === 'r70-params-schema'
       ) as { readonly error?: { readonly cause?: Record<string, unknown> } } | undefined
       expect(response?.error).toMatchObject({
-        name: 'WebRpcSchemaValidationError',
+        name: 'RpcSchemaValidationError',
         source: '@migaia/rpc/core',
-        code: WebRpcErrorCode.schemaInvalid,
+        code: RpcCoreErrorCode.schemaInvalid,
         stack: expect.any(String)
       })
       expect(response?.error?.cause).toMatchObject({
@@ -5169,7 +5163,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   })
 
   it('T194 transfer overflow preserves native failure identity and requires serialized error graph', async () => {
-    const observations: IWebRpcOutboundCommandObservation[] = []
+    const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       observeOutboundCommand: (observation) => observations.push(observation),
       providerMap: {
@@ -5181,7 +5175,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     const messages: unknown[] = []
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
-    let report: Extract<IWebRpcOutboundCommand, { readonly kind: 'report' }> | undefined
+    let report: Extract<IRpcOutboundCommand, { readonly kind: 'report' }> | undefined
     let response: Record<string, unknown> | undefined
     let terminal: ReturnType<IActualAdmissionFixture['snapshot']> | undefined
     try {
@@ -5189,7 +5183,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await fixture.clientTransport.send(createProviderRequest('r70-transfer-overflow'))
       await settleProviderDelivery()
       report = observations.find(({ command }) => command.kind === 'report')?.command as
-        | Extract<IWebRpcOutboundCommand, { readonly kind: 'report' }>
+        | Extract<IRpcOutboundCommand, { readonly kind: 'report' }>
         | undefined
       response = messages.find(
         (message) =>
@@ -5212,11 +5206,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect({ report, response, terminal }).toMatchObject({
         report: {
           kind: 'report',
-          code: WebRpcErrorCode.internal,
+          code: RpcCoreErrorCode.internal,
           error: {
-            name: 'WebRpcContractError',
+            name: 'RpcContractError',
             source: '@migaia/rpc/core',
-            code: WebRpcErrorCode.contractInvalid,
+            code: RpcCoreErrorCode.contractInvalid,
             message: expect.any(String),
             stack: expect.any(String)
           }
@@ -5224,7 +5218,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         response: {
           kind: 'response',
           id: 'r70-transfer-overflow',
-          code: WebRpcErrorCode.internal,
+          code: RpcCoreErrorCode.internal,
           error: {
             name: reportError?.name,
             source: reportError?.source,
@@ -5269,7 +5263,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await expect(client.send('r70-canonical-provider', 'fail', null)).rejects.toMatchObject({
-        code: WebRpcErrorCode.internal
+        code: RpcCoreErrorCode.internal
       })
       const endpointDispose = server.dispose()
       expect(server.dispose()).toBe(endpointDispose)
@@ -5295,7 +5289,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T214 owned provider transport closes once after successful canonical disposal', async () => {
     const [, baseTransport] = createMemoryTransportPair()
     let closeCalls = 0
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       ...baseTransport,
       ownership: 'owned',
       close: () => {
@@ -5350,7 +5344,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T215 borrowed provider transport remains open after repeated canonical disposal', async () => {
     const [, baseTransport] = createMemoryTransportPair()
     let closeCalls = 0
-    const transport: IWebRpcTransport = {
+    const transport: IRpcTransport = {
       ...baseTransport,
       ownership: 'borrowed',
       close: () => {
@@ -5406,7 +5400,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const [clientTransport, baseServerTransport] = createMemoryTransportPair()
     /** Captures server-to-client physical sends; dispatch-only delivery must not emit responses. */
     const responseFrames: unknown[] = []
-    const serverTransport: IWebRpcTransport = {
+    const serverTransport: IRpcTransport = {
       ...baseServerTransport,
       send(message, options) {
         responseFrames.push(message)
@@ -5476,7 +5470,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     /** Controls whether the next client physical send fails before memory transport delivery. */
     let rejectPhysicalSend = true
     /** Injects the controlled rejection without changing the canonical memory peer setup. */
-    const clientTransport: IWebRpcTransport = {
+    const clientTransport: IRpcTransport = {
       ...baseClientTransport,
       send(message, options) {
         if (rejectPhysicalSend) return Promise.reject(physicalFailure)
@@ -5511,7 +5505,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         () => undefined,
         (error: unknown) => error
       )
-      expect(failure).toMatchObject({ code: WebRpcErrorCode.transport })
+      expect(failure).toMatchObject({ code: RpcCoreErrorCode.transport })
       expect((failure as { cause?: unknown }).cause).toBe(physicalFailure)
       expect(readEndpointDebugSnapshot(client)?.pending).toBe(0)
 

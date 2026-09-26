@@ -1,10 +1,13 @@
+import { systemScheduler } from '@migaia/utils/promise'
+import { createEndpointTimePort } from '../../../src/core/internal/time-port.js'
 import { describe, expect, it } from 'vitest'
-import { raceWithAsyncControl, waitWithSignal } from '../../../src/core/internal/async-control.js'
+import { raceWithAsyncControl } from '../../../src/core/internal/async-control.js'
 
 describe('async control', () => {
   it('settles on timeout and ignores late operation completion', async () => {
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => new Promise((resolve) => setTimeout(() => resolve('late'), 20)),
         timeoutMs: 1,
         createTimeoutError: () => new Error('timeout'),
@@ -13,17 +16,13 @@ describe('async control', () => {
     ).rejects.toThrow('timeout')
   })
 
-  it('removes abort listeners when delay completes', async () => {
-    const controller = new AbortController()
-    await waitWithSignal(0, [controller.signal], () => new Error('aborted'))
-    controller.abort()
-  })
   it('does not start a lazy operation after pre-cancellation', async () => {
     const controller = new AbortController()
     controller.abort()
     let started = false
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => {
           started = true
           return Promise.resolve('late')
@@ -39,6 +38,7 @@ describe('async control', () => {
     const diagnostics: unknown[] = []
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => new Promise(() => undefined),
         timeoutMs: 0,
         onTimeout: () => {
@@ -56,6 +56,7 @@ describe('async control', () => {
     const order: string[] = []
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => new Promise(() => undefined),
         timeoutMs: 0,
         onTimeout: () => {
@@ -81,6 +82,7 @@ describe('async control', () => {
     } as unknown as AbortSignal
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => {
           started = true
           return Promise.resolve()
@@ -110,6 +112,7 @@ describe('async control', () => {
     } as unknown as AbortSignal
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => Promise.resolve('late'),
         signals: [first, second],
         createTimeoutError: () => new Error('timeout'),
@@ -117,15 +120,13 @@ describe('async control', () => {
       })
     ).rejects.toThrow('aborted')
     expect(laterAdded).toBe(0)
-    await expect(waitWithSignal(0, [first, second], () => new Error('aborted'))).rejects.toThrow(
-      'aborted'
-    )
     expect(laterAdded).toBe(0)
   })
   it('starts the operation only after control checks', async () => {
     let started = false
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => {
           started = true
           return Promise.resolve('ok')
@@ -155,6 +156,7 @@ describe('async control', () => {
     } as unknown as AbortSignal
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => Promise.resolve('late'),
         signals: [first, second],
         createTimeoutError: () => new Error('timeout'),
@@ -162,54 +164,6 @@ describe('async control', () => {
       })
     ).rejects.toThrow('registration failed')
     expect(removed).toBe(1)
-  })
-  it('rolls back earlier delay listeners when a later registration fails', async () => {
-    let removed = 0
-    const first = {
-      aborted: false,
-      addEventListener() {},
-      removeEventListener() {
-        removed += 1
-      }
-    } as unknown as AbortSignal
-    const second = {
-      aborted: false,
-      addEventListener() {
-        throw new Error('registration failed')
-      },
-      removeEventListener() {}
-    } as unknown as AbortSignal
-    await expect(waitWithSignal(100, [first, second], () => new Error('aborted'))).rejects.toThrow(
-      'registration failed'
-    )
-    expect(removed).toBe(1)
-  })
-  it('observes delay listener cleanup failures without replacing the result', async () => {
-    const diagnostics: unknown[] = []
-    const controller = new AbortController()
-    const signal = {
-      aborted: false,
-      addEventListener: (
-        type: 'abort',
-        listener: EventListenerOrEventListenerObject,
-        options?: boolean | AddEventListenerOptions
-      ) => controller.signal.addEventListener(type, listener, options),
-      removeEventListener() {
-        throw new Error('remove failed')
-      }
-    } as unknown as AbortSignal
-    await expect(
-      waitWithSignal(
-        0,
-        [signal],
-        () => new Error('aborted'),
-        (error) => {
-          diagnostics.push(error)
-          throw new Error('diagnostic failed')
-        }
-      )
-    ).resolves.toBeUndefined()
-    expect(diagnostics).toHaveLength(1)
   })
   it('observes race listener cleanup failures without replacing the result', async () => {
     const diagnostics: unknown[] = []
@@ -222,6 +176,7 @@ describe('async control', () => {
     } as unknown as AbortSignal
     await expect(
       raceWithAsyncControl({
+        time: createEndpointTimePort(systemScheduler),
         operation: () => Promise.resolve('ok'),
         signals: [signal],
         createTimeoutError: () => new Error('timeout'),

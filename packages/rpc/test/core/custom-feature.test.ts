@@ -5,10 +5,10 @@ import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createStringFramer } from '../../src/contract/framing/index.js'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { createFullEndpoint } from '../../src/core/full.js'
-import { defineFeature, type IWebRpcFeature } from '../../src/core/feature.js'
+import { defineFeature, type IRpcFeature } from '../../src/core/feature.js'
 import { defineMiddleware } from '../../src/core/middleware.js'
-import { WebRpcError, WebRpcErrorCode } from '../../src/core/errors.js'
-import { WebRpcErrorText } from '../../src/core/error-text.js'
+import { RpcError, RpcCoreErrorCode } from '../../src/core/errors.js'
+import { RpcCoreErrorText } from '../../src/core/error-text.js'
 
 describe('custom feature public boundary', () => {
   it('YS32 installs the first-party chunk through endpoint capabilities and closes its framer once', async () => {
@@ -141,7 +141,7 @@ describe('custom feature public boundary', () => {
     }
     const failing = defineMiddleware('failed-native-middleware', () => ({
       install: () => {
-        throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
       }
     }))
     await expect(
@@ -150,7 +150,7 @@ describe('custom feature public boundary', () => {
         transport: observedTransport,
         middlewares: [connect({ transport: observedTransport }), failing] as const
       })
-    ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(subscriptions).toBe(0)
   })
 
@@ -163,9 +163,9 @@ describe('custom feature public boundary', () => {
         install: () => {
           trace.push(`${mode}:${id}`)
           if (mode === 'fail')
-            throw new WebRpcError(
-              WebRpcErrorCode.invalidConfig,
-              WebRpcErrorText.endpointModuleInvalid
+            throw new RpcError(
+              RpcCoreErrorCode.invalidConfig,
+              RpcCoreErrorText.endpointModuleInvalid
             )
           return {}
         }
@@ -178,7 +178,7 @@ describe('custom feature public boundary', () => {
             middlewares: [connect({ transport }), middleware] as const,
             features: [feature] as const
           })
-        ).rejects.toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+        ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
         return
       }
       const endpoint = await createFullEndpoint({
@@ -216,7 +216,7 @@ describe('custom feature public boundary', () => {
       install: () => ({ custom: false }),
       publicKeys: ['custom']
     })
-    const widenedFeatures = [first, second] as IWebRpcFeature[]
+    const widenedFeatures = [first, second] as IRpcFeature[]
     /** Compile-only branch keeps the widened-array rejection out of runtime execution. */
     const typeOnlyBranch: boolean = false
     if (typeOnlyBranch) {
