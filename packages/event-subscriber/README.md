@@ -6,7 +6,7 @@
 
 **适用**：本地、瞬时的事件订阅/广播——不需要保存当前值、不需要 replay、不需要跨 Worker/网络传输。典型场景：模块间解耦通知、按 `taskId` 定向到某个订阅者并等待其结果、把多个异步 listener 的执行编排成并行/串行结算。
 
-**不适用**：不要把它当作响应式状态（当前值、派生、依赖图见 `@migaia/reactive`）、中间件管道（waterfall/`next()`/短路见 `@migaia/middleware-pipeline`）、资源生命周期宿主（`dispose()`/队列/背压见 `@migaia/lifecycle`/`@migaia/resource`）或跨进程传输（Worker/iframe/网络见 `@migaia/web-rpc`）。
+**不适用**：不要把它当作响应式状态（当前值、派生、依赖图见 `@migaia/reactive`）、中间件管道（waterfall/`next()`/短路见 `@migaia/middleware-pipeline`）、资源生命周期宿主（`dispose()`/队列/背压见 `@migaia/lifecycle`/`@migaia/resource`）或跨进程传输（Worker/iframe/网络见 `@migaia/rpc/core`）。
 
 ## 安装
 

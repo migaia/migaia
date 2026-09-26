@@ -678,7 +678,7 @@ channel.subscribe((event) => {
 - **`invokeTask`/`invokeTaskSettled` 抛 `TASK_NOT_FOUND`/`TASK_NOT_UNIQUE`**：目标 `taskId` 在选择那一刻没有恰好一个匹配的 registration；检查该 `taskId` 是否已退订，或是否有多个 listener 意外使用了同一个 `taskId`。
 - **`subscribeOnce`/`subscribeUntil`/`subscribeSubscriber` 抛 `INVALID_CHANNEL`**：传入的 channel 不满足结构契约，或异步发布 helper 收到了非 `createEventChannel()` 产出（或跨包物理副本）的对象；确认使用同一份包实例创建的 channel。
 - **订阅句柄 `.subscribe()` 抛 `SUBSCRIPTION_CLOSED`**：该链已经调用过 `unsubscribe()`；关闭后的链不可再扩展，需要新建订阅。
-- **需要保存当前值、replay、跨 Worker/网络传输**：`@migaia/event-subscriber` 刻意不提供，应分别参考 `@migaia/reactive`（响应式状态）、`@migaia/middleware-pipeline`（waterfall/`next()`/短路）、`@migaia/lifecycle`/`@migaia/resource`（资源生命周期宿主）、`@migaia/web-rpc`（跨进程传输）。
+- **需要保存当前值、replay、跨 Worker/网络传输**：`@migaia/event-subscriber` 刻意不提供，应分别参考 `@migaia/reactive`（响应式状态）、`@migaia/middleware-pipeline`（waterfall/`next()`/短路）、`@migaia/lifecycle`/`@migaia/resource`（资源生命周期宿主）、`@migaia/rpc/core`（跨进程传输）。
 
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
