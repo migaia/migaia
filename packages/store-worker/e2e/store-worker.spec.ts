@@ -33,14 +33,14 @@ test('Worker failure retains canonical remote outer and meaningful native cause 
     {
       name: 'WebRpcRemoteError',
       message: 'Provider failed',
-      source: '@migaia/web-rpc',
+      source: '@migaia/rpc/core',
       code: 'INTERNAL',
       hasStack: true
     },
     {
       name: 'Error',
       message: 'Unable to calculate the requested value',
-      source: '@migaia/web-rpc',
+      source: '@migaia/rpc/core',
       code: 'INTERNAL',
       hasStack: true
     }

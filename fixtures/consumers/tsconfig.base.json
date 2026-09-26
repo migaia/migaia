@@ -6,7 +6,7 @@
     "paths": {
       "@migaia/plugin-host": ["../../packages/plugin-host/dist/index.d.ts"],
       "@migaia/event-subscriber": ["../../packages/event-subscriber/dist/index.d.ts"],
-      "@migaia/web-rpc/*": ["../../packages/web-rpc/dist/*"],
+      "@migaia/rpc/*": ["../../packages/rpc/dist/*"],
       "@migaia/logger": ["../../packages/logger/dist/index.d.ts"],
       "@migaia/capability": ["../../packages/capability/dist/index.d.ts"],
       "@migaia/reactive": ["../../packages/reactive/dist/index.d.ts"],

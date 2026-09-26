@@ -5,8 +5,8 @@ const { createProviderEndpointSpy } = vi.hoisted(() => ({
   createProviderEndpointSpy: vi.fn()
 }))
 
-vi.mock('@migaia/web-rpc/provider', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@migaia/web-rpc/provider')>()
+vi.mock('@migaia/rpc/core/provider', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@migaia/rpc/core/provider')>()
   createProviderEndpointSpy.mockImplementation(actual.createProviderEndpoint)
   return {
     ...actual,

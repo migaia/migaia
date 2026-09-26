@@ -4,7 +4,7 @@
 // （Map 实现、SSR/Node/testing 降级目标），经 DOM-free 子路径 `@migaia/storage-web/memory`
 // 单独引入，不把 IDB/WebStorage 的 DOM 类型带进来。
 import { MessageChannel } from 'node:worker_threads'
-import { createNodeMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'
+import { createNodeMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'
 import { Logger, type ILogEntry, type ISink } from '@migaia/logger'
 import { createCapabilityHost } from '@migaia/capability'
 import { jsonPlugin } from '@migaia/serialize'

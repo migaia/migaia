@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WEBRPC_SOURCE, WebRpcLifecycleError } from '@migaia/web-rpc'
+import { WEBRPC_SOURCE, WebRpcLifecycleError } from '@migaia/rpc/core'
 import { StoreWorkerErrorCode } from '../src/error-code.js'
 import { workerParser } from '../src/serialize/worker.js'
 import { transferablesOf } from '../src/serialize/transferables.js'
