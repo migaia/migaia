@@ -10,6 +10,7 @@ import {
   raceWithAbort,
   retry,
   sleep,
+  systemScheduler,
   toPromise,
   withTimeout
 } from '../src/promise.js'
@@ -532,6 +533,16 @@ describe('promise primitives', () => {
     expect(unrefReads).toBe(1)
     scheduler.advance(1)
     await pending
+  })
+
+  it('unrefs native system timers with the timer as receiver', () => {
+    // Node's Timeout#unref reads internal state from `this`; a detached call throws TypeError.
+    const task = systemScheduler.schedule(() => undefined, 60_000)
+    try {
+      expect(() => task.unref?.()).not.toThrow()
+    } finally {
+      task.cancel()
+    }
   })
 
   it('settles sleep despite hostile cleanup and reports cleanup failures', async () => {
