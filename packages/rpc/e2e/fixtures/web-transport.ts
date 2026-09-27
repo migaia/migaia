@@ -10,11 +10,7 @@ import { timeout } from '../../src/core/middleware/timeout.js'
 import { abort } from '../../src/core/middleware/abort.js'
 import { ping } from '../../src/core/middleware/ping.js'
 import { contract } from '../../src/core/middleware/contract.js'
-import type {
-  IWebRpcContractConfig,
-  IWebRpcEndpoint,
-  IWebRpcProvider
-} from '../../src/core/typing.js'
+import type { IRpcContractConfig, IRpcEndpoint, IRpcProvider } from '../../src/core/typing.js'
 import { installErrorGuards, terminalProviders } from './rpc.js'
 
 const errors = installErrorGuards()
@@ -24,9 +20,9 @@ const createWebTransportRpc = (
   id: string,
   targetIds: readonly string[],
   transport: ReturnType<typeof createWebTransportDatagramTransport>,
-  provider: Readonly<Record<string, IWebRpcProvider>> = {},
-  contractConfig?: IWebRpcContractConfig
-): Promise<IWebRpcEndpoint<string, 'automatic', true>> =>
+  provider: Readonly<Record<string, IRpcProvider>> = {},
+  contractConfig?: IRpcContractConfig
+): Promise<IRpcEndpoint<string, 'automatic', true>> =>
   (() => {
     const codec = defineCBORCodec({ version: 1 })
     return createEndpoint({
@@ -48,7 +44,7 @@ const createWebTransportRpc = (
         ping(),
         ...(contractConfig === undefined ? [] : [contract(contractConfig)])
       ]
-    }) as Promise<IWebRpcEndpoint<string, 'automatic', true>>
+    }) as Promise<IRpcEndpoint<string, 'automatic', true>>
   })()
 
 /** Creates two in-memory datagram directions with the same stream contract as WebTransport. */
