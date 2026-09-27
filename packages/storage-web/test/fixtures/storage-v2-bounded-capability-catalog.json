@@ -9,6 +9,7 @@
     "@migaia/plugin-host",
     "@migaia/reactive",
     "@migaia/resource",
+    "@migaia/rpc",
     "@migaia/serialize",
     "@migaia/storage-contract",
     "@migaia/storage-web",
@@ -26,7 +27,6 @@
     "@migaia/tray",
     "@migaia/utils",
     "@migaia/wasm",
-    "@migaia/web-rpc",
     "migaia-website"
   ],
   "capabilities": [
@@ -35,7 +35,7 @@
       "owner": "@migaia/event-subscriber",
       "routes": ["@migaia/event-subscriber"],
       "symbols": ["EventDispatchPolicy", "createEventChannel"],
-      "consumers": ["@migaia/storage-web", "@migaia/store-light", "@migaia/web-rpc"]
+      "consumers": ["@migaia/rpc", "@migaia/storage-web", "@migaia/store-light"]
     },
     {
       "name": "abort-timeout",
@@ -56,12 +56,12 @@
       "routes": ["@migaia/utils/bytes"],
       "symbols": ["isArrayBuffer", "isUint8Array"],
       "consumers": [
+        "@migaia/rpc",
         "@migaia/serialize",
         "@migaia/storage-contract",
         "@migaia/storage-web",
         "@migaia/store-persist",
-        "@migaia/store-worker",
-        "@migaia/web-rpc"
+        "@migaia/store-worker"
       ]
     },
     {
@@ -69,12 +69,7 @@
       "owner": "@migaia/lifecycle",
       "routes": ["@migaia/lifecycle"],
       "symbols": ["IGenerationController", "IGenerationToken", "createGenerationController"],
-      "consumers": [
-        "@migaia/capability",
-        "@migaia/resource",
-        "@migaia/store-light",
-        "@migaia/web-rpc"
-      ]
+      "consumers": ["@migaia/capability", "@migaia/resource", "@migaia/rpc", "@migaia/store-light"]
     },
     {
       "name": "reactive-graph",
@@ -197,12 +192,12 @@
     {
       "id": "SWV2-RED10",
       "packages": [
+        "@migaia/rpc",
         "@migaia/serialize",
         "@migaia/storage-contract",
         "@migaia/storage-web",
         "@migaia/store-persist",
-        "@migaia/store-worker",
-        "@migaia/web-rpc"
+        "@migaia/store-worker"
       ],
       "pathPattern": "^src/",
       "sourcePatterns": ["instanceof\\s+(?:Uint8Array|ArrayBuffer)\\b"]
