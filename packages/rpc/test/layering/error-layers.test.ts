@@ -6,24 +6,11 @@ import { describe, expect, it } from 'vitest'
 /** Source root whose error ownership is checked by the layering migration. */
 const sourceRoot = join(import.meta.dirname, '../../src')
 /** The core codes removed by BC1 because no supported throw site emits them. */
-const retired = [
-  'UUID_UNAVAILABLE',
-  'UUID_INVALID',
-  'UUID_CONFLICT',
-  'PROTOCOL_UNSUPPORTED',
-  'PROTOCOL_DECRYPT_FAILED',
-  'CONTRACT_VERSION_UNSUPPORTED',
-  'PAYLOAD_TOO_LARGE',
-  'METHOD_NOT_FOUND',
-  'UNAUTHENTICATED',
-  'FORBIDDEN',
-  'UNAVAILABLE',
-  'CHUNK_TOO_LARGE',
-  'CHUNK_CAPACITY_EXCEEDED',
-  'CHUNK_RECEIVE_TIMEOUT',
-  'CHUNK_ACK_TIMEOUT',
-  'PLUGIN_INSTALL_FAILED'
-] as const
+const retired = (
+  JSON.parse(
+    readFileSync(join(import.meta.dirname, '../fixtures/layering-retired-codes.json'), 'utf8')
+  ) as { readonly codes: readonly string[] }
+).codes
 
 type ICodeReference = { readonly table: string; readonly key: string }
 

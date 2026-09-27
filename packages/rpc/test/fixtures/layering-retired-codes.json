@@ -1,0 +1,21 @@
+{
+  "description": "Core error codes removed by rpc-layering BC1/R2 because no supported throw site emits them; shared by the layering A2 oracle and the merge A5 registry oracle.",
+  "codes": [
+    "UUID_UNAVAILABLE",
+    "UUID_INVALID",
+    "UUID_CONFLICT",
+    "PROTOCOL_UNSUPPORTED",
+    "PROTOCOL_DECRYPT_FAILED",
+    "CONTRACT_VERSION_UNSUPPORTED",
+    "PAYLOAD_TOO_LARGE",
+    "METHOD_NOT_FOUND",
+    "UNAUTHENTICATED",
+    "FORBIDDEN",
+    "UNAVAILABLE",
+    "CHUNK_TOO_LARGE",
+    "CHUNK_CAPACITY_EXCEEDED",
+    "CHUNK_RECEIVE_TIMEOUT",
+    "CHUNK_ACK_TIMEOUT",
+    "PLUGIN_INSTALL_FAILED"
+  ]
+}

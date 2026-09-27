@@ -90,10 +90,22 @@ test('A5 maps merged RPC codes and preserves capability graph ownership', () => 
   const frozen = JSON.parse(
     readFileSync(join(repositoryRoot, 'packages/rpc/test/fixtures/legacy-error-codes.json'), 'utf8')
   )
+  /** Core codes the successor rpc-layering BC1 deleted after this merge froze its code set. */
+  const retired = new Set(
+    JSON.parse(
+      readFileSync(
+        join(repositoryRoot, 'packages/rpc/test/fixtures/layering-retired-codes.json'),
+        'utf8'
+      )
+    ).codes
+  )
   const rows = collectErrorRegistry()
   const codes = (source) => rows.filter((row) => row.source === source).map((row) => row.code)
   assert.deepEqual(codes('@migaia/rpc/contract'), frozen.contract)
-  assert.deepEqual(codes('@migaia/rpc/core'), frozen.core)
+  assert.deepEqual(
+    codes('@migaia/rpc/core'),
+    frozen.core.filter((code) => !retired.has(code))
+  )
   assert.equal(codes('@migaia/capability/graph').length, 15)
   assert.deepEqual(codes('@migaia/rpc-contract'), [])
   assert.deepEqual(codes('@migaia/web-rpc'), [])
