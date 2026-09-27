@@ -118,5 +118,6 @@ describe('serialize optional peer packed consumer', () => {
     } finally {
       rmSync(temporary, { recursive: true, force: true })
     }
-  })
+    // Three `pnpm pack` runs plus offline installs exceed Vitest's 5 s default under workspace load.
+  }, 60_000)
 })
