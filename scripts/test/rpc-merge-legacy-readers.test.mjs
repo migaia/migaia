@@ -11,8 +11,8 @@ const legacyPattern =
   /@migaia\/(?:rpc-contract|web-rpc)|(?:rpc-contract|web-rpc)\/|packages\/(?:rpc-contract|web-rpc)/g
 /** A5 cases intentionally name legacy sources while checking their absence. */
 const permittedA5Titles = new Set([
-  'uses a layer ERROR_SOURCE and falls back to the package name',
-  'maps merged RPC codes and preserves capability graph ownership'
+  'A5 uses a layer ERROR_SOURCE and falls back to the package name',
+  'A5 maps merged RPC codes and preserves capability graph ownership'
 ])
 
 /** Return source-like files, excluding build products and S1 historical evidence. */
