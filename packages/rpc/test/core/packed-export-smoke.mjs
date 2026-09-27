@@ -271,6 +271,22 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
   )
   if (createHash('sha256').update(fixture.source).digest('hex') !== fixture.sha256)
     throw new Error('Packed legacy chunk fixture digest drifted')
+  /**
+   * Digest-pinned retired owner with its pre-layering import names bound to the renamed core
+   * exports (rpc-layering BC2), so the perturbation still loads against the current packed dist.
+   */
+  const legacyChunkSource = fixture.source
+    .replace(
+      'import { WebRpcError, WebRpcErrorCode }',
+      'import { RpcError as WebRpcError, RpcCoreErrorCode as WebRpcErrorCode }'
+    )
+    .replace(
+      'import { WebRpcFirstPartyRoleSchema }',
+      'import { RpcFirstPartyRoleSchema as WebRpcFirstPartyRoleSchema }'
+    )
+    .replace('import { WebRpcSharedKey }', 'import { RpcPortName as WebRpcSharedKey }')
+  if (legacyChunkSource.includes('import { WebRpc'))
+    throw new Error('Packed legacy chunk fixture imports an unmapped pre-layering name')
   /** Packed files whose exact bytes establish the root-export sensitivity baseline. */
   const rootPath = join(packedPackage, 'dist/core/index.js')
   const canonicalChunkPath = join(packedPackage, 'dist/core/middleware/canonical-chunk.js')
@@ -293,10 +309,10 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
   const restoredSharedKeys = `${sharedKeysSource.replace(
     sharedAnchor,
     `${sharedAnchor},\n    chunk: 'chunk'`
-  )}\nexport const WebRpcSharedKey = WebRpcPortName\n`
+  )}`
   const restoredRoleSchema = roleSchemaSource.replace(
     roleAnchor,
-    `chunk: Object.freeze({\n        sharedProvides: Object.freeze([WebRpcPortName.chunk]),\n        sharedConsumes: Object.freeze([]),\n        sharedOptionalConsumes: Object.freeze([])\n    }),\n    ${roleAnchor}`
+    `chunk: Object.freeze({\n        sharedProvides: Object.freeze([RpcPortName.chunk]),\n        sharedConsumes: Object.freeze([]),\n        sharedOptionalConsumes: Object.freeze([])\n    }),\n    ${roleAnchor}`
   )
   /** Child-process entry that observes root exports without sharing the parent ESM cache. */
   const probe = join(consumerDirectory, 'legacy-root-alias-probe.mjs')
@@ -329,7 +345,7 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
   try {
     writeFileSync(sharedKeysPath, restoredSharedKeys, 'utf8')
     writeFileSync(roleSchemaPath, restoredRoleSchema, 'utf8')
-    writeFileSync(canonicalChunkPath, fixture.source, 'utf8')
+    writeFileSync(canonicalChunkPath, legacyChunkSource, 'utf8')
     writeFileSync(
       rootPath,
       `${root.toString('utf8')}\nexport { canonicalChunk as chunk } from './middleware/canonical-chunk.js'\n`,
@@ -341,9 +357,9 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
       probe,
       [
         `import * as root from ${JSON.stringify(`${pathToFileURL(rootPath).href}?${probeVersion}`)}`,
-        `import { WebRpcPortName } from ${JSON.stringify(pathToFileURL(sharedKeysPath).href)}`,
+        `import { RpcPortName } from ${JSON.stringify(pathToFileURL(sharedKeysPath).href)}`,
         'const installed = root.chunk({ chunkSize: 4 }).install()',
-        'const chunk = installed.shared[WebRpcPortName.chunk]',
+        'const chunk = installed.shared[RpcPortName.chunk]',
         "if (JSON.stringify(chunk.split('abcdefgh', 4)) !== JSON.stringify(['abcd', 'efgh']))",
         "  throw new Error('Restored root chunk export did not install the exact split capability')"
       ].join('\n'),
@@ -453,8 +469,8 @@ async function assertPackedSelectiveBrowserImport(consumerDirectory, packedPacka
   writeFileSync(
     browserEntry,
     [
-      "import { isWebRpcError } from '@migaia/rpc/core'",
-      "globalThis.__migaiaSelectiveImport = isWebRpcError({ code: 'SELECTIVE_BROWSER_PROBE' })"
+      "import { isRpcError } from '@migaia/rpc/core'",
+      "globalThis.__migaiaSelectiveImport = isRpcError({ code: 'SELECTIVE_BROWSER_PROBE' })"
     ].join('\n'),
     'utf8'
   )
@@ -582,12 +598,7 @@ function readFeatureDocumentationManifest(rootPath) {
   const exports = new Map(
     checker.getExportsOfModule(root).map((symbol) => [symbol.getName(), symbol])
   )
-  const names = [
-    'defineFeature',
-    'IWebRpcFeatureDefinition',
-    'IWebRpcFeature',
-    'IWebRpcFeatureSurface'
-  ]
+  const names = ['defineFeature', 'IRpcFeatureDefinition', 'IRpcFeature', 'IRpcFeatureSurface']
   const manifest = {}
   for (const name of names) {
     const exported = exports.get(name)
@@ -670,9 +681,8 @@ function readFeatureDocumentationManifest(rootPath) {
       manifest[name] = { documentation, tags }
     }
   }
-  const configExport = exports.get('IWebRpcFactoryConfig')
-  if (!configExport)
-    throw new Error('Feature documentation root export missing: IWebRpcFactoryConfig')
+  const configExport = exports.get('IRpcFactoryConfig')
+  if (!configExport) throw new Error('Feature documentation root export missing: IRpcFactoryConfig')
   const config =
     configExport.flags & ts.SymbolFlags.Alias
       ? checker.getAliasedSymbol(configExport)
@@ -694,7 +704,7 @@ function readFeatureDocumentationManifest(rootPath) {
     : ''
   if (!property || !configurationDocumentation || !property.type?.getText().includes('TFeatures'))
     throw new Error(`Feature configuration documentation is incomplete in ${rootPath}`)
-  manifest.IWebRpcFactoryConfig = {
+  manifest.IRpcFactoryConfig = {
     documentation: configurationDocumentation,
     type: property.type.getText()
   }
