@@ -85,6 +85,20 @@ describe('rpc-contract', () => {
     expect(framer.accept(frames[0]!, context).status).toBe('rejected')
   })
 
+  it('reassembles ordered binary fragments into one contiguous byte array', () => {
+    const framer = createBinaryFramer({ chunkBytes: 2, assemblyTimeoutMs: 10_000 })
+    const context = { source: 'peer-a', messageId: 'message-bytes' } as const
+    const frames = framer.frame(new Uint8Array([1, 2, 3, 4, 5]), context)
+    expect(frames).toHaveLength(3)
+    expect(framer.accept(frames[0]!, context)).toEqual({ status: 'pending' })
+    expect(framer.accept(frames[1]!, context)).toEqual({ status: 'pending' })
+    const complete = framer.accept(frames[2]!, context)
+    expect(complete.status).toBe('complete')
+    expect(complete.status === 'complete' && complete.value).toEqual(
+      new Uint8Array([1, 2, 3, 4, 5])
+    )
+  })
+
   it('rejects out-of-order and over-limit binary fragments before semantic decoding', () => {
     const framer = createBinaryFramer({ chunkBytes: 2, maxMessageBytes: 4 })
     const context = { source: 'peer-a', messageId: 'message-b' } as const
