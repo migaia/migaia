@@ -29,23 +29,28 @@ function tsc(args: string[]) {
 }
 
 describe('A3 platform-neutral type boundaries', () => {
-  it.each(['contract', 'core'])('typechecks %s without DOM or ambient host types', (layer) => {
-    const config = `tsconfig.${layer}.json`
-    const check = tsc(['--noEmit', '-p', config])
-    expect(check.status, `${config}\n${check.stdout}\n${check.stderr}`).toBe(0)
-    const show = tsc(['--showConfig', '-p', config])
-    expect(show.status, show.stderr).toBe(0)
-    const parsed = JSON.parse(show.stdout) as {
-      compilerOptions: { lib: string[]; types: string[] }
-      files: string[]
-    }
-    expect(parsed.compilerOptions.lib).toEqual([layer === 'contract' ? 'es2024' : 'es2023'])
-    expect(parsed.compilerOptions.types).toEqual([])
-    expect(parsed.compilerOptions.lib).not.toContain('dom')
-    if (layer === 'core') {
-      for (const file of coreFiles) expect(parsed.files).toContain(`./${file}`)
-    } else {
-      expect(parsed.files.every((file) => file.startsWith('./src/contract/'))).toBe(true)
-    }
-  })
+  it.each(['contract', 'core'])(
+    'typechecks %s without DOM or ambient host types',
+    (layer) => {
+      const config = `tsconfig.${layer}.json`
+      const check = tsc(['--noEmit', '-p', config])
+      expect(check.status, `${config}\n${check.stdout}\n${check.stderr}`).toBe(0)
+      const show = tsc(['--showConfig', '-p', config])
+      expect(show.status, show.stderr).toBe(0)
+      const parsed = JSON.parse(show.stdout) as {
+        compilerOptions: { lib: string[]; types: string[] }
+        files: string[]
+      }
+      expect(parsed.compilerOptions.lib).toEqual([layer === 'contract' ? 'es2024' : 'es2023'])
+      expect(parsed.compilerOptions.types).toEqual([])
+      expect(parsed.compilerOptions.lib).not.toContain('dom')
+      if (layer === 'core') {
+        for (const file of coreFiles) expect(parsed.files).toContain(`./${file}`)
+      } else {
+        expect(parsed.files.every((file) => file.startsWith('./src/contract/'))).toBe(true)
+      }
+      // Two full tsc processes per case exceed Vitest's 5 s default under `--coverage` load.
+    },
+    30_000
+  )
 })
