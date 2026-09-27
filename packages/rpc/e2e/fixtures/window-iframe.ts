@@ -1,6 +1,6 @@
 import { createWindowMessageTransport } from '../../src/browser/adapters/window.js'
 import { readEndpointDebugSnapshot } from '../../src/core/internal/test-observer.js'
-import type { IWebRpcEndpointDebugSnapshot } from '../../src/core/internal/test-observer.js'
+import type { IRpcEndpointDebugSnapshot } from '../../src/core/internal/test-observer.js'
 import { createRpc, installErrorGuards } from './rpc.js'
 
 const errors = installErrorGuards()
@@ -131,7 +131,7 @@ globalThis.runWindowIframeScenario = async () => {
     () => 'unexpected',
     (error: { code?: string }) => error.code ?? 'error'
   )
-  const activeSnapshot = readEndpointDebugSnapshot(endpoint) as IWebRpcEndpointDebugSnapshot
+  const activeSnapshot = readEndpointDebugSnapshot(endpoint) as IRpcEndpointDebugSnapshot
   sibling.remove()
   crossOriginSpoof?.remove()
   await endpoint.dispose()
@@ -153,7 +153,7 @@ globalThis.runWindowIframeScenario = async () => {
     errors,
     listenerAdds,
     listenerRemoves,
-    snapshot: readEndpointDebugSnapshot(endpoint) as IWebRpcEndpointDebugSnapshot
+    snapshot: readEndpointDebugSnapshot(endpoint) as IRpcEndpointDebugSnapshot
   }
 }
 

@@ -8,26 +8,26 @@ import { ping } from '../../src/core/middleware/ping.js'
 import { authentication } from '../../src/core/middleware/authentication.js'
 import { abort } from '../../src/core/middleware/abort.js'
 import { contract } from '../../src/core/middleware/contract.js'
-import type { IWebRpcContractConfig } from '../../src/core/typing.js'
-import type { IWebRpcProvider } from '../../src/core/typing.js'
-import type { IWebRpcEndpoint } from '../../src/core/typing.js'
-import type { IWebRpcTransport } from '../../src/core/transport.js'
+import type { IRpcContractConfig } from '../../src/core/typing.js'
+import type { IRpcProvider } from '../../src/core/typing.js'
+import type { IRpcEndpoint } from '../../src/core/typing.js'
+import type { IRpcTransport } from '../../src/core/transport.js'
 
 export const createRpc = <TDiscoveryMode extends 'automatic' | 'manual' = 'automatic'>(
   id: string,
   targetIds: readonly string[],
-  transport: IWebRpcTransport,
-  provider: Readonly<Record<string, IWebRpcProvider>> = {},
+  transport: IRpcTransport,
+  provider: Readonly<Record<string, IRpcProvider>> = {},
   identity?: {
     readonly uniqueTargetId: string
     readonly identifier?: (context: { readonly data?: unknown }) => boolean
   },
   fixedUuid?: string | (() => string),
   authenticated = false,
-  contractConfig?: IWebRpcContractConfig,
+  contractConfig?: IRpcContractConfig,
   chunkConfig?: { readonly chunkSize?: number },
   discoveryMode: TDiscoveryMode = 'automatic' as TDiscoveryMode
-): Promise<IWebRpcEndpoint<string, TDiscoveryMode, true>> =>
+): Promise<IRpcEndpoint<string, TDiscoveryMode, true>> =>
   createEndpoint({
     id,
     targetIds,
@@ -70,12 +70,12 @@ export const createRpc = <TDiscoveryMode extends 'automatic' | 'manual' = 'autom
         ? []
         : [uuid({ generate: typeof fixedUuid === 'function' ? fixedUuid : () => fixedUuid })])
     ]
-  }) as Promise<IWebRpcEndpoint<string, TDiscoveryMode, true>>
+  }) as Promise<IRpcEndpoint<string, TDiscoveryMode, true>>
 
-export const echoProvider: IWebRpcProvider = (context) => context.success(context.data)
+export const echoProvider: IRpcProvider = (context) => context.success(context.data)
 
 /** Providers used by adapter terminal-state E2E scenarios. */
-export const terminalProviders: Readonly<Record<string, IWebRpcProvider>> = {
+export const terminalProviders: Readonly<Record<string, IRpcProvider>> = {
   echo: echoProvider,
   fail: (context) => context.failed('remote failure', 'REMOTE_FAILURE'),
   hang: async () => await new Promise<never>(() => undefined)
