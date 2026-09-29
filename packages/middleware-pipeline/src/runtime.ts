@@ -2,6 +2,7 @@ import { createMiddlewarePipelineExecutionError } from './errors.js'
 import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
 import { admitAbortSignal } from '@migaia/utils/promise'
 import type { IAbortSignal } from '@migaia/utils/promise'
+import { tryReadProperty } from '@migaia/utils/error'
 import {
   createMiddlewarePipelineAbortCleanupError,
   createMiddlewarePipelineAbortError,
@@ -155,11 +156,17 @@ const admit = (
     throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, {
       cause: admission.cause
     })
-  if (admission.aborted) throw makeAbortError(signal.reason)
+  if (admission.aborted) {
+    const read = tryReadProperty(signal, 'reason')
+    throw makeAbortError(read.threw ? read.error : read.value)
+  }
   return Object.freeze({ signal })
 }
 const check = (context: IMiddlewarePipelineContext | undefined): void => {
-  if (context?.signal.aborted) throw makeAbortError(context.signal.reason)
+  if (context?.signal.aborted) {
+    const read = tryReadProperty(context.signal, 'reason')
+    throw makeAbortError(read.threw ? read.error : read.value)
+  }
 }
 
 type IAsyncControlPath = {
