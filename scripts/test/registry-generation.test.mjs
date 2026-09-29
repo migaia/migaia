@@ -208,3 +208,225 @@ test('A4 generated region includes a source count table before code rows', () =>
   assert.ok(rendered.indexOf('| `@fixture/b` | 1 |') < rendered.indexOf('| source | code | 场景 |'))
   assert.match(rendered, /pnpm run registry:write/)
 })
+
+/**
+ * Writes one fixture package whose exports resolve to concrete JavaScript files.
+ *
+ * @param {string} root Fixture root.
+ * @param {string} directory Package directory.
+ * @param {string} name Public package name.
+ * @param {Record<string, string>} exportsMap Export subpaths and targets.
+ * @param {Record<string, string>} modules Relative module paths and source.
+ * @returns {string} Absolute package directory.
+ */
+const declareExports = (root, directory, name, exportsMap, modules) => {
+  /** Package root contains both manifest and optional build output. */
+  const packageRoot = join(root, 'packages', directory)
+  mkdirSync(packageRoot, { recursive: true })
+  writeFileSync(
+    join(packageRoot, 'package.json'),
+    JSON.stringify({ name, type: 'module', exports: exportsMap })
+  )
+  for (const [path, source] of Object.entries(modules)) {
+    /** Each module is created only when the fixture declares it built. */
+    const file = join(packageRoot, path)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, source)
+  }
+  return packageRoot
+}
+
+/**
+ * Writes a tracked-baseline shape into an isolated fixture.
+ *
+ * @param {string} root Fixture root.
+ * @param {Record<string, Record<string, string[]>>} packages Expected names by package/subpath.
+ * @returns {string} Absolute baseline path.
+ */
+const declareBaseline = (root, packages) => {
+  /** Baseline location follows the repository's existing script contract. */
+  const file = join(root, 'scripts/fixtures/public-exports.baseline.json')
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, `${JSON.stringify({ packages }, null, 2)}\n`)
+  return file
+}
+
+test('A5 export collection fails on missing targets and preserves upstream errors', async () => {
+  /** An isolated module tree exercises manifest coverage without a full build. */
+  const root = fixture()
+  /** Shared global exposes one exact Error instance to the fixture ESM module. */
+  const fixtureGlobal = /** @type {typeof globalThis & { __publicExportsFixtureError?: Error }} */ (
+    globalThis
+  )
+  try {
+    /** The covered package has one present and one missing concrete target. */
+    const packageRoot = declareExports(
+      root,
+      'a',
+      'a',
+      { '.': './dist/index.js', './x': './dist/x.js' },
+      { 'dist/index.js': 'export const present = 1\n' }
+    )
+    declareExports(root, 'w', 'w', { '.': './src/w.js' }, { 'src/w.js': 'export const web = 1\n' })
+    /** Generator import occurs after fixture creation so the red phase fails at the new module. */
+    const exportsTool = await import('../public-exports.mjs')
+    /** @type {string[]} Stub records exact directories without depending on fixture stamps. */
+    const freshDirectories = []
+    await assert.rejects(
+      exportsTool.collectPublicExports({
+        root,
+        assertFresh: (directories) => freshDirectories.push(...directories)
+      }),
+      (error) =>
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'PUBLIC_EXPORTS_TARGET_MISSING' &&
+        /a/.test(error.message) &&
+        /\.\/x/.test(error.message)
+    )
+    assert.deepEqual(exportsTool.coveredPackages(root).excluded, ['w'])
+    assert.deepEqual(freshDirectories, [packageRoot])
+    /** A freshness failure must retain identity and its original DIST_STALE code. */
+    const stale = Object.assign(new Error('stale'), { code: 'DIST_STALE' })
+    await assert.rejects(
+      exportsTool.collectPublicExports({
+        root,
+        assertFresh: () => {
+          throw stale
+        }
+      }),
+      (error) => error === stale
+    )
+    /** The module's own thrown object must survive dynamic import unchanged. */
+    const importError = new Error('fixture module failed')
+    fixtureGlobal.__publicExportsFixtureError = importError
+    writeFileSync(
+      join(packageRoot, 'dist/index.js'),
+      'throw globalThis.__publicExportsFixtureError\n'
+    )
+    writeFileSync(join(packageRoot, 'dist/x.js'), 'export const x = 1\n')
+    await assert.rejects(
+      exportsTool.collectPublicExports({ root, assertFresh: () => {} }),
+      (error) => error === importError
+    )
+  } finally {
+    delete fixtureGlobal.__publicExportsFixtureError
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('A6 scoped checks report only admitted differences without writing the baseline', async () => {
+  /** Two packages distinguish admitted from unadmitted export drift. */
+  const root = fixture()
+  try {
+    declareExports(
+      root,
+      'a',
+      'a',
+      { '.': './dist/index.js' },
+      { 'dist/index.js': 'export const newName = 1\n' }
+    )
+    declareExports(
+      root,
+      'b',
+      'b',
+      { '.': './dist/index.js' },
+      { 'dist/index.js': 'export const other = 1\n' }
+    )
+    /** The old baseline lacks a's new name and still expects b's old name. */
+    const baseline = declareBaseline(root, { a: { '.': [] }, b: { '.': ['oldName', 'other'] } })
+    /** Baseline bytes remain unchanged across every check mode. */
+    const original = readFileSync(baseline)
+    const exportsTool = await import('../public-exports.mjs')
+    await assert.rejects(
+      exportsTool.checkPublicExports({ root, scope: ['a'], assertFresh: () => {} }),
+      (error) => {
+        assert.ok(error instanceof Error && 'code' in error && 'packages' in error)
+        assert.equal(error.code, 'PUBLIC_EXPORTS_DRIFT')
+        assert.deepEqual(error.packages, ['b'])
+        return true
+      }
+    )
+    assert.deepEqual(
+      await exportsTool.checkPublicExports({ root, scope: ['a', 'b'], assertFresh: () => {} }),
+      [
+        { sign: '+', pkg: 'a', subpath: '.', name: 'newName' },
+        { sign: '-', pkg: 'b', subpath: '.', name: 'oldName' }
+      ]
+    )
+    await assert.rejects(
+      exportsTool.checkPublicExports({ root, scope: ['zzz'], assertFresh: () => {} }),
+      (error) =>
+        error instanceof Error && 'code' in error && error.code === 'PUBLIC_EXPORTS_SCOPE_UNKNOWN'
+    )
+    assert.deepEqual(readFileSync(baseline), original)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('A8 merged source changes generate identical and idempotent registration bytes', async () => {
+  /** Independent fixture copies model the two possible child integration orders. */
+  const roots = [fixture(), fixture()]
+  try {
+    const exportsTool = await import('../public-exports.mjs')
+    /**
+     * Applies one package's code and export change to a fixture. @param {string} root Fixture root.
+     * @param {string} packageName Branch package name.
+     */
+    const applyChange = (root, packageName) => {
+      /** Public code and export names encode the same branch identity. */
+      const letter = packageName.toUpperCase()
+      declareCodes(
+        root,
+        packageName,
+        `@fixture/${packageName}`,
+        `export const Code = {\n  /** ${letter} added scenario. */\n  added: '${letter}_ADDED'\n} as const\n`
+      )
+      declareExports(
+        root,
+        packageName,
+        `@fixture/${packageName}`,
+        { '.': './dist/index.js' },
+        { 'dist/index.js': `export const ${packageName}Added = 1\n` }
+      )
+    }
+    /** Both integration orders end with the same two declarations. */
+    applyChange(roots[0], 'a')
+    applyChange(roots[0], 'b')
+    applyChange(roots[1], 'b')
+    applyChange(roots[1], 'a')
+    /**
+     * Each fixture starts with a local registry document and an empty baseline. @param {string}
+     * root Fixture root.
+     */
+    const generate = async (root) => {
+      /** The generator replaces only its marked region. */
+      const document = join(root, 'docs/contracts/error-codes.md')
+      mkdirSync(dirname(document), { recursive: true })
+      writeFileSync(document, '# Registry\n## 5. 什么不是错误码\n')
+      declareBaseline(root, {})
+      registry.writeErrorRegistry(root)
+      await exportsTool.writePublicExports({ root, assertFresh: () => {} })
+      /** Snapshot covers both generated files. */
+      const result = [
+        readFileSync(document),
+        readFileSync(join(root, 'scripts/fixtures/public-exports.baseline.json'))
+      ]
+      registry.writeErrorRegistry(root)
+      await exportsTool.writePublicExports({ root, assertFresh: () => {} })
+      assert.deepEqual(readFileSync(document), result[0])
+      assert.deepEqual(
+        readFileSync(join(root, 'scripts/fixtures/public-exports.baseline.json')),
+        result[1]
+      )
+      assert.deepEqual((await import('node:fs')).readdirSync(join(root, 'scripts/fixtures')), [
+        'public-exports.baseline.json'
+      ])
+      return result
+    }
+    assert.deepEqual(await generate(roots[0]), await generate(roots[1]))
+  } finally {
+    for (const root of roots) rmSync(root, { recursive: true, force: true })
+  }
+})
