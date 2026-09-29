@@ -372,6 +372,7 @@ test('A8 merged source changes generate identical and idempotent registration by
     const exportsTool = await import('../public-exports.mjs')
     /**
      * Applies one package's code and export change to a fixture. @param {string} root Fixture root.
+     *
      * @param {string} packageName Branch package name.
      */
     const applyChange = (root, packageName) => {
