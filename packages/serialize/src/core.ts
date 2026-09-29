@@ -19,7 +19,6 @@ export {
   type ISerializePhase,
   type ISerializePlugin,
   type ISerializeRegistry,
-  type ISerializeScheduler,
   type ITextDecoder,
   type ITextEncoder
 } from './types.js'

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { createManualScheduler } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import {
   SerializeCodecError,
   chunkToText,

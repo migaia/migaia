@@ -21,7 +21,8 @@ import {
 import { createAbortController } from '@migaia/lifecycle/abort'
 import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle/scope'
 import { createPendingTracker, type IPendingTracker } from '@migaia/lifecycle/quiescence'
-import { snapshotScheduler, systemScheduler } from '@migaia/lifecycle/scheduler'
+import { snapshotScheduler } from '@migaia/lifecycle/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   createSerializeError,
   createSerializeRangeError,
@@ -371,7 +372,6 @@ export type {
   ISerializePlugin,
   ISerializeRegistry,
   ISerializeRegistryOptions,
-  ISerializeScheduler,
   ISerializeTimeoutDiagnostic,
   ITextDecoder,
   ITextEncoder

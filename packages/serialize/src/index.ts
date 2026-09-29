@@ -10,7 +10,6 @@ export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.j
 export type {
   ISerializeCleanupError,
   ISerializeRegistryOptions,
-  ISerializeScheduler,
   ISerializeTimeoutDiagnostic
 } from './registry.js'
 export {

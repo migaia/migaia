@@ -11,7 +11,7 @@ import {
   type ISerializeParser,
   type ISerializePlugin
 } from './src/index';
-import { systemScheduler } from '@migaia/lifecycle';
+import { systemScheduler } from '@migaia/utils/scheduler';
 
 async function readmeExample() {
   const registry = createSerializeRegistry([jsonPlugin()]);
