@@ -110,7 +110,7 @@ describe('reactive guarded-read policy', () => {
     }
   })
 
-  it('keeps the pre-report cause-read fallback during batch and flush failure', () => {
+  it('retains the cause getter failure during batch and flush failure', () => {
     const runtime = createRuntime()
     const signal = runtime.signal(0)
     const flushFailure = new Error('flush failed')
@@ -139,8 +139,9 @@ describe('reactive guarded-read policy', () => {
       dispose()
       signal.dispose()
     }
-    expect(caught).toBe(primary)
-    expect(primary.cause).toBe(flushFailure)
+    expect(caught).toBeInstanceOf(AggregateError)
+    expect(caught).toMatchObject({ code: ReactiveErrorCode.actionFlushFailed })
+    expect((caught as AggregateError).errors).toEqual([primary, flushFailure, causeReadFailure])
     expect(causeReads).toBe(1)
   })
 })
