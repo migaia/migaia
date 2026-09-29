@@ -52,7 +52,8 @@ describe('rpc-contract error identity', () => {
       INVALID_ENVELOPE: [TypeError, 'rpc envelope is invalid'],
       INVALID_FRAME: [RangeError, 'rpc frame is invalid'],
       FRAME_LIMIT_EXCEEDED: [RangeError, 'rpc frame limit exceeded'],
-      FRAME_ASSEMBLY_EXPIRED: [RangeError, 'rpc frame assembly expired']
+      FRAME_ASSEMBLY_EXPIRED: [RangeError, 'rpc frame assembly expired'],
+      INVALID_WIRE_ERROR: [TypeError, 'rpc wire error is invalid']
     } as const
     for (const code of Object.values(RpcContractErrorCode)) {
       const error = createContractError(code)

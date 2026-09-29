@@ -27,6 +27,33 @@ export type IRpcSerializedError = Readonly<{
   stack: string
   cause?: IRpcSerializedError
   errors?: readonly IRpcSerializedError[]
+  data?: IRpcPortableValue
+  truncated?: true
+}>
+
+/** Unknown field policy used while validating a received error tree. */
+export type IRpcWireErrorOptions = Readonly<{
+  unknownFields?: 'reject' | 'ignore'
+  onUnknownField?: (pointer: string, field: string) => void
+}>
+
+/** Original failure retained when a hostile property or portable value cannot be read. */
+export type IRpcWireErrorFailure = Readonly<{
+  pointer: string
+  field: string
+  error: unknown
+}>
+
+/** Required sink for failures that the serializer can omit from a bounded payload. */
+export type IRpcSerializeErrorOptions = Readonly<{
+  report: (failure: IRpcWireErrorFailure) => void
+}>
+
+/** JSON-RPC error object carrying the canonical error payload in its data. */
+export type IRpcJsonRpcErrorObject = Readonly<{
+  code: number
+  message: string
+  data?: IRpcPortableValue
 }>
 
 /** Runtime protocol descriptor that normalizes untrusted semantic input. */

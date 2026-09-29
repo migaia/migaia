@@ -64,6 +64,8 @@ export const RpcCoreErrorText = {
     'wallClock must provide timestamp, and timestamp() must return non-negative safe-integer epoch milliseconds',
   /** Stable fallback when a remote failure omits its public message. */
   remoteRequestFailed: 'Remote request failed',
+  /** Stable text for an unreported hostile property read at the safeRead boundary. */
+  propertyReadFailed: 'rpc property read failed',
   /** Stable validation failure for malformed provider registration input. */
   providerDescriptorInvalid: 'provider descriptor is invalid',
   /** Stable duplicate-provider diagnostic keyed by the conflicting method. */

@@ -4712,6 +4712,28 @@
         "pct": 100
       }
     },
+    "packages/rpc/src/contract/wire-error-constants.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
     "packages/rpc/src/core/adapters/memory.ts": {
       "lines": {
         "covered": 45,
@@ -12813,64 +12835,13 @@
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
   "changedRuntimeFiles": [
-    "packages/lifecycle/src/bounded-wait.ts",
-    "packages/lifecycle/src/dispose-transaction.ts",
-    "packages/lifecycle/src/error-code.ts",
-    "packages/lifecycle/src/generation-controller.ts",
-    "packages/lifecycle/src/index.ts",
-    "packages/lifecycle/src/lifecycle-scope.ts",
-    "packages/lifecycle/src/mutation-queue.ts",
-    "packages/lifecycle/src/scheduler.ts",
-    "packages/lifecycle/src/types.ts",
-    "packages/logger/src/log.ts",
-    "packages/logger/src/plugins/batch.ts",
-    "packages/logger/src/plugins/http.ts",
-    "packages/logger/src/plugins/process.ts",
-    "packages/logger/src/scheduler-domain.ts",
-    "packages/logger/src/typing.ts",
-    "packages/plugin-host/src/cleanup-runtime.ts",
-    "packages/plugin-host/src/composition-runtime.ts",
-    "packages/plugin-host/src/host-disposal-runtime.ts",
-    "packages/plugin-host/src/host-runtime.ts",
-    "packages/plugin-host/src/install-runtime.ts",
-    "packages/plugin-host/src/operation-runtime.ts",
-    "packages/plugin-host/src/pipeline-runtime.ts",
-    "packages/plugin-host/src/typing.ts",
-    "packages/reactive/src/runtime/types.ts",
-    "packages/resource/src/resource.class.ts",
-    "packages/rpc/src/core/composed.ts",
-    "packages/rpc/src/core/endpoint-kernel.ts",
-    "packages/rpc/src/core/error-text.ts",
-    "packages/rpc/src/core/internal/control-attachment.ts",
-    "packages/rpc/src/core/internal/discovery-attachment.ts",
-    "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
-    "packages/rpc/src/core/internal/endpoint-capabilities-plugin.ts",
-    "packages/rpc/src/core/internal/endpoint-options.ts",
-    "packages/rpc/src/core/internal/outbound-attachment.ts",
-    "packages/rpc/src/core/internal/plugin-inventory.ts",
-    "packages/rpc/src/core/internal/plugin-shared-keys.ts",
-    "packages/rpc/src/core/internal/provider-attachment.ts",
-    "packages/rpc/src/core/internal/provider-executor.ts",
-    "packages/rpc/src/core/internal/time-port.ts",
-    "packages/rpc/src/core/internal/variation-coordinator.ts",
-    "packages/rpc/src/core/middleware.ts",
-    "packages/rpc/src/core/typing.ts",
-    "packages/serialize/src/core.ts",
-    "packages/serialize/src/index.ts",
-    "packages/serialize/src/registry.ts",
-    "packages/serialize/src/stream.ts",
-    "packages/serialize/src/types.ts",
-    "packages/storage-web/src/host/reactive.ts",
-    "packages/storage-web/src/host/storage-host.ts",
-    "packages/storage-web/src/host/types.ts",
-    "packages/storage-web/src/reactive-adapter.ts",
-    "packages/tray/src/loader/load-into-host.ts",
-    "packages/tray/src/runtime/create-runtime.ts",
-    "packages/utils/src/error-code.ts",
-    "packages/utils/src/error-text.ts",
-    "packages/utils/src/index.ts",
-    "packages/utils/src/promise.ts",
-    "packages/utils/src/scheduler.ts"
+    "packages/rpc/src/contract/contract-error.ts",
+    "packages/rpc/src/contract/error-code.ts",
+    "packages/rpc/src/contract/error-text.ts",
+    "packages/rpc/src/contract/types.ts",
+    "packages/rpc/src/contract/wire-error-constants.ts",
+    "packages/rpc/src/core/error-code.ts",
+    "packages/rpc/src/core/error-text.ts"
   ],
   "deletedRuntimeFiles": []
 }
