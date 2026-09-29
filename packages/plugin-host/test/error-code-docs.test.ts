@@ -29,6 +29,22 @@ describe('PluginHost public error-code documentation', () => {
     expect(source).toMatch(/\/\*\*[\s\S]+temporarily suspended[\s\S]+pluginSuspended/)
   })
 
+  it('A7 registers the async setup sync-path code and its package texts', async () => {
+    expect(PluginHostErrorCode.setupRequiresAsyncInstall).toBe('SETUP_REQUIRES_ASYNC_INSTALL')
+    const [codes, texts] = await Promise.all([
+      readFile(new URL('../src/error-code.ts', import.meta.url), 'utf8'),
+      readFile(new URL('../src/error-text.ts', import.meta.url), 'utf8')
+    ])
+    expect(codes).toContain('must install it through `use()`')
+    for (const name of [
+      'SETUP_REQUIRES_ASYNC_INSTALL',
+      'PLUGIN_SETUP_FUNCTION',
+      'SETUP_LATE_REJECTION',
+      'SETUP_LATE_RELEASE_FAILED'
+    ])
+      expect(texts).toContain(name)
+  })
+
   it('入参校验 TypeError 保持类型不变并携带 (source, INVALID_OPTION)（§7 裸抛扫描门禁）', () => {
     const error = createPluginHostTypeError('plugin name must be a non-empty string')
     expect(error).toBeInstanceOf(TypeError)

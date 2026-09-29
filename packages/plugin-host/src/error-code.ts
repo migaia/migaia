@@ -107,6 +107,12 @@ export const PluginHostErrorCode = {
   pluginInstallFailed: 'PLUGIN_INSTALL_FAILED',
 
   /**
+   * A plugin selected for immediate `useSync()` installation declares async setup (R5). The caller
+   * must install it through `use()` so setup can settle before features and install run.
+   */
+  setupRequiresAsyncInstall: 'SETUP_REQUIRES_ASYNC_INSTALL',
+
+  /**
    * 单个插件的 `unUse()` 过程中有 disposer 失败。
    *
    * 失败被聚合后抛出，但卸载流程仍会走完 —— 一个 disposer 失败不阻断其余资源释放。调用方应把它当作资源泄漏告警而非状态回滚信号。
@@ -147,14 +153,15 @@ export const PluginHostErrorCode = {
   prerequisiteRemoved: 'PREREQUISITE_REMOVED',
 
   /**
-   * 在插件 `install()` 生命周期之外调用 `onDispose()` 注册资源。
+   * 在插件 `install()` 生命周期之外，或 setup 尝试结束后调用其上下文的 `onDispose()` 注册资源。
    *
-   * 资源必须归属于某次具体的安装，否则无人负责在对应的 `unUse()` 时释放它。调用方应把注册移进 `install()` 内。
+   * 资源必须归属于当前尝试；迟到资源先被释放，再抛此码。调用方应在有效 setup 或 install 窗口登记。
    */
   resourceOutsideInstall: 'RESOURCE_OUTSIDE_INSTALL',
 
   /**
-   * 在插件生命周期回调（install / dispose / update）内部反过来调用 Host 的 mutation API。
+   * 在插件生命周期回调（setup / install / dispose / update）内部反过来调用 Host 的 mutation API， 或 setup 进行中由外部调用
+   * `config.update()`。
    *
    * 重入会让安装事务的回滚边界无法确定。调用方应把后续 mutation 移到生命周期回调之外。
    */
