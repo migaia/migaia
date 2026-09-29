@@ -68,7 +68,10 @@ describe('rpc-contract error identity', () => {
       INVALID_FRAME: [RangeError, 'rpc frame is invalid'],
       FRAME_LIMIT_EXCEEDED: [RangeError, 'rpc frame limit exceeded'],
       FRAME_ASSEMBLY_EXPIRED: [RangeError, 'rpc frame assembly expired'],
-      INVALID_WIRE_ERROR: [TypeError, 'rpc wire error is invalid']
+      INVALID_WIRE_ERROR: [TypeError, 'rpc wire error is invalid'],
+      HANDSHAKE_INVALID: [TypeError, 'rpc handshake is invalid'],
+      HANDSHAKE_INCOMPATIBLE: [Error, 'rpc handshake is incompatible'],
+      HANDSHAKE_REJECTED: [Error, 'rpc handshake was rejected']
     } as const
     for (const code of Object.values(RpcContractErrorCode)) {
       const error = createContractError(code)

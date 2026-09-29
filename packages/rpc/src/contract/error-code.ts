@@ -14,7 +14,13 @@ export const RpcContractErrorCode = {
   /** Reassembly expired before all fragments arrived. */
   frameAssemblyExpired: 'FRAME_ASSEMBLY_EXPIRED',
   /** Invalid wire error payload; the caller must reject the received value under R4. */
-  invalidWireError: 'INVALID_WIRE_ERROR'
+  invalidWireError: 'INVALID_WIRE_ERROR',
+  /** Malformed UTF-8, JSON, shape, or negotiation fields in a handshake; close this channel. */
+  handshakeInvalid: 'HANDSHAKE_INVALID',
+  /** No shared protocol identity or major version; the caller needs a compatible peer. */
+  handshakeIncompatible: 'HANDSHAKE_INCOMPATIBLE',
+  /** The remote peer rejected its handshake; inspect the preserved remote cause. */
+  handshakeRejected: 'HANDSHAKE_REJECTED'
 } as const
 
 export type IRpcContractErrorCode = (typeof RpcContractErrorCode)[keyof typeof RpcContractErrorCode]

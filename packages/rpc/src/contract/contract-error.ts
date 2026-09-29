@@ -12,7 +12,10 @@ const TEXT_BY_CODE: Readonly<Record<IRpcContractErrorCode, string>> = {
   [RpcContractErrorCode.invalidFrame]: RpcContractErrorText.invalidFrame,
   [RpcContractErrorCode.frameLimitExceeded]: RpcContractErrorText.frameLimitExceeded,
   [RpcContractErrorCode.frameAssemblyExpired]: RpcContractErrorText.frameAssemblyExpired,
-  [RpcContractErrorCode.invalidWireError]: RpcContractErrorText.invalidWireError
+  [RpcContractErrorCode.invalidWireError]: RpcContractErrorText.invalidWireError,
+  [RpcContractErrorCode.handshakeInvalid]: RpcContractErrorText.handshakeInvalid,
+  [RpcContractErrorCode.handshakeIncompatible]: RpcContractErrorText.handshakeIncompatible,
+  [RpcContractErrorCode.handshakeRejected]: RpcContractErrorText.handshakeRejected
 }
 
 /**
@@ -36,6 +39,9 @@ export function createContractError(code: IRpcContractErrorCode, cause?: unknown
   /** Native error preserving the per-code runtime type. */
   const error = RANGE_CODES.has(code)
     ? new RangeError(TEXT_BY_CODE[code], options)
-    : new TypeError(TEXT_BY_CODE[code], options)
+    : code === RpcContractErrorCode.handshakeIncompatible ||
+        code === RpcContractErrorCode.handshakeRejected
+      ? new Error(TEXT_BY_CODE[code], options)
+      : new TypeError(TEXT_BY_CODE[code], options)
   return attachErrorIdentity(error, { source: RPC_CONTRACT_SOURCE, code })
 }

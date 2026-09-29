@@ -103,6 +103,10 @@ test('A5 maps merged RPC codes and preserves capability graph ownership', () => 
   const added = JSON.parse(
     readFileSync(join(repositoryRoot, 'packages/rpc/test/fixtures/error-format-added-codes.json'), 'utf8')
   )
+  /** Additive I5 codes remain separate from both the frozen and I3 fixture sets. */
+  const controlAdded = JSON.parse(
+    readFileSync(join(repositoryRoot, 'packages/rpc/test/fixtures/control-semantics-added-codes.json'), 'utf8')
+  )
   /** Core codes the successor rpc-layering BC1 deleted after this merge froze its code set. */
   const retired = new Set(
     JSON.parse(
@@ -114,10 +118,10 @@ test('A5 maps merged RPC codes and preserves capability graph ownership', () => 
   )
   const rows = collectErrorRegistry()
   const codes = (source) => rows.filter((row) => row.source === source).map((row) => row.code)
-  assert.deepEqual(codes('@migaia/rpc/contract'), [...frozen.contract, ...added.contract].sort())
+  assert.deepEqual(codes('@migaia/rpc/contract'), [...frozen.contract, ...added.contract, ...controlAdded.contract].sort())
   assert.deepEqual(
     codes('@migaia/rpc/core'),
-    [...frozen.core.filter((code) => !retired.has(code)), ...added.core].sort()
+    [...frozen.core.filter((code) => !retired.has(code)), ...added.core, ...controlAdded.core].sort()
   )
   assert.equal(codes('@migaia/capability/graph').length, 15)
   assert.deepEqual(codes('@migaia/rpc-contract'), [])
