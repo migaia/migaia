@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "migaia.rpc.handshake/1",
+  "title": "migaia.rpc first-channel handshake 1",
+  "oneOf": [
+    {
+      "title": "hello",
+      "type": "object",
+      "required": ["kind", "step", "protocol", "versions", "codecs", "capabilities", "peer"],
+      "properties": {
+        "kind": { "const": "handshake" },
+        "step": { "const": "hello" },
+        "protocol": { "const": "migaia.rpc" },
+        "versions": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/version" } },
+        "codecs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,31}$" } },
+        "capabilities": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9.-]*@[1-9][0-9]*$" } },
+        "peer": { "$ref": "#/$defs/peer" },
+        "auth": {}
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "accept",
+      "type": "object",
+      "required": ["kind", "step", "protocol", "major", "minor", "codec", "capabilities", "peer"],
+      "properties": {
+        "kind": { "const": "handshake" },
+        "step": { "const": "accept" },
+        "protocol": { "const": "migaia.rpc" },
+        "major": { "type": "integer", "minimum": 1 },
+        "minor": { "type": "integer", "minimum": 0 },
+        "codec": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,31}$" },
+        "capabilities": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9.-]*@[1-9][0-9]*$" } },
+        "peer": { "$ref": "#/$defs/peer" }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "reject",
+      "type": "object",
+      "required": ["kind", "step", "protocol", "error"],
+      "properties": {
+        "kind": { "const": "handshake" },
+        "step": { "const": "reject" },
+        "protocol": { "const": "migaia.rpc" },
+        "error": { "$ref": "wire-error.schema.json" }
+      },
+      "additionalProperties": true
+    }
+  ],
+  "x-migaia-negotiation": "Choose the highest common major, the minimum of both offered minors, the initiator's first common codec, and capabilities in initiator order that both sides offered. JSON codec is mandatory in every hello. Reject incompatible versions or protocol; an accept must be a subset of the initiator's offer. Count the UTF-8 bytes of the original first message before parsing, rejecting more than 65536 bytes.",
+  "$defs": {
+    "version": {
+      "type": "object",
+      "required": ["major", "minor"],
+      "properties": { "major": { "type": "integer", "minimum": 1 }, "minor": { "type": "integer", "minimum": 0 } },
+      "additionalProperties": true
+    },
+    "peer": {
+      "type": "object",
+      "required": ["id", "runtime"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "runtime": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+        "runtimeVersion": { "type": "string", "maxLength": 64 },
+        "implementation": {
+          "type": "object",
+          "required": ["name", "version"],
+          "properties": { "name": { "type": "string" }, "version": { "type": "string" } },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

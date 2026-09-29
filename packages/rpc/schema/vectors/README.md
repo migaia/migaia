@@ -33,3 +33,11 @@ and record keys within `data`, and bytes values' `base64url` text. Do not count 
 JSON syntax, or bytes marker keys. The sender replaces lone surrogates and marks `truncated`; the
 receiver rejects them. Child admission counts only the child's five fields before `data` and
 descendants. `cause` precedes `errors`, and cleanup errors append to `errors` in source order.
+
+`envelope.json` records valid 1.0 kinds, invalid values with the first `violation` and `pointer`,
+unknown-field callback order, validation order, and per-connection warning keys. An invalid case
+marked `evolvable` may become valid in a later negotiated minor version. `control.json` records
+the four initial variation subtypes, their payloads, and expected actions; its unknown subtype is
+also evolvable. `handshake.json` records offer pairs, negotiated values, invalid first messages,
+and accept values outside an offer. These vectors contain JSON values and protocol text only; they
+do not depend on JavaScript error prototypes.
