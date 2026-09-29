@@ -10,7 +10,7 @@ export default defineConfig(withDistFreshness({
     rollupOptions: {
       external: (id) => id === '@migaia/lifecycle' || id.startsWith('@migaia/lifecycle/') || id === '@migaia/utils' || id.startsWith('@migaia/utils/'),
       preserveEntrySignatures: 'strict',
-      input: { index: 'src/index.ts', 'coroutine/index': 'src/coroutine/index.ts', 'process/index': 'src/process/index.ts' },
+      input: { index: 'src/index.ts', 'coroutine/index': 'src/coroutine/index.ts', 'process/index': 'src/process/index.ts', 'threads/index': 'src/threads/index.ts' },
       output: { preserveModules: true, preserveModulesRoot: 'src', entryFileNames: '[name].js' }
     },
     sourcemap: true
