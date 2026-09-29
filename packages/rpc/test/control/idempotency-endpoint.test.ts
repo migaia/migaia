@@ -1,12 +1,106 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createRpcIdempotencyStore } from '../../src/core/index.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { abort } from '../../src/core/middleware/abort.js'
+import { readEndpointDebugSnapshot } from '../../src/core/internal/test-observer.js'
 
 describe('keyed provider execution (A7)', () => {
+  it('retains a transfer result without detaching the provider buffer', async () => {
+    const [clientWire, serverWire] = createMemoryTransportPair()
+    const buffer = new Uint8Array([1, 2, 3])
+    let calls = 0
+    const server = await createProviderEndpoint({
+      id: 'server',
+      transport: serverWire,
+      middlewares: [connect({ transport: serverWire })],
+      provider: {
+        bytes: (context) => {
+          calls += 1
+          return context.success(buffer, { transfer: [buffer.buffer] })
+        }
+      }
+    })
+    const client = await createClientEndpoint({
+      id: 'client',
+      transport: clientWire,
+      middlewares: [connect({ transport: clientWire })]
+    })
+    try {
+      const first = await client.send('server', 'bytes', null, { idempotencyKey: 'bytes' })
+      const second = await client.send('server', 'bytes', null, { idempotencyKey: 'bytes' })
+      expect(first).toEqual(second)
+      expect(buffer.buffer.byteLength).toBe(3)
+      expect(calls).toBe(1)
+    } finally {
+      await client.dispose()
+      await server.dispose()
+    }
+  })
+
+  it('shares an injected scope across connections and reclaims after owner disposal', async () => {
+    const store = createRpcIdempotencyStore()
+    const [clientWireA, serverWireA] = createMemoryTransportPair()
+    const [clientWireB, serverWireB] = createMemoryTransportPair()
+    const idempotency = { store, scope: () => 'shared-session' }
+    let started!: () => void
+    const firstStarted = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    let calls = 0
+    const serverA = await createProviderEndpoint({
+      id: 'server',
+      transport: serverWireA,
+      idempotency,
+      middlewares: [connect({ transport: serverWireA })],
+      provider: {
+        count: async (context) => {
+          calls += 1
+          started()
+          await new Promise<void>((resolve) =>
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
+          )
+          return context.success(calls)
+        }
+      }
+    })
+    const serverB = await createProviderEndpoint({
+      id: 'server',
+      transport: serverWireB,
+      idempotency,
+      middlewares: [connect({ transport: serverWireB })],
+      provider: { count: (context) => context.success(++calls) }
+    })
+    const clientA = await createClientEndpoint({
+      id: 'client-a',
+      transport: clientWireA,
+      middlewares: [connect({ transport: clientWireA })]
+    })
+    const clientB = await createClientEndpoint({
+      id: 'client-b',
+      transport: clientWireB,
+      middlewares: [connect({ transport: clientWireB })]
+    })
+    try {
+      const first = clientA.send<number>('server', 'count', null, { idempotencyKey: 'k' })
+      first.catch(() => undefined)
+      await firstStarted
+      const duplicate = clientB.send<number>('server', 'count', null, { idempotencyKey: 'k' })
+      await vi.waitFor(() => expect(readEndpointDebugSnapshot(serverB)?.activeControllers).toBe(1))
+      expect(calls).toBe(1)
+      await serverA.dispose()
+      expect(await duplicate).toBe(2)
+      expect(calls).toBe(2)
+    } finally {
+      await clientA.dispose()
+      await clientB.dispose()
+      await serverA.dispose()
+      await serverB.dispose()
+    }
+  })
+
   it('rejects a new key while the bounded store owns an executing request', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createProviderEndpoint({
