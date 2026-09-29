@@ -10,7 +10,8 @@ describe('provider registry ownership', () => {
     registry.listen('event', () => undefined)
     registry.clear()
     expect(registry.getProvider('method')).toBeUndefined()
-    expect(registry.getListeners('event')).toBeUndefined()
+    expect(registry.hasListeners('event')).toBe(false)
+    expect(registry.listenerCount).toBe(0)
   })
 
   it('keeps listener disposal idempotent and independent', () => {
@@ -21,8 +22,10 @@ describe('provider registry ownership', () => {
     const stopSecond = registry.listen('event', second)
     stopFirst()
     stopFirst()
-    expect(registry.getListeners('event')).toEqual([second])
+    expect(registry.hasListeners('event')).toBe(true)
+    expect(registry.listenerCount).toBe(1)
     stopSecond()
-    expect(registry.getListeners('event')).toBeUndefined()
+    expect(registry.hasListeners('event')).toBe(false)
+    expect(registry.listenerCount).toBe(0)
   })
 })
