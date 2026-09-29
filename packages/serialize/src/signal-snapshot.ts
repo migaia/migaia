@@ -5,6 +5,7 @@ import {
   SERIALIZE_SOURCE
 } from './errors.js'
 import type { ISerializeAbortSignal } from './types.js'
+import { tryReadProperty } from '@migaia/utils/error'
 
 /** Keep tagged serialize failures intact while wrapping hostile signal accessors. */
 export const isSerializeTaggedError = (
@@ -37,16 +38,17 @@ export const readAborted = (signal: ISerializeAbortSignal): boolean => {
 
 /** Read abort reason once at the point it wins arbitration. */
 export const readReason = (signal: ISerializeAbortSignal): unknown => {
-  try {
-    return signal.reason
-  } catch (error) {
-    if (isSerializeTaggedError(error)) throw error
+  /** Keep serialize-tagged getter failures intact at this boundary. */
+  const read = tryReadProperty(signal, 'reason')
+  if (read.threw) {
+    if (isSerializeTaggedError(read.error)) throw read.error
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.signalReasonReadFailed,
-      { cause: error }
+      { cause: read.error }
     )
   }
+  return read.value
 }
 
 /** Capture a structural source for stream operations without importing lifecycle runtime code. */
