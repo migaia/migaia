@@ -1,3 +1,5 @@
+import type { IScheduler } from '@migaia/utils/scheduler'
+
 /**
  * 结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal`
  * 类型的运行时里可用。
@@ -240,15 +242,6 @@ export function encodeSerializeTextChunk(
 export type ITextEncoder = { encode(input: string): Uint8Array }
 export type ITextDecoder = { decode(input: Uint8Array): string }
 
-/**
- * Serialize 的结构化 scheduler（`ILifecycleScheduler` 的结构子集，字段签名一致，不 import
- * lifecycle）。鸭子类型：`ILifecycleScheduler` 可赋值给它（T-18 兼容门禁）。
- */
-export type ISerializeScheduler = {
-  now(): number
-  schedule(callback: () => void, delayMs: number): { cancel(): void }
-}
-
 export type ISerializeRegistry = {
   /** 写入使用的格式：插件数组的第一项。 */
   readonly primaryType: string
@@ -290,8 +283,8 @@ export type ISerializeTimeoutDiagnostic = {
 }
 
 export type ISerializeRegistryOptions = {
-  /** 默认 lifecycle `systemScheduler`；创建后不可更换（scheduler 时间域契约见 R-9，此处不重复解释）。 */
-  readonly scheduler?: ISerializeScheduler
+  /** 默认 `@migaia/utils/scheduler` 的 `systemScheduler`；创建后不可更换（单调时钟契约见该子路径，此处不重复解释）。 */
+  readonly scheduler?: IScheduler
   /** 省略时用宿主 `TextEncoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */
   readonly encoder?: ITextEncoder
   /** 省略时用宿主 `TextDecoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */

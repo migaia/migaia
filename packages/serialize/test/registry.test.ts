@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createAbortController, createManualScheduler } from '@migaia/lifecycle'
+import { createAbortController } from '@migaia/lifecycle'
+import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import {
   SerializeCodecError,
   chunkToBytes,
@@ -10,7 +11,6 @@ import {
   type ISerializeParser,
   type ISerializePlugin
 } from '../src/index'
-import type { ISerializeScheduler } from '../src/types.js'
 
 const textParser = (name = 'text'): ISerializeParser => ({
   name,
@@ -1111,7 +1111,7 @@ describe('Round18：deadline failure never skips parser cleanup', () => {
   it('scheduler.schedule throw still disposes parser exactly once', async () => {
     const scheduleFailure = new Error('schedule failure')
     let parserDisposeCalls = 0
-    const scheduler: ISerializeScheduler = {
+    const scheduler: IScheduler = {
       now: (): number => 0,
       schedule: () => {
         throw scheduleFailure
@@ -1137,7 +1137,7 @@ describe('Round18：deadline failure never skips parser cleanup', () => {
 
   it('invalid scheduler task still disposes parser exactly once', async () => {
     let parserDisposeCalls = 0
-    const scheduler: ISerializeScheduler = {
+    const scheduler: IScheduler = {
       now: (): number => 0,
       schedule: () => ({}) as never
     }
@@ -1161,7 +1161,7 @@ describe('Round18：deadline failure never skips parser cleanup', () => {
 
   it('scheduler task cancel getter throw still disposes parser exactly once', async () => {
     let parserDisposeCalls = 0
-    const scheduler: ISerializeScheduler = {
+    const scheduler: IScheduler = {
       now: (): number => 0,
       schedule: () =>
         ({

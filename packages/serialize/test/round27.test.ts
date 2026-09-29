@@ -67,7 +67,8 @@ describe('Round27 serialize boundaries', () => {
     expect([...graph.external].sort()).toEqual([
       '@migaia/lifecycle/abort',
       '@migaia/utils/bytes',
-      '@migaia/utils/error'
+      '@migaia/utils/error',
+      '@migaia/utils/scheduler'
     ])
     for (const dependency of dependencies.filter(
       (dependency) => dependency !== '@migaia/utils' && dependency !== '@migaia/lifecycle'

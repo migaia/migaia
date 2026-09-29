@@ -14,7 +14,7 @@
 pnpm add @migaia/serialize
 ```
 
-依赖 `@migaia/lifecycle`（异步作用域、调度器、AbortController）与 `@migaia/utils`（Base64/UTF-8 底层算法、错误身份标注）。
+依赖 `@migaia/lifecycle`（异步作用域、调度器注入准入、AbortController）与 `@migaia/utils`（调度器契约与默认实现、Base64/UTF-8 底层算法、错误身份标注）。
 
 以下三个二进制 codec 使用可选 peer；只用主入口、`/codec` 或 JSON codec 时无需安装它们。缺少 peer 时，import 对应子路径会由 Node 抛出 `ERR_MODULE_NOT_FOUND`，其他子路径仍可加载。
 
@@ -125,7 +125,7 @@ registry.dispose(); // 等待在途操作结算，再释放全部 parser
 `createSerializeRegistry(plugins, options?)` 全部参数：
 
 - `plugins: readonly ISerializePlugin[]`（必填）—— `{ type: string; parser: ISerializeParser }[]`，至少 1 项（空数组抛 `RangeError`／`INVALID_OPTION`）；数组第一项的 `type` 就是 `primaryType`；`type` 必须匹配 `SERIALIZE_TYPE_PATTERN`，重复 `type` 会抛 `RangeError`／`INVALID_OPTION`
-- `options?.scheduler?: ISerializeScheduler` —— 默认 `@migaia/lifecycle` 的 `systemScheduler`；创建后不可更换
+- `options?.scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 默认 `@migaia/utils/scheduler` 的 `systemScheduler`；创建后不可更换
 - `options?.encoder?: ITextEncoder` —— 默认宿主 `TextEncoder`；两者都缺失时构造期即抛 `ENV_UNSUPPORTED`
 - `options?.decoder?: ITextDecoder` —— 默认宿主 `TextDecoder`；同上
 - `options?.cleanup?: { policy: 'throw' } | { policy: 'report'; report: (d) => void }` —— 默认 `{ policy: 'throw' }`；parser `dispose()` 失败时是并入 `dispose()` 的 reject，还是转发给 `report` 而不影响 `dispose()` 的结算
@@ -147,7 +147,7 @@ createSerializeRegistry([jsonPlugin({ space: 0 })]);
 **`encodeStream` / `collectStream`｜10 秒上手** —— 大数组编码成分段流，一次性收集完整结果（适合"最终要一个完整 blob"的场景）：
 
 ```ts
-import { systemScheduler } from '@migaia/lifecycle';
+import { systemScheduler } from '@migaia/utils/scheduler';
 
 const stream = encodeStream(registry, hugeArrayOfRows, {
   initialItems: 500,
@@ -315,7 +315,7 @@ import {
   jsonPlugin,
   SerializeCodecError
 } from '@migaia/serialize';
-import { systemScheduler } from '@migaia/lifecycle';
+import { systemScheduler } from '@migaia/utils/scheduler';
 
 const registry = createSerializeRegistry([jsonPlugin()]);
 const controller = new AbortController();

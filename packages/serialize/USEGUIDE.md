@@ -61,7 +61,6 @@ import {
   type ISerializePlugin,
   type ISerializeRegistry,
   type ISerializeRegistryOptions,
-  type ISerializeScheduler,
   type ISerializeCleanupError,
   type ISerializeTimeoutDiagnostic,
   type ISerializeErrorCode,
@@ -247,7 +246,7 @@ function createSerializeRegistry(
 type ISerializePlugin = { readonly type: string; readonly parser: ISerializeParser };
 
 type ISerializeRegistryOptions = {
-  readonly scheduler?: ISerializeScheduler;
+  readonly scheduler?: IScheduler;
   readonly encoder?: ITextEncoder;
   readonly decoder?: ITextDecoder;
   readonly cleanup?:
@@ -257,10 +256,8 @@ type ISerializeRegistryOptions = {
   readonly report?: (error: unknown) => void;
 };
 
-type ISerializeScheduler = {
-  now(): number;
-  schedule(callback: () => void, delayMs: number): { cancel(): void };
-};
+// scheduler 选项类型是 @migaia/utils/scheduler 的 IScheduler：
+// { now(): number; schedule(callback: () => void, delayMs: number): { cancel(): void; unref?(): void } }
 ```
 
 `plugins`（必填）：
@@ -276,7 +273,7 @@ type ISerializeScheduler = {
 
 | 字段                              | 默认值                                   | 说明                                                                                                                                                                                                                                                                |
 | --------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scheduler?: ISerializeScheduler` | `@migaia/lifecycle` 的 `systemScheduler` | 创建后不可更换；结构非法（缺 `now`/`schedule`，或 `now()` 不返回有限数字）抛 `TypeError`／`INVALID_OPTION`（"serialize scheduler must be { now, schedule }" 等）                                                                                                    |
+| `scheduler?: IScheduler` | `@migaia/utils/scheduler` 的 `systemScheduler` | 创建后不可更换；结构非法（缺 `now`/`schedule`，或 `now()` 不返回有限数字）抛 `TypeError`／`INVALID_OPTION`（"serialize scheduler must be { now, schedule }" 等）                                                                                                    |
 | `encoder?: ITextEncoder`          | 宿主 `TextEncoder`                       | 用于把 `text` 段就地转成字节（多段拼装出现 `bytes` 时）；省略且宿主没有 `TextEncoder` → 构造期抛 `ENV_UNSUPPORTED`；提供了但形状不对（没有 `.encode` 方法）→ `TypeError`／`INVALID_OPTION`                                                                          |
 | `decoder?: ITextDecoder`          | 宿主 `TextDecoder`                       | 目前构造期只做能力探测（供后续经该 registry 派生的 API 复用），同上校验规则                                                                                                                                                                                         |
 | `cleanup?`                        | `{ policy: 'throw' }`                    | `{ policy: 'throw' }`：`dispose()` 时任一 parser `dispose()` 失败会并入 `dispose()` 的 reject（见 [§3.3](#33-释放语义详解)）；`{ policy: 'report'; report }`：转发给 `report`，不影响 `dispose()` 的正常结算；`report` 缺失或非函数抛 `TypeError`／`INVALID_OPTION` |
@@ -552,7 +549,7 @@ type IFrameBudgetOptions = {
   readonly initialItems?: number; // 默认 2_048
   readonly yieldTo?: () => Promise<void>;
   readonly signal?: ISerializeAbortSignal;
-  readonly scheduler: ISerializeScheduler; // 必填
+  readonly scheduler: IScheduler; // 必填
 };
 
 function sliceByFrameBudget<T>(
@@ -561,7 +558,7 @@ function sliceByFrameBudget<T>(
 ): AsyncGenerator<readonly T[], void, undefined>;
 ```
 
-> `options` 本身是**必填**参数，因为 `scheduler` 没有默认值——`/core` 不假定任何宿主全局 timer，一律经 `scheduler` 注入（`setTimeout`/`performance.now`/`Date.now` 都不会被直接调用）。主入口/`/registry` 场景下通常传 `@migaia/lifecycle` 的 `systemScheduler`。
+> `options` 本身是**必填**参数，因为 `scheduler` 没有默认值——`/core` 不假定任何宿主全局 timer，一律经 `scheduler` 注入（`setTimeout`/`performance.now`/`Date.now` 都不会被直接调用）。主入口/`/registry` 场景下通常传 `@migaia/utils/scheduler` 的 `systemScheduler`。
 
 实测数据（100 万条数据编码进 worker）：整包一次性编码会连续占住主线程 237ms（约合掉 14 帧）；切成 5 万条一片、片间让出后，最长单次阻塞降到 14.2ms——压在 60fps 的 16.7ms 预算之内、一帧不掉，墙钟总耗时反而快了 37%。但切太碎同样有害：1 万条一片时最长阻塞只有 3.1ms，但 100 次让出的固定开销又把墙钟顶回了整包水平。
 
@@ -768,7 +765,6 @@ import {
   type ISerializePhase,
   type ISerializePlugin,
   type ISerializeRegistry,
-  type ISerializeScheduler,
   type ITextDecoder,
   type ITextEncoder,
   type ISerializeErrorCode,
@@ -814,7 +810,6 @@ import {
   type ISerializePlugin,
   type ISerializeRegistry,
   type ISerializeRegistryOptions,
-  type ISerializeScheduler,
   type ISerializeTimeoutDiagnostic,
   type ITextDecoder,
   type ITextEncoder
@@ -835,7 +830,7 @@ import {
   jsonPlugin,
   SerializeCodecError
 } from '@migaia/serialize';
-import { systemScheduler } from '@migaia/lifecycle';
+import { systemScheduler } from '@migaia/utils/scheduler';
 
 // 1. 建一个只认 JSON 的 registry
 const registry = createSerializeRegistry([jsonPlugin({ space: 0 })]);
@@ -920,7 +915,7 @@ pnpm --filter @migaia/serialize test
 这是设计如此。外层 `SerializeCodecError` 的 `chunkIndex` 是"流里的第几片/第几个 chunk"；内层挂在 `error.cause` 上的 `SerializeCodecError`（如果原因本身也是一个 `SerializeCodecError`）说的是"那一次 encode/decode 内部的第几段"，两者刻度不同，见 [§4.4](#44-错误场景速查表)。
 
 **Q：`sliceByFrameBudget`/`encodeStream` 报 `TypeError: serialize scheduler must be { now, schedule }`。**
-`/core` 不提供默认 timer，`scheduler` 是必填选项。主入口场景下从 `@migaia/lifecycle` 导入 `systemScheduler` 传入即可；自定义 scheduler 需要同时提供 `now(): number`（返回有限数字）和 `schedule(callback, delayMs): { cancel(): void }`。
+`/core` 不提供默认 timer，`scheduler` 是必填选项。主入口场景下从 `@migaia/utils/scheduler` 导入 `systemScheduler` 传入即可；自定义 scheduler 需要同时提供 `now(): number`（返回有限数字）和 `schedule(callback, delayMs): { cancel(): void }`。
 
 **Q：大数据导出还是卡主线程。**
 检查 `encodeStream`/`sliceByFrameBudget` 的 `yieldTo` 是否被覆盖成了同步函数，或者 `maxItems`/`initialItems` 是否设置得过大导致首片就超出预算太多——自适应算法需要几轮才能收敛到合适的片大小，极端参数会削弱这个自适应过程的效果。

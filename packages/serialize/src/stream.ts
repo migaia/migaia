@@ -1,3 +1,4 @@
+import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   SerializeCodecError,
   encodeSerializeTextChunk,
@@ -5,7 +6,6 @@ import {
   type ISerializeAbortSignal,
   type ISerializeChunk,
   type ISerializeRegistry,
-  type ISerializeScheduler,
   type ITextEncoder
 } from './types.js'
 import {
@@ -31,7 +31,7 @@ type IFrameBudgetSnapshot = {
   readonly initialItems: number
   readonly yieldTo?: () => Promise<void>
   readonly signal?: ISerializeAbortSignal
-  readonly scheduler: ISerializeScheduler
+  readonly scheduler: IScheduler
 }
 
 /** Fully admitted encode-stream options captured before the first slice or registry call. */
@@ -183,7 +183,7 @@ const readSerializeSignalReason = (signal: ISerializeAbortSignal): unknown => {
  * release the handle; every cleanup failure is either the first failure or a contained secondary.
  */
 const scheduleOwnedYield = (
-  scheduler: ISerializeScheduler,
+  scheduler: IScheduler,
   signal: ISerializeAbortSignal | undefined
 ): Promise<void> => {
   let resolveYield!: () => void
@@ -405,7 +405,7 @@ const snapshotScheduledTask = (value: unknown): ISerializeScheduledTask => {
 }
 
 /** Capture scheduler methods once and translate every scheduler failure into serialize errors. */
-const snapshotSerializeScheduler = (value: unknown): ISerializeScheduler | undefined => {
+const snapshotSerializeScheduler = (value: unknown): IScheduler | undefined => {
   if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
     return undefined
   }
@@ -488,7 +488,7 @@ export type IFrameBudgetOptions = {
    * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主
    * `setTimeout`/`performance`/`Date.now`）。
    */
-  readonly scheduler: ISerializeScheduler
+  readonly scheduler: IScheduler
 }
 
 const clamp = (value: number, low: number, high: number): number =>

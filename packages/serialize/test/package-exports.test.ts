@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   SerializeChunkKind,
   chunkToBytes,
@@ -7,7 +8,6 @@ import {
   jsonPlugin,
   type ISerializeCleanupError as IRootSerializeCleanupError,
   type ISerializeRegistryOptions as IRootSerializeRegistryOptions,
-  type ISerializeScheduler as IRootSerializeScheduler,
   type ISerializeTimeoutDiagnostic as IRootSerializeTimeoutDiagnostic,
   type ITextDecoder as IRootTextDecoder,
   type ITextEncoder as IRootTextEncoder
@@ -22,7 +22,6 @@ import {
   type IEncodeStreamOptions,
   type IFrameBudgetOptions,
   type ISerializeChunk,
-  type ISerializeScheduler,
   type ITextDecoder,
   type ITextEncoder
 } from '@migaia/serialize/core'
@@ -38,10 +37,8 @@ import {
 
 type ICompileEncoder = ITextEncoder
 type ICompileDecoder = ITextDecoder
-type ICompileScheduler = ISerializeScheduler
 type ICompileRootEncoder = IRootTextEncoder
 type ICompileRootDecoder = IRootTextDecoder
-type ICompileRootScheduler = IRootSerializeScheduler
 type ICompileRegistryOptions = ISerializeRegistryOptions
 type ICompileCleanupError = ISerializeCleanupError
 type ICompileTimeoutDiagnostic = ISerializeTimeoutDiagnostic
@@ -59,7 +56,7 @@ describe('package exports', () => {
     const decoder: ICompileDecoder & ICompileRootDecoder = {
       decode: (value: Uint8Array) => String.fromCharCode(...value)
     }
-    const scheduler: ICompileScheduler & ICompileRootScheduler = {
+    const scheduler: IScheduler = {
       now: () => 0,
       schedule: (callback: () => void) => {
         callback()
