@@ -428,11 +428,15 @@ const transport = createBrowserMessagePortTransport(port, { ownership: 'borrowed
 ```ts
 import {
   isRpcError,
-  RpcCoreErrorCode,
-  serializeError,
-  deserializeError,
-  reachError
+  RpcCoreErrorCode
 } from '@migaia/rpc/core'
+import {
+  serializeRpcError,
+  deserializeRpcError,
+  reachRpcError,
+  RpcWireErrorLimit,
+  RpcErrorReachLimit
+} from '@migaia/rpc/contract'
 ```
 
 **错误处理｜5 秒上手** —— 所有跨包失败都带稳定的 `(source, code)`；部分失败保留原生 `TypeError`、`RangeError`、`AggregateError` 或 `RpcRemoteError` 类型：
@@ -451,31 +455,32 @@ try {
 }
 ```
 
-业务分支应优先使用 `isRpcError(error)` 后检查 `source` / `code`，不要匹配可能变化的 `message`；需要区分入参类型错误或聚合清理失败时，再检查保留下来的原生错误类型。错误码全表与各类错误的完整语义见 [USEGUIDE §8](./USEGUIDE.md#8-错误处理)。
+业务分支应优先使用 `isRpcError(error)` 后检查 `source` / `code`，不要匹配可能变化的 `message`；需要区分入参类型错误或聚合清理失败时，再检查保留下来的原生错误类型。`isRpcError` 读取敌意 `code` getter 失败时会抛 `PROPERTY_READ_FAILED`，其 `cause` 保留原异常。错误码全表与各类错误的完整语义见 [USEGUIDE §8](./USEGUIDE.md#8-错误处理)。
 
-**`serializeError`｜5 秒上手** —— 把任意错误（含 `cause`/`AggregateError` 链）转成可安全 `postMessage`/`JSON.stringify` 的数据结构：
-
-```ts
-const wire = serializeError(new Error('outer', { cause: new Error('inner') }))
-```
-
-单参数 `error: unknown`，无选项；图深度上限 64、节点数上限 1024，超限抛 `RpcSerializationError`（`PAYLOAD_INVALID`）。
-
-**`deserializeError`｜5 秒上手** —— 逆操作，从 wire 数据重建出真正的 `Error` 实例（按 `name` 还原对应原生子类）：
+**`serializeRpcError`｜5 秒上手** —— 把任意抛出值（含 `cause`/`AggregateError.errors` 链）投影为可跨端传输的 `IRpcSerializedError`：
 
 ```ts
-const restored = deserializeError(wire)
+const report = ({ field, error }: { field: string; error: unknown }) => console.error(field, error)
+const wire = serializeRpcError(new Error('outer', { cause: new Error('inner') }), { report })
 ```
 
-单参数 `serialized: ISerializedError`，无选项。
+`report` 为必传同步回调；读取敌意属性或投影不可移植 `data` 失败时，它收到 `{ pointer, field, error }`，原错误保持可追踪。core 的发送路径将该回调接到端点 `PAYLOAD_INVALID` failure 事件。没有身份的抛出值使用 `unknown`/`UNKNOWN` 兜底；超出 `RpcWireErrorLimit`（48 层、1024 节点、单字符串 65,536 字节、总文本 1,048,576 字节）的部分以 `truncated: true` 标记，不能假设完整图总会到达。
 
-**`reachError`｜3 秒上手** —— 生成器，按遍历顺序 yield 一个错误能到达的全部节点，用于日志/脱敏：
+**`deserializeRpcError`｜5 秒上手** —— 校验 wire 数据并按 `name` 恢复原生错误类型、`stack` 与 `cause`/`errors` 链：
 
 ```ts
-for (const node of reachError(topLevelError)) console.error(node)
+const restored = deserializeRpcError(wire)
 ```
 
-单参数 `error: unknown`，无选项；和序列化使用同一安全预算，图超过 64 层或 1024 个节点、或 hostile getter 读取失败时会抛带 `PAYLOAD_INVALID` 的 `RpcSerializationError`，不会返回不完整遍历。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。此外主入口还整体导出传输与契约常量，用于替代手写字符串字面量，完整清单见 [USEGUIDE §15](./USEGUIDE.md#15-协议常量与类型工具)。
+非法载荷抛 `INVALID_WIRE_ERROR`；core 接收失败响应时仍以 `RpcRemoteError` 拒绝调用，反序列化错误保留在 `cause`，并向端点报告一次 `PROTOCOL_INVALID`。
+
+**`reachRpcError`｜3 秒上手** —— 生成器，按 `cause`、`errors`、`cleanupErrors` 边遍历；同一对象身份只产出一次：
+
+```ts
+for (const node of reachRpcError(restored, { report })) console.error(node)
+```
+
+`reachRpcError` 有独立的 `RpcErrorReachLimit.maxObjects === 4096` 上限，也需要必传 `report`；它遍历原生图，不受 wire 的 48 层截断约束。自定义 adapter 从 `@migaia/rpc/core/transport-kit` 使用 `safeRead(value, key, report?)` 时，第三参数只接受同步报告器；省略后若 getter 抛错，`safeRead` 抛带原异常 `cause` 的 `PROPERTY_READ_FAILED`。端点 hook 的 failure 事件对字符串属性名提供可选 `field`。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。
 
 ---
 
