@@ -531,6 +531,11 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   let last: IRegistrationOwner<T, R, V> | undefined
   let count = 0
   let membershipEpoch = 0
+  /** Unique channels alone index active owners by listener identity. */
+  const uniqueOwners =
+    admissionPolicy === EventAdmissionPolicy.unique
+      ? new Map<IEventListener<T, R, V>, IRegistrationOwner<T, R, V>>()
+      : undefined
   const activeLiveDispatches = new Set<IActiveLiveDispatch<T, R, V>>()
   /** Queued values used only when the caller explicitly opts into queued reentrancy. */
   let publishing = false
@@ -546,6 +551,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     const removeOwner = (target: IRegistrationOwner<T, R, V>, incrementEpoch: boolean): void => {
       if (!target.active || !target.committed) return
       target.active = false
+      if (uniqueOwners?.get(target.listener) === target) uniqueOwners.delete(target.listener)
       if (target.previous) target.previous.next = target.next
       else first = target.next
       if (target.next) target.next.previous = target.previous
@@ -558,7 +564,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     const release = (): void => {
       if (released) return
       released = true
-      if (removalPolicy === 'listener-all' && committed) {
+      if (removalPolicy === 'listener-all' && committed && !uniqueOwners) {
         const matching: IRegistrationOwner<T, R, V>[] = []
         let current = first
         while (current) {
@@ -590,8 +596,24 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       else first = owner
       last = owner
       count += 1
+      uniqueOwners?.set(listener, owner)
     }
     return { release, commit }
+  }
+  /** Returns the current owner's release without changing its order or task label. */
+  const admitUnique = (
+    listener: IEventListener<T, R, V>,
+    taskId: string | undefined
+  ): IUnsubscribe | undefined => {
+    const existing = uniqueOwners?.get(listener)
+    if (!existing) return undefined
+    if (existing.currentTaskId !== taskId) {
+      throw createEventTypeError(
+        EventSubscriberErrorCode.invalidOptions,
+        eventErrorText(EventSubscriberErrorCode.invalidOptions)
+      )
+    }
+    return existing.release
   }
   /** Delivers one value while preserving listener snapshots and late-failure reporting. */
   let remaining: number
@@ -699,10 +721,17 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         )
       }
       const taskId = readTaskOption(listenerOptions)
-      const admission = registerRaw(listener, taskId)
+      const shared = admitUnique(listener, taskId)
+      const admission = shared ? undefined : registerRaw(listener, taskId)
+      /** A duplicate handle may release the shared owner only after projection succeeds. */
+      let bound = false
       try {
         const handle = createSubscriptionHandle(
-          admission.release,
+          shared
+            ? () => {
+                if (bound) shared()
+              }
+            : admission!.release,
           (nextListener, nextOptions) => {
             if (typeof nextListener !== 'function') {
               throw createEventTypeError(
@@ -711,16 +740,19 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
               )
             }
             const nextTaskId = readTaskOption(nextOptions)
+            const nextShared = admitUnique(nextListener, nextTaskId)
+            if (nextShared) return nextShared
             const nextAdmission = registerRaw(nextListener, nextTaskId)
             nextAdmission.commit()
             return nextAdmission.release
           },
           stylePlan
         )
-        admission.commit()
+        bound = true
+        admission?.commit()
         return handle
       } catch (error) {
-        admission.release()
+        admission?.release()
         throw error
       }
     },
@@ -755,6 +787,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       first = undefined
       last = undefined
       count = 0
+      uniqueOwners?.clear()
     },
     get size() {
       return count

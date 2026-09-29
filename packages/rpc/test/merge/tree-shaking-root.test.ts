@@ -9,8 +9,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** I4 and the required unique-admission option use exact observed byte caps with no headroom. */
 const allowedIncrease = {
-  rawBytes: 7791 / legacyRoot.rawBytes,
-  gzipBytes: 2321 / legacyRoot.gzipBytes
+  rawBytes: 8208 / legacyRoot.rawBytes,
+  gzipBytes: 2441 / legacyRoot.gzipBytes
 } as const
 
 describe('A9 root tree-shaking cost', () => {
