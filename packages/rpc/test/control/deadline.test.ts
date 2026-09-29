@@ -4,12 +4,60 @@ import { normalizeRpcEnvelope } from '../../src/contract/index.js'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
+import { createEndpointKernel } from '../../src/core/endpoint-kernel.js'
+import { prepareEndpoint } from '../../src/core/internal/endpoint-bootstrap.js'
+import { RpcOutboundAttachment } from '../../src/core/internal/outbound-attachment.js'
+import { RpcPortName } from '../../src/core/internal/plugin-shared-keys.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { timeout } from '../../src/core/middleware/timeout.js'
 import type { IRpcTransport } from '../../src/core/transport.js'
 import type { IRpcAbortSignal } from '../../src/core/typing.js'
 
 describe('provider relative deadline (A6)', () => {
+  it('subtracts receiver resolution delay from the outbound wire budget', async () => {
+    const scheduler = createManualScheduler()
+    const wallClock = { timestamp: () => 0 }
+    const [transport, peer] = createMemoryTransportPair()
+    const kernel = createEndpointKernel(transport, undefined, scheduler, wallClock)
+    const deferred = await prepareEndpoint(
+      { id: 'client', transport, scheduler, wallClock, middlewares: [] },
+      { deferMiddlewareInstall: true }
+    )
+    const prepared = await deferred.finalize(
+      [],
+      async (operation) => await operation(),
+      (key) => (key === RpcPortName.connect ? { uniqueTargetId: 'client' } : undefined),
+      () => 0
+    )
+    const outbound = new RpcOutboundAttachment(kernel, prepared)
+    let releaseReceiver!: () => void
+    const receiver = new Promise<{ readonly receiverId: string }>((resolve) => {
+      releaseReceiver = () => resolve({ receiverId: 'provider' })
+    })
+    outbound.setReceiverResolver(() => receiver)
+    let sent: unknown
+    const unsubscribe = peer.subscribe(({ data }) => {
+      sent = data
+    })
+    try {
+      const pending = outbound.send('provider', 'check', null, { timeoutMs: 100 })
+      pending.catch(() => undefined)
+      scheduler.advance(30)
+      releaseReceiver()
+      await vi.waitFor(() => expect(sent).toBeDefined())
+      expect(normalizeRpcEnvelope(sent)).toMatchObject({
+        kind: 'request',
+        data: { route: { timeoutMs: 70, sentAt: 0 } }
+      })
+      scheduler.advance(70)
+      await expect(pending).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
+    } finally {
+      unsubscribe()
+      kernel.beginClose()
+      await kernel.resources.releaseAll()
+    }
+  })
+
   it('omits disabled deadlines and clears a settled provider timer', async () => {
     const providerScheduler = createManualScheduler()
     const clientScheduler = createManualScheduler()
