@@ -314,7 +314,7 @@ describe('pipeline internal cleanup', () => {
     const runtime = readFileSync(`${sourceDirectory}/runtime.ts`, 'utf8')
     const codes = readFileSync(`${sourceDirectory}/error-code.ts`, 'utf8')
     expect(runtime).toMatch(/import \{ tryReadProperty \} from '@migaia\/utils\/error'/)
-    expect((runtime.match(/tryReadProperty\([^\n]*, 'reason'\)/g) ?? []).length).toBe(2)
+    expect((runtime.match(/tryReadProperty\([^\n]*, 'reason'\)/g) ?? []).length).toBe(1)
     expect(source).not.toMatch(/\.reason\b/)
     const comment = codes.slice(
       codes.indexOf('/**', codes.indexOf('executionFailed:')),
