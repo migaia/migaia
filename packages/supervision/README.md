@@ -18,3 +18,10 @@ The `./process` entry adds a shell-free specification, capability checks, usage 
 bounded output tails, durable orphan records and recovery, a parent-loss guard, and an optional
 bounded prewarm pool. It defines a launcher port and does not start an operating-system process
 itself. See [USEGUIDE.md](./USEGUIDE.md) for the process contract, defaults and cleanup.
+
+The `./threads` entry supervises a launcher-owned thread with the same core budget, restart,
+health, replacement, and bounded release policy. The launcher declares `heap-limit` and
+`exit-observation` as `enforced` or `unsupported`; a launcher without enforced exit observation
+requires a health check. A thread is not a fault-isolation or CPU-limit boundary. Choose the
+process profile when either guarantee is required. See [USEGUIDE.md](./USEGUIDE.md) for the
+thread launcher contract and example.
