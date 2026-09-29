@@ -180,24 +180,24 @@
     },
     "rpc": {
       "lines": {
-        "covered": 4848,
-        "total": 5348,
-        "pct": 90.65
+        "covered": 4852,
+        "total": 5351,
+        "pct": 90.67
       },
       "statements": {
-        "covered": 5301,
-        "total": 5951,
-        "pct": 89.07
+        "covered": 5307,
+        "total": 5956,
+        "pct": 89.1
       },
       "functions": {
-        "covered": 1266,
-        "total": 1392,
-        "pct": 90.94
+        "covered": 1270,
+        "total": 1395,
+        "pct": 91.03
       },
       "branches": {
-        "covered": 3167,
-        "total": 3687,
-        "pct": 85.89
+        "covered": 3170,
+        "total": 3689,
+        "pct": 85.93
       }
     },
     "serialize": {
@@ -5947,18 +5947,18 @@
     "packages/rpc/src/core/internal/provider-attachment.ts": {
       "lines": {
         "covered": 84,
-        "total": 94,
-        "pct": 89.36
+        "total": 93,
+        "pct": 90.32
       },
       "statements": {
         "covered": 89,
-        "total": 102,
-        "pct": 87.25
+        "total": 101,
+        "pct": 88.11
       },
       "functions": {
         "covered": 21,
-        "total": 24,
-        "pct": 87.5
+        "total": 23,
+        "pct": 91.3
       },
       "branches": {
         "covered": 52,
@@ -5968,14 +5968,14 @@
     },
     "packages/rpc/src/core/internal/provider-executor.ts": {
       "lines": {
-        "covered": 86,
-        "total": 90,
-        "pct": 95.55
+        "covered": 85,
+        "total": 89,
+        "pct": 95.5
       },
       "statements": {
-        "covered": 98,
-        "total": 103,
-        "pct": 95.14
+        "covered": 96,
+        "total": 101,
+        "pct": 95.04
       },
       "functions": {
         "covered": 11,
@@ -5983,9 +5983,9 @@
         "pct": 91.66
       },
       "branches": {
-        "covered": 101,
+        "covered": 102,
         "total": 112,
-        "pct": 90.17
+        "pct": 91.07
       }
     },
     "packages/rpc/src/core/internal/provider-first-party-roots.ts": {
@@ -6012,24 +6012,24 @@
     },
     "packages/rpc/src/core/internal/provider.ts": {
       "lines": {
-        "covered": 18,
-        "total": 18,
+        "covered": 23,
+        "total": 23,
         "pct": 100
       },
       "statements": {
-        "covered": 21,
-        "total": 22,
-        "pct": 95.45
+        "covered": 29,
+        "total": 30,
+        "pct": 96.66
       },
       "functions": {
-        "covered": 6,
-        "total": 6,
+        "covered": 10,
+        "total": 10,
         "pct": 100
       },
       "branches": {
-        "covered": 9,
-        "total": 10,
-        "pct": 90
+        "covered": 11,
+        "total": 12,
+        "pct": 91.66
       }
     },
     "packages/rpc/src/core/internal/replay.ts": {
