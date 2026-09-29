@@ -24,7 +24,7 @@ import {
   GENERATOR_UNDEFINED as hostUndefined
 } from '../src/typing'
 import { PluginHostRemovalRuntime } from '../src/removal-runtime.js'
-import { createManualScheduler } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import { openComposition } from '../src/composition-entry.js'
 
 type IExt = { marker?: string } & Pick<IPluginHostCore<number>, 'onDispose' | 'usePipeline'>

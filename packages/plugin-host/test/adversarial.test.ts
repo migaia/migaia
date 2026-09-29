@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost, PluginHostError } from '../src/index.js'
-import { createManualScheduler } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 
 class Host extends PluginHost<Record<string, never>, string> {
   /** Supplies an explicit test policy while preserving each test's option override. */

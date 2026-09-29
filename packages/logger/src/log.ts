@@ -44,12 +44,8 @@ type ILoggerExtendsTarget<TMode extends IMiddlewarePipelineMode> = Omit<
 const loggerInternalState = Symbol('logger.internal.state')
 type ILoggerInternalState = { extendPath: string[]; topicChain: string[] }
 import { getLoggerRuntimeManager } from './runtime-manager.js'
-import {
-  boundedWait,
-  snapshotScheduler,
-  systemScheduler,
-  type ILifecycleScheduler
-} from '@migaia/lifecycle'
+import { boundedWait, snapshotScheduler } from '@migaia/lifecycle'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { LoggerStatus, type ILoggerStatus } from './state-constants.js'
 import { LoggerErrorText } from './error-text.js'
 import { registerLoggerSchedulerDomain } from './scheduler-domain.js'
@@ -62,7 +58,7 @@ import { captureLoggerPromiseLike, observeLoggerReporterResult } from './thenabl
  * docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
  */
 /** Resolves one immutable scheduler facade before PluginHost or logger code can observe it. */
-function resolveLoggerScheduler(value: unknown): ILifecycleScheduler {
+function resolveLoggerScheduler(value: unknown): IScheduler {
   if (value === undefined) return registerLoggerSchedulerDomain(systemScheduler, systemScheduler)
   try {
     const snapshot = snapshotScheduler(value)
@@ -164,7 +160,7 @@ class LoggerCore {
   /** Extends() 注册的转发目标 */
   #extendTargets: ILoggerExtendsTarget<IMiddlewarePipelineMode>[] = []
   /** 单调时钟源（R-9）；`flush`/`shutdown`/`#drain` 的 deadline 与 `boundedWait` 共用。 */
-  #scheduler: ILifecycleScheduler
+  #scheduler: IScheduler
   /** Functional Host owns plugin admission, config, pipeline, and disposal for this facade. */
   #handle: IHostHandle<ILoggerDomainCore<IMiddlewarePipelineMode>, ILogEntry, readonly []>
   /** Config facade is fixed after the functional Host has been created. */
@@ -174,7 +170,7 @@ class LoggerCore {
     readonly []
   >['config']
 
-  get scheduler(): ILifecycleScheduler {
+  get scheduler(): IScheduler {
     return this.#scheduler
   }
 
@@ -184,7 +180,7 @@ class LoggerCore {
     topic: string,
     hostOptions: IPluginHostOptions,
     plugins: readonly ILoggerPluginConstraint[] = [],
-    scheduler: ILifecycleScheduler = systemScheduler
+    scheduler: IScheduler = systemScheduler
   ) {
     this.#scheduler = scheduler
     // Freeze the top-level context containers. Nested option values and Date remain

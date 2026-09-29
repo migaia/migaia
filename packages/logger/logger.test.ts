@@ -12,7 +12,7 @@ import { setLoggerRuntimeManager } from './src/runtime-manager'
 import { LoggerErrorCode } from './src/errors'
 import type { ILogEntry, ILoggerPlugin, ILoggerPluginCore } from './src/typing'
 import { definePlugin, GENERATOR_CONTINUE } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 
 describe('logger plugin host integration', () => {
   it('runs without process through the runtime manager', () => {

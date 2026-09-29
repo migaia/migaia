@@ -1,7 +1,8 @@
 /* oxlint-disable unicorn/no-thenable -- 对抗夹具刻意构造 hostile then getter 以验证单次探测语义 */
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler, LifecycleErrorCode } from '@migaia/lifecycle'
+import { LifecycleErrorCode } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import { Resource } from '../src'
 import { ResourceErrorCode } from '../src/error-code.js'
 

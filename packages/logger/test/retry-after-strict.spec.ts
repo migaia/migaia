@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createManualScheduler, type ILifecycleScheduler } from '@migaia/lifecycle'
+import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { Logger } from '../src/index.js'
 import { http } from '../src/plugins/http.js'
 import { setLoggerRuntimeManager } from '../src/runtime-manager.js'
@@ -25,13 +25,13 @@ type IRetryOutcome = {
 
 /** Creates a deterministic scheduler facade that exposes each retry delay and cancellation. */
 function createObservedScheduler(): {
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
   readonly manual: ReturnType<typeof createManualScheduler>
   readonly schedules: IRetrySchedule[]
 } {
   const manual = createManualScheduler()
   const schedules: IRetrySchedule[] = []
-  const scheduler: ILifecycleScheduler = {
+  const scheduler: IScheduler = {
     now: () => manual.now(),
     schedule: (callback, delayMs) => {
       const task = manual.schedule(callback, delayMs)

@@ -13,7 +13,7 @@ import type {
   IPipelineConfig,
   IMiddlewarePipelineMode
 } from '@migaia/plugin-host'
-import type { ILifecycleScheduler } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 
 /**
  * 全局约定：能用 `type` 就不用 `interface`；所有类型别名以 `I` 开头， 用来在阅读代码时一眼区分"这是一个类型"还是"这是一个变量/类/函数"。 泛型参数（如
@@ -154,7 +154,7 @@ export type ILoggerCore<
    * 本 logger 的单调时钟源（R-9 时间域）。`flush`/`shutdown`/`batch` 的 deadline 与 `boundedWait` 都用它，缺省 lifecycle
    * `systemScheduler`；插件可据此与宿主 clock 对齐。
    */
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
 
   /** 便捷方法：同步构造并处理一条 entry；插件需要异步输出时应使用 dispatchRaw 的调度参数。 */
   log(tag: string, message: string, ...args: unknown[]): void
@@ -336,7 +336,7 @@ export type ILoggerOptions<
   options?: Record<string, unknown>
   pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode }
   /** 缺省 lifecycle `systemScheduler`；`flush`/`shutdown`/`batch` 的 deadline 均用它（R-9 时间域）。 */
-  scheduler?: ILifecycleScheduler
+  scheduler?: IScheduler
 }
 
 /** Logger constructor type, kept separate so plugin extension types remain on instances. */

@@ -16,14 +16,12 @@ import {
   createGenerationController,
   createTerminalController,
   probeThenable,
-  systemScheduler,
   snapshotScheduler,
   LifecycleState,
   ThenableProbeKind,
-  type IGenerationToken,
-  type ILifecycleScheduler,
-  type IScheduledTask
+  type IGenerationToken
 } from '@migaia/lifecycle'
+import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import { observeAbortSubscription, type IAbortSignal } from '@migaia/lifecycle/abort'
 import {
   createResourceError,
@@ -72,7 +70,7 @@ type IResourceOptionSnapshot<T> = {
   readonly retryDelay: number | ((failureCount: number, error: unknown) => number)
   readonly keepAlive: boolean
   readonly initialSnapshot: IResourceCacheSnapshot<T> | undefined
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
 }
 
 export type IResourceOptions<T = unknown> = {
@@ -98,7 +96,7 @@ export type IResourceOptions<T = unknown> = {
    * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一
    * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。
    */
-  scheduler?: ILifecycleScheduler
+  scheduler?: IScheduler
 }
 
 function abortError(): DOMException {
@@ -299,7 +297,7 @@ function snapshotResourceOptions<T>(options: IResourceOptions<T>): IResourceOpti
   const admittedInitialSnapshot = snapshotInitialSnapshot<T>(initialSnapshot)
   let admittedScheduler = systemScheduler
   if (schedulerOption !== undefined) {
-    let schedulerSnapshot: ILifecycleScheduler | undefined
+    let schedulerSnapshot: IScheduler | undefined
     try {
       schedulerSnapshot = snapshotScheduler(schedulerOption)
     } catch (error) {
@@ -421,7 +419,7 @@ export class Resource<T> implements IObserver, IDisposable {
   /** Holds one validated expiry pair between request admission and success-state publication. */
   #settlementExpiry: IResourceExpiry | undefined
   #terminal = createTerminalController()
-  #scheduler: ILifecycleScheduler
+  #scheduler: IScheduler
 
   constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options: IResourceOptions<T> = {}) {
     const admittedOptions = snapshotResourceOptions(options)

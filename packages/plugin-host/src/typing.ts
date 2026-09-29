@@ -1,5 +1,6 @@
 import { asyncDisposeKey, disposeKey } from './symbols.js'
-import type { IAbortSignal, ILifecycleScheduler } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import type {
   IFeatureOutput,
   IFeatureReference,
@@ -489,7 +490,7 @@ export type IPluginHostOptions = {
    */
   onDiagnosticFailure?: (error: unknown) => void
   /** 时间域与排程来源（默认 lifecycle `systemScheduler`）；queue watchdog / dispose timeout 共用。 */
-  scheduler?: ILifecycleScheduler
+  scheduler?: IScheduler
   /** 队列 admission 阈值。`undefined`：只诊断不拒绝；`false`：不建 timer、不诊断、不拒绝；`number`：超时出队并 reject。 */
   queueAdmissionTimeoutMs?: number | false
   /** `queueAdmissionTimeoutMs` 未配置时的诊断阈值；`false` 关闭诊断 timer。 */

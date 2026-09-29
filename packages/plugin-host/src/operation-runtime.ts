@@ -3,9 +3,9 @@ import {
   boundedWait,
   createGenerationController,
   type IAbortSignal,
-  type IGenerationRequest,
-  type ILifecycleScheduler
+  type IGenerationRequest
 } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 
@@ -16,7 +16,7 @@ type IPluginHostOperationRegistration = {
 
 type IPluginHostOperationRuntimeOptions = Readonly<{
   readonly parentSignal: IAbortSignal
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
   readonly timeoutMs: number | false
   readonly isHostOpen: () => boolean
   readonly diagnostic: (message: string) => void

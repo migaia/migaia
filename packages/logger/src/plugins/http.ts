@@ -14,7 +14,7 @@ import {
   LoggerErrorCode
 } from '../errors.js'
 import { LoggerErrorText } from '../error-text.js'
-import type { ILifecycleScheduler, IScheduledTask } from '@migaia/lifecycle'
+import type { IScheduler, IScheduledTask } from '@migaia/utils/scheduler'
 
 export type IHttpPluginConfig = {
   url: string
@@ -242,7 +242,7 @@ class HttpPlugin implements ILoggerPlugin<
 
   #resolvedConfig!: IHttpPluginConfig
   #controller: AbortController | undefined
-  #scheduler!: ILifecycleScheduler
+  #scheduler!: IScheduler
 
   constructor(config: IHttpPluginConfig) {
     if (

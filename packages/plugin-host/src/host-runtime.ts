@@ -31,14 +31,13 @@ import {
   createQuiescenceTracker,
   createTerminalController,
   snapshotScheduler,
-  systemScheduler,
-  type ILifecycleScheduler,
   type IMutationQueue,
   type IAbortController,
   type IQuiescenceTracker,
   type IPendingTracker,
   type ITerminalController
 } from '@migaia/lifecycle'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import {
   PluginHostCleanupRuntime,
   PluginHostDisposalNodeKind,
@@ -176,7 +175,7 @@ export class PluginHost<
    * per-call owner identity for lifecycle's self-dependency guard.
    */
   #queue: IMutationQueue
-  #scheduler: ILifecycleScheduler
+  #scheduler: IScheduler
   #cleanupRuntime: PluginHostCleanupRuntime
   #installRuntime: PluginHostInstallRuntime<TDomainCore, TValue>
   #removalRuntime: PluginHostRemovalRuntime<TDomainCore, TValue>
@@ -299,7 +298,7 @@ export class PluginHost<
       assertTimeoutOption(value, label)
     // 只读取一次 scheduler 快照（AF-31）：校验、保存、传给 queue/dispose scope 都用这个局部快照。
     const schedulerOption = options.scheduler
-    let schedulerSnapshot: ILifecycleScheduler | undefined
+    let schedulerSnapshot: IScheduler | undefined
     if (schedulerOption !== undefined) {
       try {
         schedulerSnapshot = snapshotScheduler(schedulerOption)

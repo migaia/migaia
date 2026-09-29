@@ -1,6 +1,7 @@
 import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
 import { defineFeature, definePlugin, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
-import { boundedWait, type IScheduledTask } from '@migaia/lifecycle'
+import { boundedWait } from '@migaia/lifecycle'
+import type { IScheduledTask } from '@migaia/utils/scheduler'
 import {
   createLoggerCleanupError,
   createLoggerError,

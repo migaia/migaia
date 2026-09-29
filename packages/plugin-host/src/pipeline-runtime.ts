@@ -1,5 +1,6 @@
 import { reportDiagnostic } from './diagnostic-report.js'
-import { boundedWait, type ILifecycleScheduler, type IPendingTracker } from '@migaia/lifecycle'
+import { boundedWait, type IPendingTracker } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   MiddlewarePipelineMode,
   MiddlewarePipelineViolation,
@@ -138,7 +139,7 @@ export const drainPipelineLeases = async (context: {
   readonly leases: { whenZeroOnce(key: object): Promise<void> }
   readonly key: object
   readonly drainTimeoutMs: number | false
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
 }): Promise<{
   readonly complete: boolean
   readonly physicalCompletion?: Promise<{ readonly cleanupErrors: readonly unknown[] }>

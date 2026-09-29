@@ -2,11 +2,11 @@ import { reportDiagnostic } from './diagnostic-report.js'
 import {
   boundedWait,
   type IAbortController,
-  type ILifecycleScheduler,
   type IPendingTracker,
   type IQuiescenceTracker,
   type ITerminalController
 } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginHostDiagnostic, IPluginHostDisposalResult } from './typing.js'
@@ -17,7 +17,7 @@ type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly pipelineLeases: IQuiescenceTracker<object>
   readonly pending: IPendingTracker
   readonly pipelineKey: object
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
   readonly pipelineDrainTimeoutMs: number | false
   readonly enqueueTerminal: <T>(task: () => Promise<T>) => Promise<T>
   readonly registrationsInReverse: () => readonly TRegistration[]

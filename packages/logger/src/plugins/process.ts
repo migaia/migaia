@@ -9,7 +9,7 @@ import {
 } from '../errors.js'
 import { LoggerErrorText } from '../error-text.js'
 import { LoggerProcessReason } from '../plugin-constants.js'
-import type { ILifecycleScheduler, IScheduledTask } from '@migaia/lifecycle'
+import type { IScheduler, IScheduledTask } from '@migaia/utils/scheduler'
 import { getLoggerSchedulerDomain } from '../scheduler-domain.js'
 import { observeLoggerReporterResult } from '../thenable.js'
 
@@ -45,7 +45,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
   /** Runtime process capability currently owned by this plugin. */
   static #runtimeProcess: ILoggerProcess | undefined
   /** Scheduler snapshot shared by every process-plugin timer in this runtime. */
-  static #scheduler: ILifecycleScheduler | undefined
+  static #scheduler: IScheduler | undefined
   /** Stable token identifying the scheduler source's time domain across snapshots. */
   static #schedulerDomain: object | undefined
   /** Exact exit function captured before interception so late callbacks cannot recurse. */
@@ -96,10 +96,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
   }
 
   /** 只有第一次调用会真正生效；后续实例复用同一套监听器和配置。 */
-  static #installOnce(
-    config: Required<IProcessPluginConfig>,
-    scheduler: ILifecycleScheduler
-  ): void {
+  static #installOnce(config: Required<IProcessPluginConfig>, scheduler: IScheduler): void {
     if (ProcessPlugin.#installed) {
       const previous = ProcessPlugin.#config!
       const schedulerDomain = getLoggerSchedulerDomain(scheduler)

@@ -1,9 +1,9 @@
 import {
   createLifecycleScope,
-  type ILifecycleScheduler,
   type IPendingTracker,
   type IReleaseDescriptor
 } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 
@@ -24,7 +24,7 @@ export type IPluginHostDisposalProvenance = Readonly<{
 }>
 
 type IPluginHostCleanupRuntimeOptions = Readonly<{
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
   readonly pending: IPendingTracker
   readonly disposeStepTimeoutMs: number | false
   readonly markAbandoned: () => void

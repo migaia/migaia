@@ -1,4 +1,4 @@
-import type { ILifecycleScheduler } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 
 /** Opaque identity token representing one injected scheduler time domain. */
 type ISchedulerDomainToken = object
@@ -13,10 +13,7 @@ const snapshotDomains = new WeakMap<object, ISchedulerDomainToken>()
  * snapshots from one source therefore remain in one time domain without retaining the source
  * through a strong reference.
  */
-export function registerLoggerSchedulerDomain(
-  source: object,
-  snapshot: ILifecycleScheduler
-): ILifecycleScheduler {
+export function registerLoggerSchedulerDomain(source: object, snapshot: IScheduler): IScheduler {
   /** Reuses source or snapshot identity so repeated lifecycle snapshots share one time domain. */
   const domain = snapshotDomains.get(source) ?? sourceDomains.get(source) ?? {}
   sourceDomains.set(source, domain)
@@ -25,6 +22,6 @@ export function registerLoggerSchedulerDomain(
 }
 
 /** Returns the retained time-domain token for a logger scheduler snapshot. */
-export function getLoggerSchedulerDomain(scheduler: ILifecycleScheduler): object | undefined {
+export function getLoggerSchedulerDomain(scheduler: IScheduler): object | undefined {
   return snapshotDomains.get(scheduler)
 }
