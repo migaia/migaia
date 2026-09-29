@@ -980,6 +980,34 @@
         "workerPlugin"
       ]
     },
+    "@migaia/supervision": {
+      ".": [
+        "BudgetOverflow",
+        "BudgetRejection",
+        "CapabilityLevel",
+        "ExitReason",
+        "IsolationMode",
+        "LaunchCause",
+        "LaunchPhase",
+        "ReplaceStrategy",
+        "RestartMode",
+        "SUPERVISION_SOURCE",
+        "StandardCapability",
+        "SupervisionErrorCode",
+        "SupervisionErrorText",
+        "SupervisorEventType",
+        "SupervisorState",
+        "TerminalPolicyMode",
+        "TerminationMode",
+        "createSupervisor",
+        "createUnitBudget"
+      ],
+      "./coroutine": [
+        "CoroutineOutcome",
+        "coroutineCapabilities",
+        "createCoroutineSupervisor"
+      ]
+    },
     "@migaia/tray": {
       ".": [
         "TRAY_SOURCE",
