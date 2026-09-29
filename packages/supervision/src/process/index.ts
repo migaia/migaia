@@ -30,3 +30,4 @@ export type {
   IProcessSupervisorOptions,
   IProcessSupervisor
 } from './types.js'
+export { createProcessSupervisor } from './supervisor.js'
