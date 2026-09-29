@@ -230,6 +230,67 @@ describe('pipeline internal cleanup', () => {
     )
   })
 
+  it('A4 wraps primitive reason getter failures in all modes and preserves cleanup order', async () => {
+    for (const mode of Object.values(MiddlewarePipelineMode)) {
+      for (const duringStage of [false, true]) {
+        const fixture = throwingReasonSignal('boom', !duringStage)
+        const downstream = vi.fn()
+        const done = vi.fn()
+        const run = () =>
+          runMode(mode, fixture.signal, duringStage ? fixture.abort : undefined, downstream, done)
+        const failure =
+          mode === MiddlewarePipelineMode.sync || mode === MiddlewarePipelineMode.generator
+            ? thrown(run)
+            : await (run() as Promise<void>).catch((error: unknown) => error)
+        expect(failure).toMatchObject({
+          message: 'middleware pipeline aborted',
+          source: MIDDLEWARE_PIPELINE_SOURCE,
+          code: MiddlewarePipelineErrorCode.aborted,
+          cause: 'boom'
+        })
+        expect(failure).toBeInstanceOf(Error)
+        expect(fixture.reads()).toBe(1)
+        expect(downstream).not.toHaveBeenCalled()
+        expect(done).not.toHaveBeenCalled()
+      }
+    }
+    const fixture = throwingReasonSignal('boom', false)
+    const cleanup = new Error('cleanup')
+    /** Raises the cleanup failure without obscuring the generator's primary abort in source. */
+    const failCleanup = (): never => {
+      throw cleanup
+    }
+    const pipeline = createPipeline<number>({
+      mode: MiddlewarePipelineMode.generator,
+      signal: fixture.signal
+    })
+    const failure = thrown(() =>
+      pipeline.run(
+        [
+          function* (value): Generator<number, typeof GENERATOR_CONTINUE, void> {
+            try {
+              yield value
+              fixture.abort()
+              yield value
+            } finally {
+              failCleanup()
+            }
+            return GENERATOR_CONTINUE
+          }
+        ],
+        1,
+        vi.fn()
+      )
+    )
+    expect(failure).toBeInstanceOf(AggregateError)
+    expect(failure).toMatchObject({ code: MiddlewarePipelineErrorCode.abortCleanupFailed })
+    expect((failure as AggregateError).errors[0]).toMatchObject({
+      code: MiddlewarePipelineErrorCode.aborted,
+      cause: 'boom'
+    })
+    expect((failure as AggregateError).errors[1]).toBe(cleanup)
+  })
+
   it('A5 retains an Error thrown by reason getters across modes and timing', async () => {
     const original = new Error('reason failure')
     for (const mode of Object.values(MiddlewarePipelineMode)) {

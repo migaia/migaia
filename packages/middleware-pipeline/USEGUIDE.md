@@ -196,6 +196,8 @@ await pipeline.run(stages, payload, consume, { signal: request.signal })
 
 取消错误保留原生类型、reason、`source`、`code` 和错误链。用户代码已经抛出或拒绝普通失败时，该失败保持为主错误，后续取消检查不会替换它。async stage 与下游分别出现两个独立普通失败时，仍由 `combineStageAndDownstreamError` 组合，未提供组合器时产生 `EXECUTION_FAILED`。pipeline 不拥有 controller，也不关闭 host；创建与处置这些资源仍是调用方职责。
 
+自定义 `signal.reason` 的 getter 抛出时，抛出值按 reason 处理。
+
 `assertActive` 抛出的错误原样传播。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。
 
 ## 5. 违约处理
