@@ -32,10 +32,14 @@ const packageDependencies = [
   'serialize',
   'utils'
 ]
-/** Frozen public map gives the packed probe all 24 mapped deep subpaths. */
-const publicSubpaths = Object.keys(
-  JSON.parse(readFileSync(resolve(packageDirectory, 'test/fixtures/legacy-exports.json'), 'utf8'))
-)
+/** Frozen legacy map plus reviewed new entries cover every packed deep subpath. */
+const publicSubpaths = [
+  ...Object.keys(
+    JSON.parse(readFileSync(resolve(packageDirectory, 'test/fixtures/legacy-exports.json'), 'utf8'))
+  ),
+  '@migaia/rpc/core/transport-kit',
+  '@migaia/rpc/core/stream'
+]
 const obsoleteSubpaths = [
   '.',
   './browser',
