@@ -510,24 +510,24 @@
     },
     "supervision": {
       "lines": {
-        "covered": 674,
-        "total": 759,
-        "pct": 88.8
+        "covered": 1066,
+        "total": 1182,
+        "pct": 90.18
       },
       "statements": {
-        "covered": 734,
-        "total": 867,
-        "pct": 84.65
+        "covered": 1162,
+        "total": 1348,
+        "pct": 86.2
       },
       "functions": {
-        "covered": 133,
-        "total": 145,
-        "pct": 91.72
+        "covered": 213,
+        "total": 230,
+        "pct": 92.6
       },
       "branches": {
-        "covered": 417,
-        "total": 545,
-        "pct": 76.51
+        "covered": 693,
+        "total": 866,
+        "pct": 80.02
       }
     },
     "tray": {
@@ -12143,9 +12143,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 7,
+        "covered": 8,
         "total": 8,
-        "pct": 87.5
+        "pct": 100
       }
     },
     "packages/supervision/src/budget.ts": {
@@ -12155,9 +12155,9 @@
         "pct": 93.02
       },
       "statements": {
-        "covered": 133,
+        "covered": 134,
         "total": 152,
-        "pct": 87.5
+        "pct": 88.15
       },
       "functions": {
         "covered": 21,
@@ -12165,9 +12165,9 @@
         "pct": 87.5
       },
       "branches": {
-        "covered": 73,
+        "covered": 75,
         "total": 94,
-        "pct": 77.65
+        "pct": 79.78
       }
     },
     "packages/supervision/src/constants.ts": {
@@ -12434,26 +12434,312 @@
         "pct": 81.25
       }
     },
-    "packages/supervision/src/supervisor.ts": {
+    "packages/supervision/src/process/capabilities.ts": {
       "lines": {
-        "covered": 328,
-        "total": 379,
-        "pct": 86.54
+        "covered": 12,
+        "total": 12,
+        "pct": 100
       },
       "statements": {
-        "covered": 361,
-        "total": 439,
-        "pct": 82.23
+        "covered": 17,
+        "total": 17,
+        "pct": 100
       },
       "functions": {
-        "covered": 62,
-        "total": 70,
-        "pct": 88.57
+        "covered": 2,
+        "total": 2,
+        "pct": 100
       },
       "branches": {
-        "covered": 211,
+        "covered": 16,
+        "total": 16,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/process/constants.ts": {
+      "lines": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/process/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/process/orphan.ts": {
+      "lines": {
+        "covered": 20,
+        "total": 21,
+        "pct": 95.23
+      },
+      "statements": {
+        "covered": 20,
+        "total": 21,
+        "pct": 95.23
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 10,
+        "total": 11,
+        "pct": 90.9
+      }
+    },
+    "packages/supervision/src/process/output-tail.ts": {
+      "lines": {
+        "covered": 21,
+        "total": 22,
+        "pct": 95.45
+      },
+      "statements": {
+        "covered": 24,
+        "total": 26,
+        "pct": 92.3
+      },
+      "functions": {
+        "covered": 6,
+        "total": 7,
+        "pct": 85.71
+      },
+      "branches": {
+        "covered": 6,
+        "total": 8,
+        "pct": 75
+      }
+    },
+    "packages/supervision/src/process/parent-loss.ts": {
+      "lines": {
+        "covered": 26,
+        "total": 29,
+        "pct": 89.65
+      },
+      "statements": {
+        "covered": 27,
+        "total": 35,
+        "pct": 77.14
+      },
+      "functions": {
+        "covered": 5,
+        "total": 7,
+        "pct": 71.42
+      },
+      "branches": {
+        "covered": 12,
+        "total": 18,
+        "pct": 66.66
+      }
+    },
+    "packages/supervision/src/process/prewarm.ts": {
+      "lines": {
+        "covered": 153,
+        "total": 182,
+        "pct": 84.06
+      },
+      "statements": {
+        "covered": 168,
+        "total": 208,
+        "pct": 80.76
+      },
+      "functions": {
+        "covered": 34,
+        "total": 38,
+        "pct": 89.47
+      },
+      "branches": {
+        "covered": 80,
+        "total": 110,
+        "pct": 72.72
+      }
+    },
+    "packages/supervision/src/process/profile.ts": {
+      "lines": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/process/registry.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/process/spec.ts": {
+      "lines": {
+        "covered": 41,
+        "total": 46,
+        "pct": 89.13
+      },
+      "statements": {
+        "covered": 45,
+        "total": 53,
+        "pct": 84.9
+      },
+      "functions": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 54,
+        "total": 64,
+        "pct": 84.37
+      }
+    },
+    "packages/supervision/src/process/supervisor.ts": {
+      "lines": {
+        "covered": 50,
+        "total": 53,
+        "pct": 94.33
+      },
+      "statements": {
+        "covered": 52,
+        "total": 56,
+        "pct": 92.85
+      },
+      "functions": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 49,
+        "total": 57,
+        "pct": 85.96
+      }
+    },
+    "packages/supervision/src/process/types.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/process/usage-monitor.ts": {
+      "lines": {
+        "covered": 36,
+        "total": 42,
+        "pct": 85.71
+      },
+      "statements": {
+        "covered": 38,
+        "total": 47,
+        "pct": 80.85
+      },
+      "functions": {
+        "covered": 8,
+        "total": 9,
+        "pct": 88.88
+      },
+      "branches": {
+        "covered": 25,
+        "total": 30,
+        "pct": 83.33
+      }
+    },
+    "packages/supervision/src/supervisor.ts": {
+      "lines": {
+        "covered": 345,
+        "total": 379,
+        "pct": 91.02
+      },
+      "statements": {
+        "covered": 379,
+        "total": 439,
+        "pct": 86.33
+      },
+      "functions": {
+        "covered": 65,
+        "total": 70,
+        "pct": 92.85
+      },
+      "branches": {
+        "covered": 225,
         "total": 284,
-        "pct": 74.29
+        "pct": 79.22
       }
     },
     "packages/supervision/src/types.ts": {
@@ -13340,6 +13626,8 @@
   "exclusions": {
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
-  "changedRuntimeFiles": [],
+  "changedRuntimeFiles": [
+    "packages/supervision/src/process/index.ts"
+  ],
   "deletedRuntimeFiles": []
 }

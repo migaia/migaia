@@ -30,8 +30,8 @@ export type {
   IProcessSupervisorOptions,
   IProcessSupervisor
 } from './types.js'
-export { createProcessSupervisor } from './supervisor.js'
 export type { IOrphanReclaimResult } from './orphan.js'
+export { createProcessSupervisor } from './supervisor.js'
+export { createPrewarmPool } from './prewarm.js'
 export { reclaimOrphanProcesses } from './orphan.js'
 export { createParentLossGuard } from './parent-loss.js'
-export { createPrewarmPool } from './prewarm.js'

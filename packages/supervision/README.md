@@ -14,4 +14,7 @@ The core depends only on `@migaia/lifecycle` and `@migaia/utils`. A profile may 
 
 All errors leaving this package carry `source: '@migaia/supervision'` and one semantic `SupervisionErrorCode`; original failures remain on `cause`, and cleanup failures remain reachable through `errors`. States and budget outcomes are values, not thrown codes.
 
-See [USEGUIDE.md](./USEGUIDE.md) for coroutine usage and cleanup.
+The `./process` entry adds a shell-free specification, capability checks, usage monitoring,
+bounded output tails, durable orphan records and recovery, a parent-loss guard, and an optional
+bounded prewarm pool. It defines a launcher port and does not start an operating-system process
+itself. See [USEGUIDE.md](./USEGUIDE.md) for the process contract, defaults and cleanup.
