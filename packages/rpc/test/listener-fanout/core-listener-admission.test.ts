@@ -63,7 +63,7 @@ function createBrowserPort() {
 }
 
 describe('core listener admission', () => {
-  it.fails('RLF A5 removes the HookRegistry identity map while preserving Set behavior', () => {
+  it('RLF A5 removes the HookRegistry identity map while preserving Set behavior', () => {
     const registry = new HookRegistry()
     const hook = vi.fn()
     const first = registry.add(hook)

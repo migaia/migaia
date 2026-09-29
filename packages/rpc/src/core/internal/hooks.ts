@@ -1,4 +1,4 @@
-import { createEventChannel } from '@migaia/event-subscriber'
+import { createEventChannel, EventAdmissionPolicy } from '@migaia/event-subscriber'
 import type { IRpcHook, IRpcHookEvent } from '../typing.js'
 
 /** Reports one listener failure without allowing diagnostics to re-enter listener dispatch. */
@@ -38,40 +38,31 @@ export function createConstructionDiagnosticReporter(
 /** Owns hook subscription and failure isolation for one endpoint runtime. */
 export class HookRegistry {
   /** Event-subscriber channel owning hook registration and snapshot dispatch. */
-  readonly #channel = createEventChannel<IRpcHookEvent>({ report: () => undefined })
-  /** Maps legacy hook identities to event-subscriber registrations for Set semantics. */
-  readonly #registrations = new Map<IRpcHook, () => void>()
+  readonly #channel = createEventChannel<IRpcHookEvent>({
+    admissionPolicy: EventAdmissionPolicy.unique,
+    report: () => undefined
+  })
+  /** Reuses a wrapper per hook so the channel can compare the original function identity. */
+  readonly #wrappers = new WeakMap<IRpcHook, (event: { value: IRpcHookEvent }) => void>()
 
   /** Returns the number of registered hooks for test-only lifecycle inspection. */
   get size(): number {
-    return this.#registrations.size
+    return this.#channel.size
   }
 
   /** Adds a hook and returns its idempotent disposer. */
   add(listener: IRpcHook): () => void {
-    const existing = this.#registrations.get(listener)
-    if (existing) {
-      return () => {
-        if (this.#registrations.get(listener) !== existing) return
-        this.#registrations.delete(listener)
-        existing()
-      }
+    let wrapper = this.#wrappers.get(listener)
+    if (wrapper === undefined) {
+      wrapper = (event) => dispatchHookListener(listener, event.value, this.#activeReport)
+      this.#wrappers.set(listener, wrapper)
     }
-    const registration = this.#channel.subscribe((event) => {
-      dispatchHookListener(listener, event.value, this.#activeReport)
-    })
-    this.#registrations.set(listener, registration)
-    return () => {
-      if (this.#registrations.get(listener) !== registration) return
-      this.#registrations.delete(listener)
-      registration()
-    }
+    return this.#channel.subscribe(wrapper)
   }
 
   /** Clears all hooks during endpoint disposal. */
   clear(): void {
     this.#channel.clear()
-    this.#registrations.clear()
   }
 
   /** Emits an event while isolating synchronous and asynchronous hook failures. */
