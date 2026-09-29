@@ -3,6 +3,13 @@ export { createDescriptor } from './protocol.js'
 export { fromJsonRpcError, toJsonRpcError } from './error-jsonrpc.js'
 export { normalizePortable } from './normalize.js'
 export { normalizeRpcEnvelope, rpcProtocol as rpcProtocolV1 } from './v1/index.js'
+export { invalidRpcStream, normalizeStreamPayload } from './v1/stream.js'
+export {
+  measurePortableStreamValue,
+  RpcStreamEvent,
+  RpcStreamLimit,
+  RpcStreamViolation
+} from './stream-constants.js'
 export { createRpcUnknownFieldWarner } from './unknown-field.js'
 export {
   acceptRpcHandshake,
@@ -82,3 +89,5 @@ export type {
   IRpcResponseSuccess,
   IRpcVariationEnvelope
 } from './v1/types.js'
+export type { IRpcStreamEnvelope } from './v1/types.js'
+export type { IRpcStreamPayload } from './v1/stream.js'

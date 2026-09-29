@@ -1,12 +1,13 @@
 /** Identifies the language-neutral wire protocol independently of the package version. */
-export const RpcProtocol = { id: 'migaia.rpc', major: 1, minor: 0 } as const
+export const RpcProtocol = { id: 'migaia.rpc', major: 1, minor: 1 } as const
 
-/** Names the semantic envelope forms that protocol 1.0 can carry. */
+/** Names the semantic envelope forms that protocol 1.1 can carry. */
 export const RpcEnvelopeKind = {
   request: 'request',
   response: 'response',
   discovery: 'discovery',
-  variation: 'variation'
+  variation: 'variation',
+  stream: 'stream'
 } as const
 export type RpcEnvelopeKind = keyof typeof RpcEnvelopeKind
 
@@ -29,7 +30,8 @@ export const RpcCapability = {
   close: 'close@1',
   deadline: 'deadline@1',
   idempotency: 'idempotency@1',
-  trace: 'trace@1'
+  trace: 'trace@1',
+  stream: 'stream@1'
 } as const
 
 /** JSON is the mandatory codec available to every protocol 1.0 peer. */
@@ -59,7 +61,8 @@ export const RpcRouteType = {
   response: 'response',
   discoveryQuery: 'discovery-query',
   discoveryResponse: 'discovery-response',
-  variation: 'variation'
+  variation: 'variation',
+  stream: 'stream'
 } as const
 export type RpcRouteType = (typeof RpcRouteType)[keyof typeof RpcRouteType]
 

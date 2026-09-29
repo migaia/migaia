@@ -1,0 +1,48 @@
+{
+  "payload": [
+    { "id": "open", "value": { "event": "open", "seq": 0 }, "valid": true },
+    { "id": "item", "value": { "event": "item", "seq": 0, "value": "a" }, "valid": true },
+    { "id": "unknown-event", "value": { "event": "unknown", "seq": 0 }, "violation": "event", "pointer": "/event" },
+    { "id": "missing-value", "value": { "event": "item", "seq": 0 }, "violation": "field", "pointer": "/value" },
+    { "id": "bad-seq", "value": { "event": "pull", "seq": -1 }, "violation": "field", "pointer": "/seq" }
+  ],
+  "sequences": [
+    { "id": "three-items", "role": "consumer", "events": ["open", "item", "item", "item", "end"], "values": ["a", "b", "c"] },
+    { "id": "cancel", "role": "producer", "events": ["pull", "cancel", "cancelled"] }
+  ],
+  "measure": [
+    { "id": "null", "value": null, "bytes": 4 },
+    { "id": "ascii", "value": "a", "bytes": 3 },
+    { "id": "escape", "value": "\"", "bytes": 4 },
+    { "id": "multibyte", "value": "中", "bytes": 5 },
+    { "id": "number", "value": 1, "bytes": 24 },
+    { "id": "bytes-tag", "value": { "$rpc": "bytes", "base64url": "AQ" }, "bytes": 33 }
+  ],
+  "envelope": {
+    "valid": {
+      "kind": "stream",
+      "id": "stream-1",
+      "data": {
+        "route": { "profile": "migaia.rpc.route", "type": "stream", "applicationVersion": "1", "senderId": "peer-a", "targetId": "peer-b", "sentAt": 0 },
+        "payload": { "event": "open", "seq": 0 }
+      }
+    },
+    "reclassified": {
+      "id": "unknown-kind",
+      "violation": "route",
+      "pointer": "/data/route/type"
+    }
+  },
+  "handshake": {
+    "newVersion": {
+      "major": 1,
+      "minor": 1
+    },
+    "oldVersion": {
+      "major": 1,
+      "minor": 0
+    },
+    "negotiatedMinor": 0,
+    "capabilities": ["stream@1"]
+  }
+}

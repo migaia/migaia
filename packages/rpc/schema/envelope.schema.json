@@ -1,73 +1,178 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "migaia.rpc.envelope/1",
-  "title": "migaia.rpc semantic envelope 1.0",
+  "title": "migaia.rpc semantic envelope 1.1",
   "oneOf": [
     {
       "title": "request",
       "type": "object",
-      "required": ["kind", "id", "method", "data"],
+      "required": [
+        "kind",
+        "id",
+        "method",
+        "data"
+      ],
       "properties": {
-        "kind": { "const": "request" },
-        "id": { "type": "string" },
-        "method": { "type": "string" },
-        "data": { "$ref": "#/$defs/requestData" }
+        "kind": {
+          "const": "request"
+        },
+        "id": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/requestData"
+        }
       },
       "additionalProperties": true
     },
     {
       "title": "response-success",
       "type": "object",
-      "required": ["kind", "ok", "id", "data"],
+      "required": [
+        "kind",
+        "ok",
+        "id",
+        "data"
+      ],
       "properties": {
-        "kind": { "const": "response" },
-        "ok": { "const": true },
-        "id": { "type": "string" },
-        "data": { "$ref": "#/$defs/responseData" }
+        "kind": {
+          "const": "response"
+        },
+        "ok": {
+          "const": true
+        },
+        "id": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/responseData"
+        }
       },
       "additionalProperties": true
     },
     {
       "title": "response-failure",
       "type": "object",
-      "required": ["kind", "ok", "id", "code", "message", "data"],
+      "required": [
+        "kind",
+        "ok",
+        "id",
+        "code",
+        "message",
+        "data"
+      ],
       "properties": {
-        "kind": { "const": "response" },
-        "ok": { "const": false },
-        "id": { "type": "string" },
-        "code": { "type": "string" },
-        "message": { "type": "string" },
-        "data": { "$ref": "#/$defs/responseData" },
-        "error": { "$ref": "wire-error.schema.json" }
+        "kind": {
+          "const": "response"
+        },
+        "ok": {
+          "const": false
+        },
+        "id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/responseData"
+        },
+        "error": {
+          "$ref": "wire-error.schema.json"
+        }
       },
       "additionalProperties": true
     },
     {
       "title": "discovery",
       "type": "object",
-      "required": ["kind", "id", "version", "acceptVersions", "data"],
+      "required": [
+        "kind",
+        "id",
+        "version",
+        "acceptVersions",
+        "data"
+      ],
       "properties": {
-        "kind": { "const": "discovery" },
-        "id": { "type": "string" },
-        "version": { "type": "string" },
-        "acceptVersions": { "type": "array", "items": { "type": "string" } },
-        "data": { "$ref": "#/$defs/discoveryData" }
+        "kind": {
+          "const": "discovery"
+        },
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "acceptVersions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "data": {
+          "$ref": "#/$defs/discoveryData"
+        }
       },
       "additionalProperties": true
     },
     {
       "title": "variation",
       "type": "object",
-      "required": ["kind", "id", "data"],
+      "required": [
+        "kind",
+        "id",
+        "data"
+      ],
       "properties": {
-        "kind": { "const": "variation" },
-        "id": { "type": "string" },
-        "data": { "$ref": "#/$defs/variationData" }
+        "kind": {
+          "const": "variation"
+        },
+        "id": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/variationData"
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "stream",
+      "type": "object",
+      "required": [
+        "kind",
+        "id",
+        "data"
+      ],
+      "properties": {
+        "kind": {
+          "const": "stream"
+        },
+        "id": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/streamData"
+        }
       },
       "additionalProperties": true
     }
   ],
-  "x-migaia-validation-order": ["V1", "V2", "V3", "V4", "V5", "V6", "V7"],
+  "x-migaia-validation-order": [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7"
+  ],
   "x-migaia-limits": {
     "maxIdentifierChars": 128,
     "maxTraceChars": 256,
@@ -82,39 +187,209 @@
   "$defs": {
     "route": {
       "type": "object",
-      "required": ["profile", "type", "applicationVersion", "senderId", "targetId", "sentAt"],
+      "required": [
+        "profile",
+        "type",
+        "applicationVersion",
+        "senderId",
+        "targetId",
+        "sentAt"
+      ],
       "properties": {
-        "profile": { "const": "migaia.rpc.route" },
-        "type": { "enum": ["request", "response", "discovery-query", "discovery-response", "variation"] },
-        "applicationVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "senderId": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "targetId": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "sentAt": { "type": "integer", "minimum": 0 },
-        "receiverId": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "dispatchOnly": { "type": "boolean" },
-        "method": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "manual": { "type": "boolean" },
-        "resolvedTargetId": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "platform": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "accepted": { "type": "boolean" },
-        "message": { "type": "string" },
-        "operation": { "const": "unregister" },
-        "variation": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
-        "timeoutMs": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
-        "idempotencyKey": { "type": "string", "pattern": "^[A-Za-z0-9._:~-]{1,128}$" },
-        "trace": { "type": "string", "minLength": 1, "maxLength": 256 }
+        "profile": {
+          "const": "migaia.rpc.route"
+        },
+        "type": {
+          "enum": [
+            "request",
+            "response",
+            "discovery-query",
+            "discovery-response",
+            "variation",
+            "stream"
+          ]
+        },
+        "applicationVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "senderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "targetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sentAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receiverId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "dispatchOnly": {
+          "type": "boolean"
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "manual": {
+          "type": "boolean"
+        },
+        "resolvedTargetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "operation": {
+          "const": "unregister"
+        },
+        "variation": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
+        },
+        "trace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
       },
       "additionalProperties": true
     },
-    "requestData": { "allOf": [{ "$ref": "#/$defs/data" }, { "properties": { "route": { "properties": { "type": { "const": "request" } } } } }] },
-    "responseData": { "allOf": [{ "$ref": "#/$defs/data" }, { "properties": { "route": { "properties": { "type": { "const": "response" } } } } }] },
-    "discoveryData": { "allOf": [{ "$ref": "#/$defs/data" }, { "properties": { "route": { "properties": { "type": { "enum": ["discovery-query", "discovery-response"] } } } } }] },
-    "variationData": { "allOf": [{ "$ref": "#/$defs/data" }, { "properties": { "route": { "properties": { "type": { "const": "variation" } } } } }], "x-migaia-payload": "opaque" },
+    "requestData": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/data"
+        },
+        {
+          "properties": {
+            "route": {
+              "properties": {
+                "type": {
+                  "const": "request"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "responseData": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/data"
+        },
+        {
+          "properties": {
+            "route": {
+              "properties": {
+                "type": {
+                  "const": "response"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "discoveryData": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/data"
+        },
+        {
+          "properties": {
+            "route": {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "discovery-query",
+                    "discovery-response"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "variationData": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/data"
+        },
+        {
+          "properties": {
+            "route": {
+              "properties": {
+                "type": {
+                  "const": "variation"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "x-migaia-payload": "opaque"
+    },
     "data": {
       "type": "object",
-      "required": ["route"],
-      "properties": { "route": { "$ref": "#/$defs/route" }, "payload": {} },
+      "required": [
+        "route"
+      ],
+      "properties": {
+        "route": {
+          "$ref": "#/$defs/route"
+        },
+        "payload": {}
+      },
       "additionalProperties": true
+    },
+    "streamData": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/data"
+        },
+        {
+          "properties": {
+            "route": {
+              "properties": {
+                "type": {
+                  "const": "stream"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

@@ -9,6 +9,7 @@ import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.js'
 const TEXT_BY_CODE: Readonly<Record<IRpcContractErrorCode, string>> = {
   [RpcContractErrorCode.invalidDescriptor]: RpcContractErrorText.invalidDescriptor,
   [RpcContractErrorCode.invalidEnvelope]: RpcContractErrorText.invalidEnvelope,
+  [RpcContractErrorCode.invalidStream]: RpcContractErrorText.invalidStream,
   [RpcContractErrorCode.invalidFrame]: RpcContractErrorText.invalidFrame,
   [RpcContractErrorCode.frameLimitExceeded]: RpcContractErrorText.frameLimitExceeded,
   [RpcContractErrorCode.frameAssemblyExpired]: RpcContractErrorText.frameAssemblyExpired,

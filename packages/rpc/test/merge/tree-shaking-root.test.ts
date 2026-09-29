@@ -7,10 +7,10 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** K138 keeps the frozen baseline and admits the exact measured async setup cost. */
+/** K151 keeps the frozen baseline and admits exact protocol 1.1 stream-contract bytes. */
 const allowedIncrease = {
-  rawBytes: 40088 / legacyRoot.rawBytes,
-  gzipBytes: 10902 / legacyRoot.gzipBytes
+  rawBytes: 40747 / legacyRoot.rawBytes,
+  gzipBytes: 11049 / legacyRoot.gzipBytes
 } as const
 
 /** I5 adds five required modules and removes the obsolete core route validator. */

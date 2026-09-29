@@ -7,6 +7,11 @@ export const RpcContractErrorCode = {
   invalidDescriptor: 'INVALID_DESCRIPTOR',
   /** Invalid semantic envelope; caller must reject the untrusted message. */
   invalidEnvelope: 'INVALID_ENVELOPE',
+  /**
+   * Invalid stream event, field, sequence, or value budget under streaming R3/R6/R8; reject this
+   * frame and terminate only its stream.
+   */
+  invalidStream: 'INVALID_STREAM',
   /** Invalid frame grammar; caller must discard the frame sequence. */
   invalidFrame: 'INVALID_FRAME',
   /** Reassembly exceeded a declared message/source/global budget. */

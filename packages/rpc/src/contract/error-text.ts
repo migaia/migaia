@@ -7,6 +7,8 @@ export const RPC_CONTRACT_SOURCE = ERROR_SOURCE
 export const RpcContractErrorText = {
   invalidDescriptor: 'rpc descriptor is invalid',
   invalidEnvelope: 'rpc envelope is invalid',
+  /** Stable diagnostic for a stream frame rejected by the contract validator. */
+  invalidStream: 'rpc stream is invalid',
   invalidFrame: 'rpc frame is invalid',
   frameLimitExceeded: 'rpc frame limit exceeded',
   frameAssemblyExpired: 'rpc frame assembly expired',

@@ -48,6 +48,7 @@ describe('rpc-contract declarations', () => {
       if (value.kind === 'request') return value.method
       if (value.kind === 'discovery') return value.version
       if (value.kind === 'variation') return value.id
+      if (value.kind === 'stream') return value.id
       return exhaustive(value)
     }
     expect(narrowed(envelope)).toBe('1')

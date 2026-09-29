@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import legacyExports from '../fixtures/legacy-exports.json'
 import errorFormatDelta from '../fixtures/error-format-export-delta.json'
 import controlSemanticsDelta from '../fixtures/control-semantics-export-delta.json'
+import streamingDelta from '../fixtures/streaming-export-delta.json'
 
 /** Package root whose manifest and built files define the new public surface. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -69,7 +70,8 @@ describe('A1 merged public exports', () => {
               )
           ),
           ...((errorFormatDelta.added as Record<string, string[]>)[name] ?? []),
-          ...((controlSemanticsDelta.added as Record<string, string[]>)[name] ?? [])
+          ...((controlSemanticsDelta.added as Record<string, string[]>)[name] ?? []),
+          ...((streamingDelta.added as Record<string, string[]>)[name] ?? [])
         ].sort()
       )
       // A leaf export maps to its own source path; index entries map to directory roots.

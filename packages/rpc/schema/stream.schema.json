@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "migaia.rpc.stream/1",
+  "title": "migaia.rpc stream payload 1.1",
+  "type": "object",
+  "required": ["event", "seq"],
+  "properties": {
+    "event": { "enum": ["open", "pull", "item", "end", "fail", "cancel", "cancelled"] },
+    "seq": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "value": {},
+    "error": { "$ref": "wire-error.schema.json" },
+    "reason": { "$ref": "wire-error.schema.json" }
+  },
+  "additionalProperties": false,
+  "x-migaia-violations": ["event", "direction", "field", "seq", "budget"],
+  "x-migaia-limits": {
+    "maxItemValueBytes": 16384,
+    "maxOpenStreamsPerPeer": 256
+  }
+}

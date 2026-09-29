@@ -99,6 +99,11 @@ const TOP_LEVEL_FIELDS = {
     },
     routeTypes: [RpcRouteType.variation],
     payload: 'opaque'
+  },
+  [RpcEnvelopeKind.stream]: {
+    shape: { required: ['kind', 'id', 'data'], scalars: [['id', 'string']] },
+    routeTypes: [RpcRouteType.stream],
+    payload: 'portable'
   }
 } as const satisfies Readonly<Record<RpcEnvelopeKind, IRpcEnvelopeKindFields>>
 

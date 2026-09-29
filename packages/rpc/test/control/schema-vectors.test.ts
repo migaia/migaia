@@ -49,7 +49,8 @@ describe('protocol 1.0 schemas and frozen vectors (A9)', () => {
       'response-success': ['kind', 'ok', 'id', 'data'],
       'response-failure': ['kind', 'ok', 'id', 'code', 'message', 'data'],
       discovery: ['kind', 'id', 'version', 'acceptVersions', 'data'],
-      variation: ['kind', 'id', 'data']
+      variation: ['kind', 'id', 'data'],
+      stream: ['kind', 'id', 'data']
     })
     const route = (schema.$defs as { route: { properties: Record<string, unknown> } }).route
     expect(Object.keys(route.properties).sort()).toEqual(Object.values(RpcRouteField).sort())
@@ -79,9 +80,20 @@ describe('protocol 1.0 schemas and frozen vectors (A9)', () => {
       expect(Object.isFrozen(result), id).toBe(true)
       expect(Object.isFrozen(result.data), id).toBe(true)
     }
+    const streamVectors = readJson(join(vectorRoot, 'stream.json')) as {
+      envelope: { reclassified: { id: string; violation: string; pointer: string } }
+    }
     for (const { id, value, violation, pointer } of [...vectors.invalid, ...vectors.order]) {
       const error = envelopeFailure(value)
-      expect(error, id).toMatchObject({ code: 'INVALID_ENVELOPE', violation, pointer })
+      const expected =
+        id === streamVectors.envelope.reclassified.id
+          ? streamVectors.envelope.reclassified
+          : { violation, pointer }
+      expect(error, id).toMatchObject({
+        code: 'INVALID_ENVELOPE',
+        violation: expected.violation,
+        pointer: expected.pointer
+      })
       expect(error, id).toBeInstanceOf(TypeError)
     }
     for (const { id, value, expected } of vectors.unknownFields) {
