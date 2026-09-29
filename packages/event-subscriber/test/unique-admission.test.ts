@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   createEventChannel,
   EventAdmissionPolicy,
   EventSubscriberErrorCode,
   invokeTask
 } from '../src/index.js'
+import { measureRootClosure } from './bundle-size-closure.js'
 
 describe('channel admission policies', () => {
   it('ES-T189 ESUA A8 exports the stable admission modes without a sync error policy', () => {
@@ -173,5 +176,22 @@ describe('channel admission policies', () => {
     expect(channel.size).toBe(1)
     await invokeTask(channel, 'a', 1)
     expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('ES-T195 ESUA A11 measures the complete root closure against the pre-change base', () => {
+    /** The existing gate and this case must share the closure measurement. */
+    const packageRoot = resolve(import.meta.dirname, '..')
+    const baseline = JSON.parse(
+      readFileSync(resolve(packageRoot, 'test/fixtures/bundle-size-baseline.json'), 'utf8')
+    ) as { readonly fixture: string; readonly bytes: number; readonly absoluteLimitBytes: number }
+    const measurement = measureRootClosure(packageRoot)
+    const gateSource = readFileSync(resolve(packageRoot, 'test/bundle-size.test.ts'), 'utf8')
+    expect(baseline.fixture).toBe('dist/index.js + transitive static chunks')
+    expect(baseline.bytes).toBe(8172)
+    expect(measurement.files.length).toBeGreaterThan(1)
+    expect(measurement.bytes).toBeGreaterThan(measurement.indexOnlyBytes)
+    expect(measurement.bytes).toBeLessThanOrEqual(baseline.absoluteLimitBytes)
+    expect(measurement.bytes).toBeLessThanOrEqual(baseline.bytes + 600)
+    expect(gateSource).toContain('measureRootClosure(packageRoot).bytes')
   })
 })

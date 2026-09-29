@@ -1,8 +1,8 @@
-import { gzipSync } from 'node:zlib'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { measureRootClosure } from './bundle-size-closure.js'
 
 type IBundleBaseline = {
   readonly bytes: number
@@ -15,8 +15,7 @@ describe('bundle size gate', () => {
     const baseline = JSON.parse(
       readFileSync(resolve(packageRoot, 'test/fixtures/bundle-size-baseline.json'), 'utf8')
     ) as IBundleBaseline
-    const bundle = readFileSync(resolve(packageRoot, 'dist/index.js'))
-    const observed = gzipSync(bundle).byteLength
+    const observed = measureRootClosure(packageRoot).bytes
     expect(observed).toBeLessThanOrEqual(baseline.absoluteLimitBytes)
     expect(observed).toBeLessThanOrEqual(
       baseline.bytes + Math.max(Math.ceil(baseline.bytes * 0.1), 1024)
@@ -32,6 +31,8 @@ describe('bundle size gate', () => {
     expect(Number.isInteger(baseline.absoluteLimitBytes)).toBe(true)
     expect(baseline.bytes).toBeGreaterThan(0)
     expect(baseline.absoluteLimitBytes).toBe(12 * 1024)
+    expect(readFileSync(baselinePath, 'utf8')).toContain('dist/index.js + transitive static chunks')
+    expect(readFileSync(baselinePath, 'utf8')).toContain('minified+gzip')
     expect(Math.max(Math.ceil(baseline.bytes * 0.1), 1024)).toBeGreaterThanOrEqual(1024)
   })
 })

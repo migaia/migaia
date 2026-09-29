@@ -48,6 +48,7 @@ type IEventChannelOptions<T> = {
   readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>
   readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
   readonly dispatchPolicy?: EventDispatchPolicy
+  readonly admissionPolicy?: EventAdmissionPolicy
   readonly removalPolicy?: 'handle' | 'listener-all'
   readonly publishBudget?: number
   readonly style?: IEventApiStyle
@@ -85,6 +86,8 @@ unsubscribe()
 
 `dispatchPolicy` 默认是 `EventDispatchPolicy.recursive`，保持 canonical channel 的同步 nested publish trace。需要当前 snapshot 完成后再交付重入值的消费者必须显式传入 `EventDispatchPolicy.queued`；该 opt-in 不改变其他消费者的默认行为。
 
+`admissionPolicy` 默认是 `EventAdmissionPolicy.multiple`。显式传 `EventAdmissionPolicy.unique` 后，同一个 listener 函数在这个 channel 内只占一份 registration；重复订阅返回的 handle 解除现有那一份。多个 handle 解除同一份时只有首次生效；`clear()` 或退订后重新订阅产生新一代，旧 handle 不会误删它。重复订阅的 `taskId` 必须与现有项相同（包括两者均未提供），否则在修改状态前抛带 `INVALID_OPTIONS` 的 `TypeError`。Hub 和 `subscribeOnce` 等以 wrapper 注册的 helper 不按原始 listener 函数去重；同步 listener throw 仍由 `publish()` 聚合为 `PUBLISH_FAILED`。
+
 `publishBudget` 默认 `100_000`，必须是正安全整数。它限制一次顶层同步发布事务内实际调用的 listener 总数（包括 nested publish 展开的调用）；预算耗尽时停止继续展开，并以 `PUBLISH_FAILED` 抛出且在 `error.detail` 中记录已处理数量，避免递归或重入发布无限占用线程。
 
 `removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。
@@ -115,7 +118,7 @@ type IEventChannel<T, R = void> = {
 }
 ```
 
-- `subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的[订阅句柄](#订阅句柄)（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）。
+- `subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的[订阅句柄](#订阅句柄)（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。缺省 `multiple` 下相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）；显式 `unique` 的行为见上。
 - `subscribeOnce`/`subscribeUntil` —— 与下方 [Helper 模块](#helper-模块)的同名独立函数语义完全一致，channel 上直接暴露方便链式调用。
 - `publish(value)` —— 按注册顺序（快照）同步调用全部 listener，**不等待**返回的 Promise；默认同步重入 publish 递归交付，只有 `dispatchPolicy: EventDispatchPolicy.queued` 才会排队到当前快照完成后再交付。listener **同步抛出**的错误会被收集并以携带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出；listener 返回的 thenable **迟到 reject**（即在 `publish()` 同步返回之后才拒绝）会转发给 `options.report`（见上），不计入 `publish()` 本身抛出的错误。
 - `filterTaskId(taskId)` —— 创建一个只读的 task 选择 view（`IFilteredEventChannel`），交给[异步发布](#async-模块) helper 使用；`taskId` 必须是非空字符串，否则抛 `INVALID_TASK_ID`。
