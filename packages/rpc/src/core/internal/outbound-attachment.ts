@@ -430,7 +430,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                     senderId: this.id,
                     targetId,
                     receiverId: receiver.receiverId,
-                    sentAt: this.kernel.time.now(),
+                    sentAt: this.kernel.time.timestamp(),
                     variation: 'abort'
                   },
                   ...(payload === undefined ? {} : { payload })
@@ -494,7 +494,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 senderId: this.id,
                 targetId,
                 ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
-                sentAt: this.kernel.time.now()
+                sentAt: this.kernel.time.timestamp()
               },
               ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
             }
@@ -555,7 +555,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 targetId,
                 ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
                 dispatchOnly: true,
-                sentAt: this.kernel.time.now()
+                sentAt: this.kernel.time.timestamp()
               },
               ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
             }
@@ -635,7 +635,13 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
 
   /** Reports one diagnostic without allowing reporter failure to re-enter runtime work. */
   emitFailure(error: unknown, code: string = RpcCoreErrorCode.internal): void {
-    const event = { name: 'failure', at: this.kernel.time.now(), localId: this.id, error, code }
+    const event = {
+      name: 'failure',
+      at: this.kernel.time.timestamp(),
+      localId: this.id,
+      error,
+      code
+    }
     this.#emit(event)
     try {
       this.#hookErrorReporter?.(error, event)
@@ -646,7 +652,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
 
   /** Emits one package-owned diagnostic through the canonical hook owner. */
   emitDiagnostic(event: Omit<IRpcHookEvent, 'at' | 'localId'>): void {
-    this.#emit(Object.freeze({ ...event, at: this.kernel.time.now(), localId: this.id }))
+    this.#emit(Object.freeze({ ...event, at: this.kernel.time.timestamp(), localId: this.id }))
   }
 
   /** Applies the canonical contract validation snapshot for provider execution. */
@@ -719,7 +725,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     if (existing !== undefined && existing !== binding) {
       this.#emit({
         name: 'authentication.rejected',
-        at: this.kernel.time.now(),
+        at: this.kernel.time.timestamp(),
         localId: this.id,
         code: 'SOURCE_BINDING_CONFLICT'
       })

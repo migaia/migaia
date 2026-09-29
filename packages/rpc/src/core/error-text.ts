@@ -56,8 +56,12 @@ export const RpcCoreErrorText = {
   abortSignalInvalid: 'abort signal is invalid',
   /** Stable timeout-domain validation shared by legacy and slim outbound runtimes. */
   timeoutInvalid: 'timeoutMs must be false or a non-negative finite number',
-  /** Injected clocks must produce valid wire timestamps and own endpoint timer scheduling. */
-  schedulerInvalid: 'scheduler must provide now, schedule, and a non-negative epoch millisecond',
+  /** Injected schedulers own endpoint timers and must expose a finite non-negative monotonic clock. */
+  schedulerInvalid:
+    'scheduler must provide now and schedule, and now() must return finite non-negative milliseconds',
+  /** Injected wall clocks only stamp diagnostics and must return safe-integer epoch milliseconds. */
+  wallClockInvalid:
+    'wallClock must provide timestamp, and timestamp() must return non-negative safe-integer epoch milliseconds',
   /** Stable fallback when a remote failure omits its public message. */
   remoteRequestFailed: 'Remote request failed',
   /** Stable validation failure for malformed provider registration input. */

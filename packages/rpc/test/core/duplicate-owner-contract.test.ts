@@ -1,4 +1,4 @@
-import { systemScheduler } from '@migaia/utils/promise'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../src/core/internal/time-port.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createComposedEndpoint, type IRpcCoreConfig } from '../../src/core/composed.js'
@@ -237,6 +237,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
       time: {
         scheduler: systemScheduler,
         now: () => now,
+        timestamp: () => 0,
         setTimeout: () => ({ clear: () => undefined }),
         clearTimeout: (timer) => timer.clear(),
         dispose: () => {
@@ -409,6 +410,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
       time: {
         scheduler: systemScheduler,
         now: () => now,
+        timestamp: () => 0,
         setTimeout: () => ({ clear: () => undefined }),
         clearTimeout: (timer) => timer.clear(),
         dispose: () => undefined

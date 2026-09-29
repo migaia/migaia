@@ -17,7 +17,7 @@ import type {
 import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '../../contract/index.js'
 import type { IRpcBoundFrameIngress } from '../../contract/framing/index.js'
 import type { ICodec } from '@migaia/serialize/codec'
-import type { IUtilsScheduler } from '@migaia/utils/promise'
+import type { IScheduler, IWallClock } from '@migaia/utils/scheduler'
 
 /** Immutable descriptor snapshot consumed by the one composed endpoint pipeline. */
 export type IRpcSelectedComponents = Readonly<{
@@ -36,7 +36,9 @@ export type IRpcSelectedComponents = Readonly<{
 /** Canonical normalized endpoint options produced by middleware/config bootstrap. */
 export type IRpcEndpointOptions<TTargetId extends string> = {
   /** Original caller scheduler, preserved without copying for endpoint and Host ownership. */
-  injectedScheduler?: IUtilsScheduler
+  injectedScheduler?: IScheduler
+  /** Original caller wall clock, preserved without copying; only stamps diagnostics. */
+  injectedWallClock?: IWallClock
   /** Descriptors selected once before Host installation drives the canonical byte pipeline. */
   components?: IRpcSelectedComponents
   contract?: IRpcContractConfig | IRpcContractCapability

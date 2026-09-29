@@ -151,7 +151,8 @@ async function createComposedEndpointRuntime<
     kernel = createEndpointKernel(
       deferred.transport,
       deferred.transportSnapshot,
-      deferred.injectedScheduler
+      deferred.injectedScheduler,
+      deferred.injectedWallClock
     )
     const constructionConfig = deferred.construction
     const constructionSignal =

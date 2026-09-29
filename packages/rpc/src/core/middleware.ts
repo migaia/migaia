@@ -154,7 +154,7 @@ export function defineMiddleware<
                 report: (error) => {
                   core.hooks({
                     name: 'failure',
-                    at: core.construction.time.now(),
+                    at: core.construction.time.timestamp(),
                     localId: core.id,
                     code: RpcCoreErrorCode.internal,
                     error
@@ -257,7 +257,7 @@ export function defineMiddleware<
                     report: (error) => {
                       core.hooks({
                         name: 'failure',
-                        at: core.construction.time.now(),
+                        at: core.construction.time.timestamp(),
                         localId: core.id,
                         code: RpcCoreErrorCode.internal,
                         error

@@ -1,4 +1,4 @@
-import { systemScheduler } from '@migaia/utils/promise'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { RpcAbortError, RpcTimeoutError } from '../../../src/core/errors.js'
 import type { IRpcTransport } from '../../../src/core/transport.js'

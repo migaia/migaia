@@ -21,13 +21,20 @@ export class RpcVariationCoordinator {
    * directly.
    */
   readonly #now: () => number
-  /** Unobserved clock read for the admission ledger; preserves time-port observer events. */
-  readonly #timestamp: () => number
+  /**
+   * Unobserved monotonic clock read for the admission window; preserves time-port observer events.
+   * Named for admission so `timestamp` in rpc core only ever means the diagnostic wall clock.
+   */
+  readonly #admissionNow: () => number
 
   /** Creates one coordinator; feature handlers are registered before kernel activation. */
-  constructor(now: () => number, timestamp: () => number, admission?: VariationAdmissionRegistry) {
+  constructor(
+    now: () => number,
+    admissionNow: () => number,
+    admission?: VariationAdmissionRegistry
+  ) {
     this.#now = now
-    this.#timestamp = timestamp
+    this.#admissionNow = admissionNow
     this.#admission = admission ?? new VariationAdmissionRegistry()
   }
 
@@ -54,7 +61,7 @@ export class RpcVariationCoordinator {
     peerKey: string
   ): Promise<boolean> {
     const handler = this.#handlers.get(variation)
-    if (!handler || !this.#admission.admit(peerKey, key, this.#timestamp())) return false
+    if (!handler || !this.#admission.admit(peerKey, key, this.#admissionNow())) return false
     await handler(message, peerKey)
     return true
   }

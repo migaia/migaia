@@ -180,7 +180,12 @@ export type IRpcServerMetadata<TTargetId extends string = string> = {
   readonly uniqueTargetId?: string
   readonly platform: IRpcPlatform
   readonly origin?: string
+  /**
+   * Endpoint monotonic time (the endpoint scheduler's `now()`) when the receiver was registered.
+   * Comparable only with other metadata of the same endpoint or with `IRpcTimePort.now()`.
+   */
   readonly registeredAt: number
+  /** Endpoint monotonic time of the last observation; same comparison domain as `registeredAt`. */
   readonly lastSeenAt: number
   readonly pinned: boolean
   readonly status: IRpcCandidateStatus
@@ -296,8 +301,16 @@ export type IRpcFactoryConfig<
 > = {
   /** Stable local endpoint identity included in every routed protocol envelope. */
   readonly id: string
-  /** Endpoint clock and timers; the same injected instance also drives PluginHost deadlines. */
-  readonly scheduler?: import('@migaia/utils/promise').IUtilsScheduler
+  /**
+   * Endpoint monotonic clock and timers; the same injected instance also drives PluginHost
+   * deadlines. `now()` must return finite non-negative milliseconds and is never read as an epoch.
+   */
+  readonly scheduler?: import('@migaia/utils/scheduler').IScheduler
+  /**
+   * Endpoint wall clock; only produces wire `sentAt` and hook event `at` diagnostics. `timestamp()`
+   * must return non-negative safe-integer epoch milliseconds. Defaults to the host wall clock.
+   */
+  readonly wallClock?: import('@migaia/utils/scheduler').IWallClock
   /** Optional known-peer seed; automatic discovery may resolve additional target ids lazily. */
   readonly targetIds?: readonly TTargetId[]
   /** Transport receives exactly the selected framer output, except an explicit opaque sink. */

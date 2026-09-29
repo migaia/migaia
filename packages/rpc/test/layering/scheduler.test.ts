@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createManualScheduler, systemScheduler } from '@migaia/utils/promise'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpoint, RpcConfigurationError, RpcTimeoutError } from '../../src/core/index.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { abort } from '../../src/core/middleware/abort.js'
@@ -137,7 +137,10 @@ describe('endpoint scheduler ownership', () => {
     await endpoint.dispose()
     expect(scheduler.pendingCount).toBe(0)
 
-    for (const invalid of [{ now: () => 1 }, { now: () => 1.5, schedule: scheduler.schedule }]) {
+    for (const invalid of [
+      { now: () => 1 },
+      { now: () => Number.NaN, schedule: scheduler.schedule }
+    ]) {
       const failure = await createEndpoint({
         id: 'invalid-scheduler',
         transport: silentTransport(),
@@ -202,6 +205,8 @@ describe('endpoint scheduler ownership', () => {
 
   it('A6 timestamps failed responses and expires replay using manual time', async () => {
     const scheduler = createManualScheduler()
+    /** Diagnostic wall clock; wire sentAt comes from it, never from the manual scheduler. */
+    const wallClock = { timestamp: () => 1_700_000_000_042 }
     const [clientBase, serverBase] = createMemoryTransportPair()
     const requests: unknown[] = []
     const responses: unknown[] = []
@@ -224,6 +229,7 @@ describe('endpoint scheduler ownership', () => {
       id: 'scheduler-server',
       transport: serverTransport,
       scheduler,
+      wallClock,
       provider: {
         fail: (context) => {
           calls += 1
@@ -236,6 +242,7 @@ describe('endpoint scheduler ownership', () => {
       id: 'scheduler-client',
       transport: clientTransport,
       scheduler,
+      wallClock,
       middlewares: [connect({ transport: clientTransport })]
     })
     scheduler.advance(42)
@@ -243,7 +250,7 @@ describe('endpoint scheduler ownership', () => {
     expect(calls).toBe(1)
     expect(requests).toHaveLength(1)
     expect((responses[0] as { data?: { webRpc?: { sentAt?: number } } }).data?.webRpc?.sentAt).toBe(
-      42
+      1_700_000_000_042
     )
     await clientBase.send(requests[0])
     await flushMicrotasks()
@@ -259,6 +266,8 @@ describe('endpoint scheduler ownership', () => {
 
   it('A6 expires an early abort before a delayed provider request arrives', async () => {
     const scheduler = createManualScheduler()
+    /** Diagnostic wall clock; the abort variation sentAt comes from it. */
+    const wallClock = { timestamp: () => 1_700_000_000_050 }
     const [clientBase, serverTransport] = createMemoryTransportPair()
     let heldRequest: unknown
     let abortTimestamp: number | undefined
@@ -283,6 +292,7 @@ describe('endpoint scheduler ownership', () => {
       id: 'early-abort-server',
       transport: serverTransport,
       scheduler,
+      wallClock,
       provider: {
         observe: (context) => {
           providerAborted = context.signal.aborted
@@ -295,6 +305,7 @@ describe('endpoint scheduler ownership', () => {
       id: 'early-abort-client',
       transport: clientTransport,
       scheduler,
+      wallClock,
       middlewares: [connect({ transport: clientTransport }), abort(), timeout()]
     })
     const pending = client.send('early-abort-server', 'observe', null, { timeoutMs: 50 })
@@ -303,7 +314,7 @@ describe('endpoint scheduler ownership', () => {
     scheduler.advance(50)
     await expect(pending).rejects.toBeInstanceOf(RpcTimeoutError)
     await flushMicrotasks()
-    expect(abortTimestamp).toBe(50)
+    expect(abortTimestamp).toBe(1_700_000_000_050)
     scheduler.advance(310_001)
     await clientBase.send(heldRequest)
     for (let index = 0; index < 80 && providerAborted === undefined; index += 1)

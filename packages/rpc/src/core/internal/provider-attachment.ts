@@ -101,7 +101,7 @@ export class RpcProviderAttachment {
     this.#transaction = kernel
     this.#replay = new RequestReplayLedger(4096, 1024, 310_000)
     this.#executor = new ProviderExecutor({
-      now: () => kernel.time.scheduler.now(),
+      timestamp: () => kernel.time.timestamp(),
       id: this.#id,
       registry: this.#registry,
       controllers: this.#controllers,

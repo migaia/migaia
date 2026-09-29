@@ -192,7 +192,10 @@ export type IRpcEndpointTimer = { readonly clear: () => void }
 
 /** Endpoint clock and timer operations shared with construction-aware features. */
 export type IRpcTimePort = {
+  /** Monotonic endpoint time; only meaningful as a difference or against other `now()` values. */
   readonly now: () => number
+  /** Epoch milliseconds for diagnostics only; never compared with `now()` or used in deadlines. */
+  readonly timestamp: () => number
   readonly setTimeout: (task: () => void, delayMs: number) => IRpcEndpointTimer
   readonly clearTimeout: (timer: IRpcEndpointTimer) => void
 }

@@ -704,7 +704,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
           applicationVersion: this.#applicationVersion,
           senderId: this.#identity.id,
           targetId,
-          sentAt: this.#ports.time.now()
+          sentAt: this.#ports.time.timestamp()
         },
         ...(this.#uniqueTargetId === undefined
           ? {}
@@ -850,7 +850,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
               applicationVersion: this.#applicationVersion,
               senderId: this.#identity.id,
               targetId,
-              sentAt: this.#ports.time.now(),
+              sentAt: this.#ports.time.timestamp(),
               manual: true
             },
             ...(this.#uniqueTargetId === undefined
@@ -1162,7 +1162,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
           senderId: this.#identity.id,
           targetId: route.webRpc.senderId,
           resolvedTargetId: this.#identity.id,
-          sentAt: this.#ports.time.now(),
+          sentAt: this.#ports.time.timestamp(),
           platform: this.#kernel.platform,
           receiverId
         },
@@ -1425,7 +1425,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         senderId: this.#identity.id,
         targetId: query.senderId,
         resolvedTargetId: this.#identity.id,
-        sentAt: this.#ports.time.now(),
+        sentAt: this.#ports.time.timestamp(),
         manual: true,
         accepted,
         ...(accepted
@@ -1542,7 +1542,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         senderId: this.#identity.id,
         targetId: route.webRpc.senderId,
         resolvedTargetId: this.#identity.id,
-        sentAt: this.#ports.time.now(),
+        sentAt: this.#ports.time.timestamp(),
         platform: this.#kernel.platform,
         receiverId
       },
