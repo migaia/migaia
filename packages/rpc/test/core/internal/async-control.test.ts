@@ -1,4 +1,4 @@
-import { systemScheduler } from '@migaia/utils/promise'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../../src/core/internal/time-port.js'
 import { describe, expect, it } from 'vitest'
 import { raceWithAsyncControl } from '../../../src/core/internal/async-control.js'

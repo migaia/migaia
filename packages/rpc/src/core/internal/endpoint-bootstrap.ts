@@ -11,7 +11,7 @@ import {
   RpcCoreErrorCode,
   RpcTimeoutError
 } from '../errors.js'
-import type { IUtilsScheduler } from '@migaia/utils/promise'
+import type { IScheduler, IWallClock } from '@migaia/utils/scheduler'
 import { safeRead } from './safe-value.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type {
@@ -88,13 +88,15 @@ export type IDeferredPreparedEndpoint<TTargetId extends string = string> = {
   /** Construction controls snapshotted with the other outer configuration fields. */
   readonly construction: IRpcFactoryConfig['construction']
   /** Caller scheduler, snapshotted once and forwarded by identity to kernel and PluginHost. */
-  readonly injectedScheduler: IUtilsScheduler | undefined
+  readonly injectedScheduler: IScheduler | undefined
+  /** Caller wall clock, snapshotted once and forwarded by identity to the kernel time port. */
+  readonly injectedWallClock: IWallClock | undefined
   readonly middlewareSnapshots: readonly IEndpointMiddlewareSnapshot[]
   readonly finalize: (
     hookEvents: IRpcHookEvent[],
     runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
     getPort: (key: PropertyKey) => unknown,
-    now: () => number
+    timestamp: () => number
   ) => Promise<IPreparedEndpoint<TTargetId>>
 }
 
@@ -113,7 +115,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   installHookEvents: IRpcHookEvent[],
   runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
   getPort: (key: PropertyKey) => unknown,
-  now: () => number
+  timestamp: () => number
 ): Promise<IPreparedEndpoint<TTargetId>> {
   const installedConnect = getPort(RpcPortName.connect) as IRpcConnectCapability | undefined
   if (!installedConnect)
@@ -140,7 +142,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
     hooksPort?.reportConstructionDiagnostic?.(
       Object.freeze({
         name: RpcCoreErrorText.componentShadowed,
-        at: now(),
+        at: timestamp(),
         localId: factoryId,
         contract: diagnostic
       })
@@ -191,7 +193,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   ) {
     installHookEvents.push({
       name: 'connect.unique-target-id.ignored',
-      at: now(),
+      at: timestamp(),
       localId: factoryId,
       code: 'UNIQUE_TARGET_ID_DERIVED_ID_TOO_LONG'
     })
@@ -253,6 +255,8 @@ export async function prepareEndpoint<
   let construction: IRpcFactoryConfig['construction']
   /** Original injected scheduler value captured with all other outer configuration fields. */
   let factoryScheduler: unknown
+  /** Original injected wall clock value captured with all other outer configuration fields. */
+  let factoryWallClock: unknown
   let factoryReplay: IRpcFactoryConfig['replay']
   let factoryProtocol: IRpcFactoryConfig['protocol']
   let factoryCodec: IRpcFactoryConfig['codec']
@@ -268,6 +272,7 @@ export async function prepareEndpoint<
     factoryProviderLimits = config.providerLimits
     construction = config.construction
     factoryScheduler = config.scheduler
+    factoryWallClock = config.wallClock
     // Snapshotted here with everything else, not read again later at endpoint-construction
     // time: reading it late (past middleware install) means a hostile `replay` getter would
     // surface its error only after side effects already ran, instead of being rejected
@@ -283,21 +288,39 @@ export async function prepareEndpoint<
   }
   if (typeof factoryId !== 'string' || factoryId.length === 0)
     throw new RpcError(RpcCoreErrorCode.invalidConfig, 'id must be a non-empty string')
-  let injectedScheduler: IUtilsScheduler | undefined
+  let injectedScheduler: IScheduler | undefined
   if (factoryScheduler !== undefined) {
     try {
-      const scheduler = factoryScheduler as IUtilsScheduler
+      const scheduler = factoryScheduler as IScheduler
       const now = scheduler?.now
       const schedule = scheduler?.schedule
       if (!scheduler || typeof now !== 'function' || typeof schedule !== 'function')
         throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
-      const instant = scheduler.now()
-      if (!Number.isSafeInteger(instant) || instant < 0)
+      /** One monotonic reading; only its domain is checked, never an epoch interpretation. */
+      const instant: unknown = scheduler.now()
+      if (typeof instant !== 'number' || !Number.isFinite(instant) || instant < 0)
         throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
       injectedScheduler = scheduler
     } catch (error) {
       if (error instanceof RpcConfigurationError) throw error
       throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid, error)
+    }
+  }
+  /** Admitted caller wall clock; undefined keeps the time port's host default. */
+  let injectedWallClock: IWallClock | undefined
+  if (factoryWallClock !== undefined) {
+    try {
+      const wallClock = factoryWallClock as IWallClock
+      if (!wallClock || typeof wallClock.timestamp !== 'function')
+        throw new RpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
+      /** One admission probe of the epoch diagnostic clock. */
+      const probe: unknown = wallClock.timestamp()
+      if (!Number.isSafeInteger(probe) || (probe as number) < 0)
+        throw new RpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
+      injectedWallClock = wallClock
+    } catch (error) {
+      if (error instanceof RpcConfigurationError) throw error
+      throw new RpcConfigurationError(RpcCoreErrorText.wallClockInvalid, error)
     }
   }
   try {
@@ -450,8 +473,9 @@ export async function prepareEndpoint<
     providerLimits: factoryProviderLimits as IRpcFactoryConfig<TTargetId>['providerLimits'],
     construction,
     injectedScheduler,
+    injectedWallClock,
     middlewareSnapshots: Object.freeze(middlewareSnapshots.map((item) => Object.freeze(item))),
-    finalize: async (installHookEvents, runConstruction, getPort, now) => {
+    finalize: async (installHookEvents, runConstruction, getPort, timestamp) => {
       const prepared = await finalizePreparedEndpoint(
         factoryId as string,
         factoryTargetIds as readonly TTargetId[] | undefined,
@@ -466,7 +490,7 @@ export async function prepareEndpoint<
         installHookEvents,
         runConstruction,
         getPort,
-        now
+        timestamp
       )
       return {
         ...prepared,

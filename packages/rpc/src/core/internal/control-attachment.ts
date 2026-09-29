@@ -287,7 +287,7 @@ export class RpcControlAttachment {
           senderId: this.#id,
           targetId,
           receiverId,
-          sentAt: this.#ports.time.now(),
+          sentAt: this.#ports.time.timestamp(),
           variation
         }
       }

@@ -254,7 +254,7 @@ endpoint.endpointId()
 #### 2.4 完整构造配置
 
 ```ts
-import type { IUtilsScheduler } from '@migaia/utils/promise'
+import type { IScheduler, IWallClock } from '@migaia/utils/scheduler'
 
 type IRpcFactoryConfig<TTargetId extends string = string> = {
   readonly id: string // 必需：本端在整个通信拓扑里的唯一标识
@@ -264,7 +264,8 @@ type IRpcFactoryConfig<TTargetId extends string = string> = {
   readonly providerLimits?: { readonly maxGlobal?: number; readonly maxPerPeer?: number } // provider 并发上限，默认 256/64，超限立即 OVERLOADED
   readonly middlewares: readonly IRpcPlugin[] // 必需：必须包含且只能包含一个 connect()；其他 middleware 按需
   readonly replay?: { readonly maxEntries?: number; readonly ttlMs?: number } // 出站请求 id 的重放保护窗口容量与 TTL
-  readonly scheduler?: IUtilsScheduler // 可注入时钟与定时器；默认使用系统调度器
+  readonly scheduler?: IScheduler // 可注入单调时钟与定时器；默认 systemScheduler
+  readonly wallClock?: IWallClock // 只产生诊断时间戳（sentAt、hook 事件 at）；默认 systemWallClock
   readonly construction?: {
     readonly signal?: IRpcAbortSignal // 构造期取消
     readonly timeoutMs?: number | false // 构造期超时，false 表示不限时
@@ -279,7 +280,9 @@ type IRpcFactoryConfig<TTargetId extends string = string> = {
 - **`provider`**：等价于在 `createEndpoint` 返回前，对每一项调用一次 `endpoint.provide(method, fn)`；纯粹是"少写几行"的便利写法。
 - **`replay`**：出站请求/消息 id 会在一个有界窗口内保留，防止重放攻击复用同一个 id 让已完成的请求再跑一次 provider。普通请求的 id 在整个 TTL 内都不释放（哪怕响应已经收到）——这是有意为之，防止晚到的重复响应复活一个"看起来还在等"的旧请求；dispatch-only（单向通知）的 id 在发送结算后立即释放，因为它天生不会有响应需要防重放。默认容量 4096、TTL 310 秒；高频单向通知场景一般不需要调大，持续的双向请求量很大时可以按需调整。
 - **`construction.signal` / `construction.timeoutMs`**：构造 `createEndpoint()` 本身也是异步的（要跑完全部中间件的 `install()`），可以用这两个字段取消或限时。取消会 reject 构造过程，并且仍然会清理已经安装成功的中间件（不会留下半初始化的资源）。中间件的 `install(context)` 会收到同一个 `signal`，如果中间件自己的初始化工作是可取消的，应该监听它。
-- **`scheduler`**：可注入 `@migaia/utils/promise` 的 `IUtilsScheduler`，同一对象供 endpoint 与 PluginHost 使用；未注入时使用系统调度器。`now()` 必须返回非负安全整数的毫秒时间戳，`schedule(callback, delayMs)` 必须返回含 `cancel()` 的任务；不合法的 scheduler 会在构造期以 `INVALID_CONFIG` 拒绝。注入手动调度器时，构造超时、请求 deadline、重放窗口及发出的 `sentAt` 均受同一时钟控制。
+- **`scheduler`**：可注入 `@migaia/utils/scheduler` 的 `IScheduler`，同一对象供 endpoint 与 PluginHost 使用；未注入时使用 `systemScheduler`（`performance.now()`）。`now()` 是单调时钟，只须返回有限非负毫秒（可含小数，不解释为 epoch），`schedule(callback, delayMs)` 必须返回含 `cancel()` 的任务；不合法的 scheduler 会在构造期以 `INVALID_CONFIG` 拒绝。注入手动调度器时，构造超时、请求 deadline、TTL、过期与重放窗口均受同一时钟控制。
+- **`wallClock`**：可注入 `IWallClock`，只用于产生 wire `sentAt` 与 hook 事件 `at` 等诊断时间戳；未注入时使用 `systemWallClock`（`Date.now()`）。构造期读取一次并调用一次 `timestamp()`，返回值必须是非负安全整数 epoch 毫秒，否则以 `INVALID_CONFIG` 拒绝（抛出的原错误位于 `cause`）。墙钟回拨不影响任何截止时间。
+- **服务器元数据时间**：`getServerList()` 与 `receiverSelector(serverList)` 中的 `registeredAt`/`lastSeenAt` 是端点单调时间（`scheduler.now()`），只能相互比较或与同一端点的 `IRpcTimePort.now()` 比较；不要当作日历时间显示或跨进程比较，需要日历时间时在回调中读取自己的墙钟。
 
 #### 2.5 PluginHost 的边界
 

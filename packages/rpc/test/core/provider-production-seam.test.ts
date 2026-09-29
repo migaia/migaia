@@ -1,4 +1,4 @@
-import { systemScheduler } from '@migaia/utils/promise'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../src/core/internal/time-port.js'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'

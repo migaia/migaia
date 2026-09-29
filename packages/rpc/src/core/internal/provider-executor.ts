@@ -23,8 +23,8 @@ type IControllerRegistry = {
 }
 
 type IProviderExecutorOptions<TTargetId extends string> = {
-  /** Unobserved endpoint clock for response wire timestamps. */
-  readonly now: () => number
+  /** Endpoint wall clock for response wire `sentAt` diagnostics; never used for deadlines. */
+  readonly timestamp: () => number
   readonly id: string
   readonly registry: ProviderRegistry
   readonly controllers: IControllerRegistry
@@ -227,7 +227,7 @@ export class ProviderExecutor<TTargetId extends string> {
           data: response.ok ? response.data : undefined,
           message: response.ok ? undefined : response.message,
           code: response.ok ? undefined : response.code,
-          sentAt: this.options.now(),
+          sentAt: this.options.timestamp(),
           ...((this.options.responseReceiverId?.(request) ?? request.route.webRpc.receiverId) ===
           undefined
             ? {}
@@ -277,7 +277,7 @@ export class ProviderExecutor<TTargetId extends string> {
         ? safeString(safeRead<unknown>(error, 'message'), 'Schema validation failed')
         : 'Provider failed',
       data: error instanceof RpcSchemaValidationError ? error.data : undefined,
-      sentAt: this.options.now(),
+      sentAt: this.options.timestamp(),
       ...(schemaError || includeSerializedError
         ? { serializedError: serializeErrorForRpc(error) }
         : {}),

@@ -141,6 +141,7 @@ export function buildNativePluginBatch(
       () => ({
         [RpcPortName.time]: Object.freeze({
           now: () => options.kernel.time.now(),
+          timestamp: () => options.kernel.time.timestamp(),
           setTimeout: options.kernel.time.setTimeout,
           clearTimeout: options.kernel.time.clearTimeout
         } satisfies IRpcTimePort)
@@ -190,7 +191,7 @@ export function buildNativePluginBatch(
                 ? (error) =>
                     constructionReporter({
                       name: 'failure',
-                      at: core.construction.time.now(),
+                      at: core.construction.time.timestamp(),
                       localId: core.id,
                       code: RpcCoreErrorCode.internal,
                       error
@@ -198,7 +199,7 @@ export function buildNativePluginBatch(
                 : (error) =>
                     core.hooks({
                       name: 'failure',
-                      at: core.construction.time.now(),
+                      at: core.construction.time.timestamp(),
                       localId: core.id,
                       code: RpcCoreErrorCode.internal,
                       error
@@ -250,7 +251,7 @@ export function buildNativePluginBatch(
           options.hookEvents,
           (operation) => Promise.resolve(operation()),
           core.getPort,
-          () => options.kernel.time.scheduler.now()
+          () => options.kernel.time.timestamp()
         )
         options.onPrepared(prepared)
         return {}

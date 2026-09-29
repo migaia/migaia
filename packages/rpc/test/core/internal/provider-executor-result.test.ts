@@ -38,7 +38,7 @@ function makeExecutor(result: unknown, sent: unknown[]): ProviderExecutor<string
   const registry = new ProviderRegistry()
   registry.register('test', () => result as never)
   return new ProviderExecutor<string>({
-    now: () => Date.now(),
+    timestamp: () => Date.now(),
     id: 'host',
     registry,
     controllers: new Map(),
@@ -66,7 +66,7 @@ describe('ProviderExecutor result normalization', () => {
     const releaseBinding = vi.fn()
     const sent: unknown[] = []
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
       controllers: new Map(),
@@ -95,7 +95,7 @@ describe('ProviderExecutor result normalization', () => {
     const admission = new ProviderAdmissionRegistry(1, 1)
     const releaseBinding = vi.fn()
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
       controllers: new Map(),
@@ -124,7 +124,7 @@ describe('ProviderExecutor result normalization', () => {
     registry.register('test', provider)
     const sent: unknown[] = []
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -160,7 +160,7 @@ describe('ProviderExecutor result normalization', () => {
     const registry = new ProviderRegistry()
     registry.register('test', (context) => context.success('ok', { transfer: [transfer] }))
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -190,7 +190,7 @@ describe('ProviderExecutor result normalization', () => {
     const registry = new ProviderRegistry()
     registry.register('test', (context) => context.failed('denied', 'DENIED'))
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -218,7 +218,7 @@ describe('ProviderExecutor result normalization', () => {
       return context.success()
     })
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -248,7 +248,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     const send = vi.fn()
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -273,7 +273,7 @@ describe('ProviderExecutor result normalization', () => {
     registry.register('test', provider)
     const replaySend = vi.fn()
     const replayExecutor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -291,7 +291,7 @@ describe('ProviderExecutor result normalization', () => {
 
     const overflowSend = vi.fn()
     const overflowExecutor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -313,7 +313,7 @@ describe('ProviderExecutor result normalization', () => {
   it('returns a stable failure when no provider owns the method', async () => {
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
       controllers: new Map(),
@@ -347,7 +347,7 @@ describe('ProviderExecutor result normalization', () => {
       const sent: unknown[] = []
       const failures: Array<{ error: unknown; code: string }> = []
       const executor = new ProviderExecutor<string>({
-        now: () => Date.now(),
+        timestamp: () => Date.now(),
         id: 'host',
         registry,
         controllers,
@@ -399,7 +399,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),
@@ -423,7 +423,7 @@ describe('ProviderExecutor result normalization', () => {
     registry.register('test', provider)
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
-      now: () => Date.now(),
+      timestamp: () => Date.now(),
       id: 'host',
       registry,
       controllers: new Map(),

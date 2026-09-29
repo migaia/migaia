@@ -187,7 +187,8 @@ endpoint.provide('add', (ctx) => {
 - `providerLimits?: { maxGlobal?: number; maxPerPeer?: number }` —— provider 并发上限，默认 `256/64`；超限立即返回 `OVERLOADED`，不排队
 - `replay?: { maxEntries?: number; ttlMs?: number }` —— 出站请求 id 重放保护窗口，默认容量 4096、TTL 310 秒
 - `construction?: { signal?: IRpcAbortSignal; timeoutMs?: number | false }` —— 构造期本身的取消/超时；取消/超时后仍会正确回滚已安装成功的中间件
-- `scheduler?: IUtilsScheduler` —— 端点和 PluginHost 共用的时钟与定时器；未提供时使用系统调度器。`now()` 须返回非负安全整数毫秒时间戳，`schedule()` 须返回可取消任务；非法配置以 `INVALID_CONFIG` 拒绝
+- `scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 端点和 PluginHost 共用的单调时钟与定时器；未提供时使用 `systemScheduler`。`now()` 须返回有限非负毫秒（可含小数，不是 epoch），`schedule()` 须返回可取消任务；非法配置以 `INVALID_CONFIG` 拒绝
+- `wallClock?: IWallClock`（`@migaia/utils/scheduler`）—— 只产生 wire `sentAt` 与 hook 事件 `at` 的诊断墙钟，默认 `systemWallClock`（`Date.now()`）；`timestamp()` 须返回非负安全整数 epoch 毫秒，否则以 `INVALID_CONFIG` 拒绝。截止时间、TTL、重放窗口只按 `scheduler` 计算
 
 `middlewares` 接受由 `defineMiddleware` 或首方 middleware 工厂创建的原生定义；它们与 Feature 一起作为同一个 PluginHost 批次安装，资源清理由 `core.own()` 归属。0.x 的 `IRpcMiddlewareContext`/`install(context)` 形状已移除；继续传入旧形状会在任何传输副作用前以 `INVALID_CONFIG` 拒绝。
 

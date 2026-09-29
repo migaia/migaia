@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createEndpointKernel } from '../../src/core/endpoint-kernel.js'
+import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { RpcError, RpcLifecycleError } from '../../src/core/errors.js'
 import { RpcMessageKind } from '../../src/core/semantic-constants.js'
 import { RpcPlatform } from '../../src/core/transport-constants.js'
@@ -82,14 +83,15 @@ async function createDiscoveryHarness(
   receiverSelector?: IReceiverSelector,
   platform?: typeof RpcPlatform.broadcastChannel,
   topology?: 'exclusive' | 'multiplexed' | 'broadcast',
-  verifyPeer?: (senderId: string, targetId: string) => boolean | Promise<boolean>
+  verifyPeer?: (senderId: string, targetId: string) => boolean | Promise<boolean>,
+  scheduler?: IScheduler
 ): Promise<IDiscoveryHarness> {
   const [transport, peerTransport] = createMemoryTransportPair()
   if (platform !== undefined)
     Object.defineProperty(transport, 'platform', { configurable: true, value: platform })
   if (topology !== undefined)
     Object.defineProperty(transport, 'topology', { configurable: true, value: topology })
-  const kernel = createEndpointKernel(transport)
+  const kernel = createEndpointKernel(transport, undefined, scheduler)
   const connectPort = {
     discoveryMode: mode,
     ...(uniqueTargetId ? { uniqueTargetId } : {}),
@@ -601,7 +603,17 @@ describe('discovery attachment boundary semantics', () => {
       undefined,
       RpcPlatform.broadcastChannel
     )
-    const staleHarness = await createDiscoveryHarness('automatic')
+    /** Manual endpoint clock that moves the stale receiver past its freshness window. */
+    const staleScheduler = createManualScheduler()
+    const staleHarness = await createDiscoveryHarness(
+      'automatic',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      staleScheduler
+    )
     const targetId = 'broadcast-target'
     try {
       const pending = harness.attachment.query(targetId)
@@ -652,7 +664,7 @@ describe('discovery attachment boundary semantics', () => {
       )
       await stalePending
       staleHarness.attachment.controls.pinReceiver(staleTargetId, 'stale-receiver')
-      vi.setSystemTime(Date.now() + 300_001)
+      staleScheduler.advance(300_001)
       expect(staleHarness.attachment.getServerList(staleTargetId)[0]?.status).toBe('stale')
       expect(() => staleHarness.attachment.receiverForTarget(staleTargetId)).toThrowError(RpcError)
     } finally {
@@ -1462,7 +1474,17 @@ describe('discovery attachment boundary semantics', () => {
 
   it('proves receiver miss to replacement without stale pin or result leakage', async () => {
     vi.useFakeTimers()
-    const harness = await createDiscoveryHarness('automatic')
+    /** Manual endpoint clock that moves the pinned receiver past its freshness window. */
+    const scheduler = createManualScheduler()
+    const harness = await createDiscoveryHarness(
+      'automatic',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      scheduler
+    )
     const targetId = 'r2-v4-replacement-target'
     try {
       const pending = harness.attachment.query(targetId)
@@ -1508,7 +1530,7 @@ describe('discovery attachment boundary semantics', () => {
       ])
 
       harness.attachment.controls.pinReceiver(targetId, 'replacement-receiver')
-      vi.setSystemTime(Date.now() + 300_001)
+      scheduler.advance(300_001)
       expect(() => harness.attachment.receiverForTarget(targetId)).toThrowError(RpcError)
 
       harness.attachment.controls.unpinReceiver(targetId)

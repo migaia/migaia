@@ -1,4 +1,4 @@
-import { systemScheduler } from '@migaia/utils/promise'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../src/core/internal/time-port.js'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
@@ -3476,6 +3476,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const time = {
       scheduler: systemScheduler,
       now: () => 500,
+      timestamp: () => 0,
       setTimeout: () => {
         timerCalls += 1
         return { clear: () => (clearCalls += 1) }
@@ -3566,6 +3567,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const time = {
       scheduler: systemScheduler,
       now: () => now,
+      timestamp: () => 0,
       setTimeout: () => ({ clear: () => undefined }),
       clearTimeout: () => undefined,
       dispose: () => {

@@ -13,7 +13,7 @@ import type {
 } from './transport.js'
 import type { IRpcPlatform } from './typing.js'
 import { RpcPlatform } from './transport-constants.js'
-import { systemScheduler, type IUtilsScheduler } from '@migaia/utils/promise'
+import { systemScheduler, type IScheduler, type IWallClock } from '@migaia/utils/scheduler'
 
 /** Canonical lifecycle states owned by one endpoint kernel. */
 export const EndpointKernelState = {
@@ -122,9 +122,10 @@ class EndpointKernel implements IEndpointKernelHost {
   constructor(
     transport: IRpcTransport,
     snapshot: IEndpointKernelTransportSnapshot | undefined,
-    scheduler: IUtilsScheduler
+    scheduler: IScheduler,
+    wallClock: IWallClock | undefined
   ) {
-    this.#time = createEndpointTimePort(scheduler)
+    this.#time = createEndpointTimePort(scheduler, wallClock)
     const transportSnapshot = snapshot ?? readTransportSnapshot(transport)
     const {
       send: transportSend,
@@ -365,9 +366,10 @@ class EndpointKernel implements IEndpointKernelHost {
 export function createEndpointKernel(
   transport: IRpcTransport,
   snapshot?: IEndpointKernelTransportSnapshot,
-  scheduler: IUtilsScheduler = systemScheduler
+  scheduler: IScheduler = systemScheduler,
+  wallClock?: IWallClock
 ): IEndpointKernelHost {
-  return new EndpointKernel(transport, snapshot, scheduler)
+  return new EndpointKernel(transport, snapshot, scheduler, wallClock)
 }
 
 /** Captures each transport descriptor field once when no bootstrap snapshot is available. */

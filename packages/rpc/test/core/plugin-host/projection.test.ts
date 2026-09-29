@@ -1,4 +1,4 @@
-import { systemScheduler } from '@migaia/utils/promise'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../../src/core/internal/time-port.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createWebRpcPluginHost } from '../../../src/core/internal/web-rpc-plugin-host.js'
