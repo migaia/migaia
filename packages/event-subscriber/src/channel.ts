@@ -1,6 +1,7 @@
 import { EventSubscriberErrorCode } from './error-code.js'
 import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
 import { admitAbortSignal } from '@migaia/utils/promise'
+import { tryReadProperty } from '@migaia/utils/error'
 import {
   attachEventErrorCode,
   codeExistingError,
@@ -1027,14 +1028,15 @@ export const subscribeUntil = <T, R, V = undefined>(
       return overlayReason
     }
     captured = true
-    try {
-      overlayReason = signal.reason
-      return overlayReason
-    } catch (error) {
+    /** Cache the first getter outcome so repeated abort paths retain identity. */
+    const read = tryReadProperty(signal, 'reason')
+    if (read.threw) {
       captureFailed = true
-      captureFailure = error
-      throw error
+      captureFailure = read.error
+      throw read.error
     }
+    overlayReason = read.value
+    return overlayReason
   }
   let sourceRelease: IUnsubscribe = () => undefined
   let released = false
