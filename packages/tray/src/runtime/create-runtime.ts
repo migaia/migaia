@@ -2,9 +2,9 @@ import {
   assimilateCapturedThen,
   createAbortController,
   probeThenable,
-  systemScheduler,
   ThenableProbeKind
 } from '@migaia/lifecycle'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { TrayErrorCode } from '../error-code.js'
 import { attachTrayError, createTrayError } from '../errors.js'
 import { readRuntimeBridge } from '../host/internal-capability.js'

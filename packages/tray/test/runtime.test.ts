@@ -1,7 +1,8 @@
 /* oxlint-disable unicorn/no-thenable -- this suite intentionally models foreign thenables. */
 import { describe, expect, it } from 'vitest'
 import { PluginHost } from '@migaia/plugin-host'
-import { createAbortController, systemScheduler } from '@migaia/lifecycle'
+import { createAbortController } from '@migaia/lifecycle'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { createHost } from '../src/host/index.js'
 import { defineAdapter } from '../src/adapter/index.js'
 import { defineLoader, loadIntoHost } from '../src/loader/index.js'

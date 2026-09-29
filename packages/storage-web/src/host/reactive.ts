@@ -2,10 +2,9 @@ import { createEventChannel } from '@migaia/event-subscriber'
 import {
   createAbortController,
   createSyncLifecycleScope,
-  createLifecycleScope,
-  systemScheduler,
-  type ILifecycleScheduler
+  createLifecycleScope
 } from '@migaia/lifecycle'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { Resource } from '@migaia/resource'
 import type { IComputedValue, IRuntime } from '@migaia/reactive/runtime'
 import {
@@ -134,12 +133,12 @@ export type IStorageReactiveQueryInput<T> = {
   readonly timeoutMs?: number
   readonly signal?: import('@migaia/lifecycle').IAbortSignal
   readonly report?: (error: unknown) => void | PromiseLike<void>
-  readonly scheduler?: import('@migaia/lifecycle').ILifecycleScheduler
+  readonly scheduler?: IScheduler
 }
 
 /** Creates the one service instance owned by one StorageHost. */
 export const createStorageReactiveService = (
-  scheduler: ILifecycleScheduler = systemScheduler
+  scheduler: IScheduler = systemScheduler
 ): IStorageReactiveService => {
   const adapters = new Map<string, IStorageReactiveAdapter>()
   const serviceScope = createLifecycleScope({ errorPolicy: 'collect' })

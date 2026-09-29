@@ -1,4 +1,5 @@
-import type { IAbortSignal, ILifecycleScheduler } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IComputedValue, IRuntime } from '@migaia/reactive/runtime'
 import type { IKeyValueStore, IStorageChange } from '@migaia/storage-contract'
 import type { IPlugin, IMergePluginExts } from '@migaia/plugin-host'
@@ -27,7 +28,7 @@ export type IStorageReactiveSourceDisposer = () => void | Promise<void>
 export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = {
   readonly store: TStore
   /** Host-snapshotted scheduler shared with source timing and installation deadlines. */
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
   readonly signal: IAbortSignal
   readonly report: (error: unknown) => void
   /** Invalidates Resource-owned query generations after an admitted backend change. */
@@ -167,7 +168,7 @@ export type IStorageHostOptions = {
   /** Bounds one complete plugin installation batch; defaults to 30 seconds. */
   readonly installTimeoutMs?: number
   /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */
-  readonly scheduler?: ILifecycleScheduler
+  readonly scheduler?: IScheduler
   /**
    * Receives contained late rejection and cleanup diagnostics without replacing the primary
    * failure.

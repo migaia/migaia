@@ -1,4 +1,5 @@
-import { createAbortController, createProvisionalScope, systemScheduler } from '@migaia/lifecycle'
+import { createAbortController, createProvisionalScope } from '@migaia/lifecycle'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { TrayErrorCode } from '../error-code.js'
 import { attachTrayError, createTrayError } from '../errors.js'
 import { registerArtifactCustody } from '../host/internal-capability.js'

@@ -590,6 +590,9 @@ importers:
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
     devDependencies:
       typescript:
         specifier: ~6.0.2

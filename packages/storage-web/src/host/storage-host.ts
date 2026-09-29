@@ -10,12 +10,8 @@ import {
   type IFeatureReference,
   type IPluginResource
 } from '@migaia/plugin-host'
-import {
-  createAbortController,
-  snapshotScheduler,
-  systemScheduler,
-  type ILifecycleScheduler
-} from '@migaia/lifecycle'
+import { createAbortController, snapshotScheduler } from '@migaia/lifecycle'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { snapshotKeyValueStoreDetailed } from '@migaia/storage-contract'
 import { withTimeout } from '@migaia/utils/promise'
 import { createStorageTypeError, StorageError, StorageErrorCode } from '../types/errors.js'
@@ -236,7 +232,7 @@ export class StorageHostFacade<
   /** Stable idempotent disposal promise shared by every caller. */
   #disposePromise: Promise<void> | undefined
   /** One snapped scheduler shared by PluginHost and every factory deadline. */
-  readonly #scheduler: ILifecycleScheduler
+  readonly #scheduler: IScheduler
   /** Finite host-wide budget consumed by each install batch. */
   readonly #installTimeoutMs: number
   /** Caller diagnostics are observed without becoming a lifecycle rejection. */
