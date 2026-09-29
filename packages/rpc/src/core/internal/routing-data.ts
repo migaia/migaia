@@ -1,6 +1,6 @@
 import type { IRpcPortableValue } from '../../contract/index.js'
 import { RpcVariation } from '../semantic-constants.js'
-import { safeRead } from './safe-value.js'
+import { safeRead, type IRpcPropertyReadReporter } from './safe-value.js'
 
 /** Stable discriminator for the WebRPC-owned route profile carried by canonical RPC envelopes. */
 export const RpcRoutingProfile = 'web-rpc.route.v1'
@@ -38,14 +38,17 @@ export type IRpcRoutingData = {
 }
 
 /** Reads one untrusted canonical data value once and returns only a legal route-tag field set. */
-export function normalizeWebRpcRoutingData(value: unknown): IRpcRoutingData | undefined {
+export function normalizeWebRpcRoutingData(
+  value: unknown,
+  report?: IRpcPropertyReadReporter
+): IRpcRoutingData | undefined {
   if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined
   try {
     if (Object.keys(value).some((key) => key !== 'webRpc' && key !== 'payload')) return undefined
   } catch {
     return undefined
   }
-  const webRpc = safeRead<unknown>(value, 'webRpc')
+  const webRpc = safeRead<unknown>(value, 'webRpc', report)
   if (!webRpc || (typeof webRpc !== 'object' && typeof webRpc !== 'function')) return undefined
   try {
     const allowed = new Set([
@@ -70,13 +73,13 @@ export function normalizeWebRpcRoutingData(value: unknown): IRpcRoutingData | un
   } catch {
     return undefined
   }
-  const profile = safeRead<unknown>(webRpc, 'profile')
-  const type = safeRead<unknown>(webRpc, 'type')
-  const applicationVersion = safeRead<unknown>(webRpc, 'applicationVersion')
-  const senderId = safeRead<unknown>(webRpc, 'senderId')
-  const targetId = safeRead<unknown>(webRpc, 'targetId')
-  const sentAt = safeRead<unknown>(webRpc, 'sentAt')
-  const payload = safeRead<unknown>(value, 'payload')
+  const profile = safeRead<unknown>(webRpc, 'profile', report)
+  const type = safeRead<unknown>(webRpc, 'type', report)
+  const applicationVersion = safeRead<unknown>(webRpc, 'applicationVersion', report)
+  const senderId = safeRead<unknown>(webRpc, 'senderId', report)
+  const targetId = safeRead<unknown>(webRpc, 'targetId', report)
+  const sentAt = safeRead<unknown>(webRpc, 'sentAt', report)
+  const payload = safeRead<unknown>(value, 'payload', report)
   if (
     profile !== RpcRoutingProfile ||
     !Object.values(RpcRoutingType).includes(type as never) ||
@@ -87,7 +90,7 @@ export function normalizeWebRpcRoutingData(value: unknown): IRpcRoutingData | un
     (sentAt as number) < 0
   )
     return undefined
-  const optional = readOptionalRouteFields(webRpc)
+  const optional = readOptionalRouteFields(webRpc, report)
   if (!optional || !isLegalRouteFields(type, optional)) return undefined
   return Object.freeze({
     webRpc: Object.freeze({
@@ -104,7 +107,10 @@ export function normalizeWebRpcRoutingData(value: unknown): IRpcRoutingData | un
 }
 
 /** Snapshots optional route fields once before their tag-specific legality check. */
-function readOptionalRouteFields(value: object): Record<string, unknown> | undefined {
+function readOptionalRouteFields(
+  value: object,
+  report?: IRpcPropertyReadReporter
+): Record<string, unknown> | undefined {
   const fields = [
     'receiverId',
     'dispatchOnly',
@@ -119,7 +125,7 @@ function readOptionalRouteFields(value: object): Record<string, unknown> | undef
   ] as const
   const result: Record<string, unknown> = {}
   for (const field of fields) {
-    const current = safeRead<unknown>(value, field)
+    const current = safeRead<unknown>(value, field, report)
     if (current !== undefined) result[field] = current
   }
   if (

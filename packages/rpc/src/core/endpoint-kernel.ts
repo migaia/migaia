@@ -278,12 +278,15 @@ class EndpointKernel implements IEndpointKernelHost {
           this.#state = EndpointKernelState.disposed
         }
       )
-      throw new RpcConstructionError(
-        safeString(safeRead(error, 'message'), RpcCoreErrorText.endpointRegistrationFailed),
-        error,
-        [],
-        cleanupPromise
-      )
+      /** A hostile message getter is secondary; the registration failure remains first. */
+      let primary: unknown = error
+      let message: string = RpcCoreErrorText.endpointRegistrationFailed
+      try {
+        message = safeString(safeRead(error, 'message'), message)
+      } catch (readError) {
+        primary = new AggregateError([error, readError], message)
+      }
+      throw new RpcConstructionError(message, primary, [], cleanupPromise)
     }
   }
 
@@ -373,19 +376,27 @@ export function createEndpointKernel(
 }
 
 /** Captures each transport descriptor field once when no bootstrap snapshot is available. */
-function readTransportSnapshot(transport: IRpcTransport): IEndpointKernelTransportSnapshot {
-  return Object.freeze({
-    send: safeRead<unknown>(transport, 'send'),
-    subscribe: safeRead<unknown>(transport, 'subscribe'),
-    close: safeRead<unknown>(transport, 'close'),
-    onTransportError: safeRead<unknown>(transport, 'onTransportError'),
-    onListenerError: safeRead<unknown>(transport, 'onListenerError'),
-    platform: safeRead<unknown>(transport, 'platform'),
-    topology: safeRead<unknown>(transport, 'topology'),
-    origin: safeRead<unknown>(transport, 'origin'),
-    encodedType: safeRead<unknown>(transport, 'encodedType'),
-    ownership: safeRead<unknown>(transport, 'ownership')
-  })
+export function readTransportSnapshot(transport: IRpcTransport): IEndpointKernelTransportSnapshot {
+  try {
+    return Object.freeze({
+      send: safeRead<unknown>(transport, 'send'),
+      subscribe: safeRead<unknown>(transport, 'subscribe'),
+      close: safeRead<unknown>(transport, 'close'),
+      onTransportError: safeRead<unknown>(transport, 'onTransportError'),
+      onListenerError: safeRead<unknown>(transport, 'onListenerError'),
+      platform: safeRead<unknown>(transport, 'platform'),
+      topology: safeRead<unknown>(transport, 'topology'),
+      origin: safeRead<unknown>(transport, 'origin'),
+      encodedType: safeRead<unknown>(transport, 'encodedType'),
+      ownership: safeRead<unknown>(transport, 'ownership')
+    })
+  } catch (error) {
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.transportDescriptorInvalid,
+      error
+    )
+  }
 }
 
 /** Narrows a hostile transport platform descriptor to the public platform domain. */

@@ -108,12 +108,18 @@ describe('worker adapter source metadata', () => {
       removeEventListener() {}
     }
     const transport = createServiceTransport(client)
+    const failures: unknown[] = []
+    const dispose = transport.onTransportError?.((error) => failures.push(error))
+    const failure = new Error('hostile id')
     const source = {
       get id() {
-        throw new Error('hostile id')
+        throw failure
       }
     }
     expect(transport.sourceProof?.(source)).toBe(false)
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toMatchObject({ code: 'TRANSPORT', cause: failure })
+    dispose?.()
   })
 
   it('does not merge two service-worker client identities', () => {

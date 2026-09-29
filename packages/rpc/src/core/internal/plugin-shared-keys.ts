@@ -108,7 +108,12 @@ export type IRpcOutboundCommand =
       readonly kind: 'diagnostic'
       readonly event: Omit<IRpcHookEvent, 'at' | 'localId'>
     }
-  | { readonly kind: 'report'; readonly error: unknown; readonly code?: string }
+  | {
+      readonly kind: 'report'
+      readonly error: unknown
+      readonly code?: string
+      readonly field?: string
+    }
 
 /** Commands whose canonical transport operation is asynchronous. */
 export type IRpcResponseOutboundCommand = Extract<

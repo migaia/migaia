@@ -39,7 +39,7 @@ import type {
 } from './plugin-shared-keys.js'
 import { DiscoveryRegistry } from './discovery-registry.js'
 import { RequestReplayLedger } from './request-replay-ledger.js'
-import { safeRead, tupleKey } from './safe-value.js'
+import { safeRead, tupleKey, type IRpcPropertyReadReporter } from './safe-value.js'
 import { raceWithAsyncControl } from './async-control.js'
 import type { IRpcDiscoveryCleanupFaults } from './test-observer.js'
 import { allocateRpcId } from './id.js'
@@ -1051,6 +1051,16 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       return
     if (route.webRpc.manual && this.#mode !== 'manual') return
+    /** Reports an invalid inbound discovery metadata read through this endpoint's existing hook. */
+    const reportRead: IRpcPropertyReadReporter = ({ key, error }) => {
+      this.#emit({
+        name: 'failure',
+        code: RpcCoreErrorCode.invalidConfig,
+        error,
+        ...(typeof key === 'string' ? { field: key } : {})
+      })
+      return undefined
+    }
     if (route.webRpc.type === RpcRoutingType.discoveryQuery) {
       if (route.webRpc.manual && this.#mode === 'manual') {
         const replayKey = tupleKey(
@@ -1196,7 +1206,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       }
       const candidateUniqueId =
         route.payload && typeof route.payload === 'object'
-          ? safeRead<unknown>(route.payload, '__unique_id__')
+          ? safeRead<unknown>(route.payload, '__unique_id__', reportRead)
           : undefined
       if (candidateUniqueId !== undefined && typeof candidateUniqueId !== 'string') {
         this.#emit({
@@ -1282,7 +1292,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     }
     const uniqueTargetId =
       route.payload && typeof route.payload === 'object'
-        ? safeRead<unknown>(route.payload, '__unique_id__')
+        ? safeRead<unknown>(route.payload, '__unique_id__', reportRead)
         : undefined
     if (uniqueTargetId !== undefined) {
       if (typeof uniqueTargetId !== 'string') {

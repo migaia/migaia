@@ -34,7 +34,7 @@ import type {
 } from '../typing.js'
 import type { IRpcTransport } from '../transport.js'
 import { RpcPlatform } from '../transport-constants.js'
-import type { IEndpointKernelTransportSnapshot } from '../endpoint-kernel.js'
+import { readTransportSnapshot, type IEndpointKernelTransportSnapshot } from '../endpoint-kernel.js'
 import type { IRpcFeature } from '../feature.js'
 import {
   isDefinedMiddleware,
@@ -420,28 +420,9 @@ export async function prepareEndpoint<
   const transport = (factoryTransport as IRpcTransport | undefined) ?? transportCandidates[0]
   if (!transport)
     throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect middleware must provide transport')
-  const send = safeRead<unknown>(transport, 'send')
-  const subscribe = safeRead<unknown>(transport, 'subscribe')
-  const close = safeRead<unknown>(transport, 'close')
-  const onTransportError = safeRead<unknown>(transport, 'onTransportError')
-  const onListenerError = safeRead<unknown>(transport, 'onListenerError')
-  const platform = safeRead<unknown>(transport, 'platform')
-  const topology = safeRead<unknown>(transport, 'topology')
-  const origin = safeRead<unknown>(transport, 'origin')
-  const encodedType = safeRead<unknown>(transport, 'encodedType')
-  const ownership = safeRead<unknown>(transport, 'ownership')
-  const transportSnapshot: IEndpointKernelTransportSnapshot = Object.freeze({
-    send,
-    subscribe,
-    close,
-    onTransportError,
-    onListenerError,
-    platform,
-    topology,
-    origin,
-    encodedType,
-    ownership
-  })
+  /** Kernel owns the same one-read descriptor snapshot on both construction paths. */
+  const transportSnapshot: IEndpointKernelTransportSnapshot = readTransportSnapshot(transport)
+  const { send, subscribe, platform, encodedType, ownership } = transportSnapshot
   if (
     typeof send !== 'function' ||
     typeof subscribe !== 'function' ||

@@ -1,6 +1,6 @@
 import { VerifiedPeerRegistry } from './identity.js'
 import { SourceIdentityRegistry } from './source-identity.js'
-import { tupleKey } from './safe-value.js'
+import { tupleKey, type IRpcPropertyReadReporter } from './safe-value.js'
 import { recordInboundIdentityRelease } from './test-observer.js'
 import type { IRpcConnectCapability } from '../typing.js'
 import type { IRpcInboundMessage, IRpcTransportTopology } from '../transport.js'
@@ -48,6 +48,8 @@ export class InboundIdentityCoordinator {
   readonly #peers: VerifiedPeerRegistry
   /** Adapter/connect verification snapshot shared by all inbound features. */
   readonly #connect: IRpcConnectCapability | undefined
+  /** Existing endpoint failure sink used when connect verification reads hostile metadata. */
+  readonly #reportRead: IRpcPropertyReadReporter | undefined
   /** Adapter source proof is the first fail-closed admission check. */
   readonly #sourceProof: ((source: unknown, origin?: string) => boolean) | undefined
   /** Platform and topology context passed to connect verification. */
@@ -65,12 +67,14 @@ export class InboundIdentityCoordinator {
     /** Endpoint clock forwarded to the verified binding registry. */
     readonly now: () => number
     readonly connect?: IRpcConnectCapability
+    readonly reportRead?: IRpcPropertyReadReporter
     readonly sourceProof?: (source: unknown, origin?: string) => boolean
     readonly platform: IRpcPlatform
     readonly topology?: IRpcTransportTopology
     readonly peers?: VerifiedPeerRegistry
   }) {
     this.#connect = options.connect
+    this.#reportRead = options.reportRead
     this.#sourceProof = options.sourceProof
     this.#platform = options.platform
     this.#topology = options.topology
@@ -134,16 +138,19 @@ export class InboundIdentityCoordinator {
         }
       }
     if (this.#connect?.verify) {
-      const verified = await this.#connect.verify({
-        senderId: request.senderId,
-        targetId: request.targetId,
-        peerId: prepared.peerId,
-        origin: prepared.origin,
-        source: prepared.source,
-        data: request.data,
-        platform: this.#platform,
-        topology: this.#topology
-      })
+      const verified = await this.#connect.verify(
+        {
+          senderId: request.senderId,
+          targetId: request.targetId,
+          peerId: prepared.peerId,
+          origin: prepared.origin,
+          source: prepared.source,
+          data: request.data,
+          platform: this.#platform,
+          topology: this.#topology
+        },
+        this.#reportRead
+      )
       if (!verified || this.#closed) return undefined
     }
     const token = this.#peers.register(
