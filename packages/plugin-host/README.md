@@ -145,7 +145,7 @@ import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'
 
 **`host.config.get(path)` 的路径语义**：`path` 可以是"插件名"本身（返回该插件整份只读配置），也可以是 `插件名.键`（可继续 `.` 或 `.[下标]` 深入嵌套）。找不到匹配的插件、或路径中途缺失，返回 `undefined`（不抛错——读取是探测性操作）；`config.update(name, ...)` 对不存在的插件则抛 `PLUGIN_NOT_INSTALLED`（写入是明确的意图表达，语义不对称）。以上两个方法都要求 Host 处于 `active` 状态，否则抛 `HOST_DISPOSING`/`HOST_DISPOSED`。
 
-**构造函数只接受同步安装的插件**：`new Host({ plugins: ... })` 这种写法不存在——构造期插件走的是子类内部调用受保护的 `useSync(plugins)`，其中任何一个插件的 `install()` 返回 Promise 都会立即抛错；需要异步安装的插件要在宿主构造完成后用 `await host.use(plugin)`。
+**构造函数只接受同步安装的插件**：`new Host({ plugins: ... })` 这种写法不存在——构造期插件走的是子类内部调用受保护的 `useSync(plugins)`，其中任何一个插件的 `install()` 返回 Promise 都会立即抛错；立即安装且声明 `setup` 的插件在任何 hook 执行前抛 `SETUP_REQUIRES_ASYNC_INSTALL`。需要准备阶段的插件应在宿主构造完成后用 `await host.use(plugin)`；惰性插件可先由 `useSync` 登记，再由 `activate()` 异步运行 setup。
 
 ---
 
@@ -161,6 +161,7 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 
 - `name: string`（必填）—— Host 内唯一标识，**不能包含 `.`**（会和 `config.get('plugin.key')` 的路径解析产生歧义，安装入口直接拒绝）。
 - `config?: TConfig`（可选）—— 初始配置，Host 以深拷贝的所有权快照保存。
+- `setup?(context)`（可选，仅对象形式）—— 在 Feature 构造与 `install` 前运行，可异步返回准备结果；结果原样传给 `featureExpose(core, setupOutput)` 与 `install(core, setupOutput)`。
 - `install(core)`（必填）—— 拿到"领域 core + 通用 core 能力"，返回 `TExt | Promise<TExt>`（plain 对象，构造期同步插件不允许返回 Promise）。
 - `features?: Record<string, IFeature>`（可选）—— 声明实例能力；消费者通过 provider 定义的 `getFeature()` 引用建立依赖。
 - `update?: (next, core) => void | Promise<void>`（可选）—— 响应 `config.update`；`next` 是候选完整配置的只读视图，成功返回才提交。
@@ -174,7 +175,7 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 | API                                     | 参数                                                                 | 返回                 | 说明                                                               |
 | --------------------------------------- | -------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------ |
 | `core.config.get<T>()`                  | 无运行时参数                                                         | `IReadonlyConfig<T>` | 当前插件已提交配置的只读懒代理；嵌套对象/数组按访问路径缓存代理。  |
-| `core.onDispose(resource)`              | `IPluginResource`（函数 / `Symbol.dispose` / `Symbol.asyncDispose`） | `void`               | **仅 `install()` 期间可调用**；否则抛 `RESOURCE_OUTSIDE_INSTALL`。 |
+| `core.onDispose(resource)`              | `IPluginResource`（函数 / `Symbol.dispose` / `Symbol.asyncDispose`） | `void`               | **仅安装期间可调用**；setup 使用 `context.onDispose`，尝试关闭后的迟到登记先释放资源再抛 `RESOURCE_OUTSIDE_INSTALL`。 |
 | `core.usePipeline(stage)`               | `(value, next) => void`                                              | `core`               | 仅 install 期间注册；sync stage 可提升到任意 Host mode。           |
 | `core.useAsyncPipeline(stage)`          | `(value, next) => void \| Promise<void>`                             | `core`               | 仅 install 期间、且 Host mode 为 `async` 时可用。                  |
 | `core.useGeneratorPipeline(stage)`      | `(value) => Generator`                                               | `core`               | 仅 install 期间，可用于 `generator` 与 `async-generator` mode。    |
@@ -182,7 +183,34 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 
 领域 core（`createPluginDomainCore()` 的返回值）不能定义与上表同名的字段（`config`/`onDispose`/`usePipeline`/`useAsyncPipeline`/`useGeneratorPipeline`/`useAsyncGeneratorPipeline` 是保留键），且必须是普通对象、字段都是可枚举 data property，否则构造时抛 `TypeError`。
 
-`useSync`（构造函数期）安装的插件允许注册 async disposer；Host 同步撤销可见状态并发布冻结的 `PLUGIN_INSTALL_FAILED.detail` 快照，随后通过 `detail.completion` 提供包含完整 rollback identities 的冻结结果。需要完整 secondary identity 的错误转换必须 await completion。**不要把 `use`/`unUse`/`config.update`/`dispose` 暴露给插件 core，插件生命周期钩子内也不能调用当前 Host 的这几个方法**——会同步抛 `LIFECYCLE_MUTATION`。
+`useSync`（构造函数期）安装的插件允许注册 async disposer；Host 同步撤销可见状态并发布冻结的 `PLUGIN_INSTALL_FAILED.detail` 快照，随后通过 `detail.completion` 提供包含完整 rollback identities 的冻结结果。需要完整 secondary identity 的错误转换必须 await completion。**不要把 `use`/`unUse`/`config.update`/`dispose` 暴露给插件 core，插件生命周期钩子（包括 setup）内也不能调用当前 Host 的这些方法**——会同步抛 `LIFECYCLE_MUTATION`。setup 等待期间外部发起的 Host mutation 与 `config.update` 同样同步抛该码。
+
+### 安装前的异步 setup
+
+对象形式 `definePlugin` 可声明 `setup(context)`。它先于 `featureExpose`、Feature 工厂和 `install` 运行，适合建立连接并用 `context.onDispose(resource)` 把连接交给本次安装事务。`context` 仅提供 `config`、`operation`（`signal`、绝对 `deadlineAt`、`now()`）、`lifecycle` 和 `onDispose`；它没有 Feature、pipeline 或 Host mutation 能力。setup 返回的值保持同一对象身份，传给后续两个钩子的第二参数；未声明 setup 的插件仍只收到一个 core 参数。
+
+```ts
+import { definePlugin, PluginHost } from '@migaia/plugin-host'
+
+const host = new PluginHost<Record<string, never>>({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
+})
+const prepared = definePlugin({
+  name: 'prepared',
+  setup: async (context) => {
+    const resource = { closed: false }
+    context.onDispose(() => { resource.closed = true })
+    await Promise.resolve()
+    return { resource }
+  },
+  install: (_core, { resource }) => ({ isOpen: () => !resource.closed })
+})
+const [handle] = await host.use(prepared)
+handle.extensions.isOpen() // true
+await host.dispose()
+```
+
+setup 与 install 共用一次 `mutationTimeoutMs` 期限；超时会取消本次 setup signal、回滚资源，宿主 `dispose()` 也能终止等待。迟到的 setup 结果不会安装，迟到拒绝经 `diagnostic` 报告。`use()` 批次失败返回 `PLUGIN_INSTALL_FAILED`，原错误在 `cause`；惰性 `activate()` 保留原错误身份。已关闭尝试的 `context.onDispose` 会立即释放有效资源，再抛 `RESOURCE_OUTSIDE_INSTALL`。已有对象若把 `setup` 当普通元数据，请改名：该键现在必须是函数并在异步安装时执行。恢复重装的诊断仅解开 `PLUGIN_INSTALL_FAILED` 包装，其他带 `cause` 的原错误保持完整。
 
 ---
 
