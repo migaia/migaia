@@ -1,0 +1,34 @@
+{
+  "baseCommit": "5758521",
+  "directSearch": [
+    "packages/rpc/src/contract/error-text.ts",
+    "packages/rpc/src/contract/error.ts",
+    "packages/rpc/src/contract/index.ts",
+    "packages/rpc/src/core/error-code.ts",
+    "packages/rpc/src/core/error-serialization.ts",
+    "packages/rpc/src/core/errors.ts",
+    "packages/rpc/src/core/index.ts",
+    "packages/rpc/src/core/internal/outbound-attachment.ts",
+    "packages/rpc/src/core/internal/provider-executor.ts",
+    "packages/rpc/test/contract/acceptance.test.ts",
+    "packages/rpc/test/contract/contract.test.ts",
+    "packages/rpc/test/contract/error-identity.test.ts",
+    "packages/rpc/test/core/error-serialization.test.ts",
+    "packages/rpc/test/core/errors.test.ts",
+    "packages/rpc/test/layering/naming.test.ts",
+    "packages/rpc/test/merge/error-source.test.ts",
+    "packages/storage-web/test/types/error-serialization.spec.ts",
+    "packages/store-worker/e2e/store-worker.spec.ts",
+    "packages/store-worker/test/exports.test.ts"
+  ],
+  "semanticReaders": [
+    "packages/rpc/test/core/composed-variation-capability.test.ts",
+    "packages/rpc/test/core/fixtures/tree-shaking/retained-inventory.ts",
+    "packages/rpc/test/merge/export-mapping.test.ts",
+    "packages/rpc/test/merge/suite-parity.test.ts",
+    "packages/rpc/test/merge/tree-shaking-root.test.ts",
+    "packages/rpc/README.md",
+    "packages/rpc/USEGUIDE.md",
+    "scripts/fixtures/public-exports.baseline.json"
+  ]
+}
