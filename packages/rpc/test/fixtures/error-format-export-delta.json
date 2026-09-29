@@ -1,0 +1,16 @@
+{
+  "removed": {},
+  "added": {
+    "@migaia/rpc/contract": [
+      "normalizeRpcSerializedError",
+      "reachRpcError",
+      "RpcErrorReachLimit",
+      "RpcJsonRpcWireError",
+      "RpcWireErrorFallback",
+      "RpcWireErrorField",
+      "RpcWireErrorLimit",
+      "RpcWireErrorUnknownFieldMode",
+      "RpcWireErrorViolation"
+    ]
+  }
+}

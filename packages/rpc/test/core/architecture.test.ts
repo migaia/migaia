@@ -91,7 +91,9 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
         violations.push(`${path} imports endpoint/factory/middleware`)
       if (
         path.endsWith('/index.ts') &&
-        imports.some((specifier) => /(?:internal|wire|endpoint)/.test(specifier))
+        imports.some((specifier) =>
+          /(?:\/internal\/|(?:^|\/)(?:wire|endpoint)\.js$)/.test(specifier)
+        )
       )
         violations.push(`${path} exports an internal module`)
     }

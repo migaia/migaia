@@ -34,7 +34,7 @@ describe('Rpc naming boundary', () => {
     expect(transport.name).toBe('RpcTransportError')
     expect(new AbortError().name).toBe('AbortError')
     expect(new TimeoutError().name).toBe('TimeoutError')
-    expect(serializeRpcError(transport)).toMatchObject({
+    expect(serializeRpcError(transport, { report: () => {} })).toMatchObject({
       name: 'RpcTransportError',
       source: '@migaia/rpc/core'
     })

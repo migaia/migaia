@@ -28,7 +28,7 @@ describe('A4 source continuity through merged layers', () => {
     expect(caught).toBeInstanceOf(RpcError)
     expect(caught).toMatchObject({ source: coreSource, code: 'INVALID_CONFIG' })
     expect(coreSource).toBe('@migaia/rpc/core')
-    expect(serializeRpcError(caught as Error).source).toBe(coreSource)
+    expect(serializeRpcError(caught as Error, { report: () => {} }).source).toBe(coreSource)
   })
 
   it('tags browser adapter configuration failure with core source', () => {

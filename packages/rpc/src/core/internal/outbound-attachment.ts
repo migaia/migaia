@@ -25,7 +25,8 @@ import {
   normalizePortable,
   normalizeRpcEnvelope,
   type IRpcEnvelope,
-  type IRpcPortableValue
+  type IRpcPortableValue,
+  type IRpcWireErrorFailure
 } from '../../contract/index.js'
 import { serializeRpcError } from '../../contract/error.js'
 import { deserializeErrorFromRpc } from '../error-serialization.js'
@@ -417,7 +418,12 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         if (!this.#abortEnabled) return
         void this.resolveReceiver(targetId)
           .then((receiver) => {
-            const payload = reason === undefined ? undefined : normalizeAbortReason(reason)
+            const payload =
+              reason === undefined
+                ? undefined
+                : normalizeAbortReason(reason, (failure) =>
+                    this.emitFailure(failure.error, RpcCoreErrorCode.payloadInvalid)
+                  )
             return this.#pipeline.send(
               normalizeRpcEnvelope({
                 kind: 'variation',
@@ -769,8 +775,11 @@ function normalizeHooks(value: IRpcHook | readonly IRpcHook[] | undefined): read
 }
 
 /** Projects an abort reason through RPC portable/error owners before it crosses the wire. */
-function normalizeAbortReason(reason: unknown): IRpcPortableValue {
-  return normalizePortable(reason instanceof Error ? serializeRpcError(reason) : reason)
+function normalizeAbortReason(
+  reason: unknown,
+  report: (failure: IRpcWireErrorFailure) => void
+): IRpcPortableValue {
+  return normalizePortable(reason instanceof Error ? serializeRpcError(reason, { report }) : reason)
 }
 
 /** Rejects timeout values outside the inherited finite non-negative domain. */

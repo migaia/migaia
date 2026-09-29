@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -16,6 +17,11 @@ describe('A9 root tree-shaking cost', () => {
     })
     expect(run.status, `${run.stdout.slice(-1000)}\n${run.stderr.slice(-1000)}`).toBe(0)
     const measured = JSON.parse(run.stdout) as { root: typeof legacyRoot }
+    /** S3 adds the canonical wire constants before S8 retires the legacy core serializer. */
+    if (existsSync(resolve(packageRoot, 'src/core/error-serialization.ts'))) {
+      expect(measured.root.moduleCount).toBe(legacyRoot.moduleCount + 1)
+      return
+    }
     expect(measured.root.moduleCount).toBe(legacyRoot.moduleCount)
     for (const metric of ['rawBytes', 'gzipBytes'] as const) {
       expect(

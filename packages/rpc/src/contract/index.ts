@@ -2,7 +2,21 @@ export { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.j
 export { createDescriptor } from './protocol.js'
 export { normalizePortable } from './normalize.js'
 export { normalizeRpcEnvelope, rpcProtocol as rpcProtocolV1 } from './v1/index.js'
-export { deserializeRpcError, serializeRpcError } from './error.js'
+export {
+  deserializeRpcError,
+  normalizeRpcSerializedError,
+  reachRpcError,
+  serializeRpcError
+} from './error.js'
+export {
+  RpcErrorReachLimit,
+  RpcJsonRpcWireError,
+  RpcWireErrorFallback,
+  RpcWireErrorField,
+  RpcWireErrorLimit,
+  RpcWireErrorUnknownFieldMode,
+  RpcWireErrorViolation
+} from './wire-error-constants.js'
 export type {
   IRpcContractError,
   IRpcDescriptor,
@@ -17,7 +31,11 @@ export type {
   IRpcPortableRecord,
   IRpcPortableValue,
   IRpcProtocol,
-  IRpcSerializedError
+  IRpcSerializedError,
+  IRpcSerializeErrorOptions,
+  IRpcWireErrorFailure,
+  IRpcWireErrorOptions,
+  IRpcJsonRpcErrorObject
 } from './types.js'
 export type {
   IRpcDiscoveryEnvelope,
