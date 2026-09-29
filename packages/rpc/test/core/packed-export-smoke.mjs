@@ -178,8 +178,11 @@ function assertPackedLegacyEnvelopeRejection(
 function assertPackedLegacyEnvelopePerturbation(consumerDirectory, normalizerPath) {
   const original = readFileSync(normalizerPath, 'utf8')
   const target =
-    'export function normalizeRpcEnvelope(value) {\n    const normalized = normalizePortable(value);'
-  const replacement = `${target}\n    if (value && typeof value === 'object' && ('taskId' in value || value.kind === 'chunk' || value.variation === 'abort')) return value;`
+    "export function normalizeRpcEnvelope(value, options) {\n    const record = snapshotRpcRecord(value, '', RpcEnvelopeViolation.type);"
+  const replacement = target.replace(
+    '    const record =',
+    "    if (value && typeof value === 'object' && ('taskId' in value || value.kind === 'chunk' || value.variation === 'abort')) return value;\n    const record ="
+  )
   if (!original.includes(target))
     throw new Error('Packed rpc-contract normalizer mutation anchor is unavailable')
   try {

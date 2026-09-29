@@ -7,6 +7,62 @@ import { connect } from '../../src/core/middleware/connect.js'
 import { abort } from '../../src/core/middleware/abort.js'
 
 describe('keyed provider execution (A7)', () => {
+  it('rejects a new key while the bounded store owns an executing request', async () => {
+    const [clientTransport, serverTransport] = createMemoryTransportPair()
+    const server = await createProviderEndpoint({
+      id: 'server',
+      transport: serverTransport,
+      targetIds: ['client'],
+      idempotency: { store: createRpcIdempotencyStore({ maxEntries: 1 }) },
+      middlewares: [connect({ transport: serverTransport })]
+    })
+    const client = await createClientEndpoint({
+      id: 'client',
+      transport: clientTransport,
+      targetIds: ['server'],
+      middlewares: [connect({ transport: clientTransport })]
+    })
+    let count = 0
+    let started!: () => void
+    let finish!: (value: number) => void
+    const providerStarted = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const gate = new Promise<number>((resolve) => {
+      finish = resolve
+    })
+    server.provide('count', async (context) => {
+      count += 1
+      started()
+      return context.success(await gate)
+    })
+    try {
+      const first = client.send<number>('server', 'count', null, { idempotencyKey: 'first' })
+      await providerStarted
+      await expect(
+        client.send<number>('server', 'count', null, { idempotencyKey: 'second' })
+      ).rejects.toMatchObject({ code: 'OVERLOADED' })
+      expect(count).toBe(1)
+      finish(7)
+      expect(await first).toBe(7)
+    } finally {
+      await client.dispose()
+      await server.dispose()
+    }
+  })
+
+  it('rejects a malformed injected store before constructing a provider endpoint', async () => {
+    const [, serverTransport] = createMemoryTransportPair()
+    await expect(
+      createProviderEndpoint({
+        id: 'server',
+        transport: serverTransport,
+        idempotency: { store: 1 as never },
+        middlewares: [connect({ transport: serverTransport })]
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+  })
+
   it('keeps method tuples distinct and reports retained-result tombstones', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createProviderEndpoint({
@@ -69,6 +125,9 @@ describe('keyed provider execution (A7)', () => {
       expect(() => client.send<number>('server', 'count', null, { idempotencyKey: '' })).toThrow(
         expect.objectContaining({ code: 'CONTRACT_INVALID' })
       )
+      expect(() =>
+        client.send<number>('server', 'count', null, { idempotencyKey: 'has space' })
+      ).toThrow(expect.objectContaining({ code: 'CONTRACT_INVALID' }))
     } finally {
       await client.dispose()
       await server.dispose()

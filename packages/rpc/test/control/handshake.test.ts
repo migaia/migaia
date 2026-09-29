@@ -48,6 +48,69 @@ describe('handshake 1.0 (A5)', () => {
     })
   })
 
+  it('keeps a lower shared major, optional peer details, and portable auth', () => {
+    const caller: IRpcHandshakeOffer = {
+      ...initiator,
+      versions: [{ major: 1, minor: 2 }],
+      codecs: ['json'],
+      auth: { token: 'opaque' },
+      peer: {
+        id: 'caller',
+        runtime: 'zig',
+        runtimeVersion: '0.14',
+        implementation: { name: 'client', version: '1' }
+      }
+    }
+    const answer = acceptRpcHandshake(
+      {
+        ...responder,
+        versions: [
+          { major: 1, minor: 5 },
+          { major: 2, minor: 0 }
+        ]
+      },
+      createRpcHello(caller)
+    )
+    expect(answer.ok).toBe(true)
+    if (!answer.ok) return
+    expect(answer.agreement).toMatchObject({
+      major: 1,
+      minor: 2,
+      codec: 'json',
+      auth: { token: 'opaque' },
+      peer: { runtimeVersion: '0.14', implementation: { name: 'client', version: '1' } }
+    })
+    expect(completeRpcHandshake(caller, answer.reply)).toMatchObject({ major: 1, minor: 2 })
+  })
+
+  it('rejects malformed first-message fields at the handshake boundary', () => {
+    const hello = JSON.parse(createRpcHello(initiator)) as Record<string, unknown>
+    const malformed: readonly [Record<string, unknown>, string][] = [
+      [{ ...hello, kind: 'request' }, 'required'],
+      [{ ...hello, step: 'resume' }, 'step'],
+      [{ ...hello, peer: { id: '', runtime: 'zig' } }, 'required'],
+      [
+        { ...hello, peer: { id: 'caller', runtime: 'zig', runtimeVersion: 'x'.repeat(65) } },
+        'type'
+      ],
+      [
+        { ...hello, peer: { id: 'caller', runtime: 'zig', implementation: { name: 'client' } } },
+        'required'
+      ],
+      [{ ...hello, versions: [] }, 'type'],
+      [{ ...hello, versions: [{ major: 0, minor: 0 }] }, 'type'],
+      [{ ...hello, codecs: ['json', 'json'] }, 'duplicate'],
+      [{ ...hello, capabilities: ['abort@1', 'abort@1'] }, 'duplicate']
+    ]
+    for (const [message, violation] of malformed)
+      expect(() => normalizeRpcHandshake(JSON.stringify(message))).toThrow(
+        expect.objectContaining({ code: 'HANDSHAKE_INVALID', violation })
+      )
+    expect(() => normalizeRpcHandshake('{')).toThrow(
+      expect.objectContaining({ code: 'HANDSHAKE_INVALID', violation: 'type' })
+    )
+  })
+
   it('returns a coded reject and keeps the remote cause on completion', () => {
     const answer = acceptRpcHandshake(
       { ...responder, versions: [{ major: 1, minor: 0 }] },
