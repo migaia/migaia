@@ -14,7 +14,10 @@ export function createSupervisionError(
   text: string,
   options: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> } = {}
 ): Error {
-  const error = new Constructor(text, { cause: options.cause })
+  const error =
+    options.cause === undefined
+      ? new Constructor(text)
+      : new Constructor(text, { cause: options.cause })
   return attachErrorIdentity(error, {
     source: SUPERVISION_SOURCE,
     code,
