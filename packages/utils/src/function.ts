@@ -1,5 +1,6 @@
 import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
+import { tryReadProperty } from './error.js'
 
 /**
  * Maximum synchronous reentrancy before consumers spill work from the native stack.
@@ -47,12 +48,10 @@ export const noop = (): undefined => undefined
 export function probeThenable(value: unknown): IThenableProbe {
   if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
     return { kind: ThenableProbeKind.notThenable }
-  let thenFn: unknown
-  try {
-    thenFn = (value as { then?: unknown }).then
-  } catch (error) {
-    return { kind: ThenableProbeKind.failed, error }
-  }
+  /** The only read of then; a getter failure remains caller-owned data. */
+  const read = tryReadProperty(value as { then?: unknown }, 'then')
+  if (read.threw) return { kind: ThenableProbeKind.failed, error: read.error }
+  const thenFn = read.value
   if (typeof thenFn !== 'function') return { kind: ThenableProbeKind.notThenable }
   return {
     kind: ThenableProbeKind.thenable,
@@ -78,15 +77,14 @@ export function assimilateCapturedThen<T>(
 export function inspectThenable(value: unknown): IThenableInspection {
   if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
     return Object.freeze({}) as IAbsentThenProperty
-  try {
-    const then = (value as { then?: unknown }).then
-    if (typeof then !== 'function') return Object.freeze({}) as IAbsentThenProperty
-    const inspection = {} as IPresentThenProperty
-    Object.defineProperty(inspection, String.fromCharCode(116, 104, 101, 110), { value: then })
-    return inspection
-  } catch (error) {
-    return { error }
-  }
+  /** The only read of then; output shape and descriptor stay unchanged. */
+  const read = tryReadProperty(value as { then?: unknown }, 'then')
+  if (read.threw) return { error: read.error }
+  const then = read.value
+  if (typeof then !== 'function') return Object.freeze({}) as IAbsentThenProperty
+  const inspection = {} as IPresentThenProperty
+  Object.defineProperty(inspection, String.fromCharCode(116, 104, 101, 110), { value: then })
+  return inspection
 }
 
 /** Observes a captured thenable rejection while containing reporter failures at the boundary. */
