@@ -5,6 +5,12 @@ export { normalizePortable } from './normalize.js'
 export { normalizeRpcEnvelope, rpcProtocol as rpcProtocolV1 } from './v1/index.js'
 export { createRpcUnknownFieldWarner } from './unknown-field.js'
 export {
+  acceptRpcHandshake,
+  completeRpcHandshake,
+  createRpcHello,
+  normalizeRpcHandshake
+} from './handshake.js'
+export {
   RpcCapability,
   RpcCodecId,
   RpcControl,
@@ -60,6 +66,14 @@ export type {
 } from './types.js'
 export type { IRpcUnknownFieldWarner } from './unknown-field.js'
 export type { IRpcControlData, IRpcEnvelopeData, IRpcRouteHeader } from './v1/route.js'
+export type {
+  IRpcHandshakeAgreement,
+  IRpcHandshakeMessage,
+  IRpcHandshakeOffer,
+  IRpcHandshakeText,
+  IRpcHandshakeVersion,
+  IRpcPeerInfo
+} from './handshake.js'
 export type {
   IRpcDiscoveryEnvelope,
   IRpcEnvelope,
