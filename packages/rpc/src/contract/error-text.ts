@@ -11,7 +11,5 @@ export const RpcContractErrorText = {
   frameLimitExceeded: 'rpc frame limit exceeded',
   frameAssemblyExpired: 'rpc frame assembly expired',
   /** Stable message for invalid wire error payloads reported by contract validation. */
-  invalidWireError: 'rpc wire error is invalid',
-  /** Existing serializer still consumes this text until S3 replaces its conversion path. */
-  unstringifiableThrown: 'rpc thrown value is not stringifiable'
+  invalidWireError: 'rpc wire error is invalid'
 } as const

@@ -2,18 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { createContractError } from '../../src/contract/contract-error.js'
 import { RpcContractErrorCode } from '../../src/contract/error-code.js'
 import { createStringFramer } from '../../src/contract/framing/index.js'
-import { createDescriptor, normalizePortable, serializeRpcError } from '../../src/contract/index.js'
+import {
+  createDescriptor,
+  normalizePortable,
+  RpcWireErrorFallback,
+  serializeRpcError
+} from '../../src/contract/index.js'
 
 /** Reads a rejected framer result's error. */
 const rejectedError = (result: object): Error => (result as { readonly error: Error }).error
 
 describe('rpc-contract error identity', () => {
-  it('uses the canonical UNKNOWN code for untagged and cyclic errors alike', () => {
-    const untagged = serializeRpcError(new Error('plain'))
+  it('uses the canonical UNKNOWN code for untagged errors and marks cyclic edges truncated', () => {
+    const untagged = serializeRpcError(new Error('plain'), { report: () => {} })
     expect(untagged).toMatchObject({ source: 'unknown', code: 'UNKNOWN' })
     const cyclic = new Error('loop') as Error & { cause?: unknown }
     cyclic.cause = cyclic
-    expect(serializeRpcError(cyclic).cause).toMatchObject({ source: 'unknown', code: 'UNKNOWN' })
+    const wire = serializeRpcError(cyclic, { report: () => {} })
+    expect(wire.cause).toBeUndefined()
+    expect(wire.truncated).toBe(true)
   })
 
   it('never throws while serializing hostile thrown values', () => {
@@ -22,13 +29,21 @@ describe('rpc-contract error identity', () => {
         throw new Error('toString refused')
       }
     }
-    expect(serializeRpcError(hostileToString)).toMatchObject({
+    const reports: unknown[] = []
+    expect(
+      serializeRpcError(hostileToString, {
+        report: (failure) => {
+          reports.push(failure)
+        }
+      })
+    ).toMatchObject({
       name: 'Error',
-      message: 'rpc thrown value is not stringifiable',
+      message: RpcWireErrorFallback.nonErrorMessage,
       code: 'UNKNOWN'
     })
-    expect(serializeRpcError(Object.create(null)).message).toBe(
-      'rpc thrown value is not stringifiable'
+    expect(reports).toMatchObject([{ field: 'data' }])
+    expect(serializeRpcError(Object.create(null), { report: () => {} }).message).toBe(
+      RpcWireErrorFallback.nonErrorMessage
     )
     let reads = 0
     const flaky = {
@@ -40,8 +55,8 @@ describe('rpc-contract error identity', () => {
       message: 'flaky',
       stack: 'FlakyError: flaky'
     }
-    const wire = serializeRpcError(flaky)
-    expect(wire.name).toBe('Error')
+    const wire = serializeRpcError(flaky, { report: () => {} })
+    expect(wire.name).toBe('FlakyError')
     expect(wire.message).toBe('flaky')
     expect(wire.stack).toBe('FlakyError: flaky')
   })

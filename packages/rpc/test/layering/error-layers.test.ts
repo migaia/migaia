@@ -151,13 +151,9 @@ describe('layered error ownership', () => {
     for (const value of retired) expect([...core.values()]).not.toContain(value)
     const contractThrown = new Set(layerThrows('contract').map(({ key }) => key))
     const coreThrown = new Set(layerThrows('core').map(({ key }) => key))
-    /** S3 supplies this registered contract code's first real throw site. */
-    const pendingContract = new Set(['invalidWireError'])
     /** S11 supplies this registered core code's first real throw site. */
     const pendingCore = new Set(['propertyReadFailed'])
-    expect(
-      [...contract.keys()].filter((key) => !pendingContract.has(key) && !contractThrown.has(key))
-    ).toEqual([])
+    expect([...contract.keys()].filter((key) => !contractThrown.has(key))).toEqual([])
     expect([...core.keys()].filter((key) => !pendingCore.has(key) && !coreThrown.has(key))).toEqual(
       []
     )

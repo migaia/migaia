@@ -158,7 +158,7 @@ describe('RPCC-T06 serialized error graphs', () => {
       })()`,
       context
     )
-    const wire = serializeRpcError(remote)
+    const wire = serializeRpcError(remote, { report: () => {} })
     expect(wire).toMatchObject({ source: '@remote', code: 'REMOTE_ROOT', name: 'TypeError' })
     expect(wire.stack).toBeTypeOf('string')
     expect(wire.cause?.code).toBe('REMOTE_CAUSE')
