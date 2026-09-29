@@ -1,6 +1,7 @@
 export { SUPERVISION_SOURCE, SupervisionErrorCode } from './error-code.js'
 export type { ISupervisionErrorCode } from './error-code.js'
 export { SupervisionErrorText } from './error-text.js'
+export { createUnitBudget } from './budget.js'
 export {
   SupervisorState,
   ExitReason,
