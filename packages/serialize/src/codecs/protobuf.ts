@@ -1,4 +1,5 @@
 import { fromBinary, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf'
+import { isUint8Array } from '@migaia/utils/bytes'
 import { SerializeErrorCode } from '../error-code.js'
 import {
   assertCodecVersion,
@@ -25,15 +26,6 @@ export type IProtobufCodecOptions<
   schema: IProtobufSchema<TSchemaId, TSchemaVersion>
   binding: TBinding
 }>
-
-/** Accepts intrinsic byte views from another realm while rejecting arbitrary typed arrays. */
-function isUint8Array(value: unknown): value is Uint8Array {
-  return (
-    value instanceof Uint8Array ||
-    (ArrayBuffer.isView(value) &&
-      (value as { readonly [Symbol.toStringTag]?: unknown })[Symbol.toStringTag] === 'Uint8Array')
-  )
-}
 
 /** Create a protobuf codec that keeps codec and schema identities independent. */
 export function defineProtobufCodec<

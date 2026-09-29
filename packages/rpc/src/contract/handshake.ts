@@ -1,4 +1,4 @@
-import { decodeUtf8, utf8ByteLength } from '@migaia/utils/bytes'
+import { decodeUtf8, isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { createContractError } from './contract-error.js'
 import { deserializeRpcError, normalizeRpcSerializedError } from './error.js'
 import { RpcContractErrorCode } from './error-code.js'
@@ -203,7 +203,7 @@ function parseText(text: IRpcHandshakeText): unknown {
     json = text
     if (utf8ByteLength(json) > RpcWireLimit.maxHandshakeBytes)
       throw handshakeInvalid(RpcHandshakeViolation.bytes, text)
-  } else if (text instanceof Uint8Array) {
+  } else if (isUint8Array(text)) {
     if (text.byteLength > RpcWireLimit.maxHandshakeBytes)
       throw handshakeInvalid(RpcHandshakeViolation.bytes, text)
     try {

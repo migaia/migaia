@@ -24,6 +24,7 @@
     "@migaia/store-ssr",
     "@migaia/store-wasm",
     "@migaia/store-worker",
+    "@migaia/supervision",
     "@migaia/tray",
     "@migaia/utils",
     "@migaia/wasm",
@@ -35,7 +36,7 @@
       "owner": "@migaia/event-subscriber",
       "routes": ["@migaia/event-subscriber"],
       "symbols": ["EventDispatchPolicy", "createEventChannel"],
-      "consumers": ["@migaia/rpc", "@migaia/storage-web", "@migaia/store-light"]
+      "consumers": ["@migaia/logger", "@migaia/rpc", "@migaia/storage-web", "@migaia/store-light"]
     },
     {
       "name": "abort-timeout",
@@ -48,7 +49,11 @@
         "raceWithAbort",
         "withTimeout"
       ],
-      "consumers": ["@migaia/lifecycle", "@migaia/storage-web"]
+      "consumers": [
+        "@migaia/event-subscriber",
+        "@migaia/middleware-pipeline",
+        "@migaia/storage-web"
+      ]
     },
     {
       "name": "byte-brand",
@@ -69,7 +74,14 @@
       "owner": "@migaia/lifecycle",
       "routes": ["@migaia/lifecycle"],
       "symbols": ["IGenerationController", "IGenerationToken", "createGenerationController"],
-      "consumers": ["@migaia/capability", "@migaia/resource", "@migaia/rpc", "@migaia/store-light"]
+      "consumers": [
+        "@migaia/capability",
+        "@migaia/plugin-host",
+        "@migaia/resource",
+        "@migaia/rpc",
+        "@migaia/store-light",
+        "@migaia/supervision"
+      ]
     },
     {
       "name": "reactive-graph",
@@ -88,6 +100,7 @@
       "symbols": ["*"],
       "consumers": [
         "@migaia/resource",
+        "@migaia/storage-web",
         "@migaia/store-devtools",
         "@migaia/store-indexed",
         "@migaia/store-keyed",
@@ -106,21 +119,40 @@
       "owner": "@migaia/storage-contract",
       "routes": ["@migaia/storage-contract"],
       "symbols": ["*"],
-      "consumers": ["@migaia/storage-web"]
+      "consumers": ["@migaia/storage-web", "@migaia/store-persist"]
     }
   ],
   "nonCapabilityEdges": [
     {
+      "route": "@migaia/event-subscriber",
+      "symbols": [
+        "EventAdmissionPolicy",
+        "ICanonicalEventChannel",
+        "IEventChannel",
+        "IEventContext",
+        "createEventHub",
+        "invokeEachLive",
+        "withSnapshotEntries"
+      ]
+    },
+    {
       "route": "@migaia/lifecycle",
       "symbols": [
+        "IAbortController",
         "IAbortSignal",
+        "ICollectedError",
+        "IGenerationRequest",
         "ILeaseRegistry",
         "ILifecycleScope",
         "ILifecycleState",
         "IMutationQueue",
+        "IPendingTracker",
+        "IProvisionalScope",
+        "IQuiescenceTracker",
         "IReleaseContext",
         "IReleaseDescriptor",
         "ISyncLifecycleScope",
+        "ISyncStartedDisposalLedger",
         "ITerminalController",
         "LifecycleErrorCode",
         "LifecycleState",
@@ -129,21 +161,48 @@
         "boundedWait",
         "containAsyncRejection",
         "createAbortController",
+        "createErrorCollector",
         "createLifecycleScope",
         "createMutationQueue",
         "createObjectLeaseRegistry",
+        "createPendingTracker",
         "createProvisionalScope",
         "createQuiescenceTracker",
         "createStringLeaseRegistry",
         "createSyncLifecycleScope",
+        "createSyncStartedDisposalLedger",
         "createTerminalController",
+        "executeReleaseDescriptor",
         "probeThenable",
         "snapshotScheduler"
       ]
     },
     {
+      "route": "@migaia/lifecycle/abort",
+      "symbols": ["IAbortSignal", "createAbortController", "observeAbortSubscription"]
+    },
+    {
+      "route": "@migaia/lifecycle/quiescence",
+      "symbols": ["IPendingTracker", "createPendingTracker"]
+    },
+    {
+      "route": "@migaia/lifecycle/scheduler",
+      "symbols": ["resolveScheduler", "resolveSchedulerOption", "snapshotScheduler"]
+    },
+    {
+      "route": "@migaia/lifecycle/scope",
+      "symbols": ["ILifecycleScope", "createLifecycleScope"]
+    },
+    {
       "route": "@migaia/utils/bytes",
-      "symbols": ["base64ToBytes", "bytesToBase64", "streamBase64Chunks", "utf8ByteLength"]
+      "symbols": [
+        "base64ToBytes",
+        "bytesToBase64",
+        "decodeUtf8",
+        "splitUtf8",
+        "streamBase64Chunks",
+        "utf8ByteLength"
+      ]
     },
     {
       "route": "@migaia/utils/config",
@@ -151,17 +210,70 @@
     },
     {
       "route": "@migaia/utils/error",
-      "symbols": ["UtilsErrorCode", "UtilsTimeoutError", "attachErrorIdentity"]
+      "symbols": [
+        "UtilsErrorCode",
+        "attachErrorIdentity",
+        "attachSecondaryErrors",
+        "safeErrorReason",
+        "tryReadProperty"
+      ]
+    },
+    {
+      "route": "@migaia/utils/function",
+      "symbols": [
+        "IThenableInspection",
+        "IThenableProbe",
+        "MAX_NATIVE_RECURSION_DEPTH",
+        "ThenableProbeKind",
+        "assimilateCapturedThen",
+        "inspectThenable",
+        "observeThenableRejection",
+        "probeThenable"
+      ]
     },
     {
       "route": "@migaia/utils/object",
-      "symbols": ["IObjectPathInput", "IObjectPathTuple", "get", "parseObjectPath"]
+      "symbols": [
+        "IObjectPathInput",
+        "IObjectPathTuple",
+        "IObjectPathValue",
+        "get",
+        "identitySnapshot",
+        "immutableSnapshot",
+        "isPlainObject",
+        "parseObjectPath",
+        "snapshotOwnDescriptors",
+        "structuredDiagnosticSnapshot"
+      ]
+    },
+    {
+      "route": "@migaia/utils/object-path",
+      "symbols": [
+        "IObjectPath",
+        "IObjectPathInput",
+        "IObjectPathTuple",
+        "IObjectPathValue",
+        "IPathProbe",
+        "parseObjectPath",
+        "probeObjectPathSegments"
+      ]
+    },
+    {
+      "route": "@migaia/utils/promise",
+      "symbols": ["admitAbortSignal"]
     },
     {
       "route": "@migaia/utils/scheduler",
-      "symbols": ["IScheduler", "systemScheduler"]
+      "symbols": [
+        "IScheduledTask",
+        "IScheduler",
+        "IWallClock",
+        "systemScheduler",
+        "systemWallClock"
+      ]
     }
   ],
+
   "targetedRules": [
     {
       "id": "SWV2-RED02",

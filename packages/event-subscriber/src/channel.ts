@@ -1032,11 +1032,9 @@ export const subscribeUntil = <T, R, V = undefined>(
     const read = tryReadProperty(signal, 'reason')
     if (read.threw) {
       captureFailed = true
-      captureFailure = read.error
-      throw read.error
+      throw (captureFailure = read.error)
     }
-    overlayReason = read.value
-    return overlayReason
+    return (overlayReason = read.value)
   }
   let sourceRelease: IUnsubscribe = () => undefined
   let released = false

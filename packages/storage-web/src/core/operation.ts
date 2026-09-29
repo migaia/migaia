@@ -1,4 +1,5 @@
 import type { IOperationContext } from '@migaia/storage-contract'
+import { tryReadProperty } from '@migaia/utils/error'
 import {
   createAbortTimeoutSignal,
   type IAbortSignal as IUtilsAbortSignal
@@ -46,11 +47,9 @@ const readSignalAborted = (signal: IWebAbortSignal | undefined): boolean => {
 /** Treat an inaccessible abort reason as the cancellation cause instead of leaking its getter. */
 export const readAbortReason = (signal: IWebAbortSignal | undefined): unknown => {
   if (signal === undefined) return undefined
-  try {
-    return signal.reason
-  } catch (cause) {
-    return cause
-  }
+  /** Storage operations use an inaccessible reason as the cancellation cause. */
+  const read = tryReadProperty(signal, 'reason')
+  return read.threw ? read.error : read.value
 }
 
 /** Subscribe once with race closure and return cleanup that cannot mask an operation result. */
