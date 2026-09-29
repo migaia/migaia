@@ -1,5 +1,5 @@
 import { createManualScheduler } from '@migaia/utils/scheduler'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope } from '../../src/contract/index.js'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
@@ -10,6 +10,111 @@ import type { IRpcTransport } from '../../src/core/transport.js'
 import type { IRpcAbortSignal } from '../../src/core/typing.js'
 
 describe('provider relative deadline (A6)', () => {
+  it('omits disabled deadlines and clears a settled provider timer', async () => {
+    const providerScheduler = createManualScheduler()
+    const clientScheduler = createManualScheduler()
+    const [clientWire, providerWire] = createMemoryTransportPair()
+    const sent: unknown[] = []
+    const capture: IRpcTransport = {
+      ...clientWire,
+      send(message, options) {
+        sent.push(message)
+        return clientWire.send(message, options)
+      }
+    }
+    let providerSignal: IRpcAbortSignal | undefined
+    const provider = await createProviderEndpoint({
+      id: 'provider',
+      transport: providerWire,
+      scheduler: providerScheduler,
+      middlewares: [connect({ transport: providerWire })],
+      provider: {
+        check: (context) => {
+          providerSignal = context.signal
+          return context.success(context.signal.aborted)
+        }
+      }
+    })
+    const client = await createClientEndpoint({
+      id: 'client',
+      transport: capture,
+      scheduler: clientScheduler,
+      middlewares: [connect({ transport: capture }), timeout()]
+    })
+    try {
+      expect(await client.send('provider', 'check', null, { timeoutMs: false })).toBe(false)
+      const disabled = sent
+        .map((value) => normalizeRpcEnvelope(value))
+        .find((value) => value.kind === 'request')
+      expect(disabled?.kind).toBe('request')
+      if (disabled?.kind !== 'request') return
+      expect(disabled.data.route.timeoutMs).toBeUndefined()
+      providerScheduler.advance(1_000_000)
+      clientScheduler.advance(1_000_000)
+      expect(providerSignal?.aborted).toBe(false)
+      const baseline = providerScheduler.pendingCount
+      expect(await client.send('provider', 'check', null, { timeoutMs: 100 })).toBe(false)
+      await vi.waitFor(() => expect(providerScheduler.pendingCount).toBe(baseline))
+    } finally {
+      await client.dispose()
+      await provider.dispose()
+    }
+  })
+
+  it('presents an injected zero deadline as an already aborted provider signal', async () => {
+    const [clientWire, providerWire] = createMemoryTransportPair()
+    const sent: unknown[] = []
+    const capture: IRpcTransport = {
+      ...clientWire,
+      send(message, options) {
+        sent.push(message)
+        return clientWire.send(message, options)
+      }
+    }
+    let observed!: (value: boolean) => void
+    const called = new Promise<boolean>((resolve) => {
+      observed = resolve
+    })
+    let calls = 0
+    const provider = await createProviderEndpoint({
+      id: 'provider',
+      transport: providerWire,
+      middlewares: [connect({ transport: providerWire })],
+      provider: {
+        check: (context) => {
+          calls += 1
+          if (calls === 2) observed(context.signal.aborted)
+          return context.success(null)
+        }
+      }
+    })
+    const client = await createClientEndpoint({
+      id: 'client',
+      transport: capture,
+      middlewares: [connect({ transport: capture })]
+    })
+    try {
+      await client.send('provider', 'check', null)
+      const request = sent
+        .map((value) => normalizeRpcEnvelope(value))
+        .find((value) => value.kind === 'request')
+      expect(request?.kind).toBe('request')
+      if (request?.kind !== 'request') return
+      await clientWire.send({
+        ...request,
+        id: 'zero-deadline',
+        data: {
+          ...request.data,
+          route: { ...request.data.route, timeoutMs: 0 }
+        }
+      })
+      expect(await called).toBe(true)
+    } finally {
+      await client.dispose()
+      await provider.dispose()
+    }
+  })
+
   it('aborts at the monotonic deadline even without the abort control capability', async () => {
     const scheduler = createManualScheduler()
     const wallClock = { timestamp: () => 0 }
