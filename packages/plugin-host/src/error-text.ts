@@ -412,6 +412,25 @@ const ERROR_TEXT = {
     return (name: string) =>
       localize(`插件 "${name}" 安装失败`, `plugin "${name}" failed to install`)
   },
+  /** `useSync` rejects a setup plugin before any hook runs; callers use the async path. */
+  SETUP_REQUIRES_ASYNC_INSTALL: (name: string) =>
+    localize(
+      `插件 "${name}" 的 setup 需要异步安装`,
+      `plugin "${name}" setup requires async installation`
+    ),
+  /** Definition admission requires the known setup key to contain a function. */
+  get PLUGIN_SETUP_FUNCTION() {
+    return localize('plugin setup 必须是函数', 'plugin setup must be a function')
+  },
+  /** Reports a setup rejection that arrived after its installation attempt closed. */
+  SETUP_LATE_REJECTION: (name: string) =>
+    localize(`插件 "${name}" 的 setup 迟到拒绝`, `plugin "${name}" setup rejected late`),
+  /** Reports failure to release a resource registered after setup closed. */
+  SETUP_LATE_RELEASE_FAILED: (name: string) =>
+    localize(
+      `插件 "${name}" 的 setup 迟到资源释放失败`,
+      `plugin "${name}" late setup resource release failed`
+    ),
   get PLUGIN_ROLLBACK_FAILED() {
     return (name: string) =>
       localize(`插件 "${name}" 安装失败且回滚失败`, `plugin "${name}" install rollback failed`)
