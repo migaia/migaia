@@ -1,6 +1,11 @@
 import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
-import { attachErrorIdentity, UtilsAbortError, UtilsTimeoutError } from './error.js'
+import {
+  attachErrorIdentity,
+  tryReadProperty,
+  UtilsAbortError,
+  UtilsTimeoutError
+} from './error.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from './scheduler.js'
 
 export { UtilsAbortError } from './error.js'
@@ -147,22 +152,18 @@ function observeAbort(signals: readonly IAbortSignal[]): IAbortObservation {
       return { kind: 'failed', error }
     }
     if (!aborted) continue
-    try {
-      return { kind: 'aborted', reason: signal.reason }
-    } catch (error) {
-      return { kind: 'aborted', reason: error }
-    }
+    /** Preserve a hostile getter failure as the cancellation reason. */
+    const read = tryReadProperty(signal, 'reason')
+    return { kind: 'aborted', reason: read.threw ? read.error : read.value }
   }
   return { kind: 'none' }
 }
 
 /** Reads one event-delivered abort reason without redundantly probing mutable aborted state. */
 function observeAbortReason(signal: IAbortSignal): unknown {
-  try {
-    return signal.reason
-  } catch (error) {
-    return error
-  }
+  /** The caller owns whether an inaccessible reason is reported or propagated. */
+  const read = tryReadProperty(signal, 'reason')
+  return read.threw ? read.error : read.value
 }
 
 /** Freezes the admission set so reentrant callers cannot change cleanup ownership. */
