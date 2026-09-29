@@ -1,4 +1,5 @@
-import { boundedWait, type ILifecycleScheduler } from '@migaia/lifecycle'
+import { boundedWait } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   DependencyMutationKind,
   DependencyPolicy,
@@ -48,7 +49,7 @@ type ICompositionStrictCleanupResult<TRegistration> = Readonly<{
 
 type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly host: object
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
   readonly pipelineDrainTimeoutMs: number | false
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   /** Host-owned dependency facts used for one whole-batch removal plan. */

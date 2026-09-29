@@ -4,9 +4,9 @@ import {
   createPendingTracker,
   createLifecycleScope,
   createProvisionalScope,
-  probeThenable,
-  type ILifecycleScheduler
+  probeThenable
 } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import { copyConfig, readPlainDataRecord } from './config.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -35,7 +35,7 @@ export type IInstallBatchContext<TDomainCore extends object, TValue> = {
 }
 
 type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonly<{
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
   /** Shared host state owning dependency facts and committed registration status. */
   readonly state: PluginHostState<TDomainCore, TValue>
   readonly snapshotBatch: () => IInstallBatchContext<TDomainCore, TValue>
