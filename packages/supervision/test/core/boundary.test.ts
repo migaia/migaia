@@ -3,10 +3,11 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import ts from 'typescript'
 
-/** Finds every implementation source, including the coroutine subentry. */
+/** Finds core and coroutine sources; each later profile owns its separate boundary oracle. */
 function sources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name)
+    if (entry.isDirectory() && (entry.name === 'process' || entry.name === 'threads')) return []
     return entry.isDirectory() ? sources(path) : path.endsWith('.ts') ? [path] : []
   })
 }
@@ -31,9 +32,14 @@ describe('A1 runtime-neutral boundary', () => {
       const text = readFileSync(path, 'utf8')
       expect(text, relativePath).not.toMatch(/host|plugin|rpc/i)
       expect(text, relativePath).not.toMatch(
-        /\b(?:NodeJS|Buffer|Window|Worker|Deno|Bun|process)\b|\bnode:|Reflect\.apply|\.call\(|\.apply\(|\.bind\(/
+        /\b(?:NodeJS|Buffer|Window|Worker|Deno|Bun)\b|\bnode:|Reflect\.apply|\.call\(|\.apply\(|\.bind\(/
       )
       const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true)
+      const checkIdentifiers = (node: ts.Node): void => {
+        if (ts.isIdentifier(node)) expect(node.text, relativePath).not.toBe('process')
+        ts.forEachChild(node, checkIdentifiers)
+      }
+      checkIdentifiers(file)
       for (const statement of file.statements) {
         if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue
         const value = statement.moduleSpecifier

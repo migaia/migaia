@@ -23,5 +23,7 @@ export const SupervisionErrorText = {
   /** Unit-producing command attempted after disposal completed. */
   scopeTerminal: 'supervisor is disposed',
   /** Coroutine progress probe exceeded its configured heartbeat window. */
-  heartbeatMissed: 'coroutine heartbeat missed'
+  heartbeatMissed: 'coroutine heartbeat missed',
+  /** Prior-run process recovery failed while leaving its registry record available for retry. */
+  orphanReclaimFailed: 'orphan process reclaim failed'
 } as const
