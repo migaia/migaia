@@ -6,37 +6,17 @@ import { defaultRuntimeAdapter } from './default-runtime-adapter.js'
 import {
   assimilateCapturedThen,
   inspectThenable as inspectCallbackThenable,
-  observeThenableRejection
+  observeThenableRejection,
+  probeThenable,
+  ThenableProbeKind
 } from '@migaia/utils/function'
+import { tryReadProperty } from '@migaia/utils/error'
 import { ReactiveErrorPhase } from './trace-constants.js'
-
-type IThenableInspection =
-  | { readonly handler: (resolve: unknown, reject: unknown) => void }
-  | { readonly error: unknown }
-  | undefined
-
-/** Reads a returned scheduler value once, preserving hostile `.then` getter failures as data. */
-function inspectThenable(value: unknown): IThenableInspection {
-  if ((value === null || typeof value !== 'object') && typeof value !== 'function') {
-    return undefined
-  }
-  try {
-    const then = (value as { then?: unknown }).then
-    return typeof then === 'function'
-      ? { handler: then as (resolve: unknown, reject: unknown) => void }
-      : undefined
-  } catch (error) {
-    return { error }
-  }
-}
 
 /** 只读 `cause`，hostile getter 抛错时按 `undefined` 处理（诊断通道不反向破坏结果）。 */
 const readCauseSafely = (error: Error): unknown => {
-  try {
-    return error.cause
-  } catch {
-    return undefined
-  }
+  const read = tryReadProperty(error, 'cause')
+  return read.threw ? undefined : read.value
 }
 
 /** 用 `defineProperty` 安全附加 `cause`；失败（frozen / non-extensible）返回 false。 */
@@ -151,13 +131,14 @@ export class Scheduler {
     try {
       const result = (strategy as (flush: () => void) => unknown)(flush)
       insideStrategyCall = false
-      const inspected = inspectThenable(result)
-      if (inspected === undefined) {
+      /** Shared probe retains the original getter failure and captured then method. */
+      const inspected = probeThenable(result)
+      if (inspected.kind === ThenableProbeKind.notThenable) {
         if (this.#strategy === strategy) this.#safeStrategy = strategy
         return
       }
       this.#recoverFromStrategyFailure(strategy, generation)
-      if ('error' in inspected) {
+      if (inspected.kind === ThenableProbeKind.failed) {
         this.#reportStrategyFailure(
           strategy,
           generation,
@@ -170,7 +151,7 @@ export class Scheduler {
         )
         return
       }
-      const settled = assimilateCapturedThen(inspected.handler, result)
+      const settled = assimilateCapturedThen(inspected.thenFn, result)
       void settled.then(
         () => {
           this.#reportStrategyFailure(

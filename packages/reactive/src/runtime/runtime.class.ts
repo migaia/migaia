@@ -1,3 +1,4 @@
+import { tryReadProperty } from '@migaia/utils/error'
 import { DependencyTracker } from './dependency-tracker.class.js'
 import { Scheduler } from './scheduler.class.js'
 import { VersionClock } from './version-clock.class.js'
@@ -57,16 +58,17 @@ export class Runtime implements IRuntime {
   constructor(options: IRuntimeOptions = {}) {
     /** Reads one option exactly once and converts getter failures into a package error. */
     const readOption = <K extends keyof IRuntimeOptions>(key: K): IRuntimeOptions[K] => {
-      try {
-        return options[key]
-      } catch (error) {
+      /** The read primitive leaves the option failure policy with this runtime. */
+      const read = tryReadProperty(options, key)
+      if (read.threw) {
         throw tagReactiveError(
           new TypeError(ReactiveErrorText.runtimeOptionGetterFailed(String(key)), {
-            cause: error
+            cause: read.error
           }),
           ReactiveErrorCode.invalidOption
         )
       }
+      return read.value
     }
 
     /** Reads one adapter method once, retaining the source object as its receiver. */
@@ -77,17 +79,17 @@ export class Runtime implements IRuntime {
       if (source === undefined) {
         return { fn: defaultRuntimeAdapter[key], receiver: defaultRuntimeAdapter }
       }
-      let value: unknown
-      try {
-        value = source[key]
-      } catch (error) {
+      /** Preserve the source object as the method receiver after this single read. */
+      const read = tryReadProperty(source, key)
+      if (read.threw) {
         throw tagReactiveError(
           new TypeError(ReactiveErrorText.runtimeAdapterGetterFailed(String(key)), {
-            cause: error
+            cause: read.error
           }),
           ReactiveErrorCode.invalidOption
         )
       }
+      const value = read.value
       if (value === undefined) {
         return { fn: defaultRuntimeAdapter[key], receiver: defaultRuntimeAdapter }
       }

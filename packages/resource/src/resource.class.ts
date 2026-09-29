@@ -10,7 +10,7 @@ import { internalsOf } from '@migaia/reactive/internals'
 import { internalRuntimeOf } from '@migaia/reactive/node-factories'
 import { claimOwnership } from '@migaia/reactive/ownership'
 import { registerDeps, registerDepVersions } from '@migaia/reactive/node-internals'
-import { attachSecondaryErrors } from '@migaia/utils/error'
+import { attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
 import {
   assimilateCapturedThen,
   createGenerationController,
@@ -172,11 +172,10 @@ function readResourceOption<T, K extends keyof IResourceOptions<T>>(
   key: K,
   message: string
 ): IResourceOptions<T>[K] {
-  try {
-    return options[key]
-  } catch (error) {
-    throw createResourceOptionTypeError(message, error)
-  }
+  /** The option failure remains the cause of the package-owned TypeError. */
+  const read = tryReadProperty(options, key)
+  if (read.threw) throw createResourceOptionTypeError(message, read.error)
+  return read.value
 }
 
 /** Snapshots and validates one initial cache value before runtime ownership is established. */
