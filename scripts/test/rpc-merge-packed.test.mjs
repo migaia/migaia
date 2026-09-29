@@ -15,6 +15,10 @@ const legacy = JSON.parse(
 const errorFormatDelta = JSON.parse(
   readFileSync(join(root, 'packages/rpc/test/fixtures/error-format-export-delta.json'), 'utf8')
 )
+/** I5's admitted contract and core additions extend the same frozen merge count. */
+const controlDelta = JSON.parse(
+  readFileSync(join(root, 'packages/rpc/test/fixtures/control-semantics-export-delta.json'), 'utf8')
+)
 const checks = [
   'subpath-imports',
   'obsolete-subpaths',
@@ -91,9 +95,9 @@ test('A11 packed consumer runs every preserved check against all 24 deep exports
   )
   assert.equal(subpaths.size, 24)
   for (const [name, record] of Object.entries(legacy)) {
-    /** Count the exact S8 removals and contract additions against the legacy surface. */
-    const removed = errorFormatDelta.removed[name] ?? []
-    const added = errorFormatDelta.added[name] ?? []
+    /** Count each reviewed export delta against the frozen merge surface. */
+    const removed = [...(errorFormatDelta.removed[name] ?? []), ...(controlDelta.removed[name] ?? [])]
+    const added = [...(errorFormatDelta.added[name] ?? []), ...(controlDelta.added[name] ?? [])]
     assert.equal(subpaths.get(name), record.names.length - removed.length + added.length, name)
   }
   assert.deepEqual([...obsoleteProbe(script)].sort(), [...obsolete].sort())

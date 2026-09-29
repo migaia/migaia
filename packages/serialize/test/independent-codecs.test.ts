@@ -9,7 +9,7 @@ import { defineCBORCodec } from '../src/codecs/cbor.js'
 import { defineJsonCodec } from '../src/codecs/json.js'
 import { defineMessagePackCodec } from '../src/codecs/message-pack.js'
 import { defineProtobufCodec } from '../src/codecs/protobuf.js'
-import { rpcProtocolV1 } from '../../rpc/dist/contract/index.js'
+import { RpcRouteProfile, RpcRouteType, rpcProtocolV1 } from '../../rpc/dist/contract/index.js'
 import {
   rpcEnvelopeDescriptorBase64,
   RpcEnvelopeSchema,
@@ -46,6 +46,16 @@ const protobufMessage = protobuf.parse(protobufSchema).root.lookupType('migaia.r
 
 /** Independent MessagePack encoder configured for plain maps. */
 const independentMessagePack = new Packr({ useRecords: false })
+
+/** A valid RPC 1.0 request route shared by protobuf interoperability fixtures. */
+const rpcRequestRoute = {
+  profile: RpcRouteProfile,
+  type: RpcRouteType.request,
+  applicationVersion: '1.0',
+  senderId: 'client',
+  targetId: 'server',
+  sentAt: 0
+} as const
 
 /** Byte-exact scalar vectors shared by both production and independent codec assertions. */
 const messagePackByteVectors: readonly IByteVector[] = [
@@ -177,7 +187,7 @@ describe('independent codec interoperability', () => {
       kind: 'request' as const,
       id: 'f3-request',
       method: 'echo',
-      data: { request: true }
+      data: { route: rpcRequestRoute, payload: { request: true } }
     }
     const { kind: requestKind, id: requestId, ...requestBody } = request
     const productionRequest = productionCodec.encode({
@@ -194,14 +204,24 @@ describe('independent codec interoperability', () => {
     expect(peerRequest.id).toBe(request.id)
     expect(JSON.parse(new TextDecoder().decode(peerRequest.payload))).toEqual({
       method: 'echo',
-      data: { request: true }
+      data: { route: rpcRequestRoute, payload: { request: true } }
     })
 
+    /** Response routes carry the method so a decoded failure remains independently routable. */
+    const responseRoute = {
+      profile: RpcRouteProfile,
+      type: RpcRouteType.response,
+      applicationVersion: '1.0',
+      senderId: 'server',
+      targetId: 'client',
+      sentAt: 1,
+      method: 'echo'
+    }
     const responseBody = {
       ok: false,
       code: 'REJECTED',
       message: 'peer rejected',
-      data: { retry: false },
+      data: { route: responseRoute, payload: { retry: false } },
       error: {
         source: 'peer',
         code: 'PEER_REJECTED',
@@ -241,7 +261,12 @@ describe('independent codec interoperability', () => {
       normalize: rpcProtocolV1.normalize
     })
     expect(() =>
-      productionCodec.encode({ kind: 'request', id: '', method: 'echo', data: null })
+      productionCodec.encode({
+        kind: 'request',
+        id: '',
+        method: 'echo',
+        data: { route: rpcRequestRoute }
+      })
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ENVELOPE' }))
     const invalidCases = [
       { kind: 'unknown', id: 'f3-invalid', payload: '{}' },
