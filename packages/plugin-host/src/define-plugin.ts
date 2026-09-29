@@ -17,8 +17,10 @@ import type {
 import type {
   IDefinedPluginConstraint,
   IPlugin,
+  IPluginCommon,
   IPluginConfig,
-  IPluginConstraint
+  IPluginConstraint,
+  IPluginSetupHooks
 } from './typing.js'
 
 type IStoredDefinition = IPluginDefinition<any>
@@ -246,6 +248,49 @@ export function definePlugin<
 >
 
 /** Functional full descriptor form retaining config and metadata shape. */
+export function definePlugin<
+  TCore extends object = Record<string, never>,
+  TExtension extends Record<string, unknown> = Record<string, never>,
+  TValue = never,
+  TConfig extends IPluginConfig = IPluginConfig,
+  TShared extends object = Record<string, never>,
+  const TName extends string = string,
+  TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object = Record<never, never>,
+  TDefinition extends object = object,
+  TSetup = unknown
+>(
+  definition: IPluginCommon<
+    TCore & import('./typing.js').IPluginHostCore<TValue>,
+    TConfig,
+    TFeatures,
+    TExpose
+  > &
+    IPluginSetupHooks<
+      TCore & import('./typing.js').IPluginHostCore<TValue>,
+      TExtension,
+      TConfig,
+      TFeatures,
+      TExpose,
+      TSetup
+    > &
+    Readonly<{ name: TName }> &
+    (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) &
+    TDefinition
+): IDefinedPluginConstraint<
+  TCore,
+  TValue,
+  TExtension,
+  TConfig,
+  TShared,
+  TName,
+  TFeatures,
+  TExpose,
+  TSetup
+> &
+  Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any, any, any, any> | 'name'>>
+
+/** Object definition without setup keeps its original one-argument hook signatures. */
 export function definePlugin<
   TCore extends object = Record<string, never>,
   TExtension extends Record<string, unknown> = Record<string, never>,

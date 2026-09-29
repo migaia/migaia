@@ -79,6 +79,28 @@ export type IPluginLifecycleCore<TConfig extends IPluginConfig = IPluginConfig> 
   readonly lifecycle: IPluginRegistrationContext
 }
 
+/** Attempt-scoped cancellation and deadline for setup, independent of later Host mutations. */
+export type IPluginSetupOperation = Readonly<{
+  readonly signal: IAbortSignal
+  /** Absolute deadline in the Host scheduler clock, or undefined without a mutation timeout. */
+  readonly deadlineAt: number | undefined
+  /** Reads the Host scheduler clock used for the deadline. */
+  now(): number
+}>
+
+/** Setup sees lifecycle capabilities but no Feature or pipeline output. */
+export type IPluginSetupContext<TConfig extends IPluginConfig = IPluginConfig> = Readonly<{
+  readonly config: IPluginLifecycleConfig<TConfig>
+  readonly operation: IPluginSetupOperation
+  readonly lifecycle: IPluginRegistrationContext
+  onDispose(resource: IPluginResource): void
+}>
+
+/** Produces one registration's setup output before Feature construction. */
+export type IPluginSetup<TConfig extends IPluginConfig, TSetup> = (
+  context: IPluginSetupContext<TConfig>
+) => TSetup | PromiseLike<TSetup>
+
 /**
  * 错误码已迁至 `./error-code.ts`（`docs/contracts/error-codes.md` §3.5 要求每包在 `src/error-code.ts` 单点声明）。此处
  * re-export 仅为保持既有导入路径可用，码值未变；新代码请直接从 `./error-code` 导入。
@@ -106,29 +128,19 @@ export type IPipelineConfig = { mode?: IMiddlewarePipelineMode }
  */
 export { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED }
 /** 通用插件契约；具体应用通过 TCore 暴露自己的领域能力。 */
-export type IPlugin<
+export type IPluginCommon<
   TCore,
-  TExt extends Record<string, unknown> = Record<string, never>,
-  TConfig extends IPluginConfig = IPluginConfig,
-  TShared extends object = Record<string, never>,
-  TFeatures extends IFeatureRecord = Record<never, never>,
-  TExpose extends object = Record<never, never>
+  TConfig extends IPluginConfig,
+  TFeatures extends IFeatureRecord,
+  TExpose extends object
 > = {
   readonly name: string
   readonly config?: TConfig
   readonly features?: TFeatures
-  readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose)
   readonly activation?: 'eager' | 'lazy'
-  install: (
-    core: TCore &
-      IPluginLifecycleCore<TConfig> &
-      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
-  ) => IPluginAwaitable<TExt>
   update?: (
     next: IReadonlyConfig<TConfig>,
-    core: TCore &
-      IPluginLifecycleCore<TConfig> &
-      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
+    core: IPluginHookCore<TCore, TConfig, TFeatures, TExpose>
   ) => IPluginAwaitable<void>
   /** Notification fired after installation and each later transition into the enabled state. */
   onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>
@@ -141,7 +153,94 @@ export type IPlugin<
   dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
-} & (TShared extends object ? unknown : never)
+}
+
+/** Feature-ready core passed to install and update. */
+export type IPluginHookCore<
+  TCore,
+  TConfig extends IPluginConfig,
+  TFeatures extends IFeatureRecord,
+  TExpose extends object
+> = TCore &
+  IPluginLifecycleCore<TConfig> &
+  Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
+
+/** A definition without setup keeps exactly the original one-argument hook signatures. */
+export type IPluginPlainHooks<
+  TCore,
+  TExt extends Record<string, unknown>,
+  TConfig extends IPluginConfig,
+  TFeatures extends IFeatureRecord,
+  TExpose extends object
+> = {
+  readonly setup?: undefined
+  readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose)
+  install: (core: IPluginHookCore<TCore, TConfig, TFeatures, TExpose>) => IPluginAwaitable<TExt>
+}
+
+/** A declared setup supplies its output only as the second argument to these hooks. */
+export type IPluginSetupHooks<
+  TCore,
+  TExt extends Record<string, unknown>,
+  TConfig extends IPluginConfig,
+  TFeatures extends IFeatureRecord,
+  TExpose extends object,
+  TSetup
+> = {
+  readonly setup: IPluginSetup<TConfig, TSetup>
+  readonly featureExpose?:
+    | TExpose
+    | ((core: TCore & IPluginLifecycleCore<TConfig>, setupOutput: NoInfer<TSetup>) => TExpose)
+  install: (
+    core: IPluginHookCore<TCore, TConfig, TFeatures, TExpose>,
+    setupOutput: NoInfer<TSetup>
+  ) => IPluginAwaitable<TExt>
+}
+
+/** Wildcard shape used only when extracting properties from either plugin variant. */
+export type IPluginAnyHooks<
+  TCore,
+  TExt extends Record<string, unknown>,
+  TConfig extends IPluginConfig,
+  TFeatures extends IFeatureRecord,
+  TExpose extends object
+> = {
+  readonly setup?: IPluginSetup<TConfig, any>
+  readonly featureExpose?:
+    | TExpose
+    | ((core: TCore & IPluginLifecycleCore<TConfig>, setupOutput?: any) => TExpose)
+  install: (
+    core: IPluginHookCore<TCore, TConfig, TFeatures, TExpose>,
+    setupOutput?: any
+  ) => IPluginAwaitable<TExt>
+}
+
+/** Selects plain, declared-setup, or wildcard hook shape from the setup axis. */
+export type IPluginHooks<
+  TCore,
+  TExt extends Record<string, unknown>,
+  TConfig extends IPluginConfig,
+  TFeatures extends IFeatureRecord,
+  TExpose extends object,
+  TSetup
+> = 0 extends 1 & TSetup
+  ? IPluginAnyHooks<TCore, TExt, TConfig, TFeatures, TExpose>
+  : [TSetup] extends [never]
+    ? IPluginPlainHooks<TCore, TExt, TConfig, TFeatures, TExpose>
+    : IPluginSetupHooks<TCore, TExt, TConfig, TFeatures, TExpose, TSetup>
+
+/** Plugin contract; the seventh axis exists only for a declared setup output. */
+export type IPlugin<
+  TCore,
+  TExt extends Record<string, unknown> = Record<string, never>,
+  TConfig extends IPluginConfig = IPluginConfig,
+  TShared extends object = Record<string, never>,
+  TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object = Record<never, never>,
+  TSetup = never
+> = IPluginCommon<TCore, TConfig, TFeatures, TExpose> &
+  IPluginHooks<TCore, TExt, TConfig, TFeatures, TExpose, TSetup> &
+  (TShared extends object ? unknown : never)
 
 /** 用于约束插件元组，同时保留每个插件自身的精确泛型。 */
 export type IPluginConstraint<
@@ -152,13 +251,7 @@ export type IPluginConstraint<
   readonly name: string
   readonly config?: unknown
   readonly features?: TFeatures
-  readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>) => TExpose)
   readonly activation?: 'eager' | 'lazy'
-  install: (
-    core: TCore &
-      IPluginLifecycleCore<any> &
-      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
-  ) => IPluginAwaitable<Record<string, unknown>>
   update?: (
     next: never,
     core: TCore &
@@ -174,11 +267,23 @@ export type IPluginConstraint<
   dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
-}
+} & (
+  | IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose>
+  | {
+      readonly setup: (context: IPluginSetupContext<any>) => unknown
+      readonly featureExpose?:
+        | TExpose
+        | ((core: TCore & IPluginLifecycleCore<any>, setupOutput?: any) => TExpose)
+      install: (
+        core: IPluginHookCore<TCore, any, TFeatures, TExpose>,
+        setupOutput?: any
+      ) => IPluginAwaitable<Record<string, unknown>>
+    }
+)
 
 /** Extracts one candidate's native Feature roots without widening a tuple element. */
 type IPluginConstraintFeatures<TPlugin> =
-  TPlugin extends IDefinedPluginConstraint<any, any, any, any, any, any, infer TFeatures, any>
+  TPlugin extends IDefinedPluginConstraint<any, any, any, any, any, any, infer TFeatures, any, any>
     ? TFeatures
     : TPlugin extends { readonly features?: infer TFeatures extends IFeatureRecord }
       ? TFeatures
@@ -301,7 +406,7 @@ export type IUniquePluginNames<
   : TPlugins extends readonly [infer THead, ...infer TTail]
     ? [THead] extends [never]
       ? readonly [THead, ...IUniquePluginNames<TTail, TSeen>]
-      : THead extends { readonly name: infer TName extends string }
+      : [THead] extends [{ readonly name: infer TName extends string }]
         ? string extends TName
           ? readonly [THead, ...IUniquePluginNames<TTail, TSeen>]
           : TName extends TSeen
@@ -340,8 +445,9 @@ export type IDefinedPluginConstraint<
   TShared extends object = Record<string, never>,
   TName extends string = string,
   TFeatures extends IFeatureRecord = Record<never, never>,
-  TExpose extends object = Record<never, never>
-> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose> &
+  TExpose extends object = Record<never, never>,
+  TSetup = never
+> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose, TSetup> &
   Readonly<{
     readonly name: TName
     getFeature<TKey extends Extract<keyof TFeatures, string>>(
@@ -356,7 +462,15 @@ export type IDefinedPluginConstraint<
   }>
 
 export type IExtractPluginExt<TPlugin> =
-  TPlugin extends IPlugin<infer _TCore, infer TExt, infer _TConfig, infer _TShared>
+  TPlugin extends IPlugin<
+    infer _TCore,
+    infer TExt,
+    infer _TConfig,
+    infer _TShared,
+    infer _TFeatures extends IFeatureRecord,
+    infer _TExpose extends object,
+    any
+  >
     ? TExt
     : Record<string, never>
 
