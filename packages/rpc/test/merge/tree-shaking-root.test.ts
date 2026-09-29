@@ -7,10 +7,10 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** K110 keeps the frozen baseline and admits only the measured I5 protocol implementation cost. */
+/** K114 keeps the frozen baseline and admits the measured guarded-read migration cost. */
 const allowedIncrease = {
-  rawBytes: 35043 / legacyRoot.rawBytes,
-  gzipBytes: 9488 / legacyRoot.gzipBytes
+  rawBytes: 35919 / legacyRoot.rawBytes,
+  gzipBytes: 9785 / legacyRoot.gzipBytes
 } as const
 
 /** I5 adds five required modules and removes the obsolete core route validator. */

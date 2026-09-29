@@ -1,6 +1,6 @@
 // Keep the internal compatibility path while preserving the canonical utility function identity.
 export { isUint8Array } from '@migaia/utils/bytes'
-import { attachErrorIdentity } from '@migaia/utils/error'
+import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
 import { ERROR_SOURCE, RpcCoreErrorCode } from '../error-code.js'
 import { RpcCoreErrorText } from '../error-text.js'
 
@@ -15,26 +15,25 @@ export function safeRead<T>(
   key: PropertyKey,
   report?: IRpcPropertyReadReporter
 ): T | undefined {
-  try {
-    if ((typeof value !== 'object' && typeof value !== 'function') || value === null)
-      return undefined
-    return (value as Record<PropertyKey, T>)[key]
-  } catch (error) {
-    /** The original read error stays first if the reporter also fails. */
-    let cause: unknown = error
-    if (report) {
-      try {
-        report({ key, error })
-      } catch (reportError) {
-        cause = new AggregateError([error, reportError], RpcCoreErrorText.propertyReadFailed)
-      }
-      if (cause === error) return undefined
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return undefined
+  /** The guarded read only captures the failure; this function owns its reporting policy. */
+  const read = tryReadProperty(value as Record<PropertyKey, T>, key)
+  if (!read.threw) return read.value
+  const error = read.error
+  /** The original read error stays first if the reporter also fails. */
+  let cause: unknown = error
+  if (report) {
+    try {
+      report({ key, error })
+    } catch (reportError) {
+      cause = new AggregateError([error, reportError], RpcCoreErrorText.propertyReadFailed)
     }
-    throw attachErrorIdentity(new TypeError(RpcCoreErrorText.propertyReadFailed, { cause }), {
-      source: ERROR_SOURCE,
-      code: RpcCoreErrorCode.propertyReadFailed
-    })
+    if (cause === error) return undefined
   }
+  throw attachErrorIdentity(new TypeError(RpcCoreErrorText.propertyReadFailed, { cause }), {
+    source: ERROR_SOURCE,
+    code: RpcCoreErrorCode.propertyReadFailed
+  })
 }
 
 /** Accepts only finite safe integer values from an untrusted boundary. */

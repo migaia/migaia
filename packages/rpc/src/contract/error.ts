@@ -1,4 +1,4 @@
-import { attachErrorIdentity } from '@migaia/utils/error'
+import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
 import { createContractError } from './contract-error.js'
 import { RpcContractErrorCode } from './error-code.js'
 import { normalizePortable } from './normalize.js'
@@ -68,12 +68,12 @@ function snapshotError(
     'errors',
     'cleanupErrors'
   ]) {
-    try {
-      fields[key] = (input as Record<string, unknown>)[key]
-    } catch (error) {
+    /** Keep each field's failure attached to its original pointer. */
+    const read = tryReadProperty(input as Record<string, unknown>, key)
+    if (read.threw) {
       failed.add(key)
-      report(pointer, key, error)
-    }
+      report(pointer, key, read.error)
+    } else fields[key] = read.value
   }
   return { fields, failed, truncated: failed.size > 0 }
 }
@@ -241,12 +241,12 @@ export function serializeRpcError(
           if (source.failed.has(key)) continue
           if (Object.hasOwn(source.fields, key)) record[key] = source.fields[key]
           else {
-            try {
-              record[key] = (input as Record<string, unknown>)[key]
-            } catch (error) {
+            /** Keep data-field reporting at the existing serialization boundary. */
+            const read = tryReadProperty(input as Record<string, unknown>, key)
+            if (read.threw) {
               node.truncated = true
-              report(pointer, key, error)
-            }
+              report(pointer, key, read.error)
+            } else record[key] = read.value
           }
         }
         if (enumerated) projectData(record, pointer, node, depth)
@@ -400,21 +400,21 @@ function appendChildren(
     return true
   }
   if (!array) return false
-  let length: number
-  try {
-    length = (input as unknown[]).length
-  } catch (error) {
-    report(pointer, 'length', error)
+  /** Array metadata is read once before admitting any children. */
+  const lengthRead = tryReadProperty(input as unknown[], 'length')
+  if (lengthRead.threw) {
+    report(pointer, 'length', lengthRead.error)
     return true
   }
+  const length = lengthRead.value
   let failed = false
   for (let index = 0; index < Math.min(length, RpcErrorReachLimit.maxObjects); index += 1) {
-    try {
-      output.push((input as unknown[])[index])
-    } catch (error) {
+    /** An index trap reports its original thrown value and skips only that child. */
+    const read = tryReadProperty(input as unknown[], index)
+    if (read.threw) {
       failed = true
-      report(pointer, String(index), error)
-    }
+      report(pointer, String(index), read.error)
+    } else output.push(read.value)
   }
   return failed || length > RpcErrorReachLimit.maxObjects
 }
@@ -431,13 +431,12 @@ function appendCleanupChildren(
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index]
     if ((typeof entry !== 'object' || entry === null) && typeof entry !== 'function') continue
-    try {
-      const error = (entry as Record<string, unknown>).error
-      if (error !== undefined) output.push(error)
-    } catch (error) {
+    /** Cleanup entry reads use the same original-error reporting policy. */
+    const read = tryReadProperty(entry as Record<string, unknown>, 'error')
+    if (read.threw) {
       failed = true
-      report(`${pointer}/cleanupErrors/${index}`, 'error', error)
-    }
+      report(`${pointer}/cleanupErrors/${index}`, 'error', read.error)
+    } else if (read.value !== undefined) output.push(read.value)
   }
   return failed
 }
@@ -460,6 +459,17 @@ export function normalizeRpcSerializedError(
     cause: unknown = value
   ): never {
     throw createInvalidWireError(cause, pointer, violation)
+  }
+
+  /** Keep all mandatory property reads on the same wire-error path. */
+  function readOrInvalid<T extends object, K extends keyof T>(
+    target: T,
+    key: K,
+    pointer: string
+  ): T[K] {
+    const read = tryReadProperty(target, key)
+    if (read.threw) invalid(pointer, RpcWireErrorViolation.read, read.error)
+    return read.value
   }
 
   /** Check one well-formed UTF-8 text unit and optionally debit the payload budget. */
@@ -539,11 +549,7 @@ export function normalizeRpcSerializedError(
         if (index < 5) invalid(`${pointer}/${key}`, RpcWireErrorViolation.required)
         continue
       }
-      try {
-        fields[key] = (input as Record<string, unknown>)[key]
-      } catch (error) {
-        invalid(`${pointer}/${key}`, RpcWireErrorViolation.read, error)
-      }
+      fields[key] = readOrInvalid(input as Record<string, unknown>, key, `${pointer}/${key}`)
       if (['source', 'code', 'name', 'message', 'stack'].includes(key)) {
         const field = fields[key]
         if (typeof field !== 'string' || (key !== 'message' && field.length === 0))
@@ -587,11 +593,7 @@ export function normalizeRpcSerializedError(
         invalid(`${pointer}/errors`, RpcWireErrorViolation.read, error)
       }
       if (!errorsArray) invalid(`${pointer}/errors`, RpcWireErrorViolation.type)
-      try {
-        errorsLength = (fields.errors as unknown[]).length
-      } catch (error) {
-        invalid(`${pointer}/errors/length`, RpcWireErrorViolation.read, error)
-      }
+      errorsLength = readOrInvalid(fields.errors as unknown[], 'length', `${pointer}/errors/length`)
       if (errorsLength === 0) invalid(`${pointer}/errors`, RpcWireErrorViolation.emptyErrors)
     }
     if (keys.includes('data')) {
@@ -613,13 +615,10 @@ export function normalizeRpcSerializedError(
       const children = fields.errors as unknown[]
       const normalized: IRpcSerializedError[] = []
       for (let index = 0; index < errorsLength; index += 1) {
-        let child: unknown
-        try {
-          child = children[index]
-        } catch (error) {
-          invalid(`${pointer}/errors/${index}`, RpcWireErrorViolation.read, error)
-        }
-        normalized.push(visit(child, `${pointer}/errors/${index}`, depth + 2))
+        const childPointer = `${pointer}/errors/${index}`
+        normalized.push(
+          visit(readOrInvalid(children, index, childPointer), childPointer, depth + 2)
+        )
       }
       result.errors = Object.freeze(normalized)
     }
