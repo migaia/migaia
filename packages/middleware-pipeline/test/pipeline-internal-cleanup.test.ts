@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createPipeline,
@@ -123,6 +125,9 @@ const expectInvalidOption = (
   if (hasCause) expect((failure as Error).cause).toBe(cause)
 }
 
+/** Source directory used to prove internal ownership and import order. */
+const sourceDirectory = fileURLToPath(new URL('../src/', import.meta.url))
+
 describe('pipeline internal cleanup', () => {
   it('A1 preserves invalid-option text, native type, and own cause for seven admissions', () => {
     const invalidMode = 'middleware pipeline mode is invalid'
@@ -203,6 +208,26 @@ describe('pipeline internal cleanup', () => {
         )
       expect(stage).not.toHaveBeenCalled()
     }
+  })
+
+  it('A3 has one error factory, one control admission, and ordered runtime imports', () => {
+    const files = readdirSync(sourceDirectory).filter((name) => name.endsWith('.ts'))
+    const source = files.map(
+      (name) => [name, readFileSync(`${sourceDirectory}/${name}`, 'utf8')] as const
+    )
+    expect(
+      source.flatMap(([name, text]) => [...text.matchAll(/new TypeError\(/g)].map(() => name))
+    ).toEqual(['signal-errors.ts'])
+    const create = source.find(([name]) => name === 'create-pipeline.ts')?.[1] ?? ''
+    const runtime = source.find(([name]) => name === 'runtime.ts')?.[1] ?? ''
+    expect(create).not.toContain('const invalidOption')
+    expect(runtime).not.toMatch(/readControlSignal|readAsyncSignal|invalidSignal/)
+    expect(runtime.lastIndexOf('import ')).toBeLessThan(
+      runtime.indexOf('function invokeWithContext')
+    )
+    expect(runtime).toMatch(
+      /\/\*\* Explicit generator result[^]*?\*\/\s*type IGeneratorUndefinedSignal/
+    )
   })
 
   it('A5 retains an Error thrown by reason getters across modes and timing', async () => {

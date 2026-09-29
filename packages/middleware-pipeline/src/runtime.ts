@@ -9,27 +9,6 @@ import {
 } from './signal-errors.js'
 import { MiddlewarePipelineSignalText } from './signal-text.js'
 
-/** Invokes a one-argument optional-context callback. */
-function invokeWithContext<TFirst, TResult>(
-  callback: (first: TFirst, context?: IMiddlewarePipelineContext) => TResult,
-  args: readonly [TFirst],
-  context: IMiddlewarePipelineContext | undefined
-): TResult
-/** Invokes a two-argument optional-context callback. */
-function invokeWithContext<TFirst, TSecond, TResult>(
-  callback: (first: TFirst, second: TSecond, context?: IMiddlewarePipelineContext) => TResult,
-  args: readonly [TFirst, TSecond],
-  context: IMiddlewarePipelineContext | undefined
-): TResult
-/** Implements both supported callback arities without reflective invocation. */
-function invokeWithContext(
-  callback: Function,
-  args: readonly [unknown] | readonly [unknown, unknown],
-  context: IMiddlewarePipelineContext | undefined
-): unknown {
-  if (args.length === 1) return context ? callback(args[0], context) : callback(args[0])
-  return context ? callback(args[0], args[1], context) : callback(args[0], args[1])
-}
 import {
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
@@ -55,10 +34,10 @@ export type {
   IMiddlewarePipelineViolationHandler
 } from './state-constants.js'
 
-/** Explicit generator result used when the payload itself may be undefined. */
 export { MIDDLEWARE_PIPELINE_SOURCE, MiddlewarePipelineErrorCode } from './error-code.js'
 export type { IMiddlewarePipelineErrorCode } from './error-code.js'
 
+/** Explicit generator result used when the payload itself may be undefined. */
 type IGeneratorUndefinedSignal<TValue> = undefined extends TValue
   ? typeof GENERATOR_UNDEFINED
   : never
@@ -110,6 +89,28 @@ export type IMiddlewarePipelineOptions = {
   /** Host-owned error construction for the stage+downstream failure case. */
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown
   readonly signal?: IMiddlewarePipelineAbortSignal
+}
+
+/** Invokes a one-argument optional-context callback. */
+function invokeWithContext<TFirst, TResult>(
+  callback: (first: TFirst, context?: IMiddlewarePipelineContext) => TResult,
+  args: readonly [TFirst],
+  context: IMiddlewarePipelineContext | undefined
+): TResult
+/** Invokes a two-argument optional-context callback. */
+function invokeWithContext<TFirst, TSecond, TResult>(
+  callback: (first: TFirst, second: TSecond, context?: IMiddlewarePipelineContext) => TResult,
+  args: readonly [TFirst, TSecond],
+  context: IMiddlewarePipelineContext | undefined
+): TResult
+/** Implements both supported callback arities without reflective invocation. */
+function invokeWithContext(
+  callback: Function,
+  args: readonly [unknown] | readonly [unknown, unknown],
+  context: IMiddlewarePipelineContext | undefined
+): unknown {
+  if (args.length === 1) return context ? callback(args[0], context) : callback(args[0])
+  return context ? callback(args[0], args[1], context) : callback(args[0], args[1])
 }
 
 /** One reusable next-call protocol shared by adapters and runners. */
