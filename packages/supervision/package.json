@@ -12,7 +12,8 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./coroutine": { "types": "./dist/coroutine/index.d.ts", "default": "./dist/coroutine/index.js" },
-    "./process": { "types": "./dist/process/index.d.ts", "default": "./dist/process/index.js" }
+    "./process": { "types": "./dist/process/index.d.ts", "default": "./dist/process/index.js" },
+    "./threads": { "types": "./dist/threads/index.d.ts", "default": "./dist/threads/index.js" }
   },
   "scripts": {
     "fmt": "oxfmt src test",
