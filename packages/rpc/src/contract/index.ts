@@ -1,5 +1,6 @@
 export { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.js'
 export { createDescriptor } from './protocol.js'
+export { fromJsonRpcError, toJsonRpcError } from './error-jsonrpc.js'
 export { normalizePortable } from './normalize.js'
 export { normalizeRpcEnvelope, rpcProtocol as rpcProtocolV1 } from './v1/index.js'
 export {
