@@ -1,4 +1,4 @@
 {
   "contract": ["INVALID_STREAM", "INVALID_WIRE_ERROR"],
-  "core": ["PROPERTY_READ_FAILED"]
+  "core": ["PROPERTY_READ_FAILED", "STREAM_RESULT_UNKNOWN"]
 }

@@ -162,6 +162,12 @@ export const RpcCoreErrorCode = {
   overloaded: 'OVERLOADED',
 
   /**
+   * A stream frame may have been sent before its transport rejected; the caller must open a fresh
+   * stream and never replay delivered values (streaming R7).
+   */
+  streamResultUnknown: 'STREAM_RESULT_UNKNOWN',
+
+  /**
    * Chunk frame 格式非法，作为 `RpcChunkError` 的基础码。
    *
    * 调用方检查分片配置（chunkSize ≥ 4）与对端实现；非法帧只触发 hooks，不重试。

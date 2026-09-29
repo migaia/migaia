@@ -80,7 +80,10 @@ export const createProviderFeature = (
           on: (event: string, listener: IRpcEventListener) => provider.on(event, listener)
         })
         registerEndpointDebugSnapshot(publicSurface, () => attachment!.debugSnapshot())
-        const preparedInstallation: IProviderInstallation = Object.freeze({ public: publicSurface })
+        const preparedInstallation: IProviderInstallation = Object.freeze({
+          public: publicSurface,
+          registerStream: (method, handler) => provider.provideStream(method, handler)
+        })
         installation = preparedInstallation
         return preparedInstallation
       }

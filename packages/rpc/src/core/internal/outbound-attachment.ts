@@ -6,6 +6,7 @@ import {
   RpcCoreErrorCode,
   RpcLifecycleError,
   RpcRemoteError,
+  RpcProtocolError,
   RpcTimeoutError
 } from '../errors.js'
 import { RpcMessageKind } from '../semantic-constants.js'
@@ -25,6 +26,7 @@ import {
   normalizePortable,
   normalizeRpcEnvelope,
   RpcControl,
+  RpcEnvelopeKind,
   RpcRouteProfile,
   RpcWireLimit,
   type IRpcEnvelope,
@@ -50,6 +52,7 @@ import { RpcVariationCoordinator } from './variation-coordinator.js'
 import { createSafeRecord, fanoutDeliveryKey } from './safe-value.js'
 import { readSelectedFramerChunks, type IRpcEndpointDebugSnapshot } from './test-observer.js'
 import type { IRpcDiscoveryResolverPort } from './plugin-shared-keys.js'
+import type { IRpcFrameAdmission, IRpcStreamOpenCommand } from './plugin-shared-keys.js'
 import type { IEndpointTimer } from './time-port.js'
 import { createEndpointTransportActivation } from './transport-activation.js'
 
@@ -75,7 +78,12 @@ export type IOutboundAttachmentHost = {
   readonly receiverId: string
   readonly kernel: IEndpointKernelHost
   readonly targetIds: readonly string[]
-  sendFrame(message: IRpcEnvelope, transfer?: readonly unknown[]): Promise<void>
+  sendFrame(
+    message: IRpcEnvelope,
+    transfer?: readonly unknown[],
+    admission?: IRpcFrameAdmission
+  ): Promise<void>
+  sendStreamOpen(command: IRpcStreamOpenCommand): Promise<void>
   dispatch(targetId: string, method: string, data: unknown): void
   sendOneWay(
     targetId: string,
@@ -335,10 +343,15 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         if (!admission) return
         try {
           this.kernel.assertActive(generation)
-          await this.kernel.dispatchRoute(
+          const handled = await this.kernel.dispatchRoute(
             envelope.kind,
             Object.freeze({ envelope, route, inbound: message, admission })
           )
+          if (!handled && envelope.kind === RpcEnvelopeKind.stream)
+            this.emitFailure(
+              new RpcProtocolError(RpcCoreErrorText.streamRouteUnclaimed),
+              RpcCoreErrorCode.protocolInvalid
+            )
         } finally {
           admission.release()
         }
@@ -607,34 +620,69 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     const taskId = allocateRpcId(this.#uuid, 'message', this.id, targetId, (id) =>
       this.#replay.hasReservedId(id)
     )
-    if (!this.#replay.reserveId(taskId))
+    return this.#sendUnansweredRequest({
+      id: taskId,
+      targetId,
+      method,
+      data,
+      transfer,
+      dispatchOnly: true
+    })
+  }
+
+  /** Emits the initial stream request without a normal response waiter or idempotency key. */
+  sendStreamOpen(command: IRpcStreamOpenCommand): Promise<void> {
+    this.kernel.assertActive()
+    assertMethod(command.targetId)
+    assertMethod(command.method)
+    this.#validateData(command.method, 'params', command.data)
+    return this.#sendUnansweredRequest(command)
+  }
+
+  /** Reuse one route header and replay reservation path for dispatch and stream-open. */
+  #sendUnansweredRequest(
+    command: Readonly<{
+      id: string
+      targetId: string
+      method: string
+      data: unknown
+      transfer?: readonly unknown[]
+      dispatchOnly?: true
+      operation?: IRpcStreamOpenCommand['operation']
+    }>
+  ): Promise<void> {
+    if (!this.#replay.reserveId(command.id))
       throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
     return Promise.resolve()
-      .then(() => this.resolveReceiver(targetId))
-      .then((receiver) =>
-        this.#pipeline.send(
+      .then(() => this.resolveReceiver(command.targetId))
+      .then((receiver) => {
+        if (command.operation?.signal.aborted) throw command.operation.signal.reason
+        const remaining = command.operation?.remaining()
+        if (remaining === 0) throw new RpcTimeoutError()
+        return this.#pipeline.send(
           normalizeRpcEnvelope({
-            kind: 'request' as const,
-            id: taskId,
-            method,
+            kind: 'request',
+            id: command.id,
+            method: command.method,
             data: {
               route: {
                 profile: RpcRouteProfile,
-                type: 'request' as const,
+                type: 'request',
                 applicationVersion: this.#version,
                 senderId: this.id,
-                targetId,
+                targetId: command.targetId,
                 ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
-                dispatchOnly: true,
-                sentAt: this.kernel.time.timestamp()
+                ...(command.dispatchOnly ? { dispatchOnly: true } : {}),
+                sentAt: this.kernel.time.timestamp(),
+                ...(typeof remaining === 'number' ? { timeoutMs: remaining } : {})
               },
-              ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
+              ...(command.data === undefined ? {} : { payload: command.data as IRpcPortableValue })
             }
           }),
-          transfer === undefined ? undefined : { transfer }
+          command.transfer === undefined ? undefined : { transfer: command.transfer }
         )
-      )
-      .finally(() => this.#replay.releaseId(taskId))
+      })
+      .finally(() => this.#replay.releaseId(command.id))
   }
 
   /** Installs the one discovery-backed selector for all outbound operation kinds. */
@@ -651,10 +699,15 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Sends a frame generated by the provider attachment through the canonical pipeline. */
-  sendFrame(message: IRpcEnvelope, transfer?: readonly unknown[]): Promise<void> {
-    return Promise.resolve().then(() =>
-      this.#pipeline.send(message, transfer === undefined ? undefined : { transfer })
-    )
+  sendFrame(
+    message: IRpcEnvelope,
+    transfer?: readonly unknown[],
+    admission?: IRpcFrameAdmission
+  ): Promise<void> {
+    return Promise.resolve().then(() => {
+      admission?.assertCanSend()
+      return this.#pipeline.send(message, transfer === undefined ? undefined : { transfer })
+    })
   }
 
   /**

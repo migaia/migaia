@@ -16,6 +16,7 @@ import type { IInboundIdentityAdmission, IInboundIdentityRequest } from './inbou
 import type { IVariationHandler } from './variation-coordinator.js'
 import type { RpcControl } from '../../contract/index.js'
 import type { IRpcEnvelope } from '../../contract/index.js'
+import type { IAbortSignal } from './async-control.js'
 
 /** Typed outbound owner port consumed by dependent feature descriptors. */
 export type IRpcOutboundAttachmentPort = IOutboundAttachmentHost
@@ -78,12 +79,35 @@ export const RpcPingEnablePortShape: IRpcPingEnablePort = Object.freeze({ enable
 export type IRpcUuidPort = { readonly generate?: IRpcUuidConfig['generate'] }
 
 /** Bounded provider command sent through the one outbound operation. */
+export type IRpcFrameAdmission = Readonly<{
+  readonly queueSignal?: IAbortSignal
+  readonly assertCanSend: () => void
+}>
+
+/** Initial stream request carries the sole stream operation's cancellation and remaining budget. */
+export type IRpcStreamOpenCommand = Readonly<{
+  readonly kind: 'stream-open'
+  readonly id: string
+  readonly targetId: string
+  readonly method: string
+  readonly data: unknown
+  readonly timeoutMs?: number
+  readonly operation: {
+    readonly signal: IAbortSignal
+    readonly remaining: () => number | false | undefined
+  }
+}>
+
+/** Bounded provider command sent through the one outbound operation. */
 export type IRpcOutboundCommand =
   | {
       readonly kind: 'response' | 'frame'
       readonly message: IRpcEnvelope
       readonly transfer?: readonly unknown[]
+      /** Stream frames may be withdrawn before their first physical write. */
+      readonly admission?: IRpcFrameAdmission
     }
+  | IRpcStreamOpenCommand
   | {
       readonly kind: 'dispatch'
       readonly targetId: string
@@ -118,7 +142,7 @@ export type IRpcOutboundCommand =
 /** Commands whose canonical transport operation is asynchronous. */
 export type IRpcResponseOutboundCommand = Extract<
   IRpcOutboundCommand,
-  { readonly kind: 'response' | 'frame' | 'one-way' }
+  { readonly kind: 'response' | 'frame' | 'one-way' | 'stream-open' }
 >
 
 /** Commands whose canonical owner must preserve synchronous throw timing. */

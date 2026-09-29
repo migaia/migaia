@@ -177,6 +177,22 @@ export class RpcProviderAttachment {
     return this
   }
 
+  /** Transfers one method to the stream owner without duplicating request admission. */
+  provideStream(method: string, handler: (message: unknown) => void | Promise<void>): () => void {
+    this.#kernel.assertActive()
+    if (typeof method !== 'string' || method.length === 0 || typeof handler !== 'function')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.providerDescriptorInvalid)
+    if (!this.#registry.registerStream(method, handler))
+      throw new RpcError(
+        RpcCoreErrorCode.providerDuplicated,
+        RpcCoreErrorText.providerDuplicated(method)
+      )
+    return () => {
+      if (this.#registry.streamProviders.get(method) === handler)
+        this.#registry.streamProviders.delete(method)
+    }
+  }
+
   /** Registers an inbound dispatch listener in the same provider registry as request handlers. */
   on(event: string, listener: IRpcEventListener): () => void {
     this.#kernel.assertActive()
@@ -300,6 +316,11 @@ export class RpcProviderAttachment {
       return
     if (this.#kernel.state !== 'active') return
     if (!record.admission) return
+    const stream = this.#registry.streamProviders.get(request.method)
+    if (stream) {
+      await stream(record)
+      return
+    }
     await this.#executor.execute({ envelope: request, route }, record.admission.token)
   }
 }
