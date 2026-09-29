@@ -33,3 +33,4 @@ export type {
 export { createProcessSupervisor } from './supervisor.js'
 export type { IOrphanReclaimResult } from './orphan.js'
 export { reclaimOrphanProcesses } from './orphan.js'
+export { createParentLossGuard } from './parent-loss.js'
