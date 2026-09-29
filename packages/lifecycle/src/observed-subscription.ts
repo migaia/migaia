@@ -2,6 +2,7 @@ import type { IAbortSignal } from './abort.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createLifecycleTypeError } from './errors.js'
+import { tryReadProperty } from '@migaia/utils/error'
 
 /** Idempotent handle for one lifecycle-owned abort registration. */
 export type IObservedAbortSubscription = {
@@ -77,18 +78,16 @@ export function observeAbortSubscription(
     delivered = true
     if (registrationInProgress) callbackDuringRegistration = true
     try {
-      let reason: unknown
-      try {
-        reason = signal.reason
-      } catch (error) {
+      /** The callback receives a getter failure as its original reason. */
+      const read = tryReadProperty(signal, 'reason')
+      if (read.threw) {
         try {
-          onFailure(error)
+          onFailure(read.error)
         } catch {
           // Native dispatch must not receive an operation callback failure.
         }
-        reason = error
       }
-      callback(reason)
+      callback(read.threw ? read.error : read.value)
     } catch (error) {
       try {
         onFailure(error)
