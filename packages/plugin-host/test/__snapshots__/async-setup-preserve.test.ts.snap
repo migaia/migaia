@@ -1,0 +1,45 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`A11 no-setup installation preservation > keeps hook arity, order, and microtask turns on every installation path 1`] = `
+{
+  "lazy": {
+    "activationToInstall": 0,
+    "events": [
+      "p.featureExpose:1",
+      "p.install:1",
+      "c.featureExpose:1",
+      "c.install:1",
+    ],
+    "providerToDependent": 5,
+  },
+  "replace": {
+    "events": [
+      "p.featureExpose:1",
+      "p.install:1",
+      "c.featureExpose:1",
+      "c.install:1",
+    ],
+    "providerToDependent": 20,
+  },
+  "sync": {
+    "completedBeforeReturn": true,
+    "events": [
+      "p.featureExpose:1",
+      "p.install:1",
+      "c.featureExpose:1",
+      "c.install:1",
+      "handle.featureExpose:1",
+      "handle.install:1",
+    ],
+  },
+  "use": {
+    "events": [
+      "p.featureExpose:1",
+      "p.install:1",
+      "c.featureExpose:1",
+      "c.install:1",
+    ],
+    "providerToDependent": 3,
+  },
+}
+`;
