@@ -78,7 +78,7 @@ const host = new Host({
 })
 ```
 
-**构造函数只接受同步安装的插件**：`new Host({ plugins: ... })` 这种写法不存在——`IPluginHostOptions` 没有 `plugins` 字段。构造期插件走的是子类内部调用受保护的 `useSync(plugins)`，其中任何一个插件的 `install()` 返回 Promise（或 thenable）都会立即抛 `TypeError`；需要异步安装的插件要在宿主构造完成后用 `await host.use(plugin)`。
+**构造函数只接受同步安装的插件**：`new Host({ plugins: ... })` 这种写法不存在——`IPluginHostOptions` 没有 `plugins` 字段。构造期插件走的是子类内部调用受保护的 `useSync(plugins)`，其中任何一个插件的 `install()` 返回 Promise（或 thenable）都会立即抛 `TypeError`；立即安装且声明 `setup` 的插件则在任何 hook 执行前抛顶层 `SETUP_REQUIRES_ASYNC_INSTALL`。需要准备阶段的插件在宿主构造完成后用 `await host.use(plugin)`；惰性插件可经 `useSync` 登记，随后由 `activate()` 异步运行 setup。
 
 ### 实例 API
 
@@ -134,6 +134,7 @@ const prefix: IPlugin<IPluginCore, { greet(name: string): void }, IPluginConfig>
 | ----------------------------------------------- | --------------------------------------------------------------------------- | ------ | ----------------------- | --------- | ------------------------------------------------------------------------------------------------------------------- |
 | `name: string`                                  | 非空字符串，**不能包含 `.`**                                                | 必填   | 无                      | —         | 当前 Host 内的唯一插件标识；含 `.` 会在安装入口直接被拒绝（避免和 `config.get('plugin.key')` 的路径解析产生歧义）。 |
 | `config?: TConfig`                              | `TConfig extends Record<string, unknown>`                                   | 可选   | 无                      | —         | 初始配置；Host 以深拷贝的所有权快照保存（见 [§5](#5-配置系统)）。                                                   |
+| `setup?(context)`                               | `IPluginSetupContext<TConfig>`                                               | 可选   | 任意值或 Promise        | 异步安装  | 在 Feature 构造和 install 前准备资源；输出原样传入后续两个钩子的第二参数。                                           |
 | `install(core)`                                 | 领域 core 与 `config.get()`、Feature 输出、`onDispose()`、pipeline 注册方法 | 必填   | `TExt \| Promise<TExt>` | 视情况    | 初始化插件并返回 plain extension record；同步安装（`useSync`）不允许返回 Promise。                                  |
 | `features`                                      | 命名 Feature 定义或 provider 的 Feature 引用                                | 可选   | Feature record          | 同步      | 声明本插件提供和消费的实例能力；依赖拓扑由 Host 统一解析。                                                          |
 | `update?(next, core)`                           | `next: IReadonlyConfig<TConfig>`，候选完整配置                              | 可选   | `void \| Promise<void>` | 视情况    | 响应 `config.update`；成功返回才提交 `next`，且 `next` 只能读取。                                                   |
@@ -171,7 +172,7 @@ const configurable = definePlugin({
 | API / 签名                              | 参数                                                                 | 必填性          | 返回值               | 同步/异步 | 作用                                                                                 |
 | --------------------------------------- | -------------------------------------------------------------------- | --------------- | -------------------- | --------- | ------------------------------------------------------------------------------------ |
 | `core.config.get<T>()`                  | 可选泛型 `T`，通常由插件 `config` 推导                               | 无运行时参数    | `IReadonlyConfig<T>` | 同步      | 当前插件已提交配置的只读懒代理；嵌套对象/数组按访问路径缓存代理，不允许修改。        |
-| `core.onDispose(resource)`              | `IPluginResource`（函数 / `Symbol.dispose` / `Symbol.asyncDispose`） | `resource` 必填 | `void`               | 同步      | **仅 `install()` 期间可调用**；否则抛 `RESOURCE_OUTSIDE_INSTALL`；卸载时按逆序执行。 |
+| `core.onDispose(resource)`              | `IPluginResource`（函数 / `Symbol.dispose` / `Symbol.asyncDispose`） | `resource` 必填 | `void`               | 同步      | **仅安装期间可调用**；setup 使用 `context.onDispose`；尝试关闭后的迟到登记先释放有效资源再抛 `RESOURCE_OUTSIDE_INSTALL`。 |
 | `core.usePipeline(stage)`               | `stage: (value, next) => void`                                       | `stage` 必填    | `core`               | 同步      | 仅 install 期间注册；sync stage 可提升到任意 Host mode。                            |
 | `core.useAsyncPipeline(stage)`          | `stage: (value, next) => void \| Promise<void>`                      | `stage` 必填    | `core`               | 同步      | 仅 install 期间、且 Host mode 为 `async` 时可用。                                    |
 | `core.useGeneratorPipeline(stage)`      | `stage: (value) => Generator`                                        | `stage` 必填    | `core`               | 同步      | 仅 install 期间，可用于 `generator` 与 `async-generator` mode。                      |
@@ -181,7 +182,41 @@ const configurable = definePlugin({
 
 `onDispose` 接受函数、`{ [Symbol.dispose]() }` 或 `{ [Symbol.asyncDispose]() }`。同步安装（构造函数期通过 `useSync` 安装）的插件也可注册 async disposer：Host 会先同步撤销可见状态，再通过 `PLUGIN_INSTALL_FAILED.detail.completion` 提供包含完整 rollback identities 的冻结结果；需要完整 secondary identity 的错误转换必须 await completion。资源、shared、pipeline stage 和 extension 都由这次安装记录拥有；`unUse()` 时会按逆序撤销它们（见 [§10](#10-资源清理协议)）。
 
-**不要把 `use`、`unUse`、`config.update` 或 `dispose` 暴露给插件 core。** 插件也不得在自己的 lifecycle hook（`install`/`update`/`dispose`）内部调用当前 Host 的这几个方法——这会同步抛出 `LIFECYCLE_MUTATION`，见 [§8](#8-生命周期与错误)。
+**不要把 `use`、`unUse`、`config.update` 或 `dispose` 暴露给插件 core。** 插件也不得在自己的 lifecycle hook（包括 `setup`、`install`、`update`、`dispose`）内部调用当前 Host 的这些方法；setup 等待期间从外部调用 Host mutation 或 `config.update` 同样同步抛 `LIFECYCLE_MUTATION`，见 [§8](#8-生命周期与错误)。
+
+### 安装前的异步 setup
+
+对象形式 `definePlugin` 可声明 `setup(context)`；函数形式 descriptor 不提供这个字段。每次异步安装依次执行领域 core 构造、setup、`featureExpose(core, setupOutput)`、Feature 工厂、`install(core, setupOutput)`，同批插件按依赖拓扑串行。领域 core 的构造因此可能在 setup 失败前发生一次。`setupOutput` 保持原对象身份；未声明 setup 的插件，两个钩子仍各只收到一个 core 参数。
+
+`context` 是当前安装尝试的窄接口：`config.get()` 读取配置，`operation.signal` 在本次期限到达或宿主关闭时 abort，`operation.deadlineAt` 是注入 scheduler 的绝对时刻（无期限时为 `undefined`），`operation.now()` 读取同一个时钟，`lifecycle.signal` 保持注册代际的生命周期，`onDispose(resource)` 将函数或带 dispose 符号的资源交给本次安装事务。setup 没有 `features`、`featureExpose` 或 pipeline 注册能力。成功后只关闭 setup 的登记窗口，不中止它的 `operation.signal`；插件可继续使用其已返回的 setup 输出。移除插件时，setup 登记的资源按安装逆序释放。
+
+```ts
+import { definePlugin, PluginHost } from '@migaia/plugin-host'
+
+const host = new PluginHost<Record<string, never>>({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
+})
+const plugin = definePlugin({
+  name: 'prepared',
+  setup: async (context) => {
+    const resource = { closed: false }
+    context.onDispose(() => { resource.closed = true })
+    await Promise.resolve()
+    return { resource }
+  },
+  featureExpose: (_core, output) => ({ isOpen: () => !output.resource.closed }),
+  install: (_core, output) => ({ isOpen: () => !output.resource.closed })
+})
+const [handle] = await host.use(plugin)
+handle.extensions.isOpen() // true
+await host.dispose()
+```
+
+setup 与后续 install 共用本注册的 `mutationTimeoutMs` 绝对期限；超时或宿主 `dispose()` 会回滚已登记资源，并使 setup signal abort。setup 永不兑现时，`dispose()` 仍能完成。迟到兑现被丢弃，迟到拒绝经 `diagnostic` 报告，协作取消回显同一个 abort reason 不重复上报。尝试关闭后再调用保留的 `context.onDispose(resource)`，有效资源会立即释放并抛 `RESOURCE_OUTSIDE_INSTALL`；资源无 disposer 时抛 `INVALID_OPTION`。
+
+`use()`、替换候选与组合预备的 setup 失败以 `PLUGIN_INSTALL_FAILED` 返回，原错误保持在 `cause`；惰性 `activate()` 原样抛出原错误。恢复重装若失败，诊断的 `DEPENDENT_RESTART_FAILED.cause.errors[0]` 仅对 `PLUGIN_INSTALL_FAILED` 包装解开一层；其他带 `cause` 的原错误保持其自身身份。setup 期间新发起的 Host mutation 和 `config.update` 同步抛 `LIFECYCLE_MUTATION`；在 setup 前已排队的变更继续按 FIFO 等待，若配置了 `queueAdmissionTimeoutMs` 可被队列拒绝。调用方应在安装完成后重试。
+
+迁移：过去对象上的 `setup` 是普通元数据；现在该键必须是函数，并在异步安装时执行。原来以它存数据的插件须改名；没有元数据回退。同步构造路径将这类插件改为 `await host.use(plugin)`，或登记为惰性后调用 `activate()`。
 
 TypeScript 的"已安装插件"类型（`TInstalled` 元组）只会随 `use()` 累加，不会因 `unUse()` 递减；卸载后的类型仍应视为静态能力记录，这是当前 API 的已知限制，不是 bug——运行时行为是正确的（方法确实被移除了），只是类型层面不会收窄。
 
@@ -300,7 +335,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 1. `use()` 逐个安装批次内的插件；任一安装失败会把这次批次里已安装的插件按逆序回滚。
 2. `unUse()` 依次移除 pipeline stage → 插件自身的 `dispose()`/`Symbol.dispose`/`Symbol.asyncDispose` → 释放 shared key → `onDispose()` 登记的资源 disposer → 移除已挂载的 extension 属性。
-3. **插件 lifecycle hook 内禁止调用当前 Host 的 `use`、`unUse`、`config.update` 或 `dispose`**——这些调用会同步抛出 `LIFECYCLE_MUTATION`。应用组合层负责维护插件之间的安装/卸载拓扑，插件本身不应该自己触发宿主级变更。
+3. **插件 lifecycle hook（包括 setup）内禁止调用当前 Host 的 `use`、`unUse`、`config.update` 或 `dispose`**；setup 等待期间外部代码调用 Host mutation 或 `config.update` 也同步抛 `LIFECYCLE_MUTATION`。应用组合层负责维护插件之间的安装/卸载拓扑。
 4. cleanup 报错时，Host 仍会移除该插件的可发现状态（从注册表移除、撤销 extension），随后返回的 Promise 才 reject——错误上报和状态清理是分离的两件事，一个失败不会阻塞另一个。
 5. Host 被 dispose 后，所有访问/变更 API 都会以 `PluginHostError` reject 或抛出；入口守卫（如内部的 `#assertActive()`）同步抛出，队列内运行时失败以 rejected Promise 返回。
 
@@ -310,7 +345,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 `use`/`unUse`/`config.update` 内部共用一个严格 FIFO 的 mutation 队列（基于 `@migaia/lifecycle` 的 `createMutationQueue`）；`dispose()` 作为终态操作单独入队，永远不受排队拒绝阈值驱逐。排队等待多久会被拒绝**完全由构造选项决定，不是固定值**——见 [§2](#2-host-公开-api-参考) 的 `queueAdmissionTimeoutMs`/`queueAdmissionDiagnosticMs`：默认（两者都不传）只在等待超过 1 秒时发一条诊断，不拒绝；只有显式传入 `queueAdmissionTimeoutMs: <number>` 才会在等待超过该阈值时以 `MUTATION_QUEUE_TIMEOUT` reject 排队中的任务。已经开始执行的插件代码不会被强制中断，超时只影响排在它后面、尚未开始执行的任务；超时后前序工作仍会正常完成，Host 也仍可接受新的 mutation——一次排队超时不会把 Host 永久置为不可用状态。
 
-如果某个插件的 `install()`/`dispose()`/`update()` 在自己执行期间又调用了宿主的 mutation 方法并且直接 `await` 其结果，会形成自依赖：这个新任务排在当前批次后面，而当前批次要等它完成才能继续。若配置了 `queueAdmissionTimeoutMs`，这种自依赖会在阈值到达后转成一次可捕获的 `MUTATION_QUEUE_TIMEOUT` 失败，而不是永久卡死；若未配置（默认），这种自依赖只会持续触发诊断，不会自动解开。**正确的做法始终是插件永远不要同步等待自己触发的宿主级 mutation**——需要联动的话用 fire-and-forget（发起调用但不 await 它的结果）。
+setup 运行期间 Host mutation 与 `config.update` 由同步守卫拒绝，不会进入队列。若某个变更在 setup 前、队列由不持有守卫的任务占用时已经入队，它继续按 FIFO 等待；配置了 `queueAdmissionTimeoutMs` 时，等待超阈值会以 `MUTATION_QUEUE_TIMEOUT` 拒绝。插件不要在自己的 lifecycle hook 中触发宿主级变更；需要联动时由应用组合层在安装完成后发起。
 
 同样的自依赖也可能发生在 `dispose()` 的清理阶段：如果某个 pipeline disposer、resource disposer 或插件的 `dispose()` 钩子反过来又 `await` 了触发它的这次 `host.dispose()` 调用，该调用会返回同一个仍在等待这一步完成的 Promise，形成循环等待。Host 为每一步 disposer 的等待设了 `disposeStepTimeoutMs`（默认 5000ms，可配置或用 `false` 关闭）：超时后这一步被计为失败（`DISPOSE_STEP_TIMEOUT`）并继续清理流程，disposal 事务本身仍会收敛到 `disposed`，不会因为一个 disposer 的自依赖而永久停在 `closing`。
 
@@ -370,8 +405,8 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 | `EXTENSION_NON_ENUMERABLE_IGNORED` | 诊断（非抛出）：`install()` 返回值上的非枚举 key 被有意忽略，未挂载到 Host；通过 `diagnostic` 回调上报。                                                                                                                                                                         |
 | `PREREQUISITE_DISABLED`            | feature provider 被禁用；可启用该插件后重试。                                                                                                                                                                                                                                    |
 | `PREREQUISITE_REMOVED`             | feature provider 已卸载；需重新安装 provider。                                                                                                                                                                                                                                   |
-| `RESOURCE_OUTSIDE_INSTALL`         | 在允许的插件生命周期之外注册资源或 pipeline stage。                                                                                                                                                                                                                              |
-| `LIFECYCLE_MUTATION`               | 插件生命周期钩子内尝试变更 Host，见 [§8](#8-生命周期与错误)。                                                                                                                                                                                                                    |
+| `RESOURCE_OUTSIDE_INSTALL`         | 在允许的插件生命周期之外注册资源或 pipeline stage；setup 尝试关闭后的 `context.onDispose` 先释放有效资源再抛此码。                                                                                                                                                              |
+| `LIFECYCLE_MUTATION`               | 插件生命周期钩子内或 setup 等待期间尝试变更 Host；setup 期间的 `config.update` 也同步抛此码，见 [§8](#8-生命周期与错误)。                                                                                                                                                     |
 | `INVALID_PIPELINE_MODE`            | 构造时传入的 pipeline mode 无效。                                                                                                                                                                                                                                                |
 | `PIPELINE_MODE_MISMATCH`           | stage 不能由 middleware-pipeline runner 提升到 Host mode；顶层为带 Host 身份的 `PluginHostError`，`cause` 保留上游 `TypeError`（`INVALID_OPTION`，source 为 `@migaia/middleware-pipeline`）。                                                                                       |
 | `PIPELINE_NEXT_DUPLICATE`          | 同一次 stage 调用里重复调用了 `next()`。                                                                                                                                                                                                                                         |
