@@ -39,4 +39,10 @@ export {
 } from './errors.js'
 export type { IRpcCoreErrorCode, IRpcError, IRpcCleanupError } from './errors.js'
 export type { IRpcTransport, IRpcSendOptions, IRpcTransportTopology } from './transport.js'
+export {
+  createRpcIdempotencyStore,
+  type IRpcIdempotencyClaim,
+  type IRpcIdempotencyOutcome,
+  type IRpcIdempotencyStore
+} from './idempotency-store.js'
 export * from './middleware/index.js'

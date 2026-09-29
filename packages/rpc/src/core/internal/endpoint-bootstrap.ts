@@ -30,7 +30,8 @@ import type {
   IRpcPlugin,
   IRpcMiddleware,
   IRpcProvider,
-  IRpcProviderLimits
+  IRpcProviderLimits,
+  IRpcIdempotencyConfig
 } from '../typing.js'
 import type { IRpcTransport } from '../transport.js'
 import { RpcPlatform } from '../transport-constants.js'
@@ -107,6 +108,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   factoryProvider: Readonly<Record<string, IRpcProvider>> | undefined,
   factoryProviderLimits: IRpcProviderLimits | undefined,
   factoryReplay: IRpcFactoryConfig['replay'],
+  factoryIdempotency: IRpcIdempotencyConfig | undefined,
   transport: IRpcTransport,
   platform: IRpcPlatform,
   encodedType: string | undefined,
@@ -224,7 +226,8 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
         ping: pingCapability?.enabled
       },
       initialHookEvents: installHookEvents,
-      replay: factoryReplay
+      replay: factoryReplay,
+      idempotency: factoryIdempotency
     }
   }
 }
@@ -258,6 +261,8 @@ export async function prepareEndpoint<
   /** Original injected wall clock value captured with all other outer configuration fields. */
   let factoryWallClock: unknown
   let factoryReplay: IRpcFactoryConfig['replay']
+  /** Idempotency is read before Host installation and then snapshotted once. */
+  let factoryIdempotency: IRpcIdempotencyConfig | undefined
   let factoryProtocol: IRpcFactoryConfig['protocol']
   let factoryCodec: IRpcFactoryConfig['codec']
   let factoryFramer: IRpcFactoryConfig['framer']
@@ -285,6 +290,28 @@ export async function prepareEndpoint<
   } catch (error) {
     if (error instanceof RpcError) throw error
     throw new RpcError(RpcCoreErrorCode.invalidConfig, 'factory descriptor is unreadable', error)
+  }
+  try {
+    const input = config.idempotency
+    if (input !== undefined) {
+      if (typeof input !== 'object' || input === null || Array.isArray(input))
+        throw new RpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
+      const store = input.store
+      const scope = input.scope
+      if (
+        (store !== undefined &&
+          (typeof store !== 'object' || store === null || typeof store.claim !== 'function')) ||
+        (scope !== undefined && typeof scope !== 'function')
+      )
+        throw new RpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
+      factoryIdempotency = Object.freeze({
+        ...(store === undefined ? {} : { store }),
+        ...(scope === undefined ? {} : { scope })
+      })
+    }
+  } catch (cause) {
+    if (cause instanceof RpcConfigurationError) throw cause
+    throw new RpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid, cause)
   }
   if (typeof factoryId !== 'string' || factoryId.length === 0)
     throw new RpcError(RpcCoreErrorCode.invalidConfig, 'id must be a non-empty string')
@@ -463,6 +490,7 @@ export async function prepareEndpoint<
         factoryProvider as IRpcFactoryConfig<TTargetId>['provider'],
         factoryProviderLimits as IRpcFactoryConfig<TTargetId>['providerLimits'],
         factoryReplay,
+        factoryIdempotency,
         transport,
         platform as IRpcPlatform,
         encodedType as string | undefined,

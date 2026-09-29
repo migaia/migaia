@@ -1,15 +1,17 @@
 import { RpcPlatform } from '../transport-constants.js'
 import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from '../errors.js'
-import { RpcMessageKind, RpcVariation } from '../semantic-constants.js'
+import { RpcMessageKind } from '../semantic-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
   deserializeRpcError,
   normalizeRpcEnvelope,
+  RpcControl,
+  RpcRouteProfile,
   type IRpcEnvelope,
+  type IRpcEnvelopeData,
   type IRpcSerializedError
 } from '../../contract/index.js'
-import { RpcRoutingProfile, type IRpcRoutingData } from './routing-data.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IInboundIdentityAdmission } from './inbound-identity.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
@@ -24,6 +26,7 @@ import { ProviderExecutor } from './provider-executor.js'
 import { ProviderRegistry } from './provider.js'
 import { RequestReplayLedger } from './request-replay-ledger.js'
 import { tupleKey } from './safe-value.js'
+import { createRpcIdempotencyStore } from '../idempotency-store.js'
 import {
   readSelectedFramerChunks,
   recordProviderRegistration,
@@ -103,6 +106,11 @@ export class RpcProviderAttachment {
     this.#replay = new RequestReplayLedger(4096, 1024, 310_000)
     this.#executor = new ProviderExecutor({
       timestamp: () => kernel.time.timestamp(),
+      now: () => kernel.time.now(),
+      setTimeout: (task, delayMs) => kernel.time.setTimeout(task, delayMs),
+      clearTimeout: (timer) => kernel.time.clearTimeout(timer),
+      idempotencyStore: prepared.options.idempotency?.store ?? createRpcIdempotencyStore(),
+      idempotencyScope: prepared.options.idempotency?.scope,
       id: this.#id,
       registry: this.#registry,
       controllers: this.#controllers,
@@ -124,12 +132,12 @@ export class RpcProviderAttachment {
       },
       isReplay: (request, peerKey) =>
         this.#replay.has(
-          tupleKey(peerKey, request.route.webRpc.senderId, request.envelope.id),
+          tupleKey(peerKey, request.route.route.senderId, request.envelope.id),
           kernel.time.scheduler.now()
         ),
       admitReplay: (request, peerKey) =>
         this.#replay.admit(
-          tupleKey(peerKey, request.route.webRpc.senderId, request.envelope.id),
+          tupleKey(peerKey, request.route.route.senderId, request.envelope.id),
           peerKey,
           kernel.time.scheduler.now()
         ),
@@ -138,7 +146,7 @@ export class RpcProviderAttachment {
           readonly found: boolean
           readonly reason: unknown
         },
-      responseReceiverId: (request) => request.route.webRpc.senderId
+      responseReceiverId: (request) => request.route.route.senderId
     })
     kernel.registerOwner('provider-registry', this.#registry)
     kernel.registerOwner('request-replay', this.#replay)
@@ -148,7 +156,7 @@ export class RpcProviderAttachment {
     kernel.registerRoute(RpcMessageKind.request, (message) => this.#receiveRequest(message))
     this.#releaseAbortHandler = this.#variations.admit({
       operation: 'register',
-      variation: RpcVariation.abort,
+      variation: RpcControl.abort,
       handler: (message, peerKey) => this.#receiveAbort(message, peerKey)
     }) as () => void
     for (const [method, provider] of snapshotProviderEntries(prepared.providers))
@@ -252,18 +260,22 @@ export class RpcProviderAttachment {
    */
   #receiveAbort(message: unknown, peerKey: string): void {
     if (!this.#abortEnabled) return
-    const record = message as { envelope?: IRpcEnvelope; route?: IRpcRoutingData }
+    const record = message as { envelope?: IRpcEnvelope; route?: IRpcEnvelopeData }
     const envelope = record.envelope
     const route = record.route
-    if (envelope?.kind !== 'variation' || route?.webRpc.type !== 'variation') return
-    const key = tupleKey(peerKey, route.webRpc.senderId, envelope.id)
+    if (envelope?.kind !== 'variation' || route?.route.type !== 'variation') return
+    const key = tupleKey(peerKey, route.route.senderId, envelope.id)
     this.#variations.admit({
       operation: 'abort',
       key,
       controller: this.#controllers.get(key),
       expiresAt: this.#kernel.time.now() + 310_000,
-      reason: decodeAbortReason(route.payload, (error) =>
-        this.#outbound.send({ kind: 'report', error, code: RpcCoreErrorCode.protocolInvalid })
+      reason: decodeAbortReason(
+        route.payload,
+        (error) =>
+          this.#outbound.send({ kind: 'report', error, code: RpcCoreErrorCode.protocolInvalid }),
+        (pointer, field) =>
+          this.#outbound.noteUnknownField(peerKey, 'variation', `/data/payload${pointer}`, field)
       )
     })
   }
@@ -272,7 +284,7 @@ export class RpcProviderAttachment {
   async #receiveRequest(message: unknown): Promise<void> {
     const record = message as {
       envelope?: IRpcEnvelope
-      route?: IRpcRoutingData
+      route?: IRpcEnvelopeData
       inbound?: IProviderInbound
       admission?: IInboundIdentityAdmission
     }
@@ -281,9 +293,9 @@ export class RpcProviderAttachment {
     if (
       !request ||
       request.kind !== 'request' ||
-      route?.webRpc.type !== 'request' ||
-      route.webRpc.targetId !== this.#id ||
-      route.webRpc.receiverId !== this.#receiverId
+      route?.route.type !== 'request' ||
+      route.route.targetId !== this.#id ||
+      route.route.receiverId !== this.#receiverId
     )
       return
     if (this.#kernel.state !== 'active') return
@@ -293,10 +305,14 @@ export class RpcProviderAttachment {
 }
 
 /** Decode a present abort payload while keeping cancellation effective on malformed input. */
-function decodeAbortReason(payload: unknown, report: (error: unknown) => void): unknown {
+function decodeAbortReason(
+  payload: unknown,
+  report: (error: unknown) => void,
+  onUnknownField: (pointer: string, field: string) => void
+): unknown {
   if (payload === undefined) return undefined
   try {
-    return deserializeRpcError(payload)
+    return deserializeRpcError(payload, { unknownFields: 'ignore', onUnknownField })
   } catch (error) {
     report(error)
     return error
@@ -320,7 +336,7 @@ function toCanonicalResponse(response: unknown): IRpcEnvelope {
     readonly sentAt: number
   }
   const route = {
-    profile: RpcRoutingProfile,
+    profile: RpcRouteProfile,
     type: 'response' as const,
     applicationVersion: current.version,
     senderId: current.senderId,
@@ -336,7 +352,7 @@ function toCanonicalResponse(response: unknown): IRpcEnvelope {
       ok: true,
       id: current.taskId,
       data: {
-        webRpc: route,
+        route: route,
         ...(current.data === undefined ? {} : { payload: current.data })
       } as never
     })
@@ -347,7 +363,7 @@ function toCanonicalResponse(response: unknown): IRpcEnvelope {
     code: current.code ?? RpcCoreErrorCode.internal,
     message: current.message ?? RpcCoreErrorText.remoteRequestFailed,
     data: {
-      webRpc: route,
+      route: route,
       ...(current.data === undefined ? {} : { payload: current.data })
     } as never,
     ...(current.serializedError === undefined ? {} : { error: current.serializedError })

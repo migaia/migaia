@@ -3,6 +3,7 @@ import type { IRpcTransport } from './transport.js'
 import type { IRpcFeature } from './feature.js'
 import type { IRpcMiddlewareComponentContribution, IRpcNativeMiddleware } from './middleware.js'
 import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '../contract/index.js'
+import type { IRpcIdempotencyStore } from './idempotency-store.js'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { IRpcPlatformValue as IProtocolWebRpcPlatform } from './transport-constants.js'
 import type { IRpcCandidateStatus, IRpcOperation } from './transport-constants.js'
@@ -13,6 +14,8 @@ export type IRpcProviderResult =
 export type IRpcContext = {
   readonly data: unknown
   readonly signal: IRpcAbortSignal
+  /** Opaque trace supplied by the caller; downstream sends must pass it explicitly. */
+  readonly trace?: string
   success(data?: unknown, options?: { readonly transfer?: readonly unknown[] }): IRpcProviderResult
   failed(message: string, code: string): IRpcProviderResult
   dispatchTo(input: { readonly id?: string; readonly method: string; readonly data: unknown }): void
@@ -33,6 +36,12 @@ export type ISendOptions = {
   readonly idempotencyKey?: string
   readonly trace?: string
 }
+
+/** A session owner may inject shared deduplication with an authenticated scope function. */
+export type IRpcIdempotencyConfig = Readonly<{
+  store?: IRpcIdempotencyStore
+  scope?: (admission: Readonly<{ token: string; senderId: string }>) => string
+}>
 export type IRpcHookEvent = {
   readonly name: string
   readonly at: number
@@ -333,6 +342,8 @@ export type IRpcFactoryConfig<
   readonly provider?: Readonly<Record<string, IRpcProvider>>
   /** Provider concurrency budgets; defaults to 256 global and 64 per peer. */
   readonly providerLimits?: IRpcProviderLimits
+  /** Optional store and session scope used only for keyed provider requests. */
+  readonly idempotency?: IRpcIdempotencyConfig
   /** Bounds outbound identifier replay reservations for this endpoint. */
   readonly replay?: {
     /** Maximum retained outbound request identifiers; defaults to 4096. */
