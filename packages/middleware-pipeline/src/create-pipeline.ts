@@ -99,7 +99,7 @@ const ignoreViolation: IMiddlewarePipelineViolationHandler = () => undefined
 
 /** Admits only ordinary option records at construction and run boundaries. */
 const isOptionRecord = (value: unknown): value is object =>
-  value !== null && typeof value === 'object' && !Array.isArray(value)
+  value !== null && !Array.isArray(value) && typeof value === 'object'
 
 /** Returns whether a runtime value belongs to the public mode domain. */
 const isPipelineMode = (value: unknown): value is IMiddlewarePipelineMode =>
@@ -156,10 +156,11 @@ const selectSignal = (
   options: INormalizedPipelineOptions,
   control: unknown
 ): IMiddlewarePipelineAbortSignal | undefined => {
-  if (control !== undefined && !isOptionRecord(control))
+  if (control === undefined) return options.signal
+  if (!isOptionRecord(control))
     throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
   /** Call-time signal wins when supplied; creation signal remains the fallback. */
-  return (control as IMiddlewarePipelineControlOptions | undefined)?.signal ?? options.signal
+  return (control as IMiddlewarePipelineControlOptions).signal ?? options.signal
 }
 
 /** Promotes one stage through the canonical existing adapter matrix. */

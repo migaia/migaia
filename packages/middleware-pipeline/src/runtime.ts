@@ -146,7 +146,12 @@ const createNextGuard = <TValue, TResult>(
   })
 }
 
-const makeAbortError = (reason: unknown): Error => createMiddlewarePipelineAbortError(reason)
+/** Reads one observed abort reason and applies the package's Error identity policy. */
+const makeAbortError = (signal: IMiddlewarePipelineAbortSignal): Error => {
+  const read = tryReadProperty(signal, 'reason')
+  return createMiddlewarePipelineAbortError(read.threw ? read.error : read.value)
+}
+/** Applies structural signal admission inside each mode's own throw boundary. */
 const admit = (
   signal: IMiddlewarePipelineAbortSignal | undefined
 ): IMiddlewarePipelineContext | undefined => {
@@ -156,17 +161,12 @@ const admit = (
     throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, {
       cause: admission.cause
     })
-  if (admission.aborted) {
-    const read = tryReadProperty(signal, 'reason')
-    throw makeAbortError(read.threw ? read.error : read.value)
-  }
+  if (admission.aborted) throw makeAbortError(signal)
   return Object.freeze({ signal })
 }
+/** Rechecks cooperative cancellation between public runner transitions. */
 const check = (context: IMiddlewarePipelineContext | undefined): void => {
-  if (context?.signal.aborted) {
-    const read = tryReadProperty(context.signal, 'reason')
-    throw makeAbortError(read.threw ? read.error : read.value)
-  }
+  if (context?.signal.aborted) throw makeAbortError(context.signal)
 }
 
 type IAsyncControlPath = {
@@ -298,6 +298,7 @@ export const adaptSyncStageToAsyncGenerator = <TValue>(
 ): IAsyncGeneratorMiddlewareStage<TValue> =>
   adaptGeneratorStageToAsyncGenerator(adaptSyncStageToGenerator(stage, onViolation))
 
+/** Runs a synchronous stage sequence with one admitted signal and synchronous failure timing. */
 export const runSyncMiddleware = <TValue>(
   stages: readonly ISyncMiddlewareStage<TValue>[],
   value: TValue,
@@ -333,6 +334,7 @@ export const runSyncMiddleware = <TValue>(
   invokeWithContext(done, [current], context)
 }
 
+/** Runs an asynchronous stage sequence with runner-owned downstream failure composition. */
 export const runAsyncMiddleware = async <TValue>(
   stages: readonly IAsyncMiddlewareStage<TValue>[],
   value: TValue,
@@ -480,6 +482,7 @@ export const runAsyncMiddleware = async <TValue>(
   await step(value)
 }
 
+/** Reduces generator stages while cleaning up an iterator if cancellation interrupts a yield. */
 export const runGeneratorMiddleware = <TValue>(
   stages: readonly IGeneratorMiddlewareStage<TValue>[],
   value: TValue,
@@ -519,6 +522,7 @@ export const runGeneratorMiddleware = <TValue>(
 }
 
 /** Serially drains asynchronous generator stages and commits only each terminal transition. */
+/** Reduces asynchronous generator stages and awaits cancellation cleanup before rejecting. */
 export const runAsyncGeneratorMiddleware = async <TValue>(
   stages: readonly IAsyncGeneratorMiddlewareStage<TValue>[],
   value: TValue,
