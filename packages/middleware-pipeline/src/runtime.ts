@@ -144,29 +144,7 @@ const createNextGuard = <TValue, TResult>(
   })
 }
 
-const invalidSignal = (cause?: unknown): TypeError =>
-  createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, { cause })
 const makeAbortError = (reason: unknown): Error => createMiddlewarePipelineAbortError(reason)
-const readControlSignal = (
-  control: IMiddlewarePipelineControlOptions | null | undefined
-): IMiddlewarePipelineAbortSignal | undefined => {
-  if (control === undefined) return undefined
-  if (
-    control === null ||
-    (typeof control !== 'object' && typeof control !== 'function') ||
-    Array.isArray(control)
-  )
-    throw invalidSignal()
-  return control.signal
-}
-const readAsyncSignal = (
-  options: IMiddlewarePipelineOptions | null | undefined
-): IMiddlewarePipelineAbortSignal | undefined => {
-  if (options === null || options === undefined) throw invalidSignal()
-  if ((typeof options !== 'object' && typeof options !== 'function') || Array.isArray(options))
-    throw invalidSignal()
-  return options.signal
-}
 const admit = (
   signal: IMiddlewarePipelineAbortSignal | undefined
 ): IMiddlewarePipelineContext | undefined => {
@@ -317,10 +295,10 @@ export const runSyncMiddleware = <TValue>(
   value: TValue,
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void,
   onViolation: IMiddlewarePipelineViolationHandler,
-  control?: IMiddlewarePipelineControlOptions,
+  signal?: IMiddlewarePipelineAbortSignal,
   assertActive?: () => void
 ): void => {
-  const context = admit(readControlSignal(control))
+  const context = admit(signal)
   assertActive?.()
   /** Caller-stage identity snapshot; dispatch never observes later list mutation. */
   const stageSnapshot = stages.slice()
@@ -353,7 +331,7 @@ export const runAsyncMiddleware = async <TValue>(
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>,
   options: IMiddlewarePipelineOptions
 ): Promise<void> => {
-  const context = admit(readAsyncSignal(options))
+  const context = admit(options.signal)
   /** Caller-stage identity snapshot; async dispatch never re-reads the mutable input list. */
   const stageSnapshot = stages.slice()
   let index = -1
@@ -499,10 +477,10 @@ export const runGeneratorMiddleware = <TValue>(
   value: TValue,
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void,
   signals: IGeneratorMiddlewareSignals = MiddlewarePipelineGeneratorSignals,
-  control?: IMiddlewarePipelineControlOptions,
+  signal?: IMiddlewarePipelineAbortSignal,
   assertActive?: () => void
 ): void => {
-  const context = admit(readControlSignal(control))
+  const context = admit(signal)
   assertActive?.()
   /** Caller-stage identity snapshot; generator dispatch uses one fixed stage sequence. */
   const stageSnapshot = stages.slice()
@@ -538,10 +516,10 @@ export const runAsyncGeneratorMiddleware = async <TValue>(
   value: TValue,
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>,
   signals: IGeneratorMiddlewareSignals = MiddlewarePipelineGeneratorSignals,
-  control?: IMiddlewarePipelineControlOptions,
+  signal?: IMiddlewarePipelineAbortSignal,
   assertActive?: () => void
 ): Promise<void> => {
-  const context = admit(readControlSignal(control))
+  const context = admit(signal)
   assertActive?.()
   /** Caller-stage identity snapshot; async iteration never re-reads the mutable input list. */
   const stageSnapshot = stages.slice()
