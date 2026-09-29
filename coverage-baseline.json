@@ -508,6 +508,28 @@
         "pct": 80.24
       }
     },
+    "supervision": {
+      "lines": {
+        "covered": 674,
+        "total": 759,
+        "pct": 88.8
+      },
+      "statements": {
+        "covered": 734,
+        "total": 867,
+        "pct": 84.65
+      },
+      "functions": {
+        "covered": 133,
+        "total": 145,
+        "pct": 91.72
+      },
+      "branches": {
+        "covered": 417,
+        "total": 545,
+        "pct": 76.51
+      }
+    },
     "tray": {
       "lines": {
         "covered": 649,
@@ -12102,6 +12124,380 @@
         "covered": 44,
         "total": 45,
         "pct": 97.77
+      }
+    },
+    "packages/supervision/src/admission.ts": {
+      "lines": {
+        "covered": 10,
+        "total": 10,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 12,
+        "total": 12,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 7,
+        "total": 8,
+        "pct": 87.5
+      }
+    },
+    "packages/supervision/src/budget.ts": {
+      "lines": {
+        "covered": 120,
+        "total": 129,
+        "pct": 93.02
+      },
+      "statements": {
+        "covered": 133,
+        "total": 152,
+        "pct": 87.5
+      },
+      "functions": {
+        "covered": 21,
+        "total": 24,
+        "pct": 87.5
+      },
+      "branches": {
+        "covered": 73,
+        "total": 94,
+        "pct": 77.65
+      }
+    },
+    "packages/supervision/src/constants.ts": {
+      "lines": {
+        "covered": 14,
+        "total": 14,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 14,
+        "total": 14,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/coroutine/constants.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/coroutine/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/coroutine/launcher.ts": {
+      "lines": {
+        "covered": 57,
+        "total": 63,
+        "pct": 90.47
+      },
+      "statements": {
+        "covered": 58,
+        "total": 66,
+        "pct": 87.87
+      },
+      "functions": {
+        "covered": 14,
+        "total": 15,
+        "pct": 93.33
+      },
+      "branches": {
+        "covered": 16,
+        "total": 19,
+        "pct": 84.21
+      }
+    },
+    "packages/supervision/src/coroutine/supervisor.ts": {
+      "lines": {
+        "covered": 15,
+        "total": 19,
+        "pct": 78.94
+      },
+      "statements": {
+        "covered": 15,
+        "total": 19,
+        "pct": 78.94
+      },
+      "functions": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 20,
+        "total": 25,
+        "pct": 80
+      }
+    },
+    "packages/supervision/src/coroutine/types.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/error-code.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/error-text.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/errors.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/health.ts": {
+      "lines": {
+        "covered": 47,
+        "total": 48,
+        "pct": 97.91
+      },
+      "statements": {
+        "covered": 54,
+        "total": 59,
+        "pct": 91.52
+      },
+      "functions": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 27,
+        "total": 40,
+        "pct": 67.5
+      }
+    },
+    "packages/supervision/src/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/options.ts": {
+      "lines": {
+        "covered": 29,
+        "total": 35,
+        "pct": 82.85
+      },
+      "statements": {
+        "covered": 30,
+        "total": 39,
+        "pct": 76.92
+      },
+      "functions": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 39,
+        "total": 48,
+        "pct": 81.25
+      }
+    },
+    "packages/supervision/src/supervisor.ts": {
+      "lines": {
+        "covered": 328,
+        "total": 379,
+        "pct": 86.54
+      },
+      "statements": {
+        "covered": 361,
+        "total": 439,
+        "pct": 82.23
+      },
+      "functions": {
+        "covered": 62,
+        "total": 70,
+        "pct": 88.57
+      },
+      "branches": {
+        "covered": 211,
+        "total": 284,
+        "pct": 74.29
+      }
+    },
+    "packages/supervision/src/types.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/supervision/src/unit-teardown.ts": {
+      "lines": {
+        "covered": 47,
+        "total": 55,
+        "pct": 85.45
+      },
+      "statements": {
+        "covered": 50,
+        "total": 60,
+        "pct": 83.33
+      },
+      "functions": {
+        "covered": 15,
+        "total": 15,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 21,
+        "total": 24,
+        "pct": 87.5
       }
     },
     "packages/tray/src/adapter/define-adapter.ts": {
