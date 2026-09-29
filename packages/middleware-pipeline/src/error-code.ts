@@ -10,7 +10,10 @@ export const MiddlewarePipelineErrorCode = {
    * `combineStageAndDownstreamError` 接管领域错误。
    */
   executionFailed: 'EXECUTION_FAILED',
-  /** Signal shape invalid at admission; caller must provide a structural abort signal. */
+  /**
+   * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The
+   * caller must correct the supplied option rather than retrying the same input.
+   */
   invalidOption: 'INVALID_OPTION',
   /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */
   aborted: 'ABORTED',

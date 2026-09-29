@@ -306,4 +306,21 @@ describe('pipeline internal cleanup', () => {
       }
     }
   })
+  it('A6 uses guarded reason reads and documents every invalid-option scenario', () => {
+    const files = readdirSync(sourceDirectory).filter((name) => name.endsWith('.ts'))
+    const source = files
+      .map((name) => readFileSync(`${sourceDirectory}/${name}`, 'utf8'))
+      .join('\n')
+    const runtime = readFileSync(`${sourceDirectory}/runtime.ts`, 'utf8')
+    const codes = readFileSync(`${sourceDirectory}/error-code.ts`, 'utf8')
+    expect(runtime).toMatch(/import \{ tryReadProperty \} from '@migaia\/utils\/error'/)
+    expect((runtime.match(/tryReadProperty\([^\n]*, 'reason'\)/g) ?? []).length).toBe(2)
+    expect(source).not.toMatch(/\.reason\b/)
+    const comment = codes.slice(
+      codes.indexOf('/**', codes.indexOf('executionFailed:')),
+      codes.indexOf("invalidOption: 'INVALID_OPTION'")
+    )
+    for (const scenario of ['mode', 'onViolation', 'signal', 'signals', 'lift'])
+      expect(comment).toContain(scenario)
+  })
 })
