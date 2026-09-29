@@ -104,5 +104,22 @@ export const RpcCoreErrorText = {
   protectedEncodedType: (encodedType: string): string =>
     `Protected frame output must be ${encodedType}`,
   /** Identifies an authentication transform that failed before transport send. */
-  authenticationFailed: 'Authentication transform failed'
+  authenticationFailed: 'Authentication transform failed',
+  /** Public validation text for a trace identifier outside the printable bounded wire domain. */
+  traceInvalid: 'trace must be 1-256 printable ASCII characters',
+  /** Public validation text for an idempotency key outside the bounded wire domain. */
+  idempotencyKeyInvalid: 'idempotencyKey is invalid',
+  /** Public validation text for a relative peer drain outside the wire duration domain. */
+  drainInvalid: 'drainMs must be a non-negative integer within the limit',
+  /** Configuration text for an invalid endpoint idempotency store or scope function. */
+  idempotencyConfigInvalid: 'idempotency configuration is invalid',
+  /** Explains that a completed keyed call cannot be replayed because its result was not retained. */
+  idempotencyResultUnavailable: 'Idempotency result is unavailable',
+  /** Public backpressure text when the bounded keyed-call store cannot admit another tuple. */
+  idempotencyStoreFull: 'Idempotency store is full',
+  /** Preserves the duplicate control handler's existing native TypeError message. */
+  variationHandlerDuplicate: (variation: string): string =>
+    `variation handler already registered: ${variation}`,
+  /** Preserves the existing duplicate manual query listener message and code. */
+  manualQueryListenerDuplicate: 'only one manual query listener may be registered'
 } as const

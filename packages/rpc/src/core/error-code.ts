@@ -169,7 +169,13 @@ export const RpcCoreErrorCode = {
   chunkInvalid: 'CHUNK_INVALID',
 
   /** 无同步报告器的 safeRead 遇到 getter/Proxy 抛错，或报告器自身抛错（R11）。 调用方应修复输入对象，或在拥有诊断 sink 的边界传入同步 report。 */
-  propertyReadFailed: 'PROPERTY_READ_FAILED'
+  propertyReadFailed: 'PROPERTY_READ_FAILED',
+
+  /**
+   * A keyed call already executed but its result was not retained for replay. The caller must
+   * resolve the outcome before issuing another non-idempotent attempt.
+   */
+  idempotencyResultUnavailable: 'IDEMPOTENCY_RESULT_UNAVAILABLE'
 } as const
 
 export type IRpcCoreErrorCode = (typeof RpcCoreErrorCode)[keyof typeof RpcCoreErrorCode]

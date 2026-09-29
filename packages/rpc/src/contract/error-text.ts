@@ -11,5 +11,11 @@ export const RpcContractErrorText = {
   frameLimitExceeded: 'rpc frame limit exceeded',
   frameAssemblyExpired: 'rpc frame assembly expired',
   /** Stable message for invalid wire error payloads reported by contract validation. */
-  invalidWireError: 'rpc wire error is invalid'
+  invalidWireError: 'rpc wire error is invalid',
+  /** Public diagnostic for a handshake message that fails protocol 1.0 validation. */
+  handshakeInvalid: 'rpc handshake is invalid',
+  /** Public diagnostic when protocol identity or major versions cannot be negotiated. */
+  handshakeIncompatible: 'rpc handshake is incompatible',
+  /** Public diagnostic for a rejected remote handshake with its original cause retained. */
+  handshakeRejected: 'rpc handshake was rejected'
 } as const
