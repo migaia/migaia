@@ -12,10 +12,17 @@ The contract layer has no dependency on transports, runtimes, codecs, workers, o
 
 ```ts
 import rpcV1, { normalizeRpcEnvelope, rpcProtocol } from '@migaia/rpc/contract/v1'
+import { RpcRouteProfile } from '@migaia/rpc/contract'
 import { messageFramer } from '@migaia/rpc/contract/framing/v1'
 import { messageFramerV1 } from '@migaia/rpc/contract/framing'
 
-const envelope = rpcProtocol.normalize({ kind: 'request', id: '1', method: 'ping', data: null })
+const envelope = rpcProtocol.normalize({
+  kind: 'request', id: '1', method: 'ping',
+  data: { route: {
+    profile: RpcRouteProfile, type: 'request', applicationVersion: '1',
+    senderId: 'client', targetId: 'server', sentAt: 0
+  } }
+})
 const sameProtocol = rpcV1.rpcProtocol === rpcProtocol
 const sameFramer = messageFramer === messageFramerV1
 const normalized = normalizeRpcEnvelope(envelope)
@@ -23,6 +30,40 @@ const normalized = normalizeRpcEnvelope(envelope)
 
 The frozen default `rpcV1` aggregates the named V1 exports. The contract entry’s `rpcProtocolV1` and
 `normalizeRpcEnvelope`, plus `messageFramerV1`, remain the same runtime identities for existing callers.
+
+Protocol 1.0 gives every request, response, discovery, and variation envelope a `data.route`
+header. The normalizer keeps only declared fields, reports unknown fields through
+`onUnknownField(pointer, field)`, and returns a frozen snapshot. Variation payloads remain opaque
+until their control handler decodes them; other payloads must be portable. Unknown kinds are
+discarded with a `protocol.unknown-field` warning by the receiving core. The kind table in the
+contract normalizer is the extension point for a negotiated future minor version; protocol 1.0
+vectors are frozen from the commit that first adds `schema/vectors/frozen/1.0/SHA256SUMS`.
+
+`createRpcHello`, `normalizeRpcHandshake`, `acceptRpcHandshake`, and `completeRpcHandshake` from
+`@migaia/rpc/contract` implement the UTF-8 first-message handshake. Process channels call these
+before creating endpoints; in-memory and MessagePort peers loaded by one application do not need
+it. The highest common major, minimum offered minor, initiator-preferred common codec, and ordered
+capability intersection form the agreement. JSON is the required baseline codec.
+
+After the 1.0 freeze, a minor version may add optional fields, control subtypes, codecs, and
+capability-gated kinds. A field that existing peers must understand requires a new major version.
+The receiver ignores unknown fields and reports each retained connection/field pair through the
+`protocol.unknown-field` hook. Unknown kinds and control subtypes are dropped and reported.
+The handshake rejects peers without a common major version. A channel owner supplies the
+authenticated peer identity before constructing an endpoint; `peer.runtime` is diagnostic only.
+
+The control Feature sends one-shot `ping`/`pong`, request `abort`, and `close` announcements.
+`endpoint.announceClose(targetId, { drainMs, receiverId? })` announces a bounded drain window;
+core does not close the transport. `send()` carries remaining relative `timeoutMs`, opaque
+`trace`, and `idempotencyKey` in `data.route`. The provider receives `ctx.trace`; a deadline
+aborts its signal even when the caller has not installed `abort()`.
+
+For keyed calls, the provider deduplicates the tuple of admitted scope, method, and key. A
+concurrent duplicate waits for the first execution; a completed duplicate replays its result.
+When the retained result exceeds its byte budget, the key remains a tombstone and a duplicate
+receives `IDEMPOTENCY_RESULT_UNAVAILABLE`. The default store is bounded; a session owner can
+inject `idempotency: { store, scope }` into endpoint construction to share outcomes across
+authenticated connections. A cancelled execution releases its key for a waiting call to claim.
 
 ## Core
 
@@ -242,7 +283,9 @@ endpoint.provide('greet', (ctx) => ctx.success(`hello, ${ctx.data}`))
 const sum = await endpoint.send<number>('server', 'add', { a: 1, b: 2 })
 ```
 
-`options?: ISendOptions` 全部字段：`signal?: IRpcAbortSignal`（需要装 `abort()` 中间件）、`timeoutMs?: number | false`（覆盖 `timeout()` 中间件的默认值）、`transfer?: readonly unknown[]`（零拷贝转移列表）。
+`options?: ISendOptions` 全部字段：`signal?: IRpcAbortSignal`（需要装 `abort()` 中间件）、`timeoutMs?: number | false`（覆盖 `timeout()` 中间件的默认值，并将剩余相对时长送到 provider）、`trace?: string`（原样交给 provider 的 `ctx.trace`）、`idempotencyKey?: string`（同连接、同方法去重）、`transfer?: readonly unknown[]`（零拷贝转移列表）。provider 的截止时间由本地单调时钟驱动；`sentAt` 只用于诊断。
+
+同键的执行中请求会等待原执行；已结算请求重放结果；结果超出存储字节预算时，同键重复请求返回 `IDEMPOTENCY_RESULT_UNAVAILABLE`。端点的 `idempotency: { store, scope }` 可让已鉴权的会话共享存储与作用域。带键请求的成功结果按复制发送，即使 provider 给出 `transfer`。
 
 **`endpoint.sendAll<T>(method, data, options?)`｜5 秒上手** —— 向当前全部已知/存活对端发起同一次调用：
 

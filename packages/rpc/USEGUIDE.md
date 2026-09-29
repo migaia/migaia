@@ -26,6 +26,19 @@ const sameProtocol = rpcV1.rpcProtocol === protocol
 
 The contract entry exports remain available with their existing V1 identities.
 
+`migaia.rpc` 协议 1.0 的 request、response、discovery、variation 信封均有 `data.route`。
+接收方忽略不认识的可选字段，并通过 `protocol.unknown-field` hook 对保留中的每条连接、
+每个字段报告一次；不认识的 kind 或控制子类型整条丢弃并报告。新可选字段与经能力协商
+的新 kind 可加入次版本；要求旧端必须理解的字段只能进入新主版本。1.0 从首次加入
+`schema/vectors/frozen/1.0/SHA256SUMS` 的提交起冻结。
+
+`@migaia/rpc/contract` 导出 `createRpcHello`、`normalizeRpcHandshake`、
+`acceptRpcHandshake`、`completeRpcHandshake`。进程 stdio、Unix socket、named pipe、
+TCP 回环及 JSON-RPC 桥接的通道所有者在构造 endpoint 前，以 UTF-8 首消息完成协商；
+这些纯函数不读取时钟、不建立连接。内存与 MessagePort 通道可免握手。握手选择共同
+的最高主版本、双方声明的最低次版本、发起方优先的共同 codec 及有序能力交集；
+JSON 是必备基线。无共同主版本时拒绝。`peer.runtime` 只供诊断，身份须由通道鉴权。
+
 ## Core
 
 本文是 `@migaia/rpc/core` 的完整参考手册，面向已经读过 [README.md](./README.md) 五分钟上手部分、需要深入了解具体配置项和边界行为的开发者。README 讲"是什么、能干什么、怎么快速上手"，本文讲"每一个配置项、每一种错误、每一个坑的具体细节"。
@@ -264,6 +277,10 @@ type IRpcFactoryConfig<TTargetId extends string = string> = {
   readonly providerLimits?: { readonly maxGlobal?: number; readonly maxPerPeer?: number } // provider 并发上限，默认 256/64，超限立即 OVERLOADED
   readonly middlewares: readonly IRpcPlugin[] // 必需：必须包含且只能包含一个 connect()；其他 middleware 按需
   readonly replay?: { readonly maxEntries?: number; readonly ttlMs?: number } // 出站请求 id 的重放保护窗口容量与 TTL
+  readonly idempotency?: {
+    readonly store?: IRpcIdempotencyStore // 可由会话所有者共享的去重存储
+    readonly scope?: (admission: { readonly token: string; readonly senderId: string }) => string // 已准入身份作用域
+  }
   readonly scheduler?: IScheduler // 可注入单调时钟与定时器；默认 systemScheduler
   readonly wallClock?: IWallClock // 只产生诊断时间戳（sentAt、hook 事件 at）；默认 systemWallClock
   readonly construction?: {
@@ -383,6 +400,8 @@ timeout({
 ```
 
 `send()` 调用时可以在 `options.timeoutMs` 里覆盖这个默认值。每次请求只发送一次；调用方负责业务层失败处理。
+发送端在发现接收端之后把剩余相对时长放入 `data.route.timeoutMs`；接收端以单调时钟
+截止 provider 的 `signal`，不根据 `sentAt` 推算时长。`timeoutMs: false` 不发送截止字段。
 
 #### 3.7 `ping()`
 
@@ -391,6 +410,18 @@ timeout({
 #### 3.8 `abort()`
 
 让 `send()`/`sendAll()` 支持通过 `options.signal` 传入的 `AbortSignal` 取消进行中的请求。
+取消帧是 `variation: 'abort'`，其 `id` 指向原请求；provider 的 `signal.reason` 保留
+反序列化后的原生错误类型。控制帧另含单次探测 `ping`/`pong` 与关闭通知 `close`。
+`announceClose(targetId, { drainMs, receiverId? })` 发送 `close`，对端收到
+`control.close` hook（含 `requesterId`、`durationMs`）；core 不因通知关闭传输。
+
+带 `idempotencyKey` 的请求按已准入 scope、方法和键去重：执行中重复请求等待，完成
+后重复请求重放。存储结果超过预算时保留墓碑，重复请求返回
+`IDEMPOTENCY_RESULT_UNAVAILABLE`；取消执行释放键，让等待者重新领取。默认存储上限
+为 1024 条、每 scope 256 条、总结果 8 MiB、单结果 1 MiB，结算后保留 300 秒。
+会话所有者可以用 endpoint 配置 `idempotency: { store, scope }` 注入
+`createRpcIdempotencyStore()` 返回的共享存储与基于已鉴权身份的 scope 函数。
+带键请求的结果按复制发送，不转移 provider 的 buffer。
 
 #### 3.9 `hooks(config?)`
 
@@ -418,6 +449,10 @@ createBrowserMessagePortTransport(port, { ownership?: 'owned' | 'borrowed' })
 ```
 
 默认 `ownership: 'owned'`——`dispose()` 时框架会关闭传入的 `port`。调用方需要自己保留端口控制权（比如这个 port 还要给别的地方用）时传 `{ ownership: 'borrowed' }`，此时清理阶段只移除框架自己挂的监听器，不关闭底层端口。
+浏览器或 Node MessagePort 的 `messageerror`，以及 Node 端口的 `close`，会向
+`onTransportError` 交付保留原生 `Error` 类型的错误；错误带
+`source: '@migaia/rpc/core'` 与 `code: 'TRANSPORT'`。重复订阅终止后的 Node 端口
+会收到同一个错误实例。
 
 另有 `createNodeMessagePortTransport(port)` 适配 Node.js 的 `worker_threads` MessagePort，接口形状略有差异（`INodeMessagePortLike`），用法一致。
 
@@ -479,6 +514,7 @@ type IRpcEndpoint<TTargetId extends string = string> = {
   sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IRpcFanoutResult<T>>
   dispatch(targetId: TTargetId, method: string, data: unknown): void
   dispatchAll(method: string, data: unknown): void
+  announceClose(targetId: TTargetId, options: { drainMs: number; receiverId?: string }): Promise<void>
   ping(targetId: TTargetId, receiverId?: string, options?: IRpcPingOptions): Promise<boolean> // control Feature + ping() middleware
   pingAll(): Promise<IRpcFanoutResult<boolean>> // control Feature + ping() middleware
   readonly connect: IRpcConnectControlForMode<TTargetId, TMode>
@@ -492,7 +528,8 @@ type IRpcEndpoint<TTargetId extends string = string> = {
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `provide(method, fn)`                                 | `method: string`；`fn: IRpcProvider`（即 `(context: IRpcContext) => IRpcProviderResult \| Promise<IRpcProviderResult>`）                                                | 同步（直接返回 `this`）                                                                                                                    | 注册一个方法处理函数，返回 `this` 以支持链式调用；`method` 重复注册会抛错                                                               |
 | `on(event, listener)`                                 | `event: string`；`listener: IRpcEventListener`（即 `(context: IRpcContext) => void \| Promise<void>`）                                                                        | 同步（直接返回取消订阅函数）                                                                                                               | 监听对端通过 `dispatch()`/`dispatchAll()` 发来的单向通知，返回取消订阅函数                                                              |
-| `send<T>(targetId, method, data, options?)`           | `targetId: TTargetId`；`method: string`；`data: unknown`；`options?: ISendOptions`（`{ signal?: IRpcAbortSignal; timeoutMs?: number \| false; transfer?: readonly unknown[] }`） | 异步（返回 `Promise<T>`）                                                                                                                  | 发起一次双向调用并等待结果；`options` 支持 `signal`（需要 `abort()` 中间件）、`timeoutMs`（覆盖默认超时）、`transfer`（零拷贝转移列表） |
+| `send<T>(targetId, method, data, options?)`           | `targetId: TTargetId`；`method: string`；`data: unknown`；`options?: ISendOptions`（`signal`、`timeoutMs`、`trace`、`idempotencyKey`、`transfer`） | 异步（返回 `Promise<T>`） | 发起一次双向调用；剩余相对时长、追踪值与幂等键随请求路由头传递 |
+| `announceClose(targetId, options)`                    | `targetId: TTargetId`；`options: { drainMs: number; receiverId?: string }` | 异步（返回 `Promise<void>`） | 向对端通知排空窗口，不关闭传输 |
 | `sendAll<T>(method, data, options?)`                  | `method: string`；`data: unknown`；`options?: ISendOptions`                                                                                                                         | 异步（返回 `Promise<IRpcFanoutResult<T>>`）                                                                                             | 向当前全部已知/存活的对端发起同一次调用，返回按目标聚合的结果集，见下方 `IRpcFanoutResult`                                           |
 | `dispatch(targetId, method, data)`                    | `targetId: TTargetId`；`method: string`；`data: unknown`                                                                                                                            | 同步（返回 `void`）                                                                                                                        | 单向通知，不等待、不产生响应，同步返回（内部异步执行）                                                                                  |
 | `dispatchAll(method, data)`                           | `method: string`；`data: unknown`                                                                                                                                                   | 同步（返回 `void`）                                                                                                                        | 单向广播给全部已知/存活对端                                                                                                             |
@@ -661,6 +698,8 @@ type IRpcHookEvent = {
   readonly receiverIds?: readonly string[]
   readonly ambiguous?: boolean
   readonly responseCount?: number
+  readonly field?: string
+  readonly durationMs?: number
 }
 ```
 
@@ -668,7 +707,7 @@ type IRpcHookEvent = {
 
 | 事件名                                                  | 何时触发                                                                     |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `receive.failure`                                       | 收到一条无法处理的入站消息（格式错误、校验失败等）                           |
+| `failure`                                               | 收到无法处理的入站消息，或控制载荷校验失败；`code` 指出具体错误               |
 | `authentication.rejected`                               | `authentication()`/`connect()` 的身份或完整性校验未通过                      |
 | `response.unmatched`                                    | 收到一条响应，但找不到匹配的挂起请求（可能是重复响应或超时后晚到）           |
 | `transport.failure`                                     | 传输层报告的错误（通过 `onTransportError`）                                  |
@@ -676,6 +715,8 @@ type IRpcHookEvent = {
 | `dispatch.failure`                                      | `dispatch()`/`dispatchAll()` 发送失败                                        |
 | `dispose.failure`                                       | 释放过程中某个资源清理失败（对应 `cleanupErrors` 里的一项）                  |
 | `variation.failure` / `variation.unmatched`             | ping/pong/abort 这类控制帧发送失败，或收到的控制帧找不到匹配的挂起状态       |
+| `protocol.unknown-field`                                | 未识别的字段、kind 或控制子类型；`field` 给出去重后的字段标识 |
+| `control.close`                                         | 对端通知排空窗口；`requesterId` 标识对端，`durationMs` 是相对时长 |
 | `connect.receiver-registered`                           | 一个新的接收端被发现并注册进路由表                                           |
 | `connect.server-unregistered`                           | 一个接收端注销（比如所在的 endpoint 被 dispose）                             |
 | `connect.receiver-pinned` / `connect.receiver-unpinned` | `pinReceiver`/`unpinReceiver` 被调用                                         |
@@ -875,7 +916,7 @@ Feature 的私有依赖不会扩大根投影。discovery 在内部需要 outboun
 framing layer 决定是否安装分片帧运行时所有者；`framer()` descriptor 提供 `chunkSize`、容量和超时等策略。`control()` Feature 与 `ping()` middleware 也是同样的分层关系。
 
 **Q：`send()` 一直不 resolve 也不 reject。**
-检查是否装了 `timeout()` 中间件——默认没有超时限制的场景下，对端确实没有响应就会一直挂起。同时确认 `connect()` 配置正确，否则请求可能在对端因身份校验失败被静默丢弃（可以订阅 `authentication.rejected`/`receive.failure` hook 事件确认）。
+检查是否装了 `timeout()` 中间件——默认没有超时限制的场景下，对端确实没有响应就会一直挂起。同时确认 `connect()` 配置正确，否则请求可能在对端因身份校验失败被静默丢弃（可以订阅 `authentication.rejected`/`failure` hook 事件确认）。
 
 **Q：调用报 `TARGET_UNKNOWN`，但对端明明在线。**
 自动发现模式下确认对端确实 `provide()` 了对应方法、`id` 拼写一致；跨源场景确认 `targetOrigin`/`connect` 的身份校验没有把合法请求也拒绝了。手动模式下确认调用方已经 `register()` 过这个接收端。
@@ -890,7 +931,7 @@ framing layer 决定是否安装分片帧运行时所有者；`framer()` descrip
 `ping` / `pingAll` 同时要求 full/control Feature 与 `ping()` middleware。`endpoint.connect` / `endpoint.discovery` 要求 discovery Feature；其中手动方法（`query` / `register` / ...）还要求 `discoveryMode: 'manual'` 的原生 middleware 定义。自定义组合与 middleware 数组建议写 `as const`，否则宽化后的联合类型只能给出保守表面。
 
 **Q：想知道某条消息为什么被拒绝，去哪里看？**
-装上 `hooks()` 中间件，订阅全部事件打日志，[§10](#10-可观测性hooks-事件参考) 的事件表基本覆盖了所有"消息被拒绝/丢弃"的原因分类。生产环境建议至少常驻订阅 `receive.failure`、`authentication.rejected`、`transport.failure`、`dispose.failure` 这几个和"东西坏了"直接相关的事件。
+装上 `hooks()` 中间件，订阅全部事件打日志，[§10](#10-可观测性hooks-事件参考) 的事件表基本覆盖了所有"消息被拒绝/丢弃"的原因分类。生产环境建议至少常驻订阅 `failure`、`authentication.rejected`、`transport.failure`、`dispose.failure` 这几个和"东西坏了"直接相关的事件。
 
 ---
 
