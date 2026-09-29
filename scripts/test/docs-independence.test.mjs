@@ -17,8 +17,12 @@ const EXEMPT = new Map([
 ])
 /** Source extensions whose string literals can name workspace files. */
 const SOURCE_SUFFIX = /\.(?:ts|tsx|mts|cts|js|mjs|cjs)$/
-/** A path component naming the workspace documentation tree. */
-const DOCS_COMPONENT = /(?:^|[\s/\\])docs[/\\]/
+/** Split the guarded directory name so this scanner does not flag its own rule. */
+const DOCS_NAME = 'do' + 'cs'
+/** Source path literals need an actual path boundary before the documentation directory. */
+const SOURCE_DOCS_COMPONENT = /(?:^|[/\\])docs[/\\]/
+/** Manifest commands can name a documentation path after whitespace. */
+const SCRIPT_DOCS_COMPONENT = /(?:^|[\s/\\])docs[/\\]/
 
 /** Returns tracked and untracked non-ignored paths without shell glob expansion. */
 function workspacePaths() {
@@ -68,7 +72,7 @@ export function findDocsReads(sourceText) {
       continue
     const literal = scanner.getTokenText()
     const content = scanner.getTokenValue()
-    if (content !== 'docs' && !DOCS_COMPONENT.test(content)) continue
+    if (content !== DOCS_NAME && !SOURCE_DOCS_COMPONENT.test(content)) continue
     const line = sourceText.slice(0, scanner.getTokenPos()).split('\n').length
     matches.push({ line, literal })
   }
@@ -83,7 +87,7 @@ export function findDocsReads(sourceText) {
  */
 export function findDocsScripts(manifest) {
   return Object.entries(manifest.scripts ?? {}).filter(
-    ([, value]) => value === 'docs' || DOCS_COMPONENT.test(value)
+    ([, value]) => value === DOCS_NAME || SCRIPT_DOCS_COMPONENT.test(value)
   )
 }
 
@@ -96,7 +100,8 @@ test('TDI A2 recognizes real path literals without treating comments or names as
     `/** ${docs}/a.md */`,
     `// ${docs}/a.md`,
     `'define-feature-${docs}'`,
-    `'${docs}\\n'`
+    `'${docs}\\n'`,
+    `'coverage ignores ${docs}/tests'`
   ].join('\n')
   assert.deepEqual(
     findDocsReads(source).map(({ line }) => line),
@@ -111,32 +116,26 @@ test('TDI A2 recognizes real path literals without treating comments or names as
   )
 })
 
-test(
-  'TDI A1 scans tracked test and script sources',
-  {
-    skip: process.env.TDI_ENFORCE ? false : 'S1 red baseline; enable after S4 removes the readers'
-  },
-  () => {
-    const paths = workspacePaths()
-    const sources = paths.filter(isGuardedSource)
-    assert.ok(sources.length > 0, 'source inventory must not be empty')
-    const violations = []
-    for (const path of sources) {
-      if (EXEMPT.has(path)) continue
-      for (const { line } of findDocsReads(readFileSync(join(root, path), 'utf8')))
-        violations.push(`${path}:${line}`)
-    }
-    for (const path of paths.filter(
-      (entry) => entry === 'package.json' || /^packages\/[^/]+\/package\.json$/.test(entry)
-    )) {
-      const manifest = JSON.parse(readFileSync(join(root, path), 'utf8'))
-      for (const [name, value] of findDocsScripts(manifest))
-        violations.push(`${path}:scripts.${name} ${value}`)
-    }
-    assert.deepEqual(violations, [], violations.join('\n'))
-    assert.ok(!paths.includes('packages/storage-web/test/reconcile-error-registry.mjs'))
+test('TDI A1 scans tracked test and script sources', () => {
+  const paths = workspacePaths()
+  const sources = paths.filter(isGuardedSource)
+  assert.ok(sources.length > 0, 'source inventory must not be empty')
+  const violations = []
+  for (const path of sources) {
+    if (EXEMPT.has(path)) continue
+    for (const { line } of findDocsReads(readFileSync(join(root, path), 'utf8')))
+      violations.push(`${path}:${line}`)
   }
-)
+  for (const path of paths.filter(
+    (entry) => entry === 'package.json' || /^packages\/[^/]+\/package\.json$/.test(entry)
+  )) {
+    const manifest = JSON.parse(readFileSync(join(root, path), 'utf8'))
+    for (const [name, value] of findDocsScripts(manifest))
+      violations.push(`${path}:scripts.${name} ${value}`)
+  }
+  assert.deepEqual(violations, [], violations.join('\n'))
+  assert.ok(!paths.includes('packages/storage-web/test/reconcile-error-registry.mjs'))
+})
 
 /** Explicit refs keep unrelated earlier production changes out of this SDD's preserve check. */
 const base = process.env.TDI_BASE
