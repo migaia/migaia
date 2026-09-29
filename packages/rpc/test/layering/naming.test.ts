@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as core from '../../src/core/index.js'
-import { serializeRpcError } from '../../src/contract/index.js'
+import { deserializeRpcError, serializeRpcError } from '../../src/contract/index.js'
 
 /** Runtime-facing symbol table, including exports whose names change in BC2. */
 const surface = core as Record<string, unknown>
@@ -39,9 +39,7 @@ describe('Rpc naming boundary', () => {
       source: '@migaia/rpc/core'
     })
     const abort = new DOMException('aborted', 'AbortError')
-    const serializeError = surface.serializeError as (error: unknown) => unknown
-    const deserializeError = surface.deserializeError as (error: unknown) => unknown
-    const restored = deserializeError(serializeError(abort)) as Error
+    const restored = deserializeRpcError(serializeRpcError(abort, { report: () => {} }))
     expect(restored).toBeInstanceOf(DOMException)
     expect(restored.name).toBe('AbortError')
   })

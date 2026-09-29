@@ -38,11 +38,5 @@ export {
   RPC_CORE_ERROR_SOURCE
 } from './errors.js'
 export type { IRpcCoreErrorCode, IRpcError, IRpcCleanupError } from './errors.js'
-export {
-  serializeError,
-  deserializeError,
-  reachError,
-  type ISerializedError
-} from './error-serialization.js'
 export type { IRpcTransport, IRpcSendOptions, IRpcTransportTopology } from './transport.js'
 export * from './middleware/index.js'

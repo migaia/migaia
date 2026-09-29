@@ -22,7 +22,8 @@ const retiredSuites = new Set([
   'approved-migration-candidate.test.ts',
   'provenance.test.ts',
   'delivery-successor-transaction.test.ts',
-  'intended-cost-custody.test.ts'
+  'intended-cost-custody.test.ts',
+  'error-serialization.test.ts'
 ])
 /** Exact historical titles retired by rpc-layering R5 after deleting unused control code. */
 const retiredLayeringTitles = new Set([

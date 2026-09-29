@@ -1,5 +1,7 @@
 {
-  "removed": {},
+  "removed": {
+    "@migaia/rpc/core": ["deserializeError", "reachError", "serializeError"]
+  },
   "added": {
     "@migaia/rpc/contract": [
       "fromJsonRpcError",
