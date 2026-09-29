@@ -78,7 +78,7 @@ function eventOf(command: IRpcOutboundCommand): string | undefined {
 /** Deliver one stream frame to the owner's installed route. */
 function frame(
   id: string,
-  event: 'open' | 'pull' | 'item',
+  event: 'open' | 'pull' | 'item' | 'cancel',
   senderId: string,
   targetId: string,
   value?: string
@@ -125,6 +125,43 @@ function request(id: string, senderId = 'client') {
 }
 
 describe('streaming A12 admission', () => {
+  it('bounds early-cancel keys per peer and rejects late opens after saturation', async () => {
+    const fixture = streamPorts()
+    let calls = 0
+    fixture.owner.provide('count', function* () {
+      calls += 1
+      yield calls
+    })
+    try {
+      for (let index = 0; index <= RpcStreamLimit.maxOpenStreamsPerPeer; index += 1)
+        await fixture.route(frame(`early-${index}`, 'cancel', 'client', 'server'))
+      await fixture.accept(request('early-0'))
+      await fixture.accept(request('late-open'))
+      expect(calls).toBe(0)
+      expect(
+        fixture.commands.find(
+          (command) => command.kind === 'frame' && command.message.id === 'early-0'
+        )
+      ).toMatchObject({ message: { data: { payload: { event: 'cancelled' } } } })
+      expect(
+        fixture.commands.find(
+          (command) => command.kind === 'frame' && command.message.id === 'late-open'
+        )
+      ).toMatchObject({
+        message: { data: { payload: { event: 'fail', error: { code: 'OVERLOADED' } } } }
+      })
+      await fixture.accept(request('other-peer', 'second-client'))
+      expect(calls).toBe(0)
+      expect(
+        fixture.commands.find(
+          (command) => command.kind === 'frame' && command.message.id === 'other-peer'
+        )
+      ).toMatchObject({ message: { data: { payload: { event: 'open' } } } })
+    } finally {
+      await fixture.owner.dispose()
+    }
+  })
+
   it('rejects the 257th active stream from one peer before invoking its provider', async () => {
     const fixture = streamPorts()
     let calls = 0

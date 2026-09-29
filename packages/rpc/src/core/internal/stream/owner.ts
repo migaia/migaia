@@ -97,8 +97,10 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   readonly #producers = new Map<string, IProducerState>()
   /** Cancelled caller keys remain admitted until their terminal peer notification. */
   readonly #pendingCancels = new Map<string, IPendingCancel>()
-  /** An early producer cancel prevents a later request from starting orphan work. */
-  readonly #earlyCancels = new Map<string, number>()
+  /** Bounded early cancels prevent delayed requests from starting orphan work. */
+  readonly #earlyCancels = new Map<string, { senderId: string; seq: number }>()
+  /** A peer that exceeded its early-cancel budget cannot start an orphan producer. */
+  readonly #earlyCancelOverflow = new Set<string>()
   /** Provider registrations released on feature disposal. */
   readonly #registrations = new Set<() => void>()
   /** Kernel route release is idempotent and belongs to this feature. */
@@ -219,6 +221,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     }
     this.#producers.clear()
     for (const key of this.#pendingCancels.keys()) this.#resolveCancel(key)
+    this.#earlyCancels.clear()
+    this.#earlyCancelOverflow.clear()
   }
 
   /** Allocate the sole operation scope and issue the initial request through outbound. */
@@ -555,9 +559,21 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     }
     const key = tupleKey(senderId, request.id)
     const early = this.#earlyCancels.get(key)
-    if (early !== undefined) {
+    if (early) {
       this.#earlyCancels.delete(key)
-      await this.#sendFrame(senderId, request.id, { event: RpcStreamEvent.cancelled, seq: early })
+      await this.#sendFrame(senderId, request.id, {
+        event: RpcStreamEvent.cancelled,
+        seq: early.seq
+      })
+      return
+    }
+    if (this.#earlyCancelOverflow.has(senderId)) {
+      await this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded)
+      )
       return
     }
     if (this.#producers.has(key)) return
@@ -638,7 +654,18 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const key = tupleKey(senderId, id)
     const state = this.#producers.get(key)
     if (!state) {
-      if (payload.event === RpcStreamEvent.cancel) this.#earlyCancels.set(key, payload.seq)
+      if (payload.event === RpcStreamEvent.cancel && !this.#earlyCancelOverflow.has(senderId)) {
+        if (!this.#earlyCancels.has(key)) {
+          let peerCancels = 0
+          for (const early of this.#earlyCancels.values())
+            if (early.senderId === senderId) peerCancels += 1
+          if (peerCancels >= RpcStreamLimit.maxOpenStreamsPerPeer) {
+            this.#earlyCancelOverflow.add(senderId)
+            return
+          }
+        }
+        this.#earlyCancels.set(key, { senderId, seq: payload.seq })
+      }
       return
     }
     if (state.terminal) return
@@ -825,6 +852,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       void Promise.resolve(state.iterator.return?.()).catch((failure) => this.#report(failure))
     }
     this.#producers.clear()
+    this.#earlyCancels.clear()
+    this.#earlyCancelOverflow.clear()
   }
 }
 
