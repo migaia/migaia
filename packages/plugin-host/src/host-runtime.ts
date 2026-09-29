@@ -196,6 +196,8 @@ export class PluginHost<
    */
   #state = new PluginHostState<TDomainCore, TValue>()
   #hookRegistration: IRegistration<TDomainCore, TValue> | undefined
+  /** Registration currently awaiting setup; blocks synchronous config mutation admission. */
+  #setupPending: IRegistration<TDomainCore, TValue> | undefined
   #pipelineMode: IMiddlewarePipelineMode
   /** Canonical stateless runner that owns mode dispatch, lifting, and violation semantics. */
   #pipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
@@ -347,6 +349,7 @@ export class PluginHost<
     })
     this.#installRuntime = new PluginHostInstallRuntime({
       scheduler: this.#scheduler,
+      executionSignal: this.#executionController.signal,
       state: this.#state,
       snapshotBatch: () => ({
         registrations: new Map(),
@@ -362,6 +365,9 @@ export class PluginHost<
       assertOperationCurrent: (registration) => this.#operationRuntime.assertCurrent(registration),
       setHookRegistration: (registration) => {
         this.#hookRegistration = registration
+      },
+      setSetupPending: (registration) => {
+        this.#setupPending = registration
       },
       publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
       disposeRegistration: (registration, preserveErrorIdentity) =>
@@ -438,6 +444,8 @@ export class PluginHost<
     this.#configRuntime = new PluginHostConfigRuntime({
       registrations: this.#state.registrations,
       assertActive: () => this.#assertActive(),
+      isSetupPending: () => this.#setupPending !== undefined,
+      decorateError: (error) => attachPluginHostIdentity(error, this),
       enqueue: (task) => this.#enqueue(task),
       beginOperation: (registration) => {
         this.#operationRuntime.begin(registration)

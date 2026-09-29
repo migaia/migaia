@@ -6,6 +6,7 @@ import {
   createProvisionalScope,
   probeThenable
 } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { copyConfig, readPlainDataRecord } from './config.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
@@ -15,6 +16,7 @@ import { invokeCaptured } from './invocation.js'
 import { reportDiagnostic, reportTerminalFailure } from './diagnostic-report.js'
 import { compileFeatures, instantiateFeatures, snapshotFeatureExpose } from './feature-runtime.js'
 import { validateInstallBatch } from './dependency-runtime.js'
+import { closeSetupAttempt, runPluginSetup, type IPluginSetupPort } from './setup-runtime.js'
 import { isFeatureReference } from './define-feature.js'
 import type { PluginHostState } from './host-state.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
@@ -36,6 +38,8 @@ export type IInstallBatchContext<TDomainCore extends object, TValue> = {
 
 type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly scheduler: IScheduler
+  readonly executionSignal: IAbortSignal
+  readonly setSetupPending: (registration: IRegistration<TDomainCore, TValue> | undefined) => void
   /** Shared host state owning dependency facts and committed registration status. */
   readonly state: PluginHostState<TDomainCore, TValue>
   readonly snapshotBatch: () => IInstallBatchContext<TDomainCore, TValue>
@@ -87,7 +91,10 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       batch.registrations.set(registration.name, registration)
       registration.lifecycle = PluginHostRegistrationLifecycle.install
       try {
-        const installResult = this.#startInstall(registration, batch, true)
+        this.#beginInstall(registration, true)
+        if (registration.plugin.setup)
+          registration.setupOutput = await runPluginSetup(registration, this.#setupPort(batch))
+        const installResult = this.#startInstall(registration, batch)
         if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
         const installThen = this.#readThen(installResult)
         const installedValue = await this.#port.awaitOperation(
@@ -103,7 +110,9 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         registration.installed = true
         registration.activated = true
         this.#port.publish([registration], batch)
+        closeSetupAttempt(registration)
       } catch (error) {
+        closeSetupAttempt(registration)
         if (registration.provisional) await registration.provisional.rollback()
         registration.provisional = undefined
         for (const detach of [...registration.pipelineDisposers].reverse()) detach()
@@ -151,7 +160,10 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           continue
         }
         try {
-          const installResult = this.#startInstall(registration, batch, true)
+          this.#beginInstall(registration, true)
+          if (registration.plugin.setup)
+            registration.setupOutput = await runPluginSetup(registration, this.#setupPort(batch))
+          const installResult = this.#startInstall(registration, batch)
           if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
           const installThen = this.#readThen(installResult)
           const installedValue = await this.#port.awaitOperation(
@@ -167,6 +179,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           registration.installed = true
           registration.activated = true
         } finally {
+          closeSetupAttempt(registration)
           this.#port.setHookRegistration(undefined)
           registration.lifecycle = PluginHostRegistrationLifecycle.idle
         }
@@ -204,7 +217,8 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         try {
           let installedValue: unknown
           try {
-            installedValue = this.#startInstall(registration, batch, false)
+            this.#beginInstall(registration, false)
+            installedValue = this.#startInstall(registration, batch)
           } finally {
             this.#port.setHookRegistration(undefined)
           }
@@ -297,19 +311,35 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     }
   }
 
-  /** Begins one owned install invocation only after its registration is rollback-visible. */
-  #startInstall(
-    registration: IRegistration<TDomainCore, TValue>,
-    batch: IInstallBatchContext<TDomainCore, TValue>,
-    provisional: boolean
-  ): unknown {
+  /** Opens operation, provisional owner, and hook guard before optional setup. */
+  #beginInstall(registration: IRegistration<TDomainCore, TValue>, provisional: boolean): void {
     this.#port.beginOperation(registration)
     if (provisional)
       registration.provisional = createProvisionalScope({
         parentSignal: registration.operation?.signal
       })
     this.#port.setHookRegistration(registration)
+  }
+
+  /** Builds features from setup output and invokes the install hook. */
+  #startInstall(
+    registration: IRegistration<TDomainCore, TValue>,
+    batch: IInstallBatchContext<TDomainCore, TValue>
+  ): unknown {
     return this.#invokeInstall(registration, this.#initializeFeatureCore(registration, batch))
+  }
+
+  /** Binds setup to the same batch, generation, scheduler, and diagnostic authority as install. */
+  #setupPort(batch: IInstallBatchContext<TDomainCore, TValue>): IPluginSetupPort {
+    return {
+      createCore: (registration) => this.#port.createCore(registration, batch),
+      executionSignal: this.#port.executionSignal,
+      scheduler: this.#port.scheduler,
+      setSetupPending: this.#port.setSetupPending,
+      awaitOperation: this.#port.awaitOperation,
+      assertOperationCurrent: this.#port.assertOperationCurrent,
+      diagnostic: this.#port.diagnostic
+    }
   }
 
   /** Commits extension preparation after each path resolves its install result. */
@@ -396,7 +426,11 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     const expose = registration.descriptor?.featureExpose
       ? registration.descriptor.featureExpose()
       : typeof registration.plugin.featureExpose === 'function'
-        ? invokeCaptured(registration.plugin.featureExpose, registration.plugin.owner, [core])
+        ? invokeCaptured(
+            registration.plugin.featureExpose,
+            registration.plugin.owner,
+            registration.plugin.setup ? [core, registration.setupOutput] : [core]
+          )
         : (registration.plugin.featureExpose ?? {})
     this.#rejectThenable(expose, ERROR_TEXT.PLUGIN_FEATURE_EXPOSE_OUTPUT)
     if (!expose || typeof expose !== 'object')
@@ -476,7 +510,11 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     const hook = registration.descriptor?.install
     return hook
       ? hook()
-      : invokeCaptured(registration.plugin.install, registration.plugin.owner, [core])
+      : invokeCaptured(
+          registration.plugin.install,
+          registration.plugin.owner,
+          registration.plugin.setup ? [core, registration.setupOutput] : [core]
+        )
   }
 
   /** Merges descriptor install/expose outputs only after rejecting their own-key collision. */

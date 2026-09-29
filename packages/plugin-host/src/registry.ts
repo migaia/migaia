@@ -12,6 +12,7 @@ import type {
 } from '@migaia/lifecycle'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IStageEntry, IStageOwnerSegment } from './stage-lanes.js'
+import type { IPluginSetupAttempt } from './setup-runtime.js'
 
 export type IPluginDefinition<TCore> = {
   readonly owner: IPluginConstraint<TCore>
@@ -79,6 +80,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   operation?: IGenerationRequest
   /** Output owned by this registration's current setup attempt. */
   setupOutput?: unknown
+  /** Attempt lifetime retained by setup contexts after this registration settles. */
+  setupAttempt?: IPluginSetupAttempt
   operationDeadlineAt?: number
   provisional?: IProvisionalScope
   scope?: ILifecycleScope

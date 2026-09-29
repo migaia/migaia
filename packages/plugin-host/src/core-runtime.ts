@@ -86,7 +86,7 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
     } catch (cause) {
       throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause })
     }
-    if (!disposer) throw createPluginHostTypeError('plugin resource must provide a disposer')
+    if (!disposer) throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_RESOURCE_DISPOSER)
     const owner: IProvisionalScope | ILifecycleScope =
       registration.provisional ?? registration.scope!
     const ownedResource = () => Promise.resolve(disposer())
