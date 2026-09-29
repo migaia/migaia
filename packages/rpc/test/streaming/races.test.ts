@@ -49,8 +49,11 @@ function heldOpen() {
     time: {
       now: () => now,
       timestamp: () => now,
-      setTimeout: () => ({ clear: () => undefined }),
-      clearTimeout: () => undefined
+      setTimeout: (task: () => void, delayMs: number) => {
+        const timer = globalThis.setTimeout(task, delayMs)
+        return { clear: () => globalThis.clearTimeout(timer) }
+      },
+      clearTimeout: (timer: { clear: () => void }) => timer.clear()
     }
   } as unknown as IEndpointKernelHost
   const prepared = {

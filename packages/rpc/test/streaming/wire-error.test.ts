@@ -111,4 +111,43 @@ describe('streaming A5 error graph', () => {
       await server.dispose()
     }
   })
+
+  it('transfers a 64 KiB stack under wire-error limits rather than the item budget', async () => {
+    const [clientTransport, serverTransport] = createMemoryTransportPair()
+    const server = await createComposedEndpoint(
+      {
+        id: 'server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })]
+      },
+      streamRoots()
+    )
+    const client = await createComposedEndpoint(
+      {
+        id: 'client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      streamRoots()
+    )
+    const original = {
+      source: '@migaia/rpc/core',
+      code: RpcCoreErrorCode.internal,
+      name: 'RpcError',
+      message: 'large trace',
+      stack: 's'.repeat(65_536)
+    }
+    server.stream.provide('large-trace', function* () {
+      throw original
+    })
+    try {
+      await expect(client.stream.open('server', 'large-trace', null).next()).rejects.toMatchObject({
+        code: 'INTERNAL',
+        stack: original.stack
+      })
+    } finally {
+      await client.dispose()
+      await server.dispose()
+    }
+  })
 })

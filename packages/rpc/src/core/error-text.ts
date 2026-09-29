@@ -31,14 +31,6 @@ export const RpcCoreErrorText = {
   endpointRouteOwned: 'endpoint route is already owned',
   /** Stable diagnostic when protocol 1.1 admits a frame but no stream feature owns it. */
   streamRouteUnclaimed: 'stream route unavailable',
-  /** Stable terminal diagnostic when the result of a stream write is unknown. */
-  streamResultUnknown: 'stream result unknown',
-  /** A peer lacking the stream capability cannot exchange stream frames. */
-  streamCapabilityMissing: 'stream capability unavailable',
-  /** A stream provider must return a generator-like non-string object. */
-  streamIterableInvalid: 'stream provider must return an iterable',
-  /** Aggregate retains a local throw before a later producer cleanup failure. */
-  streamCleanupFailed: 'stream cleanup failed',
   /** Stable conflict text when two attachments claim the same runtime owner. */
   endpointOwnerOwned: 'endpoint runtime owner is already registered',
   /** Stable composition admission text consumed by core before transport side effects. */
