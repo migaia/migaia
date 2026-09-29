@@ -123,7 +123,8 @@ describe('composed inbound variation capability gating', () => {
       )
       await new Promise((resolve) => setTimeout(resolve, 200))
       expect(observedAborted).toBe(true)
-      expect(observedReason).toEqual({ reason: ['active', { route: 'portable' }] })
+      expect(observedReason).toBeInstanceOf(Error)
+      expect((observedReason as Error & { readonly data: unknown }).data).toEqual(abortReason)
     } finally {
       await client.dispose()
       await server.dispose()

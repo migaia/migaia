@@ -26,10 +26,10 @@ import {
   normalizeRpcEnvelope,
   type IRpcEnvelope,
   type IRpcPortableValue,
+  type IRpcResponseFailure,
   type IRpcWireErrorFailure
 } from '../../contract/index.js'
-import { serializeRpcError } from '../../contract/error.js'
-import { deserializeErrorFromRpc } from '../error-serialization.js'
+import { deserializeRpcError, serializeRpcError } from '../../contract/error.js'
 import { normalizeWebRpcRoutingData, RpcRoutingProfile } from './routing-data.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcInboundMessage } from '../transport.js'
@@ -747,11 +747,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       }
     } else
       pending.reject(
-        new RpcRemoteError(
-          canonical.code ?? RpcCoreErrorCode.internal,
-          canonical.message ?? RpcCoreErrorText.remoteRequestFailed,
-          route.payload,
-          canonical.error === undefined ? undefined : deserializeErrorFromRpc(canonical.error)
+        restoreRemoteError(canonical, route.payload, (error) =>
+          this.emitFailure(error, RpcCoreErrorCode.protocolInvalid)
         )
       )
   }
@@ -779,7 +776,28 @@ function normalizeAbortReason(
   reason: unknown,
   report: (failure: IRpcWireErrorFailure) => void
 ): IRpcPortableValue {
-  return normalizePortable(reason instanceof Error ? serializeRpcError(reason, { report }) : reason)
+  return normalizePortable(serializeRpcError(reason, { report }))
+}
+
+/** Always settle a failed call, reporting a malformed optional remote error once. */
+function restoreRemoteError(
+  canonical: IRpcResponseFailure<IRpcPortableValue>,
+  payload: unknown,
+  report: (error: unknown) => void
+): RpcRemoteError {
+  let restored: unknown
+  try {
+    restored = canonical.error === undefined ? undefined : deserializeRpcError(canonical.error)
+  } catch (error) {
+    report(error)
+    restored = error
+  }
+  return new RpcRemoteError(
+    canonical.code ?? RpcCoreErrorCode.internal,
+    canonical.message ?? RpcCoreErrorText.remoteRequestFailed,
+    payload,
+    restored
+  )
 }
 
 /** Rejects timeout values outside the inherited finite non-negative domain. */

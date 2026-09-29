@@ -40,8 +40,8 @@ test('Worker failure retains canonical remote outer and meaningful native cause 
     {
       name: 'Error',
       message: 'Unable to calculate the requested value',
-      source: '@migaia/rpc/core',
-      code: 'INTERNAL',
+      source: 'unknown',
+      code: 'UNKNOWN',
       hasStack: true
     }
   ])

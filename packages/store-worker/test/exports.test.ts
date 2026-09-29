@@ -128,8 +128,8 @@ describe('A8/A9 store-worker exports', () => {
       expect(cause).toMatchObject({
         name: providerFailure.name,
         message: providerFailure.message,
-        source: '@migaia/rpc/core',
-        code: 'INTERNAL'
+        source: 'unknown',
+        code: 'UNKNOWN'
       })
       expect((cause as Error).stack).toBe(providerFailure.stack)
     } finally {
@@ -162,8 +162,8 @@ describe('A8/A9 store-worker exports', () => {
       expect(cause).toMatchObject({
         name: primary.name,
         message: primary.message,
-        source: '@migaia/rpc/core',
-        code: 'INTERNAL'
+        source: 'unknown',
+        code: 'UNKNOWN'
       })
       expect((cause as Error).stack).toBe(primary.stack)
       /** Preserves the second native failure in the reconstructed nested causal chain. */
@@ -172,8 +172,8 @@ describe('A8/A9 store-worker exports', () => {
       expect(nestedCause).toMatchObject({
         name: nested.name,
         message: nested.message,
-        source: '',
-        code: ''
+        source: 'unknown',
+        code: 'UNKNOWN'
       })
       expect((nestedCause as Error).stack).toBe(nested.stack)
     } finally {
