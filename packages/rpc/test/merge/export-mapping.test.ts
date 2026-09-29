@@ -34,8 +34,12 @@ describe('A1 merged public exports', () => {
     const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
       exports: Record<string, { default: string; types: string }>
     }
-    const expected = [...Object.keys(legacyExports), '@migaia/rpc/core/transport-kit'].sort()
-    expect(expected).toHaveLength(25)
+    const expected = [
+      ...Object.keys(legacyExports),
+      '@migaia/rpc/core/transport-kit',
+      '@migaia/rpc/core/stream'
+    ].sort()
+    expect(expected).toHaveLength(26)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )
@@ -77,6 +81,14 @@ describe('A1 merged public exports', () => {
       // A leaf export maps to its own source path; index entries map to directory roots.
       expect(relative, name).toBe(expectedRelative)
     }
+    const stream = manifest.exports['./core/stream']
+    expect(stream).toEqual({
+      types: './dist/core/stream/index.d.ts',
+      default: './dist/core/stream/index.js'
+    })
+    expect(
+      Object.keys(await import(pathToFileURL(join(packageRoot, stream.default)).href)).sort()
+    ).toEqual(['createCanonicalChunkFeature', 'createStreamFeature'])
   })
 
   it('keeps contract protocol and normalizer implementations outside compiled core', () => {

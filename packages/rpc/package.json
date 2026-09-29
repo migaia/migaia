@@ -82,6 +82,10 @@
       "types": "./dist/core/features/control.d.ts",
       "default": "./dist/core/features/control.js"
     },
+    "./core/stream": {
+      "types": "./dist/core/stream/index.d.ts",
+      "default": "./dist/core/stream/index.js"
+    },
     "./core/adapters/memory": {
       "types": "./dist/core/adapters/memory.d.ts",
       "default": "./dist/core/adapters/memory.js"

@@ -191,8 +191,25 @@ contract({
 | `@migaia/rpc/core`                      | `defineFeature` / `defineMiddleware` | 定义返回的 surface 决定                           | 原生扩展                     |
 | `@migaia/rpc/core/adapters/{memory,message-port}` | transport factory | 不改变 endpoint 表面 | 内存或 MessagePort 传输 |
 | `@migaia/rpc/browser/adapters/<transport>` | transport factory | 不改变 endpoint 表面 | 浏览器与 Worker 传输 |
+| `@migaia/rpc/core/stream` | `createStreamFeature`、`createCanonicalChunkFeature` | 组合后投影 `endpoint.stream` | 按需异步多值流 |
 
 所有 endpoint 都有 kernel 表面：`on()`、`hooks.on()`、`dispose()`。只有完整预设或显式选择的 Feature 才增加其他方法。要获得可靠 tree-shaking，应直接导入最窄预设或 `/core` 与单独 Feature 子路径，不要从 core 入口导入完整预设后再只使用其中一部分。
+
+流 Feature 与 outbound/provider 共用一个端点；完整的两端组合见 [README 的流示例](./README.md#721-按需流逐次拉取期限与取消)。`open(targetId, method, params, { signal?, timeoutMs? })` 立即返回异步迭代器，首次 `next()` 才发初始请求；每次 `next()` 只触发一次远端 `iterator.next()`。生产者用 `endpoint.stream.provide(method, (params, { signal }) => generator)` 注册，返回的必须是同步或异步 Iterable 对象，不能返回字符串。
+
+```ts
+const controller = new AbortController()
+const parts = client.stream.open('server', 'parts', null, {
+  signal: controller.signal,
+  timeoutMs: 5_000 // 从首次 next 起，整条流共享此期限
+})
+const first = await parts.next()
+const waiting = parts.next()
+controller.abort() // 等待中的 next 以原 abort reason 拒绝；生产者收到协作式 cancel
+await waiting.catch((reason) => console.log(reason))
+```
+
+正常提前退出可调用 `await parts.return?.()`；已收到的值保留。远端 `fail`、期限或传输失败后的 `next()` 会再次以同一错误实例拒绝；传输失败不自动重放初始请求或已交付值。每个 `item.value`/`end.value` 按可移植计量最多 16 KiB；`fail.error`/`cancel.reason` 走 wire-error 的独立预算。连接型通道须先协商 `stream@1`，无能力时不能发流帧；内存/MessagePort 的免握手组合可由创建方静态确定双方均支持。
 
 #### 2.2 三个预设
 
