@@ -1,3 +1,4 @@
+export { createCanonicalChunkFeature } from '../features/canonical-chunk.js'
 export { createStreamFeature } from '../features/stream.js'
 export type {
   IRpcStreamCapabilityPort,

@@ -198,6 +198,57 @@ try {
 
 `connect()` 是唯一必需 middleware。`contract()`、`codec()`、`timeout()` 等按需要添加；不应为了“凑齐默认栈”机械安装。
 
+#### 7.2.1 按需流：逐次拉取、期限与取消
+
+流能力只从 `@migaia/rpc/core/stream` 导入，不进入 core 根预设。下面两端用同一组 Feature 组合；连接型通道还须先协商 `stream@1`，免握手的内存通道可直接选用。
+
+```ts
+import { connect } from '@migaia/rpc/core'
+import { createComposedEndpoint } from '@migaia/rpc/core/composed'
+import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+import { createOutboundFeature } from '@migaia/rpc/core/features/outbound'
+import { createProviderFeature } from '@migaia/rpc/core/features/provider'
+import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc/core/stream'
+
+const streamRoots = () => {
+  const chunk = createCanonicalChunkFeature()
+  const outbound = createOutboundFeature(chunk)
+  const provider = createProviderFeature(outbound)
+  const stream = createStreamFeature(outbound, provider)
+  return {
+    'first-party-chunk': chunk,
+    'first-party-outbound': outbound,
+    'first-party-provider': provider,
+    'first-party-stream': stream
+  }
+}
+
+const [clientTransport, serverTransport] = createMemoryTransportPair()
+const server = await createComposedEndpoint(
+  { id: 'server', transport: serverTransport, middlewares: [connect({ transport: serverTransport })] },
+  streamRoots()
+)
+const client = await createComposedEndpoint(
+  { id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] },
+  streamRoots()
+)
+
+server.stream.provide('parts', async function* () {
+  yield 'part one'
+  yield 'part two'
+})
+
+try {
+  const parts = client.stream.open('server', 'parts', null, { timeoutMs: 5_000 })
+  console.log(await parts.next()) // { done: false, value: 'part one' }
+  await parts.return?.() // 协作式取消服务端迭代器
+} finally {
+  await Promise.all([client.dispose(), server.dispose()])
+}
+```
+
+每次 `next()` 只授予一个值的信用；`timeoutMs` 从第一次 `next()` 起计整条流。单个 `item.value` 或 `end.value` 的可移植计量上限为 16 KiB，大数据应由生产者拆成多次 `yield`。
+
 #### 7.3 完整预设：core 入口的 `createEndpoint`
 
 ```ts

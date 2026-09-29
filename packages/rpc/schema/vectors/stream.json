@@ -7,8 +7,42 @@
     { "id": "bad-seq", "value": { "event": "pull", "seq": -1 }, "violation": "field", "pointer": "/seq" }
   ],
   "sequences": [
-    { "id": "three-items", "role": "consumer", "events": ["open", "item", "item", "item", "end"], "values": ["a", "b", "c"] },
-    { "id": "cancel", "role": "producer", "events": ["pull", "cancel", "cancelled"] }
+    {
+      "id": "three-items",
+      "role": "consumer",
+      "onPull": [
+        { "event": "item", "seq": 0, "value": "a" },
+        { "event": "item", "seq": 1, "value": "b" },
+        { "event": "item", "seq": 2, "value": "c" },
+        { "event": "end", "seq": 3, "value": "r" }
+      ],
+      "expectNext": [
+        { "done": false, "value": "a" },
+        { "done": false, "value": "b" },
+        { "done": false, "value": "c" },
+        { "done": true, "value": "r" }
+      ],
+      "clientFrames": ["request", "pull", "pull", "pull", "pull"],
+      "peerFrames": ["open", "item", "item", "item", "end"]
+    },
+    {
+      "id": "wrong-credit",
+      "role": "consumer",
+      "onPull": [{ "event": "item", "seq": 2, "value": "wrong" }],
+      "expectNext": [{ "error": { "code": "INVALID_STREAM", "violation": "seq", "pointer": "/seq" } }],
+      "clientFrames": ["request", "pull", "cancel"],
+      "peerFrames": ["open", "item", "cancelled"]
+    },
+    {
+      "id": "cancel",
+      "role": "producer",
+      "values": ["a", "b"],
+      "actions": ["next", "return"],
+      "expect": [{ "done": false, "value": "a" }, { "done": true, "value": "local" }],
+      "clientFrames": ["request", "pull", "cancel"],
+      "providerFrames": ["open", "item", "cancelled"],
+      "cleanupCount": 1
+    }
   ],
   "measure": [
     { "id": "null", "value": null, "bytes": 4 },
