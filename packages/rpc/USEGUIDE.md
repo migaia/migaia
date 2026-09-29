@@ -941,10 +941,16 @@ const transport = {
 
 ### 16. 跨端错误序列化
 
-`serializeError()`、`deserializeError()` 和 `reachError()` 用于 Worker、iframe、MessagePort 等边界上的完整错误链传递：
+`@migaia/rpc/contract` 的 `serializeRpcError()`、`deserializeRpcError()` 和 `reachRpcError()` 是 Worker、iframe、MessagePort 等边界的唯一公开错误格式；core 入口不再导出旧的 `serializeError`、`deserializeError`、`reachError`：
 
 ```ts
-import { deserializeError, reachError, serializeError } from '@migaia/rpc/core'
+import {
+  deserializeRpcError,
+  reachRpcError,
+  serializeRpcError,
+  RpcErrorReachLimit,
+  RpcWireErrorLimit
+} from '@migaia/rpc/contract'
 
 const original = new AggregateError(
   [new TypeError('invalid payload'), new Error('transport failed')],
@@ -952,19 +958,24 @@ const original = new AggregateError(
   { cause: new Error('primary cause') }
 )
 
-const wire = serializeError(original)
-const restored = deserializeError(structuredClone(wire))
+const report = ({ pointer, field, error }: { pointer: string; field: string; error: unknown }) => {
+  console.error('error projection failed', pointer, field, error)
+}
+const wire = serializeRpcError(original, { report })
+const restored = deserializeRpcError(structuredClone(wire))
 
-for (const node of reachError(restored)) {
+for (const node of reachRpcError(restored, { report })) {
   console.error(node)
 }
 ```
 
-`ISerializedError` 保存 `source`、`code`、`name`、`message`、原始 `stack`，并按需保存 `phase`、`detail`、`data`、`errors` 和 `causes`。序列化会遍历 `cause`、`AggregateError.errors` 以及 lifecycle `cleanupErrors[].error`，确保原始失败仍可从恢复后的图到达。
+`serializeRpcError` 与 `reachRpcError` 都必须传入同步 `report`。敌意属性读取失败或 `data` 无法投影时，回调收到 `{ pointer, field, error }`；core 发送路径把序列化回调接到端点的 `PAYLOAD_INVALID` failure 事件。`IRpcSerializedError` 的必填字段是 `source`、`code`、`name`、`message`、`stack`；可选字段是 `cause`、`errors`、`data`、`truncated: true`。序列化按 `cause`、`AggregateError.errors`、lifecycle `cleanupErrors[].error` 的顺序投影；无身份的抛出值使用 `unknown`/`UNKNOWN` 兜底。原始 `stack` 在链上保留，不由接收方重写。
 
-反序列化会恢复 `AggregateError`、`TypeError`、`RangeError`、`SyntaxError`、`ReferenceError`、`URIError`、`EvalError`；运行时存在 `DOMException` 时恢复标准 `AbortError`，其他名称恢复为 `Error` 并保留原始 `name`。接收方得到的是新的本地错误对象，不应期待与发送方对象保持 `===` 身份。
+`deserializeRpcError` 会恢复 `AggregateError`、`TypeError`、`RangeError`、`SyntaxError`、`ReferenceError`、`URIError`、`EvalError`；运行时存在 `DOMException` 时恢复标准 `AbortError`，其他名称恢复为 `Error` 并保留原始 `name`。接收方得到新的本地对象，跨端不保持 `===` 身份。非法 wire 值抛带 `INVALID_WIRE_ERROR` 的 `TypeError`；core 的调用响应即使反序列化失败，仍以 `RpcRemoteError` 拒绝，`cause` 指向该错误，端点报告一次 `PROTOCOL_INVALID`。abort 的 provider `signal.reason` 总是 `Error`；非 Error 原值保存在 `reason.data`。
 
-三个函数都执行安全快照，不信任对象 getter。错误图最大深度 64、最大节点数 1024；超预算、循环 wire 图或字段形状非法时，操作会抛 `RpcSerializationError`，`code` 为 `PAYLOAD_INVALID`，不会静默截断。`reachError()` 是诊断遍历工具，也受同样边界保护。
+发送端投影有 `RpcWireErrorLimit`：错误树最多 48 层、1024 节点，嵌入数据深度最多 16 层，单字符串最多 65,536 字节，文本总量最多 1,048,576 字节；被裁剪的节点标记 `truncated: true`。`reachRpcError` 是独立的原生图遍历，按身份去重，最多走 `RpcErrorReachLimit.maxObjects === 4096` 个对象，不受 wire 深度限制。
+
+自定义 adapter 可从 `@migaia/rpc/core/transport-kit` 导入 `safeRead(value, key, report?)`：第三参数只接受同步报告器；有报告器时敌意 getter 的原异常恰报告一次并返回 `undefined`，没有报告器时抛原生 `TypeError`，`code === 'PROPERTY_READ_FAILED'`、`cause` 是原异常。公开 `isRpcError` 没有报告 sink，对敌意 `code` getter 同样抛该错误。端点 hook 的 failure 事件以可选 `field` 标出失败的字符串属性名；symbol key 只保留在 `report` 参数中。
 
 ### 17. 构建、格式化与测试
 

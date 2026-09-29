@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { serializeError, deserializeError, reachError } from '@migaia/rpc/core'
+import { serializeRpcError, deserializeRpcError, reachRpcError } from '@migaia/rpc/contract'
 import { StorageError, StorageErrorCode } from '../../src/types/errors.js'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 
 describe('storage 错误家族经 web-rpc serializer 往返（T-5）', () => {
-  it('StorageError（web）往返后 (source, code, name, message, causes) 一致', () => {
+  it('StorageError（web）往返后 (source, code, name, message, cause) 一致', () => {
     const cause = new Error('root cause')
     const error = new StorageError(StorageErrorCode.quotaExceeded, { cause })
-    const serialized = serializeError(error)
+    const serialized = serializeRpcError(error, { report: () => {} })
     expect(serialized.source).toBe('@migaia/storage-web')
     expect(serialized.code).toBe('QUOTA_EXCEEDED')
     expect(serialized.name).toBe('StorageError')
     expect(serialized.message).toBe(error.message)
-    expect(serialized.causes?.[0]?.message).toBe('root cause')
+    expect(serialized.cause?.message).toBe('root cause')
 
-    const restored = deserializeError(serialized) as Error & { source?: string; code?: string }
+    const restored = deserializeRpcError(serialized) as Error & { source?: string; code?: string }
     expect(restored.source).toBe('@migaia/storage-web')
     expect(restored.code).toBe('QUOTA_EXCEEDED')
     expect(restored.name).toBe('StorageError')
@@ -23,12 +23,12 @@ describe('storage 错误家族经 web-rpc serializer 往返（T-5）', () => {
   it('StorageContractError（contract）往返后 source/code/cause 链一致', () => {
     const cause = new TypeError('bad option')
     const error = new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
-    const serialized = serializeError(error)
+    const serialized = serializeRpcError(error, { report: () => {} })
     expect(serialized.source).toBe('@migaia/storage-contract')
     expect(serialized.code).toBe('INVALID_ARGUMENT')
     expect(serialized.name).toBe('StorageContractError')
 
-    const restored = deserializeError(serialized) as Error & { source?: string; code?: string }
+    const restored = deserializeRpcError(serialized) as Error & { source?: string; code?: string }
     expect(restored.source).toBe('@migaia/storage-contract')
     expect(restored.code).toBe('INVALID_ARGUMENT')
   })
@@ -40,7 +40,7 @@ describe('storage 错误家族经 web-rpc serializer 往返（T-5）', () => {
       'multi-failure'
     )
     let found = false
-    for (const node of reachError(aggregate)) {
+    for (const node of reachRpcError(aggregate, { report: () => {} })) {
       if (node === root) found = true
     }
     expect(found).toBe(true)
