@@ -442,6 +442,10 @@ const ERROR_TEXT = {
       'resources can only be registered during plugin install()'
     )
   },
+  /** A plugin resource must expose a disposer for install and late setup cleanup. */
+  get PLUGIN_RESOURCE_DISPOSER() {
+    return 'plugin resource must provide a disposer'
+  },
   LIFECYCLE_MUTATION: localize(
     '插件生命周期内禁止调用 Host mutation',
     'Host mutations are forbidden during plugin lifecycle callbacks'

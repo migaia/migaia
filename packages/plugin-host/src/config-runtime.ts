@@ -13,6 +13,8 @@ import type {
 type IPluginHostConfigRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly assertActive: () => void
+  readonly isSetupPending: () => boolean
+  readonly decorateError: <TError extends PluginHostError>(error: TError) => TError
   readonly enqueue: <T>(task: () => Promise<T>) => Promise<T>
   readonly beginOperation: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly awaitOperation: <T>(
@@ -79,6 +81,10 @@ export class PluginHostConfigRuntime<
     recipe: (previous: Readonly<T>) => Partial<T>
   ): Promise<void> {
     this.#port.assertActive()
+    if (this.#port.isSetupPending())
+      throw this.#port.decorateError(
+        new PluginHostError(PluginHostErrorCode.lifecycleMutation, ERROR_TEXT.LIFECYCLE_MUTATION)
+      )
     return this.#port.enqueue(async () => {
       const registration = this.#port.registrations.get(name)
       if (!registration)

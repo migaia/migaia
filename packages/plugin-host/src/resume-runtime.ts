@@ -147,8 +147,8 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
         }
       } catch (error) {
         restartFailure =
-          error && typeof error === 'object' && 'cause' in error
-            ? ((error as { readonly cause?: unknown }).cause ?? error)
+          error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed
+            ? (error.cause ?? error)
             : error
         for (const registration of restarting)
           if (!this.#port.state.registrations.has(registration.name)) {
