@@ -1,6 +1,7 @@
 import { safeRead, safeString } from './internal/safe-value.js'
 import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode, RpcSerializationError } from './errors.js'
 import type { IRpcSerializedError } from '../contract/index.js'
+import { RpcWireErrorFallback } from '../contract/wire-error-constants.js'
 
 /** Maximum error-graph depth accepted by either boundary direction. */
 const MAX_ERROR_GRAPH_DEPTH = 64
@@ -301,8 +302,8 @@ function projectSerializedErrorForRpc(
     ...continuation
   ]
   return Object.freeze({
-    source: serialized.source,
-    code: serialized.code,
+    source: serialized.source || RpcWireErrorFallback.source,
+    code: serialized.code || RpcWireErrorFallback.code,
     name: serialized.name,
     message: serialized.message,
     stack: serialized.stack ?? `${serialized.name}: ${serialized.message}`,

@@ -1,6 +1,8 @@
 import { RpcContractErrorCode } from '../error-code.js'
 import { createContractError } from '../contract-error.js'
+import { normalizeRpcSerializedError } from '../error.js'
 import { normalizePortable } from '../normalize.js'
+import { RpcWireErrorUnknownFieldMode } from '../wire-error-constants.js'
 import type { IRpcPortableValue } from '../types.js'
 import type { IRpcEnvelope } from './types.js'
 
@@ -32,8 +34,15 @@ export function normalizeRpcEnvelope(value: unknown): IRpcEnvelope {
         throw createContractError(RpcContractErrorCode.invalidEnvelope)
       if (typeof record.code !== 'string' || typeof record.message !== 'string')
         throw createContractError(RpcContractErrorCode.invalidEnvelope)
-      if (record.error !== undefined && !isSerializedError(record.error))
-        throw createContractError(RpcContractErrorCode.invalidEnvelope)
+      if (record.error !== undefined) {
+        try {
+          normalizeRpcSerializedError(record.error, {
+            unknownFields: RpcWireErrorUnknownFieldMode.reject
+          })
+        } catch (cause) {
+          throw createContractError(RpcContractErrorCode.invalidEnvelope, cause)
+        }
+      }
     }
   } else if (kind === 'request') {
     if (
@@ -59,23 +68,4 @@ export function normalizeRpcEnvelope(value: unknown): IRpcEnvelope {
     throw createContractError(RpcContractErrorCode.invalidEnvelope)
   }
   return normalized as IRpcEnvelope
-}
-
-/** Validate the bounded portable error graph carried by a V1 response failure. */
-function isSerializedError(value: IRpcPortableValue, depth = 0): boolean {
-  if (depth > 32 || typeof value !== 'object' || value === null || Array.isArray(value))
-    return false
-  const record = value as Record<string, IRpcPortableValue>
-  const required = ['source', 'code', 'name', 'message', 'stack']
-  if (!required.every((key) => typeof record[key] === 'string')) return false
-  if (record.cause !== undefined && !isSerializedError(record.cause, depth + 1)) return false
-  if (
-    record.errors !== undefined &&
-    (!Array.isArray(record.errors) ||
-      !record.errors.every((child) => isSerializedError(child, depth + 1)))
-  )
-    return false
-  return Object.keys(record).every(
-    (key) => required.includes(key) || key === 'cause' || key === 'errors'
-  )
 }
