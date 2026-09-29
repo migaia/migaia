@@ -91,7 +91,7 @@ describe('core listener admission', () => {
     expect(source).not.toContain('new Map<IRpcHook')
   })
 
-  it.fails('RLF A6 keeps stale transport disposers from removing a new admission', () => {
+  it('RLF A6 keeps stale transport disposers from removing a new admission', () => {
     /** Node transport errors must keep both native error hooks after stale disposal. */
     const node = createNodePort()
     const nodeTransport = createNodeMessagePortTransport(node.port)
@@ -190,7 +190,7 @@ describe('core listener admission', () => {
     expect(late.mock.calls[0]?.[0]).toMatchObject({ message: '[rpc] message port closed' })
   })
 
-  it.fails('RLF A8 owns every MessagePort error text without changing messages', () => {
+  it('RLF A8 owns every MessagePort error text without changing messages', () => {
     /** Source scanning distinguishes a canonical text reference from an inline message. */
     const source = readFileSync(
       resolve(import.meta.dirname, '../../src/core/adapters/message-port.ts'),
