@@ -128,6 +128,7 @@ const expectedRetainedModules = [
   '@migaia/utils/dist/error-text-[chunk].js',
   '@migaia/utils/dist/error.js',
   '@migaia/utils/dist/object-path.js',
+  '@migaia/utils/dist/scheduler.js',
   '@migaia/utils/dist/promise.js',
   'app/bundle-entry.js'
 ] as const

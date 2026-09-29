@@ -23,30 +23,45 @@
 
 处理截止时间、协作式中止、重试与并发限流。所有中止都是**协作式**的：被中止的操作只有在读取传入的 `signal` 并主动提前返回/抛错时才会真正停止；忽略 `signal` 的 I/O 不会被强制打断。
 
-### 调度器类型
+### 调度器（`@migaia/utils/scheduler`）
+
+调度器契约与实现只由 `@migaia/utils/scheduler`（及根入口 `@migaia/utils`）导出；本模块的 `sleep`、`withTimeout`、`retry`、`createAbortTimeoutSignal` 以它为 `scheduler` 选项类型与默认值。
 
 ```ts
+import {
+  createManualScheduler,
+  systemScheduler,
+  systemWallClock,
+  type IManualScheduler,
+  type IScheduledTask,
+  type IScheduler,
+  type IWallClock
+} from '@migaia/utils/scheduler';
+
 type IScheduledTask = { cancel(): void; unref?(): void };
-type IUtilsScheduler = {
+type IScheduler = {
   now(): number;
   schedule(callback: () => void, delayMs: number): IScheduledTask;
 };
-type IManualScheduler = IUtilsScheduler & {
+type IManualScheduler = IScheduler & {
   advance(ms: number): void;
   readonly pendingCount: number;
 };
+type IWallClock = { timestamp(): number };
 ```
 
-- `IUtilsScheduler`：可注入的时间源，`now()` 返回当前时刻，`schedule()` 安排一次性回调并返回可取消的句柄。
-- `IManualScheduler`：额外提供 `advance(ms)`（手动推进虚拟时间，触发到期回调）与 `pendingCount`（未取消的待执行任务数），用于确定性单测。
+- `IScheduler`：唯一调度器契约。`now()` 是单调不递减的毫秒数（连续两次可相等），只用于差值与本地截止时间，不解释为 epoch；`schedule()` 的 `delayMs` 必须有限非负，回调至多执行一次，且不会在 `schedule()` 调用内同步执行。
+- `IManualScheduler`：额外提供 `advance(ms)`（手动推进虚拟时间，触发到期回调）与 `pendingCount`（未触发且未取消的任务数），用于确定性单测。
+- `IWallClock`：只产生诊断时间戳（epoch 毫秒安全整数），不得参与截止时间、过期或重放窗口比较。
 
 ```ts
-export const systemScheduler: IUtilsScheduler;
+export const systemScheduler: IScheduler;
+export const systemWallClock: IWallClock;
 ```
 
-基于原生 `setTimeout`/`clearTimeout` 的默认调度器，`now()` 当前直接调用 `Date.now()`，因此两者返回的时间戳与精度相同。`systemScheduler.now()` 的价值不是提供另一种计时算法，而是让读取时间的 `now()` 和安排任务的 `schedule()` 共享同一个可注入边界；测试可将两者一起替换为虚拟时钟。
+`systemScheduler` 以 `performance.now()` 为单调时钟、以宿主 `setTimeout`/`clearTimeout` 排程，每次调用都经 `globalThis` 读取宿主能力。宿主缺少 `performance.now`、返回非有限值，或缺少定时器函数时抛带 `ENV_UNSUPPORTED` 的原生错误；`performance.now` 自身抛出的错误原样传播。`delayMs` 非 number 抛 `TypeError`、非有限或为负抛 `RangeError`，二者都带 `INVALID_ARGUMENT`，且不创建定时器。超过 `2_147_483_647` 的延迟分段等待；`unref()` 以原生 timer 为接收者，并对后续分段持续生效；`cancel()` 幂等。
 
-普通业务只需要读取真实墙上时间时，直接使用 `Date.now()`。实现接受 `IUtilsScheduler` 的超时、重试或调度逻辑时，必须配对使用 `scheduler.now()` 和 `scheduler.schedule()`；直接调用 `Date.now()` 会绕过注入的调度器，造成真实时间与虚拟定时器混用。`schedule()` 返回的句柄在宿主支持时会转发 `unref()`（避免测试/进程因悬挂定时器无法退出）。
+`systemWallClock.timestamp()` 返回 `Date.now()`。需要 epoch 时间戳时使用它；实现接受 `IScheduler` 的超时、重试或调度逻辑时，必须配对使用 `scheduler.now()` 和 `scheduler.schedule()`，不要把墙钟值与 `now()` 相减或比较。
 
 ```ts
 function createManualScheduler(): IManualScheduler;
@@ -54,7 +69,7 @@ function createManualScheduler(): IManualScheduler;
 
 > 本仓测试专用：用于本仓单元测试与适配器验证，不建议外部业务代码使用。外部项目应优先选择测试框架自带的 fake timers，生产代码使用 `systemScheduler` 或默认调度器。
 
-创建一个 FIFO 虚拟时钟调度器：`schedule()` 按 `到期时间 → 注册顺序` 排队；调用 `advance(ms)` 会一次性执行所有到期回调（回调内部再 `schedule` 的新任务，只要到期时间 `<= 目标时刻` 也会在同一次 `advance` 内继续触发）。`advance` 单次循环超过 10000 次会抛 `RangeError`（防止回调间互相递归调度导致死循环）。`delayMs`/`ms` 必须是有限的非负数，否则抛 `RangeError`。
+创建一个 FIFO 虚拟时钟调度器：`schedule()` 按 `到期时间 → 注册顺序` 排队；调用 `advance(ms)` 会一次性执行所有到期回调（回调内部再 `schedule` 的新任务，只要到期时间 `<= 目标时刻` 也会在同一次 `advance` 内继续触发）。`advance` 单次循环超过 10000 次会抛 `RangeError`/`SCHEDULER_RUNAWAY`（防止回调间互相递归调度导致死循环）。`delayMs`/`ms` 必须是有限的非负数（非 number 抛 `TypeError`，否则抛 `RangeError`），到期时刻或目标时刻溢出为非有限值时同样抛 `RangeError`，均带 `INVALID_ARGUMENT` 且不改变时钟与队列；回调内再次调用 `advance()` 抛 `TypeError`/`REENTRANT_CALL`，外层 `advance` 照常完成。
 
 ```ts
 const scheduler = createManualScheduler();
@@ -127,7 +142,7 @@ function sleep(delayMs: number, options?: IAsyncControls): Promise<void>;
 type IAsyncControls = {
   readonly signal?: IAbortSignal;
   readonly signals?: readonly IAbortSignal[];
-  readonly scheduler?: IUtilsScheduler;
+  readonly scheduler?: IScheduler;
   readonly unref?: boolean;
 };
 ```
@@ -147,7 +162,7 @@ await p; // 抛 UtilsAbortError，cause 为 'cancelled'
 type IAbortTimeoutSignalOptions = {
   readonly signal?: IAbortSignal;
   readonly timeoutMs?: number;
-  readonly scheduler?: IUtilsScheduler;
+  readonly scheduler?: IScheduler;
   readonly timeoutReason?: () => unknown;
   readonly report?: IUtilsReporter;
 };
@@ -259,7 +274,7 @@ function retry<T>(
     readonly zeroTimeoutBehavior?: 'skip' | 'start';
     readonly report?: IUtilsReporter;
     readonly unref?: boolean;
-    readonly scheduler?: IUtilsScheduler;
+    readonly scheduler?: IScheduler;
   }
 ): Promise<T>;
 ```
@@ -1193,7 +1208,8 @@ const result = collector.result;
 > 该组合用于本仓测试验证，不是外部生产代码示例。外部测试应优先使用测试框架的 fake timers。
 
 ```ts
-import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';
+import { retry, withTimeout } from '@migaia/utils/promise';
+import { createManualScheduler } from '@migaia/utils/scheduler';
 import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';
 
 const scheduler = createManualScheduler();

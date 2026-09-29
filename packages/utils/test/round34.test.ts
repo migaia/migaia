@@ -9,9 +9,9 @@ import {
   patchConfig,
   retry,
   set,
-  createManualScheduler,
   walkErrorCauses
 } from '../src/index.js'
+import { createManualScheduler } from '../src/scheduler.js'
 
 describe('round 34 contract regressions', () => {
   it('preserves missing-versus-undefined presence and array descriptors', () => {
