@@ -92,7 +92,7 @@ export function observeListener<T>(
 /** Reports one adapter failure to every listener while collecting reporter failures once. */
 export function reportListenerFailure(
   error: unknown,
-  reporters: ReadonlySet<(error: unknown) => unknown>,
+  reporters: Iterable<(error: unknown) => unknown>,
   reporterFailures: IListenerFailureState
 ): void {
   for (const reporter of Array.from(reporters)) {

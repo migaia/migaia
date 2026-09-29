@@ -1,3 +1,8 @@
+import {
+  createEventChannel,
+  EventAdmissionPolicy,
+  withSnapshotEntries
+} from '@migaia/event-subscriber'
 import { RpcCoreErrorCode, RpcTransportError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '../transport.js'
@@ -15,6 +20,7 @@ import {
 } from '../internal/listener-safety.js'
 import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 import { RpcPlatform, RpcTransportOwnership } from '../transport-constants.js'
+import { RpcMessagePortErrorText } from './message-port-text.js'
 
 /**
  * Structural shape of Node's `worker_threads.MessagePort` (and close enough to `EventEmitter`
@@ -43,14 +49,79 @@ export type IBrowserMessagePortTransportOptions = {
   readonly ownership?: 'owned' | 'borrowed'
 }
 
+/** One diagnostic listener is identified by its original function. */
+type IRpcErrorListener = (error: unknown) => void
+
+/** Uses one channel for admission while keeping native-listener release generation-safe. */
+function createErrorListenerChannel() {
+  /** The channel is the only owner of listener registration and dispatch snapshots. */
+  const channel = createEventChannel<unknown>({
+    admissionPolicy: EventAdmissionPolicy.unique,
+    report: () => undefined
+  })
+  /** Wrapper identity and generation only guard physical port detachment. */
+  const wrappers = new WeakMap<
+    IRpcErrorListener,
+    { wrapper: (event: { value: unknown }) => void; generation: number; active: boolean }
+  >()
+  return {
+    /** Counts live channel registrations for native listener attachment decisions. */
+    get size(): number {
+      return channel.size
+    },
+    /** Admits a listener and binds its disposer to that registration generation. */
+    add(listener: IRpcErrorListener) {
+      /** One stable wrapper makes repeated public listeners equal to the channel. */
+      let record = wrappers.get(listener)
+      if (record === undefined) {
+        record = { wrapper: (event) => listener(event.value), generation: 0, active: false }
+        wrappers.set(listener, record)
+      }
+      /** A size increase distinguishes a new generation from duplicate admission. */
+      const before = channel.size
+      /** The channel-owned disposer remains bound to this exact registration. */
+      const dispose = channel.subscribe(record.wrapper)
+      if (channel.size > before) {
+        record.generation += 1
+        record.active = true
+      }
+      /** Old closures compare against this generation before detaching native hooks. */
+      const generation = record.generation
+      return {
+        isCurrent: (): boolean => record.generation === generation && record.active,
+        release: (): boolean => {
+          if (record.generation !== generation || !record.active) return false
+          /** The count comparison reports whether this handle removed its owner. */
+          const size = channel.size
+          dispose()
+          /** A stale handle is a no-op even if a newer owner uses the same function. */
+          const removed = channel.size < size
+          if (removed) record.active = false
+          return removed
+        }
+      }
+    },
+    /** Preserves the existing ordered isolation and secondary-failure collector. */
+    report(error: unknown, failures: ReturnType<typeof createListenerFailureState>): void {
+      withSnapshotEntries(channel, error, (entries) =>
+        reportListenerFailure(
+          error,
+          entries.map((entry) => () => entry.invoke()),
+          failures
+        )
+      )
+    }
+  }
+}
+
 /** Wraps a browser MessagePort and owns its terminal lifecycle. */
 export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = unknown>(
   port: IBrowserMessagePortLike<TTransfer, TEvent>,
   options: IBrowserMessagePortTransportOptions = {}
 ): IRpcTransport<unknown, TTransfer> {
   const messageListeners = createMessageListenerHub<{ data: unknown }>()
-  const errorListeners = new Set<(error: unknown) => void>()
-  const listenerErrors = new Set<(error: unknown) => void>()
+  const errorListeners = createErrorListenerChannel()
+  const listenerErrors = createErrorListenerChannel()
   const secondaryFailures = createListenerFailureState()
   let closed = false
   let closeResult: void | Promise<void>
@@ -59,9 +130,8 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     let readFailed = false
     const data = safeRead<unknown>(event, 'data', ({ error }) => {
       readFailed = true
-      reportListenerFailure(
+      errorListeners.report(
         new RpcTransportError(RpcCoreErrorText.propertyReadFailed, error),
-        errorListeners,
         secondaryFailures
       )
       return undefined
@@ -70,14 +140,14 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     messageListeners.dispatch({ data }, (listener, message) => {
       observeListener(
         () => listener(message),
-        (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
+        (error) => listenerErrors.report(error, secondaryFailures),
         secondaryFailures
       )
     })
   }
   const onMessageError = (): void => {
-    const error = new Error('[rpc] browser message port could not deserialize a message')
-    reportListenerFailure(error, errorListeners, secondaryFailures)
+    const error = new Error(RpcMessagePortErrorText.browserMessagePortDeserializeFailed)
+    errorListeners.report(error, secondaryFailures)
   }
   return {
     platform: RpcPlatform.messagePort,
@@ -87,11 +157,11 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       return closed
     },
     send(message, options?: IRpcSendOptions<TTransfer>) {
-      if (closed) throw new RpcTransportError('[rpc] browser message port is closed')
+      if (closed) throw new RpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
       port.postMessage(message, options?.transfer)
     },
     subscribe(listener) {
-      if (closed) throw new RpcTransportError('[rpc] browser message port is closed')
+      if (closed) throw new RpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
       messageListeners.add(listener, () =>
         registerListeners(
           [
@@ -148,17 +218,17 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       return closeResult
     },
     onTransportError(listener) {
-      errorListeners.add(listener)
+      const registration = errorListeners.add(listener)
       return () => {
-        const deleted = errorListeners.delete(listener)
+        const deleted = registration.release()
         drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
     },
     onListenerError(listener) {
-      listenerErrors.add(listener)
+      const registration = listenerErrors.add(listener)
       return () => {
-        const deleted = listenerErrors.delete(listener)
+        const deleted = registration.release()
         drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
@@ -172,22 +242,22 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
  */
 export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpcTransport {
   const messageListeners = createMessageListenerHub<{ data: unknown }>()
-  const errorListeners = new Set<(error: unknown) => void>()
-  const listenerErrors = new Set<(error: unknown) => void>()
+  const errorListeners = createErrorListenerChannel()
+  const listenerErrors = createErrorListenerChannel()
   const secondaryFailures = createListenerFailureState()
   let closed = false
   let terminalReported = false
   let terminalError: Error | undefined
 
   const emitTransportError = (error: unknown): void => {
-    reportListenerFailure(error, errorListeners, secondaryFailures)
+    errorListeners.report(error, secondaryFailures)
   }
 
   const onMessage = (message: unknown): void => {
     messageListeners.dispatch({ data: message }, (listener, messageValue) => {
       observeListener(
         () => listener(messageValue),
-        (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
+        (error) => listenerErrors.report(error, secondaryFailures),
         secondaryFailures
       )
     })
@@ -197,13 +267,13 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
   // exception from inside Node's event emitter dispatch.
   const onMessageError = (error?: unknown): void => {
     const detail = error === undefined ? '' : `: ${safeString(error)}`
-    emitTransportError(new Error(`[rpc] message port could not deserialize a message${detail}`))
+    emitTransportError(new Error(RpcMessagePortErrorText.messagePortDeserializeFailed(detail)))
   }
   const onClose = (): void => {
     if (terminalReported) return
     terminalReported = true
     closed = true
-    terminalError = new Error('[rpc] message port closed')
+    terminalError = new Error(RpcMessagePortErrorText.messagePortTerminated)
     emitTransportError(terminalError)
   }
 
@@ -215,14 +285,14 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
       return closed
     },
     send(message, options?: IRpcSendOptions) {
-      if (closed) throw new RpcTransportError('[rpc] message port is closed')
+      if (closed) throw new RpcTransportError(RpcMessagePortErrorText.messagePortClosed)
       port.postMessage(message, options?.transfer)
     },
     // Lazily attached/detached the same way as the web-worker adapter —
     // a client that closes must not leave the underlying port still
     // referencing listeners it can no longer reach.
     subscribe(listener) {
-      if (closed) throw new RpcTransportError('[rpc] message port is closed')
+      if (closed) throw new RpcTransportError(RpcMessagePortErrorText.messagePortClosed)
       messageListeners.add(listener, () =>
         registerListeners(
           [
@@ -260,7 +330,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
           ],
           { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
-      errorListeners.add(listener)
+      const registration = errorListeners.add(listener)
       if (terminalError !== undefined) {
         observeListener(
           () => listener(terminalError),
@@ -269,22 +339,22 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
         )
       }
       return () => {
-        if (!errorListeners.has(listener)) return
+        if (!registration.isCurrent()) return
         releaseListenerRegistration(
           errorListeners.size === 1
             ? [() => port.off('messageerror', onMessageError), () => port.off('close', onClose)]
             : [],
           () => {
-            errorListeners.delete(listener)
+            registration.release()
           },
           { code: RpcCoreErrorCode.transport, secondaryFailures }
         )
       }
     },
     onListenerError(listener) {
-      listenerErrors.add(listener)
+      const registration = listenerErrors.add(listener)
       return () => {
-        const deleted = listenerErrors.delete(listener)
+        const deleted = registration.release()
         drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
         return deleted
       }
