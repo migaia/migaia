@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeRpcEnvelope } from '../../src/contract/index.js'
-import { normalizeWebRpcRoutingData } from '../../src/core/internal/routing-data.js'
+import { RpcRouteProfile, normalizeRpcEnvelope } from '../../src/contract/index.js'
 import { assertContractMethod as assertMethod } from '../../src/core/internal/contract.js'
 
 describe('wire boundary', () => {
@@ -11,8 +10,8 @@ describe('wire boundary', () => {
         id: 't',
         method: 'm',
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: RpcRouteProfile,
             type: 'request',
             applicationVersion: '1.0',
             senderId: 'a',
@@ -29,8 +28,8 @@ describe('wire boundary', () => {
         id: 't',
         ok: true,
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: RpcRouteProfile,
             type: 'response',
             applicationVersion: '1.0',
             senderId: 'b',
@@ -42,15 +41,19 @@ describe('wire boundary', () => {
       })
     ).toBeDefined()
     expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'variation',
-          applicationVersion: '1.0',
-          senderId: 'a',
-          targetId: 'b',
-          variation: 'ping',
-          sentAt: 0
+      normalizeRpcEnvelope({
+        kind: 'variation',
+        id: 't',
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'variation',
+            applicationVersion: '1.0',
+            senderId: 'a',
+            targetId: 'b',
+            variation: 'ping',
+            sentAt: 0
+          }
         }
       })
     ).toBeDefined()
@@ -66,7 +69,22 @@ describe('wire boundary', () => {
   it('delegates hostile semantic envelope getters to the rpc-contract normalizer', () => {
     let reads = 0
     const input = new Proxy(
-      { kind: 'response', id: 'response-1', ok: true, data: null },
+      {
+        kind: 'response',
+        id: 'response-1',
+        ok: true,
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'response',
+            applicationVersion: '1.0',
+            senderId: 'b',
+            targetId: 'a',
+            method: 'm',
+            sentAt: 0
+          }
+        }
+      },
       {
         get(target, property, receiver) {
           if (property === 'id') {
@@ -82,95 +100,155 @@ describe('wire boundary', () => {
   })
   it('normalizes discovery and variation routing records with their required fields', () => {
     expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'discovery-query',
-          applicationVersion: '1.0',
-          senderId: 'a',
-          targetId: 'b',
-          manual: true,
-          sentAt: 1
+      normalizeRpcEnvelope({
+        kind: 'discovery',
+        id: 'd1',
+        version: '1.0',
+        acceptVersions: ['1.0'],
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'discovery-query',
+            applicationVersion: '1.0',
+            senderId: 'a',
+            targetId: 'b',
+            manual: true,
+            sentAt: 1
+          }
         }
       })
-    ).toMatchObject({ webRpc: { type: 'discovery-query', manual: true, sentAt: 1 } })
+    ).toMatchObject({ data: { route: { type: 'discovery-query', manual: true, sentAt: 1 } } })
     expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'discovery-response',
-          applicationVersion: '1.0',
-          senderId: 'b',
-          targetId: 'a',
-          resolvedTargetId: 'a',
-          accepted: true,
-          sentAt: 1
+      normalizeRpcEnvelope({
+        kind: 'discovery',
+        id: 'd2',
+        version: '1.0',
+        acceptVersions: ['1.0'],
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'discovery-response',
+            applicationVersion: '1.0',
+            senderId: 'b',
+            targetId: 'a',
+            resolvedTargetId: 'a',
+            accepted: true,
+            sentAt: 1
+          }
         }
       })
     ).toMatchObject({
-      webRpc: { type: 'discovery-response', resolvedTargetId: 'a', accepted: true, sentAt: 1 }
+      data: {
+        route: { type: 'discovery-response', resolvedTargetId: 'a', accepted: true, sentAt: 1 }
+      }
     })
     expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'variation',
-          applicationVersion: '1.0',
-          senderId: 'a',
-          targetId: 'b',
-          variation: 'ping',
-          sentAt: 1
+      normalizeRpcEnvelope({
+        kind: 'variation',
+        id: 'v1',
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'variation',
+            applicationVersion: '1.0',
+            senderId: 'a',
+            targetId: 'b',
+            variation: 'ping',
+            sentAt: 1
+          }
         }
       })
-    ).toMatchObject({ webRpc: { type: 'variation', variation: 'ping', sentAt: 1 } })
+    ).toMatchObject({ data: { route: { type: 'variation', variation: 'ping', sentAt: 1 } } })
     expect(
-      normalizeRpcEnvelope({ kind: 'response', id: 'success', ok: true, data: null })
-    ).toMatchObject({ kind: 'response', id: 'success', ok: true, data: null })
+      normalizeRpcEnvelope({
+        kind: 'response',
+        id: 'success',
+        ok: true,
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'response',
+            applicationVersion: '1.0',
+            senderId: 'b',
+            targetId: 'a',
+            method: 'm',
+            sentAt: 1
+          }
+        }
+      })
+    ).toMatchObject({ kind: 'response', id: 'success', ok: true })
     expect(
       normalizeRpcEnvelope({
         kind: 'response',
         id: 'failure',
         ok: false,
         code: 'FAILED',
-        message: 'failed'
+        message: 'failed',
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'response',
+            applicationVersion: '1.0',
+            senderId: 'b',
+            targetId: 'a',
+            method: 'm',
+            sentAt: 1
+          }
+        }
       })
     ).toMatchObject({ kind: 'response', id: 'failure', ok: false, code: 'FAILED' })
-    expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'discovery-query',
-          applicationVersion: '1.0',
-          senderId: 'a',
-          targetId: 'b',
-          sentAt: -1
+    expect(() =>
+      normalizeRpcEnvelope({
+        kind: 'discovery',
+        id: 'd3',
+        version: '1.0',
+        acceptVersions: ['1.0'],
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'discovery-query',
+            applicationVersion: '1.0',
+            senderId: 'a',
+            targetId: 'b',
+            sentAt: -1
+          }
         }
       })
-    ).toBeUndefined()
-    expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'discovery-response',
-          applicationVersion: '1.0',
-          senderId: 'b',
-          targetId: 'a',
-          sentAt: 1
+    ).toThrow()
+    expect(() =>
+      normalizeRpcEnvelope({
+        kind: 'discovery',
+        id: 'd4',
+        version: '1.0',
+        acceptVersions: ['1.0'],
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'discovery-response',
+            applicationVersion: '1.0',
+            senderId: 'b',
+            targetId: 'a',
+            sentAt: 1
+          }
         }
       })
-    ).toBeUndefined()
-    expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'variation',
-          applicationVersion: '1.0',
-          senderId: 'a',
-          targetId: 'b',
-          sentAt: 1
+    ).toThrow()
+    expect(() =>
+      normalizeRpcEnvelope({
+        kind: 'variation',
+        id: 'v2',
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'variation',
+            applicationVersion: '1.0',
+            senderId: 'a',
+            targetId: 'b',
+            sentAt: 1
+          }
         }
       })
-    ).toBeUndefined()
+    ).toThrow()
   })
   it('rejects non-string and empty methods', () => {
     expect(() => assertMethod(1 as never)).toThrow('non-empty')

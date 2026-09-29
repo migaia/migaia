@@ -3,7 +3,7 @@ import { createClientEndpoint } from '../../src/core/client.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { connect } from '../../src/core/middleware/connect.js'
-import type { IRpcRequestEnvelope } from '../../src/contract/index.js'
+import { RpcRouteProfile, type IRpcRequestEnvelope } from '../../src/contract/index.js'
 
 /** Proves composed provider admission rejects frames not addressed to its receiver identity. */
 describe('composed receiver identity admission', () => {
@@ -39,8 +39,8 @@ describe('composed receiver identity admission', () => {
         id: 'forged-task',
         method: 'count',
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: RpcRouteProfile,
             type: 'request',
             applicationVersion: '1.0',
             senderId: 'someone-else',
@@ -51,17 +51,17 @@ describe('composed receiver identity admission', () => {
           payload: null
         }
       }
-      /** Test fixture is a known routing record despite IRpcEnvelope's portable-value union. */
-      const baseData = base.data as { readonly webRpc: Record<string, unknown> }
+      /** Every forged frame changes only the receiver selector under the canonical route. */
+      const baseData = base.data
       for (const frame of [
         base,
         {
           ...base,
-          data: { ...baseData, webRpc: { ...baseData.webRpc, receiverId: 'foreign-provider' } }
+          data: { ...baseData, route: { ...baseData.route, receiverId: 'foreign-provider' } }
         },
         {
           ...base,
-          data: { ...baseData, webRpc: { ...baseData.webRpc, receiverId: 'receiver-provider' } }
+          data: { ...baseData, route: { ...baseData.route, receiverId: 'receiver-provider' } }
         }
       ])
         clientTransport.send(frame)

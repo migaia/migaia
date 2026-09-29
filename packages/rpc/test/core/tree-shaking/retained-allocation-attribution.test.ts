@@ -23,7 +23,7 @@ import { RpcDiscoveryAttachment } from '../../../src/core/internal/discovery-att
 import { createEndpointTimePort } from '../../../src/core/internal/time-port.js'
 import { connect } from '../../../src/core/middleware/connect.js'
 import { abort } from '../../../src/core/middleware/abort.js'
-import { RpcVariation } from '../../../src/core/semantic-constants.js'
+import { RpcControl, RpcRouteProfile } from '../../../src/contract/index.js'
 import { SourceIdentityRegistry } from '../../../src/core/internal/source-identity.js'
 import { RpcVariationCoordinator } from '../../../src/core/internal/variation-coordinator.js'
 import { RpcOutboundAttachment } from '../../../src/core/internal/outbound-attachment.js'
@@ -159,23 +159,23 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
       () => Date.now()
     )
     const received: string[] = []
-    const release = coordinator.register(RpcVariation.abort, (_message, peerKey) => {
+    const release = coordinator.register(RpcControl.abort, (_message, peerKey) => {
       received.push(peerKey)
     })
-    expect(() => coordinator.register(RpcVariation.abort, () => undefined)).toThrow()
+    expect(() => coordinator.register(RpcControl.abort, () => undefined)).toThrow()
     await expect(
-      coordinator.dispatch(RpcVariation.ping, 'missing-handler', {}, 'peer')
-    ).resolves.toBe(false)
-    await expect(coordinator.dispatch(RpcVariation.abort, 'abort-task', {}, 'peer')).resolves.toBe(
-      true
+      coordinator.dispatch(RpcControl.ping, 'missing-handler', {}, 'peer')
+    ).resolves.toBe('unknown')
+    await expect(coordinator.dispatch(RpcControl.abort, 'abort-task', {}, 'peer')).resolves.toBe(
+      'dispatched'
     )
-    await expect(coordinator.dispatch(RpcVariation.abort, 'abort-task', {}, 'peer')).resolves.toBe(
-      false
+    await expect(coordinator.dispatch(RpcControl.abort, 'abort-task', {}, 'peer')).resolves.toBe(
+      'rejected'
     )
     expect(received).toEqual(['peer'])
 
     release()
-    const replacementRelease = coordinator.register(RpcVariation.abort, () => undefined)
+    const replacementRelease = coordinator.register(RpcControl.abort, () => undefined)
     release()
     replacementRelease()
 
@@ -557,8 +557,8 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         version: '1.0.0',
         acceptVersions: ['1.0.0'],
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: RpcRouteProfile,
             type: 'discovery-response',
             applicationVersion: '1.0.0',
             senderId: 'discovery-peer',
@@ -580,6 +580,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         }
       },
       outboundOperations: {
+        noteUnknownField: () => undefined,
         send: ((command: IRpcOutboundCommand) => {
           if (command.kind === 'response' || command.kind === 'frame')
             return outbound.sendFrame(command.message, command.transfer)

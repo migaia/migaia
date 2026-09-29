@@ -3,7 +3,7 @@ import { createEndpointTimePort } from '../../src/core/internal/time-port.js'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
-import { rpcProtocolV1 } from '../../src/contract/index.js'
+import { RpcRouteProfile, rpcProtocolV1 } from '../../src/contract/index.js'
 import { createStringFramer } from '../../src/contract/framing/index.js'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { createComposedEndpoint, type IRpcCoreConfig } from '../../src/core/composed.js'
@@ -1712,7 +1712,17 @@ describe('B12a atomic middleware and claim contracts', () => {
           kind: 'response',
           ok: true,
           id: 'value',
-          data: null
+          data: {
+            route: {
+              profile: RpcRouteProfile,
+              type: 'response',
+              applicationVersion: '1.0',
+              senderId: 'provider',
+              targetId: 'client',
+              method: 'echo',
+              sentAt: 0
+            }
+          }
         })
       )
     ).toBeDefined()
@@ -5323,7 +5333,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       const operations = batch.host.getPort(RpcPortName.outboundOperations)
       const identity = batch.host.getPort(RpcPortName.inboundIdentity)
       const variation = batch.host.getPort(RpcPortName.variationCoordinator)
-      expectFrozenPort(operations, ['send'])
+      expectFrozenPort(operations, ['send', 'noteUnknownField'])
       expectFrozenPort(identity, ['verify'])
       expectFrozenPort(variation, ['admit'])
       expect(batch.host.getPort(RpcPortName.outboundAttachment)).toBeUndefined()

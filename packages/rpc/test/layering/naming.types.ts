@@ -257,9 +257,9 @@ export type { IWebRpcPortFeatureSet as ILayeringOld085 } from '../../src/core/in
 export type { IRpcProviderPorts as ILayeringNew086 } from '../../src/core/internal/provider-attachment.js'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcProviderPorts as ILayeringOld086 } from '../../src/core/internal/provider-attachment.js'
-export type { IRpcRoutingData as ILayeringNew087 } from '../../src/core/internal/routing-data.js'
+export type { IRpcEnvelopeData as ILayeringNew087 } from '../../src/contract/index.js'
 // @ts-expect-error BC2 removes the old public type name.
-export type { IWebRpcRoutingData as ILayeringOld087 } from '../../src/core/internal/routing-data.js'
+export type { IWebRpcRoutingData as ILayeringOld087 } from '../../src/contract/index.js'
 export type { IRpcDiscoveryCleanupFaults as ILayeringNew088 } from '../../src/core/internal/test-observer.js'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcDiscoveryCleanupFaults as ILayeringOld088 } from '../../src/core/internal/test-observer.js'
@@ -296,9 +296,6 @@ export type { IWebRpcNativeMiddleware as ILayeringOld098 } from '../../src/core/
 export type { IRpcMessageKind as ILayeringNew099 } from '../../src/core/semantic-constants.js'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcMessageKind as ILayeringOld099 } from '../../src/core/semantic-constants.js'
-export type { IRpcVariation as ILayeringNew100 } from '../../src/core/semantic-constants.js'
-// @ts-expect-error BC2 removes the old public type name.
-export type { IWebRpcVariation as ILayeringOld100 } from '../../src/core/semantic-constants.js'
 export type { IRpcCandidateStatus as ILayeringNew101 } from '../../src/core/transport-constants.js'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcCandidateStatus as ILayeringOld101 } from '../../src/core/transport-constants.js'

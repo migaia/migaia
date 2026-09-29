@@ -2,10 +2,49 @@ import { describe, expect, it } from 'vitest'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
+import { createRpcIdempotencyStore } from '../../src/core/index.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { abort } from '../../src/core/middleware/abort.js'
 
 describe('keyed provider execution (A7)', () => {
+  it('keeps method tuples distinct and reports retained-result tombstones', async () => {
+    const [clientTransport, serverTransport] = createMemoryTransportPair()
+    const server = await createProviderEndpoint({
+      id: 'server',
+      transport: serverTransport,
+      targetIds: ['client'],
+      idempotency: { store: createRpcIdempotencyStore({ maxOutcomeBytes: 10 }) },
+      middlewares: [connect({ transport: serverTransport })]
+    })
+    const client = await createClientEndpoint({
+      id: 'client',
+      transport: clientTransport,
+      targetIds: ['server'],
+      middlewares: [connect({ transport: clientTransport })]
+    })
+    let count = 0
+    let count2 = 0
+    server.provide('count', (context) => {
+      count += 1
+      return context.success('x'.repeat(20))
+    })
+    server.provide('count2', (context) => context.success(++count2))
+    try {
+      expect(await client.send('server', 'count', null, { idempotencyKey: 'same' })).toBe(
+        'x'.repeat(20)
+      )
+      await expect(
+        client.send('server', 'count', null, { idempotencyKey: 'same' })
+      ).rejects.toMatchObject({ code: 'IDEMPOTENCY_RESULT_UNAVAILABLE' })
+      expect(count).toBe(1)
+      expect(await client.send('server', 'count2', null, { idempotencyKey: 'same' })).toBe(1)
+      expect(count2).toBe(1)
+    } finally {
+      await client.dispose()
+      await server.dispose()
+    }
+  })
+
   it('executes one method/key pair once and replays the result', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createProviderEndpoint({

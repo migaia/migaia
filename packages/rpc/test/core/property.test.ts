@@ -5,9 +5,8 @@ import { ResourceScope } from '../../src/core/internal/resource-scope.js'
 import { RequestReplayLedger } from '../../src/core/internal/request-replay-ledger.js'
 import { createSettlement } from '../../src/core/internal/settlement.js'
 import { OperationScope } from '../../src/core/internal/operation-scope.js'
-import { normalizeRpcEnvelope } from '../../src/contract/index.js'
+import { RpcRouteProfile, normalizeRpcEnvelope } from '../../src/contract/index.js'
 import { createStringFramer } from '../../src/contract/framing/index.js'
-import { normalizeWebRpcRoutingData } from '../../src/core/internal/routing-data.js'
 
 const runtimeProcess = (globalThis as { process?: { env?: { CI?: string } } }).process
 const propertyParameters = { numRuns: runtimeProcess?.env?.CI ? 2_000 : 500 } as const
@@ -56,8 +55,8 @@ describe('property invariants', () => {
         ),
         (hostileKey) => {
           const base = {
-            webRpc: {
-              profile: 'web-rpc.route.v1',
+            route: {
+              profile: RpcRouteProfile,
               type: 'request',
               applicationVersion: '1',
               senderId: 'sender',
@@ -68,8 +67,8 @@ describe('property invariants', () => {
           }
           const hostile = new Proxy(base, {
             get(target, key, receiver) {
-              if (key === 'webRpc' && hostileKey !== 'payload' && hostileKey !== '__proto__')
-                return new Proxy(target.webRpc, {
+              if (key === 'route' && hostileKey !== 'payload' && hostileKey !== '__proto__')
+                return new Proxy(target.route, {
                   get(route, routeKey, routeReceiver) {
                     if (routeKey === hostileKey) throw new Error('hostile getter')
                     return Reflect.get(route, routeKey, routeReceiver)
@@ -79,18 +78,19 @@ describe('property invariants', () => {
               return Reflect.get(target, key, receiver)
             }
           })
-          const failures: unknown[] = []
-          const normalized = normalizeWebRpcRoutingData(hostile, ({ error }) => {
-            failures.push(error)
-            return undefined
-          })
-          if (hostileKey !== 'payload' && hostileKey !== '__proto__')
-            expect(normalized).toBeUndefined()
-          else {
-            expect(Object.isFrozen(normalized)).toBe(true)
-            if (hostileKey === 'payload') expect(normalized).not.toHaveProperty('payload')
+          const envelope = { kind: 'request', id: 't', method: 'm', data: hostile }
+          if (hostileKey === '__proto__') {
+            expect(Object.isFrozen(normalizeRpcEnvelope(envelope))).toBe(true)
+            return
           }
-          expect(failures).toHaveLength(hostileKey === '__proto__' ? 0 : 1)
+          let failure: unknown
+          try {
+            normalizeRpcEnvelope(envelope)
+          } catch (error) {
+            failure = error
+          }
+          expect(failure).toMatchObject({ code: 'INVALID_ENVELOPE', cause: expect.any(Error) })
+          expect((failure as Error).cause).toMatchObject({ message: 'hostile getter' })
         }
       ),
       propertyParameters
@@ -98,67 +98,43 @@ describe('property invariants', () => {
   })
 
   it('accepts only tag-owned portable route metadata', () => {
-    const valid = normalizeWebRpcRoutingData({
-      webRpc: {
-        profile: 'web-rpc.route.v1',
-        type: 'request',
-        applicationVersion: '1.0.0',
-        senderId: 'sender',
-        targetId: 'target',
-        sentAt: 1
-      },
-      payload: { args: [1, 2] }
+    const route = {
+      profile: RpcRouteProfile,
+      type: 'request',
+      applicationVersion: '1.0.0',
+      senderId: 'sender',
+      targetId: 'target',
+      sentAt: 1
+    }
+    const input = {
+      kind: 'request',
+      id: 't',
+      method: 'm',
+      data: { route, payload: { args: [1, 2] } }
+    }
+    expect(normalizeRpcEnvelope(input)).toMatchObject({
+      data: { route, payload: { args: [1, 2] } }
     })
-    expect(valid).toEqual({
-      webRpc: {
-        profile: 'web-rpc.route.v1',
-        type: 'request',
-        applicationVersion: '1.0.0',
-        senderId: 'sender',
-        targetId: 'target',
-        sentAt: 1
-      },
-      payload: { args: [1, 2] }
-    })
+    const warnings: Array<[string, string]> = []
+    const options = {
+      onUnknownField: (pointer: string, field: string) => warnings.push([pointer, field])
+    }
     expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'request',
-          applicationVersion: '1.0.0',
-          senderId: 'sender',
-          targetId: 'target',
-          accepted: true,
-          sentAt: 1
-        }
-      })
-    ).toBeUndefined()
+      normalizeRpcEnvelope({ ...input, data: { route: { ...route, accepted: true } } }, options)
+        .data.route
+    ).not.toHaveProperty('accepted')
     expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'request',
-          applicationVersion: '1.0.0',
-          senderId: 'sender',
-          targetId: 'target',
-          sentAt: 1,
-          unexpected: true
-        }
-      })
-    ).toBeUndefined()
+      normalizeRpcEnvelope({ ...input, data: { route: { ...route, unexpected: true } } }, options)
+        .data.route
+    ).not.toHaveProperty('unexpected')
     expect(
-      normalizeWebRpcRoutingData({
-        webRpc: {
-          profile: 'web-rpc.route.v1',
-          type: 'request',
-          applicationVersion: '1.0.0',
-          senderId: 'sender',
-          targetId: 'target',
-          sentAt: 1
-        },
-        unexpected: true
-      })
-    ).toBeUndefined()
+      normalizeRpcEnvelope({ ...input, data: { route, unexpected: true } }, options).data
+    ).not.toHaveProperty('unexpected')
+    expect(warnings).toEqual([
+      ['/data/route', 'accepted'],
+      ['/data/route', 'unexpected'],
+      ['/data', 'unexpected']
+    ])
   })
 
   it('keeps discovery remote state equivalent to a bounded map model', () => {

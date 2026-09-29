@@ -21,7 +21,7 @@ type IControlledTransport = IRpcTransport & {
 type ICanonicalWorkerFrame = {
   readonly id: string
   readonly data: {
-    readonly webRpc: { readonly receiverId?: string }
+    readonly route: { readonly receiverId?: string }
     readonly payload?: unknown
   }
 }
@@ -108,7 +108,7 @@ describe('deterministic source-less Worker settlement', () => {
             typeof frame === 'object' &&
             frame !== null &&
             'data' in frame &&
-            (frame as ICanonicalWorkerFrame).data.webRpc.receiverId === 'worker-provider'
+            (frame as ICanonicalWorkerFrame).data.route.receiverId === 'worker-provider'
         )
       ).toBe(true)
 
@@ -117,7 +117,7 @@ describe('deterministic source-less Worker settlement', () => {
         ...firstRequest,
         data: {
           ...firstRequest.data,
-          webRpc: { ...firstRequest.data.webRpc, receiverId: 'foreign-provider' }
+          route: { ...firstRequest.data.route, receiverId: 'foreign-provider' }
         }
       })
       await drainMicrotasks()
@@ -155,7 +155,7 @@ describe('deterministic source-less Worker settlement', () => {
             typeof frame === 'object' &&
             frame !== null &&
             'data' in frame &&
-            (frame as ICanonicalWorkerFrame).data.webRpc.receiverId === 'worker-client'
+            (frame as ICanonicalWorkerFrame).data.route.receiverId === 'worker-client'
         )
       ).toBe(true)
 
@@ -164,7 +164,7 @@ describe('deterministic source-less Worker settlement', () => {
         ...firstResponse,
         data: {
           ...firstResponse.data,
-          webRpc: { ...firstResponse.data.webRpc, receiverId: 'foreign-client' }
+          route: { ...firstResponse.data.route, receiverId: 'foreign-client' }
         }
       })
       clientTransport.deliver({

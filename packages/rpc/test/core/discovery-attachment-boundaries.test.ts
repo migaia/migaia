@@ -8,9 +8,13 @@ import { RpcPlatform } from '../../src/core/transport-constants.js'
 import { RpcDiscoveryAttachment } from '../../src/core/internal/discovery-attachment.js'
 import { prepareEndpoint } from '../../src/core/internal/endpoint-bootstrap.js'
 import { RpcPortName } from '../../src/core/internal/plugin-shared-keys.js'
-import { RpcRoutingProfile, RpcRoutingType } from '../../src/core/internal/routing-data.js'
-import type { IRpcRoutingData } from '../../src/core/internal/routing-data.js'
-import type { IRpcEnvelope, IRpcPortableValue } from '../../src/contract/index.js'
+import {
+  RpcRouteProfile,
+  RpcRouteType,
+  type IRpcEnvelope,
+  type IRpcEnvelopeData,
+  type IRpcPortableValue
+} from '../../src/contract/index.js'
 import { RpcOutboundAttachment } from '../../src/core/internal/outbound-attachment.js'
 import {
   readInboundIdentityReleaseObservation,
@@ -55,24 +59,26 @@ type IReceiverSelector = (
  */
 function discoveryInput(
   fixture: Record<string, unknown>
-): readonly [IRpcEnvelope, IRpcRoutingData] {
+): readonly [IRpcEnvelope, IRpcEnvelopeData] {
   const { kind, taskId, data, ...metadata } = fixture
+  const routeData: IRpcEnvelopeData = {
+    route: {
+      profile: RpcRouteProfile,
+      applicationVersion: '1.0.0',
+      ...metadata,
+      type: kind as IRpcEnvelopeData['route']['type']
+    } as IRpcEnvelopeData['route'],
+    ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
+  }
   return [
     {
       kind: 'discovery',
       id: taskId as string,
       version: '1.0.0',
-      acceptVersions: ['1.0.0']
+      acceptVersions: ['1.0.0'],
+      data: routeData
     },
-    {
-      webRpc: {
-        profile: RpcRoutingProfile,
-        applicationVersion: '1.0.0',
-        ...metadata,
-        type: kind as IRpcRoutingData['webRpc']['type']
-      } as IRpcRoutingData['webRpc'],
-      ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
-    }
+    routeData
   ]
 }
 
@@ -127,6 +133,7 @@ async function createDiscoveryHarness(
     releases: 0
   }
   const operations: IRpcOutboundOperationsPort = {
+    noteUnknownField: () => undefined,
     send: ((command) => {
       commands.push(command)
       if (command.kind === 'frame' || command.kind === 'response') return Promise.resolve()
@@ -221,15 +228,15 @@ function taskIdForTarget(commands: readonly IRpcOutboundCommand[], targetId: str
       (
         command.message as {
           readonly data?: {
-            readonly webRpc?: { readonly type?: unknown; readonly targetId?: unknown }
+            readonly route?: { readonly type?: unknown; readonly targetId?: unknown }
           }
         }
-      ).data?.webRpc?.type === 'discovery-query' &&
+      ).data?.route?.type === 'discovery-query' &&
       (
         command.message as {
-          readonly data?: { readonly webRpc?: { readonly targetId?: unknown } }
+          readonly data?: { readonly route?: { readonly targetId?: unknown } }
         }
-      ).data?.webRpc?.targetId === targetId
+      ).data?.route?.targetId === targetId
   )
   const taskId = (frame?.message as { readonly id?: unknown } | undefined)?.id
   if (typeof taskId !== 'string')
@@ -316,12 +323,25 @@ describe('discovery attachment boundary semantics', () => {
           kind: 'discovery',
           id: taskId,
           version: '1.0.0',
-          acceptVersions: ['1.0.0']
+          acceptVersions: ['1.0.0'],
+          data: {
+            route: {
+              profile: RpcRouteProfile,
+              type: RpcRouteType.discoveryResponse,
+              applicationVersion: '1.0.0',
+              senderId: 'direct-peer',
+              targetId: 'coverage-direct-automatic',
+              resolvedTargetId: targetId,
+              receiverId: 'direct-receiver',
+              sentAt: Date.now()
+            },
+            payload: { __unique_id__: 'unique-direct' }
+          }
         },
         {
-          webRpc: {
-            profile: RpcRoutingProfile,
-            type: RpcRoutingType.discoveryResponse,
+          route: {
+            profile: RpcRouteProfile,
+            type: RpcRouteType.discoveryResponse,
             applicationVersion: '1.0.0',
             senderId: 'direct-peer',
             targetId: 'coverage-direct-automatic',
@@ -505,8 +525,8 @@ describe('discovery attachment boundary semantics', () => {
         version: '1.0.0',
         acceptVersions: ['1.0.0'],
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: 'migaia.rpc.route',
             type: 'discovery-query',
             applicationVersion: '1.0.0',
             senderId: 'routed-peer',
@@ -525,7 +545,7 @@ describe('discovery attachment boundary semantics', () => {
               kind: 'discovery',
               id: routedQuery.id,
               data: expect.objectContaining({
-                webRpc: expect.objectContaining({ targetId: 'routed-peer' })
+                route: expect.objectContaining({ targetId: 'routed-peer' })
               })
             })
           })
@@ -542,8 +562,8 @@ describe('discovery attachment boundary semantics', () => {
         version: '1.0.0',
         acceptVersions: ['1.0.0'],
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: 'migaia.rpc.route',
             type: 'discovery-response',
             applicationVersion: '1.0.0',
             senderId: 'routed-response-peer',
@@ -562,8 +582,8 @@ describe('discovery attachment boundary semantics', () => {
         version: '1.0.0',
         acceptVersions: ['1.0.0'],
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: 'migaia.rpc.route',
             type: 'discovery-query',
             applicationVersion: '1.0.0',
             senderId: 'routed-manual-peer',
@@ -582,7 +602,7 @@ describe('discovery attachment boundary semantics', () => {
             message: expect.objectContaining({
               kind: 'discovery',
               data: expect.objectContaining({
-                webRpc: expect.objectContaining({ accepted: false, message: 'route-rejected' })
+                route: expect.objectContaining({ accepted: false, message: 'route-rejected' })
               })
             })
           })
@@ -1741,8 +1761,8 @@ describe('discovery attachment boundary semantics', () => {
         version: '1.0.0',
         acceptVersions: ['1.0.0'],
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: 'migaia.rpc.route',
             type: 'discovery-response',
             applicationVersion: '1.0.0',
             senderId: validSender,
@@ -1766,8 +1786,8 @@ describe('discovery attachment boundary semantics', () => {
         version: '1.0.0',
         acceptVersions: ['1.0.0'],
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1' as const,
+          route: {
+            profile: 'migaia.rpc.route' as const,
             type: 'discovery-response' as const,
             applicationVersion: '1.0.0',
             senderId: validSender,
@@ -1782,16 +1802,16 @@ describe('discovery attachment boundary semantics', () => {
         {
           ...base,
           data: {
-            webRpc: (() => {
-              const { receiverId: _receiverId, ...withoutReceiver } = base.data.webRpc
+            route: (() => {
+              const { receiverId: _receiverId, ...withoutReceiver } = base.data.route
               return withoutReceiver
             })()
           }
         },
-        { ...base, data: { webRpc: { ...base.data.webRpc, targetId: 'foreign-endpoint' } } },
-        { ...base, data: { webRpc: { ...base.data.webRpc, resolvedTargetId: 'foreign-target' } } },
-        { ...base, data: { webRpc: { ...base.data.webRpc, receiverId: '' } } },
-        { ...base, data: { webRpc: { ...base.data.webRpc, senderId: 'r2-v5-foreign-sender' } } },
+        { ...base, data: { route: { ...base.data.route, targetId: 'foreign-endpoint' } } },
+        { ...base, data: { route: { ...base.data.route, resolvedTargetId: 'foreign-target' } } },
+        { ...base, data: { route: { ...base.data.route, receiverId: '' } } },
+        { ...base, data: { route: { ...base.data.route, senderId: 'r2-v5-foreign-sender' } } },
         { ...base, id: 'missing-task' }
       ] as const
       for (const [index, frame] of invalidFrames.entries()) {
@@ -1807,7 +1827,12 @@ describe('discovery attachment boundary semantics', () => {
           admits: admitPrepared.mock.results.length,
           releases: readInboundIdentityReleaseObservation(harness.outbound.inboundIdentity) ?? 0
         }
-        expect(afterIdentity.admits).toBe(beforeIdentity.admits + 1)
+        if (index === 3) {
+          expect(afterIdentity.admits).toBe(beforeIdentity.admits)
+          expect(afterIdentity.releases).toBe(beforeIdentity.releases)
+          continue
+        }
+        expect(afterIdentity.admits, `invalid frame index ${index}`).toBe(beforeIdentity.admits + 1)
         const result = admitPrepared.mock.results.at(-1)?.value
         expect(result).toBeInstanceOf(Promise)
         const admission = await result

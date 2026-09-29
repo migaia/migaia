@@ -249,7 +249,7 @@ describe('endpoint scheduler ownership', () => {
     await expect(client.send('scheduler-server', 'fail', null)).rejects.toBeDefined()
     expect(calls).toBe(1)
     expect(requests).toHaveLength(1)
-    expect((responses[0] as { data?: { webRpc?: { sentAt?: number } } }).data?.webRpc?.sentAt).toBe(
+    expect((responses[0] as { data?: { route?: { sentAt?: number } } }).data?.route?.sentAt).toBe(
       1_700_000_000_042
     )
     await clientBase.send(requests[0])
@@ -276,14 +276,14 @@ describe('endpoint scheduler ownership', () => {
       send(message, options) {
         const frame = message as {
           kind?: unknown
-          data?: { webRpc?: { sentAt?: number; variation?: string } }
+          data?: { route?: { sentAt?: number; variation?: string } }
         }
         if (frame.kind === 'request') {
           heldRequest = message
           return
         }
-        if (frame.kind === 'variation' && frame.data?.webRpc?.variation === 'abort')
-          abortTimestamp = frame.data.webRpc.sentAt
+        if (frame.kind === 'variation' && frame.data?.route?.variation === 'abort')
+          abortTimestamp = frame.data.route.sentAt
         return clientBase.send(message, options)
       }
     }

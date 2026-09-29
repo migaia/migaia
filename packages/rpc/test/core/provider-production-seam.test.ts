@@ -93,7 +93,7 @@ function createProviderRequest(
   }
   /** Projects raw values without filtering hostile route or payload overrides. */
   const routing: Readonly<Record<string, unknown>> = {
-    profile: 'web-rpc.route.v1',
+    profile: 'migaia.rpc.route',
     type: 'request',
     applicationVersion: raw.version,
     senderId: raw.senderId,
@@ -106,7 +106,7 @@ function createProviderRequest(
     kind: raw.kind,
     id: raw.taskId,
     method: raw.method,
-    data: { webRpc: routing, ...(raw.data === undefined ? {} : { payload: raw.data }) }
+    data: { route: routing, ...(raw.data === undefined ? {} : { payload: raw.data }) }
   }
 }
 
@@ -1186,7 +1186,22 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       commandKinds.push('response')
       const responseResult = operations.send({
         kind: 'response',
-        message: normalizeRpcEnvelope({ kind: 'response', ok: true, id: 'response', data: null })
+        message: normalizeRpcEnvelope({
+          kind: 'response',
+          ok: true,
+          id: 'response',
+          data: {
+            route: {
+              profile: 'migaia.rpc.route',
+              type: 'response',
+              applicationVersion: '1.0',
+              senderId: 'peer',
+              targetId: 'host',
+              method: 'echo',
+              sentAt: 0
+            }
+          }
+        })
       })
       expect(responseResult).toBeInstanceOf(Promise)
       await expect(responseResult).rejects.toMatchObject({
@@ -1199,7 +1214,22 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       commandKinds.push('frame')
       const frameResult = operations.send({
         kind: 'frame',
-        message: normalizeRpcEnvelope({ kind: 'response', ok: true, id: 'frame', data: null })
+        message: normalizeRpcEnvelope({
+          kind: 'response',
+          ok: true,
+          id: 'frame',
+          data: {
+            route: {
+              profile: 'migaia.rpc.route',
+              type: 'response',
+              applicationVersion: '1.0',
+              senderId: 'peer',
+              targetId: 'host',
+              method: 'echo',
+              sentAt: 0
+            }
+          }
+        })
       })
       expect(frameResult).toBeInstanceOf(Promise)
       await expect(frameResult).rejects.toMatchObject({
@@ -1398,7 +1428,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         'connect',
         'discovery',
         'ping',
-        'pingAll'
+        'pingAll',
+        'announceClose'
       ])
       expect(client).not.toHaveProperty('discoveryResolver')
       expect(client).not.toHaveProperty('inboundIdentity')
@@ -1757,7 +1788,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         'dispatch',
         'dispatchAll',
         'ping',
-        'pingAll'
+        'pingAll',
+        'announceClose'
       ])
       expect(first).not.toHaveProperty('connect')
       expect(first).not.toHaveProperty('discovery')
@@ -2293,8 +2325,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         if (
           typeof message === 'object' &&
           message !== null &&
-          (message as { readonly data?: { readonly webRpc?: { readonly variation?: unknown } } })
-            .data?.webRpc?.variation === 'ping'
+          (message as { readonly data?: { readonly route?: { readonly variation?: unknown } } })
+            .data?.route?.variation === 'ping'
         ) {
           pingFrames.push(message)
           return
@@ -2423,8 +2455,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         if (
           typeof message === 'object' &&
           message !== null &&
-          (message as { readonly data?: { readonly webRpc?: { readonly variation?: unknown } } })
-            .data?.webRpc?.variation === 'ping'
+          (message as { readonly data?: { readonly route?: { readonly variation?: unknown } } })
+            .data?.route?.variation === 'ping'
         )
           return lateSend
         return baseClientTransport.send(message)
@@ -4041,7 +4073,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           id: 'verified',
           ok: true,
           data: expect.objectContaining({
-            webRpc: expect.objectContaining({ type: 'response', targetId: 'r70-client' }),
+            route: expect.objectContaining({ type: 'response', targetId: 'r70-client' }),
             payload: 'r70-data'
           })
         })

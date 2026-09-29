@@ -6,9 +6,8 @@ import type { IRpcTransport } from '../../src/core/transport.js'
 import { splitUtf8 } from '../../src/core/internal/utf8.js'
 import { ReplayWindow } from '../../src/core/internal/replay.js'
 import { VerifiedPeerRegistry } from '../../src/core/internal/identity.js'
-import { normalizeRpcEnvelope } from '../../src/contract/index.js'
+import { RpcRouteProfile, normalizeRpcEnvelope } from '../../src/contract/index.js'
 import { createStringFramer } from '../../src/contract/framing/index.js'
-import { normalizeWebRpcRoutingData } from '../../src/core/internal/routing-data.js'
 
 describe('#1 splitUtf8 会产出超过 maxBytes 的分片，接收端必然拒收', () => {
   it('chunk budget 小于最大 UTF-8 code point 时拒绝配置', () => {
@@ -92,57 +91,80 @@ describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍�
 
 describe('#5 discovery/variation/chunk 的 sentAt 校验弱于 request/response', () => {
   it('负数 sentAt 在 discovery-query 上通过归一化，在 request 上被拒', () => {
-    const discovery = normalizeWebRpcRoutingData({
-      webRpc: {
-        profile: 'web-rpc.route.v1',
-        type: 'discovery-query',
-        applicationVersion: '1',
-        senderId: 's',
-        targetId: 'g',
-        sentAt: -1
-      }
-    })
-    expect(discovery).toBeUndefined()
-
-    const request = normalizeWebRpcRoutingData({
-      webRpc: {
-        profile: 'web-rpc.route.v1',
-        type: 'request',
-        applicationVersion: '1',
-        senderId: 's',
-        targetId: 'g',
-        sentAt: -1
-      }
-    })
-    expect(request).toBeUndefined() // 同样的值在这里被拒
+    expect(() =>
+      normalizeRpcEnvelope({
+        kind: 'discovery',
+        id: 'd',
+        version: '1',
+        acceptVersions: ['1'],
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'discovery-query',
+            applicationVersion: '1',
+            senderId: 's',
+            targetId: 'g',
+            sentAt: -1
+          }
+        }
+      })
+    ).toThrow()
+    expect(() =>
+      normalizeRpcEnvelope({
+        kind: 'request',
+        id: 'r',
+        method: 'm',
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'request',
+            applicationVersion: '1',
+            senderId: 's',
+            targetId: 'g',
+            sentAt: -1
+          }
+        }
+      })
+    ).toThrow()
   })
 
   it('第二轮：discovery-response 与 variation 仍然接受负数 sentAt（discovery-query 已修，这两处漏了）', () => {
-    const discoveryResponse = normalizeWebRpcRoutingData({
-      webRpc: {
-        profile: 'web-rpc.route.v1',
-        type: 'discovery-response',
-        applicationVersion: '1',
-        senderId: 's',
-        targetId: 'g',
-        resolvedTargetId: 'g',
-        sentAt: -1
-      }
-    })
-    expect(discoveryResponse).toBeUndefined() // 修复后应与 discovery-query 一致地拒绝
-
-    const variation = normalizeWebRpcRoutingData({
-      webRpc: {
-        profile: 'web-rpc.route.v1',
-        type: 'variation',
-        applicationVersion: '1',
-        senderId: 's',
-        targetId: 'g',
-        variation: 'ping',
-        sentAt: -1
-      }
-    })
-    expect(variation).toBeUndefined() // 修复后应与其余四种 kind 一致地拒绝
+    expect(() =>
+      normalizeRpcEnvelope({
+        kind: 'discovery',
+        id: 'd',
+        version: '1',
+        acceptVersions: ['1'],
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'discovery-response',
+            applicationVersion: '1',
+            senderId: 's',
+            targetId: 'g',
+            resolvedTargetId: 'g',
+            sentAt: -1
+          }
+        }
+      })
+    ).toThrow()
+    expect(() =>
+      normalizeRpcEnvelope({
+        kind: 'variation',
+        id: 'v',
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'variation',
+            applicationVersion: '1',
+            senderId: 's',
+            targetId: 'g',
+            variation: 'ping',
+            sentAt: -1
+          }
+        }
+      })
+    ).toThrow()
   })
 
   it('chunk 帧完全没有 sentAt，不参与任何新鲜度判定', () => {
@@ -163,12 +185,22 @@ describe('#6 归一化只冻结表头，payload 仍是活引用', () => {
       method: 'm',
       get data() {
         reads += 1
-        return { attempt: reads }
+        return {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'request',
+            applicationVersion: '1',
+            senderId: 's',
+            targetId: 'g',
+            sentAt: 1
+          },
+          payload: { attempt: reads }
+        }
       }
     }
     const envelope = normalizeRpcEnvelope(hostile)
     expect(Object.isFrozen(envelope)).toBe(true)
-    expect(envelope.method).toBe('m') // 表头是快照，安全
+    expect(envelope).toMatchObject({ method: 'm' }) // 表头是快照，安全
 
     // data 在归一化时只读了一次并存下返回值，后续读取不再触发 getter
     const before = reads

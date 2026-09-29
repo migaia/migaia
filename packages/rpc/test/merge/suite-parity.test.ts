@@ -62,6 +62,7 @@ function migratedTitle(title: string): string | undefined {
     .replace('tagWebRpcError keeps', 'tagRpcError keeps')
     .replace('38 unique codes', '22 unique codes')
     .replace('22 unique codes', '23 unique codes')
+    .replace('23 unique codes', '24 unique codes')
     .replace(
       'does not let a hostile code getter escape',
       'reports a hostile code getter as PROPERTY_READ_FAILED with the original cause'
