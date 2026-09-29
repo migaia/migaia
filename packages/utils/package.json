@@ -22,6 +22,10 @@
       "types": "./dist/promise.d.ts",
       "default": "./dist/promise.js"
     },
+    "./scheduler": {
+      "types": "./dist/scheduler.d.ts",
+      "default": "./dist/scheduler.js"
+    },
     "./error": {
       "types": "./dist/error.d.ts",
       "default": "./dist/error.js"

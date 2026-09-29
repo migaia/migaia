@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -8,7 +16,8 @@ import {
   collectErrorRegistry,
   REGISTRY_END,
   REGISTRY_START,
-  repositoryRoot
+  repositoryRoot,
+  writeErrorRegistry
 } from '../error-registry.mjs'
 
 /** Creates the smallest repository shape understood by the registry collector. */
@@ -113,4 +122,96 @@ test('A5 maps merged RPC codes and preserves capability graph ownership', () => 
     readFileSync(join(repositoryRoot, 'scripts/error-registry.mjs'), 'utf8'),
     /capability\/src\/graph/
   )
+})
+
+/** Lists every package-owned error-code declaration file below `directory`. */
+const listErrorCodeFiles = (directory) =>
+  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    /** Absolute path of this directory entry. */
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : listErrorCodeFiles(path)
+    return entry.name === 'error-code.ts' ? [path] : []
+  })
+
+/** First sentence of the header JSDoc that precedes a file's first `export const`. */
+const headerSentence = (text) => {
+  /** Header comment body, when the file starts with one. */
+  const body = text.slice(0, text.indexOf('export const')).match(/\/\*\*([\s\S]*?)\*\//)?.[1]
+  if (body === undefined) return undefined
+  /** Header text flattened to one line the way the generator flattens JSDoc. */
+  const flat = body
+    .split('\n')
+    .map((line) => line.replace(/^\s*\*?\s?/, '').trim())
+    .filter((line) => line.length > 0 && !line.startsWith('@'))
+    .join(' ')
+  /** Index of the first sentence terminator. */
+  const boundary = flat.search(/[。！？]|[.!?](?:\s|$)/)
+  return (boundary < 0 ? flat : flat.slice(0, boundary + 1)).replaceAll('|', '\\|').trim()
+}
+
+test('A13 attributes each entry JSDoc to its own code, never to the file header', () => {
+  const root = createFixture(
+    "/** Header sentence. */\nexport const ExampleErrorCode = {\n  /** Entry scenario. */\n  first: 'FIRST',\n  /** Second scenario. */\n  second: 'SECOND'\n} as const\n"
+  )
+  try {
+    assert.deepEqual(
+      collectErrorRegistry(root).map(({ code, scenario }) => ({ code, scenario })),
+      [
+        { code: 'FIRST', scenario: 'Entry scenario.' },
+        { code: 'SECOND', scenario: 'Second scenario.' }
+      ]
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('A13 rejects a first code without JSDoc even when a file header precedes it', () => {
+  const root = createFixture(
+    "/** Header sentence. */\nexport const ExampleErrorCode = {\n  first: 'FIRST',\n  /** Second scenario. */\n  second: 'SECOND'\n} as const\n"
+  )
+  try {
+    assert.throws(() => collectErrorRegistry(root), /error code FIRST is missing descriptive JSDoc/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('A13 lists every utils code with its own scenario and regenerates a checkable registry', () => {
+  const rows = collectErrorRegistry()
+  /** Declared utils code values, read from the canonical declaration file. */
+  const utilsCodes = [
+    ...readFileSync(join(repositoryRoot, 'packages/utils/src/error-code.ts'), 'utf8').matchAll(
+      /^\s*[A-Za-z][A-Za-z0-9]*\s*:\s*'([A-Z][A-Z0-9_]*)'/gm
+    )
+  ].map((match) => match[1])
+  /** Registry rows owned by the utils package. */
+  const utilsRows = rows.filter((row) => row.source === '@migaia/utils')
+  assert.equal(utilsRows.length, 20)
+  assert.deepEqual(new Set(utilsRows.map((row) => row.code)), new Set(utilsCodes))
+  /** Header first sentences of every error-code file in the repository. */
+  const headers = new Set(
+    listErrorCodeFiles(join(repositoryRoot, 'packages'))
+      .map((file) => headerSentence(readFileSync(file, 'utf8')))
+      .filter((sentence) => sentence !== undefined && sentence.length > 0)
+  )
+  assert.ok(headers.size > 0)
+  assert.deepEqual(
+    rows.filter((row) => headers.has(row.scenario)),
+    []
+  )
+  /** Scratch repository that reuses the real packages with its own registry document. */
+  const root = mkdtempSync(join(tmpdir(), 'migai-error-registry-live-'))
+  try {
+    symlinkSync(join(repositoryRoot, 'packages'), join(root, 'packages'), 'dir')
+    mkdirSync(join(root, 'docs/contracts'), { recursive: true })
+    writeFileSync(
+      join(root, 'docs/contracts/error-codes.md'),
+      `# Registry\n${REGISTRY_START}\nstale\n${REGISTRY_END}\n`
+    )
+    writeErrorRegistry(root)
+    assert.doesNotThrow(() => checkErrorRegistry(root))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
