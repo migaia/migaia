@@ -13,12 +13,6 @@ import {
 import { tryReadProperty } from '@migaia/utils/error'
 import { ReactiveErrorPhase, type IReactiveErrorPhase } from './trace-constants.js'
 
-/** 只读 `cause`，hostile getter 抛错时按 `undefined` 处理（诊断通道不反向破坏结果）。 */
-const readCauseSafely = (error: Error): unknown => {
-  const read = tryReadProperty(error, 'cause')
-  return read.threw ? undefined : read.value
-}
-
 /** 用 `defineProperty` 安全附加 `cause`；失败（frozen / non-extensible）返回 false。 */
 const attachCauseSafely = (error: Error, cause: unknown): boolean => {
   try {
@@ -307,7 +301,21 @@ export class Scheduler {
         if (!hasFnError) throw flushError // 只有 flush 出错 → 抛 flush 错误
         // Error 对象保持身份/类型；flush 错误挂到 cause。非 Error throw 值无法安全附加元数据。
         if (fnError instanceof Error) {
-          const previousCause = readCauseSafely(fnError)
+          const read = tryReadProperty(fnError, 'cause')
+          if (read.threw) {
+            /** Preserve the business, flush, and getter failures before invoking a reporter. */
+            const failures: unknown[] = [fnError, flushError, read.error]
+            try {
+              this.#onAsyncError(read.error, ReactiveErrorPhase.causeRead)
+            } catch (reporterError) {
+              failures.push(reporterError)
+            }
+            throw tagReactiveError(
+              new AggregateError(failures, ReactiveErrorText.actionAndFlushFailed),
+              ReactiveErrorCode.actionFlushFailed
+            )
+          }
+          const previousCause = read.value
           const mergedCause =
             previousCause === undefined
               ? flushError
