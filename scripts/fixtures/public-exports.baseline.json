@@ -1006,6 +1006,21 @@
         "CoroutineOutcome",
         "coroutineCapabilities",
         "createCoroutineSupervisor"
+      ],
+      "./process": [
+        "BootstrapVia",
+        "DrainedStream",
+        "OrphanProbeResult",
+        "ParentLossExitCode",
+        "ProcessCapability",
+        "ProcessLimit",
+        "StderrMode",
+        "StdinMode",
+        "StdoutMode",
+        "createParentLossGuard",
+        "createPrewarmPool",
+        "createProcessSupervisor",
+        "reclaimOrphanProcesses"
       ]
     },
     "@migaia/tray": {
