@@ -88,9 +88,9 @@ export const ReactiveErrorCode = {
   observerFailed: 'OBSERVER_FAILED',
 
   /**
-   * `runBatched()` 内业务动作与其收尾的 flush 同时失败时，作为聚合外壳附加在原始业务错误的 `cause` 上。
+   * `runBatched()` 内业务动作与收尾 flush 同时失败时标记聚合错误；不可读的业务错误 `cause` 使三个原值直接存于 `AggregateError.errors`。
    *
-   * 业务错误优先于 flush 错误对外可见，避免原始失败原因被 finally 里的收尾错误覆盖；调用方应 从 `error.cause` 取出 flush 失败的详情。
+   * 可写的普通业务错误仍作为顶层抛出并在 `cause` 附上 flush 失败；调用方应检查顶层错误及其 `cause` 或 `errors`。
    */
   actionFlushFailed: 'ACTION_FLUSH_FAILED',
 
