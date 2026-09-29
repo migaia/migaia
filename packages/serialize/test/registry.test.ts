@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
+import * as utilsRoot from '@migaia/utils'
+import * as utilsScheduler from '@migaia/utils/scheduler'
+import * as lifecycleScheduler from '@migaia/lifecycle/scheduler'
 import { createAbortController } from '@migaia/lifecycle'
 import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import {
@@ -9,7 +12,8 @@ import {
   type ISerializeChunk,
   type ISerializeOutput,
   type ISerializeParser,
-  type ISerializePlugin
+  type ISerializePlugin,
+  type ISerializeRegistryOptions
 } from '../src/index'
 
 const textParser = (name = 'text'): ISerializeParser => ({
@@ -1748,5 +1752,49 @@ describe('T-22 detached 迟到错误经 report 通道', () => {
     // 无 report：迟到 rejection 仍被 track 的 rejection handler 观测（不 unhandled）。
     rejectGate?.(new Error('late encode boom'))
     await expect(pending).rejects.toThrow(/aborted/)
+  })
+})
+
+describe('A10 single scheduler export surface consumed by serialize', () => {
+  it('exposes one scheduler implementation through utils and none through lifecycle', () => {
+    expect(utilsRoot.systemScheduler).toBe(utilsScheduler.systemScheduler)
+    expect(utilsRoot.createManualScheduler).toBe(utilsScheduler.createManualScheduler)
+    expect(utilsRoot.systemWallClock).toBe(utilsScheduler.systemWallClock)
+    expect('systemScheduler' in lifecycleScheduler).toBe(false)
+    expect('createManualScheduler' in lifecycleScheduler).toBe(false)
+    expectTypeOf<NonNullable<ISerializeRegistryOptions['scheduler']>>().toEqualTypeOf<IScheduler>()
+  })
+
+  it('drives a registry drain timeout with the utils manual scheduler', async () => {
+    const manual = createManualScheduler()
+    /** Drain timeout diagnostics received by the registry option. */
+    const timeouts: unknown[] = []
+    /** Releases the in-flight encode after the drain deadline. */
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: async (): Promise<ISerializeChunk> => {
+            await gate
+            return ['text', 'x']
+          },
+          decode: (chunk) => chunk
+        })
+      ],
+      { scheduler: manual, onDrainTimeout: (diagnostic) => timeouts.push(diagnostic) }
+    )
+    const pending = registry.encode('x', { type: 'a' }).catch(() => undefined)
+    const disposePromise = registry.dispose({ deadlineAt: 100 })
+    manual.advance(99)
+    expect(timeouts).toHaveLength(0)
+    manual.advance(2)
+    await expect(disposePromise).resolves.toBeUndefined()
+    expect(timeouts).toHaveLength(1)
+    release?.()
+    await pending
   })
 })
