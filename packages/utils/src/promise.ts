@@ -1,6 +1,7 @@
 import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity, UtilsAbortError, UtilsTimeoutError } from './error.js'
+import { systemScheduler, type IScheduledTask, type IScheduler } from './scheduler.js'
 
 export { UtilsAbortError } from './error.js'
 
@@ -73,15 +74,6 @@ export function admitAbortSignal(candidate: unknown): IAbortSignalAdmission {
     return { kind: 'invalid', reason: 'listener-not-function' }
   return { kind: 'valid', signal, aborted }
 }
-export type IScheduledTask = { cancel(): void; unref?(): void }
-export type IUtilsScheduler = {
-  now(): number
-  schedule(callback: () => void, delayMs: number): IScheduledTask
-}
-export type IManualScheduler = IUtilsScheduler & {
-  advance(ms: number): void
-  readonly pendingCount: number
-}
 export type IDeferred<T> = {
   readonly promise: Promise<T>
   readonly resolve: (value: T | PromiseLike<T>) => void
@@ -90,7 +82,7 @@ export type IDeferred<T> = {
 export type IAsyncControls = {
   readonly signal?: IAbortSignal
   readonly signals?: readonly IAbortSignal[]
-  readonly scheduler?: IUtilsScheduler
+  readonly scheduler?: IScheduler
   readonly unref?: boolean
 }
 export type IRetryContext = {
@@ -183,7 +175,7 @@ function snapshotSignals(
 export type IAbortTimeoutSignalOptions = {
   readonly signal?: IAbortSignal
   readonly timeoutMs?: number
-  readonly scheduler?: IUtilsScheduler
+  readonly scheduler?: IScheduler
   readonly timeoutReason?: () => unknown
   readonly report?: IUtilsReporter
 }
@@ -280,42 +272,6 @@ export type IConcurrencyLimiter = {
   dispose(reason?: unknown): Promise<void>
 }
 
-/** Schedules callbacks with native timers while forwarding optional unref hints. */
-export const systemScheduler: IUtilsScheduler = {
-  now: () => Date.now(),
-  schedule: (callback, delayMs) => {
-    const maximumTimerDelay = 2_147_483_647
-    let remaining = delayMs
-    let handle: ReturnType<typeof setTimeout> | undefined
-    let cancelled = false
-    let unrefRequested = false
-    const task: IScheduledTask = {
-      cancel: () => {
-        cancelled = true
-        if (handle !== undefined) clearTimeout(handle)
-      },
-      unref: () => {
-        unrefRequested = true
-        /** Native timer remains the receiver required by Node's unref method. */
-        const nativeHandle = handle as unknown as { unref?: () => void } | undefined
-        if (typeof nativeHandle?.unref === 'function') nativeHandle.unref()
-      }
-    }
-    const scheduleNext = (): void => {
-      if (cancelled) return
-      const segment = Math.min(remaining, maximumTimerDelay)
-      remaining -= segment
-      handle = setTimeout(() => {
-        if (remaining > 0) scheduleNext()
-        else callback()
-      }, segment)
-      if (unrefRequested) task.unref?.()
-    }
-    scheduleNext()
-    return task
-  }
-}
-
 /** Creates a native Promise deferred without exposing mutable settlement state. */
 export function deferred<T>(): IDeferred<T> {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -337,136 +293,6 @@ export function toPromise<T>(run: () => T): Promise<Awaited<T>> {
   } catch (error) {
     return Promise.reject(error)
   }
-}
-
-/** Creates a deterministic FIFO scheduler for unit tests and adapters. */
-export function createManualScheduler(): IManualScheduler {
-  let current = 0
-  let sequence = 0
-  type IManualTask = {
-    readonly due: number
-    readonly order: number
-    index: number
-    callback: (() => void) | undefined
-    cancelled: boolean
-  }
-  const tasks: IManualTask[] = []
-  const compareTasks = (left: IManualTask, right: IManualTask): number =>
-    left.due - right.due || left.order - right.order
-  /** Exchanges two heap entries and keeps cancellation handles synchronized with their indexes. */
-  const swapTasks = (left: number, right: number): void => {
-    ;[tasks[left], tasks[right]] = [tasks[right], tasks[left]]
-    tasks[left].index = left
-    tasks[right].index = right
-  }
-  /** Restores heap order toward the root after an indexed insertion or removal. */
-  const siftUp = (start: number): void => {
-    let index = start
-    while (index > 0) {
-      const parent = Math.floor((index - 1) / 2)
-      if (compareTasks(tasks[parent], tasks[index]) <= 0) break
-      swapTasks(parent, index)
-      index = parent
-    }
-  }
-  /** Restores heap order toward the leaves after a root or indexed removal. */
-  const siftDown = (start: number): void => {
-    let index = start
-    while (true) {
-      const left = index * 2 + 1
-      const right = left + 1
-      let smallest = index
-      if (left < tasks.length && compareTasks(tasks[left], tasks[smallest]) < 0) smallest = left
-      if (right < tasks.length && compareTasks(tasks[right], tasks[smallest]) < 0) smallest = right
-      if (smallest === index) break
-      swapTasks(index, smallest)
-      index = smallest
-    }
-  }
-  /** Inserts one task into the due/order min-heap. */
-  const pushTask = (task: IManualTask): void => {
-    task.index = tasks.length
-    tasks.push(task)
-    siftUp(task.index)
-  }
-  /** Removes and returns the earliest heap task in O(log n), including cancelled entries. */
-  const popTask = (): IManualTask | undefined => {
-    if (tasks.length === 0) return undefined
-    const first = tasks[0]
-    const last = tasks.pop()!
-    first.index = -1
-    if (tasks.length > 0) {
-      tasks[0] = last
-      last.index = 0
-      siftDown(0)
-    }
-    return first
-  }
-  /** Removes one live or cancelled task by its handle index without creating a second task ledger. */
-  const removeTask = (task: IManualTask): void => {
-    const index = task.index
-    if (index < 0 || tasks[index] !== task) return
-    const last = tasks.pop()!
-    task.index = -1
-    if (index === tasks.length) return
-    tasks[index] = last
-    last.index = index
-    if (index > 0 && compareTasks(tasks[Math.floor((index - 1) / 2)], last) > 0) siftUp(index)
-    else siftDown(index)
-  }
-  const scheduler: IManualScheduler = {
-    now: () => current,
-    schedule: (callback, delayMs) => {
-      if (!Number.isFinite(delayMs) || delayMs < 0)
-        throw new RangeError(
-          UtilsErrorText.invalidArgument('delayMs', 'a finite non-negative number')
-        )
-      const task: IManualTask = {
-        due: current + delayMs,
-        order: sequence++,
-        index: -1,
-        callback,
-        cancelled: false
-      }
-      pushTask(task)
-      return {
-        cancel: () => {
-          task.cancelled = true
-          task.callback = undefined
-          removeTask(task)
-        },
-        unref: () => undefined
-      }
-    },
-    advance: (ms) => {
-      if (!Number.isFinite(ms) || ms < 0)
-        throw new RangeError(UtilsErrorText.invalidArgument('ms', 'a finite non-negative number'))
-      const target = current + ms
-      let count = 0
-      while (true) {
-        const next = tasks[0]
-        if (!next) break
-        if (next.cancelled || next.callback === undefined) {
-          popTask()
-          continue
-        }
-        if (next.due > target) break
-        if (++count > 10000) throw runaway()
-        const dueTask = popTask()
-        if (!dueTask) break
-        dueTask.cancelled = true
-        current = dueTask.due
-        const callback = dueTask.callback
-        dueTask.callback = undefined
-        callback?.()
-      }
-      current = target
-    },
-    get pendingCount() {
-      return tasks.length
-    }
-  }
-  return scheduler
 }
 
 /** Resolves after a scheduler delay or rejects on cooperative abort. */
@@ -811,7 +637,7 @@ async function retryCore<T>(
     readonly zeroTimeoutBehavior?: 'skip' | 'start'
     readonly report?: IUtilsReporter
     readonly unref?: boolean
-    readonly scheduler?: IUtilsScheduler
+    readonly scheduler?: IScheduler
   }
 ): Promise<T> {
   if (!Number.isSafeInteger(options.maxAttempts) || options.maxAttempts < 1)
@@ -1213,16 +1039,6 @@ export function createConcurrencyLimiter(options: {
     }
   }
   return limiter
-}
-
-function runaway(): RangeError {
-  const error = new RangeError(UtilsErrorText.schedulerRunaway)
-  Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
-  Object.defineProperty(error, 'code', {
-    value: UtilsErrorCode.schedulerRunaway,
-    enumerable: true
-  })
-  return error
 }
 
 function reportDiagnostic(

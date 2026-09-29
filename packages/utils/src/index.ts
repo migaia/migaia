@@ -1,4 +1,5 @@
 export * from './promise.js'
+export * from './scheduler.js'
 export * from './error.js'
 export * from './bytes.js'
 export * from './object.js'

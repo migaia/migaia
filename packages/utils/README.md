@@ -45,11 +45,16 @@ import {
   createConcurrencyLimiter,
   deferred,
   toPromise,
-  createManualScheduler,
-  systemScheduler,
   hostRethrowReporter
 } from '@migaia/utils/promise';
+import {
+  createManualScheduler,
+  systemScheduler,
+  systemWallClock
+} from '@migaia/utils/scheduler';
 ```
+
+调度器契约（`IScheduler`、`IScheduledTask`、`IManualScheduler`、`IWallClock`）与三个实现只由 `@migaia/utils/scheduler`（及根入口 `@migaia/utils`）导出；`@migaia/utils/promise` 不再导出任何调度符号。
 
 **`sleep`｜5 秒上手** —— 可中止的延时：
 
@@ -62,7 +67,7 @@ await sleep(1000, { signal: controller.signal }); // 中止时 reject UtilsAbort
 
 - `signal?: IAbortSignal` —— 与 `signals` 互斥，同时传抛 `TypeError`
 - `signals?: readonly IAbortSignal[]` —— 任意一个中止即中止
-- `scheduler?: IUtilsScheduler` —— 默认 `systemScheduler`
+- `scheduler?: IScheduler` —— 默认 `systemScheduler`
 - `unref?: boolean` —— 定时器不阻塞进程退出（Node）
 
 **`createAbortTimeoutSignal`｜5 秒上手** —— 只合并外部 abort 与 deadline signal，不接管任何 Promise 的结算策略：
@@ -133,7 +138,7 @@ await retry(async () => mayFail(), {
 - `zeroTimeoutBehavior?: 'skip' | 'start'` —— 透传给内部 `withTimeout`
 - `report?: IUtilsReporter`
 - `unref?: boolean`
-- `scheduler?: IUtilsScheduler`
+- `scheduler?: IScheduler`
 
 **`createConcurrencyLimiter`｜10 秒上手** —— 限制同时执行的任务数：
 
@@ -194,7 +199,7 @@ const p = withTimeout(op, { timeoutMs: 100, scheduler });
 scheduler.advance(100); // 手动触发超时，无需真实等待
 ```
 
-无入参；返回对象额外暴露 `advance(ms)`、只读 `pendingCount`（标准 `IUtilsScheduler` 的 `now()`/`schedule()` 也都有）。
+无入参；返回对象额外暴露 `advance(ms)`、只读 `pendingCount`（标准 `IScheduler` 的 `now()`/`schedule()` 也都有）。非法参数或虚拟时间溢出抛带 `INVALID_ARGUMENT` 的 `TypeError`/`RangeError`；回调内再次调用 `advance()` 抛 `REENTRANT_CALL`；单次 `advance` 超过 10000 次 flush 抛 `SCHEDULER_RUNAWAY`。
 
 **`systemScheduler`｜3 秒上手** —— 基于原生定时器的默认调度器，一般不用手动传，除非要替换成 `createManualScheduler()`：
 
@@ -202,11 +207,11 @@ scheduler.advance(100); // 手动触发超时，无需真实等待
 const now = systemScheduler.now();
 ```
 
-`systemScheduler.now()` 当前直接读取 `Date.now()`，所以两者返回的都是 Unix 时间戳，数值与精度没有区别。区别在调用边界：`systemScheduler` 把 `now()` 与 `schedule()` 放在同一个 `IUtilsScheduler` 中，使用方可以在测试时把它们一起替换成虚拟时钟。
+`systemScheduler.now()` 读取 `performance.now()`：单调不递减的毫秒数（可含小数），只用于差值与本地截止时间，不是 Unix 时间戳，也不受系统时间调整影响。宿主缺少 `performance.now` 或返回非有限值时抛 `ENV_UNSUPPORTED`；`schedule()` 的 `delayMs` 必须是有限非负数，否则抛 `INVALID_ARGUMENT`。
 
-只需要读取真实墙上时间的普通业务代码，直接使用 `Date.now()` 即可。正在实现接受 `IUtilsScheduler` 的超时、重试或调度逻辑时，应始终配对使用 `scheduler.now()` 与 `scheduler.schedule()`；如果其中一处改用 `Date.now()`，就会绕过注入的调度器，导致测试同时混用真实时间和虚拟定时器，无法再确定性推进。
+需要 epoch 时间戳（例如诊断字段）时使用 `systemWallClock.timestamp()`（即 `Date.now()`），不要把它与 `now()` 混用或参与截止时间比较。实现接受 `IScheduler` 的超时、重试或调度逻辑时，应始终配对使用 `scheduler.now()` 与 `scheduler.schedule()`。
 
-无配置，是一个现成的 `IUtilsScheduler` 常量。
+无配置，是一个现成的 `IScheduler` 常量。
 
 **`hostRethrowReporter`｜3 秒上手** —— 默认诊断上报器，把迟到的错误重新抛给宿主而不是吞掉；一般无需调用，作为 `report` 选项的默认值：
 
@@ -865,7 +870,8 @@ Collector 不复制或追踪外部修改：调用方必须在 collector 生命�
 以下示例用于本仓测试组合验证，不是外部生产代码的推荐写法；外部测试应优先复用测试框架的 fake timers。
 
 ```ts
-import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';
+import { retry, withTimeout } from '@migaia/utils/promise';
+import { createManualScheduler } from '@migaia/utils/scheduler';
 import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';
 
 const scheduler = createManualScheduler();
