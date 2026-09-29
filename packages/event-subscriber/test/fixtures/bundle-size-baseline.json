@@ -1,8 +1,8 @@
 {
-  "fixture": "dist/index.js",
+  "fixture": "dist/index.js + transitive static chunks",
   "algorithm": "minified+gzip",
-  "bytes": 6842,
+  "bytes": 8172,
   "absoluteLimitBytes": 12288,
-  "regressionLimit": "max(observed * 10%, 1024 bytes)",
-  "recordedAfter": "ESVA-R01..R11 implementation"
+  "regressionLimit": "max(baseline * 10%, 1024 bytes)",
+  "recordedAfter": "pre-unique-admission base 9f1e2b0"
 }

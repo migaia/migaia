@@ -44,6 +44,7 @@
     "@migaia/event-subscriber": {
       ".": [
         "EVENT_SUBSCRIBER_SOURCE",
+        "EventAdmissionPolicy",
         "EventApiStyle",
         "EventDispatchPolicy",
         "EventSubscriberErrorCode",
