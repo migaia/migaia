@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMutationQueue } from '../src/mutation-queue'
 import { LifecycleErrorCode } from '../src/error-code'
-import { createManualScheduler } from '../src/scheduler'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 
 const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
   let resolve!: (value: T) => void

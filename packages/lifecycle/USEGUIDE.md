@@ -10,7 +10,7 @@
 - [静默追踪与租约模块](#静默追踪与租约模块)：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`
 - [事务性所有权模块](#事务性所有权模块)：`createProvisionalScope`
 - [变更队列模块](#变更队列模块)：`createMutationQueue`
-- [调度器、中止与有界等待模块](#调度器中止与有界等待模块)：`systemScheduler`、`createManualScheduler`、`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`
+- [调度器、中止与有界等待模块](#调度器中止与有界等待模块)：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`
 - [错误基础设施模块](#错误基础设施模块)：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`
 - [状态常量模块](#状态常量模块)：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`
 - [按需导入与 tree-shaking](#按需导入与-tree-shaking)
@@ -108,7 +108,7 @@ type IReleaseDescriptor = {
 - `gcFallback?: boolean` —— 置为 `true` 时向内部 `FinalizationRegistry` 注册一个不强引用 `resource`/闭包 target 的兜底；显式释放（`dispose()`/`release()`）会自动 unregister 它。
 - `custom?` —— 逃生舱：一旦提供，完全接管释放，`graceful`/`force` 被忽略。
 
-`IReleaseContext`（回调收到的第一参数）：`signal: IAbortSignal`（容器进入 closing 时中止）、`deadlineAt: number | undefined`、`scheduler?: ILifecycleScheduler`（产出 `deadlineAt` 的时间域，缺省 `systemScheduler`）、`report(error: unknown): void`（诊断通道，自身抛错被吞掉）、`disposer?: IDisposerContext`。由 `LifecycleScope` 驱动的 disposer 才有 `disposer.join()`；该显式 owner self-join operation 在同步调用及任意 await、microtask、Promise chain、nested helper 或 timer 后都立即抛 `SCOPE_REENTRANT_DISPOSE`，不返回 outer disposal Promise。没有 scope owner 的 generic `createDisposeTransaction()` 不伪造此 capability；不要捕获 scope 后在 disposer 中直接调用 `scope.dispose()` 绕过 context。
+`IReleaseContext`（回调收到的第一参数）：`signal: IAbortSignal`（容器进入 closing 时中止）、`deadlineAt: number | undefined`、`scheduler?: IScheduler`（产出 `deadlineAt` 的时间域，缺省 `systemScheduler`）、`report(error: unknown): void`（诊断通道，自身抛错被吞掉）、`disposer?: IDisposerContext`。由 `LifecycleScope` 驱动的 disposer 才有 `disposer.join()`；该显式 owner self-join operation 在同步调用及任意 await、microtask、Promise chain、nested helper 或 timer 后都立即抛 `SCOPE_REENTRANT_DISPOSE`，不返回 outer disposal Promise。没有 scope owner 的 generic `createDisposeTransaction()` 不伪造此 capability；不要捕获 scope 后在 disposer 中直接调用 `scope.dispose()` 绕过 context。
 
 ### `createLifecycleScope`
 
@@ -119,7 +119,7 @@ type ILifecycleScopeOptions = {
   readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'
   readonly report?: (error: unknown) => void
   readonly deadlineAt?: number
-  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler
+  readonly scheduler?: IScheduler // 默认 systemScheduler
 }
 
 type ILifecycleScope = ILifecycleOwner & {
@@ -227,7 +227,7 @@ type IDisposeTransactionOptions = {
   readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'
   readonly report?: (error: unknown) => void
   readonly deadlineAt?: number
-  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler
+  readonly scheduler?: IScheduler // 默认 systemScheduler
   readonly signal?: IAbortSignal
   readonly pending?: { drain(): Promise<void> }
 }
@@ -385,7 +385,7 @@ function createGenerationController(options?: IGenerationControllerOptions): IGe
 type IGenerationControllerOptions = {
   readonly parentSignal?: IAbortSignal
   readonly onSuperseded?: (info: ILifecycleError) => void
-  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler
+  readonly scheduler?: IScheduler // 默认 systemScheduler
 }
 
 type IGenerationToken = object
@@ -599,7 +599,7 @@ type IMutationQueueOptions = {
   readonly queueAdmissionTimeoutMs?: number | false // 默认 undefined（只诊断，从不因排队超时而拒绝）
   readonly admissionDiagnosticMs?: number | false // 默认 1000
   readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void
-  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler
+  readonly scheduler?: IScheduler // 默认 systemScheduler
 }
 
 type IEnqueueOptions = {
@@ -636,18 +636,12 @@ queue.size // 排队中 + 正在执行的任务数（0 或 1）
 
 ```ts
 import {
-  systemScheduler,
-  createManualScheduler,
   snapshotScheduler,
   validateSchedulerDelay,
   validateSchedulerTime,
   createAbortController,
   boundedWait,
   createTerminalController,
-  type ILifecycleScheduler,
-  type IScheduledTask,
-  type ISchedulerSnapshot,
-  type IManualScheduler,
   type IAbortSignal,
   type IAbortController,
   type ITerminalController
@@ -659,64 +653,44 @@ import {
   resolveScheduler,
   resolveSchedulerOption
 } from '@migaia/lifecycle/scheduler'
+
+// 调度器契约与实现来自 utils：
+import {
+  systemScheduler,
+  createManualScheduler,
+  type IScheduler,
+  type IScheduledTask,
+  type IManualScheduler
+} from '@migaia/utils/scheduler'
 ```
 
-### `systemScheduler`
-
-```ts
-const systemScheduler: ILifecycleScheduler // { now(): number; schedule(cb, delayMs): IScheduledTask }
-```
-
-默认调度器，`now()` 用 `performance.now()`、`schedule()` 用 `setTimeout`/`clearTimeout`，一般不用手动传，除非要换成 `createManualScheduler()`：
-
-```ts
-systemScheduler.now() // 单调递增毫秒数
-```
-
-无配置，纯常量对象；宿主缺 `performance.now`/`setTimeout`/`clearTimeout` 时，首次调用对应方法才 fail-fast 抛 `ENV_UNSUPPORTED`。
-
-### `createManualScheduler`
-
-```ts
-function createManualScheduler(): IManualScheduler
-// type IManualScheduler = ILifecycleScheduler & { advance(ms: number): void };
-```
-
-单测里把时间变成确定性的虚拟时钟：
-
-```ts
-const scheduler = createManualScheduler()
-const task = scheduler.schedule(() => console.log('fired'), 100)
-scheduler.advance(100) // 一次性 flush 所有到期回调（含到期回调内部再排的到期任务）
-```
-
-无入参。`advance(ms)` 按到期时刻升序（同刻按登记顺序）依次执行所有到期回调，单次循环超过 10000 个 flush 任务会抛 `INVALID_OPTION`（runaway guard）；`ms`/`schedule()` 的 `delayMs` 必须是有限非负数，否则抛 `INVALID_OPTION`（`RangeError`/`TypeError` 原生类型，贴该码）。
+调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.field: 'delayMs'`）拒绝；直接调用 utils `systemScheduler.schedule()` 时同样输入得到的是 utils `INVALID_ARGUMENT`。
 
 ### `snapshotScheduler`
 
 ```ts
-function snapshotScheduler(value: unknown): ISchedulerSnapshot | undefined
+function snapshotScheduler(value: unknown): IScheduler | undefined
 ```
 
-把任意 duck-typed 值快照成标准 `ILifecycleScheduler`（校验并锁定 accessor，防止 hostile getter 二次读取）：
+把任意 duck-typed 值快照成标准 `IScheduler`（校验并锁定 accessor，防止 hostile getter 二次读取）：
 
 ```ts
 const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错
 ```
 
-单参数 `value: unknown`，无选项；`now`/`schedule` 都不是函数时返回 `undefined`；读取 `now`/`schedule` 属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。
+单参数 `value: unknown`，无选项；`now`/`schedule` 都不是函数时返回 `undefined`；读取 `now`/`schedule` 属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。快照的 `schedule()` 先以 `validateSchedulerDelay` 校验延迟，再调用注入的 `schedule`，然后按 `cancel`、`unref` 的顺序各读一次返回任务的访问器：`cancel` 缺失或不是函数时抛 `INVALID_OPTION`；`unref` 为函数时快照任务带 `unref()` 并以原任务为接收者转发，缺省时快照不含 `unref`；`unref` 读取抛出（原生 `TypeError`，原值在 `cause`）或不是函数时抛 `INVALID_OPTION`，且在抛出前先调用已读到的 `cancel` 回滚注入方已启动的 timer；回滚本身失败时，主错误不变，回滚错误挂在主错误的 `errors` 上。
 
 ### `resolveScheduler` / `resolveSchedulerOption`
 
 ```ts
-function resolveScheduler(value: unknown): ISchedulerSnapshot
+function resolveScheduler(value: unknown): IScheduler
 function resolveSchedulerOption(
   options: { readonly scheduler?: unknown } | null | undefined,
-  fallback: ISchedulerSnapshot
-): ISchedulerSnapshot
+  fallback: IScheduler
+): IScheduler
 function resolveSchedulerOption(
   options: { readonly scheduler?: unknown } | null | undefined
-): ISchedulerSnapshot | undefined
+): IScheduler | undefined
 ```
 
 内部/自定义 scheduler 实现复用的边界解析函数：`resolveScheduler(value)` 对非法值抛 `SCHEDULER_INVALID` 文案的 `INVALID_OPTION` 错误（而不是像 `snapshotScheduler` 那样返回 `undefined`）；`resolveSchedulerOption(options, fallback?)` 读取 `options.scheduler`，未提供时返回 `fallback`（若调用形态未传 `fallback` 则返回 `undefined`），读取该属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。
@@ -773,7 +747,7 @@ V2 intentional breaking behavior：
 function boundedWait(
   task: PromiseLike<unknown>,
   deadlineAt: number,
-  options?: { readonly scheduler?: ILifecycleScheduler } // 默认 systemScheduler
+  options?: { readonly scheduler?: IScheduler } // 默认 systemScheduler
 ): Promise<boolean>
 ```
 
@@ -1084,7 +1058,7 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 | `queueSelfDependency`          | `QUEUE_SELF_DEPENDENCY`          | 同一 `owner` 在自己尚未完成时又向同一队列提交新任务且被等待，会死锁                                                   |
 | `releaseForceFailed`           | `RELEASE_FORCE_FAILED`           | descriptor 的 `force` 抛出/reject（契约要求 `force` 必须无条件成功）                                                  |
 | `deadlineExceeded`             | `DEADLINE_EXCEEDED`              | 共享绝对 deadline 已过去，但仍有资源被要求进入新的 graceful 阶段（诊断码，正常降级路径不抛这个码）                    |
-| `envUnsupported`               | `ENV_UNSUPPORTED`                | `systemScheduler` 依赖的宿主能力（`performance.now`/`setTimeout`/`clearTimeout`）缺失                                 |
+| `envUnsupported`               | `ENV_UNSUPPORTED`                | lifecycle 需要的宿主 `AbortController` 能力缺失；调度器宿主能力缺失由 utils `ENV_UNSUPPORTED` 报告                    |
 | `invalidOption`                | `INVALID_OPTION`                 | scheduler 收到非法时间/延迟参数，或 descriptor 字段类型非法                                                           |
 
 逐条设计动机见源码 `src/error-code.ts` 的 JSDoc；调用方应始终以 `error.code === LifecycleErrorCode.xxx` 判别，不要硬编码码值字符串。
@@ -1168,11 +1142,8 @@ async function applyBatch(mutations: Array<() => Promise<void>>) {
 ### 4. 释放事务 + 有界等待：手动编排一组资源的优雅关闭
 
 ```ts
-import {
-  createDisposeTransaction,
-  createManualScheduler,
-  type IDisposeItem
-} from '@migaia/lifecycle'
+import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 
 const scheduler = createManualScheduler()
 const items: IDisposeItem[] = [
@@ -1260,9 +1231,9 @@ async function shutdown() {
 
 根入口 `@migaia/lifecycle` 可直接导入以下全部符号：
 
-- 构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`systemScheduler`、`snapshotScheduler`、`createManualScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。
+- 构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。
 - 常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。
-- 类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IThenableProbeKind`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`IScheduledTask`、`ILifecycleScheduler`、`ISchedulerSnapshot`、`IManualScheduler`、`ILifecycleError`、`IThenableProbe`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。
+- 类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IThenableProbeKind`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IThenableProbe`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。
 
 Leaf entry 提供更小的按需边界；其中只有五项不在根入口：`@migaia/lifecycle/scheduler` 的 `addSchedulerTime`、`resolveScheduler`、`resolveSchedulerOption`，以及 `@migaia/lifecycle/errors` 的 `createLifecycleFailure`、`createLifecycleTypeError`。其余 leaf 符号都是根入口子集；完整入口映射见“按需导入与 tree-shaking”。
 
@@ -1279,7 +1250,7 @@ Leaf entry 提供更小的按需边界；其中只有五项不在根入口：`@m
 - **`GenerationController.begin()` 抛 `GENERATION_DISPOSED`**：控制器已 `dispose()`，不可复用，需新建一个。
 - **`commitTo()` 抛 `PROVISIONAL_PARENT_CLOSED`**：目标 parent 已进入 `closing`/`terminal`；已转移的资源留在 parent 名下，未转移的部分已被自动释放，不需要再手动 `rollback()`。
 - **`enqueue()` 抛 `QUEUE_SELF_DEPENDENCY`**：同一 `owner` 在自身运行期间又提交并同步等待了新任务，FIFO 队列必然死锁；拆分成两次独立的顶层调用。
-- **`systemScheduler` 抛 `ENV_UNSUPPORTED`**：宿主缺 `performance.now`/`setTimeout`/`clearTimeout`；注入自实现的 `ILifecycleScheduler`，或改在具备这些能力的运行时里运行。
+- **`systemScheduler` 抛 `ENV_UNSUPPORTED`**（`source: '@migaia/utils'`）：宿主缺 `performance.now`/`setTimeout`/`clearTimeout`；注入自实现的 `IScheduler`，或改在具备这些能力的运行时里运行。
 - **需要事件总线/当前值订阅/依赖图拓扑**：`@migaia/lifecycle` 刻意不提供，应分别参考 `@migaia/event-subscriber`、`@migaia/reactive`、`@migaia/capability/graph`。
 
 ```bash

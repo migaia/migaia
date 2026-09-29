@@ -14,13 +14,8 @@ import {
   observeAbortSubscription,
   type IObservedAbortSubscription
 } from './observed-subscription.js'
-import {
-  resolveSchedulerOption,
-  systemScheduler,
-  validateSchedulerDelay,
-  type ILifecycleScheduler,
-  type IScheduledTask
-} from './scheduler.js'
+import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
+import { resolveScheduler, resolveSchedulerOption, validateSchedulerDelay } from './scheduler.js'
 
 export type IGenerationToken = object
 
@@ -45,7 +40,7 @@ export type IGenerationControllerOptions = {
    */
   readonly onSuperseded?: (info: ILifecycleError) => void
   /** Runtime-neutral scheduler（默认 `systemScheduler`）；`begin({ timeoutMs })` 的超时计时经它。 */
-  readonly scheduler?: ILifecycleScheduler
+  readonly scheduler?: IScheduler
 }
 
 export type IGenerationController = {
@@ -137,7 +132,7 @@ function createAdmissionFailure(
 export function createGenerationController(
   options: IGenerationControllerOptions = {}
 ): IGenerationController {
-  const scheduler = resolveSchedulerOption(options, systemScheduler)
+  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
   const createController = captureAbortControllerFactory()
   const parentSignal = options.parentSignal
   let generation = 0

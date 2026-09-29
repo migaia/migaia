@@ -25,7 +25,7 @@
 | 多个变更必须 FIFO 串行                                          | `createMutationQueue`                               | config CRUD、拓扑变更、schema/register mutation               |
 | 多资源 graceful→force、deadline、错误聚合                       | `createDisposeTransaction`                          | 服务停机、连接池关闭、插件卸载                                |
 | 真实平台取消信号                                                | `createAbortController`                             | fetch、stream、timer、Worker/RPC operation                    |
-| 可重复、无真实等待的时间测试                                    | `createManualScheduler`                             | timeout、deadline、重试和队列 SLA 单测                        |
+| 可重复、无真实等待的时间测试                                    | `createManualScheduler`（`@migaia/utils/scheduler`） | timeout、deadline、重试和队列 SLA 单测                        |
 
 选择原则：Scope 管“谁拥有资源”；Generation 管“哪个异步结果仍有效”；Pending/Lease 管“还有多少工作”；MutationQueue 管“谁先修改”；DisposeTransaction/Ledger 管“如何结束”。这些轴可以组合，但不要让两个原语同时成为同一状态的 owner。
 
@@ -44,7 +44,7 @@ pnpm add @migaia/lifecycle
 - [静默追踪与租约](#静默追踪与租约模块)：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`
 - [事务性所有权](#事务性所有权模块)：`createProvisionalScope`
 - [变更队列](#变更队列模块)：`createMutationQueue`
-- [调度器、中止与有界等待](#调度器中止与有界等待模块)：`systemScheduler`、`createManualScheduler`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`
+- [调度器、中止与有界等待](#调度器中止与有界等待模块)：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`
 - [错误基础设施](#错误基础设施模块)：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`
 - [状态常量](#状态常量模块)：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`
 - [按需导入与 tree-shaking](#按需导入与-tree-shaking)
@@ -92,7 +92,7 @@ const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败
 - `errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError'` —— 默认 `'throw'`
 - `report?: (error: unknown) => void` —— `report`/`firstError` 策略下的诊断通道；异常被自身吞掉（最后一道错误边界）
 - `deadlineAt?: number` —— 本次 `dispose()` 内所有资源共享的绝对释放截止时间
-- `scheduler?: ILifecycleScheduler` —— 默认 `systemScheduler`；决定 `deadlineAt`/`gracefulTimeoutMs` 的时间域
+- `scheduler?: IScheduler` —— 默认 `systemScheduler`；决定 `deadlineAt`/`gracefulTimeoutMs` 的时间域
 
 `own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`。环境支持时自动挂载 `[Symbol.asyncDispose]`。
 
@@ -154,7 +154,7 @@ const failures = await transaction.run([
 - `errorPolicy?` —— 默认 `'throw'`
 - `report?: (error: unknown) => void`
 - `deadlineAt?: number` —— 本次 `run()` 内所有 item 共享的绝对截止时间
-- `scheduler?: ILifecycleScheduler` —— 默认 `systemScheduler`
+- `scheduler?: IScheduler` —— 默认 `systemScheduler`
 - `signal?: IAbortSignal` —— 转发进每个 item 的 `context.signal`；`run()` 开始时自动镜像中止状态
 - `pending?: { drain(): Promise<void> }` —— 每个 item 释放完后等待其触发的在途工作排空（通常传 `createPendingTracker()`）
 
@@ -215,7 +215,7 @@ if (generations.adopt(request.token, result, (v) => v.close())) {
 
 - `parentSignal?: IAbortSignal` —— 该信号中止时，当前活跃代同步中止
 - `onSuperseded?: (info: ILifecycleError) => void` —— `adopt()` 发现 token 已过期时的诊断钩子（`GENERATION_SUPERSEDED`），不是失败信号
-- `scheduler?: ILifecycleScheduler` —— 默认 `systemScheduler`；驱动 `begin({ timeoutMs })` 的计时
+- `scheduler?: IScheduler` —— 默认 `systemScheduler`；驱动 `begin({ timeoutMs })` 的计时
 
 返回方法：`generation`（只读当前代号）、`disposed`（只读）、`begin(options?)` → `{ generation, token, signal }`（`options.timeoutMs?: number`，超时/父中止/新 `begin()` 都会使这个 token 的 `signal` 中止）、`isCurrent(token)`、`supersede(reason?)`（作废当前代但控制器仍可用）、`adopt(token, value, release, onReleaseError?)`、`dispose(reason?)`（终态，之后 `begin()` 抛 `GENERATION_DISPOSED`）。
 
@@ -316,7 +316,7 @@ queue.size // 排队中 + 正在执行的任务数
 - `queueAdmissionTimeoutMs?: number | false` —— 默认 `undefined`（只诊断、从不因排队超时而拒绝）；数字表示任务排队超过这个时长即被移出队列并以 `QUEUE_ADMISSION_TIMEOUT` reject；`false` 连诊断计时器也不开
 - `admissionDiagnosticMs?: number | false` —— 默认 `1000`；仅在 `queueAdmissionTimeoutMs` 为 `undefined` 时生效的诊断阈值，`false` 关闭诊断计时器
 - `onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void`
-- `scheduler?: ILifecycleScheduler` —— 默认 `systemScheduler`
+- `scheduler?: IScheduler` —— 默认 `systemScheduler`
 
 `enqueue(task, options?)` 的 `options`（`IEnqueueOptions`）：`owner?: string`（用于自依赖检测——同一 owner 在自己正在运行时又提交新任务会立即以 `QUEUE_SELF_DEPENDENCY` reject，因为 FIFO 队列不可能在当前任务完成前跑新任务）、`queueAdmissionTimeoutMs?: number | false`（覆盖本次任务的队列默认值）。`size` 只读，等于排队数加运行中的 0/1。
 
@@ -328,8 +328,6 @@ queue.size // 排队中 + 正在执行的任务数
 
 ```ts
 import {
-  systemScheduler,
-  createManualScheduler,
   snapshotScheduler,
   validateSchedulerDelay,
   validateSchedulerTime,
@@ -337,27 +335,12 @@ import {
   boundedWait,
   createTerminalController
 } from '@migaia/lifecycle'
+import { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 ```
 
-**`systemScheduler`｜3 秒上手** —— 默认调度器，`now()` 用 `performance.now()`、`schedule()` 用 `setTimeout`/`clearTimeout`，一般不用手动传，除非要换成 `createManualScheduler()`：
+调度器契约 `IScheduler`、默认实现 `systemScheduler` 与测试用 `createManualScheduler` 由 `@migaia/utils/scheduler` 提供（`now()` 为单调时钟，详见 utils 文档）；本包不再导出它们，只保留注入准入：lifecycle 工厂收到的 scheduler（含缺省时的 `systemScheduler`）都先经 `snapshotScheduler` 快照，非法延迟以 lifecycle `INVALID_OPTION` 拒绝。
 
-```ts
-systemScheduler.now() // 单调递增毫秒数
-```
-
-无配置，纯常量对象；宿主缺 `performance.now`/`setTimeout`/`clearTimeout` 时，首次调用对应方法才 fail-fast 抛 `ENV_UNSUPPORTED`。
-
-**`createManualScheduler`｜10 秒上手** —— 单测里把时间变成确定性的虚拟时钟：
-
-```ts
-const scheduler = createManualScheduler()
-const task = scheduler.schedule(() => console.log('fired'), 100)
-scheduler.advance(100) // 一次性 flush 所有到期回调（含到期回调内部再排的到期任务）
-```
-
-无入参；返回 `IManualScheduler`（在标准 `ILifecycleScheduler` 的 `now()`/`schedule()` 基础上加 `advance(ms)`）。`advance` 单次循环超过 10000 个 flush 任务会抛 `INVALID_OPTION`（runaway guard）；`ms`/`delayMs` 必须是有限非负数，否则抛 `INVALID_OPTION`。
-
-**`snapshotScheduler`｜5 秒上手** —— 把任意 duck-typed 值快照成标准 `ILifecycleScheduler`（校验并锁定 accessor，防止 hostile getter 二次读取）：
+**`snapshotScheduler`｜5 秒上手** —— 把任意 duck-typed 值快照成标准 `IScheduler`（校验并锁定 accessor，防止 hostile getter 二次读取；任务的 `cancel`/`unref` 按此顺序各读一次，函数 `unref` 以原任务为接收者转发，非函数 `unref` 在回滚已启动的注入 timer 后以 `INVALID_OPTION` 拒绝）：
 
 ```ts
 const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错
@@ -393,7 +376,7 @@ controller.abort('reason')
 const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=截止时间先到（task 仍在跑）
 ```
 
-参数：`task: PromiseLike<unknown>`（必填）、`deadlineAt: number`（必填，绝对时刻）、第三参数选项 `{ scheduler?: ILifecycleScheduler }`（默认 `systemScheduler`）。无论超时与否都会挂一个 `.catch()` 观察 `task`，避免它日后 reject 变成未处理拒绝；`deadlineAt` 已经过去时立即返回 `false`（仍会先观察 `task`）。
+参数：`task: PromiseLike<unknown>`（必填）、`deadlineAt: number`（必填，绝对时刻）、第三参数选项 `{ scheduler?: IScheduler }`（默认 `systemScheduler`）。无论超时与否都会挂一个 `.catch()` 观察 `task`，避免它日后 reject 变成未处理拒绝；`deadlineAt` 已经过去时立即返回 `false`（仍会先观察 `task`）。
 
 **`createTerminalController`｜5 秒上手** —— 独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope`/`createLifecycleUnit` 内部都基于它：
 
@@ -635,11 +618,8 @@ async function applyBatch(mutations: Array<() => Promise<void>>) {
 ### 4. 释放事务 + 有界等待：手动编排一组资源的优雅关闭
 
 ```ts
-import {
-  createDisposeTransaction,
-  createManualScheduler,
-  type IDisposeItem
-} from '@migaia/lifecycle'
+import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 
 const scheduler = createManualScheduler()
 const items: IDisposeItem[] = [

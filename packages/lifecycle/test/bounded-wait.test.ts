@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { boundedWait } from '../src/bounded-wait.js'
-import { systemScheduler, type ILifecycleScheduler } from '../src/scheduler.js'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 
 const deferred = <T>(): {
   promise: Promise<T>
@@ -20,7 +20,7 @@ describe('L-T16 boundedWait: task winning vs timeout winning', () => {
   it('rejects invalid deadline before reading or scheduling injected time', async () => {
     const now = vi.fn(() => 0)
     const schedule = vi.fn(() => ({ cancel: vi.fn() }))
-    const scheduler: ILifecycleScheduler = { now, schedule }
+    const scheduler: IScheduler = { now, schedule }
     await expect(boundedWait(Promise.resolve(), Number.NaN, { scheduler })).rejects.toMatchObject({
       code: 'INVALID_OPTION'
     })
@@ -30,7 +30,7 @@ describe('L-T16 boundedWait: task winning vs timeout winning', () => {
 
   it('returns false for a past deadline without scheduling', async () => {
     const schedule = vi.fn(() => ({ cancel: vi.fn() }))
-    const scheduler: ILifecycleScheduler = { now: () => 10, schedule }
+    const scheduler: IScheduler = { now: () => 10, schedule }
     await expect(boundedWait(new Promise<void>(() => {}), 5, { scheduler })).resolves.toBe(false)
     expect(schedule).not.toHaveBeenCalled()
   })
@@ -38,7 +38,7 @@ describe('L-T16 boundedWait: task winning vs timeout winning', () => {
   it('contains an already-rejected task when a past deadline returns early', async () => {
     const rejection = new Error('already failed')
     const schedule = vi.fn(() => ({ cancel: vi.fn() }))
-    const scheduler: ILifecycleScheduler = { now: () => 10, schedule }
+    const scheduler: IScheduler = { now: () => 10, schedule }
     await expect(boundedWait(Promise.reject(rejection), 5, { scheduler })).resolves.toBe(false)
     expect(schedule).not.toHaveBeenCalled()
   })
@@ -49,7 +49,7 @@ describe('L-T16 boundedWait: task winning vs timeout winning', () => {
       callback()
       return { cancel }
     })
-    const scheduler: ILifecycleScheduler = { now: () => 10, schedule }
+    const scheduler: IScheduler = { now: () => 10, schedule }
     await expect(boundedWait(new Promise<void>(() => {}), 10, { scheduler })).resolves.toBe(false)
     expect(schedule).toHaveBeenCalledWith(expect.any(Function), 0)
     expect(cancel).toHaveBeenCalledTimes(1)
@@ -64,7 +64,7 @@ describe('L-T16 boundedWait: task winning vs timeout winning', () => {
         throw new Error('clock failed')
       },
       schedule
-    } satisfies ILifecycleScheduler
+    } satisfies IScheduler
     await expect(boundedWait(Promise.reject(rejection), 5, { scheduler })).rejects.toThrow(
       'clock failed'
     )

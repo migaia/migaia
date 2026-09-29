@@ -1,12 +1,8 @@
 import { containAsyncRejection, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import {
-  resolveSchedulerOption,
-  systemScheduler,
-  type ILifecycleScheduler,
-  type IScheduledTask
-} from './scheduler.js'
+import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
+import { resolveScheduler, resolveSchedulerOption } from './scheduler.js'
 
 export type IMutationQueueOptions = {
   /**
@@ -25,7 +21,7 @@ export type IMutationQueueOptions = {
     readonly waitedMs: number
   }) => void
   /** Runtime-neutral scheduler（默认 `systemScheduler`）；watchdog 计时与时钟都经它，不直接用宿主 timer。 */
-  readonly scheduler?: ILifecycleScheduler
+  readonly scheduler?: IScheduler
 }
 
 export type IEnqueueOptions = {
@@ -82,7 +78,7 @@ const appendCancellationError = (primary: unknown, cleanupError: unknown): unkno
 export function createMutationQueue(options: IMutationQueueOptions = {}): IMutationQueue {
   const defaultAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
   const admissionDiagnosticMs = options.admissionDiagnosticMs ?? 1000
-  const scheduler = resolveSchedulerOption(options, systemScheduler)
+  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
   const queue: Array<IMutationRecord | undefined> = []
   let queueHead = 0
   let queuedCount = 0

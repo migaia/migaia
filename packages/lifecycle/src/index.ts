@@ -35,17 +35,7 @@ export {
 export { LifecycleErrorCode, type ILifecycleErrorCode } from './error-code.js'
 export { LifecycleErrorText, type ILifecycleErrorText } from './error-text.js'
 
-export {
-  systemScheduler,
-  snapshotScheduler,
-  createManualScheduler,
-  validateSchedulerDelay,
-  validateSchedulerTime,
-  type IScheduledTask,
-  type ILifecycleScheduler,
-  type ISchedulerSnapshot,
-  type IManualScheduler
-} from './scheduler.js'
+export { snapshotScheduler, validateSchedulerDelay, validateSchedulerTime } from './scheduler.js'
 
 export {
   LIFECYCLE_SOURCE,

@@ -7,9 +7,9 @@ import { createMutationQueue } from '../src/mutation-queue.js'
 import { LifecycleErrorCode } from '../src/error-code.js'
 import { LIFECYCLE_SOURCE } from '../src/errors.js'
 import { DisposeTransactionKind } from '../src/state-constants.js'
-import type { ILifecycleScheduler } from '../src/scheduler.js'
+import type { IScheduler } from '@migaia/utils/scheduler'
 
-type ISchedulerOption = { readonly scheduler?: ILifecycleScheduler }
+type ISchedulerOption = { readonly scheduler?: IScheduler }
 
 const capture = (run: () => unknown): unknown => {
   try {
@@ -33,7 +33,7 @@ describe('Round30 scheduler option admission', () => {
     const scheduler = {
       now: vi.fn(() => 0),
       schedule: vi.fn(() => ({ cancel: vi.fn() }))
-    } satisfies ILifecycleScheduler
+    } satisfies IScheduler
     const factories: readonly [string, (options: ISchedulerOption) => unknown][] = [
       ['generation controller', (options) => createGenerationController(options)],
       ['lifecycle scope', (options) => createLifecycleScope(options)],
@@ -48,7 +48,7 @@ describe('Round30 scheduler option admission', () => {
       const cause = new Error(`${label} scheduler getter failed`)
       let reads = 0
       const options = {
-        get scheduler(): ILifecycleScheduler {
+        get scheduler(): IScheduler {
           reads++
           throw cause
         }
@@ -68,7 +68,7 @@ describe('Round30 scheduler option admission', () => {
     const scheduler = {
       now: vi.fn(() => 0),
       schedule: vi.fn(() => ({ cancel: vi.fn() }))
-    } satisfies ILifecycleScheduler
+    } satisfies IScheduler
     let taskReads = 0
     const task = new Proxy(
       {},
@@ -82,7 +82,7 @@ describe('Round30 scheduler option admission', () => {
     )
     let reads = 0
     const options = {
-      get scheduler(): ILifecycleScheduler {
+      get scheduler(): IScheduler {
         reads++
         throw cause
       }
@@ -110,7 +110,7 @@ describe('Round30 scheduler option admission', () => {
     const context = {
       signal: new AbortController().signal,
       deadlineAt: undefined,
-      get scheduler(): ILifecycleScheduler {
+      get scheduler(): IScheduler {
         reads++
         throw cause
       },
