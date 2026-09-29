@@ -180,24 +180,24 @@
     },
     "rpc": {
       "lines": {
-        "covered": 4852,
-        "total": 5351,
-        "pct": 90.67
+        "covered": 4872,
+        "total": 5370,
+        "pct": 90.72
       },
       "statements": {
-        "covered": 5307,
-        "total": 5956,
-        "pct": 89.1
+        "covered": 5332,
+        "total": 5978,
+        "pct": 89.19
       },
       "functions": {
-        "covered": 1270,
-        "total": 1395,
-        "pct": 91.03
+        "covered": 1280,
+        "total": 1405,
+        "pct": 91.1
       },
       "branches": {
-        "covered": 3170,
-        "total": 3689,
-        "pct": 85.93
+        "covered": 3178,
+        "total": 3697,
+        "pct": 85.96
       }
     },
     "serialize": {
@@ -4778,26 +4778,48 @@
         "pct": 100
       }
     },
-    "packages/rpc/src/core/adapters/message-port.ts": {
+    "packages/rpc/src/core/adapters/message-port-text.ts": {
       "lines": {
-        "covered": 106,
-        "total": 114,
-        "pct": 92.98
+        "covered": 2,
+        "total": 2,
+        "pct": 100
       },
       "statements": {
-        "covered": 120,
-        "total": 132,
-        "pct": 90.9
+        "covered": 2,
+        "total": 2,
+        "pct": 100
       },
       "functions": {
-        "covered": 54,
-        "total": 61,
-        "pct": 88.52
+        "covered": 1,
+        "total": 1,
+        "pct": 100
       },
       "branches": {
-        "covered": 34,
-        "total": 37,
-        "pct": 91.89
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/core/adapters/message-port.ts": {
+      "lines": {
+        "covered": 133,
+        "total": 139,
+        "pct": 95.68
+      },
+      "statements": {
+        "covered": 153,
+        "total": 162,
+        "pct": 94.44
+      },
+      "functions": {
+        "covered": 65,
+        "total": 72,
+        "pct": 90.27
+      },
+      "branches": {
+        "covered": 46,
+        "total": 49,
+        "pct": 93.87
       }
     },
     "packages/rpc/src/core/ambient.d.ts": {
@@ -5572,23 +5594,23 @@
     },
     "packages/rpc/src/core/internal/hooks.ts": {
       "lines": {
-        "covered": 32,
-        "total": 32,
-        "pct": 100
+        "covered": 23,
+        "total": 24,
+        "pct": 95.83
       },
       "statements": {
-        "covered": 35,
-        "total": 36,
-        "pct": 97.22
+        "covered": 25,
+        "total": 26,
+        "pct": 96.15
       },
       "functions": {
-        "covered": 11,
-        "total": 12,
-        "pct": 91.66
+        "covered": 9,
+        "total": 10,
+        "pct": 90
       },
       "branches": {
-        "covered": 6,
-        "total": 6,
+        "covered": 2,
+        "total": 2,
         "pct": 100
       }
     },
