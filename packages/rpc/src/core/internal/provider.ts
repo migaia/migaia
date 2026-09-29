@@ -7,19 +7,29 @@ import type { IRpcContext } from '../typing.js'
 export class ProviderRegistry {
   /** Provider ownership remains separate from event listener registrations. */
   readonly providers = new Map<string, IRpcProvider>()
+  /** Stream handlers share the method namespace with ordinary providers. */
+  readonly streamProviders = new Map<string, (message: unknown) => void | Promise<void>>()
   /** Each event owns one channel so subscription handles identify their own registration. */
   readonly #events = new Map<string, ICanonicalEventChannel<IRpcContext, void | Promise<void>>>()
 
   /** Removes all application callbacks during endpoint disposal. */
   clear(): void {
     this.providers.clear()
+    this.streamProviders.clear()
     for (const channel of this.#events.values()) channel.clear()
     this.#events.clear()
   }
   /** Registers a provider and rejects duplicate method ownership. */
   register(method: string, provider: IRpcProvider): boolean {
-    if (this.providers.has(method)) return false
+    if (this.providers.has(method) || this.streamProviders.has(method)) return false
     this.providers.set(method, provider)
+    return true
+  }
+
+  /** Registers one stream handler in the same method namespace as ordinary providers. */
+  registerStream(method: string, handler: (message: unknown) => void | Promise<void>): boolean {
+    if (this.providers.has(method) || this.streamProviders.has(method)) return false
+    this.streamProviders.set(method, handler)
     return true
   }
 

@@ -169,7 +169,12 @@ function createOutboundSharedPorts(
     }
     try {
       if (command.kind === 'response' || command.kind === 'frame') {
-        const result = owner.sendFrame(command.message, command.transfer)
+        const result = owner.sendFrame(command.message, command.transfer, command.admission)
+        observe(result)
+        return result
+      }
+      if (command.kind === 'stream-open') {
+        const result = owner.sendStreamOpen(command)
         observe(result)
         return result
       }

@@ -15,6 +15,7 @@ import type { IDiscoverySurface } from '../features/discovery.js'
 import type { IControlSurface } from '../features/control.js'
 import type { IProviderRegistrationSurface } from '../features/provider.js'
 import type { IOneWaySurface } from '../features/one-way.js'
+import type { IRpcStreamSurface } from '../features/stream.js'
 
 /** Explicit first-party operations available through Feature expose, never a broad Plugin core. */
 export type IRpcFeatureExpose = Readonly<{
@@ -76,6 +77,10 @@ export type IControlCapability = Readonly<{
 /** Prepared provider capability exposes only registration; outbound stays owned by its dependency. */
 export type IProviderInstallation = Readonly<{
   readonly public: IProviderRegistrationSurface
+  readonly registerStream: (
+    method: string,
+    handler: (message: unknown) => void | Promise<void>
+  ) => () => void
 }>
 
 /** First-party provider prepares against direct outbound ports. */
@@ -89,4 +94,10 @@ export type IOneWayInstallation = Readonly<{ readonly public: IOneWaySurface }>
 /** Optional one-way Feature prepares only when the caller selected the legacy module token. */
 export type IOneWayCapability = Readonly<{
   readonly prepare: (scope: IRpcPluginInstallScope) => IOneWayInstallation
+}>
+
+/** Optional stream Feature publishes a single namespaced runtime surface. */
+export type IStreamInstallation = Readonly<{ readonly public: IRpcStreamSurface }>
+export type IStreamCapability = Readonly<{
+  readonly prepare: (scope: IRpcPluginInstallScope) => IStreamInstallation
 }>
