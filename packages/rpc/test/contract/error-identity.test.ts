@@ -65,6 +65,7 @@ describe('rpc-contract error identity', () => {
     const expected = {
       INVALID_DESCRIPTOR: [TypeError, 'rpc descriptor is invalid'],
       INVALID_ENVELOPE: [TypeError, 'rpc envelope is invalid'],
+      INVALID_STREAM: [TypeError, 'rpc stream is invalid'],
       INVALID_FRAME: [RangeError, 'rpc frame is invalid'],
       FRAME_LIMIT_EXCEEDED: [RangeError, 'rpc frame limit exceeded'],
       FRAME_ASSEMBLY_EXPIRED: [RangeError, 'rpc frame assembly expired'],

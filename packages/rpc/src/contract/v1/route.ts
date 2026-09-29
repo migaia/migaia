@@ -74,7 +74,8 @@ const OPTIONAL_FIELDS: Readonly<Record<IRpcRouteType, readonly string[]>> = {
     RpcRouteField.message,
     RpcRouteField.operation
   ],
-  [RpcRouteType.variation]: [RpcRouteField.receiverId, RpcRouteField.variation]
+  [RpcRouteType.variation]: [RpcRouteField.receiverId, RpcRouteField.variation],
+  [RpcRouteType.stream]: [RpcRouteField.receiverId]
 }
 
 /** Attaches the first semantic violation and its JSON pointer without replacing the cause. */

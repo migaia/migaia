@@ -1,0 +1,13 @@
+{
+  "added": {
+    "@migaia/rpc/contract": [
+      "RpcStreamEvent",
+      "RpcStreamLimit",
+      "RpcStreamViolation",
+      "invalidRpcStream",
+      "measurePortableStreamValue",
+      "normalizeStreamPayload"
+    ],
+    "@migaia/rpc/contract/v1": ["invalidRpcStream", "normalizeStreamPayload"]
+  }
+}

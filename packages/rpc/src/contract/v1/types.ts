@@ -47,6 +47,13 @@ export type IRpcVariationEnvelope = Readonly<{
   data: IRpcControlData
 }>
 
+/** Stream frames share control-owned routing and carry a portable event payload. */
+export type IRpcStreamEnvelope = Readonly<{
+  kind: 'stream'
+  id: string
+  data: IRpcEnvelopeData
+}>
+
 /** Closed V1 semantic-envelope union. */
 export type IRpcEnvelope =
   | IRpcRequestEnvelope
@@ -54,6 +61,7 @@ export type IRpcEnvelope =
   | IRpcResponseFailure
   | IRpcDiscoveryEnvelope
   | IRpcVariationEnvelope
+  | IRpcStreamEnvelope
 
 /** Values allowed in an ordinary envelope payload after portable normalization. */
 export type IRpcApplicationPayload = IRpcPortableValue
