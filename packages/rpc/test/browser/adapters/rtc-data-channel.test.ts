@@ -59,6 +59,27 @@ describe('RTCDataChannel transport', () => {
     expect(() => transport.subscribe(() => undefined)).toThrow('closed')
   })
 
+  it('reports a hostile message getter as transport failure without dispatching data', () => {
+    const { channel, emit } = makeChannel()
+    const transport = createRtcDataChannelTransport(channel)
+    const failure = new Error('data getter failed')
+    const errors: unknown[] = []
+    const received: unknown[] = []
+    transport.onTransportError?.((error) => errors.push(error))
+    const unsubscribe = transport.subscribe((message) => received.push(message.data))
+
+    emit('message', {
+      get data(): never {
+        throw failure
+      }
+    })
+
+    expect(received).toEqual([])
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toMatchObject({ code: 'TRANSPORT', cause: failure })
+    unsubscribe()
+  })
+
   it('reports an already-closed channel to late transport-error subscribers', () => {
     const { channel } = makeChannel()
     const closedChannel = { ...channel, readyState: 'closed' }

@@ -307,12 +307,23 @@
     "@migaia/rpc": {
       "./contract": [
         "RpcContractErrorCode",
+        "RpcErrorReachLimit",
+        "RpcJsonRpcWireError",
+        "RpcWireErrorFallback",
+        "RpcWireErrorField",
+        "RpcWireErrorLimit",
+        "RpcWireErrorUnknownFieldMode",
+        "RpcWireErrorViolation",
         "createDescriptor",
         "deserializeRpcError",
+        "fromJsonRpcError",
         "normalizePortable",
         "normalizeRpcEnvelope",
+        "normalizeRpcSerializedError",
+        "reachRpcError",
         "rpcProtocolV1",
-        "serializeRpcError"
+        "serializeRpcError",
+        "toJsonRpcError"
       ],
       "./contract/v1": [
         "default",
@@ -363,14 +374,11 @@
         "createFullOneWayEndpoint",
         "defineFeature",
         "defineMiddleware",
-        "deserializeError",
         "framer",
         "hooks",
         "isRpcError",
         "ping",
         "protocol",
-        "reachError",
-        "serializeError",
         "timeout",
         "uuid"
       ],
