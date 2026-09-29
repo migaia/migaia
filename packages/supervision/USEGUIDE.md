@@ -99,3 +99,50 @@ pids are removed without termination. Each failed record stays available for ano
 An optional prewarm pool uses the same budget, launcher and specification objects as its
 supervisor. It starts idle units but the supervisor still performs readiness after taking one.
 `restart()` and `replace()` bypass stale idle units.
+
+## A supervised thread profile
+
+`@migaia/supervision/threads` owns a runtime-neutral thread contract. Supply a launcher whose
+`launch(spec, context)` creates a thread and returns an idempotently terminable handle. Its
+`exited` promise must fulfill only after thread code stops executing, and must never reject.
+An error event that leaves a Web-style thread running requires the adapter to terminate it and
+fulfill `exited` with `{ code: null, error }`. A termination request or a runtime close marker
+alone is not evidence of actual exit. If `context.signal` is already aborted, the launcher
+must reject without creating a thread.
+
+```ts
+import { createUnitBudget } from '@migaia/supervision'
+import { createThreadSupervisor, ThreadUnitKind } from '@migaia/supervision/threads'
+import type { IThreadLauncher } from '@migaia/supervision/threads'
+
+declare const launcher: IThreadLauncher
+const budget = createUnitBudget({ kind: ThreadUnitKind.thread, maxUnits: 2 })
+const supervisor = createThreadSupervisor({
+  id: 'compute',
+  launcher,
+  budget,
+  spec: { entry: './compute-thread.js', limits: { heapBytes: 32 * 1024 * 1024 } },
+  report: (error) => { console.error(error) }
+})
+
+const outcome = await supervisor.start()
+if (outcome.state === 'ready') {
+  // Use the adapter-owned channel associated with outcome.unit.
+}
+await supervisor.dispose()
+```
+
+The launcher must declare `termination: 'enforced'`, `fault-isolation: 'unsupported'`,
+`heap-limit: 'enforced' | 'unsupported'`, and `exit-observation: 'enforced' | 'unsupported'`
+truthfully. `heapBytes` is accepted only when `heap-limit` is enforced; `callWallTimeMs` is
+passed unchanged to the launcher for its caller-facing operations. A launcher without enforced
+exit observation requires a `health` check so a silent exit or stalled thread can be stopped.
+The supervisor performs no heap sampling and has no separate graceful thread phase: it drains
+the optional `beforeTerminate` hook, requests `terminate()` once, then waits up to the core
+reap deadline for actual exit. An unconfirmed exit keeps its budget lease occupied.
+
+Use `@migaia/supervision/process` when you need crash isolation, a CPU limit, durable orphan
+recovery, or output draining. Thread code shares the host process and cannot provide those
+guarantees. Platform adapters and their runtime-specific proof belong to their owning packages;
+this profile does not assert that Bun, Deno, browser, or Electron thread termination has been
+verified by its in-memory tests.

@@ -1021,6 +1021,12 @@
         "createPrewarmPool",
         "createProcessSupervisor",
         "reclaimOrphanProcesses"
+      ],
+      "./threads": [
+        "ThreadCapability",
+        "ThreadLimit",
+        "ThreadUnitKind",
+        "createThreadSupervisor"
       ]
     },
     "@migaia/tray": {
