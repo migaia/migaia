@@ -7,6 +7,7 @@ import {
   createMiddlewarePipelineAbortError,
   createMiddlewarePipelineInvalidOptionError
 } from './signal-errors.js'
+import { MiddlewarePipelineSignalText } from './signal-text.js'
 
 /** Invokes a one-argument optional-context callback. */
 function invokeWithContext<TFirst, TResult>(
@@ -144,7 +145,7 @@ const createNextGuard = <TValue, TResult>(
 }
 
 const invalidSignal = (cause?: unknown): TypeError =>
-  createMiddlewarePipelineInvalidOptionError(cause)
+  createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, { cause })
 const makeAbortError = (reason: unknown): Error => createMiddlewarePipelineAbortError(reason)
 const readControlSignal = (
   control: IMiddlewarePipelineControlOptions | null | undefined
@@ -171,7 +172,10 @@ const admit = (
 ): IMiddlewarePipelineContext | undefined => {
   if (signal === undefined) return undefined
   const admission = admitAbortSignal(signal)
-  if (admission.kind === 'invalid') throw invalidSignal(admission.cause)
+  if (admission.kind === 'invalid')
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, {
+      cause: admission.cause
+    })
   if (admission.aborted) throw makeAbortError(signal.reason)
   return Object.freeze({ signal })
 }

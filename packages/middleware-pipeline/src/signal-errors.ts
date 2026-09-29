@@ -2,9 +2,12 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { MIDDLEWARE_PIPELINE_SOURCE, MiddlewarePipelineErrorCode } from './error-code.js'
 import { MiddlewarePipelineSignalText } from './signal-text.js'
 
-/** Creates tagged admission error without loading async execution error text. */
-export const createMiddlewarePipelineInvalidOptionError = (cause?: unknown): TypeError =>
-  attachErrorIdentity(new TypeError(MiddlewarePipelineSignalText.invalidOption, { cause }), {
+/** Owns all package invalid-option errors while preserving each caller's cause shape. */
+export const createMiddlewarePipelineInvalidOptionError = (
+  message: string,
+  options?: ErrorOptions
+): TypeError =>
+  attachErrorIdentity(new TypeError(message, options), {
     source: MIDDLEWARE_PIPELINE_SOURCE,
     code: MiddlewarePipelineErrorCode.invalidOption
   }) as TypeError

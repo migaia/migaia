@@ -1,6 +1,5 @@
-import { attachErrorIdentity } from '@migaia/utils/error'
-import { MIDDLEWARE_PIPELINE_SOURCE, MiddlewarePipelineErrorCode } from './error-code.js'
 import { MiddlewarePipelineErrorText } from './error-text.js'
+import { createMiddlewarePipelineInvalidOptionError } from './signal-errors.js'
 import {
   adaptGeneratorStageToAsyncGenerator,
   adaptSyncStageToAsync,
@@ -98,13 +97,6 @@ type INormalizedPipelineOptions = Readonly<{
 /** Stable no-op violation sink used when a host omits reporting. */
 const ignoreViolation: IMiddlewarePipelineViolationHandler = () => undefined
 
-/** Creates a package-tagged invalid-option error without replacing native `TypeError`. */
-const invalidOption = (message: string): TypeError =>
-  attachErrorIdentity(new TypeError(message), {
-    source: MIDDLEWARE_PIPELINE_SOURCE,
-    code: MiddlewarePipelineErrorCode.invalidOption
-  }) as TypeError
-
 /** Returns whether a runtime value belongs to the public mode domain. */
 const isPipelineMode = (value: unknown): value is IMiddlewarePipelineMode =>
   value === MiddlewarePipelineMode.sync ||
@@ -115,7 +107,8 @@ const isPipelineMode = (value: unknown): value is IMiddlewarePipelineMode =>
 /** Rejects one malformed optional callback before runner construction. */
 const readCallback = <TCallback extends Function>(value: unknown): TCallback | undefined => {
   if (value === undefined) return undefined
-  if (typeof value !== 'function') throw invalidOption(MiddlewarePipelineSignalText.invalidOption)
+  if (typeof value !== 'function')
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
   return value as TCallback
 }
 
@@ -129,17 +122,18 @@ const readSignals = (value: unknown): IGeneratorMiddlewareSignals => {
     typeof (value as { readonly halt?: unknown }).halt !== 'symbol' ||
     typeof (value as { readonly continue?: unknown }).continue !== 'symbol'
   )
-    throw invalidOption(MiddlewarePipelineSignalText.invalidOption)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
   return value as IGeneratorMiddlewareSignals
 }
 
 /** Validates and freezes construction options before any mode-specific work begins. */
 const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
-    throw invalidOption(MiddlewarePipelineErrorText.invalidMode)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidMode)
   /** Unknown input narrowed only after object admission. */
   const candidate = options as Record<string, unknown>
-  if (!isPipelineMode(candidate.mode)) throw invalidOption(MiddlewarePipelineErrorText.invalidMode)
+  if (!isPipelineMode(candidate.mode))
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidMode)
   return Object.freeze({
     mode: candidate.mode,
     onViolation:
@@ -159,7 +153,8 @@ const selectControl = (
   control: IMiddlewarePipelineControlOptions | null | undefined
 ): IMiddlewarePipelineControlOptions | undefined => {
   if (control === null || typeof control !== 'object' || Array.isArray(control)) {
-    if (control !== undefined) throw invalidOption(MiddlewarePipelineSignalText.invalidOption)
+    if (control !== undefined)
+      throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
   }
   /** Call-time signal wins when supplied; creation signal remains the fallback. */
   const signal = control?.signal ?? options.signal
@@ -184,7 +179,7 @@ const liftStage = (
     if (from === MiddlewarePipelineMode.generator)
       return adaptGeneratorStageToAsyncGenerator(stage as IGeneratorMiddlewareStage<unknown>)
   }
-  throw invalidOption(MiddlewarePipelineErrorText.unsupportedLift)
+  throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.unsupportedLift)
 }
 
 /** Dispatches one run while preserving each existing runner's return semantics. */
@@ -285,7 +280,10 @@ export function createPipeline(
   return Object.freeze({
     mode: normalized.mode,
     lift: (stage: unknown, from: IMiddlewarePipelineMode): unknown => {
-      if (!isPipelineMode(from)) throw invalidOption(MiddlewarePipelineErrorText.unsupportedLift)
+      if (!isPipelineMode(from))
+        throw createMiddlewarePipelineInvalidOptionError(
+          MiddlewarePipelineErrorText.unsupportedLift
+        )
       return liftStage(normalized.mode, from, stage, normalized.onViolation)
     },
     run: (
