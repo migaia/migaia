@@ -146,8 +146,8 @@ export type IRuntimeErrorReportContext = {
 /**
  * 运行时宿主能力注入面（`docs/contracts/runtime-neutrality.sdd.md` R-9）。
  *
- * 与 lifecycle 的 `ILifecycleScheduler` 结构兼容但**不 import**：reactive 保持零 workspace 依赖。 `now()` 是单调
- * duration 时钟；`timestamp()` 是事件时间戳（允许 epoch）；二者不得混用。默认值见 `default-runtime-adapter.ts`。
+ * 与 `@migaia/utils/scheduler` 的时钟分离一致：`now()` 单调（对应 `IScheduler.now()`），只用于 duration； `timestamp()`
+ * 为 epoch 事件时间戳（对应 `IWallClock.timestamp()`）；二者不得混用。默认值见 `default-runtime-adapter.ts`。
  */
 export type IReactiveRuntimeAdapter = {
   /** 调度一次微任务。 */

@@ -1,5 +1,5 @@
 import { invokeCaptured } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import { snapshotKeyValueStoreDetailed } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
 import {

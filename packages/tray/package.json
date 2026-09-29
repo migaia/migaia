@@ -51,7 +51,8 @@
     "@migaia/capability": "workspace:^",
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
-    "@migaia/plugin-host": "workspace:^"
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

@@ -115,13 +115,11 @@
       "symbols": [
         "IAbortSignal",
         "ILeaseRegistry",
-        "ILifecycleScheduler",
         "ILifecycleScope",
         "ILifecycleState",
         "IMutationQueue",
         "IReleaseContext",
         "IReleaseDescriptor",
-        "IScheduledTask",
         "ISyncLifecycleScope",
         "ITerminalController",
         "LifecycleErrorCode",
@@ -140,8 +138,7 @@
         "createSyncLifecycleScope",
         "createTerminalController",
         "probeThenable",
-        "snapshotScheduler",
-        "systemScheduler"
+        "snapshotScheduler"
       ]
     },
     {
@@ -159,6 +156,10 @@
     {
       "route": "@migaia/utils/object",
       "symbols": ["IObjectPathInput", "IObjectPathTuple", "get", "parseObjectPath"]
+    },
+    {
+      "route": "@migaia/utils/scheduler",
+      "symbols": ["IScheduler", "systemScheduler"]
     }
   ],
   "targetedRules": [

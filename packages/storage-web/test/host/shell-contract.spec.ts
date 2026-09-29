@@ -9,7 +9,7 @@ import {
 } from '../../src/host/index.js'
 import { memoryStorageHost } from '../../src/backends/memory.js'
 import { defineReactiveAdapterFeature } from '../../src/reactive-adapter.js'
-import { createManualScheduler, type ILifecycleScheduler } from '@migaia/lifecycle'
+import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 
@@ -69,7 +69,7 @@ describe('SWV4-B02 R02 shell', () => {
 
   it('materializes a kind-free adapter through native Plugin features with the Host scheduler', async () => {
     const scheduler = createManualScheduler()
-    let receivedScheduler: ILifecycleScheduler | undefined
+    let receivedScheduler: IScheduler | undefined
     const reactive = defineReactiveAdapterFeature({
       mode: 'push',
       visibility: 'instance',

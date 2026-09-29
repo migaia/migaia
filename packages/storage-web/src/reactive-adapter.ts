@@ -6,7 +6,8 @@ import type {
   IStorageReactiveFeatureMetadata,
   IStorageReactiveSourceDisposer
 } from './host/types.js'
-import type { IAbortSignal, ILifecycleScheduler } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IStorageChange, IKeyValueStore } from '@migaia/storage-contract'
 import type { IStorageNativeFeatureExpose } from './host/contracts.js'
 import type { IStorageReactiveAdapter, IStorageReactiveService } from './host/reactive.js'
@@ -14,7 +15,7 @@ import type { IStorageReactiveAdapter, IStorageReactiveService } from './host/re
 /** Advanced adapter source context; built-in backend factories are intentionally absent. */
 export type IReactiveAdapterContext<TStore extends IKeyValueStore> = {
   readonly store: TStore
-  readonly scheduler: ILifecycleScheduler
+  readonly scheduler: IScheduler
   readonly signal: IAbortSignal
   readonly invalidate: (change?: IStorageChange) => void
   readonly report: (error: unknown) => void
