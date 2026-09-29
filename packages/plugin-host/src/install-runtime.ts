@@ -6,7 +6,7 @@ import {
   createProvisionalScope,
   probeThenable
 } from '@migaia/lifecycle'
-import type { IAbortSignal } from '@migaia/lifecycle'
+import { observeAbortSubscription, type IAbortSignal } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { copyConfig, readPlainDataRecord } from './config.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
@@ -16,7 +16,8 @@ import { invokeCaptured } from './invocation.js'
 import { reportDiagnostic, reportTerminalFailure } from './diagnostic-report.js'
 import { compileFeatures, instantiateFeatures, snapshotFeatureExpose } from './feature-runtime.js'
 import { validateInstallBatch } from './dependency-runtime.js'
-import { closeSetupAttempt, runPluginSetup, type IPluginSetupPort } from './setup-runtime.js'
+import { resolveDisposer } from './disposal.js'
+import type { IPluginSetupAttempt, IPluginSetupPort } from './setup-runtime.js'
 import { isFeatureReference } from './define-feature.js'
 import type { PluginHostState } from './host-state.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
@@ -24,7 +25,9 @@ import type { IInstallEntry, IPluginDescriptor, IRegistration } from './registry
 import type {
   IPluginHostCore,
   IPluginInstallFailureDetail,
-  IPluginHostDiagnostic
+  IPluginHostDiagnostic,
+  IPluginResource,
+  IPluginSetupContext
 } from './typing.js'
 
 /** Candidate registries held privately until one install batch reaches its commit point. */
@@ -72,6 +75,158 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
   /** Attributes a Host boundary error before its structured detail is frozen. */
   readonly decorateError: <TError extends PluginHostError>(error: TError) => TError
 }>
+
+/** Reports a rejection only when it arrives after timeout or Host disposal won the attempt. */
+const reportLateSettlement = (
+  pending: Promise<unknown>,
+  primary: unknown,
+  signal: IAbortSignal,
+  name: string,
+  diagnostic: IPluginHostDiagnostic
+): void => {
+  void pending.then(undefined, (error: unknown) => {
+    if (error === primary || error === signal.reason) return
+    reportDiagnostic(
+      diagnostic,
+      ERROR_TEXT.SETUP_LATE_REJECTION(name),
+      PluginHostErrorCode.pluginInstallFailed,
+      error
+    )
+  })
+}
+
+/** Releases an orphaned resource immediately while keeping cleanup failure diagnostic only. */
+const releaseLateResource = (
+  resource: IPluginResource,
+  name: string,
+  diagnostic: IPluginHostDiagnostic
+): void => {
+  let disposer: ReturnType<typeof resolveDisposer>
+  try {
+    disposer = resolveDisposer(resource)
+  } catch (cause) {
+    throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause })
+  }
+  if (!disposer) throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_RESOURCE_DISPOSER)
+  /** One reporter handles synchronous and asynchronous late disposer failures. */
+  const report = (error: unknown): void =>
+    reportDiagnostic(
+      diagnostic,
+      ERROR_TEXT.SETUP_LATE_RELEASE_FAILED(name),
+      PluginHostErrorCode.pluginDisposeFailed,
+      error
+    )
+  try {
+    void Promise.resolve(disposer()).catch(report)
+  } catch (error) {
+    report(error)
+  }
+}
+
+/** Creates the narrow setup context with a signal private to this installation attempt. */
+const createSetupContext = (
+  registration: IRegistration<any, any>,
+  core: IPluginHostCore<any>,
+  attempt: IPluginSetupAttempt,
+  port: IPluginSetupPort
+): IPluginSetupContext => {
+  const operation = Object.freeze({
+    signal: attempt.controller.signal,
+    deadlineAt: registration.operationDeadlineAt,
+    now: () => port.scheduler.now()
+  })
+  return Object.freeze({
+    config: core.config,
+    operation,
+    get lifecycle() {
+      return core.lifecycle
+    },
+    onDispose: (resource: IPluginResource): void => {
+      if (attempt.open && registration.provisional) return core.onDispose(resource)
+      releaseLateResource(resource, registration.name, port.diagnostic)
+      throw new PluginHostError(
+        PluginHostErrorCode.resourceOutsideInstall,
+        ERROR_TEXT.RESOURCE_OUTSIDE_INSTALL
+      )
+    }
+  })
+}
+
+/** Closes setup resource admission before rollback or after installation commits. */
+const closeSetupAttempt = (registration: IRegistration<any, any>): void => {
+  if (registration.setupAttempt) registration.setupAttempt.open = false
+}
+
+/** Runs setup under the install operation and preserves timeout and disposal error identity. */
+async function runPluginSetup(
+  registration: IRegistration<any, any>,
+  port: IPluginSetupPort
+): Promise<unknown> {
+  const core = port.createCore(registration)
+  const attempt: IPluginSetupAttempt = { open: true, controller: createAbortController() }
+  registration.setupAttempt = attempt
+  const context = createSetupContext(registration, core, attempt, port)
+  const onObservationFailure = (error: unknown): void => {
+    reportDiagnostic(
+      port.diagnostic,
+      ERROR_TEXT.INVALID_OPTION,
+      PluginHostErrorCode.invalidOption,
+      error
+    )
+  }
+  const disposeSubscription = observeAbortSubscription(
+    port.executionSignal,
+    (reason) => attempt.controller.abort(reason),
+    onObservationFailure
+  )
+  port.setSetupPending(registration)
+  /** Subscription for the attempt's abort race, removed when setup settles. */
+  let attemptSubscription: ReturnType<typeof observeAbortSubscription> | undefined
+  try {
+    const pending = Promise.resolve(
+      invokeCaptured(registration.plugin.setup!, registration.plugin.owner, [context])
+    )
+    /** Identifies a rejection produced by setup itself before the deadline or disposal won. */
+    let ownRejection: { readonly error: unknown } | undefined
+    const tracked = pending.then(undefined, (error: unknown) => {
+      ownRejection = { error }
+      throw error
+    })
+    const abandoned = new Promise<never>((_resolve, reject) => {
+      attemptSubscription = observeAbortSubscription(
+        attempt.controller.signal,
+        (reason) => reject(reason),
+        onObservationFailure
+      )
+    })
+    let output: unknown
+    try {
+      output = await port.awaitOperation(Promise.race([tracked, abandoned]), registration)
+    } catch (error) {
+      if (ownRejection && ownRejection.error === error) throw error
+      const code = error instanceof PluginHostError ? error.code : undefined
+      if (code === PluginHostErrorCode.mutationExecutionTimeout) attempt.controller.abort(error)
+      if (
+        code === PluginHostErrorCode.mutationExecutionTimeout ||
+        code === PluginHostErrorCode.hostDisposing
+      )
+        reportLateSettlement(
+          pending,
+          error,
+          attempt.controller.signal,
+          registration.name,
+          port.diagnostic
+        )
+      throw error
+    }
+    port.assertOperationCurrent(registration)
+    return output
+  } finally {
+    port.setSetupPending(undefined)
+    attemptSubscription?.unsubscribe()
+    disposeSubscription.unsubscribe()
+  }
+}
 
 /** Owns asynchronous candidate installation, publication, and rollback semantics. */
 export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {

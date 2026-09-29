@@ -114,24 +114,24 @@
     },
     "plugin-host": {
       "lines": {
-        "covered": 1925,
-        "total": 2135,
-        "pct": 90.16
+        "covered": 2018,
+        "total": 2221,
+        "pct": 90.85
       },
       "statements": {
-        "covered": 2033,
-        "total": 2298,
-        "pct": 88.46
+        "covered": 2138,
+        "total": 2391,
+        "pct": 89.41
       },
       "functions": {
-        "covered": 520,
-        "total": 604,
-        "pct": 86.09
+        "covered": 551,
+        "total": 631,
+        "pct": 87.32
       },
       "branches": {
-        "covered": 907,
-        "total": 1124,
-        "pct": 80.69
+        "covered": 965,
+        "total": 1171,
+        "pct": 82.4
       }
     },
     "reactive": {
@@ -2514,14 +2514,14 @@
     },
     "packages/plugin-host/src/admission-runtime.ts": {
       "lines": {
-        "covered": 31,
-        "total": 35,
-        "pct": 88.57
+        "covered": 33,
+        "total": 37,
+        "pct": 89.18
       },
       "statements": {
-        "covered": 33,
-        "total": 39,
-        "pct": 84.61
+        "covered": 35,
+        "total": 41,
+        "pct": 85.36
       },
       "functions": {
         "covered": 4,
@@ -2529,9 +2529,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 27,
-        "total": 34,
-        "pct": 79.41
+        "covered": 31,
+        "total": 38,
+        "pct": 81.57
       }
     },
     "packages/plugin-host/src/cleanup-runtime.ts": {
@@ -2624,14 +2624,14 @@
     },
     "packages/plugin-host/src/config-runtime.ts": {
       "lines": {
-        "covered": 31,
-        "total": 32,
-        "pct": 96.87
-      },
-      "statements": {
         "covered": 33,
         "total": 34,
         "pct": 97.05
+      },
+      "statements": {
+        "covered": 35,
+        "total": 36,
+        "pct": 97.22
       },
       "functions": {
         "covered": 7,
@@ -2639,9 +2639,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 13,
-        "total": 14,
-        "pct": 92.85
+        "covered": 15,
+        "total": 16,
+        "pct": 93.75
       }
     },
     "packages/plugin-host/src/config.ts": {
@@ -2756,24 +2756,24 @@
     },
     "packages/plugin-host/src/define-plugin.ts": {
       "lines": {
-        "covered": 85,
-        "total": 98,
-        "pct": 86.73
+        "covered": 91,
+        "total": 104,
+        "pct": 87.5
       },
       "statements": {
-        "covered": 89,
-        "total": 103,
-        "pct": 86.4
+        "covered": 95,
+        "total": 109,
+        "pct": 87.15
       },
       "functions": {
-        "covered": 11,
-        "total": 14,
-        "pct": 78.57
+        "covered": 12,
+        "total": 15,
+        "pct": 80
       },
       "branches": {
-        "covered": 57,
-        "total": 75,
-        "pct": 76
+        "covered": 64,
+        "total": 81,
+        "pct": 79.01
       }
     },
     "packages/plugin-host/src/dependency-runtime.ts": {
@@ -2888,19 +2888,19 @@
     },
     "packages/plugin-host/src/error-text.ts": {
       "lines": {
-        "covered": 85,
-        "total": 110,
-        "pct": 77.27
+        "covered": 92,
+        "total": 115,
+        "pct": 80
       },
       "statements": {
-        "covered": 88,
-        "total": 115,
-        "pct": 76.52
+        "covered": 95,
+        "total": 120,
+        "pct": 79.16
       },
       "functions": {
-        "covered": 70,
-        "total": 95,
-        "pct": 73.68
+        "covered": 77,
+        "total": 100,
+        "pct": 77
       },
       "branches": {
         "covered": 16,
@@ -3042,14 +3042,14 @@
     },
     "packages/plugin-host/src/host-queue.ts": {
       "lines": {
-        "covered": 4,
+        "covered": 6,
         "total": 7,
-        "pct": 57.14
+        "pct": 85.71
       },
       "statements": {
-        "covered": 4,
+        "covered": 6,
         "total": 7,
-        "pct": 57.14
+        "pct": 85.71
       },
       "functions": {
         "covered": 1,
@@ -3057,31 +3057,31 @@
         "pct": 50
       },
       "branches": {
-        "covered": 5,
+        "covered": 7,
         "total": 11,
-        "pct": 45.45
+        "pct": 63.63
       }
     },
     "packages/plugin-host/src/host-runtime.ts": {
       "lines": {
-        "covered": 311,
-        "total": 334,
-        "pct": 93.11
+        "covered": 316,
+        "total": 337,
+        "pct": 93.76
       },
       "statements": {
-        "covered": 319,
-        "total": 347,
-        "pct": 91.93
+        "covered": 326,
+        "total": 350,
+        "pct": 93.14
       },
       "functions": {
-        "covered": 132,
-        "total": 144,
-        "pct": 91.66
+        "covered": 138,
+        "total": 147,
+        "pct": 93.87
       },
       "branches": {
-        "covered": 92,
+        "covered": 93,
         "total": 113,
-        "pct": 81.41
+        "pct": 82.3
       }
     },
     "packages/plugin-host/src/host-state.ts": {
@@ -3130,24 +3130,24 @@
     },
     "packages/plugin-host/src/install-runtime.ts": {
       "lines": {
-        "covered": 195,
-        "total": 211,
-        "pct": 92.41
+        "covered": 262,
+        "total": 279,
+        "pct": 93.9
       },
       "statements": {
-        "covered": 203,
-        "total": 226,
-        "pct": 89.82
+        "covered": 277,
+        "total": 301,
+        "pct": 92.02
       },
       "functions": {
-        "covered": 33,
-        "total": 36,
-        "pct": 91.66
+        "covered": 50,
+        "total": 54,
+        "pct": 92.59
       },
       "branches": {
-        "covered": 85,
-        "total": 113,
-        "pct": 75.22
+        "covered": 121,
+        "total": 149,
+        "pct": 81.2
       }
     },
     "packages/plugin-host/src/invocation.ts": {
@@ -3284,14 +3284,14 @@
     },
     "packages/plugin-host/src/removal-runtime.ts": {
       "lines": {
-        "covered": 52,
+        "covered": 54,
         "total": 65,
-        "pct": 80
+        "pct": 83.07
       },
       "statements": {
-        "covered": 52,
+        "covered": 54,
         "total": 66,
-        "pct": 78.78
+        "pct": 81.81
       },
       "functions": {
         "covered": 8,
@@ -3299,9 +3299,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 15,
+        "covered": 16,
         "total": 19,
-        "pct": 78.94
+        "pct": 84.21
       }
     },
     "packages/plugin-host/src/replace-runtime.ts": {
@@ -3311,9 +3311,9 @@
         "pct": 100
       },
       "statements": {
-        "covered": 70,
+        "covered": 72,
         "total": 75,
-        "pct": 93.33
+        "pct": 96
       },
       "functions": {
         "covered": 12,
@@ -3321,9 +3321,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 22,
+        "covered": 25,
         "total": 30,
-        "pct": 73.33
+        "pct": 83.33
       }
     },
     "packages/plugin-host/src/resume-runtime.ts": {
@@ -3333,9 +3333,9 @@
         "pct": 95.45
       },
       "statements": {
-        "covered": 71,
+        "covered": 72,
         "total": 83,
-        "pct": 85.54
+        "pct": 86.74
       },
       "functions": {
         "covered": 13,
@@ -3343,9 +3343,31 @@
         "pct": 92.85
       },
       "branches": {
-        "covered": 33,
-        "total": 48,
-        "pct": 68.75
+        "covered": 35,
+        "total": 47,
+        "pct": 74.46
+      }
+    },
+    "packages/plugin-host/src/setup-runtime.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
       }
     },
     "packages/plugin-host/src/stage-lanes.ts": {
@@ -13736,6 +13758,9 @@
   "exclusions": {
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
-  "changedRuntimeFiles": [],
+  "changedRuntimeFiles": [
+    "packages/plugin-host/src/install-runtime.ts",
+    "packages/plugin-host/src/setup-runtime.ts"
+  ],
   "deletedRuntimeFiles": []
 }
