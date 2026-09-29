@@ -13,7 +13,7 @@ import {
   type IRpcStreamPayload
 } from '../../../contract/index.js'
 import { RpcCoreErrorCode, RpcError, RpcAbortError, RpcTimeoutError } from '../../errors.js'
-import { RpcCoreErrorText } from '../../error-text.js'
+import { RpcStreamErrorText } from './error-text.js'
 import type { IEndpointKernelHost } from '../../endpoint-kernel.js'
 import type {
   IRpcStreamCapabilityPort,
@@ -23,10 +23,11 @@ import type {
 import type { IPreparedEndpoint } from '../endpoint-bootstrap.js'
 import { allocateRpcId } from '../id.js'
 import { OperationScope } from '../operation-scope.js'
-import type { IRpcOutboundOperationsPort } from '../plugin-shared-keys.js'
+import type { IRpcFrameAdmission, IRpcOutboundOperationsPort } from '../plugin-shared-keys.js'
 import { tupleKey } from '../safe-value.js'
 import type { IAbortSignal } from '../async-control.js'
 import type { IEndpointTimer } from '../time-port.js'
+import { RpcStreamLimit } from '../../../contract/stream-constants.js'
 
 /** One pending caller pull; the enclosing state owns settlement and its sequence. */
 type IConsumerPull = {
@@ -49,6 +50,7 @@ type IConsumerState = {
   removeAbort?: () => void
   seq: number
   pending?: IConsumerPull
+  pullAdmission?: AbortController
   terminal?:
     | { readonly done: true; readonly value?: IRpcPortableValue }
     | { readonly error: unknown }
@@ -68,6 +70,7 @@ type IProducerState = {
   readonly iterator: AsyncIterator<IRpcPortableValue> | Iterator<IRpcPortableValue>
   readonly scope: OperationScope
   timer?: IEndpointTimer
+  itemAdmission?: AbortController
   seq: number
   busy: boolean
   terminal: boolean
@@ -169,7 +172,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         ? await this.#cancelConsumer(state, { done: true }, thrown ? value : undefined)
         : undefined
       if (cleanup !== undefined) {
-        if (thrown) throw new AggregateError([value, cleanup], RpcCoreErrorText.streamCleanupFailed)
+        if (thrown) throw new AggregateError([value, cleanup], RpcStreamErrorText.cleanupFailed)
         throw cleanup
       }
       if (thrown) throw value
@@ -226,10 +229,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     options?: Readonly<{ signal?: IAbortSignal; timeoutMs?: number }>
   ): IConsumerState {
     if (this.#capability && !this.#capability.supports(targetId))
-      throw new RpcError(
-        RpcCoreErrorCode.capabilityConflict,
-        RpcCoreErrorText.streamCapabilityMissing
-      )
+      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcStreamErrorText.capabilityMissing)
     if (options?.signal?.aborted) throw readStreamAbortReason(options.signal)
     const id = allocateRpcId(
       this.#prepared.options.uuid ?? {},
@@ -298,10 +298,27 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     if (state.terminal) return this.#terminalResult(state.terminal)
     return new Promise<IteratorResult<IRpcPortableValue>>((resolve, reject) => {
       state.pending = { resolve, reject }
-      void this.#sendFrame(state.targetId, state.id, {
-        event: RpcStreamEvent.pull,
-        seq: state.seq
-      }).catch((error) => this.#finishConsumer(state, { error: this.#sendFailureReason(error) }))
+      const admission = new AbortController()
+      state.pullAdmission = admission
+      const seq = state.seq
+      void this.#sendFrame(
+        state.targetId,
+        state.id,
+        {
+          event: RpcStreamEvent.pull,
+          seq: state.seq
+        },
+        {
+          queueSignal: admission.signal,
+          assertCanSend: () => {
+            this.#kernel.assertActive()
+            if (state.terminal || !state.pending || state.seq !== seq) throw new RpcAbortError()
+          }
+        }
+      ).catch((error) => {
+        if (state.terminal) return
+        void this.#cancelConsumer(state, { error: this.#sendFailureReason(error) }, error)
+      })
     })
   }
 
@@ -318,7 +335,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     if ((error as { readonly code?: unknown })?.code === RpcCoreErrorCode.overloaded) return error
     return new RpcError(
       RpcCoreErrorCode.streamResultUnknown,
-      RpcCoreErrorText.streamResultUnknown,
+      RpcStreamErrorText.resultUnknown,
       error
     )
   }
@@ -330,6 +347,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     if (state.timer) this.#kernel.time.clearTimeout(state.timer)
     state.removeAbort?.()
     state.scope.abort('error' in terminal ? terminal.error : undefined)
+    state.pullAdmission?.abort()
     this.#consumers.delete(tupleKey(state.targetId, state.id))
     if ('error' in terminal) {
       state.rejectReady(terminal.error)
@@ -388,7 +406,12 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   }
 
   /** Build a protocol 1.1 frame using the canonical envelope and outbound owners. */
-  #sendFrame(targetId: string, id: string, payload: IRpcStreamPayload): Promise<void> {
+  #sendFrame(
+    targetId: string,
+    id: string,
+    payload: IRpcStreamPayload,
+    admission?: IRpcFrameAdmission
+  ): Promise<void> {
     const normalized = normalizeStreamPayload(payload)
     const message = normalizeRpcEnvelope({
       kind: 'stream',
@@ -405,7 +428,11 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         payload: normalized
       }
     })
-    return this.#outbound.send({ kind: 'frame', message })
+    return this.#outbound.send({
+      kind: 'frame',
+      message,
+      admission: admission ?? { assertCanSend: () => this.#kernel.assertActive() }
+    })
   }
 
   /** Validate one admitted stream event and dispatch it to the peer-isolated role state. */
@@ -416,7 +443,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const senderId = envelope.data.route.senderId
     if (this.#capability && !this.#capability.supports(senderId)) {
       this.#report(
-        new RpcError(RpcCoreErrorCode.protocolInvalid, RpcCoreErrorText.streamCapabilityMissing)
+        new RpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
       )
       return
     }
@@ -490,6 +517,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         return
       }
       if (payload.event === RpcStreamEvent.item) {
+        state.pullAdmission?.abort()
+        state.pullAdmission = undefined
         state.seq += 1
         state.pending.resolve({ done: false, value: payload.value! })
         state.pending = undefined
@@ -520,7 +549,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const senderId = request.data.route.senderId
     if (this.#capability && !this.#capability.supports(senderId)) {
       this.#report(
-        new RpcError(RpcCoreErrorCode.protocolInvalid, RpcCoreErrorText.streamCapabilityMissing)
+        new RpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
       )
       return
     }
@@ -532,6 +561,17 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       return
     }
     if (this.#producers.has(key)) return
+    let peerOpen = 0
+    for (const state of this.#producers.values()) if (state.senderId === senderId) peerOpen += 1
+    if (peerOpen >= RpcStreamLimit.maxOpenStreamsPerPeer) {
+      await this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded)
+      )
+      return
+    }
     const scope = new OperationScope(
       this.#kernel.generation,
       request.data.route.timeoutMs,
@@ -551,7 +591,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         (typeof source?.[Symbol.asyncIterator] !== 'function' &&
           typeof source?.[Symbol.iterator] !== 'function')
       )
-        throw new RpcError(RpcCoreErrorCode.payloadInvalid, RpcCoreErrorText.streamIterableInvalid)
+        throw new RpcError(RpcCoreErrorCode.payloadInvalid, RpcStreamErrorText.iterableInvalid)
       const iterator =
         typeof source[Symbol.asyncIterator] === 'function'
           ? source[Symbol.asyncIterator]!()
@@ -649,26 +689,66 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       try {
         await state.iterator.return?.()
       } catch (cleanupError) {
-        failure = new AggregateError([error, cleanupError], RpcCoreErrorText.streamCleanupFailed)
+        failure = new AggregateError([error, cleanupError], RpcStreamErrorText.cleanupFailed)
       }
       await this.#sendFailure(senderId, id, state.seq, failure)
       state.busy = false
       return
     }
     if (state.terminal) return
+    const outboundPayload: IRpcStreamPayload = {
+      event: result.done ? RpcStreamEvent.end : RpcStreamEvent.item,
+      seq: state.seq,
+      ...(result.done
+        ? result.value === undefined
+          ? {}
+          : { value: result.value }
+        : { value: result.value })
+    }
     try {
-      await this.#sendFrame(senderId, id, {
-        event: result.done ? RpcStreamEvent.end : RpcStreamEvent.item,
-        seq: state.seq,
-        ...(result.done
-          ? result.value === undefined
-            ? {}
-            : { value: result.value }
-          : { value: result.value })
-      })
-      if (result.done) this.#finishProducer(state)
-      else state.seq += 1
+      normalizeStreamPayload(outboundPayload)
     } catch (error) {
+      const failure = new RpcError(
+        RpcCoreErrorCode.payloadInvalid,
+        RpcStreamErrorText.valueInvalid,
+        error
+      )
+      this.#report(failure)
+      this.#finishProducer(state, failure)
+      try {
+        await state.iterator.return?.()
+      } catch (cleanupError) {
+        this.#report(cleanupError)
+      }
+      await this.#sendFailure(senderId, id, state.seq, failure)
+      state.busy = false
+      return
+    }
+    if (result.done) {
+      this.#finishProducer(state)
+      try {
+        await this.#sendFrame(senderId, id, outboundPayload)
+      } catch (error) {
+        this.#report(error)
+      }
+      state.busy = false
+      return
+    }
+    const admission = new AbortController()
+    state.itemAdmission = admission
+    const seq = state.seq
+    try {
+      await this.#yieldDataTurn(state)
+      await this.#sendFrame(senderId, id, outboundPayload, {
+        queueSignal: admission.signal,
+        assertCanSend: () => {
+          this.#kernel.assertActive()
+          if (state.terminal || state.seq !== seq) throw new RpcAbortError()
+        }
+      })
+      state.seq += 1
+    } catch (error) {
+      if (state.terminal) return
       const failure = this.#sendFailureReason(error)
       this.#finishProducer(state, failure)
       try {
@@ -678,6 +758,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       }
       await this.#sendFailure(senderId, id, state.seq, failure)
     }
+    admission.abort()
+    state.itemAdmission = undefined
     state.busy = false
   }
 
@@ -686,7 +768,24 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     state.terminal = true
     this.#producers.delete(tupleKey(state.senderId, state.id))
     if (state.timer) this.#kernel.time.clearTimeout(state.timer)
+    state.itemAdmission?.abort()
     state.scope.abort(reason)
+  }
+
+  /** Yield the endpoint scheduler once without leaving a pull suspended on disposal. */
+  #yieldDataTurn(state: IProducerState): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = this.#kernel.time.setTimeout(() => {
+        state.scope.signal.removeEventListener('abort', onAbort)
+        resolve()
+      }, 0)
+      const onAbort = (): void => {
+        this.#kernel.time.clearTimeout(timer)
+        resolve()
+      }
+      if (state.scope.signal.aborted) onAbort()
+      else state.scope.signal.addEventListener('abort', onAbort, { once: true })
+    })
   }
 
   /** Send a serialized failure while keeping the producer's original error graph reachable. */
@@ -715,7 +814,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         ? cause
         : new RpcError(
             RpcCoreErrorCode.streamResultUnknown,
-            RpcCoreErrorText.streamResultUnknown,
+            RpcStreamErrorText.resultUnknown,
             cause
           )
     for (const state of this.#consumers.values()) this.#finishConsumer(state, { error })
