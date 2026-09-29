@@ -31,3 +31,5 @@ export type {
   IProcessSupervisor
 } from './types.js'
 export { createProcessSupervisor } from './supervisor.js'
+export type { IOrphanReclaimResult } from './orphan.js'
+export { reclaimOrphanProcesses } from './orphan.js'
