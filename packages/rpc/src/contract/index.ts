@@ -3,6 +3,7 @@ export { createDescriptor } from './protocol.js'
 export { fromJsonRpcError, toJsonRpcError } from './error-jsonrpc.js'
 export { normalizePortable } from './normalize.js'
 export { normalizeRpcEnvelope, rpcProtocol as rpcProtocolV1 } from './v1/index.js'
+export { createRpcUnknownFieldWarner } from './unknown-field.js'
 export {
   deserializeRpcError,
   normalizeRpcSerializedError,
@@ -20,6 +21,7 @@ export {
 } from './wire-error-constants.js'
 export type {
   IRpcContractError,
+  IRpcEnvelopeOptions,
   IRpcDescriptor,
   IRpcEncodedType,
   IRpcFramer,
@@ -38,6 +40,8 @@ export type {
   IRpcWireErrorOptions,
   IRpcJsonRpcErrorObject
 } from './types.js'
+export type { IRpcUnknownFieldWarner } from './unknown-field.js'
+export type { IRpcControlData, IRpcEnvelopeData, IRpcRouteHeader } from './v1/route.js'
 export type {
   IRpcDiscoveryEnvelope,
   IRpcEnvelope,

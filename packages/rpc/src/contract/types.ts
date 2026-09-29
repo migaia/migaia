@@ -56,12 +56,18 @@ export type IRpcJsonRpcErrorObject = Readonly<{
   data?: IRpcPortableValue
 }>
 
+/** Optional warning hook for fields a protocol minor version may add later. */
+export type IRpcEnvelopeOptions = Readonly<{
+  onUnknownField?: (pointer: string, field: string) => void
+}>
+
 /** Runtime protocol descriptor that normalizes untrusted semantic input. */
 export type IRpcProtocol<
-  TEnvelope extends IRpcPortableValue,
+  TEnvelope extends object,
   TId extends string,
   TVersion extends number
-> = IRpcDescriptor<TId, TVersion> & Readonly<{ normalize: (value: unknown) => TEnvelope }>
+> = IRpcDescriptor<TId, TVersion> &
+  Readonly<{ normalize: (value: unknown, options?: IRpcEnvelopeOptions) => TEnvelope }>
 
 export type IRpcEncodedType = 'unknown' | 'string' | 'uint8array'
 
