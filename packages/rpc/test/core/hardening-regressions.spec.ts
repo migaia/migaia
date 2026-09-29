@@ -46,12 +46,15 @@ describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍�
   })
 
   it('容量按 origin 分桶，refs>0 的 binding 在硬上限内不被 idle-TTL 回收（不代表永不回收，见下一条 hard-lifetime 用例）', () => {
-    const registry = new VerifiedPeerRegistry(() => Date.now(), 1024, 2, 1)
+    /** Keep the idle expiry crossed while remaining below the 100 ms hard lifetime. */
+    let now = 0
+    const registry = new VerifiedPeerRegistry(() => now, 1024, 2, 1)
     const a = registry.register('s1', '', 'https://x.example') as string
     const b = registry.register('s2', '', 'https://x.example') as string
     registry.retain(a)
     registry.retain(b)
     // idle TTL 已过，但 refs>0 使 idle purge 跳过，该 origin 暂时注册不进新 binding
+    now = 2
     expect(registry.register('s3', '', 'https://x.example')).toBe(false)
   })
 

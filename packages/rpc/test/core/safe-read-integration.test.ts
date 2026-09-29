@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { reachRpcError } from '../../src/contract/index.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createClientEndpoint } from '../../src/core/client.js'
+import { createEndpointKernel } from '../../src/core/endpoint-kernel.js'
+import { RpcConstructionError } from '../../src/core/errors.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { assertPluginInstallResult } from '../../src/core/internal/plugin-descriptor.js'
 import { validateContractData } from '../../src/core/internal/contract.js'
@@ -135,5 +138,84 @@ describe('safeRead integration boundaries', () => {
     )
     expect(route).toBeUndefined()
     expect(observed).toEqual([{ key: 'profile', error: failure }])
+  })
+
+  it('keeps registration failure first when its message getter fails during cleanup', async () => {
+    const [transport] = createMemoryTransportPair()
+    const kernel = createEndpointKernel(transport)
+    const readFailure = new Error('message getter failed')
+    const primary = {
+      get message(): never {
+        throw readFailure
+      }
+    }
+    let received: unknown
+    try {
+      kernel.activate({
+        unsubscribe: () => undefined,
+        commit: () => {
+          throw primary
+        }
+      })
+    } catch (error) {
+      received = error
+    }
+    expect(received).toBeInstanceOf(RpcConstructionError)
+    const cause = (received as RpcConstructionError).cause
+    expect(cause).toBeInstanceOf(AggregateError)
+    expect((cause as AggregateError).errors[0]).toBe(primary)
+    expect((cause as AggregateError).errors[1]).toMatchObject({
+      code: 'PROPERTY_READ_FAILED',
+      cause: readFailure
+    })
+    await (received as RpcConstructionError).cleanupPromise
+  })
+
+  it('reports hostile graph reads while traversing each reachable identity once', () => {
+    const readFailure = new Error('cause getter failed')
+    const child = new Error('child')
+    const root = {
+      get cause(): never {
+        throw readFailure
+      },
+      errors: [child, 7],
+      cleanupErrors: [{ error: child }]
+    }
+    const failures: Array<{ pointer: string; field: string; error: unknown }> = []
+    expect([...reachRpcError(root, { report: (failure) => failures.push(failure) })]).toEqual([
+      root,
+      child,
+      7
+    ])
+    expect(failures).toEqual([{ pointer: '', field: 'cause', error: readFailure }])
+  })
+
+  it('reports failed aggregate indexes and cleanup entries without losing the root', () => {
+    const indexFailure = new Error('index read failed')
+    const cleanupFailure = new Error('cleanup read failed')
+    const errors = new Proxy([new Error('hidden')], {
+      get(target, key, receiver) {
+        if (key === '0') throw indexFailure
+        return Reflect.get(target, key, receiver)
+      }
+    })
+    const root = {
+      errors,
+      cleanupErrors: [
+        {
+          get error(): never {
+            throw cleanupFailure
+          }
+        }
+      ]
+    }
+    const failures: Array<{ pointer: string; field: string; error: unknown }> = []
+    expect([...reachRpcError(root, { report: (failure) => failures.push(failure) })]).toEqual([
+      root
+    ])
+    expect(failures).toEqual([
+      { pointer: '', field: '0', error: indexFailure },
+      { pointer: '/cleanupErrors/0', field: 'error', error: cleanupFailure }
+    ])
   })
 })

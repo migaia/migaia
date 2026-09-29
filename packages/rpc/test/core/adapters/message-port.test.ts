@@ -210,6 +210,38 @@ describe('browser message-port adapter', () => {
     expect(() => transport.send('still-open')).not.toThrow()
   })
 
+  it('reports a hostile browser message getter before delivery', () => {
+    const listeners = new Map<string, (event: unknown) => void>()
+    const port = {
+      postMessage() {},
+      start() {},
+      close() {},
+      addEventListener(type: 'message' | 'messageerror', listener: (event: unknown) => void) {
+        listeners.set(type, listener)
+      },
+      removeEventListener(type: 'message' | 'messageerror') {
+        listeners.delete(type)
+      }
+    }
+    const transport = createBrowserMessagePortTransport(port)
+    const failure = new Error('data getter failed')
+    const errors: unknown[] = []
+    const received: unknown[] = []
+    transport.onTransportError?.((error) => errors.push(error))
+    const unsubscribe = transport.subscribe((message) => received.push(message.data))
+
+    listeners.get('message')?.({
+      get data(): never {
+        throw failure
+      }
+    })
+
+    expect(received).toEqual([])
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toMatchObject({ code: 'TRANSPORT', cause: failure })
+    unsubscribe()
+  })
+
   it('isolates listener and messageerror reporters and detaches on last unsubscribe', () => {
     const listeners = new Map<string, (event: unknown) => void>()
     const removed: string[] = []

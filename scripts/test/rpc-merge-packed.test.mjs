@@ -11,6 +11,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const legacy = JSON.parse(
   readFileSync(join(root, 'packages/rpc/test/fixtures/legacy-exports.json'), 'utf8')
 )
+/** I3's admitted contract additions and retired core exports amend the frozen merge count. */
+const errorFormatDelta = JSON.parse(
+  readFileSync(join(root, 'packages/rpc/test/fixtures/error-format-export-delta.json'), 'utf8')
+)
 const checks = [
   'subpath-imports',
   'obsolete-subpaths',
@@ -87,7 +91,10 @@ test('A11 packed consumer runs every preserved check against all 24 deep exports
   )
   assert.equal(subpaths.size, 24)
   for (const [name, record] of Object.entries(legacy)) {
-    assert.equal(subpaths.get(name), record.names.length, name)
+    /** Count the exact S8 removals and contract additions against the legacy surface. */
+    const removed = errorFormatDelta.removed[name] ?? []
+    const added = errorFormatDelta.added[name] ?? []
+    assert.equal(subpaths.get(name), record.names.length - removed.length + added.length, name)
   }
   assert.deepEqual([...obsoleteProbe(script)].sort(), [...obsolete].sort())
   assert.ok(script.includes('@migaia/rpc/core/composed'))
