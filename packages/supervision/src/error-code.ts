@@ -29,7 +29,9 @@ export const SupervisionErrorCode = {
   /** A command attempted to create a unit after disposal; create a new supervisor. */
   scopeTerminal: 'SCOPE_TERMINAL',
   /** A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively. */
-  heartbeatMissed: 'HEARTBEAT_MISSED'
+  heartbeatMissed: 'HEARTBEAT_MISSED',
+  /** A prior process record could not be reclaimed; retain it and retry recovery after inspection. */
+  orphanReclaimFailed: 'ORPHAN_RECLAIM_FAILED'
 } as const
 
 export type ISupervisionErrorCode = (typeof SupervisionErrorCode)[keyof typeof SupervisionErrorCode]
