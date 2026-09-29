@@ -114,7 +114,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
-    "check:error-registry": "node test/reconcile-error-registry.mjs",
     "lint": "oxlint src test e2e",
     "test": "pnpm run build && vitest run --coverage",
     "test:packed": "pnpm run build && vitest run test/bundle-boundary.spec.ts",
