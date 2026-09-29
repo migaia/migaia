@@ -254,6 +254,16 @@ else useName(read.value);
 
 新代码需要受保护地读取单个属性时使用此原语。它不检查目标是否为对象，也不制定读取失败后的策略；调用方应先执行自己需要的目标检查。
 
+读取外部 abort reason 时也使用同一原语，不另建专用 helper：
+
+```ts
+const read = tryReadProperty(signal, 'reason');
+if (read.threw) report(read.error);
+else handleAbort(read.value);
+```
+
+读取失败后选择重抛、包装、上报或把原错误当作 reason，均由调用方按自身契约决定。
+
 **`attachErrorIdentity`｜5 秒上手** —— 给已有错误对象贴上稳定的 `source`/`code`：
 
 ```ts

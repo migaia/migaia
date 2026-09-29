@@ -367,6 +367,16 @@ function tryReadProperty<T extends object, K extends keyof T>(target: T, key: K)
 
 对一个属性执行恰好一次读取，保留 getter 的接收者；读取抛出时将原始值放在 `error`，不包装、不上报。调用方负责目标对象检查与失败策略。新代码中独立的单属性受保护读取应复用此原语。
 
+外部 abort signal 的 reason 也通过同一入口读取：
+
+```ts
+const read = tryReadProperty(signal, 'reason');
+if (read.threw) report(read.error);
+else handleAbort(read.value);
+```
+
+失败后是重抛、包装、上报还是把原错误当作 reason，取决于调用方原有契约；此原语只返回读取结果。
+
 ```ts
 abstract class UtilsError extends Error {
   readonly source = '@migaia/utils';
