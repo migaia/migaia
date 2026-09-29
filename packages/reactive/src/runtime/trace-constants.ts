@@ -18,6 +18,8 @@ export const ReactiveTracePhase = {
 /** Diagnostic phases used when the reactive runtime reports failures from host callbacks. */
 export const ReactiveErrorPhase = {
   asyncFlush: 'async-flush',
+  /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */
+  causeRead: 'cause-read',
   dependencyDisconnect: 'dependency-disconnect',
   lifecycleHook: 'lifecycle-hook',
   ssrResource: 'ssr-resource',

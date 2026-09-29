@@ -174,7 +174,7 @@ export class Runtime implements IRuntime {
       }
     }
     const scheduler = new Scheduler(
-      (error) => this.reportError(error, { phase: ReactiveErrorPhase.asyncFlush }),
+      (error, phase) => this.reportError(error, { phase: phase ?? ReactiveErrorPhase.asyncFlush }),
       maxFlushPassesOption,
       adapter.scheduleMicrotask
     )

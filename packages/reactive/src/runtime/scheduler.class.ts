@@ -11,7 +11,7 @@ import {
   ThenableProbeKind
 } from '@migaia/utils/function'
 import { tryReadProperty } from '@migaia/utils/error'
-import { ReactiveErrorPhase } from './trace-constants.js'
+import { ReactiveErrorPhase, type IReactiveErrorPhase } from './trace-constants.js'
 
 /** 只读 `cause`，hostile getter 抛错时按 `undefined` 处理（诊断通道不反向破坏结果）。 */
 const readCauseSafely = (error: Error): unknown => {
@@ -53,11 +53,12 @@ export class Scheduler {
   #strategy: ISchedulerStrategy
   /** Last strategy that returned a non-thenable, or the injected default strategy. */
   #safeStrategy: ISchedulerStrategy
-  #onAsyncError: (error: unknown) => void
+  /** Reports scheduler failures, optionally identifying the cause-read phase. */
+  #onAsyncError: (error: unknown, phase?: IReactiveErrorPhase) => void
 
   constructor(
-    onAsyncError: (error: unknown) => void = (error) =>
-      defaultRuntimeAdapter.reportError(error, { phase: ReactiveErrorPhase.asyncFlush }),
+    onAsyncError: (error: unknown, phase?: IReactiveErrorPhase) => void = (error, phase) =>
+      defaultRuntimeAdapter.reportError(error, { phase: phase ?? ReactiveErrorPhase.asyncFlush }),
     maxFlushPasses = 100,
     scheduleMicrotask: (task: () => void) => void = defaultRuntimeAdapter.scheduleMicrotask
   ) {
