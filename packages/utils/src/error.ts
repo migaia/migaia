@@ -1,6 +1,26 @@
 import { UtilsErrorCode, type IUtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 
+/** Result of one property read; failures retain the exact value thrown by the getter. */
+export type IPropertyRead<T> =
+  | { readonly threw: false; readonly value: T }
+  | { readonly threw: true; readonly error: unknown }
+
+/**
+ * Reads one property with the original receiver and returns a throwing getter's value as data. The
+ * caller owns fallback, reporting, and rethrow policy.
+ */
+export function tryReadProperty<T extends object, K extends keyof T>(
+  target: T,
+  key: K
+): IPropertyRead<T[K]> {
+  try {
+    return { threw: false, value: target[key] }
+  } catch (error) {
+    return { threw: true, error }
+  }
+}
+
 /** Base error retaining the utils source and stable semantic code. */
 export abstract class UtilsError extends Error {
   readonly source = '@migaia/utils' as const

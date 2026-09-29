@@ -239,9 +239,20 @@ import {
   isUtilsError,
   isUtilsAbortError,
   isUtilsTimeoutError,
-  UtilsErrorCode
+  UtilsErrorCode,
+  tryReadProperty
 } from '@migaia/utils/error';
 ```
+
+**`tryReadProperty`｜受保护地读取一个属性** —— 对对象的指定键只执行一次读取；getter 或 Proxy 抛出时返回原始抛出值，由调用方决定上报或抛出：
+
+```ts
+const read = tryReadProperty(config, 'name');
+if (read.threw) report(read.error);
+else useName(read.value);
+```
+
+新代码需要受保护地读取单个属性时使用此原语。它不检查目标是否为对象，也不制定读取失败后的策略；调用方应先执行自己需要的目标检查。
 
 **`attachErrorIdentity`｜5 秒上手** —— 给已有错误对象贴上稳定的 `source`/`code`：
 

@@ -359,6 +359,15 @@ await limiter.dispose(); // 等待剩余任务完成后关闭
 统一的错误身份、包装与因果链遍历工具。
 
 ```ts
+type IPropertyRead<T> =
+  | { readonly threw: false; readonly value: T }
+  | { readonly threw: true; readonly error: unknown };
+function tryReadProperty<T extends object, K extends keyof T>(target: T, key: K): IPropertyRead<T[K]>;
+```
+
+对一个属性执行恰好一次读取，保留 getter 的接收者；读取抛出时将原始值放在 `error`，不包装、不上报。调用方负责目标对象检查与失败策略。新代码中独立的单属性受保护读取应复用此原语。
+
+```ts
 abstract class UtilsError extends Error {
   readonly source = '@migaia/utils';
   readonly code: IUtilsErrorCode;
