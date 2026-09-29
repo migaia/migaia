@@ -19,6 +19,10 @@ const errorFormatDelta = JSON.parse(
 const controlDelta = JSON.parse(
   readFileSync(join(root, 'packages/rpc/test/fixtures/control-semantics-export-delta.json'), 'utf8')
 )
+/** I6's stream contract names amend the reviewed packed public surface. */
+const streamingDelta = JSON.parse(
+  readFileSync(join(root, 'packages/rpc/test/fixtures/streaming-export-delta.json'), 'utf8')
+)
 const checks = [
   'subpath-imports',
   'obsolete-subpaths',
@@ -71,7 +75,7 @@ function obsoleteProbe(script) {
   assert.fail('obsoleteSubpaths literal probe is missing')
 }
 
-test('A11 packed consumer runs every preserved check against all 24 deep exports', () => {
+test('A11 packed consumer runs every preserved check against all 26 deep exports', () => {
   const script = readFileSync(join(root, 'packages/rpc/test/core/packed-export-smoke.mjs'), 'utf8')
   const run = spawnSync('pnpm', ['--filter', './packages/rpc', 'run', 'test:packed'], {
     cwd: root,
@@ -93,11 +97,17 @@ test('A11 packed consumer runs every preserved check against all 24 deep exports
       return match ? [[match[1], Number(match[2])]] : []
     })
   )
-  assert.equal(subpaths.size, 24)
+  assert.equal(subpaths.size, 26)
+  assert.equal(subpaths.get('@migaia/rpc/core/transport-kit'), 16)
+  assert.equal(subpaths.get('@migaia/rpc/core/stream'), 2)
   for (const [name, record] of Object.entries(legacy)) {
     /** Count each reviewed export delta against the frozen merge surface. */
     const removed = [...(errorFormatDelta.removed[name] ?? []), ...(controlDelta.removed[name] ?? [])]
-    const added = [...(errorFormatDelta.added[name] ?? []), ...(controlDelta.added[name] ?? [])]
+    const added = [
+      ...(errorFormatDelta.added[name] ?? []),
+      ...(controlDelta.added[name] ?? []),
+      ...(streamingDelta.added[name] ?? [])
+    ]
     assert.equal(subpaths.get(name), record.names.length - removed.length + added.length, name)
   }
   assert.deepEqual([...obsoleteProbe(script)].sort(), [...obsolete].sort())
