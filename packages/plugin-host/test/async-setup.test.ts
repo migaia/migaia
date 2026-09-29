@@ -65,6 +65,46 @@ describe('async setup definition admission', () => {
 })
 
 describe('async setup installation', () => {
+  it('A3 rejects eager setup before synchronous hooks and permits lazy registration', async () => {
+    /** Exposes the constructor and later synchronous installation paths. */
+    class SyncHost extends PluginHost<Record<string, never>> {
+      constructor(plugins: readonly unknown[] = []) {
+        super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+        if (plugins.length > 0) this.useSync(plugins as never)
+      }
+
+      add(plugins: readonly unknown[]): void {
+        this.useSync(plugins as never)
+      }
+    }
+    const before = vi.fn(() => ({}))
+    const setup = vi.fn(() => 1)
+    const expose = vi.fn(() => ({}))
+    const install = vi.fn(() => ({}))
+    const plain = definePlugin({ name: 'a', install: before })
+    const prepared = definePlugin({ name: 'p', setup, featureExpose: expose, install })
+    expect(() => new SyncHost([plain, prepared])).toThrow(
+      expect.objectContaining({ code: PluginHostErrorCode.setupRequiresAsyncInstall })
+    )
+    expect(before).not.toHaveBeenCalled()
+    expect(setup).not.toHaveBeenCalled()
+    expect(expose).not.toHaveBeenCalled()
+    expect(install).not.toHaveBeenCalled()
+
+    const host = new SyncHost()
+    expect(() => host.add([plain, prepared])).toThrow(
+      expect.objectContaining({ code: PluginHostErrorCode.setupRequiresAsyncInstall })
+    )
+    expect(host.revision).toBe(0)
+    const lazy = definePlugin({ name: 'l', activation: 'lazy', setup, install })
+    expect(() => host.add([lazy])).not.toThrow()
+    expect(setup).not.toHaveBeenCalled()
+    await host.activate('l')
+    expect(setup).toHaveBeenCalledTimes(1)
+    expect(install).toHaveBeenCalledTimes(1)
+    await host.dispose()
+  })
+
   it('A1 queues behind a lease drain, then times out a mutation waiting behind setup', async () => {
     /** Exposes a long-running async pipeline that retains a plugin-owned lease. */
     class LeaseHost extends PluginHost<Record<string, never>, number> {

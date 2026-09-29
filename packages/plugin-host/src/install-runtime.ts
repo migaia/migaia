@@ -202,6 +202,14 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
   installBatchSync(entries: readonly IInstallEntry<TDomainCore, TValue>[]): void {
     const installed: IRegistration<TDomainCore, TValue>[] = []
     const { order: ordered, installSet } = this.#validateBatch(entries)
+    for (const entry of ordered)
+      if (installSet.has(entry.name) && entry.plugin.setup)
+        throw this.#port.decorateError(
+          new PluginHostError(
+            PluginHostErrorCode.setupRequiresAsyncInstall,
+            ERROR_TEXT.SETUP_REQUIRES_ASYNC_INSTALL(entry.name)
+          )
+        )
     const batch = this.#port.snapshotBatch()
     let failedName = entries[0]?.name ?? 'unknown'
     try {
