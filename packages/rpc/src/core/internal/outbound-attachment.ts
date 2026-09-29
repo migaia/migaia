@@ -24,13 +24,18 @@ import { assertContractMethod as assertMethod, validateContractData } from './co
 import {
   normalizePortable,
   normalizeRpcEnvelope,
+  RpcControl,
+  RpcRouteProfile,
+  RpcWireLimit,
   type IRpcEnvelope,
+  type IRpcEnvelopeData,
   type IRpcPortableValue,
   type IRpcResponseFailure,
   type IRpcWireErrorFailure
 } from '../../contract/index.js'
+import { createRpcUnknownFieldWarner } from '../../contract/unknown-field.js'
 import { deserializeRpcError, serializeRpcError } from '../../contract/error.js'
-import { normalizeWebRpcRoutingData, RpcRoutingProfile } from './routing-data.js'
+import { RpcProtocolEvent } from '../protocol-constants.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcInboundMessage } from '../transport.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
@@ -81,6 +86,7 @@ export type IOutboundAttachmentHost = {
   readonly hooks: { on(listener: IRpcHook): () => void }
   emitFailure(error: unknown, code?: string): void
   emitDiagnostic(event: Omit<IRpcHookEvent, 'at' | 'localId'>): void
+  noteUnknownField(connection: string, kind: string, pointer: string, field: string): void
   readonly inboundIdentity: InboundIdentityCoordinator
   readonly variations: RpcVariationCoordinator
   send<T>(targetId: string, method: string, data: unknown, options?: ISendOptions): Promise<T>
@@ -124,6 +130,16 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #replay: ReplayWindow
   /** Hook callbacks owned by the outbound runtime. */
   readonly #hooks = new HookRegistry()
+  /** Per-connection warning cache for additive fields and unknown control subtypes. */
+  readonly #unknownFields = createRpcUnknownFieldWarner({
+    warn: (_connection, field) =>
+      this.emitDiagnostic({ name: RpcProtocolEvent.unknownField, field })
+  })
+
+  /** Route control payload warnings through the same per-connection cache as envelope fields. */
+  noteUnknownField(connection: string, kind: string, pointer: string, field: string): void {
+    this.#unknownFields.note(connection, kind, pointer, field)
+  }
   /** Shared inbound source-proof/connect/binding owner for all selected features. */
   readonly inboundIdentity: InboundIdentityCoordinator
   /** Shared variation route and admission owner for optional feature handlers. */
@@ -191,7 +207,6 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       kernel,
       this.id,
       this.#components,
-      (code, error) => this.emitFailure(error, code),
       prepared.options.authentication,
       kernel.platform
     )
@@ -220,6 +235,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     kernel.registerOwner('inbound-identity', this.inboundIdentity)
     kernel.registerOwner('variation-coordinator', this.variations)
     kernel.resources.addSync('outbound hook registry', () => this.#hooks.clear())
+    kernel.resources.addSync('outbound unknown fields', () => this.#unknownFields.clear())
     kernel.resources.addSync('outbound response bindings', () => this.#responseBindings.clear())
     for (const listener of normalizeHooks(prepared.options.hooks?.listeners))
       this.#hooks.add(listener)
@@ -232,7 +248,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   async #receiveVariation(message: unknown): Promise<void> {
     const record = message as {
       envelope?: IRpcEnvelope
-      route?: ReturnType<typeof normalizeWebRpcRoutingData>
+      route?: IRpcEnvelopeData
       inbound?: import('../transport.js').IRpcInboundMessage
       admission?: IInboundIdentityAdmission
     }
@@ -240,18 +256,20 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     const route = record.route
     if (
       envelope?.kind !== 'variation' ||
-      route?.webRpc.type !== 'variation' ||
-      !route.webRpc.variation ||
-      (route.webRpc.receiverId !== this.receiverId && route.webRpc.receiverId !== this.id)
+      route?.route.type !== 'variation' ||
+      !route.route.variation ||
+      (route.route.receiverId !== this.receiverId && route.route.receiverId !== this.id)
     )
       return
     if (!record.admission) return
-    await this.variations.dispatch(
-      route.webRpc.variation,
+    const disposition = await this.variations.dispatch(
+      route.route.variation,
       `${record.admission.token}:${envelope.id}`,
       message,
       record.admission.token
     )
+    if (disposition === 'unknown')
+      this.#unknownFields.note(record.admission.token, 'variation', '', route.route.variation)
   }
 
   /** Installs the one physical receiver after all selected routes exist. */
@@ -286,30 +304,31 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         }
         const decoded = this.#components.codec.decode(accepted.value)
         let envelope: IRpcEnvelope
+        /** Unknown fields are reported after normalize returns its once-read kind. */
+        const ignored: Array<readonly [string, string]> = []
         try {
-          envelope = this.#components.protocol.normalize(decoded)
+          envelope = this.#components.protocol.normalize(decoded, {
+            onUnknownField: (pointer, field) => ignored.push([pointer, field])
+          })
         } catch (error) {
+          if ((error as { readonly violation?: unknown }).violation === 'unknownKind') {
+            this.#unknownFields.note(
+              physical.sourceToken,
+              'kind',
+              '',
+              String((error as { readonly unknownKindValue?: unknown }).unknownKindValue)
+            )
+            return
+          }
           this.emitFailure(error, RpcCoreErrorCode.transport)
           return
         }
-        const route = normalizeWebRpcRoutingData(envelope.data, ({ key, error }) => {
-          this.emitFailure(
-            error,
-            RpcCoreErrorCode.transport,
-            typeof key === 'string' ? key : undefined
-          )
-          return undefined
-        })
-        if (
-          !route ||
-          (envelope.kind === 'discovery'
-            ? route.webRpc.type !== 'discovery-query' && route.webRpc.type !== 'discovery-response'
-            : route.webRpc.type !== envelope.kind)
-        )
-          return
+        for (const [pointer, field] of ignored)
+          this.#unknownFields.note(physical.sourceToken, envelope.kind, pointer, field)
+        const route = envelope.data
         const admission = await this.inboundIdentity.admitPrepared(physical, {
-          senderId: route.webRpc.senderId,
-          targetId: route.webRpc.targetId,
+          senderId: route.route.senderId,
+          targetId: route.route.targetId,
           data: route.payload,
           inbound: message
         })
@@ -333,11 +352,30 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Sends one request through the canonical single-attempt deadline and cancellation closure. */
-  async send<T>(
+  send<T>(targetId: string, method: string, data: unknown, options: ISendOptions = {}): Promise<T> {
+    if (
+      options.idempotencyKey !== undefined &&
+      (typeof options.idempotencyKey !== 'string' ||
+        !/^[A-Za-z0-9._:~-]{1,128}$/u.test(options.idempotencyKey))
+    )
+      throw new RpcContractError(RpcCoreErrorText.idempotencyKeyInvalid)
+    if (
+      options.trace !== undefined &&
+      (typeof options.trace !== 'string' ||
+        options.trace.length < 1 ||
+        options.trace.length > RpcWireLimit.maxTraceChars ||
+        !/^[\x20-\x7E]+$/u.test(options.trace))
+    )
+      throw new RpcContractError(RpcCoreErrorText.traceInvalid)
+    return this.#sendAsync(targetId, method, data, options)
+  }
+
+  /** Keep inherited send admission and rejection timing after the new synchronous option gates. */
+  async #sendAsync<T>(
     targetId: string,
     method: string,
     data: unknown,
-    options: ISendOptions = {}
+    options: ISendOptions
   ): Promise<T> {
     this.kernel.assertActive()
     const generation = this.kernel.generation
@@ -375,10 +413,14 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     const remaining = operation.remaining(timeoutMs)
     operation.assertActive(this.kernel.generation)
     if (remaining === 0) throw new RpcTimeoutError()
-    return this.#requestOnce<T>(targetId, method, data, { ...options, timeoutMs: remaining }, [
-      operation.signal,
-      ...(options.signal ? [options.signal] : [])
-    ]).finally(() => operation.abort())
+    return this.#requestOnce<T>(
+      targetId,
+      method,
+      data,
+      { ...options, timeoutMs: remaining },
+      [operation.signal, ...(options.signal ? [options.signal] : [])],
+      operation
+    ).finally(() => operation.abort())
   }
 
   /** Owns one request's task id, pending settlement, timeout, and abort listeners. */
@@ -387,7 +429,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     method: string,
     data: unknown,
     options: ISendOptions,
-    signals: readonly NonNullable<ISendOptions['signal']>[]
+    signals: readonly NonNullable<ISendOptions['signal']>[],
+    operation: OperationScope
   ): Promise<T> {
     const taskId = allocateRpcId(this.#uuid, 'task', this.id, targetId, (id) =>
       this.#replay.hasReservedId(id)
@@ -444,15 +487,15 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 kind: 'variation',
                 id: taskId,
                 data: {
-                  webRpc: {
-                    profile: RpcRoutingProfile,
+                  route: {
+                    profile: RpcRouteProfile,
                     type: 'variation',
                     applicationVersion: this.#version,
                     senderId: this.id,
                     targetId,
                     receiverId: receiver.receiverId,
                     sentAt: this.kernel.time.timestamp(),
-                    variation: 'abort'
+                    variation: RpcControl.abort
                   },
                   ...(payload === undefined ? {} : { payload })
                 }
@@ -508,14 +551,21 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             id: taskId,
             method,
             data: {
-              webRpc: {
-                profile: RpcRoutingProfile,
+              route: {
+                profile: RpcRouteProfile,
                 type: 'request' as const,
                 applicationVersion: this.#version,
                 senderId: this.id,
                 targetId,
                 ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
-                sentAt: this.kernel.time.timestamp()
+                sentAt: this.kernel.time.timestamp(),
+                ...(options.timeoutMs === false || options.timeoutMs === undefined
+                  ? {}
+                  : { timeoutMs: Math.ceil(operation.remaining(options.timeoutMs) as number) }),
+                ...(options.idempotencyKey === undefined
+                  ? {}
+                  : { idempotencyKey: options.idempotencyKey }),
+                ...(options.trace === undefined ? {} : { trace: options.trace })
               },
               ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
             }
@@ -568,8 +618,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             id: taskId,
             method,
             data: {
-              webRpc: {
-                profile: RpcRoutingProfile,
+              route: {
+                profile: RpcRouteProfile,
                 type: 'request' as const,
                 applicationVersion: this.#version,
                 senderId: this.id,
@@ -725,25 +775,25 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   async #receiveResponse(message: unknown): Promise<void> {
     const record = message as {
       envelope?: IRpcEnvelope
-      route?: ReturnType<typeof normalizeWebRpcRoutingData>
+      route?: IRpcEnvelopeData
       inbound?: IRpcInboundMessage<unknown>
       admission?: IInboundIdentityAdmission
     }
     const canonical = record.envelope
     const route = record.route
-    if (canonical?.kind !== 'response' || route?.webRpc.type !== 'response') return
+    if (canonical?.kind !== 'response' || route?.route.type !== 'response') return
     if (
-      route.webRpc.targetId !== this.id ||
-      (route.webRpc.receiverId !== this.receiverId && route.webRpc.receiverId !== this.id)
+      route.route.targetId !== this.id ||
+      (route.route.receiverId !== this.receiverId && route.route.receiverId !== this.id)
     )
       return
-    const method = route.webRpc.method
+    const method = route.route.method
     if (typeof method !== 'string') return
     const pending = this.#pending.get(canonical.id)
-    if (!pending || pending.targetId !== route.webRpc.senderId || pending.method !== method) return
+    if (!pending || pending.targetId !== route.route.senderId || pending.method !== method) return
     const binding = record.admission?.bindingKey
     if (!binding || this.kernel.state !== 'active') return
-    const existing = this.#responseBindings.get(route.webRpc.senderId)
+    const existing = this.#responseBindings.get(route.route.senderId)
     if (existing !== undefined && existing !== binding) {
       this.#emit({
         name: 'authentication.rejected',
@@ -753,7 +803,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       })
       return
     }
-    this.#responseBindings.set(route.webRpc.senderId, binding)
+    this.#responseBindings.set(route.route.senderId, binding)
     if (canonical.ok) {
       try {
         this.#validateData(method, 'result', route.payload)
@@ -797,7 +847,7 @@ function normalizeAbortReason(
 
 /** Always settle a failed call, reporting a malformed optional remote error once. */
 function restoreRemoteError(
-  canonical: IRpcResponseFailure<IRpcPortableValue>,
+  canonical: IRpcResponseFailure,
   payload: unknown,
   report: (error: unknown) => void
 ): RpcRemoteError {

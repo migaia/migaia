@@ -3,12 +3,17 @@ import {
   RpcError,
   RpcCoreErrorCode,
   RpcLifecycleError,
+  RpcProtocolError,
   RpcTransportError
 } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import { RpcVariation } from '../semantic-constants.js'
-import type { IRpcEnvelope } from '../../contract/index.js'
-import { RpcRoutingProfile } from './routing-data.js'
+import {
+  RpcControl,
+  RpcRouteProfile,
+  RpcWireLimit,
+  type IRpcEnvelope
+} from '../../contract/index.js'
+import { RpcProtocolEvent } from '../protocol-constants.js'
 import type { IRpcAbortSignal, IRpcFanoutResult } from '../typing.js'
 import type { IRpcUuidConfig } from '../typing.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
@@ -89,8 +94,18 @@ export class RpcControlAttachment {
     const releases: Array<() => void> = []
     try {
       for (const [variation, handler] of [
-        [RpcVariation.ping, (message: unknown) => this.#receivePing(message)],
-        [RpcVariation.pong, (message: unknown) => this.#receivePong(message)]
+        [
+          RpcControl.ping,
+          (message: unknown, peerKey: string) => this.#receivePing(message, peerKey)
+        ],
+        [
+          RpcControl.pong,
+          (message: unknown, peerKey: string) => this.#receivePong(message, peerKey)
+        ],
+        [
+          RpcControl.close,
+          (message: unknown, peerKey: string) => this.#receiveClose(message, peerKey)
+        ]
       ] as const) {
         const release = ports.variationCoordinator.admit({
           operation: 'register',
@@ -116,13 +131,47 @@ export class RpcControlAttachment {
   surface(): {
     ping: (targetId: string, receiverId?: string, options?: IPingOptions) => Promise<boolean>
     pingAll: () => Promise<IRpcFanoutResult<boolean>>
+    announceClose: (
+      targetId: string,
+      options: { readonly drainMs: number; readonly receiverId?: string }
+    ) => Promise<void>
     dispose: () => void
   } {
     return {
       ping: (targetId, receiverId, options) => this.ping(targetId, receiverId, options),
       pingAll: () => this.pingAll(),
+      announceClose: (targetId, options) => this.announceClose(targetId, options),
       dispose: () => this.dispose()
     }
+  }
+
+  /** Send a close intention after a synchronous duration gate; channel drain remains host-owned. */
+  announceClose(
+    targetId: string,
+    options: { readonly drainMs: number; readonly receiverId?: string }
+  ): Promise<void> {
+    this.#kernel.assertActive()
+    this.#validateIdentifier(targetId, 'targetId')
+    if (options.receiverId !== undefined) this.#validateIdentifier(options.receiverId, 'receiverId')
+    if (
+      !Number.isInteger(options.drainMs) ||
+      options.drainMs < 0 ||
+      options.drainMs > RpcWireLimit.maxDurationMs
+    )
+      throw new RpcContractError(RpcCoreErrorText.drainInvalid)
+    const taskId = allocateRpcId(this.#uuid, 'variation', this.#id, targetId, () => false)
+    const selectedReceiver =
+      options.receiverId === undefined
+        ? this.#ports.discoveryResolver.resolve(targetId)
+        : Promise.resolve({ receiverId: options.receiverId })
+    return selectedReceiver.then((selected) =>
+      this.#ports.outboundOperations.send({
+        kind: 'frame',
+        message: this.#variationEnvelope(RpcControl.close, taskId, targetId, selected.receiverId, {
+          drainMs: options.drainMs
+        })
+      })
+    )
   }
 
   /** Validates a caller-facing identifier against the shared contract-capability domain. */
@@ -175,12 +224,7 @@ export class RpcControlAttachment {
         .then((selected) =>
           this.#ports.outboundOperations.send({
             kind: 'frame',
-            message: this.#variationEnvelope(
-              RpcVariation.ping,
-              taskId,
-              targetId,
-              selected.receiverId
-            )
+            message: this.#variationEnvelope(RpcControl.ping, taskId, targetId, selected.receiverId)
           })
         )
         .catch((error) => {
@@ -240,25 +284,27 @@ export class RpcControlAttachment {
    * that never selected the `ping()` middleware must not send a pong, even though the variation
    * route stays registered (matching the legacy single always-listening receiver).
    */
-  #receivePing(message: unknown): void {
+  #receivePing(message: unknown, peerKey: string): void {
+    this.#warnIgnoredPayload(message, peerKey)
     if (!this.#pingEnabled) return
     const record = message as {
       envelope?: IRpcEnvelope
-      route?: { readonly webRpc?: { readonly senderId?: string; readonly receiverId?: string } }
+      route?: { readonly route?: { readonly senderId?: string; readonly receiverId?: string } }
     }
     const taskId = record.envelope?.kind === 'variation' ? record.envelope.id : undefined
-    const senderId = record.route?.webRpc?.senderId
+    const senderId = record.route?.route?.senderId
     if (!taskId || !senderId) return
     void this.#ports.outboundOperations
       .send({
         kind: 'frame',
-        message: this.#variationEnvelope(RpcVariation.pong, taskId, senderId, senderId)
+        message: this.#variationEnvelope(RpcControl.pong, taskId, senderId, senderId)
       })
       .catch((error) => this.#ports.outboundOperations.send({ kind: 'report', error }))
   }
 
   /** Resolves only a pong admitted by the shared variation coordinator. */
-  #receivePong(message: unknown): void {
+  #receivePong(message: unknown, peerKey: string): void {
+    this.#warnIgnoredPayload(message, peerKey)
     const envelope = (message as { envelope?: IRpcEnvelope }).envelope
     const taskId = envelope?.kind === 'variation' ? envelope.id : undefined
     if (!taskId) return
@@ -269,19 +315,82 @@ export class RpcControlAttachment {
     pending.resolve(true)
   }
 
+  /** A control payload extension has no effect on ping/pong but is reported once per peer. */
+  #warnIgnoredPayload(message: unknown, peerKey: string): void {
+    const route = (message as { readonly route?: { readonly payload?: unknown } }).route
+    if (route && Object.hasOwn(route, 'payload'))
+      this.#ports.outboundOperations.noteUnknownField(peerKey, 'variation', '/data', 'payload')
+  }
+
+  /** Decode one close intention, reporting malformed data without emitting a peer-close event. */
+  #receiveClose(message: unknown, peerKey: string): void {
+    const record = message as {
+      readonly envelope?: IRpcEnvelope
+      readonly route?: {
+        readonly route?: { readonly senderId?: string }
+        readonly payload?: unknown
+      }
+    }
+    const payload = record.route?.payload
+    let fields: readonly string[]
+    let drainMs: unknown
+    try {
+      if (typeof payload !== 'object' || payload === null || Array.isArray(payload))
+        throw new RpcProtocolError(RpcCoreErrorText.drainInvalid)
+      const prototype = Object.getPrototypeOf(payload)
+      if (prototype !== Object.prototype && prototype !== null)
+        throw new RpcProtocolError(RpcCoreErrorText.drainInvalid)
+      fields = Object.keys(payload)
+      drainMs = (payload as { readonly drainMs?: unknown }).drainMs
+    } catch (cause) {
+      this.#ports.outboundOperations.send({
+        kind: 'report',
+        error:
+          cause instanceof RpcProtocolError
+            ? cause
+            : new RpcProtocolError(RpcCoreErrorText.drainInvalid, cause),
+        code: RpcCoreErrorCode.protocolInvalid
+      })
+      return
+    }
+    if (
+      !Number.isInteger(drainMs) ||
+      (drainMs as number) < 0 ||
+      (drainMs as number) > RpcWireLimit.maxDurationMs
+    ) {
+      this.#ports.outboundOperations.send({
+        kind: 'report',
+        error: new RpcProtocolError(RpcCoreErrorText.drainInvalid),
+        code: RpcCoreErrorCode.protocolInvalid
+      })
+      return
+    }
+    for (const field of fields.filter((value) => value !== 'drainMs').sort())
+      this.#ports.outboundOperations.noteUnknownField(peerKey, 'variation', '/data/payload', field)
+    this.#ports.outboundOperations.send({
+      kind: 'diagnostic',
+      event: {
+        name: RpcProtocolEvent.peerClosing,
+        requesterId: record.route?.route?.senderId,
+        durationMs: drainMs as number
+      }
+    })
+  }
+
   /** Builds the one canonical variation envelope used by ping and pong traffic. */
   #variationEnvelope(
-    variation: (typeof RpcVariation)[keyof typeof RpcVariation],
+    variation: (typeof RpcControl)[keyof typeof RpcControl],
     taskId: string,
     targetId: string,
-    receiverId: string
+    receiverId: string,
+    payload?: unknown
   ): IRpcEnvelope {
     return {
       kind: 'variation',
       id: taskId,
       data: {
-        webRpc: {
-          profile: RpcRoutingProfile,
+        route: {
+          profile: RpcRouteProfile,
           type: 'variation',
           applicationVersion: this.#applicationVersion,
           senderId: this.#id,
@@ -289,7 +398,8 @@ export class RpcControlAttachment {
           receiverId,
           sentAt: this.#ports.time.timestamp(),
           variation
-        }
+        },
+        ...(payload === undefined ? {} : { payload })
       }
     }
   }

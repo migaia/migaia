@@ -16,7 +16,7 @@ import { defineRpcFeature } from '../internal/define-rpc-feature.js'
 import { RpcControlRole, RpcControlRoleSchema } from '../internal/plugin-contract.js'
 
 /** Optional control methods present when corresponding control middleware is installed. */
-export type IControlSurface = Partial<Pick<IRpcEndpoint, 'ping' | 'pingAll'>>
+export type IControlSurface = Partial<Pick<IRpcEndpoint, 'ping' | 'pingAll' | 'announceClose'>>
 
 /** Native control capability prepared after outbound and discovery have established their ports. */
 export const createControlFeature = (
@@ -39,12 +39,12 @@ export const createControlFeature = (
     IEndpointCapabilitiesFeatureExpose
   >(
     {
-      publicKeys: ['ping', 'pingAll'],
+      publicKeys: ['ping', 'pingAll', 'announceClose'],
       claims: {
         routes: [],
         provides: [],
         consumes: ['variation-coordinator'],
-        publicKeys: ['ping', 'pingAll'],
+        publicKeys: ['ping', 'pingAll', 'announceClose'],
         exposedKeys: [],
         activator: false
       },

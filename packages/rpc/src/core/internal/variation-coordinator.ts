@@ -1,4 +1,4 @@
-import type { IRpcVariation } from '../semantic-constants.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import { VariationAdmissionRegistry } from './variation-admission.js'
 
 /** Private handler port for one verified variation subkind. */
@@ -14,7 +14,7 @@ export class RpcVariationCoordinator {
     { readonly expiresAt: number; readonly reason: unknown }
   >()
   /** Single-provider typed variation handlers. */
-  readonly #handlers = new Map<IRpcVariation, IVariationHandler>()
+  readonly #handlers = new Map<string, IVariationHandler>()
 
   /**
    * Canonical clock read; sourced from the endpoint-local time port, never the host wall-clock
@@ -40,13 +40,13 @@ export class RpcVariationCoordinator {
 
   /** Reports whether a variation handler is currently admitted without changing ownership. */
   admit(key: string): boolean {
-    return this.#handlers.has(key as IRpcVariation)
+    return this.#handlers.has(key)
   }
 
   /** Registers one handler and rejects duplicate subkind ownership. */
-  register(variation: IRpcVariation, handler: IVariationHandler): () => void {
+  register(variation: string, handler: IVariationHandler): () => void {
     if (this.#handlers.has(variation))
-      throw new TypeError(`variation handler already registered: ${variation}`)
+      throw new TypeError(RpcCoreErrorText.variationHandlerDuplicate(variation))
     this.#handlers.set(variation, handler)
     return () => {
       if (this.#handlers.get(variation) === handler) this.#handlers.delete(variation)
@@ -55,15 +55,16 @@ export class RpcVariationCoordinator {
 
   /** Admits and dispatches one variation after shared identity verification. */
   async dispatch(
-    variation: IRpcVariation,
+    variation: string,
     key: string,
     message: unknown,
     peerKey: string
-  ): Promise<boolean> {
+  ): Promise<'dispatched' | 'unknown' | 'rejected'> {
     const handler = this.#handlers.get(variation)
-    if (!handler || !this.#admission.admit(peerKey, key, this.#admissionNow())) return false
+    if (!handler) return 'unknown'
+    if (!this.#admission.admit(peerKey, key, this.#admissionNow())) return 'rejected'
     await handler(message, peerKey)
-    return true
+    return 'dispatched'
   }
 
   /** Aborts an active provider task or records a bounded early-abort tombstone. */
