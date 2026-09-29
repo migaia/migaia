@@ -90,7 +90,6 @@
         "createLifecycleRangeError",
         "createLifecycleScope",
         "createLifecycleUnit",
-        "createManualScheduler",
         "createMutationQueue",
         "createObjectLeaseRegistry",
         "createPendingTracker",
@@ -104,7 +103,6 @@
         "executeReleaseDescriptor",
         "probeThenable",
         "snapshotScheduler",
-        "systemScheduler",
         "tagLifecycleError",
         "validateSchedulerDelay",
         "validateSchedulerTime"
@@ -115,11 +113,9 @@
       ],
       "./scheduler": [
         "addSchedulerTime",
-        "createManualScheduler",
         "resolveScheduler",
         "resolveSchedulerOption",
         "snapshotScheduler",
-        "systemScheduler",
         "validateSchedulerDelay",
         "validateSchedulerTime"
       ],
@@ -1047,6 +1043,7 @@
         "streamBase64Chunks",
         "structuredDiagnosticSnapshot",
         "systemScheduler",
+        "systemWallClock",
         "toError",
         "toPromise",
         "utf8ByteLength",
@@ -1058,15 +1055,18 @@
         "admitAbortSignal",
         "createAbortTimeoutSignal",
         "createConcurrencyLimiter",
-        "createManualScheduler",
         "deferred",
         "hostRethrowReporter",
         "raceWithAbort",
         "retry",
         "sleep",
-        "systemScheduler",
         "toPromise",
         "withTimeout"
+      ],
+      "./scheduler": [
+        "createManualScheduler",
+        "systemScheduler",
+        "systemWallClock"
       ],
       "./error": [
         "UtilsAbortError",
