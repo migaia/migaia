@@ -1,5 +1,576 @@
 {
-  "version": 1,
-  "fields": ["source", "code", "name", "message", "stack", "cause", "errors"],
-  "ordering": "cause before errors; cleanup errors remain secondary"
+  "version": 2,
+  "fields": ["source", "code", "name", "message", "stack", "cause", "errors", "data", "truncated"],
+  "rules": {
+    "order": "preorder: node, cause subtree, errors in array order; cleanup errors append after errors",
+    "textUnits": "five identity/message/stack values per node; strings and record keys in data; bytes base64url text; field names, JSON punctuation and bytes marker keys are excluded",
+    "unicode": "text must contain Unicode scalar values; sender replaces lone UTF-16 surrogates with U+FFFD and marks truncated; receiver rejects them",
+    "budget": "each text unit and each data subtree at most 65536 UTF-8 bytes; all text units together at most 1048576; child admission counts its own five fields before its data or descendants"
+  },
+  "valid": [
+    {
+      "id": "basic",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m"
+      }
+    },
+    {
+      "id": "aggregate",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "AggregateError",
+        "message": "many",
+        "stack": "AggregateError: many",
+        "errors": [
+          {
+            "source": "s",
+            "code": "A",
+            "name": "TypeError",
+            "message": "a",
+            "stack": "TypeError: a"
+          }
+        ]
+      }
+    },
+    {
+      "id": "aggregate-empty",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "AggregateError",
+        "message": "none",
+        "stack": "AggregateError: none"
+      }
+    },
+    {
+      "id": "truncated-empty",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "truncated": true
+      }
+    },
+    {
+      "id": "nonaggregate-errors",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "errors": [
+          {
+            "source": "s",
+            "code": "B",
+            "name": "Error",
+            "message": "b",
+            "stack": "Error: b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "abort",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "AbortError",
+        "message": "cancelled",
+        "stack": "AbortError: cancelled"
+      }
+    },
+    {
+      "id": "data",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "data": {
+          "reason": [
+            null,
+            true,
+            1,
+            "x",
+            {
+              "$rpc": "bytes",
+              "base64url": "AQ"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cause-depth-48",
+      "generate": {
+        "shape": "chain",
+        "size": 48
+      }
+    },
+    {
+      "id": "errors-depth-24",
+      "generate": {
+        "shape": "errorsChain",
+        "size": 24
+      }
+    },
+    {
+      "id": "data-depth-48-string",
+      "generate": {
+        "shape": "dataDepth",
+        "size": 48,
+        "leaf": "x"
+      }
+    },
+    {
+      "id": "data-depth-48-bytes",
+      "generate": {
+        "shape": "dataDepth",
+        "size": 48,
+        "leaf": {
+          "$rpc": "bytes",
+          "base64url": "AQ"
+        }
+      }
+    },
+    {
+      "id": "message-65536",
+      "generate": {
+        "shape": "message",
+        "size": 65536
+      }
+    },
+    {
+      "id": "total-1048576",
+      "generate": {
+        "shape": "totalBytes",
+        "size": 1048576
+      }
+    },
+    {
+      "id": "nodes-1024",
+      "generate": {
+        "shape": "wide",
+        "size": 1024
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "empty-stack",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": ""
+      },
+      "violation": "type",
+      "pointer": "/stack"
+    },
+    {
+      "id": "missing-stack",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m"
+      },
+      "violation": "required",
+      "pointer": "/stack"
+    },
+    {
+      "id": "empty-errors",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "errors": []
+      },
+      "violation": "emptyErrors",
+      "pointer": "/errors"
+    },
+    {
+      "id": "false-truncated",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "truncated": false
+      },
+      "violation": "truncatedValue",
+      "pointer": "/truncated"
+    },
+    {
+      "id": "nonobject-cause",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "cause": 1
+      },
+      "violation": "type",
+      "pointer": "/cause"
+    },
+    {
+      "id": "lone-surrogate",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "\ud800",
+        "stack": "Error: m"
+      },
+      "violation": "surrogate",
+      "pointer": "/message"
+    },
+    {
+      "id": "unknown-before-required",
+      "wire": {
+        "foo": 1
+      },
+      "violation": "unknownField",
+      "pointer": ""
+    },
+    {
+      "id": "cause-depth-49",
+      "generate": {
+        "shape": "chain",
+        "size": 49
+      },
+      "violation": "depth",
+      "pointer": "/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause/cause"
+    },
+    {
+      "id": "errors-depth-25",
+      "generate": {
+        "shape": "errorsChain",
+        "size": 25
+      },
+      "violation": "depth",
+      "pointer": "/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0/errors/0"
+    },
+    {
+      "id": "message-65537",
+      "generate": {
+        "shape": "message",
+        "size": 65537
+      },
+      "violation": "stringBytes",
+      "pointer": "/message"
+    },
+    {
+      "id": "total-1048577",
+      "generate": {
+        "shape": "totalBytes",
+        "size": 1048577
+      },
+      "violation": "totalBytes",
+      "pointer": "/errors/15/stack"
+    },
+    {
+      "id": "nodes-1025",
+      "generate": {
+        "shape": "wide",
+        "size": 1025
+      },
+      "violation": "nodes",
+      "pointer": "/errors/1023"
+    },
+    {
+      "id": "data-depth-49-bytes",
+      "generate": {
+        "shape": "dataDepth",
+        "size": 49,
+        "leaf": {
+          "$rpc": "bytes",
+          "base64url": "AQ"
+        }
+      },
+      "violation": "dataPortable",
+      "pointer": "/data"
+    },
+    {
+      "id": "data-depth-49-string",
+      "generate": {
+        "shape": "dataDepth",
+        "size": 49,
+        "leaf": "x"
+      },
+      "violation": "dataPortable",
+      "pointer": "/data"
+    },
+    {
+      "id": "invalid-portable-marker",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "data": {
+          "$rpc": "error"
+        }
+      },
+      "violation": "dataPortable",
+      "pointer": "/data"
+    }
+  ],
+  "unknownFields": [
+    {
+      "id": "ordered-unknown",
+      "wire": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "cause": {
+          "source": "s",
+          "code": "B",
+          "name": "Error",
+          "message": "b",
+          "stack": "Error: b",
+          "z": 1,
+          "x": 2
+        }
+      },
+      "reject": {
+        "violation": "unknownField",
+        "pointer": "/cause"
+      },
+      "ignoreReports": [
+        {
+          "pointer": "/cause",
+          "field": "x"
+        },
+        {
+          "pointer": "/cause",
+          "field": "z"
+        }
+      ],
+      "ignoreExpected": {
+        "source": "s",
+        "code": "C",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "cause": {
+          "source": "s",
+          "code": "B",
+          "name": "Error",
+          "message": "b",
+          "stack": "Error: b"
+        }
+      }
+    }
+  ],
+  "truncation": [
+    {
+      "id": "string",
+      "input": "plain",
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "Error",
+        "message": "plain",
+        "stack": "Error: plain"
+      }
+    },
+    {
+      "id": "null",
+      "input": null,
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "Error",
+        "message": "non-error value thrown",
+        "stack": "Error: non-error value thrown",
+        "data": null
+      }
+    },
+    {
+      "id": "absent",
+      "input": {
+        "absent": true
+      },
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "Error",
+        "message": "non-error value thrown",
+        "stack": "Error: non-error value thrown"
+      }
+    },
+    {
+      "id": "number",
+      "input": 3,
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "Error",
+        "message": "non-error value thrown",
+        "stack": "Error: non-error value thrown",
+        "data": 3
+      }
+    },
+    {
+      "id": "object",
+      "input": {
+        "reason": "failed"
+      },
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "Error",
+        "message": "non-error value thrown",
+        "stack": "Error: non-error value thrown",
+        "data": {
+          "reason": "failed"
+        }
+      }
+    },
+    {
+      "id": "empty-aggregate-errors",
+      "input": {
+        "logicalError": {
+          "name": "AggregateError",
+          "message": "none",
+          "stack": "AggregateError: none",
+          "errors": []
+        }
+      },
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "AggregateError",
+        "message": "none",
+        "stack": "AggregateError: none"
+      }
+    },
+    {
+      "id": "truncated-without-errors",
+      "input": {
+        "logicalError": {
+          "message": "m",
+          "stack": "Error: m",
+          "truncated": true
+        }
+      },
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "Error",
+        "message": "m",
+        "stack": "Error: m",
+        "truncated": true
+      }
+    },
+    {
+      "id": "cycle",
+      "input": {
+        "logicalError": {
+          "message": "loop",
+          "stack": "Error: loop",
+          "cause": {
+            "ref": "root"
+          }
+        }
+      },
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "Error",
+        "message": "loop",
+        "stack": "Error: loop",
+        "truncated": true
+      }
+    },
+    {
+      "id": "lone-surrogate",
+      "input": {
+        "logicalError": {
+          "message": "\ud800",
+          "stack": "Error: m"
+        }
+      },
+      "expected": {
+        "source": "unknown",
+        "code": "UNKNOWN",
+        "name": "Error",
+        "message": "\ufffd",
+        "stack": "Error: m",
+        "truncated": true
+      }
+    },
+    {
+      "id": "long-stack",
+      "generate": {
+        "shape": "longStack",
+        "size": 200000,
+        "expectedBytes": 65536
+      }
+    },
+    {
+      "id": "oversized-data",
+      "generate": {
+        "shape": "oversizedData",
+        "size": 65537
+      }
+    },
+    {
+      "id": "greedy-siblings",
+      "generate": {
+        "shape": "greedySiblings",
+        "size": 20,
+        "textBytes": 65536,
+        "expectedChildren": 7
+      }
+    }
+  ],
+  "jsonrpc": [
+    {
+      "id": "foreign",
+      "input": {
+        "code": -32601,
+        "message": "Method not found",
+        "data": {
+          "hint": 1
+        }
+      },
+      "expected": {
+        "source": "jsonrpc-2.0",
+        "code": "-32601",
+        "name": "Error",
+        "message": "Method not found",
+        "stack": "Error: Method not found",
+        "data": {
+          "hint": 1
+        }
+      }
+    },
+    {
+      "id": "foreign-long-message",
+      "generate": {
+        "shape": "foreignLongMessage",
+        "size": 65530,
+        "expectedStackBytes": 65536
+      }
+    }
+  ]
 }

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "migaia.rpc.wire-error/1",
+  "title": "migaia.rpc wire-error version 1",
+  "type": "object",
+  "required": ["source", "code", "name", "message", "stack"],
+  "properties": {
+    "source": { "type": "string", "minLength": 1 },
+    "code": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "message": { "type": "string" },
+    "stack": { "type": "string", "minLength": 1 },
+    "cause": { "$ref": "#/$defs/node" },
+    "errors": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/node" } },
+    "data": { "$ref": "#/$defs/portable" },
+    "truncated": { "const": true }
+  },
+  "additionalProperties": true,
+  "x-migaia-limits": {
+    "maxNesting": 48,
+    "maxEmbeddingDepth": 16,
+    "maxNodes": 1024,
+    "maxStringBytes": 65536,
+    "maxBytes": 1048576
+  },
+  "$defs": {
+    "node": { "$ref": "#" },
+    "portable": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/$defs/portable" } },
+        {
+          "type": "object",
+          "properties": { "$rpc": { "const": "bytes" }, "base64url": { "type": "string" } },
+          "required": ["$rpc", "base64url"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "propertyNames": { "not": { "const": "$rpc" } },
+          "additionalProperties": { "$ref": "#/$defs/portable" }
+        }
+      ]
+    }
+  }
+}
