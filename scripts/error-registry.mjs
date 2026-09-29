@@ -50,8 +50,12 @@ export const collectErrorRegistry = (root = repositoryRoot) => {
   const rows = []
   /** Declaration files live only below package source trees. */
   const files = findErrorCodeFiles(join(root, 'packages')).sort()
+  /**
+   * One optional JSDoc block directly followed by a `key: 'CODE'` entry. The JSDoc group may not
+   * cross a closing `*\/`, so a file header comment can never be attributed to a later code.
+   */
   const entryPattern =
-    /(?:\/\*\*([\s\S]*?)\*\/\s*)?([A-Za-z][A-Za-z0-9]*)\s*:\s*'([A-Z][A-Z0-9_]*)'/g
+    /(?:\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*)?([A-Za-z][A-Za-z0-9]*)\s*:\s*'([A-Z][A-Z0-9_]*)'/g
   for (const file of files) {
     const source = sourceFor(file)
     const text = readFileSync(file, 'utf8')

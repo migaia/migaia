@@ -11,6 +11,7 @@ export default defineConfig(withDistFreshness({
       entry: {
         index: 'src/index.ts',
         promise: 'src/promise.ts',
+        scheduler: 'src/scheduler.ts',
         error: 'src/error.ts',
         bytes: 'src/bytes.ts',
         object: 'src/object.ts',

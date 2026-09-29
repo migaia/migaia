@@ -4,6 +4,16 @@ export const UtilsErrorText = {
     `[utils] invalid ${field}: ${expectation}`,
   nonErrorValue: '[utils] non-Error value was converted',
   envUnsupported: (capability: string) => `[utils] host capability is unavailable: ${capability}`,
+  /**
+   * Stable capability labels passed to `envUnsupported(capability)` by the default scheduler in
+   * `scheduler.ts`; they name which host capability (monotonic clock, finite clock reading, timers)
+   * was missing so the message stays identical across hosts.
+   */
+  schedulerCapability: {
+    monotonicClock: 'performance.now',
+    finiteClock: 'finite performance.now value',
+    timers: 'setTimeout/clearTimeout'
+  },
   aborted: '[utils] operation aborted',
   deadlineExceeded: (scope: string, timeoutMs: number) =>
     `[utils] ${scope} deadline exceeded after ${timeoutMs}ms`,
