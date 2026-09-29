@@ -222,10 +222,7 @@ export class RpcProviderAttachment {
       },
       activeControllers: this.#controllers.size,
       providers: this.#registry.providers.size,
-      events: [...this.#registry.events.values()].reduce(
-        (total, listeners) => total + listeners.length,
-        0
-      )
+      events: this.#registry.listenerCount
     }
     Object.defineProperty(snapshot, 'providerState', {
       configurable: false,

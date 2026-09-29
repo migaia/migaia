@@ -129,7 +129,6 @@ export class ProviderExecutor<TTargetId extends string> {
       }
       return
     }
-    const listeners = this.options.registry.getListeners(request.envelope.method)
     const provider = this.options.registry.getProvider(request.envelope.method)
     let responseSendStarted = false
     if (this.options.controllers.has(controllerKey)) {
@@ -186,8 +185,11 @@ export class ProviderExecutor<TTargetId extends string> {
       }
     }
     try {
-      if (request.route.webRpc.dispatchOnly && listeners?.length) {
-        for (const listener of Array.from(listeners)) await listener(context)
+      if (
+        request.route.webRpc.dispatchOnly &&
+        this.options.registry.hasListeners(request.envelope.method)
+      ) {
+        await this.options.registry.dispatch(request.envelope.method, context)
         return
       }
       if (!provider) {

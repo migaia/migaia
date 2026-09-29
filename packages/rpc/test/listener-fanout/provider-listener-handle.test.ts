@@ -58,7 +58,7 @@ const request: IProviderRequestInput = {
 }
 
 describe('provider event listener handles', () => {
-  it.fails('A1: repeated disposer calls leave the other identical registration active', async () => {
+  it('A1: repeated disposer calls leave the other identical registration active', async () => {
     const { client, server } = await makeEndpoints()
     const calls: unknown[] = []
     const listener = (context: { data: unknown }): void => {
@@ -82,7 +82,7 @@ describe('provider event listener handles', () => {
     }
   })
 
-  it.fails('A2: a stale disposer cannot withdraw a later identical registration', async () => {
+  it('A2: a stale disposer cannot withdraw a later identical registration', async () => {
     const { client, server } = await makeEndpoints()
     const calls: unknown[] = []
     const listener = (context: { data: unknown }): void => {
@@ -103,14 +103,15 @@ describe('provider event listener handles', () => {
     }
   })
 
-  it.fails('A2: clear prevents an old handle from withdrawing a new registration', () => {
+  it('A2: clear prevents an old handle from withdrawing a new registration', () => {
     const registry = new ProviderRegistry()
     const listener = () => undefined
     const stale = registry.listen('event', listener)
     registry.clear()
     registry.listen('event', listener)
     stale()
-    expect(registry.getListeners('event')).toHaveLength(1)
+    expect(registry.hasListeners('event')).toBe(true)
+    expect(registry.listenerCount).toBe(1)
   })
 
   it.each(['throw', 'reject'] as const)(
@@ -185,5 +186,39 @@ describe('provider event listener handles', () => {
       await client.dispose()
       await server.dispose()
     }
+  })
+
+  it('A4: duplicate registrations count separately while request calls its provider', async () => {
+    const registry = new ProviderRegistry()
+    const listeners: string[] = []
+    const sent: unknown[] = []
+    const listener = () => {
+      listeners.push('event')
+    }
+    registry.listen('event', listener)
+    registry.listen('event', listener)
+    registry.register('event', (context) => context.success('provider'))
+    expect(registry.listenerCount).toBe(2)
+
+    const executor = new ProviderExecutor<string>({
+      timestamp: () => 0,
+      id: 'host',
+      registry,
+      controllers: new Map(),
+      admission: new ProviderAdmissionRegistry(),
+      peers: [],
+      dispatch: () => undefined,
+      send: async (response) => {
+        sent.push(response)
+      },
+      validate: () => undefined,
+      emitFailure: () => undefined
+    })
+    await executor.execute({
+      ...request,
+      route: { ...request.route, webRpc: { ...request.route.webRpc, dispatchOnly: false } }
+    })
+    expect(listeners).toEqual([])
+    expect(sent).toEqual([expect.objectContaining({ ok: true, data: 'provider' })])
   })
 })
