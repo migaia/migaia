@@ -65,8 +65,8 @@ if (observedCalls() !== 0 || inspection.ordered.length !== 3) throw new Error('s
 class ConsumerHost extends PluginHost<Record<string, never>> { constructor() { super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
 const firstHost = new ConsumerHost()
 const secondHost = new ConsumerHost()
-const first = await firstHost.use(plugin)
-const second = await secondHost.use(plugin)
+const [first] = await firstHost.use(plugin)
+const [second] = await secondHost.use(plugin)
 const storeId: 'memory' = first.extensions.getStore().id
 const attached: IAdapter = first.extensions.attach('service', () => {})
 const selectedKind: IKind<'memory', IStore> = first.extensions.kind
@@ -94,7 +94,7 @@ const inspection = inspectFeatures({ combined })
 if (observedCalls() !== 0 || inspection.ordered.length !== 3) throw new Error('rpc inspection')
 class ConsumerHost extends PluginHost<Record<string, never>> { constructor() { super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
 const host = new ConsumerHost()
-const view = await host.use(plugin)
+const [view] = await host.use(plugin)
 const literal: string = await view.extensions.connect('rpc')
 const generic: Readonly<{ id: number }> = await view.extensions.connect({ id: 1 })
 // @ts-expect-error hidden outbound output cannot become a root extension.
@@ -110,17 +110,15 @@ const staticFeatureRecord = { feature } as const
 const plugin = definePlugin('native', (core) => ({
   featureExpose: () => ({ add: (value: number) => value }),
   install: () => ({ run: core.features.feature.run }),
-  expose: () => ({ value: () => 1 as const }),
-  shared: () => ({ secret: () => true })
+  expose: () => ({ value: () => 1 as const })
 }), staticFeatureRecord)
 const empty = definePlugin('empty', () => ({}))
 const exposeOnly = definePlugin('expose-only', () => ({ expose: () => ({ exposedValue: () => 2 as const }) }))
 const legacyPrefix = definePlugin<{ domain: number }, { read(): number }, never, 'legacy-prefix'>('legacy-prefix', (core) => ({ install: () => ({ read: () => core.domain }) }))
-const objectCompatible = definePlugin<{ domain: number }, { read(): number }, never, { enabled: boolean }, { secret(): number }, 'object-compatible'>({
+const objectCompatible = definePlugin<{ domain: number }, { read(): number }, never, { enabled: boolean }, Record<string, never>, 'object-compatible'>({
   name: 'object-compatible',
   config: { enabled: true },
-  install: (core) => ({ read: () => core.domain }),
-  shared: (core) => ({ secret: () => core.domain })
+  install: (core) => ({ read: () => core.domain })
 })
 void legacyPrefix
 void objectCompatible
@@ -136,15 +134,11 @@ if (false) {
   definePlugin('async-factory', async () => ({}))
   // @ts-expect-error expose cannot be async.
   definePlugin('async-expose', () => ({ expose: async () => ({ value: 1 }) }))
-  // @ts-expect-error shared cannot be async.
+  // @ts-expect-error retired shared descriptors are never admitted.
   definePlugin('async-shared', () => ({ shared: async () => ({ value: 1 }) }))
   // @ts-expect-error host core cannot satisfy a domain-required definition.
   await emptyHost.use(domainPlugin)
-  const installed = await emptyHost.use(plugin)
-  // @ts-expect-error accumulated views retain the required domain core.
-  await installed.use(domainPlugin)
-  // @ts-expect-error dynamic views retain the required domain core.
-  await emptyHost.getCurrentView().use(domainPlugin)
+  await emptyHost.use(plugin)
   await domainHost.use(domainPlugin)
   const emptyHandle = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }, domainCore: () => ({}) })
   // @ts-expect-error functional hosts retain each plugin core requirement.
@@ -154,12 +148,43 @@ if (false) {
 }
 class Host extends PluginHost<Record<never, never>> { constructor() { super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
 const host = new Host()
-const view = await host.use(plugin, empty, exposeOnly)
-const generic: { id: number } = view.extensions.run({ id: 1 })
-const literal: 1 = view.extensions.value()
-const exposedLiteral: 2 = view.extensions.exposedValue()
+const [nativeHandle, , exposeHandle] = await host.use(plugin, empty, exposeOnly)
+const generic: { id: number } = nativeHandle.extensions.run({ id: 1 })
+const literal: 1 = nativeHandle.extensions.value()
+const exposedLiteral: 2 = exposeHandle.extensions.exposedValue()
 if (generic.id !== 1 || literal !== 1 || exposedLiteral !== 2) throw new Error('native runtime')
 await host.dispose()
+`,
+  asyncSetup: String.raw`import { definePlugin, type IPluginSetupContext, type IPluginSetupOperation, type IPluginSetup } from '@migaia/plugin-host'
+type IEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+type IAssert<T extends true> = T
+type IContext = IPluginSetupContext
+type IOperation = IPluginSetupOperation
+type ISetup = IPluginSetup<Record<string, never>, number>
+if (false) {
+  const prepared = definePlugin({
+    name: 'prepared',
+    setup: async (_context) => ({ n: 1 }),
+    featureExpose: (_core, out) => {
+      type IOut = IAssert<IEqual<typeof out, { n: number }>>
+      return { read: () => out.n as IOut extends true ? number : never }
+    },
+    install: (_core, out) => {
+      type IOut = IAssert<IEqual<typeof out, { n: number }>>
+      return { value: () => out.n as IOut extends true ? number : never }
+    }
+  })
+  const plain = definePlugin({ name: 'plain', install: () => ({}) })
+  type IPreparedLength = IAssert<IEqual<Parameters<typeof prepared.install>['length'], 2>>
+  type IPlainLength = IAssert<IEqual<Parameters<typeof plain.install>['length'], 1>>
+  const preparedLength: IPreparedLength = true
+  const plainLength: IPlainLength = true
+  // @ts-expect-error No setup means no second install argument.
+  definePlugin({ name: 'invalid', install: (_core, _out: number) => ({}) })
+  plain.install({} as never)
+  void preparedLength; void plainLength
+}
+void (undefined as unknown as IContext | IOperation | ISetup)
 `
 }
 
@@ -258,7 +283,8 @@ const runDeclarationMutation = (
 ) => {
   const original = readFileSync(declaration, 'utf8')
   if (!original.includes(guard)) throw new Error(`${name} declaration guard missing`)
-  writeFileSync(declaration, original.replace(guard, replacement))
+  // Object definitions have plain and setup overloads; a mutant must alter both contracts.
+  writeFileSync(declaration, original.replaceAll(guard, replacement))
   try {
     expectMutantFailure(name, source, expectedDirectives)
   } finally {
@@ -284,7 +310,7 @@ runDeclarationMutation(
   'webRpc',
   fixtures.webRpc,
   join(packageDirectory, 'dist/feature-types.d.ts'),
-  'Readonly<{\n    readonly [K in keyof TDependencies]: IFeatureOutput<TDependencies[K]>;\n}>',
+  'Readonly<{\n    readonly [K in keyof TDependencies]: TDependencies[K] extends IFeatureReference<infer TOutput, infer TOptional> ? TOptional extends true ? TOutput | undefined : TOutput : IFeatureOutput<TDependencies[K]>;\n}>',
   'Readonly<Record<string, any>>',
   ['// @ts-expect-error only declared roots are injected.']
 )
@@ -316,9 +342,9 @@ runDeclarationMutation(
   'native',
   fixtures.native,
   join(packageDirectory, 'dist/registry.d.ts'),
-  'TShared & (TShared extends PromiseLike<unknown> ? never : unknown)',
-  'TShared',
-  ['// @ts-expect-error shared cannot be async.']
+  'readonly featureExpose?: () => TExpose & (TExpose extends PromiseLike<unknown> ? never : unknown);',
+  'readonly featureExpose?: () => TExpose & (TExpose extends PromiseLike<unknown> ? never : unknown); readonly shared?: () => TLegacyShared | PromiseLike<TLegacyShared>;',
+  ['// @ts-expect-error retired shared descriptors are never admitted.']
 )
 runDeclarationMutation(
   'native',
@@ -328,8 +354,6 @@ runDeclarationMutation(
   'unknown',
   [
     '// @ts-expect-error host core cannot satisfy a domain-required definition.',
-    '// @ts-expect-error accumulated views retain the required domain core.',
-    '// @ts-expect-error dynamic views retain the required domain core.',
     '// @ts-expect-error functional hosts retain each plugin core requirement.'
   ]
 )
