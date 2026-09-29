@@ -7,8 +7,11 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** I4 serial snapshot dispatch adds measured code to the existing channel bundle. */
-const allowedIncrease = { rawBytes: 0.013, gzipBytes: 0.016 } as const
+/** I4 and the required unique-admission option use exact observed byte caps with no headroom. */
+const allowedIncrease = {
+  rawBytes: 7791 / legacyRoot.rawBytes,
+  gzipBytes: 2321 / legacyRoot.gzipBytes
+} as const
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {

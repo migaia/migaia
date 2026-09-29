@@ -25,7 +25,11 @@ import type {
 } from './types.js'
 import { createSubscriptionHandle, installSubscriptionSource } from './internal/subscription.js'
 import { isRecord } from './internal/record.js'
-import { EventDispatchPolicy, EventSubscriberState } from './state-constants.js'
+import {
+  EventAdmissionPolicy,
+  EventDispatchPolicy,
+  EventSubscriberState
+} from './state-constants.js'
 import {
   normalizeEventApiStyle,
   projectEventApiStyle,
@@ -433,6 +437,8 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   let report: IEventChannelOptions<T, undefined, V>['report']
   let terminalReport: IEventChannelOptions<T, undefined, V>['terminalReport']
   let dispatchPolicy: IEventChannelOptions<T, undefined, V>['dispatchPolicy']
+  /** The selected mode is read once before creating any registration state. */
+  let admissionPolicy: IEventChannelOptions<T, undefined, V>['admissionPolicy']
   let removalPolicy: IEventChannelOptions<T, undefined, V>['removalPolicy']
   let publishBudget: number | undefined
   let throwOnAborted: boolean
@@ -449,6 +455,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     report = options.report
     terminalReport = options.terminalReport
     dispatchPolicy = options.dispatchPolicy ?? EventDispatchPolicy.recursive
+    admissionPolicy = options.admissionPolicy
     removalPolicy = options.removalPolicy ?? 'handle'
     publishBudget = options.publishBudget ?? 100_000
     const suppliedThrowOnAborted = options.throwOnAborted
@@ -488,19 +495,18 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     )
   }
   if (
-    dispatchPolicy !== EventDispatchPolicy.recursive &&
-    dispatchPolicy !== EventDispatchPolicy.queued
+    (dispatchPolicy !== EventDispatchPolicy.recursive &&
+      dispatchPolicy !== EventDispatchPolicy.queued) ||
+    (admissionPolicy !== undefined &&
+      admissionPolicy !== EventAdmissionPolicy.multiple &&
+      admissionPolicy !== EventAdmissionPolicy.unique) ||
+    (removalPolicy !== 'handle' && removalPolicy !== 'listener-all')
   ) {
     throw createEventTypeError(
       EventSubscriberErrorCode.invalidOptions,
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
   }
-  if (removalPolicy !== 'handle' && removalPolicy !== 'listener-all')
-    throw createEventTypeError(
-      EventSubscriberErrorCode.invalidOptions,
-      eventErrorText(EventSubscriberErrorCode.invalidOptions)
-    )
   if (!Number.isSafeInteger(publishBudget) || publishBudget < 1)
     throw createEventTypeError(
       EventSubscriberErrorCode.invalidOptions,

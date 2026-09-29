@@ -18,6 +18,8 @@ describe('public exports', () => {
 
   it('ES-T16 exposes one root with all runtime helpers', () => {
     expect(EventSubscriber.createEventChannel).toBeTypeOf('function')
+    expect(EventSubscriber.EventAdmissionPolicy).toEqual({ multiple: 'multiple', unique: 'unique' })
+    expect('EventSyncErrorPolicy' in EventSubscriber).toBe(false)
     expect(EventSubscriber.createEventHub).toBeTypeOf('function')
     expect(EventSubscriber.invokeParallelSettled).toBeTypeOf('function')
     expect(EventSubscriber.invokeParallel).toBeTypeOf('function')
