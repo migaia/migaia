@@ -1,0 +1,4 @@
+{
+  "contract": ["INVALID_WIRE_ERROR"],
+  "core": ["PROPERTY_READ_FAILED"]
+}

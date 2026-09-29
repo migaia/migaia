@@ -11,7 +11,8 @@ const TEXT_BY_CODE: Readonly<Record<IRpcContractErrorCode, string>> = {
   [RpcContractErrorCode.invalidEnvelope]: RpcContractErrorText.invalidEnvelope,
   [RpcContractErrorCode.invalidFrame]: RpcContractErrorText.invalidFrame,
   [RpcContractErrorCode.frameLimitExceeded]: RpcContractErrorText.frameLimitExceeded,
-  [RpcContractErrorCode.frameAssemblyExpired]: RpcContractErrorText.frameAssemblyExpired
+  [RpcContractErrorCode.frameAssemblyExpired]: RpcContractErrorText.frameAssemblyExpired,
+  [RpcContractErrorCode.invalidWireError]: RpcContractErrorText.invalidWireError
 }
 
 /**

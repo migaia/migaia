@@ -60,6 +60,7 @@ function migratedTitle(title: string): string | undefined {
     )
     .replace('tagWebRpcError keeps', 'tagRpcError keeps')
     .replace('38 unique codes', '22 unique codes')
+    .replace('22 unique codes', '23 unique codes')
     .replace('a WebRpcLifecycleError', 'a RpcLifecycleError')
     .replace('real WebRpcPluginHost Promise', 'real RpcPluginHost Promise')
   return `${path}::${mappedName}`

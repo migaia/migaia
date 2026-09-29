@@ -41,9 +41,10 @@ export const RpcCoreErrorCode = {
   providerDuplicated: 'PROVIDER_DUPLICATED',
 
   /**
-   * Protocol codec / scheme / envelope 非法，作为 `RpcProtocolError` 的基础码。
+   * Protocol codec / scheme / envelope 非法，或 caller 无法还原响应错误、provider 收到非法 abort 载荷；作为
+   * `RpcProtocolError` 的基础码。
    *
-   * 调用方检查 protocol 配置与对端 scheme 是否一致，不要对同一报文重试。
+   * 调用方检查 protocol 配置与对端 scheme 是否一致；载荷已发送或取消已生效时检查对端，不要对同一报文重试。
    */
   protocolInvalid: 'PROTOCOL_INVALID',
 
@@ -55,9 +56,10 @@ export const RpcCoreErrorCode = {
   contractInvalid: 'CONTRACT_INVALID',
 
   /**
-   * Codec 的 payload 不符合其输入规则，作为 `RpcSerializationError` / `RpcChunkError` 的基础码。
+   * Codec 的 payload 不符合其输入规则，或发送端错误序列化的读取、data 投影降级；作为 `RpcSerializationError` / `RpcChunkError`
+   * 的基础码。
    *
-   * 调用方检查 data 与 codec 的契约，不要对同一 payload 重试。
+   * 调用方检查 data、codec 或抛出值；载荷已照常发送或取消已生效时不应重试同一 payload。
    */
   payloadInvalid: 'PAYLOAD_INVALID',
 
@@ -164,7 +166,10 @@ export const RpcCoreErrorCode = {
    *
    * 调用方检查分片配置（chunkSize ≥ 4）与对端实现；非法帧只触发 hooks，不重试。
    */
-  chunkInvalid: 'CHUNK_INVALID'
+  chunkInvalid: 'CHUNK_INVALID',
+
+  /** 无同步报告器的 safeRead 遇到 getter/Proxy 抛错，或报告器自身抛错（R11）。 调用方应修复输入对象，或在拥有诊断 sink 的边界传入同步 report。 */
+  propertyReadFailed: 'PROPERTY_READ_FAILED'
 } as const
 
 export type IRpcCoreErrorCode = (typeof RpcCoreErrorCode)[keyof typeof RpcCoreErrorCode]

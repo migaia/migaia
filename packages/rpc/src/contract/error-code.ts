@@ -12,7 +12,9 @@ export const RpcContractErrorCode = {
   /** Reassembly exceeded a declared message/source/global budget. */
   frameLimitExceeded: 'FRAME_LIMIT_EXCEEDED',
   /** Reassembly expired before all fragments arrived. */
-  frameAssemblyExpired: 'FRAME_ASSEMBLY_EXPIRED'
+  frameAssemblyExpired: 'FRAME_ASSEMBLY_EXPIRED',
+  /** Invalid wire error payload; the caller must reject the received value under R4. */
+  invalidWireError: 'INVALID_WIRE_ERROR'
 } as const
 
 export type IRpcContractErrorCode = (typeof RpcContractErrorCode)[keyof typeof RpcContractErrorCode]
