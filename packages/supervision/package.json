@@ -10,7 +10,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./coroutine": { "types": "./dist/coroutine/index.d.ts", "default": "./dist/coroutine/index.js" }
   },
   "scripts": {
     "fmt": "oxfmt src test",
