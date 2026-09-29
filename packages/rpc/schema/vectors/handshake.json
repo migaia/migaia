@@ -1,0 +1,270 @@
+{
+  "schema": "migaia.rpc.handshake-v1-vectors",
+  "agreement": [
+    {
+      "id": "highest-common-major",
+      "initiator": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [
+          {
+            "major": 1,
+            "minor": 4
+          },
+          {
+            "major": 2,
+            "minor": 3
+          }
+        ],
+        "codecs": [
+          "cbor",
+          "json"
+        ],
+        "capabilities": [
+          "abort@1",
+          "trace@1",
+          "x@1"
+        ],
+        "peer": {
+          "id": "caller",
+          "runtime": "zig"
+        }
+      },
+      "responder": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [
+          {
+            "major": 1,
+            "minor": 0
+          },
+          {
+            "major": 2,
+            "minor": 1
+          },
+          {
+            "major": 3,
+            "minor": 0
+          }
+        ],
+        "codecs": [
+          "json",
+          "cbor"
+        ],
+        "capabilities": [
+          "trace@1",
+          "abort@1"
+        ],
+        "peer": {
+          "id": "provider",
+          "runtime": "node"
+        }
+      },
+      "expected": {
+        "major": 2,
+        "minor": 1,
+        "codec": "cbor",
+        "capabilities": [
+          "abort@1",
+          "trace@1"
+        ]
+      }
+    },
+    {
+      "id": "minor-minimum",
+      "initiator": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [
+          {
+            "major": 1,
+            "minor": 2
+          }
+        ],
+        "codecs": [
+          "cbor",
+          "json"
+        ],
+        "capabilities": [
+          "abort@1",
+          "trace@1",
+          "x@1"
+        ],
+        "peer": {
+          "id": "caller",
+          "runtime": "zig"
+        }
+      },
+      "responder": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [
+          {
+            "major": 1,
+            "minor": 5
+          }
+        ],
+        "codecs": [
+          "json",
+          "cbor"
+        ],
+        "capabilities": [
+          "trace@1",
+          "abort@1"
+        ],
+        "peer": {
+          "id": "provider",
+          "runtime": "node"
+        }
+      },
+      "expected": {
+        "major": 1,
+        "minor": 2,
+        "codec": "cbor",
+        "capabilities": [
+          "abort@1",
+          "trace@1"
+        ]
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "no-json",
+      "value": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [
+          {
+            "major": 1,
+            "minor": 4
+          },
+          {
+            "major": 2,
+            "minor": 3
+          }
+        ],
+        "codecs": [
+          "cbor"
+        ],
+        "capabilities": [
+          "abort@1",
+          "trace@1",
+          "x@1"
+        ],
+        "peer": {
+          "id": "caller",
+          "runtime": "zig"
+        }
+      },
+      "violation": "baseline"
+    },
+    {
+      "id": "duplicate-major",
+      "value": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [
+          {
+            "major": 1,
+            "minor": 0
+          },
+          {
+            "major": 1,
+            "minor": 1
+          }
+        ],
+        "codecs": [
+          "cbor",
+          "json"
+        ],
+        "capabilities": [
+          "abort@1",
+          "trace@1",
+          "x@1"
+        ],
+        "peer": {
+          "id": "caller",
+          "runtime": "zig"
+        }
+      },
+      "violation": "duplicate"
+    },
+    {
+      "id": "no-common-major",
+      "initiator": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": [
+          "cbor",
+          "json"
+        ],
+        "capabilities": [
+          "abort@1",
+          "trace@1",
+          "x@1"
+        ],
+        "peer": {
+          "id": "caller",
+          "runtime": "zig"
+        }
+      },
+      "responder": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [
+          {
+            "major": 1,
+            "minor": 0
+          }
+        ],
+        "codecs": [
+          "json",
+          "cbor"
+        ],
+        "capabilities": [
+          "trace@1",
+          "abort@1"
+        ],
+        "peer": {
+          "id": "provider",
+          "runtime": "node"
+        }
+      },
+      "reason": "version"
+    }
+  ],
+  "mismatch": [
+    {
+      "id": "unoffered-major",
+      "accept": {
+        "kind": "handshake",
+        "step": "accept",
+        "protocol": "migaia.rpc",
+        "major": 3,
+        "minor": 0,
+        "codec": "cbor",
+        "capabilities": [],
+        "peer": {
+          "id": "provider",
+          "runtime": "node"
+        }
+      },
+      "violation": "mismatch"
+    }
+  ]
+}
