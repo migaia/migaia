@@ -1,6 +1,6 @@
 import type { IAbortSignal } from './abort.js'
 import type { IDisposerContext } from './disposer-context.js'
-import type { ILifecycleScheduler } from './scheduler.js'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import { LifecycleErrorPolicy, LifecycleState, LifecycleUnitState } from './state-constants.js'
 
 /**
@@ -57,7 +57,7 @@ export type IReleaseContext = {
    * Exposed so descriptor callbacks and the graceful-phase deadline share one clock source instead
    * of silently mixing domains.
    */
-  readonly scheduler?: ILifecycleScheduler
+  readonly scheduler?: IScheduler
   /** Side-channel diagnostic reporter; its own throws are contained (L-T26). */
   readonly report: (error: unknown) => void
   /** Owner-bound self-join guard; absent when a generic transaction has no scope owner. */

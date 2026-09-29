@@ -137,18 +137,20 @@ export const LifecycleErrorCode = {
   deadlineExceeded: 'DEADLINE_EXCEEDED',
 
   /**
-   * `systemScheduler` 依赖的宿主能力（`performance.now` / `setTimeout` / `clearTimeout`）缺失。
+   * Lifecycle 创建取消控制器所需的宿主 `AbortController` 能力缺失或行为不合规（abort-factory）。
    *
-   * 首次调用 `now()`（缺 `performance.now`）或 `schedule()`（缺 `setTimeout`/`clearTimeout`）时
-   * fail-fast。调用方要么注入自实现 `ILifecycleScheduler`，要么在具备这些跨运行时公共 API 的环境里运行。
+   * 在需要构造 `AbortController` 的 scope、generation 或 dispose 路径上 fail-fast。调度器宿主能力缺失不再由 lifecycle 抛出，而由
+   * `@migaia/utils/scheduler` 以 utils `ENV_UNSUPPORTED` 报告。调用方要么在提供 `AbortController`
+   * 的环境运行，要么改用不依赖该能力的 API。
    */
   envUnsupported: 'ENV_UNSUPPORTED',
 
   /**
-   * Scheduler 收到非法的时间/延迟参数：`schedule()` 的 `delayMs` 或 manual `advance(ms)` 的 `ms` 非有限或为负数。
+   * Lifecycle 边界收到非法选项：注入的 scheduler 或其任务不满足准入（访问器抛出、缺 `now`/`schedule`/`cancel`、`unref`
+   * 非函数），或时间/延迟参数非有限、为负数、相加溢出。
    *
-   * 落实 `docs/contracts/runtime-neutrality.sdd.md` R-9/T-16 的「delay 有限非负、now 单调不递减」；
-   * 调用方应修正传入的延迟/推进量，不要重试同一份非法参数。
+   * 落实 `docs/lifecycle/lifecycle-scheduler-convergence.sdd.md` R5 的注入准入与 R-9 的「delay 有限非负」；
+   * 调用方应修正注入对象或传入的延迟，不要重试同一份非法参数。
    */
   invalidOption: 'INVALID_OPTION'
 } as const

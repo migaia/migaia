@@ -4,8 +4,7 @@ import { createProvisionalScope } from '../src/provisional-scope'
 import { createLifecycleUnit } from '../src/lifecycle-unit'
 import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope'
 import { createGenerationController } from '../src/generation-controller'
-import { systemScheduler, createManualScheduler } from '../src/scheduler'
-import { LifecycleErrorCode } from '../src/error-code'
+import { systemScheduler, createManualScheduler } from '@migaia/utils/scheduler'
 import { assimilateCapturedThen, probeThenable } from '../src/errors'
 import type { ILifecycleOwner } from '../src/types'
 
@@ -113,7 +112,7 @@ describe('AF-T2 LifecycleUnit thenable single probe', () => {
 })
 
 describe('AF-T3 scheduler input validation', () => {
-  it('systemScheduler.schedule rejects NaN/Infinity/negative delay with a tagged RangeError', () => {
+  it('utils systemScheduler.schedule rejects NaN/Infinity/negative delay with a utils-tagged RangeError', () => {
     for (const delay of [NaN, Infinity, -Infinity, -1]) {
       let thrown: unknown
       try {
@@ -122,7 +121,7 @@ describe('AF-T3 scheduler input validation', () => {
         thrown = error
       }
       expect(thrown).toBeInstanceOf(RangeError)
-      expect((thrown as { code?: unknown }).code).toBe(LifecycleErrorCode.invalidOption)
+      expect(thrown).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
     }
   })
 

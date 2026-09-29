@@ -15,7 +15,8 @@ import { createTerminalController } from './terminal-controller.js'
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
 import { createDisposeTransaction } from './dispose-transaction.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
-import { resolveSchedulerOption, type ILifecycleScheduler } from './scheduler.js'
+import type { IScheduler } from '@migaia/utils/scheduler'
+import { resolveSchedulerOption } from './scheduler.js'
 
 const asyncDisposeKey = (Symbol as typeof Symbol & { asyncDispose?: symbol }).asyncDispose
 
@@ -38,7 +39,7 @@ export type ILifecycleScopeOptions = {
    * 时间域来源（R-9）：graceful timeout / deadline 经它驱动，缺省 `systemScheduler`。透传给
    * `DisposeTransaction`，使注入方（如 plugin-host）的 teardown 与 mutation queue 处于同一时间域。
    */
-  readonly scheduler?: ILifecycleScheduler
+  readonly scheduler?: IScheduler
 }
 
 export type ILifecycleScope = ILifecycleOwner & {

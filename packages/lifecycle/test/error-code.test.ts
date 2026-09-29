@@ -10,7 +10,7 @@ import { createStringQuiescenceTracker } from '../src/quiescence-tracker'
 import { createProvisionalScope } from '../src/provisional-scope'
 import { createMutationQueue } from '../src/mutation-queue'
 import { createDisposeTransaction, executeReleaseDescriptor } from '../src/dispose-transaction'
-import { systemScheduler } from '../src/scheduler.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { LIFECYCLE_SOURCE } from '../src/errors'
 import type { IReleaseContext } from '../src/types'
 

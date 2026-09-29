@@ -13,13 +13,13 @@ import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 import { boundedWait } from './bounded-wait.js'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import {
+  resolveScheduler,
   resolveSchedulerOption,
   addSchedulerTime,
-  systemScheduler,
   validateSchedulerDelay,
-  validateSchedulerTime,
-  type ILifecycleScheduler
+  validateSchedulerTime
 } from './scheduler.js'
 import { type IAbortSignal } from './abort.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
@@ -107,7 +107,7 @@ async function raceGraceful(
 ): Promise<IGracefulOutcome> {
   // Start the graceful budget before user code runs so synchronous work cannot earn a fresh
   // timeout after it has already consumed the caller's budget.
-  const scheduler = context.scheduler ?? systemScheduler
+  const scheduler = context.scheduler ?? resolveScheduler(systemScheduler)
   const start = scheduler.now()
   const effectiveDeadline = computeEffectiveDeadline(gracefulTimeoutMs, context.deadlineAt, start)
   let result: void | PromiseLike<void>
@@ -280,7 +280,7 @@ export type IDisposeTransactionOptions = {
    * Scheduler whose `now()` produced `deadlineAt`（R-9 时间域契约）；缺省 `systemScheduler`。 Forwarded into
    * every item's `context.scheduler` and into the graceful-phase `boundedWait`.
    */
-  readonly scheduler?: ILifecycleScheduler
+  readonly scheduler?: IScheduler
   /** Forwarded into `context.signal` for every item; aborted automatically once `run()` starts. */
   readonly signal?: IAbortSignal
   /** Owner-bound self-join capability, supplied only by a LifecycleScope owner. */

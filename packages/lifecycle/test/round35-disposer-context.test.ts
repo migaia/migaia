@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   createDisposeTransaction,
   createLifecycleScope,
-  createManualScheduler,
   createSyncLifecycleScope,
   LifecycleErrorCode
 } from '../src/index.js'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import type { IReleaseContext } from '../src/index.js'
 
 describe('disposer context owner-join contract', () => {

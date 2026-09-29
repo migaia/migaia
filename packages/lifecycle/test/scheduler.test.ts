@@ -1,12 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  createManualScheduler,
-  resolveScheduler,
-  snapshotScheduler,
-  systemScheduler,
-  type ILifecycleScheduler
-} from '../src/scheduler.js'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { addSchedulerTime, resolveScheduler, snapshotScheduler } from '../src/scheduler.js'
+import { boundedWait } from '../src/bounded-wait.js'
+import { createLifecycleScope } from '../src/lifecycle-scope.js'
+import { createDisposeTransaction } from '../src/dispose-transaction.js'
 import { LifecycleErrorCode } from '../src/error-code.js'
+import { createGenerationController } from '../src/generation-controller.js'
+import { createMutationQueue } from '../src/mutation-queue.js'
+
+/** Captures a synchronous throw for identity assertions. */
+function captureThrow(run: () => unknown): unknown {
+  try {
+    run()
+  } catch (error) {
+    return error
+  }
+  throw new Error('expected a throw')
+}
 
 describe('T-16 lifecycle scheduler', () => {
   afterEach(() => {
@@ -30,212 +40,6 @@ describe('T-16 lifecycle scheduler', () => {
     const snapshot = snapshotScheduler({ now: () => 0, schedule })
     expect(() => snapshot?.schedule(() => {}, '1' as never)).toThrowError(TypeError)
     expect(schedule).not.toHaveBeenCalled()
-  })
-
-  it('manualScheduler.now() 单调不递减，相同值合法', () => {
-    const scheduler = createManualScheduler()
-    expect(scheduler.now()).toBe(0)
-    scheduler.advance(5)
-    expect(scheduler.now()).toBe(5)
-    scheduler.advance(0)
-    expect(scheduler.now()).toBe(5)
-  })
-
-  it('manualScheduler.schedule 到期才执行，callback 至多一次', () => {
-    const scheduler = createManualScheduler()
-    let count = 0
-    scheduler.schedule(() => {
-      count++
-    }, 10)
-    expect(count).toBe(0)
-    scheduler.advance(9)
-    expect(count).toBe(0)
-    scheduler.advance(1)
-    expect(count).toBe(1)
-    scheduler.advance(100)
-    expect(count).toBe(1)
-  })
-
-  it('manualScheduler.cancel 幂等，cancel 后不执行', () => {
-    const scheduler = createManualScheduler()
-    let count = 0
-    const task = scheduler.schedule(() => {
-      count++
-    }, 10)
-    task.cancel()
-    task.cancel()
-    scheduler.advance(100)
-    expect(count).toBe(0)
-  })
-
-  it('manualScheduler 按到期时刻升序执行（同时刻按登记顺序）', () => {
-    const scheduler = createManualScheduler()
-    const order: number[] = []
-    scheduler.schedule(() => order.push(2), 20)
-    scheduler.schedule(() => order.push(1), 10)
-    scheduler.schedule(() => order.push(3), 10)
-    scheduler.advance(30)
-    expect(order).toEqual([1, 3, 2])
-  })
-
-  it('manualScheduler rejects schedule overflow before task insertion and callback', () => {
-    const scheduler = createManualScheduler()
-    let retainedRuns = 0
-    let overflowRuns = 0
-
-    scheduler.advance(Number.MAX_VALUE)
-    scheduler.schedule(() => {
-      retainedRuns++
-    }, 0)
-
-    expect(() =>
-      scheduler.schedule(() => {
-        overflowRuns++
-      }, Number.MAX_VALUE)
-    ).toThrowError(
-      expect.objectContaining({
-        name: 'RangeError',
-        code: LifecycleErrorCode.invalidOption
-      })
-    )
-    expect(scheduler.now()).toBe(Number.MAX_VALUE)
-    expect(overflowRuns).toBe(0)
-
-    scheduler.advance(0)
-    expect(retainedRuns).toBe(1)
-    expect(overflowRuns).toBe(0)
-  })
-
-  it('manualScheduler rejects advance overflow before clock or queue mutation', () => {
-    const scheduler = createManualScheduler()
-    let runs = 0
-
-    scheduler.advance(Number.MAX_VALUE)
-    scheduler.schedule(() => {
-      runs++
-    }, 0)
-
-    expect(() => scheduler.advance(Number.MAX_VALUE)).toThrowError(
-      expect.objectContaining({
-        name: 'RangeError',
-        code: LifecycleErrorCode.invalidOption
-      })
-    )
-    expect(scheduler.now()).toBe(Number.MAX_VALUE)
-    expect(runs).toBe(0)
-
-    scheduler.advance(0)
-    expect(runs).toBe(1)
-  })
-
-  it('manualScheduler preserves finite maximum and zero arithmetic edges', () => {
-    const scheduler = createManualScheduler()
-    let runs = 0
-
-    scheduler.advance(Number.MAX_VALUE)
-    scheduler.schedule(() => {
-      runs++
-    }, 0)
-    scheduler.advance(0)
-
-    expect(scheduler.now()).toBe(Number.MAX_VALUE)
-    expect(runs).toBe(1)
-  })
-
-  it('systemScheduler.now() 返回有限数字（performance.now）', () => {
-    expect(Number.isFinite(systemScheduler.now())).toBe(true)
-  })
-
-  it.each([
-    ['NaN', NaN, RangeError],
-    ['Infinity', Infinity, RangeError],
-    ['-Infinity', -Infinity, RangeError],
-    ['non-number', 'clock', TypeError]
-  ] as const)(
-    'systemScheduler.now() rejects %s clock values without timer effects',
-    async (_label, value, errorType) => {
-      const timer = vi.fn(() => 1)
-      const clear = vi.fn()
-      const performanceHost = {
-        now(this: unknown) {
-          expect(this).toBe(performanceHost)
-          return value
-        }
-      }
-      vi.stubGlobal('performance', performanceHost)
-      vi.stubGlobal('setTimeout', timer)
-      vi.stubGlobal('clearTimeout', clear)
-      vi.resetModules()
-      const isolatedScheduler = (await import('../src/scheduler.js')).systemScheduler
-
-      expect(() => isolatedScheduler.now()).toThrowError(
-        expect.objectContaining({
-          name: errorType.name,
-          source: '@migaia/lifecycle',
-          code: LifecycleErrorCode.invalidOption
-        })
-      )
-      expect(timer).not.toHaveBeenCalled()
-      expect(clear).not.toHaveBeenCalled()
-    }
-  )
-
-  it('systemScheduler.now() preserves finite zero and original performance.now throws', async () => {
-    const originalError = new Error('clock failed')
-    let clockValue: number | (() => never) = 0
-    vi.stubGlobal('performance', {
-      now() {
-        if (typeof clockValue === 'function') return clockValue()
-        return clockValue
-      }
-    })
-    vi.resetModules()
-    const isolatedScheduler = (await import('../src/scheduler.js')).systemScheduler
-
-    expect(isolatedScheduler.now()).toBe(0)
-    clockValue = () => {
-      throw originalError
-    }
-    expect(() => isolatedScheduler.now()).toThrow(originalError)
-  })
-
-  it('systemScheduler.schedule 创建真实 timer，cancel 幂等后不执行', async () => {
-    let count = 0
-    const task = systemScheduler.schedule(() => {
-      count++
-    }, 1)
-    task.cancel()
-    task.cancel()
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    expect(count).toBe(0)
-  })
-
-  it('performance.now 缺失 → now() 抛 ENV_UNSUPPORTED', () => {
-    vi.stubGlobal('performance', undefined)
-    expect(() => systemScheduler.now()).toThrowError(
-      expect.objectContaining({ code: 'ENV_UNSUPPORTED', source: '@migaia/lifecycle' })
-    )
-  })
-
-  it('setTimeout/clearTimeout 缺失 → schedule() 抛 ENV_UNSUPPORTED', () => {
-    vi.stubGlobal('setTimeout', undefined)
-    vi.stubGlobal('clearTimeout', undefined)
-    expect(() => systemScheduler.schedule(() => {}, 1)).toThrowError(
-      expect.objectContaining({ code: 'ENV_UNSUPPORTED', source: '@migaia/lifecycle' })
-    )
-  })
-})
-
-describe('T-18 scheduler contract 兼容门禁', () => {
-  it('ILifecycleScheduler 可赋值给 ISerializeScheduler 结构子集（compile-time）', () => {
-    // serialize/core 将自声明的结构子集（R-4）；lifecycle 不得多出 serialize 未定义的语义。
-    type ISerializeScheduler = {
-      now(): number
-      schedule(callback: () => void, delayMs: number): { cancel(): void }
-    }
-    const scheduler: ILifecycleScheduler = createManualScheduler()
-    const asSerialize: ISerializeScheduler = scheduler
-    expect(asSerialize).toBe(scheduler)
   })
 })
 
@@ -335,5 +139,297 @@ describe('AF-T62 scheduler/task admission snapshot', () => {
     expect((resolvedError as Error).cause).toBe(getterError)
     expect((resolvedError as Error).cause).not.toHaveProperty('cause')
     expect(reads).toBe(2)
+  })
+})
+
+describe('A5 injected task unref forwarding, rollback and lifecycle defaults', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /** Builds an injected scheduler whose single task exposes counting `cancel`/`unref` getters. */
+  const injectedTask = (unrefValue: () => unknown, cancelImpl: () => void = () => undefined) => {
+    /** Accessor reads in order. */
+    const reads: string[] = []
+    /** Cancel invocations with their receivers. */
+    const cancelReceivers: unknown[] = []
+    const task = {
+      get cancel() {
+        reads.push('cancel')
+        return function (this: unknown) {
+          cancelReceivers.push(this)
+          cancelImpl()
+        }
+      },
+      get unref() {
+        reads.push('unref')
+        return unrefValue()
+      }
+    }
+    const scheduler = { now: () => 0, schedule: () => task }
+    return { task, reads, cancelReceivers, scheduler }
+  }
+
+  it('forwards a function unref with the original task as receiver after reading cancel then unref once', () => {
+    /** Receivers of the injected unref method. */
+    const unrefReceivers: unknown[] = []
+    const { task, reads, cancelReceivers, scheduler } = injectedTask(
+      () =>
+        function (this: unknown) {
+          unrefReceivers.push(this)
+        }
+    )
+    const snapshotTask = snapshotScheduler(scheduler)!.schedule(() => undefined, 1)
+    snapshotTask.unref?.()
+    snapshotTask.unref?.()
+    expect(reads).toEqual(['cancel', 'unref'])
+    expect(unrefReceivers).toEqual([task, task])
+    expect(cancelReceivers).toEqual([])
+  })
+
+  it('rejects a non-function unref after cancelling the injected timer once', () => {
+    const { cancelReceivers, task, scheduler } = injectedTask(() => 1)
+    const error = captureThrow(() => snapshotScheduler(scheduler)!.schedule(() => undefined, 1))
+    expect(error).toMatchObject({
+      source: '@migaia/lifecycle',
+      code: LifecycleErrorCode.invalidOption
+    })
+    expect(cancelReceivers).toEqual([task])
+  })
+
+  it('rejects a throwing unref getter with the original error on cause after one rollback', () => {
+    const getterError = new Error('unref getter failed')
+    const { cancelReceivers, scheduler } = injectedTask(() => {
+      throw getterError
+    })
+    const error = captureThrow(() => snapshotScheduler(scheduler)!.schedule(() => undefined, 1))
+    expect(error).toBeInstanceOf(TypeError)
+    expect(error).toMatchObject({
+      source: '@migaia/lifecycle',
+      code: LifecycleErrorCode.invalidOption
+    })
+    expect((error as Error).cause).toBe(getterError)
+    expect(cancelReceivers).toHaveLength(1)
+  })
+
+  it('keeps the unref rejection primary when the rollback cancel also throws', () => {
+    const getterError = new Error('unref getter failed')
+    const cancelError = new Error('cancel failed')
+    const { scheduler } = injectedTask(
+      () => {
+        throw getterError
+      },
+      () => {
+        throw cancelError
+      }
+    )
+    const error = captureThrow(() => snapshotScheduler(scheduler)!.schedule(() => undefined, 1))
+    expect(error).toBeInstanceOf(TypeError)
+    expect((error as Error).cause).toBe(getterError)
+    expect((error as { errors?: unknown[] }).errors?.[0]).toBe(cancelError)
+  })
+
+  it('omits unref from the snapshot when the injected task has none, without cancelling', () => {
+    const cancel = vi.fn()
+    const snapshotTask = snapshotScheduler({
+      now: () => 0,
+      schedule: () => ({ cancel })
+    })!.schedule(() => undefined, 1)
+    expect(Object.hasOwn(snapshotTask, 'unref')).toBe(false)
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('lifecycle factories default to a snapshot of the utils systemScheduler', async () => {
+    const schedule = vi.spyOn(systemScheduler, 'schedule')
+    const controller = createGenerationController()
+    controller.begin({ timeoutMs: 5 })
+    expect(schedule).toHaveBeenCalledTimes(1)
+    expect(schedule.mock.calls[0]![1]).toBe(5)
+    controller.dispose()
+
+    const now = vi.spyOn(systemScheduler, 'now')
+    const queue = createMutationQueue()
+    /** Releases the first queued task. */
+    let release!: () => void
+    const order: string[] = []
+    const first = queue.enqueue(
+      () =>
+        new Promise<void>((resolve) => {
+          release = () => {
+            order.push('t1')
+            resolve()
+          }
+        })
+    )
+    expect(now).not.toHaveBeenCalled()
+    const second = queue.enqueue(() => {
+      order.push('t2')
+    })
+    expect(now).toHaveBeenCalled()
+    release()
+    await Promise.all([first, second])
+    expect(order).toEqual(['t1', 't2'])
+  })
+})
+
+describe('A11 default scheduler identity versus lifecycle admission identity', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it.each([
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['-1', -1]
+  ] as const)('utils systemScheduler rejects delay %s with utils INVALID_ARGUMENT', (_l, delay) => {
+    const error = captureThrow(() => systemScheduler.schedule(() => undefined, delay))
+    expect(error).toBeInstanceOf(RangeError)
+    expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect((error as { detail?: unknown }).detail).toBeUndefined()
+  })
+
+  it('utils systemScheduler rejects a string delay with a utils TypeError', () => {
+    const error = captureThrow(() => systemScheduler.schedule(() => undefined, '1' as never))
+    expect(error).toBeInstanceOf(TypeError)
+    expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+  })
+
+  it('lifecycle admission rejects before reaching the utils implementation', () => {
+    const schedule = vi.spyOn(systemScheduler, 'schedule')
+    const error = captureThrow(() =>
+      snapshotScheduler(systemScheduler)!.schedule(() => undefined, Number.NaN)
+    )
+    expect(error).toBeInstanceOf(RangeError)
+    expect(error).toMatchObject({
+      source: '@migaia/lifecycle',
+      code: LifecycleErrorCode.invalidOption,
+      detail: { field: 'delayMs' }
+    })
+    expect(schedule).not.toHaveBeenCalled()
+  })
+
+  it('createMutationQueue keeps lifecycle identity for an invalid default admission timeout', async () => {
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: -1 })
+    /** Releases the first queued task. */
+    let release!: () => void
+    const first = queue.enqueue(
+      () =>
+        new Promise<string>((resolve) => {
+          release = () => resolve('t1')
+        })
+    )
+    const second = queue.enqueue(() => 't2')
+    await expect(second).rejects.toBeInstanceOf(RangeError)
+    await expect(second).rejects.toMatchObject({
+      source: '@migaia/lifecycle',
+      code: LifecycleErrorCode.invalidOption,
+      detail: { field: 'delayMs' }
+    })
+    expect(queue.size).toBe(1)
+    release()
+    await expect(first).resolves.toBe('t1')
+  })
+})
+
+describe('A5 admission boundaries that replace the removed lifecycle implementation', () => {
+  it('rejects overflowing admission arithmetic and non-scheduler values with lifecycle identity', () => {
+    expect(
+      captureThrow(() => addSchedulerTime(Number.MAX_VALUE, Number.MAX_VALUE, 'deadline'))
+    ).toMatchObject({
+      name: 'RangeError',
+      source: '@migaia/lifecycle',
+      code: LifecycleErrorCode.invalidOption,
+      detail: { field: 'deadline' }
+    })
+    expect(snapshotScheduler(1)).toBeUndefined()
+    expect(snapshotScheduler({ now: () => 0 })).toBeUndefined()
+    expect(
+      captureThrow(() => resolveScheduler({ schedule: () => ({ cancel() {} }) }))
+    ).toMatchObject({
+      source: '@migaia/lifecycle',
+      code: LifecycleErrorCode.invalidOption
+    })
+    const primitiveTask = snapshotScheduler({ now: () => 0, schedule: () => 1 })!
+    expect(captureThrow(() => primitiveTask.schedule(() => undefined, 1))).toMatchObject({
+      source: '@migaia/lifecycle',
+      code: LifecycleErrorCode.invalidOption
+    })
+  })
+
+  it('boundedWait surfaces injected schedule and cancel failures unchanged', async () => {
+    const scheduleFailure = new Error('schedule failed')
+    await expect(
+      boundedWait(new Promise(() => undefined), 10, {
+        scheduler: {
+          now: () => 0,
+          schedule: () => {
+            throw scheduleFailure
+          }
+        }
+      })
+    ).rejects.toBe(scheduleFailure)
+
+    const cancelFailure = new Error('cancel failed')
+    await expect(
+      boundedWait(Promise.resolve('done'), 10, {
+        scheduler: {
+          now: () => 0,
+          schedule: () => ({
+            cancel: () => {
+              throw cancelFailure
+            }
+          })
+        }
+      })
+    ).rejects.toBe(cancelFailure)
+  })
+
+  it('drives a scope graceful deadline through an injected manual scheduler', async () => {
+    const scheduler = createManualScheduler()
+    const scope = createLifecycleScope({ scheduler })
+    const force = vi.fn()
+    scope.own(
+      {},
+      {
+        graceful: () => new Promise<void>(() => undefined),
+        gracefulTimeoutMs: 10,
+        force
+      }
+    )
+    const disposed = scope.dispose()
+    for (let attempt = 0; attempt < 50 && scheduler.pendingCount === 0; attempt += 1)
+      await Promise.resolve()
+    expect(force).not.toHaveBeenCalled()
+    scheduler.advance(10)
+    await disposed
+    expect(force).toHaveBeenCalledTimes(1)
+  })
+
+  it('drives a dispose transaction graceful deadline through an injected manual scheduler', async () => {
+    const scheduler = createManualScheduler()
+    const force = vi.fn()
+    /** Abort listener the graceful callback registers on its release signal. */
+    const listener = (): void => undefined
+    const transaction = createDisposeTransaction({ kind: 'order' }, { scheduler })
+    const run = transaction.run([
+      {
+        source: 'graceful-timeout',
+        descriptor: {
+          graceful: (context) => {
+            context.signal.addEventListener('abort', listener)
+            context.signal.removeEventListener('abort', listener)
+            return new Promise<void>(() => undefined)
+          },
+          gracefulTimeoutMs: 10,
+          force
+        }
+      }
+    ])
+    for (let attempt = 0; attempt < 50 && scheduler.pendingCount === 0; attempt += 1)
+      await Promise.resolve()
+    expect(force).not.toHaveBeenCalled()
+    scheduler.advance(10)
+    await run
+    expect(force).toHaveBeenCalledTimes(1)
   })
 })
