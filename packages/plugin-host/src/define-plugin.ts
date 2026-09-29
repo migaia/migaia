@@ -32,6 +32,7 @@ const knownKeys = new Set<PropertyKey>([
   'name',
   'config',
   'install',
+  'setup',
   'update',
   'onEnable',
   'onDisable',
@@ -61,6 +62,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   const name = readData(source, 'name')
   const rawConfig = readData(source, 'config')
   const install = readData(source, 'install')
+  const setup = readData(source, 'setup')
   const update = readData(source, 'update')
   const onEnable = readData(source, 'onEnable')
   const onDisable = readData(source, 'onDisable')
@@ -79,6 +81,8 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     throw createPluginHostTypeError('plugin name must be a non-empty string without "."')
   if (typeof install !== 'function')
     throw createPluginHostTypeError('plugin install must be a function')
+  if (setup !== undefined && typeof setup !== 'function')
+    throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_SETUP_FUNCTION)
   for (const [key, value] of [
     ['update', update],
     ['onEnable', onEnable],
@@ -126,9 +130,14 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     enumerable: true
   })
   Object.defineProperty(plugin, 'install', {
-    value: (core: unknown) => invokeCaptured(install as Function, source, [core]),
+    value: (...args: unknown[]) => invokeCaptured(install as Function, source, args),
     enumerable: true
   })
+  if (setup !== undefined)
+    Object.defineProperty(plugin, 'setup', {
+      value: (context: unknown) => invokeCaptured(setup as Function, source, [context]),
+      enumerable: true
+    })
   Object.defineProperty(plugin, 'activation', { value: activation, enumerable: true })
   Object.defineProperty(plugin, 'getFeature', {
     enumerable: false,
@@ -192,6 +201,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     name,
     config: ownedConfig,
     install: plugin.install as IPluginConstraint<any>['install'],
+    setup: plugin.setup as IPluginDefinition<any>['setup'],
     update: plugin.update as IPluginConstraint<any>['update'],
     onEnable: plugin.onEnable as IPluginConstraint<any>['onEnable'],
     onDisable: plugin.onDisable as IPluginConstraint<any>['onDisable'],

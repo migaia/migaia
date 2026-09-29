@@ -39,6 +39,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       readonly name: unknown
       readonly config: unknown
       readonly install: unknown
+      readonly setup: unknown
       readonly update: unknown
       readonly onEnable: unknown
       readonly onDisable: unknown
@@ -55,6 +56,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
         name: plugin?.name,
         config: plugin?.config,
         install: plugin?.install,
+        setup: (plugin as { readonly setup?: unknown })?.setup,
         update: plugin?.update,
         onEnable: plugin?.onEnable,
         onDisable: plugin?.onDisable,
@@ -73,6 +75,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       name,
       config: rawConfig,
       install,
+      setup,
       update,
       onEnable,
       onDisable,
@@ -89,6 +92,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
     if (name.includes('.')) throw createPluginHostTypeError('plugin name must not contain "."')
     if (typeof install !== 'function')
       throw createPluginHostTypeError('plugin install must be a function')
+    if (setup !== undefined && typeof setup !== 'function')
+      throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_SETUP_FUNCTION)
     for (const [key, hook] of [
       ['update', update],
       ['onEnable', onEnable],
@@ -116,6 +121,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       name,
       config: copyConfig((rawConfig ?? {}) as IPluginConfig, 'plugin config'),
       install: install as IPluginConstraint<any>['install'],
+      setup: setup as IPluginDefinition<any>['setup'],
       update: update as IPluginConstraint<any>['update'],
       onEnable: onEnable as IPluginConstraint<any>['onEnable'],
       onDisable: onDisable as IPluginConstraint<any>['onDisable'],
