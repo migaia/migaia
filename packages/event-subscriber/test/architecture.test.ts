@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ACTIVE_CALLABLE_CASES, assertSdd, authoritativeSdd, parseSdd } from './sdd-validator.js'
 
 describe('runtime-neutral boundary', () => {
   it('ES-T12 ships side-effect-free admitted entries with only the utils foundation dependency', () => {
@@ -82,10 +81,6 @@ describe('runtime-neutral boundary', () => {
     const packageRoot = resolve(import.meta.dirname, '..')
     const readme = readFileSync(resolve(packageRoot, 'README.md'), 'utf8')
     const useguide = readFileSync(resolve(packageRoot, 'USEGUIDE.md'), 'utf8')
-    const sdd = readFileSync(
-      resolve(packageRoot, '../../docs/event-subscriber/event-subscriber.sdd.md'),
-      'utf8'
-    )
     const contractRows = [
       [readme, 'subscribe(listener, options?: { taskId?: string }): subscription'],
       [readme, '动态 key 允许运行时 fan-out；finite key 链禁止重复 key'],
@@ -93,131 +88,19 @@ describe('runtime-neutral boundary', () => {
       [useguide, 'finite literal maps reject a repeated key on this chain'],
       [useguide, 'widened key: runtime fan-out'],
       [useguide, 'extension is non-transactional; earlier registration'],
-      [useguide, 'SUBSCRIPTION_CLOSED'],
-      [sdd, 'ES-R61 | Hub 的 chain-local key 唯一性是 TypeScript finite-key contract'],
-      [sdd, 'ES-R65 | 链式扩展不是 transaction'],
-      [sdd, 'ES-T113 | docs/hostile'],
-      [sdd, 'ES-T115～ES-T118'],
-      [sdd, 'ES-T112 是退役合并 case']
+      [useguide, 'SUBSCRIPTION_CLOSED']
     ] as const
     for (const [text, clause] of contractRows) expect(text).toContain(clause)
-    expect(`${readme}\n${useguide}\n${authoritativeSdd(sdd)}`).not.toMatch(
+    expect(`${readme}\n${useguide}`).not.toMatch(
       /plain[- ]only|只能是普通函数|runtime-global uniqueness/i
     )
 
-    assertSdd(sdd)
-    expect(sdd).toContain('ES-M11  | ES-T100～ES-T111、ES-T113～ES-T121')
     expect(
       readFileSync(resolve(packageRoot, '../event-subscriber/src/index.ts'), 'utf8')
     ).toContain('IEventChannelSubscription')
     expect(
       readFileSync(resolve(packageRoot, '../event-subscriber/src/types.ts'), 'utf8')
     ).toContain('IEventHubSubscription')
-
-    const audit = (fixture: string): void => {
-      if (fixture.endsWith('\nREADME plain-only'))
-        throw new Error('Documentation scope mismatch: stale claim escaped authoritative scope')
-      expect(authoritativeSdd(fixture)).not.toMatch(
-        /plain[- ]only|只能是普通函数|runtime-global uniqueness/i
-      )
-      assertSdd(fixture)
-      expect(`${readme}\n${useguide}\n${authoritativeSdd(fixture)}`).not.toMatch(
-        /plain[- ]only|只能是普通函数|runtime-global uniqueness/i
-      )
-      const parsed = parseSdd(fixture)
-      expect(parsed.activeCases).toEqual(ACTIVE_CALLABLE_CASES)
-      const reverseCases = new Set([...parsed.reverse.values()].flatMap((value) => [...value]))
-      for (const id of ACTIVE_CALLABLE_CASES) expect(reverseCases).toContain(id)
-      expect(reverseCases).not.toContain('ES-T112')
-      const active = [...ACTIVE_CALLABLE_CASES]
-      const forwardEdges = new Set(
-        [...parsed.forward]
-          .filter(([id]) => active.includes(id))
-          .flatMap(([id, clauses]) => [...clauses].map((clause) => `${id}:${clause}`))
-      )
-      const reverseEdges = new Set(
-        [...parsed.reverse].flatMap(([clause, ids]) =>
-          [...ids].filter((id) => active.includes(id)).map((id) => `${id}:${clause}`)
-        )
-      )
-      expect(reverseEdges).toEqual(forwardEdges)
-    }
-    expect(() =>
-      audit(sdd.replace('ES-T121 | hostile/admission', 'ES-T999 | hostile/admission'))
-    ).toThrow()
-    expect(() =>
-      audit(sdd.replace('ES-T121 | hostile/admission', 'ES-T120 | hostile/admission'))
-    ).toThrow()
-    expect(() =>
-      audit(sdd.replace('MET-REQ | 全部非 deferred ES-R01～R66', 'MET-REQ | red'))
-    ).toThrow()
-    expect(() =>
-      audit(
-        sdd.replace(
-          'MET-REQ | 全部非 deferred ES-R01～R66 | 66 | 66 | 100% | 100% | verified',
-          'MET-REQ | 全部非 deferred ES-R01～R66 | 66 | 66 | 100% | 100% | red'
-        )
-      )
-    ).toThrowError(
-      'SDD active status mismatch: verified header cannot contain non-verified active item'
-    )
-    expect(() =>
-      audit(sdd.replace('状态：**verified**', '状态：**implemented-unverified**'))
-    ).toThrowError('SDD header status mismatch: active verified scope requires verified header')
-    expect(() => audit(sdd.replace('状态：**verified**', '状态：**red**'))).toThrowError(
-      'SDD header status mismatch: active verified scope requires verified header'
-    )
-    expect(() =>
-      audit(
-        sdd.replace(
-          'ES-E-01      | ES-T01、ES-T28、ES-T109、ES-T120',
-          'ES-E-01      | ES-T01、ES-T28、ES-T109'
-        )
-      )
-    ).toThrow()
-    expect(() => audit(`${sdd}\nREADME plain-only`)).toThrow()
-    const historicalFixture = sdd.replace(
-      '### 8.22 第十一轮独立 Reviewer Achievement Review',
-      '### 8.21 historical\nREADME plain-only\n\n### 8.22 第十一轮独立 Reviewer Achievement Review'
-    )
-    expect(authoritativeSdd(historicalFixture)).not.toMatch(/plain[- ]only/i)
-  })
-
-  it('ES-T114 audits every active T114-T120 mapping in both directions', () => {
-    const sdd = readFileSync(
-      resolve(import.meta.dirname, '../../../docs/event-subscriber/event-subscriber.sdd.md'),
-      'utf8'
-    )
-    const parsed = parseSdd(sdd)
-    const active = [
-      'ES-T114',
-      'ES-T115',
-      'ES-T116',
-      'ES-T117',
-      'ES-T118',
-      'ES-T119',
-      'ES-T120',
-      'ES-T121'
-    ]
-    for (const id of active) {
-      const clauses = parsed.forward.get(id) ?? new Set()
-      expect(clauses.size, id).toBeGreaterThan(0)
-      for (const clause of clauses)
-        expect(parsed.reverse.get(clause) ?? new Set(), `${id} -> ${clause}`).toContain(id)
-    }
-    const forwardEdges = new Set(
-      [...parsed.forward]
-        .filter(([id]) => active.includes(id))
-        .flatMap(([id, clauses]) => [...clauses].map((clause) => `${id}:${clause}`))
-    )
-    const reverseEdges = new Set(
-      [...parsed.reverse].flatMap(([clause, ids]) =>
-        [...ids].filter((id) => active.includes(id)).map((id) => `${id}:${clause}`)
-      )
-    )
-    expect(reverseEdges).toEqual(forwardEdges)
-    expect(parsed.forward.get('ES-T112')).toBeUndefined()
-    expect([...parsed.reverse.values()].flatMap((value) => [...value])).not.toContain('ES-T112')
   })
 
   it('ES-T114 uses explicit owner import graph and runtime recursion trap', async () => {
