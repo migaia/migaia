@@ -1,7 +1,7 @@
 import type { IObjectPath, IObjectPathValue } from '@migaia/utils/object-path'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { EventSubscriberState } from './state-constants.js'
-import type { IEventDispatchPolicy } from './state-constants.js'
+import type { IEventAdmissionPolicy, IEventDispatchPolicy } from './state-constants.js'
 import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } from './style.js'
 
 export type IUnsubscribe = () => void
@@ -329,6 +329,8 @@ export type IEventChannelOptions<
   readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
   /** Controls synchronous nested publishes while preserving listener snapshot semantics. */
   readonly dispatchPolicy?: IEventDispatchPolicy
+  /** Selects whether one listener identity has one registration or each subscribe owns a new one. */
+  readonly admissionPolicy?: IEventAdmissionPolicy
   /** Controls whether one subscription handle removes only itself or all matching listeners. */
   readonly removalPolicy?: 'handle' | 'listener-all'
   /** Maximum listener invocations in one top-level synchronous publish transaction. */

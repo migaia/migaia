@@ -13,6 +13,14 @@ export const EventDispatchPolicy = {
 
 export type IEventDispatchPolicy = (typeof EventDispatchPolicy)[keyof typeof EventDispatchPolicy]
 
+/** Stable channel admission modes; unique registration is opt-in for identity-based consumers. */
+export const EventAdmissionPolicy = {
+  multiple: 'multiple',
+  unique: 'unique'
+} as const
+
+export type IEventAdmissionPolicy = (typeof EventAdmissionPolicy)[keyof typeof EventAdmissionPolicy]
+
 export type IEventSubscriberResultStatus = (typeof EventSubscriberState)[keyof Pick<
   typeof EventSubscriberState,
   'fulfilled' | 'rejected'
