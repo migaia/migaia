@@ -30,6 +30,8 @@ export type ISendOptions = {
   readonly signal?: IRpcAbortSignal
   readonly timeoutMs?: number | false
   readonly transfer?: readonly unknown[]
+  readonly idempotencyKey?: string
+  readonly trace?: string
 }
 export type IRpcHookEvent = {
   readonly name: string
@@ -38,6 +40,8 @@ export type IRpcHookEvent = {
   readonly code?: string
   readonly error?: unknown
   readonly field?: string
+  /** Relative peer drain announced by a validated close control frame. */
+  readonly durationMs?: number
   readonly contract?: unknown
   readonly variation?: unknown
   readonly targetId?: string
@@ -408,6 +412,11 @@ export type IRpcEndpoint<
   sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IRpcFanoutResult<T>>
   dispatch(targetId: TTargetId, method: string, data: unknown): void
   dispatchAll(method: string, data: unknown): void
+  /** Announce a bounded drain window to one peer without closing the channel in core. */
+  announceClose(
+    targetId: TTargetId,
+    options: { readonly drainMs: number; readonly receiverId?: string }
+  ): Promise<void>
   readonly connect: IRpcConnectControlForMode<TTargetId, TMode>
   readonly discovery: IRpcDiscoveryControl<TTargetId>
   readonly hooks: { on(listener: IRpcHook): () => void }

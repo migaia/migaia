@@ -33,9 +33,9 @@ export type IRpcMiddlewareComponentPolicy = Readonly<
   >
 >
 /** Type-only component contribution; runtime data remains in the immutable policy sidecar. */
-declare const webRpcMiddlewareComponents: unique symbol
+declare const routeMiddlewareComponents: unique symbol
 export type IRpcMiddlewareComponentContribution<TComponents extends object> = Readonly<{
-  readonly [webRpcMiddlewareComponents]?: TComponents
+  readonly [routeMiddlewareComponents]?: TComponents
 }>
 /** Direct PluginHost definition type for a native Middleware registration. */
 export type IRpcNativeMiddleware<

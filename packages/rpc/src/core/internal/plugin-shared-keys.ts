@@ -14,7 +14,7 @@ import type { IRpcHookFailureReporter } from './hooks.js'
 import type { IOutboundAttachmentHost } from './outbound-attachment.js'
 import type { IInboundIdentityAdmission, IInboundIdentityRequest } from './inbound-identity.js'
 import type { IVariationHandler } from './variation-coordinator.js'
-import type { IRpcVariation } from '../semantic-constants.js'
+import type { RpcControl } from '../../contract/index.js'
 import type { IRpcEnvelope } from '../../contract/index.js'
 
 /** Typed outbound owner port consumed by dependent feature descriptors. */
@@ -149,7 +149,7 @@ export type IRpcInboundIdentityPort = {
 export type IRpcVariationAdmissionRequest =
   | {
       readonly operation: 'register'
-      readonly variation: IRpcVariation
+      readonly variation: RpcControl | string
       readonly handler: IVariationHandler
     }
   | { readonly operation: 'consumeAbort'; readonly key: string }
@@ -171,6 +171,13 @@ export type IRpcVariationCoordinatorPort = {
 /** Exact D87 outbound operation; provider dispatch uses the existing send owner. */
 export type IRpcOutboundOperationsPort = {
   readonly send: IRpcOutboundSend
+  /** Reuse the endpoint's bounded warning cache for control payload extensions. */
+  readonly noteUnknownField: (
+    connection: string,
+    kind: string,
+    pointer: string,
+    field: string
+  ) => void
 }
 
 /** Discovery-backed receiver selection shared with the canonical outbound sender. */

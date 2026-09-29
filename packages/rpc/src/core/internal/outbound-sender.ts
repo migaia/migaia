@@ -1,6 +1,5 @@
 import {
   RpcAuthenticationError,
-  RpcCoreErrorCode,
   RpcLifecycleError,
   RpcSerializationError,
   RpcTransportError
@@ -36,7 +35,6 @@ export class RpcOutboundSender {
   readonly id: string
   readonly components: IRpcSelectedComponents
   readonly authentication: IRpcAuthenticationCapability | undefined
-  readonly onVariationFailure: (code: string, error: unknown) => void
   /** Captures the validated transport payload discriminant for every outbound frame. */
   readonly #transportEncodedType: IRpcTransport['encodedType']
   /** Captures the kernel lifecycle once so every asynchronous send phase shares one generation. */
@@ -46,7 +44,6 @@ export class RpcOutboundSender {
     transport: IRpcOutboundTransport,
     id: string,
     components: IRpcSelectedComponents,
-    onVariationFailure: (code: string, error: unknown) => void,
     authentication?: IRpcAuthenticationCapability,
     platform: IRpcPlatform = transport.platform
   ) {
@@ -54,7 +51,6 @@ export class RpcOutboundSender {
     this.id = id
     this.components = components
     this.authentication = authentication
-    this.onVariationFailure = onVariationFailure
     this.#transportEncodedType = transport.encodedType
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
@@ -100,23 +96,6 @@ export class RpcOutboundSender {
       this.#lifecycle?.assertActive(generation)
       return this.#sendPreparedFrames(preparedFrames, transfer, generation)
     })
-  }
-
-  /** Encodes and sends a variation through the same selected framing path as every envelope. */
-  sendVariation(message: IRpcEnvelope, rejectOnFailure = false): Promise<void> {
-    try {
-      return Promise.resolve(this.send(message)).catch((error) => {
-        const code =
-          error instanceof RpcAuthenticationError
-            ? RpcCoreErrorCode.authenticationFailed
-            : RpcCoreErrorCode.transport
-        this.onVariationFailure(code, error)
-        if (rejectOnFailure) throw error
-      })
-    } catch (error) {
-      this.onVariationFailure(RpcCoreErrorCode.internal, error)
-      return rejectOnFailure ? Promise.reject(error) : Promise.resolve()
-    }
   }
 
   /** Validates codec output before it reaches a typed transport boundary. */

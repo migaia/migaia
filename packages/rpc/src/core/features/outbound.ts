@@ -214,7 +214,9 @@ function createOutboundSharedPorts(
       admit
     } satisfies IRpcVariationCoordinatorPort),
     [RpcPortName.outboundOperations]: Object.freeze({
-      send: send as IRpcOutboundSend
+      send: send as IRpcOutboundSend,
+      noteUnknownField: (connection: string, kind: string, pointer: string, field: string) =>
+        owner.noteUnknownField(connection, kind, pointer, field)
     } satisfies IRpcOutboundOperationsPort)
   })
 }

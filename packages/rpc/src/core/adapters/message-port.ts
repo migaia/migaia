@@ -3,7 +3,7 @@ import {
   EventAdmissionPolicy,
   withSnapshotEntries
 } from '@migaia/event-subscriber'
-import { RpcCoreErrorCode, RpcTransportError } from '../errors.js'
+import { RpcCoreErrorCode, RpcTransportError, tagRpcError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '../transport.js'
 import { safeRead, safeString } from '../internal/safe-value.js'
@@ -146,7 +146,10 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     })
   }
   const onMessageError = (): void => {
-    const error = new Error(RpcMessagePortErrorText.browserMessagePortDeserializeFailed)
+    const error = tagRpcError(
+      new Error(RpcMessagePortErrorText.browserMessagePortDeserializeFailed),
+      RpcCoreErrorCode.transport
+    )
     errorListeners.report(error, secondaryFailures)
   }
   return {
@@ -267,13 +270,21 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
   // exception from inside Node's event emitter dispatch.
   const onMessageError = (error?: unknown): void => {
     const detail = error === undefined ? '' : `: ${safeString(error)}`
-    emitTransportError(new Error(RpcMessagePortErrorText.messagePortDeserializeFailed(detail)))
+    emitTransportError(
+      tagRpcError(
+        new Error(RpcMessagePortErrorText.messagePortDeserializeFailed(detail)),
+        RpcCoreErrorCode.transport
+      )
+    )
   }
   const onClose = (): void => {
     if (terminalReported) return
     terminalReported = true
     closed = true
-    terminalError = new Error(RpcMessagePortErrorText.messagePortTerminated)
+    terminalError = tagRpcError(
+      new Error(RpcMessagePortErrorText.messagePortTerminated),
+      RpcCoreErrorCode.transport
+    )
     emitTransportError(terminalError)
   }
 
