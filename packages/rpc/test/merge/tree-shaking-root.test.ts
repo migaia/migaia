@@ -9,8 +9,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** K114 keeps the frozen baseline and admits the measured guarded-read migration cost. */
 const allowedIncrease = {
-  rawBytes: 35919 / legacyRoot.rawBytes,
-  gzipBytes: 9785 / legacyRoot.gzipBytes
+  rawBytes: 35930 / legacyRoot.rawBytes,
+  gzipBytes: 9754 / legacyRoot.gzipBytes
 } as const
 
 /** I5 adds five required modules and removes the obsolete core route validator. */

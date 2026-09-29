@@ -4,6 +4,7 @@ import {
   createWebWorkerTransport,
   type IWebWorkerLikePort
 } from '@migaia/rpc/browser/adapters/web-worker'
+import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import { WorkerRpcIdentity } from './worker-constants.js'
 
 type IWorkerHandler = (
@@ -119,12 +120,12 @@ export type IWorkerContractEndpoint = Readonly<{
 /** Converts worker payloads to the canonical portable profile without losing binary value kind. */
 function encodeWorkerValue(value: unknown): IRpcPortableValue {
   if (value === undefined) return { $worker: 'undefined' } as unknown as IRpcPortableValue
-  if (value instanceof ArrayBuffer)
+  if (isArrayBuffer(value))
     return {
       $worker: 'array-buffer',
       value: encodeBytes(new Uint8Array(value))
     } as unknown as IRpcPortableValue
-  if (value instanceof Uint8Array)
+  if (isUint8Array(value))
     return { $worker: 'uint8-array', value: encodeBytes(value) } as unknown as IRpcPortableValue
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
   if (typeof value === 'number' && Number.isFinite(value)) return value

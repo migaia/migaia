@@ -5,6 +5,7 @@ import {
   createLifecycleScope
 } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { tryReadProperty } from '@migaia/utils/error'
 import { Resource } from '@migaia/resource'
 import type { IComputedValue, IRuntime } from '@migaia/reactive/runtime'
 import {
@@ -468,7 +469,12 @@ export const createStorageReactiveService = (
       if (input.signal !== undefined) {
         try {
           externallyAborted = input.signal.aborted
-          if (externallyAborted) externalAbortReason = input.signal.reason
+          if (externallyAborted) {
+            /** Admission wraps the original getter failure exactly once. */
+            const read = tryReadProperty(input.signal, 'reason')
+            if (read.threw) throw read.error
+            externalAbortReason = read.value
+          }
         } catch (cause) {
           throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
         }
@@ -636,7 +642,15 @@ export const createStorageReactiveService = (
       const onExternalAbort = (): void => {
         externalAbortObserved = true
         try {
-          externalAbortReason = input.signal?.reason
+          /** Snapshot the optional signal once, as the former optional read did. */
+          const signal = input.signal
+          if (signal === undefined) externalAbortReason = undefined
+          else {
+            /** A failed read is reported without replacing the earlier reason. */
+            const read = tryReadProperty(signal, 'reason')
+            if (read.threw) reportQuery(read.error)
+            else externalAbortReason = read.value
+          }
         } catch (error) {
           reportQuery(error)
         }
@@ -692,7 +706,10 @@ export const createStorageReactiveService = (
         if (externalAbortObserved || input.signal.aborted) {
           externalAbortObserved = true
           try {
-            externalAbortReason = input.signal.reason
+            /** Registration failure reports the getter error and keeps the prior reason. */
+            const read = tryReadProperty(input.signal, 'reason')
+            if (read.threw) reportQuery(read.error)
+            else externalAbortReason = read.value
           } catch (error) {
             reportQuery(error)
           }

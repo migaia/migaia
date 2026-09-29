@@ -128,7 +128,7 @@
       "id": "red03-parallel-scheduler",
       "kind": "append-source",
       "package": "@migaia/storage-web",
-      "path": "src/reactive.ts",
+      "path": "src/host/reactive.ts",
       "value": "\nclass StorageReactiveScheduler {}\n",
       "expectedCode": "SWV2-RED03"
     },

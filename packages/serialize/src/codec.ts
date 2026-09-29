@@ -1,3 +1,4 @@
+import { isUint8Array } from '@migaia/utils/bytes'
 import { SerializeErrorCode } from './error-code.js'
 import { SERIALIZE_SOURCE } from './errors.js'
 
@@ -77,7 +78,7 @@ export function assertPortableValue(value: unknown, active = new Set<object>()):
     ? (value as { readonly [Symbol.toStringTag]?: unknown })[Symbol.toStringTag]
     : undefined
   if (
-    value instanceof Uint8Array ||
+    isUint8Array(value) ||
     objectTag === 'Uint8Array' ||
     value instanceof Date ||
     value instanceof Map ||
@@ -136,12 +137,10 @@ export function toPortableValue(value: unknown, active = new Set<object>()): unk
   const objectTag = ArrayBuffer.isView(value)
     ? (value as { readonly [Symbol.toStringTag]?: unknown })[Symbol.toStringTag]
     : undefined
-  if (value instanceof Uint8Array || objectTag === 'Uint8Array')
+  if (isUint8Array(value) || objectTag === 'Uint8Array')
     return {
       $rpc: 'bytes',
-      base64url: bytesToBase64url(
-        value instanceof Uint8Array ? value : new Uint8Array(value as never)
-      )
+      base64url: bytesToBase64url(isUint8Array(value) ? value : new Uint8Array(value as never))
     }
   if (
     value instanceof Date ||

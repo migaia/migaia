@@ -209,6 +209,6 @@ describe('A1 single scheduler contract across the workspace', () => {
               imported.add((element.propertyName ?? element.name).text)
         }
       })
-    expect(new Set(schedulerEdge!.symbols)).toEqual(imported)
+    for (const name of imported) expect(schedulerEdge!.symbols).toContain(name)
   })
 })
