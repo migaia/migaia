@@ -10,6 +10,7 @@ import type {
   IRpcProtocolCapability,
   IRpcProtocolConfig,
   IRpcProviderLimits,
+  IRpcIdempotencyConfig,
   IRpcTimeoutCapability,
   IRpcTimeoutConfig,
   IRpcUuidConfig
@@ -49,6 +50,7 @@ export type IRpcEndpointOptions<TTargetId extends string> = {
   hooks?: IRpcHooksConfig
   targetIds?: readonly TTargetId[]
   providerLimits?: IRpcProviderLimits
+  idempotency?: IRpcIdempotencyConfig
   connect?: IRpcConnectConfig | IRpcConnectCapability
   features?: IRpcFeatureConfig
   initialHookEvents?: readonly IRpcHookEvent[]
