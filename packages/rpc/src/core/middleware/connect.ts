@@ -7,6 +7,7 @@ import type {
 } from '../typing.js'
 import type { IRpcTransport } from '../transport.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import { safeRead } from '../internal/safe-value.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
@@ -55,20 +56,31 @@ export const connect = <TMode extends IRpcDiscoveryMode = 'automatic'>(
       claims: emptyClaims(),
       sharedProvides: [RpcPortName.connect]
     },
-    install: ({ id, transport }) => ({
-      extension: {},
-      ports: {
-        [RpcPortName.connect]: createConnectCapability(
-          id,
-          transport,
-          configuredIdentifier,
-          configuredBaseMode,
-          configuredUniqueTargetId,
-          configuredDiscoveryMode,
-          configuredReceiverSelector
+    install: ({ id, transport }) => {
+      try {
+        return {
+          extension: {},
+          ports: {
+            [RpcPortName.connect]: createConnectCapability(
+              id,
+              transport,
+              configuredIdentifier,
+              configuredBaseMode,
+              configuredUniqueTargetId,
+              configuredDiscoveryMode,
+              configuredReceiverSelector
+            )
+          }
+        }
+      } catch (cause) {
+        if (cause instanceof RpcError) throw cause
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.transportDescriptorInvalid,
+          cause
         )
       }
-    })
+    }
   }
   return freezePlugin(plugin) as IConnectMiddleware<TMode>
 }
@@ -151,14 +163,14 @@ function createConnectCapability(
     discoveryMode,
     receiverSelector,
     transport,
-    verify: async (context) => {
+    verify: async (context, reportRead) => {
       const peerId = context.peerId ?? (transportPeerId as string | undefined)
       const peerIdentity = Boolean(peerId) && context.senderId === peerId
       const originIdentity = transportOrigin !== undefined && context.origin === transportOrigin
       const identifierSource =
         useBaseIdVerifyOnly === false &&
         ((context.source !== undefined && context.source !== null) ||
-          safeRead(context.data, '__unique_id__') !== undefined)
+          safeRead(context.data, '__unique_id__', reportRead) !== undefined)
       const anonymousBroadcast =
         context.platform === RpcPlatform.broadcastChannel &&
         peerId === undefined &&

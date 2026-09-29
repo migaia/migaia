@@ -18,16 +18,19 @@ import {
 } from '../../src/core/errors.js'
 
 describe('error boundary helpers', () => {
-  it('does not let a hostile code getter escape', () => {
+  it('reports a hostile code getter as PROPERTY_READ_FAILED with the original cause', () => {
+    const failure = new Error('hostile getter')
     const value = new Proxy(
       {},
       {
         get() {
-          throw new Error('hostile getter')
+          throw failure
         }
       }
     )
-    expect(isRpcError(value)).toBe(false)
+    expect(() => isRpcError(value)).toThrow(
+      expect.objectContaining({ code: 'PROPERTY_READ_FAILED', cause: failure })
+    )
   })
 
   it('keeps protocol-family error codes distinct', () => {

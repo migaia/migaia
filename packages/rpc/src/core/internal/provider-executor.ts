@@ -1,4 +1,5 @@
 import { RpcContractError, RpcCoreErrorCode, RpcSchemaValidationError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcEnvelope } from '../../contract/index.js'
 import type { IRpcProviderResult } from '../typing.js'
 import type { IRpcRoutingData } from './routing-data.js'
@@ -32,7 +33,7 @@ type IProviderExecutorOptions<TTargetId extends string> = {
   readonly dispatch: (targetId: TTargetId, method: string, data: unknown) => void
   readonly send: (response: unknown, transfer?: readonly unknown[]) => Promise<void>
   readonly validate: (method: string, side: 'params' | 'result', data: unknown) => void
-  readonly emitFailure: (error: unknown, code: string) => void
+  readonly emitFailure: (error: unknown, code: string, field?: string) => void
   readonly isReplay?: (request: IProviderRequestInput, verifiedPeerKey: string) => boolean
   readonly admitReplay?: (request: IProviderRequestInput, verifiedPeerKey: string) => boolean
   readonly markCompleted?: (request: IProviderRequestInput, verifiedPeerKey: string) => void
@@ -274,7 +275,17 @@ export class ProviderExecutor<TTargetId extends string> {
       code:
         explicitCode ?? (schemaError ? RpcCoreErrorCode.schemaInvalid : RpcCoreErrorCode.internal),
       message: schemaError
-        ? safeString(safeRead<unknown>(error, 'message'), 'Schema validation failed')
+        ? safeString(
+            safeRead<unknown>(error, 'message', ({ key, error: readError }) => {
+              this.options.emitFailure(
+                readError,
+                RpcCoreErrorCode.payloadInvalid,
+                typeof key === 'string' ? key : undefined
+              )
+              return undefined
+            }),
+            RpcCoreErrorText.schemaValidationFallback
+          )
         : 'Provider failed',
       data: error instanceof RpcSchemaValidationError ? error.data : undefined,
       sentAt: this.options.timestamp(),

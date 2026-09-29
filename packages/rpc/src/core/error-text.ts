@@ -66,6 +66,13 @@ export const RpcCoreErrorText = {
   remoteRequestFailed: 'Remote request failed',
   /** Stable text for an unreported hostile property read at the safeRead boundary. */
   propertyReadFailed: 'rpc property read failed',
+  /** Stable outer schema failure text that keeps parser and issue-read errors in one cause graph. */
+  schemaValidationFailed: (method: string, side: string): string =>
+    `Schema validation failed for ${method} ${side}`,
+  /** Stable issue fallback when a parser throws without readable detail. */
+  schemaValidationFallback: 'Schema validation failed',
+  /** Stable invalid plugin-result text used before endpoint hooks exist. */
+  pluginInstallResultInvalid: 'plugin install result is invalid',
   /** Stable validation failure for malformed provider registration input. */
   providerDescriptorInvalid: 'provider descriptor is invalid',
   /** Stable duplicate-provider diagnostic keyed by the conflicting method. */

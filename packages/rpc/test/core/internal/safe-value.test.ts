@@ -13,15 +13,23 @@ import {
 
 describe('safe-value utilities', () => {
   it('contains hostile property getters', () => {
+    const failure = new Error('getter')
+    const reported: unknown[] = []
     const hostile = new Proxy(
       {},
       {
         get() {
-          throw new Error('getter')
+          throw failure
         }
       }
     )
-    expect(safeRead(hostile, 'value')).toBeUndefined()
+    expect(
+      safeRead(hostile, 'value', (failure) => {
+        reported.push(failure)
+        return undefined
+      })
+    ).toBeUndefined()
+    expect(reported).toEqual([{ key: 'value', error: failure }])
   })
 
   it('accepts only safe integer values', () => {

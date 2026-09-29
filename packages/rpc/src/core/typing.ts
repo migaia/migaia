@@ -37,6 +37,7 @@ export type IRpcHookEvent = {
   readonly localId: string
   readonly code?: string
   readonly error?: unknown
+  readonly field?: string
   readonly contract?: unknown
   readonly variation?: unknown
   readonly targetId?: string
@@ -171,7 +172,10 @@ export type IRpcConnectControlForMode<
 export type IRpcConnectCapability = Omit<IRpcConnectConfig, 'uniqueTargetId'> & {
   readonly uniqueTargetId?: string
   readonly uniqueTargetIdFactory?: (context: IRpcUniqueTargetIdContext) => string | Promise<string>
-  readonly verify: (context: IRpcConnectContext) => boolean | Promise<boolean>
+  readonly verify: (
+    context: IRpcConnectContext,
+    reportRead?: (failure: Readonly<{ key: PropertyKey; error: unknown }>) => undefined
+  ) => boolean | Promise<boolean>
 }
 export type IRpcPlatform = IProtocolWebRpcPlatform
 export type IRpcServerMetadata<TTargetId extends string = string> = {

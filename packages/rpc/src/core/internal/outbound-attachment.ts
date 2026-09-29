@@ -202,6 +202,14 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           ? prepared.options.connect
           : undefined,
       sourceProof: kernel.transport.sourceProof,
+      reportRead: ({ key, error }) => {
+        this.emitFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          typeof key === 'string' ? key : undefined
+        )
+        return undefined
+      },
       platform: kernel.platform,
       topology: kernel.topology
     })
@@ -284,7 +292,14 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           this.emitFailure(error, RpcCoreErrorCode.transport)
           return
         }
-        const route = normalizeWebRpcRoutingData(envelope.data)
+        const route = normalizeWebRpcRoutingData(envelope.data, ({ key, error }) => {
+          this.emitFailure(
+            error,
+            RpcCoreErrorCode.transport,
+            typeof key === 'string' ? key : undefined
+          )
+          return undefined
+        })
         if (
           !route ||
           (envelope.kind === 'discovery'
@@ -640,13 +655,14 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Reports one diagnostic without allowing reporter failure to re-enter runtime work. */
-  emitFailure(error: unknown, code: string = RpcCoreErrorCode.internal): void {
+  emitFailure(error: unknown, code: string = RpcCoreErrorCode.internal, field?: string): void {
     const event = {
       name: 'failure',
       at: this.kernel.time.timestamp(),
       localId: this.id,
       error,
-      code
+      code,
+      ...(field === undefined ? {} : { field })
     }
     this.#emit(event)
     try {

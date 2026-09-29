@@ -62,6 +62,10 @@ function migratedTitle(title: string): string | undefined {
     .replace('38 unique codes', '22 unique codes')
     .replace('22 unique codes', '23 unique codes')
     .replace(
+      'does not let a hostile code getter escape',
+      'reports a hostile code getter as PROPERTY_READ_FAILED with the original cause'
+    )
+    .replace(
       'uses the canonical UNKNOWN code for untagged and cyclic errors alike',
       'uses the canonical UNKNOWN code for untagged errors and marks cyclic edges truncated'
     )

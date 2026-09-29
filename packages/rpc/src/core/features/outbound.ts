@@ -196,7 +196,7 @@ function createOutboundSharedPorts(
         return result
       }
       if (command.kind === 'report') {
-        const result = owner.emitFailure(command.error, command.code)
+        const result = owner.emitFailure(command.error, command.code, command.field)
         observe(result)
         return result
       }

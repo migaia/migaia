@@ -56,7 +56,17 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
   let closeResult: void | Promise<void>
   const ownership = options.ownership ?? 'owned'
   const onMessage = (event: TEvent): void => {
-    const data = safeRead<unknown>(event, 'data')
+    let readFailed = false
+    const data = safeRead<unknown>(event, 'data', ({ error }) => {
+      readFailed = true
+      reportListenerFailure(
+        new RpcTransportError(RpcCoreErrorText.propertyReadFailed, error),
+        errorListeners,
+        secondaryFailures
+      )
+      return undefined
+    })
+    if (readFailed) return
     messageListeners.dispatch({ data }, (listener, message) => {
       observeListener(
         () => listener(message),

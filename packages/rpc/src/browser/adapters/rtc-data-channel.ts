@@ -81,7 +81,17 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     terminalListenersInstalled = true
   }
   const onMessage = (event: unknown): void => {
-    const data = safeRead<unknown>(event, 'data')
+    let readFailed = false
+    const data = safeRead<unknown>(event, 'data', ({ error }) => {
+      readFailed = true
+      reportListenerFailure(
+        new RpcTransportError(BrowserRpcErrorText.rtcMessageReadFailed, error),
+        transportErrors,
+        secondaryFailures
+      )
+      return undefined
+    })
+    if (readFailed) return
     listeners.dispatch({ data }, (listener, message) => {
       observeListener(
         () => listener(message),

@@ -11,7 +11,8 @@ import {
   reportListenerFailure,
   safeRead
 } from '../../core/transport-kit.js'
-import { RpcCoreErrorCode } from '../../core/errors.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../../core/errors.js'
+import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Outbound ServiceWorker or Client target. */
 export type IServiceWorkerMessageTarget = {
@@ -39,7 +40,15 @@ export function createServiceWorkerTransport(
   const peerId = options.peerId ?? target.id
   /** Preserves the adapter's existing physical-source admission boundary. */
   const sourceProof = (source: unknown) =>
-    source === target || (peerId !== undefined && safeRead<unknown>(source, 'id') === peerId)
+    source === target ||
+    (peerId !== undefined &&
+      safeRead<unknown>(source, 'id', ({ error }) => {
+        reportListenerFailure(
+          new RpcTransportError(BrowserRpcErrorText.serviceWorkerSourceReadFailed, error),
+          transportErrors,
+          secondaryFailures
+        )
+      }) === peerId)
   const listeners = createMessageListenerHub<{
     data: unknown
     origin?: string

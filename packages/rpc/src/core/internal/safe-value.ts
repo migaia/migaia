@@ -1,14 +1,39 @@
 // Keep the internal compatibility path while preserving the canonical utility function identity.
 export { isUint8Array } from '@migaia/utils/bytes'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { ERROR_SOURCE, RpcCoreErrorCode } from '../error-code.js'
+import { RpcCoreErrorText } from '../error-text.js'
 
-/** Reads an untrusted property without allowing getters or proxies to escape. */
-export function safeRead<T>(value: unknown, key: PropertyKey): T | undefined {
+/** Synchronous sink for a property-read failure; Promise-returning callbacks are rejected. */
+export type IRpcPropertyReadReporter = (
+  failure: Readonly<{ key: PropertyKey; error: unknown }>
+) => undefined
+
+/** Read once; a caught trap is reported or thrown with its original value as cause. */
+export function safeRead<T>(
+  value: unknown,
+  key: PropertyKey,
+  report?: IRpcPropertyReadReporter
+): T | undefined {
   try {
     if ((typeof value !== 'object' && typeof value !== 'function') || value === null)
       return undefined
     return (value as Record<PropertyKey, T>)[key]
-  } catch {
-    return undefined
+  } catch (error) {
+    /** The original read error stays first if the reporter also fails. */
+    let cause: unknown = error
+    if (report) {
+      try {
+        report({ key, error })
+      } catch (reportError) {
+        cause = new AggregateError([error, reportError], RpcCoreErrorText.propertyReadFailed)
+      }
+      if (cause === error) return undefined
+    }
+    throw attachErrorIdentity(new TypeError(RpcCoreErrorText.propertyReadFailed, { cause }), {
+      source: ERROR_SOURCE,
+      code: RpcCoreErrorCode.propertyReadFailed
+    })
   }
 }
 

@@ -79,13 +79,18 @@ describe('property invariants', () => {
               return Reflect.get(target, key, receiver)
             }
           })
-          const normalized = normalizeWebRpcRoutingData(hostile)
+          const failures: unknown[] = []
+          const normalized = normalizeWebRpcRoutingData(hostile, ({ error }) => {
+            failures.push(error)
+            return undefined
+          })
           if (hostileKey !== 'payload' && hostileKey !== '__proto__')
             expect(normalized).toBeUndefined()
           else {
             expect(Object.isFrozen(normalized)).toBe(true)
             if (hostileKey === 'payload') expect(normalized).not.toHaveProperty('payload')
           }
+          expect(failures).toHaveLength(hostileKey === '__proto__' ? 0 : 1)
         }
       ),
       propertyParameters
