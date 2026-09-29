@@ -60,6 +60,80 @@ describe('contract guarded property policy', () => {
     expect(reads).toBe(1)
   })
 
+  it('keeps hostile errors-array reads at their exact wire pointers', () => {
+    const failure = new Error('array read failed')
+    const base = { source: '@test', code: 'TEST', name: 'Error', message: 'test', stack: 'stack' }
+    for (const [key, pointer] of [
+      ['length', '/errors/length'],
+      ['0', '/errors/0']
+    ] as const) {
+      const errors = new Proxy([base], {
+        get(target, property, receiver) {
+          if (property === key) throw failure
+          return Reflect.get(target, property, receiver)
+        }
+      })
+      let thrown: unknown
+      try {
+        normalizeRpcSerializedError({ ...base, errors })
+      } catch (error) {
+        thrown = error
+      }
+      expect(thrown).toMatchObject({
+        code: 'INVALID_WIRE_ERROR',
+        pointer,
+        violation: 'read',
+        cause: failure
+      })
+    }
+  })
+
+  it('reports a failed cleanup-entry read without losing the root', () => {
+    const failure = new Error('cleanup read failed')
+    const reported: unknown[] = []
+    const wire = serializeRpcError(
+      {
+        name: 'Error',
+        message: 'test',
+        stack: 'stack',
+        cleanupErrors: [
+          {
+            get error(): never {
+              throw failure
+            }
+          }
+        ]
+      },
+      { report: (event) => reported.push(event) }
+    )
+    expect(wire.truncated).toBe(true)
+    expect(reported).toContainEqual({ pointer: '/cleanupErrors/0', field: 'error', error: failure })
+  })
+
+  it('reports an errors-array length trap and skips primitive cleanup entries', () => {
+    const failure = new Error('length failed')
+    const reported: unknown[] = []
+    const errors = new Proxy([new Error('child')], {
+      get(target, key, receiver) {
+        if (key === 'length') throw failure
+        return Reflect.get(target, key, receiver)
+      }
+    })
+    const wire = serializeRpcError(
+      {
+        name: 'Error',
+        message: 'root',
+        stack: 'stack',
+        errors,
+        cleanupErrors: [null, { error: new Error('cleanup') }]
+      },
+      { report: (event) => reported.push(event) }
+    )
+    expect(wire.truncated).toBe(true)
+    expect(reported).toContainEqual({ pointer: '', field: 'length', error: failure })
+    expect(wire.errors).toHaveLength(1)
+  })
+
   it('serializes an error from another realm', () => {
     const crossRealm = runInNewContext('new Error("remote")') as Error
     const wire = serializeRpcError(crossRealm, { report: () => undefined })
