@@ -236,7 +236,7 @@ class Runtime implements IRuntime {
 
 逐个方法：
 
-- `batch(fn)`：显式合并多次写入为一次副作用刷新；进入时计深度，只有最外层退出才真正 `flush()`。若 `fn` 抛错且随后的收尾 `flush()` 也抛错，优先抛出 `fn` 的原始错误（`Error` 实例时把 flush 错误挂到其 `cause`；非 `Error` 抛出值时两者聚合为携带 `ACTION_FLUSH_FAILED` 码的 `AggregateError`）。
+- `batch(fn)`：显式合并多次写入为一次副作用刷新；进入时计深度，只有最外层退出才真正 `flush()`。若 `fn` 抛错且随后的收尾 `flush()` 也抛错，可写的普通 `Error` 保持原对象并在 `cause` 附上 flush 错误；非 `Error` 或不可写 `Error` 用携带 `ACTION_FLUSH_FAILED` 码的 `AggregateError` 保留原值。若业务错误的 `cause` getter 抛错，聚合错误的 `errors` 依次保留业务错误、flush 错误、getter 抛出值；`onError` 另收到 getter 抛出值及 `cause-read` phase。
 - `untracked(fn)`：`fn` 执行期间关闭依赖收集，读取任何 `Signal`/`Computed` 都不会建立依赖边。
 - `flush()`：同步冲刷当前队列。**重入语义**：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。
 - `setSchedulerStrategy(strategy)`：受控地替换冲刷触发策略（默认微任务合并，可换成 `requestAnimationFrame`/`idle`/自定义）；只改变何时 `flush`，不交出 `Scheduler` 队列本身。`strategy` 必须是函数（否则抛 `INVALID_OPTION`），且调用后必须同步返回（不能返回 thenable）——策略返回 thenable 会被判定失败，自动回退到上一个安全策略并上报 `INVALID_OPTION` 诊断。
@@ -581,7 +581,7 @@ import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive';
 | `versionExhausted`     | `VERSION_EXHAUSTED`    | 单调版本时钟达到配置上限（默认 `Number.MAX_SAFE_INTEGER`）后再次申请新版本号                                     |
 | `flushLoop`            | `FLUSH_LOOP`           | 一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）                                                            |
 | `observerFailed`       | `OBSERVER_FAILED`      | 一次冲刷中多个 observer 的 `tick()` 失败、或多个 observable 生命周期钩子失败，作为 `AggregateError` 外壳         |
-| `actionFlushFailed`    | `ACTION_FLUSH_FAILED`  | `runBatched()` 内业务动作与其收尾 flush 同时失败，作为聚合外壳附加在业务错误的 `cause` 上                        |
+| `actionFlushFailed`    | `ACTION_FLUSH_FAILED`  | `runBatched()` 内业务动作与收尾 flush 同时失败；普通可写错误在 `cause` 附加聚合结果，不可读 `cause` 的三个原值直接置于 `AggregateError.errors` |
 | `schedulerFailed`      | `SCHEDULER_FAILED`     | 预留：异步调度策略回调或 `reportError()` 捕获到未处理错误的诊断通道码（默认无内置抛出/上报点）                   |
 | `captureInvalid`       | `CAPTURE_INVALID`      | `capture()` 产生的 token 在 `commitCapture()` 时已失效、已被消费、属于另一个 tracker，或对应 observer 已 dispose |
 | `bindingDuplicate`     | `BINDING_DUPLICATE`    | 同一个 `IObserverBinding` 被重复调用 `observe()`（已处于 observed 状态）                                         |
@@ -659,7 +659,7 @@ type IRuntimeTraceEvent =
 | --------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | `ReactiveTraceType`   | `{ observableChange, dependency, observerRun, action }`                                                 | trace 事件的顶层判别                                |
 | `ReactiveTracePhase`  | `{ start, end, error, connect, disconnect }`                                                            | dependency/observerRun/action 事件的阶段            |
-| `ReactiveErrorPhase`  | `{ asyncFlush, dependencyDisconnect, lifecycleHook, ssrResource, subscriptionListener, traceListener }` | `reportError`/`onError` 收到的 `context.phase` 取值 |
+| `ReactiveErrorPhase`  | `{ asyncFlush, causeRead, dependencyDisconnect, lifecycleHook, ssrResource, subscriptionListener, traceListener }` | `reportError`/`onError` 收到的 `context.phase` 取值；`causeRead` 表示批处理收尾时读取业务错误 `cause` 失败 |
 | `ReactiveTraceReason` | `{ set, notify, retrack, invalidate, dispose }`                                                         | observableChange/dependency 事件的原因              |
 
 ---
