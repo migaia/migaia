@@ -19,7 +19,7 @@ import {
 import { SerializeChunkKind, SerializePhase } from './format-constants.js'
 import { createSerializeOperationSignal } from './signal.js'
 import { snapshotSerializeSignal } from './signal-snapshot.js'
-import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
+import { attachSecondaryErrors, safeErrorReason, tryReadProperty } from '@migaia/utils/error'
 
 type ISerializeScheduledTask = { cancel(): void }
 
@@ -166,15 +166,15 @@ const readSerializeSignalAborted = (signal: ISerializeAbortSignal): boolean => {
 
 /** Read an operation abort reason only when cancellation wins the owned-yield race. */
 const readSerializeSignalReason = (signal: ISerializeAbortSignal): unknown => {
-  try {
-    return signal.reason
-  } catch (error) {
+  /** Stream cancellation wraps every getter failure, including serialize-tagged values. */
+  const read = tryReadProperty(signal, 'reason')
+  if (read.threw)
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.signalReasonReadFailed,
-      { cause: error }
+      { cause: read.error }
     )
-  }
+  return read.value
 }
 
 /**
