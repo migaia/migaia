@@ -5,6 +5,24 @@ export { normalizePortable } from './normalize.js'
 export { normalizeRpcEnvelope, rpcProtocol as rpcProtocolV1 } from './v1/index.js'
 export { createRpcUnknownFieldWarner } from './unknown-field.js'
 export {
+  RpcCapability,
+  RpcCodecId,
+  RpcControl,
+  RpcEnvelopeKind,
+  RpcEnvelopeViolation,
+  RpcHandshakeReason,
+  RpcHandshakeStep,
+  RpcHandshakeViolation,
+  RpcPeerRuntime,
+  RpcProtocol,
+  RpcReservedKind,
+  RpcRouteField,
+  RpcRouteKey,
+  RpcRouteProfile,
+  RpcRouteType,
+  RpcWireLimit
+} from './wire-constants.js'
+export {
   deserializeRpcError,
   normalizeRpcSerializedError,
   reachRpcError,

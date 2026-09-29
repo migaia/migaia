@@ -1,4 +1,5 @@
-import { rpcProtocolV1, type IRpcEnvelope } from '../contract/index.js'
+import { rpcProtocolV1, type IRpcEnvelope, type IRpcPortableRecord } from '../contract/index.js'
+import type { IRpcEnvelopeData } from '../contract/v1/route.js'
 import type { identityCodecV1 } from '@migaia/serialize/codec'
 import type { messageFramerV1 } from '../contract/framing/index.js'
 import type { IRpcFactoryConfig, IRpcMiddleware } from './typing.js'
@@ -43,6 +44,15 @@ type IEnvelope<T> =
   }
     ? IResult<TValue>
     : IRpcEnvelope
+/** Sending variation data is portable even though received unknown subtype payloads stay opaque. */
+type IRpcOutboundEnvelope = IRpcPortableRecord &
+  (
+    | Exclude<IRpcEnvelope, { readonly kind: 'variation' }>
+    | Readonly<{ kind: 'variation'; id: string; data: IRpcEnvelopeData }>
+  )
+/** Checks codecs against values core actually emits, preserving the wider receive contract. */
+type IOutboundEnvelope<T> =
+  IEqual<IEnvelope<T>, IRpcEnvelope> extends true ? IRpcOutboundEnvelope : IEnvelope<T>
 type IIdentityCodec<T> = ICodec<T> extends typeof identityCodecV1 ? true : false
 type IIdentityFramer<T> = IFramer<T> extends typeof messageFramerV1 ? true : false
 type IEncodeInput<T> =
@@ -129,7 +139,7 @@ export type ILegacyDefault<
 export type IChecked<TConfig> =
   IAnyComponent<TConfig> extends true
     ? never
-    : [IEnvelope<TConfig>] extends [IEncodeInput<TConfig>]
+    : [IOutboundEnvelope<TConfig>] extends [IEncodeInput<TConfig>]
       ? IEqual<IEncoded<TConfig>, IFrameInput<TConfig>> extends true
         ? [IFrameOutput<TConfig>] extends [ISend<TConfig>]
           ? [IIncoming<TConfig>] extends [IAcceptInput<TConfig>]
