@@ -49,11 +49,18 @@ describe('PK-04 synchronous callback admission', () => {
     source.dispose()
   })
 
-  it('rejects async batch callbacks before flushing', () => {
-    const runtime = createRuntime()
+  it('rejects async batch callbacks before flushing and reports late rejection', async () => {
+    const rejection = new Error('async batch rejected')
+    const reported: unknown[] = []
+    const runtime = createRuntime({ onError: (error) => reported.push(error) })
     expect(() => runtime.batch(async () => undefined)).toThrow(
       expect.objectContaining({ code: ReactiveErrorCode.invalidOption })
     )
+    expect(() => runtime.batch(() => Promise.reject(rejection))).toThrow(
+      expect.objectContaining({ code: ReactiveErrorCode.invalidOption })
+    )
+    await flush()
+    expect(reported).toEqual([rejection])
   })
 
   it('snapshots observed hook getters once and removes the captured callbacks', () => {
