@@ -5,6 +5,21 @@ import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { abort } from '../../src/core/middleware/abort.js'
 import { readEndpointDebugSnapshot } from '../../src/core/internal/test-observer.js'
+import type { IRpcContext, IRpcProviderResult } from '../../src/core/typing.js'
+
+/** Settle the test provider even when cancellation preceded its listener registration. */
+function hangUntilAborted(context: IRpcContext): Promise<IRpcProviderResult> {
+  if (context.signal.aborted) return Promise.resolve(context.failed('aborted', 'CANCELLED'))
+  return new Promise((resolve) =>
+    context.signal.addEventListener(
+      'abort',
+      () => resolve(context.failed('aborted', 'CANCELLED')),
+      {
+        once: true
+      }
+    )
+  )
+}
 
 /**
  * Regression gate for `SOL-CB-R9-P1-001`: a caller that settles a `send()` early (local abort
@@ -12,10 +27,9 @@ import { readEndpointDebugSnapshot } from '../../src/core/internal/test-observer
  * controller — exactly like legacy `notifyRemoteAbort()` — and the deferred outbound `send()` must
  * re-check settlement before actually transmitting the request, exactly like legacy's `if
  * (settlement.isSettled()) return` guard before `this.#send(...)`. Without both fixes, a
- * chunked/slow request that the caller already abandoned still reaches and executes on the remote
- * provider, and the resulting controller is created already-aborted (before the provider's own
- * `abort` listener attaches), so it never resolves and never leaves `activeControllers` — a
- * permanent leak, independently of how many times this test runs.
+ * chunked/slow request that the caller already abandoned can still reach the remote provider. The
+ * fixture handles an already-aborted signal at entry, as a provider must, while the endpoint
+ * assertions still require the local deadline and remote controller cleanup to converge.
  */
 describe('composed remote cancellation on caller-side settlement', () => {
   it('notifies the remote and leaves zero active controllers after a local timeoutMs expiry', async () => {
@@ -24,16 +38,7 @@ describe('composed remote cancellation on caller-side settlement', () => {
       id: 'cancel-timeout-server',
       transport: serverTransport,
       middlewares: [connect({ transport: serverTransport }), abort()],
-      provider: {
-        hang: (context) =>
-          new Promise((resolve) =>
-            context.signal.addEventListener(
-              'abort',
-              () => resolve(context.failed('aborted', 'CANCELLED')),
-              { once: true }
-            )
-          )
-      }
+      provider: { hang: hangUntilAborted }
     })
     const client = await createClientEndpoint({
       id: 'cancel-timeout-client',
@@ -62,16 +67,7 @@ describe('composed remote cancellation on caller-side settlement', () => {
       id: 'cancel-abort-server',
       transport: serverTransport,
       middlewares: [connect({ transport: serverTransport }), abort()],
-      provider: {
-        hang: (context) =>
-          new Promise((resolve) =>
-            context.signal.addEventListener(
-              'abort',
-              () => resolve(context.failed('aborted', 'CANCELLED')),
-              { once: true }
-            )
-          )
-      }
+      provider: { hang: hangUntilAborted }
     })
     const client = await createClientEndpoint({
       id: 'cancel-abort-client',
