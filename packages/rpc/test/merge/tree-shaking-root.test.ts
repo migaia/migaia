@@ -7,10 +7,10 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** K152 keeps the frozen baseline and admits exact S3 port and provider bytes. */
+/** K153 keeps the frozen baseline and admits exact S4 cancellation and transport bytes. */
 const allowedIncrease = {
-  rawBytes: 44208 / legacyRoot.rawBytes,
-  gzipBytes: 11879 / legacyRoot.gzipBytes
+  rawBytes: 45002 / legacyRoot.rawBytes,
+  gzipBytes: 12072 / legacyRoot.gzipBytes
 } as const
 
 /** I5 adds five required modules and removes the obsolete core route validator. */

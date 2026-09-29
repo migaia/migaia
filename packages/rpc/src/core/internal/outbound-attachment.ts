@@ -84,6 +84,7 @@ export type IOutboundAttachmentHost = {
     admission?: IRpcFrameAdmission
   ): Promise<void>
   sendStreamOpen(command: IRpcStreamOpenCommand): Promise<void>
+  onTransportFailure(listener: (error: unknown) => void): () => void
   dispatch(targetId: string, method: string, data: unknown): void
   sendOneWay(
     targetId: string,
@@ -134,6 +135,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #pipeline: RpcOutboundSender
   /** Active request settlements keyed by wire task id. */
   readonly #pending = new PendingRegistry<IOutboundPending>()
+  /** Optional stream owners observe the same canonical transport failure as requests. */
+  #transportFailureListener: ((error: unknown) => void) | undefined
   /** Prevents active and recently released task-id reuse. */
   readonly #replay: ReplayWindow
   /** Hook callbacks owned by the outbound runtime. */
@@ -656,9 +659,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     return Promise.resolve()
       .then(() => this.resolveReceiver(command.targetId))
       .then((receiver) => {
-        if (command.operation?.signal.aborted) throw command.operation.signal.reason
+        if (command.operation?.signal.aborted) throw new RpcAbortError()
         const remaining = command.operation?.remaining()
-        if (remaining === 0) throw new RpcTimeoutError()
+        const wireTimeout = typeof remaining === 'number' ? Math.floor(remaining) : undefined
+        if (wireTimeout === 0) throw new RpcTimeoutError()
         return this.#pipeline.send(
           normalizeRpcEnvelope({
             kind: 'request',
@@ -674,7 +678,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
                 ...(command.dispatchOnly ? { dispatchOnly: true } : {}),
                 sentAt: this.kernel.time.timestamp(),
-                ...(typeof remaining === 'number' ? { timeoutMs: remaining } : {})
+                ...(wireTimeout === undefined ? {} : { timeoutMs: wireTimeout })
               },
               ...(command.data === undefined ? {} : { payload: command.data as IRpcPortableValue })
             }
@@ -772,6 +776,14 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#hookErrorReporter?.(error, event)
     } catch {
       // Diagnostics are observational and cannot change the terminal operation outcome.
+    }
+  }
+
+  /** Register an optional flow owner without creating another transport subscription. */
+  onTransportFailure(listener: (error: unknown) => void): () => void {
+    this.#transportFailureListener = listener
+    return () => {
+      if (this.#transportFailureListener === listener) this.#transportFailureListener = undefined
     }
   }
 
@@ -876,6 +888,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   #failAll(error: unknown): void {
     for (const pending of this.#pending.values()) pending.reject(error)
     this.#pending.clear()
+    try {
+      this.#transportFailureListener?.(error)
+    } catch (failure) {
+      this.emitFailure(failure)
+    }
   }
 
   /** Emits a hook event while preserving the configured hook-error boundary. */

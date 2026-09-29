@@ -5333,7 +5333,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       const operations = batch.host.getPort(RpcPortName.outboundOperations)
       const identity = batch.host.getPort(RpcPortName.inboundIdentity)
       const variation = batch.host.getPort(RpcPortName.variationCoordinator)
-      expectFrozenPort(operations, ['send', 'noteUnknownField'])
+      expectFrozenPort(operations, ['send', 'onTransportFailure', 'noteUnknownField'])
       expectFrozenPort(identity, ['verify'])
       expectFrozenPort(variation, ['admit'])
       expect(batch.host.getPort(RpcPortName.outboundAttachment)).toBeUndefined()

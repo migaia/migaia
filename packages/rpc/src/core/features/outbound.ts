@@ -220,6 +220,8 @@ function createOutboundSharedPorts(
     } satisfies IRpcVariationCoordinatorPort),
     [RpcPortName.outboundOperations]: Object.freeze({
       send: send as IRpcOutboundSend,
+      onTransportFailure: (listener: (error: unknown) => void) =>
+        owner.onTransportFailure(listener),
       noteUnknownField: (connection: string, kind: string, pointer: string, field: string) =>
         owner.noteUnknownField(connection, kind, pointer, field)
     } satisfies IRpcOutboundOperationsPort)

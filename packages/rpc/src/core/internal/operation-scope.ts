@@ -51,9 +51,9 @@ export class OperationScope {
   }
 
   /** Cancels the scope and releases its closing listener. */
-  abort(): void {
+  abort(reason?: unknown): void {
     if (this.#closed) return
     this.#closed = true
-    this.#controller.supersede()
+    this.#controller.supersede(reason)
   }
 }
