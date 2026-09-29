@@ -18,6 +18,8 @@ export type IPluginDefinition<TCore> = {
   readonly name: string
   readonly config: IPluginConfig
   readonly install: IPluginConstraint<TCore>['install']
+  /** Captured preparation hook; absent on the one-argument installation path. */
+  readonly setup?: (context: import('./typing.js').IPluginSetupContext) => unknown
   readonly update?: IPluginConstraint<TCore>['update']
   readonly onEnable?: IPluginConstraint<TCore>['onEnable']
   readonly onDisable?: IPluginConstraint<TCore>['onDisable']
@@ -75,6 +77,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   lifecycle: (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]
   lifecycleController?: IAbortController
   operation?: IGenerationRequest
+  /** Output owned by this registration's current setup attempt. */
+  setupOutput?: unknown
   operationDeadlineAt?: number
   provisional?: IProvisionalScope
   scope?: ILifecycleScope
