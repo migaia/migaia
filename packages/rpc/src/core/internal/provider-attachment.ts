@@ -4,6 +4,7 @@ import { RpcMessageKind, RpcVariation } from '../semantic-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
+  deserializeRpcError,
   normalizeRpcEnvelope,
   type IRpcEnvelope,
   type IRpcSerializedError
@@ -264,7 +265,9 @@ export class RpcProviderAttachment {
       key,
       controller: this.#controllers.get(key),
       expiresAt: this.#kernel.time.now() + 310_000,
-      reason: route.payload
+      reason: decodeAbortReason(route.payload, (error) =>
+        this.#outbound.send({ kind: 'report', error, code: RpcCoreErrorCode.protocolInvalid })
+      )
     })
   }
 
@@ -289,6 +292,17 @@ export class RpcProviderAttachment {
     if (this.#kernel.state !== 'active') return
     if (!record.admission) return
     await this.#executor.execute({ envelope: request, route }, record.admission.token)
+  }
+}
+
+/** Decode a present abort payload while keeping cancellation effective on malformed input. */
+function decodeAbortReason(payload: unknown, report: (error: unknown) => void): unknown {
+  if (payload === undefined) return undefined
+  try {
+    return deserializeRpcError(payload)
+  } catch (error) {
+    report(error)
+    return error
   }
 }
 

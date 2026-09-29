@@ -5,7 +5,7 @@ import type { IRpcRoutingData } from './routing-data.js'
 import type { ProviderRegistry } from './provider.js'
 import { safeRead, safeString, tupleKey } from './safe-value.js'
 import { RpcMessageKind } from '../semantic-constants.js'
-import { serializeErrorForRpc } from '../error-serialization.js'
+import { serializeRpcError } from '../../contract/error.js'
 
 /** Canonical request plus WebRPC-owned route data consumed by provider execution. */
 export type IProviderRequestInput = Readonly<{
@@ -279,7 +279,12 @@ export class ProviderExecutor<TTargetId extends string> {
       data: error instanceof RpcSchemaValidationError ? error.data : undefined,
       sentAt: this.options.timestamp(),
       ...(schemaError || includeSerializedError
-        ? { serializedError: serializeErrorForRpc(error) }
+        ? {
+            serializedError: serializeRpcError(error, {
+              report: (failure) =>
+                this.options.emitFailure(failure.error, RpcCoreErrorCode.payloadInvalid)
+            })
+          }
         : {}),
       ...((this.options.responseReceiverId?.(request) ?? request.route.webRpc.receiverId) ===
       undefined
