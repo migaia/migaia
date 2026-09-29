@@ -30,7 +30,17 @@ describe('rpc-contract declarations', () => {
       kind: 'response',
       ok: true,
       id: '1',
-      data: null
+      data: {
+        route: {
+          profile: 'migaia.rpc.route',
+          type: 'response',
+          applicationVersion: '1.0',
+          senderId: 'sender',
+          targetId: 'target',
+          method: 'm',
+          sentAt: 0
+        }
+      }
     })
     const exhaustive = (value: never): never => value
     const narrowed = (value: IRpcEnvelope): string => {

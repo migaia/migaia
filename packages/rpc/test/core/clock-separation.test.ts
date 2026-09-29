@@ -235,8 +235,8 @@ describe('A7 endpoint clocks: wall clock stamps diagnostics, scheduler owns dead
     try {
       await expect(client.send('clock-server', 'fail', null)).rejects.toBeDefined()
       /** Wire sentAt of the failure response. */
-      const responseSentAt = (responses[0] as { data?: { webRpc?: { sentAt?: number } } }).data
-        ?.webRpc?.sentAt
+      const responseSentAt = (responses[0] as { data?: { route?: { sentAt?: number } } }).data
+        ?.route?.sentAt
       expect(clock.readings).toContain(responseSentAt)
       expect(responseSentAt).not.toBe(scheduler.now())
 
@@ -249,11 +249,11 @@ describe('A7 endpoint clocks: wall clock stamps diagnostics, scheduler owns dead
       /** Abort variation frame produced by the client timeout. */
       const abortFrame = variations.find(
         (message) =>
-          (message as { data?: { webRpc?: { variation?: string } } }).data?.webRpc?.variation ===
+          (message as { data?: { route?: { variation?: string } } }).data?.route?.variation ===
           'abort'
-      ) as { data: { webRpc: { sentAt: number } } } | undefined
+      ) as { data: { route: { sentAt: number } } } | undefined
       expect(abortFrame).toBeDefined()
-      expect(clock.readings).toContain(abortFrame!.data.webRpc.sentAt)
+      expect(clock.readings).toContain(abortFrame!.data.route.sentAt)
       expect(events.length).toBeGreaterThan(0)
       for (const event of events) {
         expect(clock.readings).toContain(event.at)
@@ -490,7 +490,7 @@ describe('A8 rpc core timestamp sources', () => {
       ['internal/discovery-attachment.ts', 5],
       ['internal/outbound-attachment.ts', 3],
       ['internal/control-attachment.ts', 1],
-      ['internal/provider-executor.ts', 2]
+      ['internal/provider-executor.ts', 3]
     ]
     for (const [file, count] of sentAtCounts) {
       const initializers = propertyInitializers(join(coreRoot, file), 'sentAt')

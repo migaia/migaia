@@ -1,0 +1,29 @@
+{
+  "added": {
+    "@migaia/rpc/contract": [
+      "RpcCapability",
+      "RpcCodecId",
+      "RpcControl",
+      "RpcEnvelopeKind",
+      "RpcEnvelopeViolation",
+      "RpcHandshakeReason",
+      "RpcHandshakeStep",
+      "RpcHandshakeViolation",
+      "RpcPeerRuntime",
+      "RpcProtocol",
+      "RpcReservedKind",
+      "RpcRouteField",
+      "RpcRouteKey",
+      "RpcRouteProfile",
+      "RpcRouteType",
+      "RpcWireLimit",
+      "acceptRpcHandshake",
+      "completeRpcHandshake",
+      "createRpcHello",
+      "createRpcUnknownFieldWarner",
+      "normalizeRpcHandshake"
+    ],
+    "@migaia/rpc/core": ["createRpcIdempotencyStore"]
+  },
+  "removed": {}
+}

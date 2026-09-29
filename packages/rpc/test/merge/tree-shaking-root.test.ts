@@ -7,11 +7,14 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** I4 and the required unique-admission option use exact observed byte caps with no headroom. */
+/** K110 keeps the frozen baseline and admits only the measured I5 protocol implementation cost. */
 const allowedIncrease = {
-  rawBytes: 8208 / legacyRoot.rawBytes,
-  gzipBytes: 2441 / legacyRoot.gzipBytes
+  rawBytes: 35043 / legacyRoot.rawBytes,
+  gzipBytes: 9488 / legacyRoot.gzipBytes
 } as const
+
+/** I5 adds five required modules and removes the obsolete core route validator. */
+const expectedModuleIncrease = 4
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {
@@ -22,7 +25,7 @@ describe('A9 root tree-shaking cost', () => {
     })
     expect(run.status, `${run.stdout.slice(-1000)}\n${run.stderr.slice(-1000)}`).toBe(0)
     const measured = JSON.parse(run.stdout) as { root: typeof legacyRoot }
-    expect(measured.root.moduleCount).toBe(legacyRoot.moduleCount)
+    expect(measured.root.moduleCount).toBe(legacyRoot.moduleCount + expectedModuleIncrease)
     for (const metric of ['rawBytes', 'gzipBytes'] as const) {
       expect(
         Math.abs(measured.root[metric] - legacyRoot[metric]) / legacyRoot[metric],

@@ -9,6 +9,7 @@ import { RpcOutboundSender } from '../../../src/core/internal/outbound-sender.js
 import { RpcCoreErrorText } from '../../../src/core/error-text.js'
 import type { IRpcAuthenticationTransform } from '../../../src/core/typing.js'
 import type { IRpcTransport } from '../../../src/core/transport.js'
+import { RpcRouteProfile } from '../../../src/contract/index.js'
 import { rpcProtocol, type IRpcEnvelope } from '../../../src/contract/v1/index.js'
 import { bindRpcFrameIngress } from '../../../src/contract/framing/index.js'
 import { messageFramer } from '../../../src/contract/framing/v1.js'
@@ -84,8 +85,8 @@ function canonicalRequest(id = 'task'): IRpcEnvelope {
     id,
     method: 'test',
     data: {
-      webRpc: {
-        profile: 'web-rpc.route.v1',
+      route: {
+        profile: RpcRouteProfile,
         type: 'request',
         applicationVersion: '1',
         senderId: 'a',
@@ -111,8 +112,7 @@ describe('outbound sender encoded type boundary', () => {
       'a',
       selectedStringComponents(() => {
         throw admissionError
-      }),
-      () => undefined
+      })
     )
 
     let thrown: unknown
@@ -142,7 +142,6 @@ describe('outbound sender encoded type boundary', () => {
       },
       'a',
       selectedTwoFrameComponents(() => 'payload'),
-      () => undefined,
       {
         enabled: true,
         encodedType: 'string',
@@ -181,7 +180,6 @@ describe('outbound sender encoded type boundary', () => {
       },
       'a',
       selectedStringComponents(() => 'payload'),
-      () => undefined,
       {
         enabled: true,
         encodedType: 'string',
@@ -234,7 +232,6 @@ describe('outbound sender encoded type boundary', () => {
         },
         'a',
         selectedStringComponents(() => 'payload'),
-        () => undefined,
         {
           enabled: true,
           encodedType: 'string',
@@ -290,7 +287,6 @@ describe('outbound sender encoded type boundary', () => {
         },
         'a',
         selectedStringComponents(() => 'payload'),
-        () => undefined,
         {
           enabled: true,
           encodedType: 'string',
@@ -332,15 +328,14 @@ describe('outbound sender encoded type boundary', () => {
 
     const transport = new PrivateTransport()
     const components = selectedStringComponents(() => 'payload')
-    const pipeline = new RpcOutboundSender(transport, 'a', components, () => undefined)
+    const pipeline = new RpcOutboundSender(transport, 'a', components)
 
     await pipeline.send(canonicalRequest())
 
     const secondPipeline = new RpcOutboundSender(
       transport,
       'a',
-      selectedTwoFrameComponents(() => 'payload'),
-      () => undefined
+      selectedTwoFrameComponents(() => 'payload')
     )
     await secondPipeline.send(canonicalRequest('second-message'))
 
@@ -367,8 +362,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      selectedStringComponents(() => 'payload'),
-      () => undefined
+      selectedStringComponents(() => 'payload')
     )
     const options = {
       get transfer() {
@@ -413,8 +407,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      selectedStringComponents(() => 'payload'),
-      () => undefined
+      selectedStringComponents(() => 'payload')
     )
 
     /** Observes the outbound result across the held physical transport boundary. */
@@ -449,8 +442,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      selectedStringComponents(() => 'payload'),
-      () => undefined
+      selectedStringComponents(() => 'payload')
     )
     const options = Object.defineProperty({}, 'transfer', {
       get: () => {
@@ -479,8 +471,7 @@ describe('outbound sender encoded type boundary', () => {
       'a',
       selectedStringComponents(() => {
         throw encodeError
-      }),
-      () => undefined
+      })
     )
 
     expect(() => pipeline.send(canonicalRequest())).toThrow(RpcSerializationError)
@@ -501,7 +492,6 @@ describe('outbound sender encoded type boundary', () => {
       },
       'a',
       selectedStringComponents(() => 'variation'),
-      () => undefined,
       {
         enabled: true,
         encodedType: 'string',
@@ -513,7 +503,7 @@ describe('outbound sender encoded type boundary', () => {
       }
     )
 
-    await pipeline.sendVariation(canonicalRequest())
+    await pipeline.send(canonicalRequest())
     expect(protectedValue).toBe('variation')
     expect(sentValue).toBe('variation:protected')
   })
@@ -530,8 +520,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      selectedStringComponents(() => 'payload'),
-      () => undefined
+      selectedStringComponents(() => 'payload')
     )
     await pipeline.send(canonicalRequest())
     expect(frames).toHaveLength(1)
@@ -553,8 +542,7 @@ describe('outbound sender encoded type boundary', () => {
       selectedTwoFrameComponents(() => {
         encodes += 1
         return 'payload'
-      }),
-      () => undefined
+      })
     )
     await pipeline.send(canonicalRequest())
     expect(encodes).toBe(1)
@@ -575,8 +563,7 @@ describe('outbound sender encoded type boundary', () => {
       'a',
       selectedStringComponents(() => {
         throw new RpcSerializationError(RpcCoreErrorText.protocolEncodedType('string'))
-      }),
-      () => undefined
+      })
     )
     expect(() => pipeline.send(canonicalRequest())).toThrow('Protocol encode failed')
     expect(sends).toBe(0)
@@ -592,8 +579,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      selectedStringComponents(() => 'payload'),
-      () => undefined
+      selectedStringComponents(() => 'payload')
     )
     await expect(pipeline.send(canonicalRequest())).rejects.toMatchObject({
       code: 'TRANSPORT'
@@ -608,8 +594,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      selectedTwoFrameComponents(() => 'payload'),
-      () => undefined
+      selectedTwoFrameComponents(() => 'payload')
     )
     await expect(pipeline.send(canonicalRequest())).rejects.toMatchObject({ code: 'TRANSPORT' })
   })
@@ -636,8 +621,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      selectedTwoFrameComponents(() => 'payload'),
-      () => undefined
+      selectedTwoFrameComponents(() => 'payload')
     )
 
     const result = pipeline.send(canonicalRequest())
@@ -676,8 +660,7 @@ describe('outbound sender encoded type boundary', () => {
       selectedFailingFramerComponents(() => {
         encodes += 1
         return 'payload'
-      }, frameError),
-      () => undefined
+      }, frameError)
     )
 
     let thrown: unknown
@@ -706,8 +689,7 @@ describe('outbound sender encoded type boundary', () => {
       'a',
       selectedStringComponents(() => {
         throw failure
-      }),
-      () => undefined
+      })
     )
     expect(() => pipeline.send(canonicalRequest())).toThrow(RpcSerializationError)
     expect(sends).toBe(0)
@@ -725,8 +707,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      selectedFailingFramerComponents(() => 'payload', failure),
-      () => undefined
+      selectedFailingFramerComponents(() => 'payload', failure)
     )
     let thrown: unknown
     try {

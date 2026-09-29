@@ -147,7 +147,7 @@ describe('layered error ownership', () => {
   it('A2 removes every dead core code while retaining a throw site for each declared code', () => {
     const contract = declaredCodes('contract')
     const core = declaredCodes('core')
-    expect(core.size).toBe(23)
+    expect(core.size).toBe(24)
     for (const value of retired) expect([...core.values()]).not.toContain(value)
     const contractThrown = new Set(layerThrows('contract').map(({ key }) => key))
     const coreThrown = new Set(layerThrows('core').map(({ key }) => key))

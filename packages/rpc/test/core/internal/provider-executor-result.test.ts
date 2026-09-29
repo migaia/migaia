@@ -1,5 +1,5 @@
 import { assert, describe, expect, it, vi } from 'vitest'
-import { normalizeRpcEnvelope } from '../../../src/contract/index.js'
+import { RpcRouteProfile, normalizeRpcEnvelope } from '../../../src/contract/index.js'
 import { RpcSchemaValidationError } from '../../../src/core/errors.js'
 import {
   ProviderExecutor,
@@ -8,36 +8,43 @@ import {
 import { ProviderAdmissionRegistry } from '../../../src/core/internal/provider-admission.js'
 import { ProviderRegistry } from '../../../src/core/internal/provider.js'
 import type { IRpcContext, IRpcProvider } from '../../../src/core/typing.js'
-import { RpcRoutingProfile } from '../../../src/core/internal/routing-data.js'
-
 /** Canonical provider input shared by executor behavior assertions. */
 /** Normalized fixture must remain a request before it enters the provider executor. */
+const route = {
+  profile: RpcRouteProfile,
+  type: 'request' as const,
+  applicationVersion: '1.0',
+  senderId: 'peer',
+  targetId: 'host',
+  sentAt: Date.now()
+}
 const requestEnvelope = normalizeRpcEnvelope({
   kind: 'request',
   id: 'task',
   method: 'test',
-  data: null
+  data: { route, payload: null }
 })
 assert(requestEnvelope.kind === 'request')
 const request: IProviderRequestInput = {
   envelope: requestEnvelope,
-  route: {
-    webRpc: {
-      profile: RpcRoutingProfile,
-      type: 'request',
-      applicationVersion: '1.0',
-      senderId: 'peer',
-      targetId: 'host',
-      sentAt: Date.now()
-    },
-    payload: null
-  }
+  route: requestEnvelope.data
+}
+
+/** Direct executor tests use host timers when no manual deadline is under test. */
+const testTime = {
+  now: () => Date.now(),
+  setTimeout: (task: () => void, delayMs: number) => {
+    const handle = globalThis.setTimeout(task, delayMs)
+    return { clear: () => globalThis.clearTimeout(handle) }
+  },
+  clearTimeout: (timer: { readonly clear: () => void }) => timer.clear()
 }
 
 function makeExecutor(result: unknown, sent: unknown[]): ProviderExecutor<string> {
   const registry = new ProviderRegistry()
   registry.register('test', () => result as never)
   return new ProviderExecutor<string>({
+    ...testTime,
     timestamp: () => Date.now(),
     id: 'host',
     registry,
@@ -66,6 +73,7 @@ describe('ProviderExecutor result normalization', () => {
     const releaseBinding = vi.fn()
     const sent: unknown[] = []
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
@@ -95,6 +103,7 @@ describe('ProviderExecutor result normalization', () => {
     const admission = new ProviderAdmissionRegistry(1, 1)
     const releaseBinding = vi.fn()
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
@@ -124,6 +133,7 @@ describe('ProviderExecutor result normalization', () => {
     registry.register('test', provider)
     const sent: unknown[] = []
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -160,6 +170,7 @@ describe('ProviderExecutor result normalization', () => {
     const registry = new ProviderRegistry()
     registry.register('test', (context) => context.success('ok', { transfer: [transfer] }))
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -175,7 +186,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     await executor.execute({
       ...request,
-      route: { ...request.route, webRpc: { ...request.route.webRpc, receiverId: 'receiver-1' } }
+      route: { ...request.route, route: { ...request.route.route, receiverId: 'receiver-1' } }
     })
     expect(sent).toHaveLength(1)
     expect(sent[0]?.response).toEqual(
@@ -190,6 +201,7 @@ describe('ProviderExecutor result normalization', () => {
     const registry = new ProviderRegistry()
     registry.register('test', (context) => context.failed('denied', 'DENIED'))
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -218,6 +230,7 @@ describe('ProviderExecutor result normalization', () => {
       return context.success()
     })
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -248,6 +261,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     const send = vi.fn()
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -261,7 +275,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     await executor.execute({
       ...request,
-      route: { ...request.route, webRpc: { ...request.route.webRpc, dispatchOnly: true } }
+      route: { ...request.route, route: { ...request.route.route, dispatchOnly: true } }
     })
     expect(calls).toEqual(['first', 'second'])
     expect(send).not.toHaveBeenCalled()
@@ -273,6 +287,7 @@ describe('ProviderExecutor result normalization', () => {
     registry.register('test', provider)
     const replaySend = vi.fn()
     const replayExecutor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -291,6 +306,7 @@ describe('ProviderExecutor result normalization', () => {
 
     const overflowSend = vi.fn()
     const overflowExecutor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -313,6 +329,7 @@ describe('ProviderExecutor result normalization', () => {
   it('returns a stable failure when no provider owns the method', async () => {
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry: new ProviderRegistry(),
@@ -347,6 +364,7 @@ describe('ProviderExecutor result normalization', () => {
       const sent: unknown[] = []
       const failures: Array<{ error: unknown; code: string }> = []
       const executor = new ProviderExecutor<string>({
+        ...testTime,
         timestamp: () => Date.now(),
         id: 'host',
         registry,
@@ -399,6 +417,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -423,6 +442,7 @@ describe('ProviderExecutor result normalization', () => {
     registry.register('test', provider)
     const send = vi.fn(async () => undefined)
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => Date.now(),
       id: 'host',
       registry,
@@ -436,7 +456,7 @@ describe('ProviderExecutor result normalization', () => {
     })
     await executor.execute({
       ...request,
-      route: { ...request.route, webRpc: { ...request.route.webRpc, dispatchOnly: true } }
+      route: { ...request.route, route: { ...request.route.route, dispatchOnly: true } }
     })
     expect(provider).toHaveBeenCalledOnce()
     expect(send).not.toHaveBeenCalled()

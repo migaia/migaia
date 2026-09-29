@@ -40,13 +40,31 @@ describe('rpc-contract', () => {
       },
       id: '1',
       method: 'ping',
-      data: null
+      data: {
+        route: {
+          profile: 'migaia.rpc.route',
+          type: 'request',
+          applicationVersion: '1.0',
+          senderId: 'sender',
+          targetId: 'target',
+          sentAt: 0
+        }
+      }
     }
     expect(normalizeRpcEnvelope(input)).toEqual({
       kind: 'request',
       id: '1',
       method: 'ping',
-      data: null
+      data: {
+        route: {
+          profile: 'migaia.rpc.route',
+          type: 'request',
+          applicationVersion: '1.0',
+          senderId: 'sender',
+          targetId: 'target',
+          sentAt: 0
+        }
+      }
     })
     expect(reads).toBe(1)
     expect(() => normalizeRpcEnvelope({ kind: 'response', ok: true, id: '1' })).toThrow()

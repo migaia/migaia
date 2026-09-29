@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { reachRpcError } from '../../src/contract/index.js'
+import { normalizeRpcEnvelope, reachRpcError } from '../../src/contract/index.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { createEndpointKernel } from '../../src/core/endpoint-kernel.js'
@@ -7,7 +7,6 @@ import { RpcConstructionError } from '../../src/core/errors.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { assertPluginInstallResult } from '../../src/core/internal/plugin-descriptor.js'
 import { validateContractData } from '../../src/core/internal/contract.js'
-import { normalizeWebRpcRoutingData } from '../../src/core/internal/routing-data.js'
 import type { IRpcContractConfig } from '../../src/core/typing.js'
 
 /** Follow the native cause chain without interpreting a reported error's shape. */
@@ -117,27 +116,32 @@ describe('safeRead integration boundaries', () => {
 
   it('reports a hostile route field once while keeping admission closed', () => {
     const failure = new Error('profile getter failed')
-    const observed: Array<{ key: PropertyKey; error: unknown }> = []
-    const route = normalizeWebRpcRoutingData(
-      {
-        webRpc: {
-          get profile(): never {
-            throw failure
-          },
-          type: 'request',
-          applicationVersion: '1',
-          senderId: 'sender',
-          targetId: 'target',
-          sentAt: 1
+    let reads = 0
+    let observed: unknown
+    try {
+      normalizeRpcEnvelope({
+        kind: 'request',
+        id: 't',
+        method: 'm',
+        data: {
+          route: {
+            get profile(): never {
+              reads += 1
+              throw failure
+            },
+            type: 'request',
+            applicationVersion: '1',
+            senderId: 'sender',
+            targetId: 'target',
+            sentAt: 1
+          }
         }
-      },
-      (item) => {
-        observed.push(item)
-        return undefined
-      }
-    )
-    expect(route).toBeUndefined()
-    expect(observed).toEqual([{ key: 'profile', error: failure }])
+      })
+    } catch (error) {
+      observed = error
+    }
+    expect(observed).toMatchObject({ code: 'INVALID_ENVELOPE', cause: failure })
+    expect(reads).toBe(1)
   })
 
   it('keeps registration failure first when its message getter fails during cleanup', async () => {

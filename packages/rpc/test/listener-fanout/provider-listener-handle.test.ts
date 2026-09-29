@@ -1,5 +1,5 @@
 import { assert, describe, expect, it } from 'vitest'
-import { normalizeRpcEnvelope } from '../../src/contract/index.js'
+import { RpcRouteProfile, normalizeRpcEnvelope } from '../../src/contract/index.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createClientEndpoint } from '../../src/core/client.js'
 import { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
@@ -8,7 +8,6 @@ import {
   type IProviderRequestInput
 } from '../../src/core/internal/provider-executor.js'
 import { ProviderRegistry } from '../../src/core/internal/provider.js'
-import { RpcRoutingProfile } from '../../src/core/internal/routing-data.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { createProviderEndpoint } from '../../src/core/provider.js'
 
@@ -34,27 +33,35 @@ async function makeEndpoints() {
 }
 
 /** One dispatch-only request for direct executor failure-order checks. */
+const route = {
+  profile: RpcRouteProfile,
+  type: 'request' as const,
+  applicationVersion: '1.0',
+  senderId: 'peer',
+  targetId: 'host',
+  sentAt: 0,
+  dispatchOnly: true
+}
 const envelope = normalizeRpcEnvelope({
   kind: 'request',
   id: 'fanout-task',
   method: 'event',
-  data: null
+  data: { route, payload: null }
 })
 assert(envelope.kind === 'request')
 const request: IProviderRequestInput = {
   envelope,
-  route: {
-    webRpc: {
-      profile: RpcRoutingProfile,
-      type: 'request',
-      applicationVersion: '1.0',
-      senderId: 'peer',
-      targetId: 'host',
-      sentAt: 0,
-      dispatchOnly: true
-    },
-    payload: null
-  }
+  route: envelope.data
+}
+
+/** Direct executor fixtures share host timers outside deadline-specific cases. */
+const testTime = {
+  now: () => Date.now(),
+  setTimeout: (task: () => void, delayMs: number) => {
+    const handle = globalThis.setTimeout(task, delayMs)
+    return { clear: () => globalThis.clearTimeout(handle) }
+  },
+  clearTimeout: (timer: { readonly clear: () => void }) => timer.clear()
 }
 
 describe('provider event listener handles', () => {
@@ -135,6 +142,7 @@ describe('provider event listener handles', () => {
         calls.push('third')
       })
       const executor = new ProviderExecutor<string>({
+        ...testTime,
         timestamp: () => 0,
         id: 'host',
         registry,
@@ -201,6 +209,7 @@ describe('provider event listener handles', () => {
     expect(registry.listenerCount).toBe(2)
 
     const executor = new ProviderExecutor<string>({
+      ...testTime,
       timestamp: () => 0,
       id: 'host',
       registry,
@@ -216,7 +225,7 @@ describe('provider event listener handles', () => {
     })
     await executor.execute({
       ...request,
-      route: { ...request.route, webRpc: { ...request.route.webRpc, dispatchOnly: false } }
+      route: { ...request.route, route: { ...request.route.route, dispatchOnly: false } }
     })
     expect(listeners).toEqual([])
     expect(sent).toEqual([expect.objectContaining({ ok: true, data: 'provider' })])

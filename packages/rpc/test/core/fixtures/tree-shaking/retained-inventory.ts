@@ -130,7 +130,9 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/error.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'src/contract/v1/route.ts',
+      'src/contract/wire-constants.ts'
     ),
     client: reviewed(
       '\u0000rolldown/runtime.js',
@@ -184,7 +186,6 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/replay.ts',
       'src/core/internal/request-replay-ledger.ts',
       'src/core/internal/resource-scope.ts',
-      'src/core/internal/routing-data.ts',
       'src/core/internal/safe-value.ts',
       'src/core/internal/source-identity.ts',
       'src/core/internal/test-observer.ts',
@@ -280,7 +281,11 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/promise.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'src/contract/v1/route.ts',
+      'src/contract/wire-constants.ts',
+      'src/contract/unknown-field.ts',
+      'src/core/protocol-constants.ts'
     ),
     provider: reviewed(
       '\u0000rolldown/runtime.js',
@@ -338,7 +343,6 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/replay.ts',
       'src/core/internal/request-replay-ledger.ts',
       'src/core/internal/resource-scope.ts',
-      'src/core/internal/routing-data.ts',
       'src/core/internal/safe-value.ts',
       'src/core/internal/source-identity.ts',
       'src/core/internal/test-observer.ts',
@@ -435,7 +439,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/promise.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'src/contract/v1/route.ts',
+      'src/contract/wire-constants.ts',
+      'src/contract/unknown-field.ts',
+      'src/core/protocol-constants.ts',
+      'src/core/idempotency-store.ts'
     ),
     full: reviewed(
       '\u0000rolldown/runtime.js',
@@ -499,7 +508,6 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/replay.ts',
       'src/core/internal/request-replay-ledger.ts',
       'src/core/internal/resource-scope.ts',
-      'src/core/internal/routing-data.ts',
       'src/core/internal/safe-value.ts',
       'src/core/internal/source-identity.ts',
       'src/core/internal/test-observer.ts',
@@ -595,7 +603,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/promise.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'src/contract/v1/route.ts',
+      'src/contract/wire-constants.ts',
+      'src/contract/unknown-field.ts',
+      'src/core/protocol-constants.ts',
+      'src/core/idempotency-store.ts'
     ),
     custom: reviewed(
       '\u0000rolldown/runtime.js',
@@ -657,7 +670,6 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/replay.ts',
       'src/core/internal/request-replay-ledger.ts',
       'src/core/internal/resource-scope.ts',
-      'src/core/internal/routing-data.ts',
       'src/core/internal/safe-value.ts',
       'src/core/internal/source-identity.ts',
       'src/core/internal/test-observer.ts',
@@ -753,6 +765,11 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/promise.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'src/contract/v1/route.ts',
+      'src/contract/wire-constants.ts',
+      'src/contract/unknown-field.ts',
+      'src/core/protocol-constants.ts',
+      'src/core/idempotency-store.ts'
     )
   })

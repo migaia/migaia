@@ -77,8 +77,8 @@ const peerVector = Object.freeze({
   id: 'peer-vector',
   method: 'peer-initiated',
   data: Object.freeze({
-    webRpc: Object.freeze({
-      profile: 'web-rpc.route.v1',
+    route: Object.freeze({
+      profile: 'migaia.rpc.route',
       type: 'request',
       applicationVersion: '1.0.0',
       senderId: 'peer',
@@ -153,15 +153,15 @@ const createPeerApp = (codec, carrier) => {
       codec.id === 'json' && typeof input === 'object' && input !== null
         ? input
         : codec.decode(input)
-    if (incoming.kind === 'request' && incoming.data?.webRpc?.type === 'request') {
-      const route = incoming.data.webRpc
+    if (incoming.kind === 'request' && incoming.data?.route?.type === 'request') {
+      const route = incoming.data.route
       return codec.encode({
         kind: 'response',
         ok: true,
         id: incoming.id,
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: 'migaia.rpc.route',
             type: 'response',
             applicationVersion: route.applicationVersion,
             senderId: route.targetId,
@@ -174,16 +174,16 @@ const createPeerApp = (codec, carrier) => {
         }
       })
     }
-    if (incoming.kind === 'discovery' && incoming.data?.webRpc?.type === 'discovery-query') {
-      const route = incoming.data.webRpc
+    if (incoming.kind === 'discovery' && incoming.data?.route?.type === 'discovery-query') {
+      const route = incoming.data.route
       return codec.encode({
         kind: 'discovery',
         id: incoming.id,
         version: incoming.version,
         acceptVersions: incoming.acceptVersions,
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: 'migaia.rpc.route',
             type: 'discovery-response',
             applicationVersion: route.applicationVersion,
             senderId: 'peer',
@@ -202,15 +202,15 @@ const createPeerApp = (codec, carrier) => {
         ok: true,
         id: 'peer-ack',
         data: {
-          webRpc: {
-            profile: 'web-rpc.route.v1',
+          route: {
+            profile: 'migaia.rpc.route',
             type: 'response',
-            applicationVersion: incoming.data.webRpc.applicationVersion,
+            applicationVersion: incoming.data.route.applicationVersion,
             senderId: 'peer',
-            targetId: incoming.data.webRpc.senderId,
-            receiverId: incoming.data.webRpc.senderId,
+            targetId: incoming.data.route.senderId,
+            receiverId: incoming.data.route.senderId,
             sentAt: Date.now(),
-            method: incoming.data.webRpc.method
+            method: incoming.data.route.method
           },
           payload: { ack: incoming.id }
         }
@@ -487,9 +487,9 @@ const runProductionCell = async (app, codecId, carrier) => {
           candidate.kind === 'response' &&
           candidate.ok === true &&
           candidate.id === 'peer-ack' &&
-          candidate.data?.webRpc?.type === 'response' &&
-          candidate.data.webRpc.senderId === 'peer' &&
-          candidate.data.webRpc.targetId === 'production' &&
+          candidate.data?.route?.type === 'response' &&
+          candidate.data.route.senderId === 'peer' &&
+          candidate.data.route.targetId === 'production' &&
           candidate.data.payload?.ack === peerVector.id
         )
           resolve(candidate)
@@ -535,9 +535,9 @@ const runProductionCell = async (app, codecId, carrier) => {
     if (
       responseEnvelope.kind !== 'response' ||
       responseEnvelope.ok !== true ||
-      responseEnvelope.data?.webRpc?.type !== 'response' ||
-      responseEnvelope.data.webRpc.senderId !== 'peer' ||
-      responseEnvelope.data.webRpc.targetId !== 'production' ||
+      responseEnvelope.data?.route?.type !== 'response' ||
+      responseEnvelope.data.route.senderId !== 'peer' ||
+      responseEnvelope.data.route.targetId !== 'production' ||
       JSON.stringify(responseEnvelope.data.payload) !== JSON.stringify(vector.data)
     )
       throw new Error('peer response routing-data mismatch')

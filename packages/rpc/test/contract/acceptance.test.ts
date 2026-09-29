@@ -81,7 +81,16 @@ describe('RPCC-T04 hostile normalization', () => {
       },
       get data() {
         reads.set('data', (reads.get('data') ?? 0) + 1)
-        return null
+        return {
+          route: {
+            profile: 'migaia.rpc.route',
+            type: 'request',
+            applicationVersion: '1.0',
+            senderId: 'sender',
+            targetId: 'target',
+            sentAt: 0
+          }
+        }
       }
     }
     expect(normalizeRpcEnvelope(input)).toMatchObject({ kind: 'request', id: 'request-1' })

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeRpcEnvelope } from '../../src/contract/index.js'
+import { minimalRpcRoute } from '../fixtures/control-envelopes.js'
 
 /** Short wire node that stays below text limits even in wide trees. */
 function node(): {
@@ -18,7 +19,15 @@ function node(): {
 
 /** Existing V1 failure envelope with an optional wire error slot. */
 function failure(error: unknown): unknown {
-  return { kind: 'response', ok: false, id: 'i', code: 'C', message: 'm', error }
+  return {
+    kind: 'response',
+    ok: false,
+    id: 'i',
+    code: 'C',
+    message: 'm',
+    data: { route: minimalRpcRoute('response') },
+    error
+  }
 }
 
 describe('V1 failure error slot', () => {
@@ -28,8 +37,14 @@ describe('V1 failure error slot', () => {
   })
 
   it('wraps schema violations after the whole envelope passes portable validation', () => {
+    const warnings: Array<[string, string]> = []
+    expect(
+      normalizeRpcEnvelope(failure({ ...node(), extra: true }), {
+        onUnknownField: (pointer, field) => warnings.push([pointer, field])
+      })
+    ).toMatchObject({ error: node() })
+    expect(warnings).toEqual([['/error', 'extra']])
     const invalid = [
-      { ...node(), extra: true },
       { ...node(), stack: '' },
       { ...node(), errors: Array.from({ length: 1024 }, () => node()) }
     ]
@@ -58,25 +73,40 @@ describe('V1 failure error slot', () => {
       received = error
     }
     expect(received).toMatchObject({ code: 'INVALID_ENVELOPE' })
-    expect((received as Error).cause).not.toMatchObject({ code: 'INVALID_WIRE_ERROR' })
+    expect((received as Error).cause).toMatchObject({
+      code: 'INVALID_WIRE_ERROR',
+      violation: 'depth'
+    })
   })
 
   it('preserves non-error request, discovery, variation, and success-response decisions', () => {
     const pairs = [
       [
-        { kind: 'request', id: 'i', method: 'm', data: null },
-        { kind: 'request', id: 'i', method: 1, data: null }
+        { kind: 'request', id: 'i', method: 'm', data: { route: minimalRpcRoute('request') } },
+        { kind: 'request', id: 'i', method: 1, data: { route: minimalRpcRoute('request') } }
       ],
       [
-        { kind: 'discovery', id: 'i', version: '1', acceptVersions: ['1'] },
-        { kind: 'discovery', id: 'i', version: 1, acceptVersions: ['1'] }
+        {
+          kind: 'discovery',
+          id: 'i',
+          version: '1',
+          acceptVersions: ['1'],
+          data: { route: minimalRpcRoute('discovery-query') }
+        },
+        {
+          kind: 'discovery',
+          id: 'i',
+          version: 1,
+          acceptVersions: ['1'],
+          data: { route: minimalRpcRoute('discovery-query') }
+        }
       ],
       [
-        { kind: 'variation', id: 'i', data: null },
-        { kind: 'variation', id: 1, data: null }
+        { kind: 'variation', id: 'i', data: { route: minimalRpcRoute('variation') } },
+        { kind: 'variation', id: 1, data: { route: minimalRpcRoute('variation') } }
       ],
       [
-        { kind: 'response', ok: true, id: 'i', data: null },
+        { kind: 'response', ok: true, id: 'i', data: { route: minimalRpcRoute('response') } },
         { kind: 'response', ok: true, id: 'i' }
       ]
     ] as const

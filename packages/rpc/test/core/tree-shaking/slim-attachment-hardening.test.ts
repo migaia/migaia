@@ -13,7 +13,7 @@ import type {
   IRpcPortableValue,
   IRpcRequestEnvelope
 } from '../../../src/contract/index.js'
-import { normalizeWebRpcRoutingData } from '../../../src/core/internal/routing-data.js'
+import { RpcRouteProfile } from '../../../src/contract/index.js'
 
 /** Flushes receiver and provider promise continuations without relying on timer duration. */
 const flush = async (): Promise<void> => {
@@ -53,20 +53,19 @@ function createDrivenTransport(sourceProof: (source: unknown) => boolean = () =>
 
 /** Creates a matching successful response for one captured slim request. */
 function responseFor(request: IRpcRequestEnvelope, data: unknown): IRpcEnvelope {
-  const route = normalizeWebRpcRoutingData(request.data)
-  if (!route) throw new Error('captured request must carry canonical routing data')
+  const route = request.data.route
   return {
     kind: 'response',
     id: request.id,
     ok: true,
     data: {
-      webRpc: {
-        profile: 'web-rpc.route.v1',
+      route: {
+        profile: RpcRouteProfile,
         type: 'response',
-        applicationVersion: route.webRpc.applicationVersion,
-        senderId: route.webRpc.targetId,
-        targetId: route.webRpc.senderId,
-        receiverId: route.webRpc.senderId,
+        applicationVersion: route.applicationVersion,
+        senderId: route.targetId,
+        targetId: route.senderId,
+        receiverId: route.senderId,
         method: request.method,
         sentAt: Date.now()
       },
@@ -153,8 +152,8 @@ describe('slim attachment hostile equivalence', () => {
       id: 'shared-task',
       method: 'event',
       data: {
-        webRpc: {
-          profile: 'web-rpc.route.v1',
+        route: {
+          profile: RpcRouteProfile,
           type: 'request',
           applicationVersion: '1.0',
           senderId: 'client-source-isolation',

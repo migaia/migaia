@@ -41,3 +41,8 @@ the four initial variation subtypes, their payloads, and expected actions; its u
 also evolvable. `handshake.json` records offer pairs, negotiated values, invalid first messages,
 and accept values outside an offer. These vectors contain JSON values and protocol text only; they
 do not depend on JavaScript error prototypes.
+
+Protocol 1.0 is frozen from the first commit that adds `frozen/1.0/SHA256SUMS`. The three vector
+files in `frozen/1.0/` are exact copies of the live files at that cutover, and the manifest records
+their SHA-256 digests. Future implementation changes must preserve every non-evolvable outcome;
+new minor versions can extend the live vectors without rewriting the frozen copies.

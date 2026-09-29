@@ -23,7 +23,6 @@
       "internal/pending.ts",
       "internal/replay.ts",
       "send",
-      "sendVariation",
       "allocateRpcId"
     ],
     "provider": [

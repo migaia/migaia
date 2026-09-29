@@ -329,8 +329,8 @@ describe('composition topology and rollback', () => {
     coordinator.register('abort', (_message, peerKey) => {
       received.push(peerKey)
     })
-    await expect(coordinator.dispatch('abort', 'task', {}, 'peer')).resolves.toBe(true)
-    await expect(coordinator.dispatch('abort', 'task', {}, 'peer')).resolves.toBe(false)
+    await expect(coordinator.dispatch('abort', 'task', {}, 'peer')).resolves.toBe('dispatched')
+    await expect(coordinator.dispatch('abort', 'task', {}, 'peer')).resolves.toBe('rejected')
     expect(received).toEqual(['peer'])
     coordinator.clear()
   })

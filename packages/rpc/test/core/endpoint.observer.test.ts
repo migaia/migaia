@@ -319,8 +319,8 @@ describe('endpoint test-only lifecycle observer', () => {
           id,
           method: 'echo',
           data: {
-            webRpc: {
-              profile: 'web-rpc.route.v1',
+            route: {
+              profile: 'migaia.rpc.route',
               type: 'request',
               applicationVersion: '1.0',
               senderId,
