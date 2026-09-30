@@ -8,9 +8,13 @@ import { assertRpcIdempotencyKey, defaultRpcId } from '../core/internal/id.js'
 import { RemoteMethodName } from './constants.js'
 import {
   normalizeRemoteContract,
+  normalizeRemoteControlShape,
+  normalizeRemoteHostCatalog,
   RemoteMethodMode,
   sameRemoteContract,
   type IRemoteContract,
+  type IRemoteControlDefinition,
+  type IRemoteHostCatalog,
   type IRemoteMethodContract
 } from './contract.js'
 import { RpcRemoteLayerErrorCode } from './error-code.js'
@@ -35,7 +39,7 @@ type IRemoteGeneration = Readonly<{
 
 /** Internal owner used by Plugin, Host, and Coroutine without a second proxy implementation. */
 export type IRemoteRegistration = Readonly<{
-  readonly contract: IRemoteContract
+  readonly contract: IRemoteContract | IRemoteHostCatalog
   readonly events: IRemoteGenerationEvents
   prepareGeneration(
     signal: IAbortSignal,
@@ -52,9 +56,15 @@ export type IRemoteRegistration = Readonly<{
     params: unknown,
     options?: IRemoteCallOptions
   ): AsyncIterableIterator<IRpcPortableValue>
-  featureProxies(): Readonly<
-    Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>
-  >
+  invokeControl(
+    method: string,
+    params: unknown,
+    parameterShape: IRemoteControlDefinition,
+    resultShape: IRemoteControlDefinition
+  ): Promise<IRpcPortableValue>
+  featureProxies(
+    pluginName?: string
+  ): Readonly<Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>>
   revoke(reason: unknown): void
   release(): Promise<void>
 }>
@@ -88,7 +98,9 @@ function restoreTaggedProviderFailure(error: unknown): never {
 /** One generation holder owns leave ordering and the retry port's neutral events. */
 class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   /** Validated method description, independent of a live connection. */
-  readonly contract: IRemoteContract
+  readonly contract: IRemoteContract | IRemoteHostCatalog
+  /** Host mode validates one catalog over one shared generation. */
+  readonly #catalog: IRemoteHostCatalog | undefined
   /** Generation observations consumed by retry and Host readiness. */
   readonly events: IRemoteGenerationEvents
   /** The current binding and its single scheduler. */
@@ -107,9 +119,10 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   #releasePromise: Promise<void> | undefined
 
   /** Validates local options before any launcher side effect. */
-  constructor(options: IRemoteProxyOptions<TUnit, TSpec>) {
+  constructor(options: IRemoteProxyOptions<TUnit, TSpec>, kind: 'plugin' | 'host') {
     this.#options = options
-    this.contract = normalizeRemoteContract(options.contract)
+    this.#catalog = kind === 'host' ? normalizeRemoteHostCatalog(options.contract) : undefined
+    this.contract = this.#catalog ?? normalizeRemoteContract(options.contract)
     if (
       options.callDeadlineCapMs !== undefined &&
       (!Number.isSafeInteger(options.callDeadlineCapMs) || options.callDeadlineCapMs <= 0)
@@ -245,11 +258,16 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
     own(closeChannel)
     if (channel.scheduler !== this.#options.binding.scheduler)
       throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schedulerInvalid)
-    const hasStream = Object.values(this.contract.features).some((feature) =>
-      Object.values(feature.methods).some(
-        (method) =>
-          method.mode === RemoteMethodMode.generator ||
-          method.mode === RemoteMethodMode.asyncGenerator
+    const contracts = this.#catalog
+      ? Object.values(this.#catalog)
+      : [this.contract as IRemoteContract]
+    const hasStream = contracts.some((contract) =>
+      Object.values(contract.features).some((feature) =>
+        Object.values(feature.methods).some(
+          (method) =>
+            method.mode === RemoteMethodMode.generator ||
+            method.mode === RemoteMethodMode.asyncGenerator
+        )
       )
     )
     if (hasStream && !channel.agreement.capabilities.includes('stream@1'))
@@ -267,10 +285,19 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
-    const description = normalizeRemoteContract(
-      await served.endpoint.send(channel.peerId, RemoteMethodName.describe, [])
+    const description = await served.endpoint.send(channel.peerId, RemoteMethodName.describe, [])
+    if (this.#catalog) {
+      const envelope = normalizeRemoteControlShape('describeHost', description) as {
+        readonly catalog: IRemoteHostCatalog
+      }
+      if (
+        JSON.stringify(this.#catalog) !==
+        JSON.stringify(normalizeRemoteHostCatalog(envelope.catalog))
+      )
+        throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+    } else if (
+      !sameRemoteContract(this.contract as IRemoteContract, normalizeRemoteContract(description))
     )
-    if (!sameRemoteContract(this.contract, description))
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
     if (signal.aborted) throw resolveAbortReason(signal)
     if (this.#releasePromise) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
@@ -434,6 +461,35 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
     }
   }
 
+  /** Sends one validated Host control request through the same generation and guard gate. */
+  invokeControl(
+    method: string,
+    params: unknown,
+    parameterShape: IRemoteControlDefinition,
+    resultShape: IRemoteControlDefinition
+  ): Promise<IRpcPortableValue> {
+    try {
+      if (!this.#catalog) throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+      const data = normalizeRemoteControlShape(parameterShape, params)
+      if (!Array.isArray(data))
+        throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+      if (method !== RemoteMethodName.hostInspect && !this.#catalog[data[0] as string])
+        throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+      this.#options.callGuard?.beforeDispatch({
+        method,
+        mode: 'host-control',
+        generation: this.#current?.number ?? this.#options.binding.supervisor.generation
+      })
+      const active = this.#active()
+      return active.served.endpoint
+        .send<IRpcPortableValue>(active.channel.peerId, method, data)
+        .catch(restoreTaggedProviderFailure)
+        .then((result) => normalizeRemoteControlShape(resultShape, result))
+    } catch (error) {
+      return Promise.reject(error)
+    }
+  }
+
   /** Stream opening remains lazy so guard errors reach the first next call. */
   async *invokeStream(
     method: string,
@@ -471,9 +527,10 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   /** Finds only methods present in the validated description. */
   #method(fullName: string): IRemoteMethodContract {
     const [plugin, feature, method, extra] = fullName.split('.')
+    const contract = this.#catalog?.[plugin!] ?? (this.contract as IRemoteContract)
     const declaration =
-      extra === undefined && plugin === this.contract.plugin
-        ? this.contract.features[feature!]?.methods[method!]
+      extra === undefined && plugin === contract.plugin
+        ? contract.features[feature!]?.methods[method!]
         : undefined
     if (!declaration) throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
     return declaration
@@ -488,9 +545,9 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   }
 
   /** Feature methods are projected from the contract, never enumerated from a peer object. */
-  featureProxies(): Readonly<
-    Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>
-  > {
+  featureProxies(
+    pluginName?: string
+  ): Readonly<Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>> {
     /** Stable proxy surface persists across generation switches. */
     const features: Record<
       string,
@@ -499,12 +556,16 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
       string,
       Readonly<Record<string, (...args: unknown[]) => unknown>>
     >
-    for (const [featureName, feature] of Object.entries(this.contract.features)) {
+    const contract = this.#catalog
+      ? this.#catalog[pluginName ?? '']
+      : (this.contract as IRemoteContract)
+    if (!contract) throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+    for (const [featureName, feature] of Object.entries(contract.features)) {
       const methods: Record<string, (...args: unknown[]) => unknown> = Object.create(
         null
       ) as Record<string, (...args: unknown[]) => unknown>
       for (const [methodName, declaration] of Object.entries(feature.methods)) {
-        const fullName = `${this.contract.plugin}.${featureName}.${methodName}`
+        const fullName = `${contract.plugin}.${featureName}.${methodName}`
         methods[methodName] = (...args: unknown[]) => {
           const params = args[0]
           const options = args[1] as IRemoteCallOptions | undefined
@@ -548,9 +609,10 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
 
 /** Creates the single proxy owner shared by all runtime launchers. */
 export function createRemoteRegistration<TUnit, TSpec>(
-  options: IRemoteProxyOptions<TUnit, TSpec>
+  options: IRemoteProxyOptions<TUnit, TSpec>,
+  kind: 'plugin' | 'host' = 'plugin'
 ): IRemoteRegistration {
-  return new RemoteRegistration(options)
+  return new RemoteRegistration(options, kind)
 }
 
 /** Owns generation resources once across setup, replacement, and final removal. */
