@@ -2,6 +2,7 @@ import { hostRethrowReporter } from '@migaia/utils/promise'
 import { defineFeature } from '../feature.js'
 import type { IRpcFeatureExpose } from '../internal/feature-contract.js'
 import type { IIpcLogInstallation, IIpcLogRecord, IIpcSendGate } from './flow-control.js'
+import { IpcReporterContext } from './reporter-context.js'
 
 /** Observational reporter does not change a gate admission or business Promise result. */
 export function createIpcLogFeature(
@@ -15,10 +16,10 @@ export function createIpcLogFeature(
   const handleReportError = (error: unknown, record: IIpcLogRecord): void => {
     try {
       void Promise.resolve(options.onReportError(error, record)).catch((reporterError: unknown) =>
-        hostRethrowReporter(reporterError, { operation: 'limiter', phase: 'reporter' })
+        hostRethrowReporter(reporterError, IpcReporterContext)
       )
     } catch (reporterError) {
-      hostRethrowReporter(reporterError, { operation: 'limiter', phase: 'reporter' })
+      hostRethrowReporter(reporterError, IpcReporterContext)
     }
   }
   /** Captures both synchronous throws and asynchronous rejections from the injected sink. */

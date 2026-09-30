@@ -27,7 +27,8 @@ import {
 import {
   type IDeferredPreparedEndpoint,
   type IPreparedEndpoint,
-  prepareEndpoint
+  prepareEndpoint,
+  rollbackTransportConstruction
 } from './internal/endpoint-bootstrap.js'
 import {
   createEndpointKernel,
@@ -112,6 +113,7 @@ async function createComposedEndpointRuntime<
     if (new Set(declaredFeatureKeys).size !== declaredFeatureKeys.length)
       throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleDuplicated)
   } catch (error) {
+    if (config.transport) rollbackTransportConstruction(config.transport)
     if (error instanceof RpcError) throw error
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
@@ -119,9 +121,15 @@ async function createComposedEndpointRuntime<
       error
     )
   }
-  const deferred = (await prepareEndpoint(config, {
-    deferMiddlewareInstall: true
-  })) as IDeferredPreparedEndpoint<TTargetId>
+  let deferred: IDeferredPreparedEndpoint<TTargetId>
+  try {
+    deferred = (await prepareEndpoint(config, {
+      deferMiddlewareInstall: true
+    })) as IDeferredPreparedEndpoint<TTargetId>
+  } catch (error) {
+    if (config.transport) rollbackTransportConstruction(config.transport)
+    throw error
+  }
   /**
    * Object-form native middleware carries immutable claims. Reject conflicts before the endpoint
    * creates its kernel or Host; function-form middleware intentionally has dynamic output keys.
@@ -129,16 +137,21 @@ async function createComposedEndpointRuntime<
   const staticMiddlewareClaims = deferred.middlewareSnapshots.flatMap((snapshot) =>
     snapshot.kind === 'native' && snapshot.metadata !== undefined ? [snapshot] : []
   )
-  preflightFeatureClaims(
-    staticMiddlewareClaims.map((snapshot) => ({
-      name: snapshot.name,
-      claims: snapshot.metadata!.claims,
-      sharedProvides: snapshot.metadata!.sharedProvides,
-      sharedConsumes: snapshot.metadata!.sharedConsumes,
-      sharedOptionalConsumes: snapshot.metadata!.sharedOptionalConsumes
-    })),
-    { requireCompleteGraph: false }
-  )
+  try {
+    preflightFeatureClaims(
+      staticMiddlewareClaims.map((snapshot) => ({
+        name: snapshot.name,
+        claims: snapshot.metadata!.claims,
+        sharedProvides: snapshot.metadata!.sharedProvides,
+        sharedConsumes: snapshot.metadata!.sharedConsumes,
+        sharedOptionalConsumes: snapshot.metadata!.sharedOptionalConsumes
+      })),
+      { requireCompleteGraph: false }
+    )
+  } catch (error) {
+    rollbackTransportConstruction(deferred.transport)
+    throw error
+  }
   let kernel: IEndpointKernelHost | undefined
   let host: IRpcPluginHost | undefined
   let hostExtensions: Readonly<Record<string, unknown>> | undefined
@@ -323,6 +336,7 @@ async function createComposedEndpointRuntime<
       { activated: activationCommitted }
     )
   } catch (primary) {
+    rollbackTransportConstruction(deferred.transport)
     if (host) {
       try {
         await host.dispose()
@@ -420,6 +434,7 @@ async function createComposedEndpointRuntime<
       }
     })
   } catch (primary) {
+    rollbackTransportConstruction(deferred.transport)
     try {
       await host!.dispose()
     } catch (error) {

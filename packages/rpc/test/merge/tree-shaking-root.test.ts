@@ -9,8 +9,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** IPC outbound-gate retains one core module; byte caps are its measured root output. */
 const allowedIncrease = {
-  rawBytes: 49629 / legacyRoot.rawBytes,
-  gzipBytes: 13145 / legacyRoot.gzipBytes
+  rawBytes: 50998 / legacyRoot.rawBytes,
+  gzipBytes: 13692 / legacyRoot.gzipBytes
 } as const
 
 /** The IPC core port adds exactly one module without retaining the optional plugin imports. */
