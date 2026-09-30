@@ -45,14 +45,14 @@ def read_exact(stream: BinaryIO, size: int) -> bytes:
     return b"".join(chunks)
 
 
-def read_frame(stream: BinaryIO) -> bytes | None:
-    """Check the 4-byte length before allocating or reading the payload."""
+def read_frame(stream: BinaryIO, max_payload: int = MAX_FRAME) -> bytes | None:
+    """Check the frame and caller-specific limits before reading the payload."""
     first = stream.read(1)
     if not first:
         return None
     header = first + read_exact(stream, 3)
     length = struct.unpack(">I", header)[0]
-    if not 1 <= length <= MAX_FRAME:
+    if not 1 <= length <= MAX_FRAME or length > max_payload:
         raise PeerFailure("INVALID_FRAME_LENGTH")
     return read_exact(stream, length)
 
@@ -70,8 +70,10 @@ def decode_frame(payload: bytes) -> Any:
     """Decode strict UTF-8 JSON without exposing invalid text in errors."""
     try:
         return json.loads(payload.decode("utf-8", "strict"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    except (UnicodeDecodeError, json.JSONDecodeError):
         raise PeerFailure("INVALID_JSON") from None
+    except RecursionError:
+        raise PeerFailure("RECURSION_ERROR") from None
 
 
 def write_json(stream: BinaryIO, value: Any) -> None:
@@ -80,6 +82,8 @@ def write_json(stream: BinaryIO, value: Any) -> None:
         payload = json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
     except (TypeError, ValueError, UnicodeEncodeError):
         raise PeerFailure("INVALID_JSON") from None
+    except RecursionError:
+        raise PeerFailure("RECURSION_ERROR") from None
     write_frame(stream, payload)
 
 
@@ -204,16 +208,19 @@ def response(identifier: str, method: str, sender: str, target: str, payload: An
 def run_responder(reader: BinaryIO, writer: BinaryIO) -> None:
     """Complete handshake, then serve one-way, request and control frames."""
     local = own_offer()
-    first = read_frame(reader)
-    if first is None or len(first) > MAX_HANDSHAKE:
+    try:
+        first = read_frame(reader, MAX_HANDSHAKE)
+        if first is None:
+            raise PeerFailure("HANDSHAKE_INVALID")
+        hello = decode_frame(first)
+        validate_hello(hello)
+    except PeerFailure:
         raise PeerFailure("HANDSHAKE_INVALID")
-    hello = decode_frame(first)
-    validate_hello(hello)
     agreed = negotiate(hello, local)
     if agreed is None:
         reason = "protocol" if hello["protocol"] != local["protocol"] else "version"
         write_json(writer, {"kind": "handshake", "step": "reject", "protocol": PROTOCOL, "error": wire_error("HANDSHAKE_INCOMPATIBLE", "rpc handshake incompatible: " + reason)})
-        return
+        raise PeerFailure("HANDSHAKE_INVALID")
     write_json(writer, {"kind": "handshake", "step": "accept", "protocol": PROTOCOL, **agreed, "peer": local["peer"]})
     remote_id = hello["peer"]["id"]
     open_waits: dict[str, str] = {}
@@ -225,24 +232,30 @@ def run_responder(reader: BinaryIO, writer: BinaryIO) -> None:
         message = decode_frame(raw)
         if not _plain_object(message):
             raise PeerFailure("INVALID_ENVELOPE")
+        kind = message.get("kind")
+        if kind not in ("request", "response", "discovery", "variation", "stream"):
+            print("PEER_WARN UNKNOWN_KIND", file=sys.stderr, flush=True)
+            continue
         identifier = message.get("id")
         data = message.get("data")
         header = data.get("route") if _plain_object(data) else None
         if not isinstance(identifier, str) or not _plain_object(header) or header.get("profile") != ROUTE_PROFILE:
             raise PeerFailure("INVALID_ENVELOPE")
-        kind = message.get("kind")
         if kind == "variation" and header.get("type") == "variation":
             control = header.get("variation")
             if control == "ping" and "ping@1" in agreed["capabilities"]:
                 write_json(writer, variation(identifier, "pong", local["peer"]["id"], remote_id))
             elif control == "abort" and "abort@1" in agreed["capabilities"]:
+                if closing:
+                    print("PEER_EVENT ABORT_DURING_DRAIN", file=sys.stderr, flush=True)
                 open_waits.pop(identifier, None)
                 if closing and not open_waits:
                     return
             elif control == "close" and "close@1" in agreed["capabilities"]:
                 payload = data.get("payload")
                 if not _plain_object(payload) or type(payload.get("drainMs")) is not int or not 0 <= payload["drainMs"] <= 2_147_483_647:
-                    raise PeerFailure("INVALID_CONTROL")
+                    print("PEER_ERROR PROTOCOL_INVALID", file=sys.stderr, flush=True)
+                    continue
                 closing = True
                 if not open_waits:
                     return
@@ -254,10 +267,17 @@ def run_responder(reader: BinaryIO, writer: BinaryIO) -> None:
             raise PeerFailure("INVALID_ENVELOPE")
         if closing:
             continue
-        if method == "peer.wait":
-            open_waits[identifier] = method
+        if method == "peer.finish":
+            for wait_id, wait_method in tuple(open_waits.items()):
+                write_json(writer, response(wait_id, wait_method, local["peer"]["id"], remote_id, payload=None))
+                del open_waits[wait_id]
+            if header.get("dispatchOnly") is not True:
+                write_json(writer, response(identifier, method, local["peer"]["id"], remote_id, payload=None))
             continue
         if header.get("dispatchOnly") is True:
+            continue
+        if method == "peer.wait":
+            open_waits[identifier] = method
             continue
         if method == "peer.error":
             result = response(identifier, method, local["peer"]["id"], remote_id, error=wire_error("PEER_ERROR", "native peer requested error"))
@@ -272,17 +292,20 @@ def run_initiator(reader: BinaryIO, writer: BinaryIO) -> None:
     """Prove a peer-to-peer handshake and echo, then announce close."""
     local = own_offer()
     write_json(writer, local)
-    raw = read_frame(reader)
-    if raw is None or len(raw) > MAX_HANDSHAKE:
+    try:
+        raw = read_frame(reader, MAX_HANDSHAKE)
+        if raw is None:
+            raise PeerFailure("HANDSHAKE_INVALID")
+        reply = decode_frame(raw)
+    except PeerFailure:
         raise PeerFailure("HANDSHAKE_INVALID")
-    reply = decode_frame(raw)
     if not _plain_object(reply) or reply.get("kind") != "handshake" or reply.get("step") != "accept" or reply.get("protocol") != PROTOCOL:
-        raise PeerFailure("HANDSHAKE_REJECTED")
+        raise PeerFailure("HANDSHAKE_INVALID")
     if reply.get("major") != 1 or reply.get("minor") not in (0, 1) or reply.get("codec") != "json":
-        raise PeerFailure("HANDSHAKE_MISMATCH")
+        raise PeerFailure("HANDSHAKE_INVALID")
     capabilities = reply.get("capabilities")
     if not isinstance(capabilities, list) or any(item not in local["capabilities"] for item in capabilities):
-        raise PeerFailure("HANDSHAKE_MISMATCH")
+        raise PeerFailure("HANDSHAKE_INVALID")
     remote = reply.get("peer")
     if not _plain_object(remote) or not isinstance(remote.get("id"), str):
         raise PeerFailure("HANDSHAKE_INVALID")
@@ -337,8 +360,8 @@ def main() -> int:
         else:
             run_initiator(reader, writer)
         return 0
-    except (PeerFailure, BrokenPipeError, ConnectionResetError) as error:
-        code = error.code if isinstance(error, PeerFailure) else "CHANNEL_CLOSED"
+    except (PeerFailure, BrokenPipeError, ConnectionResetError, RecursionError) as error:
+        code = error.code if isinstance(error, PeerFailure) else "RECURSION_ERROR" if isinstance(error, RecursionError) else "CHANNEL_CLOSED"
         print("PEER_FAIL " + code, file=sys.stderr, flush=True)
         return 1
     finally:
@@ -351,4 +374,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    sys.dont_write_bytecode = True
     raise SystemExit(main())

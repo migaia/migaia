@@ -8,6 +8,9 @@ import { pathToFileURL } from 'node:url'
 /** Largest native frame payload accepted by stream-framing@1. */
 export const MAX_FRAME = 16_777_216
 
+/** Bound unmatched abort IDs retained for duplicate control diagnostics. */
+const MAX_EARLY_ABORT_IDS = 1_024
+
 /** A JSON object after parsing an untrusted native frame. */
 export type IRecord = Record<string, unknown>
 
@@ -252,9 +255,10 @@ export function validateAccept(offer: IRecord, accept: unknown): boolean {
 }
 
 /** Constructs an ordinary wire-error node with fixed text and no input-derived fields. */
-function wireError(code: 'INTERNAL' | 'CANCELLED'): IRecord {
-  const message = code === 'CANCELLED' ? 'peer request cancelled' : 'peer request failed'
-  const name = code === 'CANCELLED' ? 'RangeError' : 'Error'
+function wireError(code: 'INTERNAL' | 'METHOD_NOT_FOUND'): IRecord {
+  const message =
+    code === 'METHOD_NOT_FOUND' ? 'native peer method unavailable' : 'peer request failed'
+  const name = 'Error'
   return { source: '@migaia/rpc/core', code, name, message, stack: `${name}: ${message}` }
 }
 
@@ -281,9 +285,14 @@ function route(
 /** Serves one authenticated native connection with no child process or secret logging. */
 async function respond(source: Readable, destination: Writable): Promise<void> {
   const reader = new FrameReader(source)
-  const first = await readJson(reader, 65_536)
+  let first: unknown
+  try {
+    first = await readJson(reader, 65_536)
+  } catch {
+    throw new PeerFault('HANDSHAKE_INVALID')
+  }
   const violation = validateHello(first)
-  if (violation !== undefined) return
+  if (violation !== undefined) throw new PeerFault('HANDSHAKE_INVALID')
   const hello = first as IRecord
   const agreement = negotiate(hello, localOffer('ts-peer'))
   if (agreement === undefined) {
@@ -317,9 +326,31 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
   >()
   /** Abort ids that may arrive before their matching request. */
   const cancelledIds = new Set<string>()
+  /** A negotiated close stops new work but keeps the receive loop alive for abort. */
+  let closing = false
+  /** Deadline signal for the current close drain, if announced. */
+  let drain: Promise<void> | undefined
+  /** Timer owned by the current close drain. */
+  let drainTimer: NodeJS.Timeout | undefined
   while (true) {
-    const value = await readJson(reader)
+    if (closing && pending.size === 0) break
+    const value =
+      closing && drain !== undefined
+        ? await Promise.race([
+            readJson(reader),
+            drain.then(() => undefined),
+            Promise.all([...pending.values()].map((task) => task.done)).then(() => undefined)
+          ])
+        : await readJson(reader)
     if (value === undefined) break
+    if (
+      isRecord(value) &&
+      typeof value.kind === 'string' &&
+      !['request', 'response', 'discovery', 'variation', 'stream'].includes(value.kind)
+    ) {
+      stderr.write('PEER_WARN UNKNOWN_KIND\n')
+      continue
+    }
     if (
       !isRecord(value) ||
       typeof value.id !== 'string' ||
@@ -340,39 +371,46 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
           data: { route: route('variation', 'ts-peer', sender, undefined, 'pong') }
         })
       } else if (inboundRoute.variation === 'abort') {
-        cancelledIds.add(value.id)
-        const task = pending.get(value.id)
-        if (task !== undefined) {
-          clearTimeout(task.timer)
-          pending.delete(value.id)
-          task.finish()
+        if ((agreement.capabilities as string[]).includes('abort@1')) {
+          if (closing) stderr.write('PEER_EVENT ABORT_DURING_DRAIN\n')
+          const task = pending.get(value.id)
+          if (task !== undefined) {
+            clearTimeout(task.timer)
+            pending.delete(value.id)
+            task.finish()
+          } else {
+            cancelledIds.add(value.id)
+            if (cancelledIds.size > MAX_EARLY_ABORT_IDS) {
+              const oldest = cancelledIds.values().next().value
+              if (oldest !== undefined) cancelledIds.delete(oldest)
+            }
+          }
         }
       } else if (inboundRoute.variation === 'close') {
+        if (!(agreement.capabilities as string[]).includes('close@1')) continue
         const payload = value.data.payload
         if (
           !isRecord(payload) ||
           !Number.isSafeInteger(payload.drainMs) ||
-          Number(payload.drainMs) < 0
+          Number(payload.drainMs) < 0 ||
+          Number(payload.drainMs) >= 2 ** 31
         ) {
           stderr.write('PEER_ERROR PROTOCOL_INVALID\n')
           continue
         }
-        const drainMs = Number(payload.drainMs)
-        let deadline: NodeJS.Timeout | undefined
-        await Promise.race([
-          Promise.all([...pending.values()].map((task) => task.done)),
-          new Promise<void>((resolve) => {
-            deadline = setTimeout(resolve, drainMs)
+        if (!closing) {
+          closing = true
+          drain = new Promise<void>((resolve) => {
+            drainTimer = setTimeout(resolve, Number(payload.drainMs))
           })
-        ])
-        if (deadline !== undefined) clearTimeout(deadline)
-        break
+        }
       }
       continue
     }
     if (value.kind !== 'request' || typeof value.method !== 'string')
       throw new PeerFault('INVALID_ENVELOPE')
-    if (cancelledIds.delete(value.id)) continue
+    cancelledIds.delete(value.id)
+    if (closing) continue
     if (inboundRoute.dispatchOnly === true) {
       oneWayCount += 1
       continue
@@ -413,6 +451,39 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       })
       continue
     }
+    if (value.method === 'peer.finish') {
+      for (const [id, task] of pending) {
+        clearTimeout(task.timer)
+        pending.delete(id)
+        await writeJson(destination, {
+          kind: 'response',
+          id,
+          ok: true,
+          data: { route: route('response', 'ts-peer', sender, 'peer.wait'), payload: null }
+        })
+        task.finish()
+      }
+      await writeJson(destination, {
+        kind: 'response',
+        id: value.id,
+        ok: true,
+        data: { route: route('response', 'ts-peer', sender, value.method), payload: null }
+      })
+      continue
+    }
+    if (!['echo', 'peer.receipts', 'peer.trace'].includes(value.method)) {
+      const error = wireError('METHOD_NOT_FOUND')
+      await writeJson(destination, {
+        kind: 'response',
+        id: value.id,
+        ok: false,
+        code: error.code,
+        message: error.message,
+        error,
+        data: { route: route('response', 'ts-peer', sender, value.method) }
+      })
+      continue
+    }
     const payload =
       value.method === 'peer.receipts'
         ? oneWayCount
@@ -426,6 +497,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       data: { route: route('response', 'ts-peer', sender, value.method), payload }
     })
   }
+  if (drainTimer !== undefined) clearTimeout(drainTimer)
   for (const task of pending.values()) {
     clearTimeout(task.timer)
     task.finish()
@@ -504,7 +576,7 @@ if (
 ) {
   main().catch((error: unknown) => {
     const code = error instanceof PeerFault ? error.code : 'PEER_FAILED'
-    stderr.write(`PEER_ERROR ${code}\n`)
+    stderr.write(`PEER_FAIL ${code}\n`)
     process.exitCode = 1
   })
 }

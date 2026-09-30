@@ -477,7 +477,7 @@ func runSelftest(directory string) int {
 	} else {
 		suite.unavailable("error-chain")
 	}
-	fmt.Printf("SUMMARY passed=%d failed=%d pending=%d\n", suite.passed, suite.failed, suite.pending)
+	fmt.Printf("SUMMARY passed=%d failed=%d pending=%d\n", suite.passed, suite.failed+suite.pending, suite.pending)
 	if suite.failed != 0 || suite.pending != 0 {
 		return 1
 	}
@@ -501,30 +501,52 @@ func runtimeChecks(suite *vectorSuite) {
 	suite.check("runtime/framing/invalid-utf8", utf8Err != nil)
 	requestRoute := route("request", "a", "b")
 	request := record{"kind": "request", "id": "one", "method": "peer.echo", "data": record{"route": requestRoute, "payload": "x"}}
-	reply, err := response(request, map[string]bool{})
-	suite.check("runtime/request/echo", err == nil && reply["ok"] == true && field(reply["data"])["payload"] == "x")
+	replies, err := response(request, map[string]record{})
+	suite.check("runtime/request/echo", err == nil && len(replies) == 1 && replies[0]["ok"] == true && field(replies[0]["data"])["payload"] == "x")
 	requestRoute["dispatchOnly"] = true
-	oneWay, oneWayErr := response(request, map[string]bool{})
+	oneWay, oneWayErr := response(request, map[string]record{})
 	suite.check("runtime/request/one-way", oneWayErr == nil && oneWay == nil)
 	delete(requestRoute, "dispatchOnly")
 	request["method"] = "peer.error"
-	failure, errorErr := response(request, map[string]bool{})
-	wire := field(failure["error"])
-	suite.check("runtime/request/wire-error", errorErr == nil && failure["ok"] == false && wire["code"] == "PEER_ERROR" && wire["stack"] != "")
-	pending := map[string]bool{"one": true}
+	failures, errorErr := response(request, map[string]record{})
+	wire := record(nil)
+	if len(failures) == 1 {
+		wire = field(failures[0]["error"])
+	}
+	suite.check("runtime/request/wire-error", errorErr == nil && len(failures) == 1 && failures[0]["ok"] == false && wire["code"] == "PEER_ERROR" && wire["stack"] != "")
+	request["method"] = "missing-method"
+	missing, missingErr := response(request, map[string]record{})
+	suite.check("runtime/request/method-not-found", missingErr == nil && len(missing) == 1 && missing[0]["code"] == "METHOD_NOT_FOUND" && field(missing[0]["error"])["code"] == "METHOD_NOT_FOUND")
+	pending := map[string]record{"one": requestRoute}
 	abortRoute := route("variation", "a", "b")
 	abortRoute["variation"] = "abort"
 	abort := record{"kind": "variation", "id": "one", "data": record{"route": abortRoute}}
-	_, _, abortErr := control(abort, pending)
-	suite.check("runtime/control/abort", abortErr == nil && !pending["one"])
+	_, _, abortErr := control(abort, pending, localOffer().Capabilities)
+	_, stillPending := pending["one"]
+	suite.check("runtime/control/abort", abortErr == nil && !stillPending)
+	pending["one"] = requestRoute
+	_, _, ignoredAbortErr := control(abort, pending, []string{})
+	_, stillPending = pending["one"]
+	suite.check("runtime/control/unnegotiated-abort", ignoredAbortErr == nil && stillPending)
+	finish := record{"kind": "request", "id": "finish", "method": "peer.finish", "data": record{"route": requestRoute}}
+	finished, finishErr := response(finish, pending)
+	suite.check("runtime/request/finish-wait", finishErr == nil && len(finished) == 2 && finished[0]["id"] == "one" && finished[0]["ok"] == true && finished[1]["id"] == "finish" && finished[1]["ok"] == true)
 	pingRoute := route("variation", "a", "b")
 	pingRoute["variation"] = "ping"
-	pong, _, pingErr := control(record{"kind": "variation", "id": "ping-1", "data": record{"route": pingRoute}}, pending)
+	pong, _, pingErr := control(record{"kind": "variation", "id": "ping-1", "data": record{"route": pingRoute}}, pending, localOffer().Capabilities)
 	suite.check("runtime/control/ping", pingErr == nil && pong["id"] == "ping-1" && field(field(pong["data"])["route"])["variation"] == "pong")
+	ignoredPong, _, ignoredPingErr := control(record{"kind": "variation", "id": "ping-2", "data": record{"route": pingRoute}}, pending, []string{})
+	suite.check("runtime/control/unnegotiated-ping", ignoredPingErr == nil && ignoredPong == nil)
 	closeRoute := route("variation", "a", "b")
 	closeRoute["variation"] = "close"
-	_, closed, closeErr := control(record{"kind": "variation", "id": "close-1", "data": record{"route": closeRoute, "payload": record{"drainMs": json.Number("0")}}}, pending)
-	suite.check("runtime/control/close", closeErr == nil && closed)
+	closeFrame := record{"kind": "variation", "id": "close-1", "data": record{"route": closeRoute, "payload": record{"drainMs": json.Number("0")}}}
+	_, closeMs, closeErr := control(closeFrame, pending, localOffer().Capabilities)
+	suite.check("runtime/control/close", closeErr == nil && closeMs != nil && *closeMs == 0)
+	_, ignoredClose, ignoredCloseErr := control(closeFrame, pending, []string{})
+	suite.check("runtime/control/unnegotiated-close", ignoredCloseErr == nil && ignoredClose == nil)
+	closeFrame["data"] = record{"route": closeRoute, "payload": record{"drainMs": "invalid"}}
+	_, _, invalidCloseErr := control(closeFrame, pending, localOffer().Capabilities)
+	suite.check("runtime/control/invalid-close", errors.Is(invalidCloseErr, errInvalidClose))
 	secret := "SENTINEL_NATIVE_PEER_AUTH_9D8C"
 	hello := helloRecord(localOffer())
 	hello["protocol"] = "other-protocol"
