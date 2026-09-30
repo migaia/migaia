@@ -87,7 +87,7 @@ def run_case(command, base_hello, case):
         for step in case["steps"]:
             if step.get("pauseMs"):
                 time.sleep(step["pauseMs"] / 1000)
-            process.stdin.write(frame(step["frame"]))
+            process.stdin.write(bytes.fromhex(step["rawHex"]) if "rawHex" in step else frame(step["frame"]))
             process.stdin.flush()
     except BrokenPipeError:
         pass
@@ -110,6 +110,7 @@ def run_case(command, base_hello, case):
     if any(not matches(actual, wanted) for actual, wanted in zip(output, expected["frames"])):
         return False
     return (all(stderr.count(marker) == count for marker, count in expected.get("stderr", {}).items())
+            and all(marker in stderr for marker in expected.get("stderrContains", []))
             and all(marker not in stderr for marker in expected.get("stderrNot", [])))
 
 
