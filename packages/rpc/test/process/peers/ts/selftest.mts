@@ -149,11 +149,13 @@ function validatePortable(value: unknown, depth = 1): void {
 
 /** A pair of canonical wire-error violation and JSON Pointer. */
 class WireViolation extends Error {
-  constructor(
-    readonly violation: string,
-    readonly pointer: string
-  ) {
+  readonly violation: string
+  readonly pointer: string
+
+  constructor(violation: string, pointer: string) {
     super(violation)
+    this.violation = violation
+    this.pointer = pointer
   }
 }
 
