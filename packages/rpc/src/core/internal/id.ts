@@ -1,5 +1,5 @@
 import { RpcCoreErrorText } from '../error-text.js'
-import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcConfigurationError, RpcContractError, RpcError, RpcCoreErrorCode } from '../errors.js'
 import type { IRpcUuidConfig, IRpcUuidContext } from '../typing.js'
 
 /** Stable diagnostic for a UUID descriptor whose generator property cannot be read. */
@@ -53,7 +53,7 @@ export function allocateRpcId(
 }
 
 /** Generates a cryptographically random fallback identifier. */
-function defaultRpcId(): string {
+export function defaultRpcId(): string {
   const cryptoApi = globalThis.crypto as
     | { randomUUID?: () => string; getRandomValues?: (array: Uint8Array) => Uint8Array }
     | undefined
@@ -63,4 +63,10 @@ function defaultRpcId(): string {
     return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('')
   }
   throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidUnavailable)
+}
+
+/** Enforces the single wire grammar used by core send admission and remote retries. */
+export function assertRpcIdempotencyKey(value: unknown): asserts value is string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9._:~-]{1,128}$/u.test(value))
+    throw new RpcContractError(RpcCoreErrorText.idempotencyKeyInvalid)
 }

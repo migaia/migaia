@@ -1,0 +1,340 @@
+{
+  "catalogs": [
+    {
+      "id": "two-plugins",
+      "value": {
+        "p": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": true
+                },
+                "oneWay": {
+                  "mode": "one-way",
+                  "idempotent": false
+                },
+                "generator": {
+                  "mode": "generator",
+                  "idempotent": false
+                },
+                "asyncGenerator": {
+                  "mode": "async-generator",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        },
+        "q": {
+          "schemaVersion": 1,
+          "plugin": "q",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": true
+                },
+                "oneWay": {
+                  "mode": "one-way",
+                  "idempotent": false
+                },
+                "generator": {
+                  "mode": "generator",
+                  "idempotent": false
+                },
+                "asyncGenerator": {
+                  "mode": "async-generator",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "empty",
+      "value": {},
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "key-plugin-mismatch",
+      "value": {
+        "p": {
+          "schemaVersion": 1,
+          "plugin": "q",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": true
+                },
+                "oneWay": {
+                  "mode": "one-way",
+                  "idempotent": false
+                },
+                "generator": {
+                  "mode": "generator",
+                  "idempotent": false
+                },
+                "asyncGenerator": {
+                  "mode": "async-generator",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": false
+    },
+    {
+      "id": "invalid-key",
+      "value": {
+        "9bad": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": true
+                },
+                "oneWay": {
+                  "mode": "one-way",
+                  "idempotent": false
+                },
+                "generator": {
+                  "mode": "generator",
+                  "idempotent": false
+                },
+                "asyncGenerator": {
+                  "mode": "async-generator",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "invalid-child",
+      "value": {
+        "p": {
+          "schemaVersion": 2,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": true
+                },
+                "oneWay": {
+                  "mode": "one-way",
+                  "idempotent": false
+                },
+                "generator": {
+                  "mode": "generator",
+                  "idempotent": false
+                },
+                "asyncGenerator": {
+                  "mode": "async-generator",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false
+    }
+  ],
+  "controls": [
+    {
+      "id": "describe-host",
+      "definition": "describeHost",
+      "value": {
+        "schemaVersion": 1,
+        "catalog": {
+          "p": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": true
+                  },
+                  "oneWay": {
+                    "mode": "one-way",
+                    "idempotent": false
+                  },
+                  "generator": {
+                    "mode": "generator",
+                    "idempotent": false
+                  },
+                  "asyncGenerator": {
+                    "mode": "async-generator",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "describe-host-unwrapped",
+      "definition": "describeHost",
+      "value": {
+        "p": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": true
+                },
+                "oneWay": {
+                  "mode": "one-way",
+                  "idempotent": false
+                },
+                "generator": {
+                  "mode": "generator",
+                  "idempotent": false
+                },
+                "asyncGenerator": {
+                  "mode": "async-generator",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "use-one-param",
+      "definition": "hostUseParams",
+      "value": [
+        "p"
+      ],
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "use-three-params",
+      "definition": "hostUseParams",
+      "value": [
+        "p",
+        {},
+        {}
+      ],
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "unuse-cascade",
+      "definition": "hostUnUseParams",
+      "value": [
+        "p",
+        {
+          "policy": "cascade"
+        }
+      ],
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "unuse-unknown",
+      "definition": "hostUnUseParams",
+      "value": [
+        "p",
+        {
+          "unknown": true
+        }
+      ],
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "unuse-dry-run",
+      "definition": "hostUnUseResult",
+      "value": {
+        "dryRun": true,
+        "policy": "reject",
+        "order": [
+          "p"
+        ],
+        "steps": [
+          {
+            "name": "p",
+            "action": "remove"
+          }
+        ],
+        "edges": []
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "unuse-failed",
+      "definition": "hostUnUseResult",
+      "value": {
+        "ok": false,
+        "errors": [
+          {}
+        ]
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "inspect-unsorted",
+      "definition": "hostInspectResult",
+      "value": {
+        "revision": 1,
+        "plugins": [
+          {
+            "name": "q",
+            "state": "enabled",
+            "revision": 1,
+            "features": []
+          },
+          {
+            "name": "p",
+            "state": "enabled",
+            "revision": 1,
+            "features": []
+          }
+        ]
+      },
+      "schemaValid": true,
+      "semanticValid": false
+    }
+  ]
+}

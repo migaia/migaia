@@ -176,6 +176,9 @@ importers:
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
+      '@migaia/supervision':
+        specifier: workspace:^
+        version: link:../supervision
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils

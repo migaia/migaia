@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://migaia.dev/rpc/remote-contract.schema.json",
+  "$ref": "#/$defs/contract",
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,39}$",
+      "maxLength": 40
+    },
+    "portable": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/portable"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/portable"
+          }
+        }
+      ]
+    },
+    "method": {
+      "type": "object",
+      "required": [
+        "mode",
+        "idempotent"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "request",
+            "one-way",
+            "generator",
+            "async-generator"
+          ]
+        },
+        "idempotent": {
+          "type": "boolean"
+        }
+      },
+      "if": {
+        "properties": {
+          "mode": {
+            "not": {
+              "const": "request"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "idempotent": {
+            "const": false
+          }
+        }
+      }
+    },
+    "feature": {
+      "type": "object",
+      "required": [
+        "methods"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "methods": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,39}$",
+            "maxLength": 40
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/method"
+          }
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "plugin",
+        "features"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "plugin": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,39}$",
+          "maxLength": 40
+        },
+        "features": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,39}$",
+            "maxLength": 40
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/feature"
+          }
+        }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,39}$",
+        "maxLength": 40
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/contract"
+      }
+    },
+    "describePlugin": {
+      "$ref": "#/$defs/contract"
+    },
+    "describeHost": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "catalog"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "catalog": {
+          "$ref": "#/$defs/catalog"
+        }
+      }
+    },
+    "hostUseParams": {
+      "oneOf": [
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/name"
+            }
+          ],
+          "minItems": 1,
+          "maxItems": 1
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/name"
+            },
+            {
+              "$ref": "#/$defs/portable"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        }
+      ]
+    },
+    "hostUseResult": {
+      "type": "object",
+      "required": [
+        "name",
+        "state",
+        "revision",
+        "features"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "state": {
+          "enum": [
+            "enabled",
+            "disabled"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/name"
+          }
+        }
+      }
+    },
+    "hostUnUseParams": {
+      "oneOf": [
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/name"
+            }
+          ],
+          "minItems": 1,
+          "maxItems": 1
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/name"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "policy": {
+                  "enum": [
+                    "reject",
+                    "suspend"
+                  ]
+                },
+                "dryRun": {
+                  "type": "boolean"
+                }
+              }
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        }
+      ]
+    },
+    "hostUnUseResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "ok"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ok": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "ok",
+            "errors"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ok": {
+              "const": false
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "dryRun",
+            "policy",
+            "order",
+            "steps",
+            "edges"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "dryRun": {
+              "const": true
+            },
+            "policy": {
+              "enum": [
+                "reject",
+                "suspend"
+              ]
+            },
+            "order": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/name"
+              }
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hostInspectParams": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "hostInspectResult": {
+      "type": "object",
+      "required": [
+        "revision",
+        "plugins"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "state",
+              "revision",
+              "features"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/name"
+              },
+              "state": {
+                "enum": [
+                  "enabled",
+                  "disabled"
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "features": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/name"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

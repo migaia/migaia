@@ -1,0 +1,127 @@
+{
+  "contracts": [
+    {
+      "id": "all-modes",
+      "value": {
+        "schemaVersion": 1,
+        "plugin": "p",
+        "features": {
+          "f": {
+            "methods": {
+              "request": {
+                "mode": "request",
+                "idempotent": true
+              },
+              "oneWay": {
+                "mode": "one-way",
+                "idempotent": false
+              },
+              "generator": {
+                "mode": "generator",
+                "idempotent": false
+              },
+              "asyncGenerator": {
+                "mode": "async-generator",
+                "idempotent": false
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "non-request-idempotent",
+      "value": {
+        "schemaVersion": 1,
+        "plugin": "p",
+        "features": {
+          "f": {
+            "methods": {
+              "m": {
+                "mode": "one-way",
+                "idempotent": true
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "unknown-field",
+      "value": {
+        "schemaVersion": 1,
+        "plugin": "p",
+        "features": {
+          "f": {
+            "methods": {
+              "request": {
+                "mode": "request",
+                "idempotent": true
+              },
+              "oneWay": {
+                "mode": "one-way",
+                "idempotent": false
+              },
+              "generator": {
+                "mode": "generator",
+                "idempotent": false
+              },
+              "asyncGenerator": {
+                "mode": "async-generator",
+                "idempotent": false
+              }
+            }
+          }
+        },
+        "unknown": 1
+      },
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "empty-features",
+      "value": {
+        "schemaVersion": 1,
+        "plugin": "p",
+        "features": {}
+      },
+      "schemaValid": false,
+      "semanticValid": false
+    },
+    {
+      "id": "invalid-plugin",
+      "value": {
+        "schemaVersion": 1,
+        "plugin": "9bad",
+        "features": {
+          "f": {
+            "methods": {
+              "request": {
+                "mode": "request",
+                "idempotent": true
+              },
+              "oneWay": {
+                "mode": "one-way",
+                "idempotent": false
+              },
+              "generator": {
+                "mode": "generator",
+                "idempotent": false
+              },
+              "asyncGenerator": {
+                "mode": "async-generator",
+                "idempotent": false
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false
+    }
+  ]
+}
