@@ -18,6 +18,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./remote": {
+      "types": "./dist/remote/index.d.ts",
+      "default": "./dist/remote/index.js"
+    },
     "./contract": {
       "types": "./dist/contract/index.d.ts",
       "default": "./dist/contract/index.js"

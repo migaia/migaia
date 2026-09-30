@@ -40,9 +40,10 @@ describe('A1 merged public exports', () => {
       '@migaia/rpc/core/stream',
       '@migaia/rpc/core/plugins/flow-control',
       '@migaia/rpc/core/plugins/send-queue',
-      '@migaia/rpc/core/plugins/log'
+      '@migaia/rpc/core/plugins/log',
+      '@migaia/rpc/remote'
     ].sort()
-    expect(expected).toHaveLength(29)
+    expect(expected).toHaveLength(30)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )
@@ -92,6 +93,35 @@ describe('A1 merged public exports', () => {
     expect(
       Object.keys(await import(pathToFileURL(join(packageRoot, stream.default)).href)).sort()
     ).toEqual(['createCanonicalChunkFeature', 'createStreamFeature'])
+    const remote = manifest.exports['./remote']
+    expect(remote).toEqual({
+      types: './dist/remote/index.d.ts',
+      default: './dist/remote/index.js'
+    })
+    expect(
+      Object.keys(await import(pathToFileURL(join(packageRoot, remote.default)).href)).sort()
+    ).toEqual(
+      [
+        'RemoteMethodMode',
+        'REMOTE_NAME_PATTERN',
+        'REMOTE_METHOD_MAX_LENGTH',
+        'REMOTE_SCHEMA_VERSION',
+        'REMOTE_METHOD_MODES',
+        'RemoteMethodName',
+        'RpcRemoteLayerErrorCode',
+        'RpcRemoteLayerErrorText',
+        'normalizeRemoteContract',
+        'normalizeRemoteHostCatalog',
+        'normalizeRemoteControlShape',
+        'sameRemoteContract',
+        'createRemotePlugin',
+        'serveRemotePlugin',
+        'createRemoteHost',
+        'serveRemoteHost',
+        'createCoroutinePlugin',
+        'createCoroutineHost'
+      ].sort()
+    )
   })
 
   it('keeps contract protocol and normalizer implementations outside compiled core', () => {

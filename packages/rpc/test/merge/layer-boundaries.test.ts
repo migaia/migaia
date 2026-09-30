@@ -29,7 +29,9 @@ function layerViolations(file: string, source: string): string[] {
       invalid ||= isRelative
         ? outside || !target.startsWith('contract/')
         : !contractBareAllowlist.has(specifier)
-    if (owner === 'core') invalid ||= outside || target.startsWith('browser/')
+    if (owner === 'core')
+      invalid ||= outside || target.startsWith('browser/') || target.startsWith('remote/')
+    if (owner === 'remote') invalid ||= outside || target.startsWith('browser/')
     if (owner === 'browser') {
       invalid ||=
         outside ||
@@ -62,6 +64,8 @@ describe('A2 layer dependency direction', () => {
     ['contract bare import', 'contract/x.ts', "import '@migaia/utils'"],
     ['contract to core', 'contract/framing/x.ts', "import '../../core/errors.js'"],
     ['core to browser', 'core/x.ts', "import '../browser/adapters/window.js'"],
+    ['core to remote', 'core/x.ts', "import '../remote/host.js'"],
+    ['remote to browser', 'remote/x.ts', "import '../browser/adapters/window.js'"],
     ['browser to private core', 'browser/x.ts', "import '../../core/internal/outbound-sender.js'"],
     ['browser bare import', 'browser/x.ts', "import '@migaia/lifecycle'"],
     ['browser escape', 'browser/x.ts', "import '../../../outside.js'"],
@@ -77,7 +81,8 @@ describe('A2 layer dependency direction', () => {
     ['contract error utility', 'contract/contract-error.ts', "import '@migaia/utils/error'"],
     ['browser sibling', 'browser/adapters/window.ts', "import './broadcast-channel.js'"],
     ['browser approved core', 'browser/adapters/window.ts', "import '../../core/transport-kit.js'"],
-    ['browser bytes', 'browser/adapters/web-transport.ts', "import '@migaia/utils/bytes'"]
+    ['browser bytes', 'browser/adapters/web-transport.ts', "import '@migaia/utils/bytes'"],
+    ['remote to core', 'remote/host.ts', "import '../core/typing.js'"]
   ])('accepts %s', (_case, file, source) => {
     expect(layerViolations(join(sourceRoot, file), source)).toEqual([])
   })
