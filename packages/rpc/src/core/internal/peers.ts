@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
 export class PeerRegistry<T extends string = string> {
@@ -11,12 +12,12 @@ export class PeerRegistry<T extends string = string> {
   constructor(now: () => number, maxLearned = 1024, learnedTtlMs = 300_000) {
     if (!Number.isSafeInteger(maxLearned) || maxLearned < 1)
       throw tagRpcError(
-        new TypeError('maxLearned must be a positive safe integer'),
+        new TypeError(RpcCoreErrorText.maxLearnedMustBeAPositiveSafeInteger),
         RpcCoreErrorCode.invalidConfig
       )
     if (!Number.isSafeInteger(learnedTtlMs) || learnedTtlMs < 1)
       throw tagRpcError(
-        new TypeError('learnedTtlMs must be a positive safe integer'),
+        new TypeError(RpcCoreErrorText.learnedTtlMsMustBeAPositiveSafeInteger),
         RpcCoreErrorCode.invalidConfig
       )
     this.#maxLearned = maxLearned

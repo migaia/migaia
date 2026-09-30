@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import { createGenerationController, type IGenerationController } from '@migaia/lifecycle'
 import { RpcLifecycleError, RpcTimeoutError } from '../errors.js'
 import type { IAbortSignal } from './async-control.js'
@@ -45,7 +46,7 @@ export class OperationScope {
   /** Rejects work that crossed disposal or operation cancellation. */
   assertActive(currentGeneration: number): void {
     if (this.#closed || this.signal.aborted || currentGeneration !== this.#generation)
-      throw new RpcLifecycleError('Endpoint disposed')
+      throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (this.#deadlineAt !== undefined && this.#deadlineAt <= this.#now())
       throw new RpcTimeoutError()
   }

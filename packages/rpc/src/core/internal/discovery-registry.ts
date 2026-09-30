@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 /** Owns all discovery, DNS, pinning and manual-candidate state for one endpoint. */
 export class DiscoveryRegistry {
   readonly #localTargets = new Map<unknown, unknown>()
@@ -518,7 +519,7 @@ export class DiscoveryRegistry {
 
   /** Clears registry-owned state after all externally owned timers are stopped. */
   clear(): void {
-    this.close(new Error('discovery registry closed'))
+    this.close(new Error(RpcCoreErrorText.discoveryRegistryClosed))
   }
 
   /** Settles every outbound waiter and releases all registry-owned timers/listeners. */

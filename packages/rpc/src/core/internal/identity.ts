@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import { tupleKey } from './safe-value.js'
 import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
@@ -37,7 +38,7 @@ export class VerifiedPeerRegistry {
       maxBindingAgeMs > Number.MAX_SAFE_INTEGER / 100
     )
       throw tagRpcError(
-        new TypeError('binding limits must be positive safe integers'),
+        new TypeError(RpcCoreErrorText.bindingLimitsMustBePositiveSafeIntegers),
         RpcCoreErrorCode.invalidConfig
       )
     this.#maxBindings = maxBindings
