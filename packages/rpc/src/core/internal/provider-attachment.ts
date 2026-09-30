@@ -2,7 +2,7 @@ import { RpcPlatform } from '../transport-constants.js'
 import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcMessageKind } from '../semantic-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import type { IRpcEventListener, IRpcProvider } from '../typing.js'
+import type { IRpcAbortSignal, IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
   deserializeRpcError,
   normalizeRpcEnvelope,
@@ -178,7 +178,13 @@ export class RpcProviderAttachment {
   }
 
   /** Transfers one method to the stream owner without duplicating request admission. */
-  provideStream(method: string, handler: (message: unknown) => void | Promise<void>): () => void {
+  provideStream(
+    method: string,
+    handler: (
+      message: unknown,
+      createContext: (signal: IRpcAbortSignal) => IRpcContext
+    ) => void | Promise<void>
+  ): () => void {
     this.#kernel.assertActive()
     if (typeof method !== 'string' || method.length === 0 || typeof handler !== 'function')
       throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.providerDescriptorInvalid)
@@ -318,7 +324,9 @@ export class RpcProviderAttachment {
     if (!record.admission) return
     const stream = this.#registry.streamProviders.get(request.method)
     if (stream) {
-      await stream(record)
+      await stream(record, (signal) =>
+        this.#executor.createContext({ envelope: request, route }, signal, () => signal.aborted)
+      )
       return
     }
     await this.#executor.execute({ envelope: request, route }, record.admission.token)

@@ -61,7 +61,7 @@ function heldOpen() {
     options: { uuid: { generate: () => 'fixed' } }
   } as unknown as IPreparedEndpoint<string>
   const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
-    accept = handler
+    accept = (message) => handler(message, (signal) => ({ signal }) as never)
     return () => undefined
   })
   return {

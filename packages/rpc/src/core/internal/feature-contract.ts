@@ -1,6 +1,7 @@
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IRpcPluginInstallScope } from '../typing.js'
+import type { IRpcAbortSignal, IRpcContext } from '../typing.js'
 import type {
   IRpcCandidatePingPort,
   IRpcDiscoveryResolverPort,
@@ -79,7 +80,10 @@ export type IProviderInstallation = Readonly<{
   readonly public: IProviderRegistrationSurface
   readonly registerStream: (
     method: string,
-    handler: (message: unknown) => void | Promise<void>
+    handler: (
+      message: unknown,
+      createContext: (signal: IRpcAbortSignal) => IRpcContext
+    ) => void | Promise<void>
   ) => () => void
 }>
 

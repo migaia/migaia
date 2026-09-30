@@ -1,14 +1,20 @@
 import { createEventChannel, withSnapshotEntries } from '@migaia/event-subscriber'
 import type { ICanonicalEventChannel } from '@migaia/event-subscriber'
 import type { IRpcEventListener, IRpcProvider } from '../typing.js'
-import type { IRpcContext } from '../typing.js'
+import type { IRpcAbortSignal, IRpcContext } from '../typing.js'
 
 /** Owns provider and event routing tables for one endpoint. */
 export class ProviderRegistry {
   /** Provider ownership remains separate from event listener registrations. */
   readonly providers = new Map<string, IRpcProvider>()
   /** Stream handlers share the method namespace with ordinary providers. */
-  readonly streamProviders = new Map<string, (message: unknown) => void | Promise<void>>()
+  readonly streamProviders = new Map<
+    string,
+    (
+      message: unknown,
+      createContext: (signal: IRpcAbortSignal) => IRpcContext
+    ) => void | Promise<void>
+  >()
   /** Each event owns one channel so subscription handles identify their own registration. */
   readonly #events = new Map<string, ICanonicalEventChannel<IRpcContext, void | Promise<void>>>()
 
@@ -27,7 +33,13 @@ export class ProviderRegistry {
   }
 
   /** Registers one stream handler in the same method namespace as ordinary providers. */
-  registerStream(method: string, handler: (message: unknown) => void | Promise<void>): boolean {
+  registerStream(
+    method: string,
+    handler: (
+      message: unknown,
+      createContext: (signal: IRpcAbortSignal) => IRpcContext
+    ) => void | Promise<void>
+  ): boolean {
     if (this.providers.has(method) || this.streamProviders.has(method)) return false
     this.streamProviders.set(method, handler)
     return true

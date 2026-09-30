@@ -27,6 +27,7 @@ import type { IRpcFrameAdmission, IRpcOutboundOperationsPort } from '../plugin-s
 import { tupleKey } from '../safe-value.js'
 import { resolveAbortReason, type IAbortSignal } from '../async-control.js'
 import type { IEndpointTimer } from '../time-port.js'
+import type { IRpcAbortSignal, IRpcContext } from '../../typing.js'
 import { RpcStreamLimit } from '../../../contract/stream-constants.js'
 
 /** One pending caller pull; the enclosing state owns settlement and its sequence. */
@@ -87,7 +88,10 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   /** Shared provider namespace registration port. */
   readonly #registerStream: (
     method: string,
-    handler: (message: unknown) => void | Promise<void>
+    handler: (
+      message: unknown,
+      createContext: (signal: IRpcAbortSignal) => IRpcContext
+    ) => void | Promise<void>
   ) => () => void
   /** Connection capability decision supplied by the channel owner. */
   readonly #capability: IRpcStreamCapabilityPort | undefined
@@ -117,7 +121,10 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     outbound: IRpcOutboundOperationsPort,
     registerStream: (
       method: string,
-      handler: (message: unknown) => void | Promise<void>
+      handler: (
+        message: unknown,
+        createContext: (signal: IRpcAbortSignal) => IRpcContext
+      ) => void | Promise<void>
     ) => () => void,
     capability?: IRpcStreamCapabilityPort
   ) {
@@ -193,7 +200,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   /** Claim a provider method in the ordinary namespace and release it idempotently. */
   provide(method: string, run: IRpcStreamRun): () => void {
     if (this.#closed) throw new RpcAbortError()
-    const release = this.#registerStream(method, (message) => this.#acceptRequest(message, run))
+    const release = this.#registerStream(method, (message, createContext) =>
+      this.#acceptRequest(message, run, createContext)
+    )
     this.#registrations.add(release)
     return () => {
       release()
@@ -547,7 +556,11 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   }
 
   /** Hand off one admitted ordinary request to the registered stream producer. */
-  async #acceptRequest(message: unknown, run: IRpcStreamRun): Promise<void> {
+  async #acceptRequest(
+    message: unknown,
+    run: IRpcStreamRun,
+    createContext: (signal: IRpcAbortSignal) => IRpcContext
+  ): Promise<void> {
     const request = (message as { envelope?: IRpcEnvelope }).envelope
     if (request?.kind !== 'request') return
     const senderId = request.data.route.senderId
@@ -596,7 +609,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     )
     let state: IProducerState
     try {
-      const iterable = run(request.data.payload, { signal: scope.signal }) as unknown
+      const context = createContext(scope.signal)
+      const iterable = run(request.data.payload, { signal: scope.signal, context }) as unknown
       const source = iterable as {
         [Symbol.asyncIterator]?: () => AsyncIterator<IRpcPortableValue>
         [Symbol.iterator]?: () => Iterator<IRpcPortableValue>
