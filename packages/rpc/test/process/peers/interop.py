@@ -11,7 +11,7 @@ import threading
 
 PEERS = Path(__file__).resolve().parent
 COMMANDS = {
-    "python": [sys.executable, str(PEERS / "python" / "peer.py")],
+    "python": [sys.executable, "-B", str(PEERS / "python" / "peer.py")],
     "rust": [str(PEERS / "rust" / "run.sh")],
     "go": [str(PEERS / "go" / "run.sh")],
     "ts-reference": [str(PEERS / "ts-reference" / "run.sh")],
