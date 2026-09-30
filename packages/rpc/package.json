@@ -161,6 +161,7 @@
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
     "@migaia/serialize": "workspace:^",
+    "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {

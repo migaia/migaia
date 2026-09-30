@@ -43,7 +43,7 @@ import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcInboundMessage } from '../transport.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import { HookRegistry } from './hooks.js'
-import { allocateRpcId } from './id.js'
+import { allocateRpcId, assertRpcIdempotencyKey } from './id.js'
 import { PendingRegistry } from './pending.js'
 import { RpcOutboundSender } from './outbound-sender.js'
 import { outboundGateMatchesFeature, readOutboundGate } from './outbound-gate.js'
@@ -390,12 +390,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
 
   /** Sends one request through the canonical single-attempt deadline and cancellation closure. */
   send<T>(targetId: string, method: string, data: unknown, options: ISendOptions = {}): Promise<T> {
-    if (
-      options.idempotencyKey !== undefined &&
-      (typeof options.idempotencyKey !== 'string' ||
-        !/^[A-Za-z0-9._:~-]{1,128}$/u.test(options.idempotencyKey))
-    )
-      throw new RpcContractError(RpcCoreErrorText.idempotencyKeyInvalid)
+    if (options.idempotencyKey !== undefined) assertRpcIdempotencyKey(options.idempotencyKey)
     if (
       options.trace !== undefined &&
       (typeof options.trace !== 'string' ||
