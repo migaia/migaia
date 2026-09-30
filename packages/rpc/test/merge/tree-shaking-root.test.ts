@@ -7,14 +7,14 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** I9 audit keeps the frozen baseline and admits only the measured root bytes. */
+/** IPC outbound-gate retains one core module; byte caps are its measured root output. */
 const allowedIncrease = {
-  rawBytes: 44470 / legacyRoot.rawBytes,
-  gzipBytes: 11918 / legacyRoot.gzipBytes
+  rawBytes: 49629 / legacyRoot.rawBytes,
+  gzipBytes: 13145 / legacyRoot.gzipBytes
 } as const
 
-/** I5 adds five required modules and removes the obsolete core route validator. */
-const expectedModuleIncrease = 4
+/** The IPC core port adds exactly one module without retaining the optional plugin imports. */
+const expectedModuleIncrease = 5
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {

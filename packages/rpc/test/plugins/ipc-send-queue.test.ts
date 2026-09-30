@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile } from '../../src/contract/index.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createComposedEndpoint } from '../../src/core/composed.js'
+import { createEndpointKernel } from '../../src/core/endpoint-kernel.js'
+import { prepareEndpoint } from '../../src/core/internal/endpoint-bootstrap.js'
+import { RpcOutboundAttachment } from '../../src/core/internal/outbound-attachment.js'
 import { RpcOutboundSender } from '../../src/core/internal/outbound-sender.js'
+import { RpcPortName } from '../../src/core/internal/plugin-shared-keys.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { createFirstPartyRoots } from '../../src/core/internal/first-party-roots.js'
 import type { IRpcTransport } from '../../src/core/transport.js'
@@ -154,6 +158,54 @@ describe('IPC send queue contract', () => {
     await Promise.all(tasks)
     expect(writes).toEqual(['one', 'two', 'three'])
     expect(events.filter((name) => name === 'ipc.backlog.low')).toHaveLength(1)
+
+    const physical = deferredWrite()
+    const frames: unknown[] = []
+    const frameTransport: IRpcTransport = {
+      platform: 'Memory',
+      encodedType: 'string',
+      send(frame) {
+        frames.push(frame)
+        return frames.length === 1 ? physical.promise : undefined
+      },
+      subscribe: () => () => undefined
+    }
+    const frameGate = queue.createIpcSendQueueFeature({ connectionId: 'a2-frames' }).gate
+    const frameSender = new RpcOutboundSender(
+      frameTransport,
+      'client',
+      {
+        protocol: { id: 'test', version: 1, normalize: (value: unknown) => value },
+        codec: {
+          id: 'test',
+          version: 1,
+          encodedType: 'string',
+          encode: () => 'payload',
+          decode: () => request('x')
+        },
+        framer: {
+          id: 'test',
+          version: 1,
+          inputEncodedType: 'string',
+          outputEncodedType: 'string',
+          frame: () => ['frame-1', 'frame-2'],
+          accept: () => undefined
+        },
+        ingressPrepare: () => undefined,
+        shadowed: []
+      } as never,
+      undefined,
+      frameTransport.platform,
+      frameGate
+    )
+    const frameSend = frameSender.send(request('framed'))
+    await vi.waitFor(() => expect(frames).toEqual(['frame-1']))
+    physical.release()
+    await frameSend
+    expect(frames, '[A2] drain must separate physical frames of one envelope').toEqual([
+      'frame-1',
+      'frame-2'
+    ])
   })
 
   it('[A3] drops a cancelled queued request, reclaims capacity, and keeps its deadline budget', async () => {
@@ -191,6 +243,121 @@ describe('IPC send queue contract', () => {
       'replacement'
     ])
     expect(scheduler.now()).toBe(300)
+
+    const [wire] = createMemoryTransportPair()
+    const firstWrite = deferredWrite()
+    const outbound: unknown[] = []
+    const slow: IRpcTransport = {
+      ...wire,
+      send(value) {
+        outbound.push(value)
+        return outbound.length === 1 ? firstWrite.promise : undefined
+      }
+    }
+    const endpointGate = queue.createIpcSendQueueFeature({
+      connectionId: 'a3-budget',
+      maxPendingData: 2
+    })
+    const wrapped = queue.createIpcSendQueueTransport(slow, endpointGate.gate)
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'client-budget',
+        transport: wrapped,
+        scheduler,
+        wallClock: { timestamp: () => 0 },
+        middlewares: [connect({ transport: wrapped })],
+        features: [endpointGate.feature] as const
+      },
+      createFirstPartyRoots(new Set(['first-party-outbound']))
+    )
+    try {
+      const head = endpoint
+        .send('server', 'test', null, { timeoutMs: false })
+        .catch(() => undefined)
+      const queued = endpoint.send('server', 'test', null, { timeoutMs: 1000 })
+      queued.catch(() => undefined)
+      await vi.waitFor(() => expect(outbound).toHaveLength(1))
+      scheduler.advance(300)
+      firstWrite.release()
+      await vi.waitFor(() => expect(outbound).toHaveLength(2))
+      const restamped = normalizeRpcEnvelope(outbound[1])
+      expect(restamped.kind).toBe('request')
+      if (restamped.kind === 'request')
+        expect(
+          restamped.data.route.timeoutMs,
+          '[A3] queued time reduces the wire deadline'
+        ).toBeLessThanOrEqual(700)
+      scheduler.advance(700)
+      await expect(queued).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
+      await endpoint.dispose()
+      await head
+    } finally {
+      await endpoint.dispose()
+    }
+
+    const streamScheduler = createManualScheduler()
+    const streamFrames: unknown[] = []
+    const streamWire: IRpcTransport = {
+      platform: 'Memory',
+      send(value) {
+        streamFrames.push(value)
+      },
+      subscribe: () => () => undefined
+    }
+    const streamGate = queue.createIpcSendQueueFeature({
+      connectionId: 'a3-stream',
+      maxPendingData: 2
+    })
+    const streamTransport = queue.createIpcSendQueueTransport(streamWire, streamGate.gate)
+    const streamKernel = createEndpointKernel(streamTransport, undefined, streamScheduler, {
+      timestamp: () => 0
+    })
+    const deferred = await prepareEndpoint(
+      {
+        id: 'stream-client',
+        transport: streamTransport,
+        scheduler: streamScheduler,
+        wallClock: { timestamp: () => 0 },
+        middlewares: []
+      },
+      { deferMiddlewareInstall: true }
+    )
+    const prepared = await deferred.finalize(
+      [],
+      async (operation) => await operation(),
+      (key) => (key === RpcPortName.connect ? { uniqueTargetId: 'stream-client' } : undefined),
+      () => 0
+    )
+    const outboundOwner = new RpcOutboundAttachment(streamKernel, prepared)
+    const queuedHead = deferredWrite()
+    const headFrame = streamGate.gate.run(request('head'), () => queuedHead.promise)
+    const streamController = new AbortController()
+    try {
+      const streamOpen = outboundOwner.sendStreamOpen({
+        kind: 'stream-open',
+        id: 'stream-open',
+        targetId: 'server',
+        method: 'test',
+        data: null,
+        operation: {
+          signal: streamController.signal,
+          remaining: () => Math.max(0, 1000 - streamScheduler.now())
+        }
+      })
+      streamScheduler.advance(300)
+      queuedHead.release()
+      await Promise.all([headFrame, streamOpen])
+      expect(streamFrames, '[A3] stream-open writes one frame after queue admission').toHaveLength(
+        1
+      )
+      const streamRequest = normalizeRpcEnvelope(streamFrames[0])
+      expect(streamRequest.kind).toBe('request')
+      if (streamRequest.kind === 'request')
+        expect(streamRequest.data.route.timeoutMs).toBeLessThanOrEqual(700)
+    } finally {
+      streamKernel.beginClose()
+      await streamKernel.resources.releaseAll()
+    }
   })
 
   it('[A4] reserves control capacity and refuses a second control envelope without partial frames', async () => {
@@ -354,7 +521,15 @@ describe('IPC send queue contract', () => {
       '[A7] ungated sender must throw synchronously'
     ).toThrow()
     const installed = queue.createIpcSendQueueFeature({ connectionId: 'a7' })
-    const result = installed.gate.run(request('x'), () => pipeline.send(request('x')))
+    const gatedPipeline = new RpcOutboundSender(
+      transport,
+      'client',
+      pipeline.components,
+      undefined,
+      transport.platform,
+      installed.gate
+    )
+    const result = gatedPipeline.send(request('x'))
     await expect(result, '[A7] gated send must reject asynchronously').rejects.toMatchObject({
       cause: failure
     })

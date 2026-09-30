@@ -45,6 +45,8 @@ import { HookRegistry } from './hooks.js'
 import { allocateRpcId } from './id.js'
 import { PendingRegistry } from './pending.js'
 import { RpcOutboundSender } from './outbound-sender.js'
+import { outboundGateMatchesFeature, readOutboundGate } from './outbound-gate.js'
+import type { IRpcOutboundGate } from './outbound-gate.js'
 import { ReplayWindow } from './replay.js'
 import { OperationScope } from './operation-scope.js'
 import { InboundIdentityCoordinator, type IInboundIdentityAdmission } from './inbound-identity.js'
@@ -133,6 +135,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #abortEnabled: boolean
   /** Outbound transport/protocol pipeline. */
   readonly #pipeline: RpcOutboundSender
+  /** Optional wrapper-owned whole-envelope gate selected before the sender is constructed. */
+  readonly #outboundGate: IRpcOutboundGate | undefined
   /** Active request settlements keyed by wire task id. */
   readonly #pending = new PendingRegistry<IOutboundPending>()
   /** Optional stream owners observe the same canonical transport failure as requests. */
@@ -214,12 +218,14 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           ? (timeout.resolveTimeout as IRpcTimeoutCapability['resolveTimeout'])
           : (override) => (override === undefined ? timeoutDefault : override)
     }
+    this.#outboundGate = readOutboundGate(kernel.transport)
     this.#pipeline = new RpcOutboundSender(
       kernel,
       this.id,
       this.#components,
       prepared.options.authentication,
-      kernel.platform
+      kernel.platform,
+      this.#outboundGate
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
       now: () => kernel.time.scheduler.now(),
@@ -248,6 +254,14 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     kernel.resources.addSync('outbound hook registry', () => this.#hooks.clear())
     kernel.resources.addSync('outbound unknown fields', () => this.#unknownFields.clear())
     kernel.resources.addSync('outbound response bindings', () => this.#responseBindings.clear())
+    if (this.#outboundGate) {
+      const unsubscribe = this.#outboundGate.onEvent((event) => {
+        const snapshot = event as { readonly name: string; readonly error?: unknown }
+        this.emitDiagnostic({ name: snapshot.name, contract: event, error: snapshot.error })
+      })
+      kernel.resources.addSync('outbound IPC diagnostics', unsubscribe)
+      kernel.resources.addSync('outbound IPC gate', () => this.#outboundGate?.close())
+    }
     for (const listener of normalizeHooks(prepared.options.hooks?.listeners))
       this.#hooks.add(listener)
     for (const event of prepared.options.initialHookEvents ?? []) this.#emit(event)
@@ -286,6 +300,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Installs the one physical receiver after all selected routes exist. */
   activate(): void {
     if (this.#activated) return
+    if (!outboundGateMatchesFeature(this.kernel.transport))
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.ipcGateMismatch)
     const activation = createEndpointTransportActivation(this.kernel.transport, {
       receive: async (message) => {
         const generation = this.kernel.generation
@@ -458,6 +474,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     return new Promise<T>((resolve, reject) => {
       let timer: IEndpointTimer | undefined
       let settled = false
+      let settlementError: unknown
+      let startedSending = false
       const registeredSignals: NonNullable<ISendOptions['signal']>[] = []
       const cleanup = (): void => {
         if (timer !== undefined) this.kernel.time.clearTimeout(timer)
@@ -475,6 +493,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       const settleReject = (error: unknown): void => {
         if (settled) return
         settled = true
+        settlementError = error
         cleanup()
         reject(error)
       }
@@ -490,6 +509,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       // failure, or transport failure, which the remote already knows about from its own send.
       const notifyRemoteAbort = (reason?: unknown): void => {
         if (!this.#abortEnabled) return
+        if (this.#outboundGate && !startedSending) return
         void this.resolveReceiver(targetId)
           .then((receiver) => {
             const payload =
@@ -586,7 +606,37 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
             }
           }
-          return this.#pipeline.send(normalizeRpcEnvelope(request), options)
+          const assertCanSend = (): void => {
+            if (settled) throw settlementError
+            if (options.signal?.aborted) throw new RpcAbortError()
+            operation.assertActive(this.kernel.generation)
+            this.kernel.assertActive()
+          }
+          return this.#pipeline.send(
+            normalizeRpcEnvelope(request),
+            options,
+            this.#outboundGate
+              ? {
+                  queueSignal: operation.signal,
+                  signals,
+                  assertCanSend
+                }
+              : undefined,
+            this.#outboundGate
+              ? () => {
+                  assertCanSend()
+                  const remaining = operation.remaining(options.timeoutMs)
+                  if (remaining === 0) throw new RpcTimeoutError()
+                  request.data.route.sentAt = this.kernel.time.timestamp()
+                  if (typeof remaining === 'number')
+                    (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(remaining)
+                  return normalizeRpcEnvelope(request)
+                }
+              : undefined,
+            () => {
+              startedSending = true
+            }
+          )
         })
         .catch(settleReject)
     })
@@ -663,27 +713,50 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         const remaining = command.operation?.remaining()
         const wireTimeout = typeof remaining === 'number' ? Math.floor(remaining) : undefined
         if (wireTimeout === 0) throw new RpcTimeoutError()
+        const request = {
+          kind: 'request' as const,
+          id: command.id,
+          method: command.method,
+          data: {
+            route: {
+              profile: RpcRouteProfile,
+              type: 'request' as const,
+              applicationVersion: this.#version,
+              senderId: this.id,
+              targetId: command.targetId,
+              ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
+              ...(command.dispatchOnly ? { dispatchOnly: true } : {}),
+              sentAt: this.kernel.time.timestamp(),
+              ...(wireTimeout === undefined ? {} : { timeoutMs: wireTimeout })
+            },
+            ...(command.data === undefined ? {} : { payload: command.data as IRpcPortableValue })
+          }
+        }
+        const assertCanSend = (): void => {
+          this.kernel.assertActive()
+          if (command.operation?.signal.aborted) throw new RpcAbortError()
+          if (command.operation?.remaining() === 0) throw new RpcTimeoutError()
+        }
         return this.#pipeline.send(
-          normalizeRpcEnvelope({
-            kind: 'request',
-            id: command.id,
-            method: command.method,
-            data: {
-              route: {
-                profile: RpcRouteProfile,
-                type: 'request',
-                applicationVersion: this.#version,
-                senderId: this.id,
-                targetId: command.targetId,
-                ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
-                ...(command.dispatchOnly ? { dispatchOnly: true } : {}),
-                sentAt: this.kernel.time.timestamp(),
-                ...(wireTimeout === undefined ? {} : { timeoutMs: wireTimeout })
-              },
-              ...(command.data === undefined ? {} : { payload: command.data as IRpcPortableValue })
-            }
-          }),
-          command.transfer === undefined ? undefined : { transfer: command.transfer }
+          normalizeRpcEnvelope(request),
+          command.transfer === undefined ? undefined : { transfer: command.transfer },
+          this.#outboundGate && command.operation
+            ? {
+                queueSignal: command.operation.signal,
+                signals: [command.operation.signal],
+                assertCanSend
+              }
+            : undefined,
+          this.#outboundGate && command.operation
+            ? () => {
+                assertCanSend()
+                const updated = command.operation?.remaining()
+                request.data.route.sentAt = this.kernel.time.timestamp()
+                if (typeof updated === 'number')
+                  (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(updated)
+                return normalizeRpcEnvelope(request)
+              }
+            : undefined
         )
       })
       .finally(() => this.#replay.releaseId(command.id))
@@ -710,7 +783,17 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   ): Promise<void> {
     return Promise.resolve().then(() => {
       admission?.assertCanSend()
-      return this.#pipeline.send(message, transfer === undefined ? undefined : { transfer })
+      return this.#pipeline.send(
+        message,
+        transfer === undefined ? undefined : { transfer },
+        this.#outboundGate && admission
+          ? {
+              queueSignal: admission.queueSignal,
+              signals: admission.queueSignal ? [admission.queueSignal] : [],
+              assertCanSend: admission.assertCanSend
+            }
+          : undefined
+      )
     })
   }
 
