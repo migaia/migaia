@@ -15,6 +15,7 @@ import { isUint8Array } from './safe-value.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcSelectedComponents } from './endpoint-options.js'
 import type { IRpcEnvelope } from '../../contract/index.js'
+import type { IRpcOutboundAdmission, IRpcOutboundGate } from './outbound-gate.js'
 
 /** Minimal canonical send port consumed by the outbound owner. */
 export type IRpcOutboundTransport = {
@@ -39,19 +40,23 @@ export class RpcOutboundSender {
   readonly #transportEncodedType: IRpcTransport['encodedType']
   /** Captures the kernel lifecycle once so every asynchronous send phase shares one generation. */
   readonly #lifecycle: IRpcOutboundLifecycle | undefined
+  /** Optional whole-envelope admission keeps plugin capacity outside the core codec pipeline. */
+  readonly #gate: IRpcOutboundGate | undefined
 
   constructor(
     transport: IRpcOutboundTransport,
     id: string,
     components: IRpcSelectedComponents,
     authentication?: IRpcAuthenticationCapability,
-    platform: IRpcPlatform = transport.platform
+    platform: IRpcPlatform = transport.platform,
+    gate?: IRpcOutboundGate
   ) {
     this.transport = transport
     this.id = id
     this.components = components
     this.authentication = authentication
     this.#transportEncodedType = transport.encodedType
+    this.#gate = gate
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
       typeof lifecycle.assertActive === 'function' && typeof lifecycle.generation === 'number'
@@ -68,7 +73,30 @@ export class RpcOutboundSender {
   readonly #authenticationContext: IRpcAuthenticationContext
 
   /** Encodes one semantic envelope once, then protects and sends each selected physical frame. */
-  send(message: IRpcEnvelope, options?: ISendOptions): void | Promise<void> {
+  send(
+    message: IRpcEnvelope,
+    options?: ISendOptions,
+    admission?: IRpcOutboundAdmission,
+    beforeWrite?: () => IRpcEnvelope,
+    onStarted?: () => void
+  ): void | Promise<void> {
+    if (this.#gate)
+      return this.#gate.run(
+        message,
+        () => this.#sendEnvelope(beforeWrite?.() ?? message, options, true, admission, onStarted),
+        admission
+      )
+    return this.#sendEnvelope(message, options, false)
+  }
+
+  /** Retains the original synchronous encode/framing path when no IPC gate was selected. */
+  #sendEnvelope(
+    message: IRpcEnvelope,
+    options?: ISendOptions,
+    gated = false,
+    admission?: IRpcOutboundAdmission,
+    onStarted?: () => void
+  ): void | Promise<void> {
     const generation = this.#lifecycle?.generation
     this.#lifecycle?.assertActive(generation)
     const transfer = this.#snapshotTransfer(options)
@@ -94,7 +122,9 @@ export class RpcOutboundSender {
       throw new RpcSerializationError(RpcCoreErrorText.transferUnsupportedForChunking)
     return this.#prepareFrames(frames, transfer, hasTransfer, generation).then((preparedFrames) => {
       this.#lifecycle?.assertActive(generation)
-      return this.#sendPreparedFrames(preparedFrames, transfer, generation)
+      return gated
+        ? this.#sendPreparedFramesGated(preparedFrames, transfer, generation, admission, onStarted)
+        : this.#sendPreparedFrames(preparedFrames, transfer, generation)
     })
   }
 
@@ -208,6 +238,27 @@ export class RpcOutboundSender {
     })
   }
 
+  /** Awaits real adapter writability between frames while committing the first frame atomically. */
+  async #sendPreparedFramesGated(
+    frames: readonly unknown[],
+    transfer: readonly unknown[] | undefined,
+    generation: number | undefined,
+    admission?: IRpcOutboundAdmission,
+    onStarted?: () => void
+  ): Promise<void> {
+    let first = true
+    for (const frame of frames) {
+      const beforeSend = first
+        ? () => {
+            admission?.assertCanSend()
+            onStarted?.()
+          }
+        : undefined
+      first = false
+      await this.#sendPreparedTransport(frame, transfer, generation, beforeSend)
+    }
+  }
+
   /** Normalizes synchronous and asynchronous transport failures without changing send ordering. */
   #prepareTransportValue(
     value: unknown,
@@ -262,11 +313,19 @@ export class RpcOutboundSender {
   #sendPreparedTransport(
     value: unknown,
     transfer: readonly unknown[] | undefined,
-    generation: number | undefined
+    generation: number | undefined,
+    beforeSend?: () => void
   ): Promise<void> {
+    let admissionFailure: unknown
     return Promise.resolve()
       .then(() => {
         this.#lifecycle?.assertActive(generation)
+        try {
+          beforeSend?.()
+        } catch (error) {
+          admissionFailure = error
+          throw error
+        }
         return this.transport.send(value, { transfer })
       })
       .then(() => {
@@ -274,6 +333,7 @@ export class RpcOutboundSender {
       })
       .then(() => undefined)
       .catch((cause) => {
+        if (cause === admissionFailure && beforeSend) throw cause
         if (cause instanceof RpcAuthenticationError) throw cause
         if (cause instanceof RpcLifecycleError) throw cause
         throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
