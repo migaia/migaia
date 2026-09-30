@@ -13,7 +13,9 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -23,6 +25,9 @@ const maxHandshakeBytes = 65536
 var codecPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]{0,31}$`)
 var capabilityPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]*@[1-9][0-9]*$`)
 var runtimePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
+var errInvalidClose = errors.New("invalid close payload")
+var errHandshakeInvalid = errors.New("invalid handshake")
+var errHandshakeIncompatible = errors.New("incompatible handshake")
 
 type record = map[string]any
 
@@ -329,8 +334,17 @@ func routeOf(message record, expected string) (record, error) {
 	return routing, nil
 }
 
-// response returns an echo, a wire error, or no frame for one-way/wait requests.
-func response(message record, pending map[string]bool) (record, error) {
+// successResponse preserves the request's route identities while returning a fixed method result.
+func successResponse(id, method string, routing record, payload any, hasPayload bool) record {
+	data := record{"route": replyRoute(routing, method)}
+	if hasPayload {
+		data["payload"] = payload
+	}
+	return record{"kind": "response", "id": id, "ok": true, "data": data}
+}
+
+// response returns zero or more frames for one-way, wait, finish, echo, and error requests.
+func response(message record, pending map[string]record) ([]record, error) {
 	routing, err := routeOf(message, "request")
 	if err != nil {
 		return nil, err
@@ -344,63 +358,76 @@ func response(message record, pending map[string]bool) (record, error) {
 		return nil, nil
 	}
 	if method == "peer.wait" {
-		pending[id] = true
+		pending[id] = routing
 		return nil, nil
 	}
 	data := message["data"].(record)
-	result := record{"kind": "response", "id": id, "data": record{"route": replyRoute(routing, method)}}
-	if method == "peer.error" {
-		result["ok"] = false
-		result["code"] = "PEER_ERROR"
-		result["message"] = "peer requested error"
-		result["error"] = wireError("PEER_ERROR", "peer requested error")
-	} else {
-		result["ok"] = true
-		if payload, present := data["payload"]; present {
-			result["data"].(record)["payload"] = payload
+	if method == "peer.finish" {
+		ids := make([]string, 0, len(pending))
+		for waitingID := range pending {
+			ids = append(ids, waitingID)
 		}
+		sort.Strings(ids)
+		replies := make([]record, 0, len(ids)+1)
+		for _, waitingID := range ids {
+			replies = append(replies, successResponse(waitingID, "peer.wait", pending[waitingID], nil, false))
+			delete(pending, waitingID)
+		}
+		payload, present := data["payload"]
+		return append(replies, successResponse(id, method, routing, payload, present)), nil
 	}
-	return result, nil
+	if method == "echo" || method == "peer.echo" {
+		payload, present := data["payload"]
+		return []record{successResponse(id, method, routing, payload, present)}, nil
+	}
+	code, messageText := "METHOD_NOT_FOUND", "method not found"
+	if method == "peer.error" {
+		code, messageText = "PEER_ERROR", "peer requested error"
+	}
+	return []record{{"kind": "response", "id": id, "ok": false, "code": code, "message": messageText, "error": wireError(code, messageText), "data": record{"route": replyRoute(routing, method)}}}, nil
 }
 
-// control handles abort, ping, and close without reflecting untrusted payloads.
-func control(message record, pending map[string]bool) (record, bool, error) {
+// control ignores unnegotiated controls and returns a close duration only for negotiated close.
+func control(message record, pending map[string]record, capabilities []string) (record, *int, error) {
 	routing, err := routeOf(message, "variation")
 	if err != nil {
-		return nil, false, err
+		return nil, nil, err
 	}
 	id, ok := message["id"].(string)
 	if !ok || id == "" {
-		return nil, false, errors.New("invalid variation")
+		return nil, nil, errors.New("invalid variation")
 	}
 	variation, ok := routing["variation"].(string)
 	if !ok {
-		return nil, false, errors.New("invalid variation")
+		return nil, nil, errors.New("invalid variation")
+	}
+	if required := map[string]string{"abort": "abort@1", "ping": "ping@1", "close": "close@1"}[variation]; required != "" && !slices.Contains(capabilities, required) {
+		return nil, nil, nil
 	}
 	senderID, _ := routing["targetId"].(string)
 	targetID, _ := routing["senderId"].(string)
 	switch variation {
 	case "abort":
 		delete(pending, id)
-		return nil, false, nil
+		return nil, nil, nil
 	case "ping":
 		pongRoute := route("variation", senderID, targetID)
 		pongRoute["variation"] = "pong"
-		return record{"kind": "variation", "id": id, "data": record{"route": pongRoute}}, false, nil
+		return record{"kind": "variation", "id": id, "data": record{"route": pongRoute}}, nil, nil
 	case "pong":
-		return nil, false, nil
+		return nil, nil, nil
 	case "close":
 		payload, ok := message["data"].(record)["payload"].(record)
 		if !ok {
-			return nil, false, errors.New("invalid close payload")
+			return nil, nil, errInvalidClose
 		}
 		drain, ok := asInt(payload["drainMs"])
 		if !ok || drain > 2147483647 {
-			return nil, false, errors.New("invalid close duration")
+			return nil, nil, errInvalidClose
 		}
-		return nil, true, nil
+		return nil, &drain, nil
 	default:
-		return nil, false, nil
+		return nil, nil, nil
 	}
 }
 
@@ -408,59 +435,106 @@ func control(message record, pending map[string]bool) (record, bool, error) {
 func responder(reader io.Reader, writer io.Writer) error {
 	first, err := receive(reader, true)
 	if err != nil {
-		return err
+		return errHandshakeInvalid
 	}
 	remote, err := parseHello(first)
 	if err != nil {
-		return err
+		return errHandshakeInvalid
 	}
 	if first["protocol"] != "migaia.rpc" {
 		_ = send(writer, rejectRecord("HANDSHAKE_INCOMPATIBLE", "incompatible protocol"))
-		return errors.New("incompatible protocol")
+		return errHandshakeIncompatible
 	}
 	chosen, ok := negotiate(remote, localOffer())
 	if !ok {
 		_ = send(writer, rejectRecord("HANDSHAKE_INCOMPATIBLE", "incompatible version or codec"))
-		return errors.New("incompatible offer")
+		return errHandshakeIncompatible
 	}
 	if err := send(writer, acceptRecord(chosen, localOffer())); err != nil {
 		return err
 	}
-	pending := make(map[string]bool)
+	// A dedicated reader lets a drain deadline close an idle stdio session.
+	type inboundFrame struct {
+		message record
+		err     error
+	}
+	inbound := make(chan inboundFrame, 1)
+	go func() {
+		for {
+			message, readErr := receive(reader, false)
+			inbound <- inboundFrame{message: message, err: readErr}
+			if readErr != nil {
+				return
+			}
+		}
+	}()
+	pending := make(map[string]record)
+	var drainTimer *time.Timer
+	var drainDeadline <-chan time.Time
+	defer func() {
+		if drainTimer != nil {
+			drainTimer.Stop()
+		}
+	}()
 	for {
-		message, err := receive(reader, false)
-		if errors.Is(err, io.EOF) {
+		var received inboundFrame
+		select {
+		case received = <-inbound:
+		case <-drainDeadline:
 			return nil
 		}
-		if err != nil {
-			return err
+		if errors.Is(received.err, io.EOF) {
+			return nil
 		}
+		if received.err != nil {
+			return received.err
+		}
+		message := received.message
 		switch message["kind"] {
 		case "request":
-			reply, err := response(message, pending)
-			if err != nil {
-				return err
+			if drainTimer != nil {
+				continue
 			}
-			if reply != nil {
-				if err := send(writer, reply); err != nil {
-					return err
+			replies, dispatchErr := response(message, pending)
+			if dispatchErr != nil {
+				return dispatchErr
+			}
+			for _, reply := range replies {
+				if sendErr := send(writer, reply); sendErr != nil {
+					return sendErr
 				}
 			}
 		case "variation":
-			reply, closed, err := control(message, pending)
-			if err != nil {
-				return err
+			reply, closeMs, controlErr := control(message, pending, chosen.Capabilities)
+			if errors.Is(controlErr, errInvalidClose) {
+				_, _ = fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+				continue
+			}
+			if controlErr != nil {
+				return controlErr
 			}
 			if reply != nil {
-				if err := send(writer, reply); err != nil {
-					return err
+				if sendErr := send(writer, reply); sendErr != nil {
+					return sendErr
 				}
 			}
-			if closed {
-				return nil
+			data, _ := message["data"].(record)
+			routing, _ := data["route"].(record)
+			if drainTimer != nil && routing["variation"] == "abort" && slices.Contains(chosen.Capabilities, "abort@1") {
+				_, _ = fmt.Fprintln(os.Stderr, "PEER_EVENT ABORT_DURING_DRAIN")
+				if len(pending) == 0 {
+					return nil
+				}
+			}
+			if closeMs != nil && drainTimer == nil {
+				if *closeMs == 0 || len(pending) == 0 {
+					return nil
+				}
+				drainTimer = time.NewTimer(time.Duration(*closeMs) * time.Millisecond)
+				drainDeadline = drainTimer.C
 			}
 		default:
-			return errors.New("unsupported envelope kind")
+			_, _ = fmt.Fprintln(os.Stderr, "PEER_WARN UNKNOWN_KIND")
 		}
 	}
 }
@@ -567,7 +641,14 @@ func main() {
 		}
 	}
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "ERROR peer session failed")
+		switch {
+		case errors.Is(err, errHandshakeInvalid):
+			_, _ = fmt.Fprintln(os.Stderr, "PEER_FAIL HANDSHAKE_INVALID")
+		case errors.Is(err, errHandshakeIncompatible):
+			_, _ = fmt.Fprintln(os.Stderr, "PEER_FAIL HANDSHAKE_INCOMPATIBLE")
+		default:
+			_, _ = fmt.Fprintln(os.Stderr, "ERROR peer session failed")
+		}
 		os.Exit(1)
 	}
 }

@@ -53,9 +53,15 @@ fn read_json(input: &mut impl Read) -> io::Result<Option<Value>> {
         Some(frame) => frame,
         None => return Ok(None),
     };
-    json::parse(&frame)
-        .map(Some)
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid JSON frame"))
+    let value = json::parse(&frame)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "INVALID_ENVELOPE"))?;
+    if !matches!(&value, Value::Object(_)) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "INVALID_ENVELOPE",
+        ));
+    }
+    Ok(Some(value))
 }
 
 /// This fixed error never includes untrusted input, including handshake auth.
@@ -254,7 +260,7 @@ fn route(request: &Value, route_type: &str, method: Option<&str>) -> Value {
     Value::Object(fields)
 }
 
-fn response(request: &Value, payload: Value, failure: bool) -> Value {
+fn response(request: &Value, payload: Value, failure: Option<(&str, &str, &str)>) -> Value {
     let id = request
         .get("id")
         .cloned()
@@ -267,18 +273,15 @@ fn response(request: &Value, payload: Value, failure: bool) -> Value {
         ("route", route(request, "response", Some(method))),
         ("payload", payload),
     ]);
-    if failure {
+    if let Some((source, code, message)) = failure {
         object(&[
             ("kind", string("response")),
             ("id", id),
             ("ok", Value::Bool(false)),
-            ("code", string("INTERNAL")),
-            ("message", string("Peer requested failure")),
+            ("code", string(code)),
+            ("message", string(message)),
             ("data", data),
-            (
-                "error",
-                wire_error("@migaia/rpc/core", "INTERNAL", "Peer requested failure"),
-            ),
+            ("error", wire_error(source, code, message)),
         ])
     } else {
         object(&[
@@ -312,22 +315,38 @@ fn subtype(value: &Value) -> Option<&str> {
     value.get("data")?.get("route")?.get("variation")?.as_str()
 }
 
+fn negotiated(agreement: &Value, capability: &str) -> bool {
+    agreement
+        .get("capabilities")
+        .and_then(Value::as_array)
+        .unwrap_or(&[])
+        .iter()
+        .any(|value| value.as_str() == Some(capability))
+}
+
+fn valid_close(value: &Value) -> bool {
+    value
+        .get("data")
+        .and_then(|data| data.get("payload"))
+        .and_then(|payload| payload.get("drainMs"))
+        .and_then(Value::as_u64)
+        .is_some_and(|duration| duration < 2_147_483_648)
+}
+
 /// Own one connection. Never print or serialize untrusted handshake fields.
 fn serve(
     input: &mut impl Read,
     output: &mut impl Write,
     required_auth: Option<&str>,
 ) -> io::Result<()> {
-    let frame = read_frame(input)?
-        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "missing handshake"))?;
+    let handshake_invalid = || io::Error::new(io::ErrorKind::InvalidData, "HANDSHAKE_INVALID");
+    let frame = read_frame(input)
+        .map_err(|_| handshake_invalid())?
+        .ok_or_else(|| handshake_invalid())?;
     if frame.len() > MAX_HANDSHAKE {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "handshake too large",
-        ));
+        return Err(handshake_invalid());
     }
-    let first = json::parse(&frame)
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid handshake"))?;
+    let first = json::parse(&frame).map_err(|_| handshake_invalid())?;
     let agreement = match negotiate(&first) {
         Ok(value)
             if required_auth
@@ -335,20 +354,27 @@ fn serve(
         {
             value
         }
-        _ => {
+        Ok(_) => {
             write_frame(output, &reject())?;
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "handshake rejected",
-            ));
+            return Err(handshake_invalid());
         }
+        Err("incompatible handshake") => {
+            write_frame(output, &reject())?;
+            return Err(handshake_invalid());
+        }
+        _ => return Err(handshake_invalid()),
     };
     write_frame(output, &accept(&agreement))?;
     let mut waiting: Option<Value> = None;
     let mut one_way_receipts = 0u64;
+    let mut draining = false;
     while let Some(message) = read_json(input)? {
         match message.get("kind").and_then(Value::as_str) {
             Some("request") => {
+                if draining && message.get("method").and_then(Value::as_str) != Some("peer.finish")
+                {
+                    continue;
+                }
                 let route = message.get("data").and_then(|data| data.get("route"));
                 if route
                     .and_then(|route| route.get("profile"))
@@ -372,20 +398,42 @@ fn serve(
                             waiting = Some(message);
                         }
                     }
+                    Some("peer.finish") => {
+                        if let Some(pending) = waiting.take() {
+                            write_frame(output, &response(&pending, Value::Null, None))?;
+                        }
+                        if !one_way {
+                            write_frame(output, &response(&message, Value::Null, None))?;
+                        }
+                        if draining {
+                            break;
+                        }
+                    }
                     Some("peer.error") => {
                         if !one_way {
-                            write_frame(output, &response(&message, Value::Null, true))?;
+                            write_frame(
+                                output,
+                                &response(
+                                    &message,
+                                    Value::Null,
+                                    Some((
+                                        "@migaia/rpc/core",
+                                        "INTERNAL",
+                                        "Peer requested failure",
+                                    )),
+                                ),
+                            )?;
                         }
                     }
                     Some("peer.receipts") => {
                         if !one_way {
                             write_frame(
                                 output,
-                                &response(&message, number(one_way_receipts), false),
+                                &response(&message, number(one_way_receipts), None),
                             )?;
                         }
                     }
-                    _ => {
+                    Some("echo") | Some("peer.echo") => {
                         if !one_way {
                             write_frame(
                                 output,
@@ -396,7 +444,19 @@ fn serve(
                                         .and_then(|data| data.get("payload"))
                                         .cloned()
                                         .unwrap_or(Value::Null),
-                                    false,
+                                    None,
+                                ),
+                            )?;
+                        }
+                    }
+                    _ => {
+                        if !one_way {
+                            write_frame(
+                                output,
+                                &response(
+                                    &message,
+                                    Value::Null,
+                                    Some(("rust-peer", "METHOD_NOT_FOUND", "Method not found")),
                                 ),
                             )?;
                         }
@@ -404,70 +464,46 @@ fn serve(
                 }
             }
             Some("variation") => match subtype(&message) {
-                Some("ping")
-                    if agreement
-                        .get("capabilities")
-                        .and_then(Value::as_array)
-                        .unwrap_or(&[])
-                        .iter()
-                        .any(|cap| cap.as_str() == Some("ping@1")) =>
-                {
+                Some("ping") if negotiated(&agreement, "ping@1") => {
                     write_frame(output, &variation(&message, "pong"))?
                 }
-                Some("abort") => {
+                Some("abort") if negotiated(&agreement, "abort@1") => {
+                    if draining {
+                        eprintln!("PEER_EVENT ABORT_DURING_DRAIN");
+                    }
                     if let Some(pending) = waiting.take() {
                         if pending.get("id") == message.get("id") {
-                            let mut failure = response(&pending, Value::Null, true);
-                            if let Value::Object(fields) = &mut failure {
-                                for (name, value) in fields.iter_mut() {
-                                    if name == "code" {
-                                        *value = string("CANCELLED");
-                                    }
-                                    if name == "message" {
-                                        *value = string("Request cancelled");
-                                    }
-                                    if name == "error" {
-                                        *value = wire_error(
-                                            "@migaia/rpc/core",
-                                            "CANCELLED",
-                                            "Request cancelled",
-                                        );
-                                    }
-                                }
+                            if draining {
+                                break;
                             }
-                            write_frame(output, &failure)?;
+                            write_frame(
+                                output,
+                                &response(
+                                    &pending,
+                                    Value::Null,
+                                    Some(("@migaia/rpc/core", "CANCELLED", "Request cancelled")),
+                                ),
+                            )?;
                         } else {
                             waiting = Some(pending);
                         }
                     }
                 }
-                Some("close") => {
-                    if let Some(pending) = waiting.take() {
-                        let mut failure = response(&pending, Value::Null, true);
-                        if let Value::Object(fields) = &mut failure {
-                            for (name, value) in fields.iter_mut() {
-                                if name == "code" {
-                                    *value = string("CANCELLED");
-                                }
-                                if name == "message" {
-                                    *value = string("Request cancelled");
-                                }
-                                if name == "error" {
-                                    *value = wire_error(
-                                        "@migaia/rpc/core",
-                                        "CANCELLED",
-                                        "Request cancelled",
-                                    );
-                                }
-                            }
-                        }
-                        write_frame(output, &failure)?;
+                Some("close") if negotiated(&agreement, "close@1") => {
+                    if !valid_close(&message) {
+                        eprintln!("PEER_ERROR PROTOCOL_INVALID");
+                        continue;
                     }
-                    break;
+                    if waiting.is_some() {
+                        draining = true;
+                    } else {
+                        break;
+                    }
                 }
                 _ => {}
             },
-            _ => {}
+            Some("response") | Some("discovery") | Some("stream") => {}
+            _ => eprintln!("PEER_WARN UNKNOWN_KIND"),
         }
     }
     Ok(())
@@ -692,7 +728,20 @@ fn run() -> io::Result<()> {
 
 fn main() {
     if let Err(error) = run() {
-        eprintln!("PEER_FAIL {}", error);
+        let label = if error.kind() == io::ErrorKind::InvalidData
+            && error.to_string() == "HANDSHAKE_INVALID"
+        {
+            "HANDSHAKE_INVALID"
+        } else if error.kind() == io::ErrorKind::InvalidData
+            && error.to_string() == "INVALID_ENVELOPE"
+        {
+            "INVALID_ENVELOPE"
+        } else if error.kind() == io::ErrorKind::InvalidData {
+            "INVALID_DATA"
+        } else {
+            "IO"
+        };
+        eprintln!("PEER_FAIL {label}");
         std::process::exit(1);
     }
 }
