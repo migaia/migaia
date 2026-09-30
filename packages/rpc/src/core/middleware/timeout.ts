@@ -1,4 +1,4 @@
-import { RpcCoreErrorText } from '../error-text.js'
+import { RpcMiddlewareErrorText } from './error-text.js'
 import type {
   IRpcPlugin,
   IRpcPluginInstallResult,
@@ -26,7 +26,7 @@ function snapshotTimeout(
     return {
       error: new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        RpcCoreErrorText.timeoutDescriptorIsInvalid
+        RpcMiddlewareErrorText.timeoutDescriptorIsInvalid
       )
     }
   let timeoutMs: IRpcTimeoutConfig['timeoutMs']
@@ -36,7 +36,7 @@ function snapshotTimeout(
     return {
       error: new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        RpcCoreErrorText.timeoutDescriptorIsUnreadable,
+        RpcMiddlewareErrorText.timeoutDescriptorIsUnreadable,
         error
       )
     }
@@ -47,7 +47,7 @@ function snapshotTimeout(
     return {
       error: new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        RpcCoreErrorText.timeoutDescriptorIsUnreadable,
+        RpcMiddlewareErrorText.timeoutDescriptorIsUnreadable,
         error
       )
     }
@@ -70,7 +70,7 @@ function createTimeoutPlugin(config: IRpcTimeoutConfig): IRpcPlugin {
       )
         throw new RpcError(
           RpcCoreErrorCode.invalidConfig,
-          RpcCoreErrorText.timeoutMsMustBeFalseOrANonNegativeNumber
+          RpcMiddlewareErrorText.timeoutMsMustBeFalseOrANonNegativeNumber
         )
       const port: IRpcTimeoutCapability = Object.freeze({
         timeoutMs,

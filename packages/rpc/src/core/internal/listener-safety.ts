@@ -1,4 +1,4 @@
-import { RpcCoreErrorText } from '../error-text.js'
+import { RpcAuxiliaryErrorText } from './auxiliary-error-text.js'
 import {
   RPC_CORE_ERROR_SOURCE,
   RpcCoreErrorCode,
@@ -163,7 +163,7 @@ export function createListenerFailure(
     return tagRpcError(errors[0], code)
   }
   return tagRpcError(
-    new AggregateError(errors, boundary.message ?? RpcCoreErrorText.listenerCleanupFailed),
+    new AggregateError(errors, boundary.message ?? RpcAuxiliaryErrorText.listenerCleanupFailed),
     code
   )
 }
@@ -210,7 +210,7 @@ export function registerListeners(
   } catch (error) {
     drainListenerFailures([error, ...collectListenerCleanupFailures(registered)], {
       ...boundary,
-      message: boundary.message ?? RpcCoreErrorText.listenerRegistrationCleanupFailed
+      message: boundary.message ?? RpcAuxiliaryErrorText.listenerRegistrationCleanupFailed
     })
   }
 }

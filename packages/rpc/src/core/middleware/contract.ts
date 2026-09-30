@@ -1,4 +1,4 @@
-import { RpcCoreErrorText } from '../error-text.js'
+import { RpcMiddlewareErrorText } from './error-text.js'
 import { validateContractData } from '../internal/contract.js'
 import type {
   IRpcContractCapability,
@@ -25,7 +25,10 @@ const contractClaims = {
 /** Normalizes contract configuration and snapshots schema ownership without registry writes. */
 function createContractCapability(config: IRpcContractConfig): IRpcContractCapability {
   if (!config || typeof config !== 'object' || Array.isArray(config))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.contractDescriptorIsInvalid)
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcMiddlewareErrorText.contractDescriptorIsInvalid
+    )
   let version: IRpcContractConfig['version']
   let acceptVersions: IRpcContractConfig['acceptVersions']
   let maxIdentifierLength: IRpcContractConfig['maxIdentifierLength']
@@ -36,7 +39,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
   } catch (error) {
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.contractDescriptorIsUnreadable,
+      RpcMiddlewareErrorText.contractDescriptorIsUnreadable,
       error
     )
   }
@@ -45,7 +48,10 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
     const source = safeRead<unknown>(config, 'schemas')
     if (source !== undefined) {
       if (!source || typeof source !== 'object' || Array.isArray(source))
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schemasMustBeAnObject)
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcMiddlewareErrorText.schemasMustBeAnObject
+        )
       schemas = createSafeRecord<IRpcMethodSchema>() as Record<string, IRpcMethodSchema>
       for (const method of Object.keys(source)) {
         const methodSchema = safeRead<unknown>(source, method)
@@ -58,7 +64,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
         if (!isSchema(params) || !isSchema(result))
           throw new RpcError(
             RpcCoreErrorCode.invalidConfig,
-            RpcCoreErrorText.schemaDescriptorInvalid(method)
+            RpcMiddlewareErrorText.schemaDescriptorInvalid(method)
           )
         schemas[method] = { params, result }
       }
@@ -67,7 +73,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
     if (error instanceof RpcError) throw error
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.contractSchemasMustContainParamsResultSchemasWithParseFunctions,
+      RpcMiddlewareErrorText.contractSchemasMustContainParamsResultSchemasWithParseFunctions,
       error
     )
   }
@@ -79,13 +85,13 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
     )
       throw new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        RpcCoreErrorText.contractAcceptVersionsMustContainNonEmptyStrings
+        RpcMiddlewareErrorText.contractAcceptVersionsMustContainNonEmptyStrings
       )
   } catch (error) {
     if (error instanceof RpcError) throw error
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.contractAcceptVersionsIsUnreadable,
+      RpcMiddlewareErrorText.contractAcceptVersionsIsUnreadable,
       error
     )
   }
@@ -98,7 +104,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
   if (version !== undefined && (!version || typeof version !== 'string'))
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.contractVersionMustBeANonEmptyString
+      RpcMiddlewareErrorText.contractVersionMustBeANonEmptyString
     )
   if (
     maxIdentifierLength !== undefined &&
@@ -106,7 +112,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
   )
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.maxIdentifierLengthMustBeAPositiveSafeInteger
+      RpcMiddlewareErrorText.maxIdentifierLengthMustBeAPositiveSafeInteger
     )
   return {
     ...snapshot,
