@@ -282,7 +282,13 @@ class EndpointKernel implements IEndpointKernelHost {
       let primary: unknown = error
       let message: string = RpcCoreErrorText.endpointRegistrationFailed
       try {
-        message = safeString(safeRead(error, 'message'), message)
+        /** String conversion and property reads share this secondary cause position. */
+        const secondary: unknown[] = []
+        message = safeString(safeRead(error, 'message'), message, ({ error: failure }) => {
+          secondary.push(failure)
+          return undefined
+        })
+        if (secondary.length > 0) primary = new AggregateError([error, ...secondary], message)
       } catch (readError) {
         primary = new AggregateError([error, readError], message)
       }

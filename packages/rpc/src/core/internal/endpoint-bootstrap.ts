@@ -137,7 +137,10 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
 ): Promise<IPreparedEndpoint<TTargetId>> {
   const installedConnect = getPort(RpcPortName.connect) as IRpcConnectCapability | undefined
   if (!installedConnect)
-    throw new RpcError(RpcCoreErrorCode.middlewareMissing, 'connect middleware is required')
+    throw new RpcError(
+      RpcCoreErrorCode.middlewareMissing,
+      RpcCoreErrorText.connectMiddlewareIsRequired
+    )
   let connectCapability = installedConnect
   const authenticationCapability = getPort(RpcPortName.authentication) as
     | IRpcAuthenticationCapability
@@ -174,7 +177,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   )
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'id and targetIds must fit the configured identifier limit'
+      RpcCoreErrorText.idAndTargetIdsMustFitTheConfiguredIdentifierLimit
     )
   if (installedConnect.uniqueTargetIdFactory) {
     let generated: string
@@ -188,7 +191,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
       if (error instanceof RpcAbortError || error instanceof RpcTimeoutError) throw error
       throw new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        'connect.uniqueTargetId factory failed',
+        RpcCoreErrorText.connectUniqueTargetIdFactoryFailed,
         error
       )
     }
@@ -220,7 +223,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   if (!isDirectedCompatible(components, authenticationCapability, encodedType))
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'outbound frame and transport encoded types are incompatible'
+      RpcCoreErrorText.outboundFrameAndTransportEncodedTypesAreIncompatible
     )
   return {
     id: factoryId,
@@ -284,7 +287,10 @@ export async function prepareEndpoint<
   let factoryFramer: IRpcFactoryConfig['framer']
   try {
     if (!config || typeof config !== 'object' || Array.isArray(config))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'factory descriptor is invalid')
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.factoryDescriptorIsInvalid
+      )
     factoryId = config.id
     factoryMiddlewares = config.middlewares
     factoryTargetIds = config.targetIds
@@ -305,7 +311,11 @@ export async function prepareEndpoint<
     factoryFramer = config.framer
   } catch (error) {
     if (error instanceof RpcError) throw error
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'factory descriptor is unreadable', error)
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.factoryDescriptorIsUnreadable,
+      error
+    )
   }
   try {
     const input = config.idempotency
@@ -330,7 +340,7 @@ export async function prepareEndpoint<
     throw new RpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid, cause)
   }
   if (typeof factoryId !== 'string' || factoryId.length === 0)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'id must be a non-empty string')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.idMustBeANonEmptyString)
   let injectedScheduler: IScheduler | undefined
   if (factoryScheduler !== undefined) {
     try {
@@ -368,18 +378,25 @@ export async function prepareEndpoint<
   }
   try {
     if (!Array.isArray(factoryMiddlewares))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'middlewares must be an array')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.middlewaresMustBeAnArray)
     if (factoryTargetIds !== undefined && !Array.isArray(factoryTargetIds))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'targetIds must be an array')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.targetIdsMustBeAnArray)
     if (
       (factoryTargetIds as readonly unknown[] | undefined)?.some(
         (targetId) => typeof targetId !== 'string' || targetId.length === 0
       )
     )
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'targetIds must contain non-empty strings')
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.targetIdsMustContainNonEmptyStrings
+      )
   } catch (error) {
     if (error instanceof RpcError) throw error
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'factory collection is unreadable', error)
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.factoryCollectionIsUnreadable,
+      error
+    )
   }
   let middlewareSnapshots: IEndpointMiddlewareSnapshot[]
   try {
@@ -447,13 +464,17 @@ export async function prepareEndpoint<
       if (names.has(middleware.name))
         throw new RpcError(
           RpcCoreErrorCode.middlewareDuplicated,
-          `Duplicate middleware: ${middleware.name}`
+          RpcCoreErrorText.duplicateMiddleware(middleware.name)
         )
       names.add(middleware.name)
     }
   } catch (error) {
     if (error instanceof RpcError) throw error
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'middlewares are unreadable', error)
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.middlewaresAreUnreadable,
+      error
+    )
   }
   const transportCandidates = middlewareSnapshots.flatMap((item) =>
     item.transport === undefined ? [] : [item.transport]
@@ -462,7 +483,10 @@ export async function prepareEndpoint<
     throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
   const transport = (factoryTransport as IRpcTransport | undefined) ?? transportCandidates[0]
   if (!transport)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect middleware must provide transport')
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.connectMiddlewareMustProvideTransport
+    )
   /** Kernel owns the same one-read descriptor snapshot on both construction paths. */
   const transportSnapshot: IEndpointKernelTransportSnapshot = readTransportSnapshot(transport)
   const { send, subscribe, platform, encodedType, ownership } = transportSnapshot
@@ -476,7 +500,7 @@ export async function prepareEndpoint<
       encodedType !== 'uint8array') ||
     (ownership !== undefined && ownership !== 'owned' && ownership !== 'borrowed')
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'transport descriptor is invalid')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.transportDescriptorInvalid)
   const components = selectWebRpcComponents({
     protocol: factoryProtocol,
     codec: factoryCodec,

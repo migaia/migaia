@@ -207,7 +207,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
               if (typeof listener !== 'function')
                 throw new RpcError(
                   RpcCoreErrorCode.invalidConfig,
-                  'query listener must be a function'
+                  RpcCoreErrorText.queryListenerMustBeAFunction
                 )
               return this.addManualQueryListener(listener)
             },
@@ -301,14 +301,17 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       throw new RpcError(
         RpcCoreErrorCode.targetNotIdentifiable,
-        `BroadcastChannel target is not individually identifiable: ${targetId}`
+        RpcCoreErrorText.broadcastTargetNotIdentifiable(targetId)
       )
     const entry = this.#registry
       .remoteSnapshot<IRpcServerMetadata<TTargetId>>()
       .map(([, candidate]) => candidate)
       .find((candidate) => candidate.targetId === targetId && candidate.receiverId === receiverId)
     if (!entry || entry.status !== 'active')
-      throw new RpcError(RpcCoreErrorCode.targetUnknown, `Unknown receiver: ${receiverId}`)
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
+        RpcCoreErrorText.unknownReceiver(receiverId)
+      )
     this.#registry.pin(targetId, receiverId)
     this.#registry.clearPinLost(targetId)
     this.#registry.setRemote(tupleKey(targetId, receiverId), { ...entry, pinned: true })
@@ -498,7 +501,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     if (entry?.status !== 'active')
       throw new RpcError(
         RpcCoreErrorCode.targetUnknown,
-        `Pinned receiver is unavailable: ${receiverId}`
+        RpcCoreErrorText.pinnedReceiverUnavailable(receiverId)
       )
   }
 
@@ -548,7 +551,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     if (typeof selected !== 'string')
       throw new RpcError(
         RpcCoreErrorCode.targetUnknown,
-        'receiverSelector returned an invalid receiver'
+        RpcCoreErrorText.receiverSelectorReturnedAnInvalidReceiver
       )
     const entry = serverList.find(
       (candidate) => candidate.receiverId === selected && candidate.status === 'active'
@@ -556,7 +559,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     if (!entry)
       throw new RpcError(
         RpcCoreErrorCode.targetUnknown,
-        `receiverSelector returned an unavailable receiver: ${selected}`
+        RpcCoreErrorText.selectedReceiverUnavailable(selected)
       )
     return {
       receiverId: selected,
@@ -634,7 +637,9 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         this.#registry.deleteResponseCount(waiter.taskId)
         this.#clearAutomaticTimer(waiter.taskId, waiter)
       }
-      waiter.reject(new RpcError(RpcCoreErrorCode.targetUnknown, `Unknown target: ${targetId}`))
+      waiter.reject(
+        new RpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.unknownTarget(targetId))
+      )
     })
   }
 
@@ -743,7 +748,9 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#registry.deleteResponseCount(taskId)
       if (this.#registry.deleteTask(taskId)) {
         this.#registry.deleteWaiter(String(targetId))
-        waiter.reject(new RpcError(RpcCoreErrorCode.targetUnknown, `Unknown target: ${targetId}`))
+        waiter.reject(
+          new RpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.unknownTarget(targetId))
+        )
       }
     }, delayMs)
     this.#registry.setTimer(taskId, waiter.timer)
@@ -789,10 +796,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     if (!Number.isFinite(timeoutMs) || timeoutMs < 0)
       throw new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        'discovery timeout must be finite and non-negative'
+        RpcCoreErrorText.discoveryTimeoutMustBeFiniteAndNonNegative
       )
     if (options?.signal?.aborted)
-      throw new RpcError(RpcCoreErrorCode.cancelled, 'Discovery aborted')
+      throw new RpcError(RpcCoreErrorCode.cancelled, RpcCoreErrorText.discoveryAborted)
     const taskId = this.#makeId(targetId)
     return new Promise((resolve, reject) => {
       const settleResolve = (value: readonly IRpcDiscoveryCandidate<TTargetId>[]): void => {
@@ -817,7 +824,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#registry.setManualWaiter(taskId, waiter)
       if (options?.signal) {
         const onAbort = (): void => {
-          const abortError = new RpcError(RpcCoreErrorCode.cancelled, 'Discovery aborted')
+          const abortError = new RpcError(
+            RpcCoreErrorCode.cancelled,
+            RpcCoreErrorText.discoveryAborted
+          )
           try {
             this.#registry.rejectManualWaiter(taskId, abortError)
           } catch (error) {
@@ -877,7 +887,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   #manualRegister(candidate: IRpcDiscoveryCandidate<TTargetId>): void {
     this.#assertManualMode()
     if (!candidate || typeof candidate !== 'object')
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'discovery candidate is invalid')
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.discoveryCandidateIsInvalid
+      )
     const candidateRecord = this.#registry.getCandidate(candidate as object) as
       | { expiresAt: number; registered: boolean; revoked: boolean }
       | undefined
@@ -889,26 +902,29 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       throw new RpcError(
         RpcCoreErrorCode.targetUnknown,
-        'discovery candidate was not produced by a verified manual query'
+        RpcCoreErrorText.discoveryCandidateWasNotProducedByAVerifiedManualQuery
       )
     this.#validateIdentifier(candidate.targetId, 'targetId')
     if (typeof candidate.receiverId !== 'string')
       throw new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        'discovery candidate receiverId is invalid'
+        RpcCoreErrorText.discoveryCandidateReceiverIdIsInvalid
       )
     try {
       this.#validateIdentifier(candidate.receiverId, 'receiverId')
     } catch {
       throw new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        'discovery candidate receiverId is invalid'
+        RpcCoreErrorText.discoveryCandidateReceiverIdIsInvalid
       )
     }
     const uniqueTargetId = this.#registry.getCandidateUniqueId(candidate as object)
     const key = tupleKey(candidate.targetId, candidate.receiverId)
     if (this.#registry.isCandidateRevoked(key))
-      throw new RpcError(RpcCoreErrorCode.targetUnknown, 'discovery candidate was revoked')
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
+        RpcCoreErrorText.discoveryCandidateWasRevoked
+      )
     if (
       !this.#registry.hasRemote(key) &&
       this.receiverCount(candidate.targetId) >= this.limits.maxReceiversPerTarget
@@ -919,7 +935,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         targetId: candidate.targetId,
         receiverId: candidate.receiverId
       })
-      throw new RpcError(RpcCoreErrorCode.targetUnknown, 'receiver limit exceeded')
+      throw new RpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.receiverLimitExceeded)
     }
     const now = this.#ports.time.now()
     const previous = this.#registry.getRemote<IRpcServerMetadata<TTargetId>>(key)
@@ -929,7 +945,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     if (candidateProof?.verifiedPeerKey === undefined)
       throw new RpcError(
         RpcCoreErrorCode.targetUnknown,
-        'verified discovery binding is no longer available'
+        RpcCoreErrorText.verifiedDiscoveryBindingIsNoLongerAvailable
       )
     if (
       !this.#registry.setRemoteWithBinding(
@@ -948,7 +964,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         candidateProof.verifiedPeerKey
       )
     )
-      throw new RpcError(RpcCoreErrorCode.targetUnknown, 'remote discovery target limit exceeded')
+      throw new RpcError(
+        RpcCoreErrorCode.targetUnknown,
+        RpcCoreErrorText.remoteDiscoveryTargetLimitExceeded
+      )
     candidateRecord.registered = true
     if (previous?.status !== 'active')
       this.#emit({
@@ -975,7 +994,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     }
     for (const key of keysToRevoke)
       if (!this.#registry.canRevokeCandidate(key, this.limits.maxManualRevokedCandidates))
-        throw new RpcError(RpcCoreErrorCode.overloaded, 'manual revocation capacity exceeded')
+        throw new RpcError(
+          RpcCoreErrorCode.overloaded,
+          RpcCoreErrorText.manualRevocationCapacityExceeded
+        )
     const removed: IRpcServerMetadata<TTargetId>[] = []
     for (const [key, entry] of this.#registry.remoteSnapshot<IRpcServerMetadata<TTargetId>>()) {
       if (
@@ -984,7 +1006,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       ) {
         this.#registry.deleteRemote(key)
         if (!this.#registry.revokeCandidate(key, this.limits.maxManualRevokedCandidates))
-          throw new RpcError(RpcCoreErrorCode.overloaded, 'manual revocation capacity exceeded')
+          throw new RpcError(
+            RpcCoreErrorCode.overloaded,
+            RpcCoreErrorText.manualRevocationCapacityExceeded
+          )
         removed.push(entry)
       }
     }
@@ -1016,12 +1041,12 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     if (!candidate || typeof candidate !== 'object')
       throw new RpcError(
         RpcCoreErrorCode.targetUnknown,
-        'discovery candidate was not produced by a verified manual query'
+        RpcCoreErrorText.discoveryCandidateWasNotProducedByAVerifiedManualQuery
       )
     if (typeof candidate.receiverId !== 'string')
       throw new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        'discovery candidate receiverId is invalid'
+        RpcCoreErrorText.discoveryCandidateReceiverIdIsInvalid
       )
     const candidateRecord = this.#registry.getCandidate(candidate as object) as
       | { expiresAt: number; registered: boolean; revoked: boolean }
@@ -1034,7 +1059,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       throw new RpcError(
         RpcCoreErrorCode.targetUnknown,
-        'discovery candidate was not produced by a verified manual query'
+        RpcCoreErrorText.discoveryCandidateWasNotProducedByAVerifiedManualQuery
       )
     return this.#ports.candidatePing(candidate as IRpcDiscoveryCandidate<string>, options)
   }
@@ -1216,7 +1241,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
           code: RpcCoreErrorCode.invalidConfig,
           error: new RpcError(
             RpcCoreErrorCode.invalidConfig,
-            'discovery candidate uniqueTargetId must be a string'
+            RpcCoreErrorText.discoveryCandidateUniqueTargetIdMustBeAString
           )
         })
         return
@@ -1403,7 +1428,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     const query = this.#registry.takeInboundQuery(key) as IManualInboundQuery | undefined
     if (!query) return false
     if (reason !== undefined && typeof reason !== 'string')
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'query rejection reason must be a string')
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.queryRejectionReasonMustBeAString
+      )
     this.#replay.admit(
       tupleKey('manual-query', query.verifiedPeerKey, query.senderId, query.queryId),
       query.verifiedPeerKey,
@@ -1691,13 +1719,16 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   #assertManualMode(): void {
     this.#assertActive()
     if (this.#mode !== 'manual')
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, 'manual discovery is unavailable')
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.manualDiscoveryIsUnavailable
+      )
   }
 
   /** Validates one wire identifier against the prepared contract snapshot. */
   #validateIdentifier(value: string, label: string): void {
     if (typeof value !== 'string' || value.length === 0 || value.length > this.#maxIdentifierLength)
-      throw new RpcContractError(`${label} must be a non-empty identifier within the limit`)
+      throw new RpcContractError(RpcCoreErrorText.identifierInvalid(label))
   }
 
   /** Allocates one collision-checked discovery correlation ID without a second ledger owner. */
