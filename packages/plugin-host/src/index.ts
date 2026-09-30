@@ -19,7 +19,7 @@ export {
   type IPluginHostDisposalNodeKind,
   type IPluginHostDisposalProvenance
 } from './host-runtime.js'
-export { definePlugin } from './define-plugin.js'
+export { definePlugin, isDefinedPlugin } from './define-plugin.js'
 export { defineFeature } from './define-feature.js'
 export {
   defineHost,

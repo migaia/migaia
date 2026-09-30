@@ -368,3 +368,10 @@ export const readDefinedPluginDefinition = (value: unknown): IStoredDefinition |
   // the trusted admission probe on its canonical single lookup while preserving forged-value safety.
   return definitions.get(value as object)
 }
+
+/**
+ * Reports whether this package instance created a plugin without reading user properties or running
+ * hooks.
+ */
+export const isDefinedPlugin = (value: unknown): value is IDefinedPluginConstraint =>
+  readDefinedPluginDefinition(value) !== undefined

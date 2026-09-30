@@ -217,6 +217,7 @@
         "defineHost",
         "definePlugin",
         "disposeKey",
+        "isDefinedPlugin",
         "invokeCaptured",
         "readPluginHostDisposalProvenance"
       ],
