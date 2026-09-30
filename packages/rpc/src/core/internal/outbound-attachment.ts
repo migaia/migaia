@@ -7,7 +7,8 @@ import {
   RpcLifecycleError,
   RpcRemoteError,
   RpcProtocolError,
-  RpcTimeoutError
+  RpcTimeoutError,
+  tagRpcError
 } from '../errors.js'
 import { RpcMessageKind } from '../semantic-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
@@ -259,8 +260,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         const snapshot = event as { readonly name: string; readonly error?: unknown }
         this.emitDiagnostic({ name: snapshot.name, contract: event, error: snapshot.error })
       })
-      kernel.resources.addSync('outbound IPC diagnostics', unsubscribe)
-      kernel.resources.addSync('outbound IPC gate', () => this.#outboundGate?.close())
+      kernel.resources.addSync('IPC diagnostics', unsubscribe)
     }
     for (const listener of normalizeHooks(prepared.options.hooks?.listeners))
       this.#hooks.add(listener)
@@ -301,7 +301,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   activate(): void {
     if (this.#activated) return
     if (!outboundGateMatchesFeature(this.kernel.transport))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.ipcGateMismatch)
+      throw tagRpcError(
+        new TypeError(RpcCoreErrorText.ipcGateMismatch),
+        RpcCoreErrorCode.invalidConfig
+      )
     const activation = createEndpointTransportActivation(this.kernel.transport, {
       receive: async (message) => {
         const generation = this.kernel.generation

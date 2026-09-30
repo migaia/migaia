@@ -21,6 +21,9 @@ import {
   type IpcSendClass as IIpcSendClass
 } from './flow-control.js'
 
+/** Prevents two wrappers from claiming the same physical connection identity. */
+const wrappedPhysical = new WeakSet<object>()
+
 /** Selects the reserved control class from normalized fields without invoking user getters. */
 function classify(envelope: IRpcEnvelope): IIpcSendClass {
   if (envelope.kind === 'variation') {
@@ -170,7 +173,9 @@ export function createIpcSendQueueFeature(
   })
   const feature = defineFeature<Record<never, never>, Record<never, never>, IRpcFeatureExpose>(
     (core) => {
-      installOutboundGate(core.featureExpose.getKernel().transport, gate)
+      const kernel = core.featureExpose.getKernel()
+      installOutboundGate(kernel.transport, gate)
+      kernel.resources.addSync('IPC send gate', () => gate.close())
       return Object.freeze({})
     }
   )
@@ -182,6 +187,11 @@ export function createIpcSendQueueTransport(
   transport: IRpcTransport,
   gate: IIpcSendGate
 ): IIpcGatedTransport {
+  if (wrappedPhysical.has(transport))
+    throw tagRpcError(
+      new TypeError(RpcCoreErrorText.ipcGateDuplicated),
+      RpcCoreErrorCode.invalidConfig
+    )
   let closed = false
   const wrapper: IIpcGatedTransport = Object.freeze({
     get platform() {
@@ -229,5 +239,6 @@ export function createIpcSendQueueTransport(
     }
   })
   registerOutboundGate(wrapper, gate)
+  wrappedPhysical.add(transport)
   return wrapper
 }
