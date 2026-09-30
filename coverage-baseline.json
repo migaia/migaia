@@ -180,24 +180,24 @@
     },
     "rpc": {
       "lines": {
-        "covered": 6638,
-        "total": 7326,
-        "pct": 90.6
+        "covered": 6644,
+        "total": 7332,
+        "pct": 90.61
       },
       "statements": {
-        "covered": 7250,
-        "total": 8175,
-        "pct": 88.68
+        "covered": 7256,
+        "total": 8181,
+        "pct": 88.69
       },
       "functions": {
-        "covered": 1634,
-        "total": 1789,
-        "pct": 91.33
+        "covered": 1635,
+        "total": 1790,
+        "pct": 91.34
       },
       "branches": {
-        "covered": 4365,
-        "total": 5138,
-        "pct": 84.95
+        "covered": 4368,
+        "total": 5141,
+        "pct": 84.96
       }
     },
     "serialize": {
@@ -7354,24 +7354,24 @@
     },
     "packages/rpc/src/remote/host.ts": {
       "lines": {
-        "covered": 41,
-        "total": 42,
-        "pct": 97.61
+        "covered": 47,
+        "total": 48,
+        "pct": 97.91
       },
       "statements": {
-        "covered": 45,
-        "total": 47,
-        "pct": 95.74
+        "covered": 51,
+        "total": 53,
+        "pct": 96.22
       },
       "functions": {
-        "covered": 13,
-        "total": 13,
+        "covered": 14,
+        "total": 14,
         "pct": 100
       },
       "branches": {
-        "covered": 26,
-        "total": 29,
-        "pct": 89.65
+        "covered": 29,
+        "total": 32,
+        "pct": 90.62
       }
     },
     "packages/rpc/src/remote/index.ts": {
@@ -14331,8 +14331,7 @@
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
   "changedRuntimeFiles": [
-    "packages/rpc/src/remote/coroutine.ts",
-    "packages/rpc/src/remote/index.ts"
+    "packages/rpc/src/remote/host.ts"
   ],
   "deletedRuntimeFiles": []
 }
