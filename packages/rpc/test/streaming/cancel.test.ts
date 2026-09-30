@@ -1,17 +1,34 @@
 import { describe, expect, it } from 'vitest'
+import { createManualScheduler, systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createComposedEndpoint } from '../../src/core/composed.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { streamRoots } from './fixture.js'
 
+/** Keep deadlines virtual while preserving the endpoint's ordinary zero-delay data handoff. */
+function controlledDeadlineScheduler(): IScheduler & { advance(ms: number): void } {
+  const manual = createManualScheduler()
+  return {
+    now: () => manual.now(),
+    schedule: (task, delayMs) =>
+      delayMs === 0 ? systemScheduler.schedule(task, 0) : manual.schedule(task, delayMs),
+    advance: (ms) => manual.advance(ms)
+  }
+}
+
 /** A4 return keeps its local value and releases the remote generator once. */
 describe('streaming A4 cancellation', () => {
   it('sends one cancel and receives the producer cleanup acknowledgement', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
+    /** Independent virtual deadline clocks let the provider expire before the caller. */
+    const serverClock = controlledDeadlineScheduler()
+    /** Caller deadline is advanced explicitly only after its first value arrives. */
+    const clientClock = controlledDeadlineScheduler()
     const server = await createComposedEndpoint(
       {
         id: 'server',
         transport: serverTransport,
+        scheduler: serverClock,
         middlewares: [connect({ transport: serverTransport })]
       },
       streamRoots()
@@ -20,6 +37,7 @@ describe('streaming A4 cancellation', () => {
       {
         id: 'client',
         transport: clientTransport,
+        scheduler: clientClock,
         middlewares: [connect({ transport: clientTransport })]
       },
       streamRoots()
@@ -73,9 +91,12 @@ describe('streaming A4 cancellation', () => {
       resume()
       const timed = client.stream.open('server', 'deadline', null, { timeoutMs: 50 })
       expect(await timed.next()).toEqual({ done: false, value: 'a' })
+      const pendingDeadline = timed.next()
+      serverClock.advance(50)
+      clientClock.advance(50)
       let deadlineError: unknown
       try {
-        await timed.next()
+        await pendingDeadline
       } catch (error) {
         deadlineError = error
       }

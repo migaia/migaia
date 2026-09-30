@@ -1,4 +1,4 @@
-import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { RpcAbortError, RpcTimeoutError } from '../../../src/core/errors.js'
 import type { IRpcTransport } from '../../../src/core/transport.js'
@@ -84,8 +84,23 @@ describe('B12a WebRPC PluginHost shell', () => {
   })
 
   it('closes late ownership at the construction deadline and observes late rejection', async () => {
+    /** Completion signals replace elapsed-time guesses about the late install and report. */
+    let markReported!: () => void
+    const reported = new Promise<void>((resolve) => {
+      markReported = resolve
+    })
     const report = vi.fn(() => {
+      markReported()
       throw new Error('reporter failed')
+    })
+    const scheduler = createManualScheduler()
+    let markStarted!: () => void
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve
+    })
+    let finishInstall!: () => void
+    const blocked = new Promise<void>((resolve) => {
+      finishInstall = resolve
     })
     let scope: unknown
     let released = 0
@@ -94,7 +109,7 @@ describe('B12a WebRPC PluginHost shell', () => {
         id: 'shell',
         transport,
         control: createConstructionControl({
-          time: createEndpointTimePort(systemScheduler),
+          time: createEndpointTimePort(scheduler),
           signal,
           timeoutMs: 5
         }),
@@ -105,7 +120,8 @@ describe('B12a WebRPC PluginHost shell', () => {
         }
       },
       async (installScope) => {
-        await new Promise((resolve) => setTimeout(resolve, 15))
+        markStarted()
+        await blocked
         installScope.own({}, () => {
           released += 1
         })
@@ -113,8 +129,11 @@ describe('B12a WebRPC PluginHost shell', () => {
       }
     )
 
+    await started
+    scheduler.advance(5)
     await expect(install).rejects.toBeInstanceOf(RpcTimeoutError)
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    finishInstall()
+    await reported
     expect(scope).toBeDefined()
     expect(released).toBe(1)
     expect(report).toHaveBeenCalled()

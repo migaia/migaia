@@ -20,7 +20,7 @@ const isRuntimeExternal = (id: string): boolean =>
  * project after every other file has finished and one file at a time, so parallel workers cannot
  * steal CPU from a timed section and turn a size ratio red (R18, X6).
  */
-const timingTestFiles = ['test/host-mutation-scaling.test.ts', 'test/acceptance-contract.test.ts']
+const timingTestFiles = ['test/acceptance-contract.test.ts']
 
 /** Produces one runtime-neutral ESM entry; declarations are emitted by TypeScript. */
 export default defineConfig(withDistFreshness({

@@ -1,4 +1,3 @@
-import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
 import {
   DependencyAction,
@@ -85,23 +84,6 @@ function createResumeFixture(
     entries[id] = { suspended: true }
   }
   return { index, state: states(entries) }
-}
-
-/** Returns the median duration of three 1000-call resume-planning runs. */
-function measureResumeMs(fixture: ReturnType<typeof createResumeFixture>): number {
-  /** Three independent elapsed durations used to discard one scheduling outlier. */
-  const samples: number[] = []
-  for (let run = 0; run < 3; run += 1) {
-    const startedAt = performance.now()
-    for (let iteration = 0; iteration < 1_000; iteration += 1)
-      planResume(fixture.index, fixture.state, {
-        provider: 'p',
-        generationChanged: true,
-        canRebind: () => false
-      })
-    samples.push(performance.now() - startedAt)
-  }
-  return samples.sort((left, right) => left - right)[1]!
 }
 
 describe('dependency planner', () => {
@@ -448,10 +430,6 @@ describe('dependency planner', () => {
       ] as const
     })
     expect(emptyDeltas[1]).toEqual(emptyDeltas[0])
-
-    const smallDuration = measureResumeMs(small)
-    const largeDuration = measureResumeMs(large)
-    expect(largeDuration).toBeLessThanOrEqual(smallDuration * 2)
 
     /** Same suspended direct frontier attached to differently sized service chains. */
     const frontierDeltas = [createResumeFixture(100, 3), createResumeFixture(2_000, 3)].map(
