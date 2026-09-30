@@ -37,9 +37,12 @@ describe('A1 merged public exports', () => {
     const expected = [
       ...Object.keys(legacyExports),
       '@migaia/rpc/core/transport-kit',
-      '@migaia/rpc/core/stream'
+      '@migaia/rpc/core/stream',
+      '@migaia/rpc/core/plugins/flow-control',
+      '@migaia/rpc/core/plugins/send-queue',
+      '@migaia/rpc/core/plugins/log'
     ].sort()
-    expect(expected).toHaveLength(26)
+    expect(expected).toHaveLength(29)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )
