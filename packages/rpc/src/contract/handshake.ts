@@ -257,7 +257,7 @@ function redactChild(value: unknown, path: IRpcHandshakeRedactionPath): IRpcHand
 }
 
 /** Keep a wire validation error only when its whole cause chain contains no input subtree. */
-function redactWireFailure(cause: unknown): unknown {
+export function redactWireFailure(cause: unknown): unknown {
   let node = cause
   for (let depth = 0; depth < 16; depth++) {
     if (!(node instanceof Error) || Object.hasOwn(node, 'errors')) break
