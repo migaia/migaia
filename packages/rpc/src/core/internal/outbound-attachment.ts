@@ -58,6 +58,7 @@ import type { IRpcDiscoveryResolverPort } from './plugin-shared-keys.js'
 import type { IRpcFrameAdmission, IRpcStreamOpenCommand } from './plugin-shared-keys.js'
 import type { IEndpointTimer } from './time-port.js'
 import { createEndpointTransportActivation } from './transport-activation.js'
+import { resolveAbortReason } from './async-control.js'
 
 /** One pending slim-client request and its terminal cleanup handles. */
 type IOutboundPending = {
@@ -439,7 +440,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           RpcCoreErrorText.abortMiddlewareMissing
         )
       if (options.signal.aborted)
-        throw new RpcAbortError(undefined, undefined, options.signal.reason)
+        throw new RpcAbortError(undefined, undefined, resolveAbortReason(options.signal))
     }
     const timeoutMs = this.#timeout.resolveTimeout(options.timeoutMs)
     assertTimeout(timeoutMs)
@@ -478,6 +479,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     return new Promise<T>((resolve, reject) => {
       let timer: IEndpointTimer | undefined
       let settled = false
+      /** Prevents a hostile reason getter from reentering abort settlement. */
+      let abortHandling = false
       let settlementError: unknown
       let startedSending = false
       const registeredSignals: NonNullable<ISendOptions['signal']>[] = []
@@ -545,14 +548,13 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           .catch((error) => this.#reportOutboundFailure(error))
       }
       const onAbort = (): void => {
-        notifyRemoteAbort(registeredSignals.find((signal) => signal.aborted)?.reason)
-        settleReject(
-          new RpcAbortError(
-            undefined,
-            undefined,
-            registeredSignals.find((signal) => signal.aborted)?.reason
-          )
-        )
+        if (settled || abortHandling) return
+        abortHandling = true
+        /** Read the selected signal once for both the remote notification and local rejection. */
+        const aborted = registeredSignals.find((signal) => signal.aborted)
+        const reason = aborted === undefined ? undefined : resolveAbortReason(aborted)
+        notifyRemoteAbort(reason)
+        settleReject(new RpcAbortError(undefined, undefined, reason))
       }
       this.#pending.set(taskId, {
         targetId,

@@ -1,7 +1,7 @@
 import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle'
 import { RpcAbortError, RpcConfigurationError, RpcTimeoutError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import { raceWithAsyncControl } from './async-control.js'
+import { raceWithAsyncControl, resolveAbortReason } from './async-control.js'
 import type { IRpcAbortSignal, IRpcHookEvent } from '../typing.js'
 import type { IRpcTransport } from '../transport.js'
 import type { IEndpointTimePort } from './time-port.js'
@@ -39,12 +39,12 @@ export function createConstructionControl(options: {
   const deadlineAt =
     timeoutMs === undefined || timeoutMs === false ? undefined : time.now() + timeoutMs
   const controller = new AbortController()
-  const onSourceAbort = (): void => controller.abort(sourceSignal.reason)
+  const onSourceAbort = (): void => controller.abort(resolveAbortReason(sourceSignal))
   try {
-    if (sourceSignal.aborted) controller.abort(sourceSignal.reason)
+    if (sourceSignal.aborted) onSourceAbort()
     else sourceSignal.addEventListener('abort', onSourceAbort, { once: true })
   } catch {
-    controller.abort(sourceSignal.reason)
+    onSourceAbort()
   }
   let closed = false
   const close = (): void => {
@@ -162,7 +162,9 @@ export function runConstructionInstall<T>(
   if (options.control.signal.aborted) {
     closeGate()
     options.control.close()
-    return Promise.reject(new RpcAbortError(undefined, undefined, options.control.signal.reason))
+    return Promise.reject(
+      new RpcAbortError(undefined, undefined, resolveAbortReason(options.control.signal))
+    )
   }
   if (timeoutMs === 0) {
     closeGate()

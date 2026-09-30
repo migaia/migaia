@@ -2,6 +2,7 @@ import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcFramer } from '../../contract/index.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
+import { resolveAbortReason } from './async-control.js'
 
 /**
  * Owns selected-framer lifetime. Sole outbound receiver accepts physical frames, so this bridge
@@ -27,7 +28,7 @@ export class RpcCanonicalChunkAttachment {
       if (this.#closed) return
       this.#closed = true
       try {
-        framer.close(kernel.closingSignal.reason)
+        framer.close(resolveAbortReason(kernel.closingSignal))
       } catch (error) {
         this.#closeFailed = true
         this.#closeError = error
