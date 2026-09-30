@@ -2,7 +2,7 @@ import type { IAbortSignal } from '@migaia/lifecycle'
 import { normalizePortable } from '../contract/normalize.js'
 import type { IRpcPortableValue } from '../contract/types.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
-import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
+import { RpcCoreErrorCode, RpcError, RpcRemoteError } from '../core/errors.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
 import { assertRpcIdempotencyKey, defaultRpcId } from '../core/internal/id.js'
 import { RemoteMethodName } from './constants.js'
@@ -74,6 +74,15 @@ type IReadyWaiter = {
   reject(error: unknown): void
   signal?: IAbortSignal
   abort?: () => void
+}
+
+/** Preserve a wire-restored tagged provider failure instead of core's generic remote wrapper. */
+function restoreTaggedProviderFailure(error: unknown): never {
+  if (error instanceof RpcRemoteError && error.cause instanceof Error) {
+    const restored = error.cause as Error & { readonly source?: unknown; readonly code?: unknown }
+    if (typeof restored.source === 'string' && typeof restored.code === 'string') throw restored
+  }
+  throw error
 }
 
 /** One generation holder owns leave ordering and the retry port's neutral events. */
@@ -377,15 +386,17 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
               this.#departed.get(input.expectedGeneration),
               { generation: input.expectedGeneration }
             )
-          return live.served.endpoint.send<IRpcPortableValue>(live.channel.peerId, method, data, {
-            ...(options.signal ? { signal: options.signal } : {}),
-            ...(input.remainingMs === undefined
-              ? timeoutMs === undefined
-                ? {}
-                : { timeoutMs }
-              : { timeoutMs: input.remainingMs }),
-            ...(key === undefined ? {} : { idempotencyKey: key })
-          })
+          return live.served.endpoint
+            .send<IRpcPortableValue>(live.channel.peerId, method, data, {
+              ...(options.signal ? { signal: options.signal } : {}),
+              ...(input.remainingMs === undefined
+                ? timeoutMs === undefined
+                  ? {}
+                  : { timeoutMs }
+                : { timeoutMs: input.remainingMs }),
+              ...(key === undefined ? {} : { idempotencyKey: key })
+            })
+            .catch(restoreTaggedProviderFailure)
         }
       }
       const port: IRemoteRetryPort | undefined = this.#options.retryPort

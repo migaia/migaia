@@ -8,7 +8,9 @@ import { serveRemotePlugin } from '../../src/remote/serve-plugin.js'
 import type { IRemoteContract } from '../../src/remote/contract.js'
 import { RpcRemoteLayerErrorCode } from '../../src/remote/error-code.js'
 import { createRemoteLayerError } from '../../src/remote/error.js'
+import { createRemoteRegistration } from '../../src/remote/proxy.js'
 import { streamRoots } from '../streaming/fixture.js'
+import { remoteHarness } from './fixture.js'
 
 /** A3 proves request and stream hooks receive their own admitted core contexts. */
 describe('remote service plugin', () => {
@@ -112,7 +114,25 @@ describe('remote service plugin', () => {
         return context
       }
     })
+    const fixture = remoteHarness()
+    const registration = createRemoteRegistration({
+      contract,
+      binding: {
+        ...fixture.binding,
+        async openChannel() {
+          return { ...fixture.channel, peerId: 'server' }
+        }
+      },
+      endpointFactory: async () => ({
+        endpoint: client as unknown as IRpcEndpoint,
+        stream: client.stream
+      }),
+      report: (error) => {
+        throw error
+      }
+    })
     try {
+      await registration.prepareGeneration(new AbortController().signal, () => undefined)
       expect(await client.send('server', 'p.f.request', ['ordinary'])).toBe('ordinary')
       const iterator = client.stream.open('server', 'p.f.generator', ['stream'])
       expect(await iterator.next()).toEqual({ done: false, value: 'stream' })
@@ -122,26 +142,27 @@ describe('remote service plugin', () => {
       expect(streamContext?.data).toEqual(['stream'])
       expect(streamContext).not.toBe(requestContext)
       expect(typeof streamContext?.dispatchTo).toBe('function')
-      await expect(client.send('server', 'p.f.request', ['reject'])).rejects.toMatchObject({
-        cause: {
-          source: '@migaia/rpc/remote',
-          code: 'REMOTE_CLOSED',
-          stack: hookError.stack,
-          cause: { message: 'hook root cause' }
-        }
+      await expect(registration.invokeRequest('p.f.request', ['reject'])).rejects.toMatchObject({
+        source: '@migaia/rpc/remote',
+        code: 'REMOTE_CLOSED',
+        stack: hookError.stack,
+        cause: { message: 'hook root cause' }
       })
       expect(requestCalls).toBe(1)
       expect(await client.send('server', 'p.f.request', ['after-hook-error'])).toBe(
         'after-hook-error'
       )
       await host.plugin.disable('p', { policy: 'suspend' })
-      await expect(client.send('server', 'p.f.request', ['disabled'])).rejects.toMatchObject({
-        cause: { code: 'REMOTE_CLOSED', source: '@migaia/rpc/remote' }
+      await expect(registration.invokeRequest('p.f.request', ['disabled'])).rejects.toMatchObject({
+        code: 'REMOTE_CLOSED',
+        source: '@migaia/rpc/remote'
       })
       await host.plugin.enable('p')
       expect(await client.send('server', 'p.f.request', ['restored'])).toBe('restored')
     } finally {
       await service.close()
+      await registration.release()
+      await fixture.registration.release()
       await client.dispose()
       await host.dispose()
     }
