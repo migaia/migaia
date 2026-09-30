@@ -476,14 +476,6 @@ fn serve(
                             if draining {
                                 break;
                             }
-                            write_frame(
-                                output,
-                                &response(
-                                    &pending,
-                                    Value::Null,
-                                    Some(("@migaia/rpc/core", "CANCELLED", "Request cancelled")),
-                                ),
-                            )?;
                         } else {
                             waiting = Some(pending);
                         }

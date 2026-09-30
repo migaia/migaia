@@ -637,6 +637,75 @@
         ],
         "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 }
       }
+    },
+    {
+      "id": "negotiated-abort-has-no-response",
+      "steps": [
+        {
+          "frame": {
+            "kind": "request",
+            "id": "abort-pending-1",
+            "method": "peer.wait",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "abort-pending-1",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "abort"
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "request",
+            "id": "echo-after-abort",
+            "method": "echo",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              },
+              "payload": "alive"
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          {
+            "kind": "response",
+            "id": "echo-after-abort",
+            "ok": true,
+            "data": { "payload": "alive" }
+          }
+        ]
+      }
     }
   ]
 }
