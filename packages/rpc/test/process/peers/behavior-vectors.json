@@ -1,0 +1,721 @@
+{
+  "schema": "migaia.rpc.peer-behavior/1",
+  "hello": {
+    "kind": "handshake",
+    "step": "hello",
+    "protocol": "migaia.rpc",
+    "versions": [{ "major": 1, "minor": 1 }],
+    "codecs": ["json"],
+    "capabilities": ["ping@1", "abort@1", "close@1", "wire-error@1"],
+    "peer": { "id": "behavior-caller", "runtime": "python" }
+  },
+  "cases": [
+    {
+      "id": "unknown-kind-continues",
+      "steps": [
+        {
+          "frame": {
+            "kind": "future",
+            "id": "future-1",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "future",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "request",
+            "id": "echo-1",
+            "method": "echo",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              },
+              "payload": "still-open"
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "close-1",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 0 }
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          { "kind": "response", "id": "echo-1", "ok": true, "data": { "payload": "still-open" } }
+        ],
+        "stderr": { "PEER_WARN UNKNOWN_KIND": 1 }
+      }
+    },
+    {
+      "id": "ping-not-negotiated",
+      "capabilities": ["close@1"],
+      "steps": [
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "ping-1",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "ping"
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "request",
+            "id": "echo-2",
+            "method": "echo",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              },
+              "payload": 2
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "close-2",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 0 }
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          { "kind": "response", "id": "echo-2", "ok": true, "data": { "payload": 2 } }
+        ]
+      }
+    },
+    {
+      "id": "abort-not-negotiated",
+      "capabilities": ["close@1"],
+      "steps": [
+        {
+          "frame": {
+            "kind": "request",
+            "id": "wait-1",
+            "method": "peer.wait",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "wait-1",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "abort"
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "request",
+            "id": "finish-1",
+            "method": "peer.finish",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "close-3",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 0 }
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          { "kind": "response", "id": "wait-1", "ok": true },
+          { "kind": "response", "id": "finish-1", "ok": true }
+        ]
+      }
+    },
+    {
+      "id": "close-not-negotiated",
+      "capabilities": [],
+      "steps": [
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "close-4",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 0 }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "request",
+            "id": "echo-4",
+            "method": "echo",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              },
+              "payload": "open"
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          { "kind": "response", "id": "echo-4", "ok": true, "data": { "payload": "open" } }
+        ]
+      }
+    },
+    {
+      "id": "invalid-close-continues",
+      "steps": [
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "bad-close-1",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": "1" }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "bad-close-2",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": -1 }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "bad-close-3",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 2147483648 }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "request",
+            "id": "echo-5",
+            "method": "echo",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              },
+              "payload": "continued"
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "close-5",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 0 }
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          { "kind": "response", "id": "echo-5", "ok": true, "data": { "payload": "continued" } }
+        ],
+        "stderr": { "PEER_ERROR PROTOCOL_INVALID": 3 }
+      }
+    },
+    {
+      "id": "close-drain-abort",
+      "steps": [
+        {
+          "frame": {
+            "kind": "request",
+            "id": "wait-drain",
+            "method": "peer.wait",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "close-drain",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 1000 }
+            }
+          }
+        },
+        {
+          "pauseMs": 30,
+          "frame": {
+            "kind": "variation",
+            "id": "wait-drain",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "abort"
+              }
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [{ "kind": "handshake", "step": "accept" }],
+        "stderr": { "PEER_EVENT ABORT_DURING_DRAIN": 1 }
+      }
+    },
+    {
+      "id": "invalid-hello",
+      "hello": {
+        "kind": "handshake",
+        "step": "hello",
+        "protocol": "migaia.rpc",
+        "versions": [],
+        "codecs": ["json"],
+        "capabilities": [],
+        "peer": { "id": "behavior-caller", "runtime": "python" }
+      },
+      "steps": [],
+      "expect": { "exit": 1, "frames": [], "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 } }
+    },
+    {
+      "id": "nonobject-hello",
+      "hello": null,
+      "steps": [],
+      "expect": { "exit": 1, "frames": [], "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 } }
+    },
+    {
+      "id": "request-before-hello",
+      "hello": {
+        "kind": "request",
+        "id": "early",
+        "method": "echo",
+        "data": {
+          "route": {
+            "profile": "migaia.rpc.route",
+            "type": "request",
+            "applicationVersion": "1",
+            "senderId": "behavior-caller",
+            "targetId": "provider",
+            "sentAt": 0
+          },
+          "payload": "early"
+        }
+      },
+      "steps": [],
+      "expect": { "exit": 1, "frames": [], "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 } }
+    },
+    {
+      "id": "eof-before-hello",
+      "sendHello": false,
+      "steps": [],
+      "expect": { "exit": 1, "frames": [], "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 } }
+    },
+    {
+      "id": "unknown-method",
+      "steps": [
+        {
+          "frame": {
+            "kind": "request",
+            "id": "method-1",
+            "method": "does.not.exist",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "close-method",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 0 }
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          {
+            "kind": "response",
+            "id": "method-1",
+            "ok": false,
+            "code": "METHOD_NOT_FOUND",
+            "error": { "code": "METHOD_NOT_FOUND" }
+          }
+        ]
+      }
+    },
+    {
+      "id": "abort-before-reused-id",
+      "steps": [
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "reuse-1",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "abort"
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "request",
+            "id": "reuse-1",
+            "method": "echo",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              },
+              "payload": "reused"
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "close-reuse",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "close"
+              },
+              "payload": { "drainMs": 0 }
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          { "kind": "response", "id": "reuse-1", "ok": true, "data": { "payload": "reused" } }
+        ]
+      }
+    },
+    {
+      "id": "hello-then-bad-header-same-chunk",
+      "coalescedAfterHelloHex": "00000000",
+      "steps": [],
+      "expect": {
+        "exit": 1,
+        "frames": [{ "kind": "handshake", "step": "accept" }],
+        "stderrNot": ["PEER_FAIL HANDSHAKE_INVALID"]
+      }
+    },
+    {
+      "id": "reject-incompatible-protocol",
+      "helloFields": { "protocol": "other.rpc" },
+      "steps": [],
+      "expect": {
+        "exit": 1,
+        "frames": [
+          { "kind": "handshake", "step": "reject", "error": { "code": "HANDSHAKE_INCOMPATIBLE" } }
+        ],
+        "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 }
+      }
+    },
+    {
+      "id": "reject-incompatible-version",
+      "helloFields": { "versions": [{ "major": 2, "minor": 0 }] },
+      "steps": [],
+      "expect": {
+        "exit": 1,
+        "frames": [
+          { "kind": "handshake", "step": "reject", "error": { "code": "HANDSHAKE_INCOMPATIBLE" } }
+        ],
+        "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 }
+      }
+    },
+    {
+      "id": "negotiated-abort-has-no-response",
+      "steps": [
+        {
+          "frame": {
+            "kind": "request",
+            "id": "abort-pending-1",
+            "method": "peer.wait",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "variation",
+            "id": "abort-pending-1",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "variation",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "variation": "abort"
+              }
+            }
+          }
+        },
+        {
+          "frame": {
+            "kind": "request",
+            "id": "echo-after-abort",
+            "method": "echo",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "type": "request",
+                "applicationVersion": "1",
+                "senderId": "behavior-caller",
+                "targetId": "provider",
+                "sentAt": 0
+              },
+              "payload": "alive"
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          { "kind": "handshake", "step": "accept" },
+          {
+            "kind": "response",
+            "id": "echo-after-abort",
+            "ok": true,
+            "data": { "payload": "alive" }
+          }
+        ]
+      }
+    },
+    {
+      "id": "post-handshake-error-marker",
+      "steps": [{ "rawHex": "000000017b" }],
+      "expect": {
+        "exit": 1,
+        "frames": [{ "kind": "handshake", "step": "accept" }],
+        "stderrContains": ["PEER_FAIL "],
+        "stderrNot": ["ERROR peer session failed"]
+      }
+    }
+  ]
+}
