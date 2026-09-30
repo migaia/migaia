@@ -48,9 +48,9 @@ describe('error boundary helpers', () => {
     expect(new RpcTimeoutError().code).toBe('DEADLINE_EXCEEDED')
   })
 
-  it('keeps the (source, code) contract: 25 unique codes and a constant source (E-T1/E-T2)', () => {
+  it('keeps the (source, code) contract: 26 unique codes and a constant source (E-T1/E-T2)', () => {
     const codes = Object.values(RpcCoreErrorCode)
-    expect(codes).toHaveLength(25)
+    expect(codes).toHaveLength(26)
     expect(new Set(codes).size).toBe(codes.length)
     const samples: ReadonlyArray<{ readonly source: string; readonly code: string }> = [
       new RpcError(RpcCoreErrorCode.internal, 'base'),

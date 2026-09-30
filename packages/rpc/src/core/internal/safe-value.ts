@@ -41,12 +41,32 @@ export function isSafeIntegerValue(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value)
 }
 
-/** Converts an untrusted value to text without invoking a hostile conversion twice. */
-export function safeString(value: unknown, fallback = 'Unknown error'): string {
+/**
+ * Converts an untrusted value once. A throwing conversion is reported synchronously or rethrown as
+ * a coded TypeError with the original value preserved as its cause.
+ */
+export function safeString(
+  value: unknown,
+  fallback: string = RpcCoreErrorText.unknownError,
+  report?: (failure: Readonly<{ error: unknown }>) => undefined
+): string {
   try {
     return typeof value === 'string' ? value : String(value)
-  } catch {
-    return fallback
+  } catch (error) {
+    /** A failing reporter must keep the conversion failure first in the cause graph. */
+    let cause: unknown = error
+    if (report) {
+      try {
+        report({ error })
+      } catch (reportError) {
+        cause = new AggregateError([error, reportError], RpcCoreErrorText.stringConversionFailed)
+      }
+      if (cause === error) return fallback
+    }
+    throw attachErrorIdentity(new TypeError(RpcCoreErrorText.stringConversionFailed, { cause }), {
+      source: ERROR_SOURCE,
+      code: RpcCoreErrorCode.stringConversionFailed
+    })
   }
 }
 

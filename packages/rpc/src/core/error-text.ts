@@ -76,6 +76,10 @@ export const RpcCoreErrorText = {
   remoteRequestFailed: 'Remote request failed',
   /** Stable text for an unreported hostile property read at the safeRead boundary. */
   propertyReadFailed: 'rpc property read failed',
+  /** Stable failure text for an unreported hostile conversion at the safeString boundary. */
+  stringConversionFailed: 'rpc string conversion failed',
+  /** Stable fallback shown when an untrusted error value cannot be converted to text. */
+  unknownError: 'Unknown error',
   /** Stable outer schema failure text that keeps parser and issue-read errors in one cause graph. */
   schemaValidationFailed: (method: string, side: string): string =>
     `Schema validation failed for ${method} ${side}`,
@@ -131,5 +135,499 @@ export const RpcCoreErrorText = {
   variationHandlerDuplicate: (variation: string): string =>
     `variation handler already registered: ${variation}`,
   /** Preserves the existing duplicate manual query listener message and code. */
-  manualQueryListenerDuplicate: 'only one manual query listener may be registered'
+  manualQueryListenerDuplicate: 'only one manual query listener may be registered',
+  /**
+   * Stable core error text consumed by core/adapters/memory.ts; preserves its existing
+   * caller-facing wording.
+   */
+  rpcMemoryTransportIsClosed: '[rpc] memory transport is closed',
+  /**
+   * Stable core error text consumed by core/errors.ts; preserves its existing caller-facing
+   * wording.
+   */
+  webRPCRequestCancelled: 'Web RPC request cancelled',
+  /**
+   * Stable core error text consumed by core/errors.ts; preserves its existing caller-facing
+   * wording.
+   */
+  webRPCRequestDeadlineExceeded: 'Web RPC request deadline exceeded',
+  /**
+   * Stable core error text consumed by core/internal/async-control.ts; preserves its existing
+   * caller-facing wording.
+   */
+  timeoutMustBeFalseOrANonNegativeFiniteNumber:
+    'timeout must be false or a non-negative finite number',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  queryListenerMustBeAFunction: 'query listener must be a function',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  broadcastTargetNotIdentifiable: (targetId: string): string =>
+    `BroadcastChannel target is not individually identifiable: ${targetId}`,
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  unknownReceiver: (receiverId: string): string => `Unknown receiver: ${receiverId}`,
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  pinnedReceiverUnavailable: (receiverId: string): string =>
+    `Pinned receiver is unavailable: ${receiverId}`,
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  receiverSelectorReturnedAnInvalidReceiver: 'receiverSelector returned an invalid receiver',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  selectedReceiverUnavailable: (selected: string): string =>
+    `receiverSelector returned an unavailable receiver: ${selected}`,
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  unknownTarget: (targetId: string): string => `Unknown target: ${targetId}`,
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  discoveryTimeoutMustBeFiniteAndNonNegative: 'discovery timeout must be finite and non-negative',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  discoveryAborted: 'Discovery aborted',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  discoveryCandidateIsInvalid: 'discovery candidate is invalid',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  discoveryCandidateWasNotProducedByAVerifiedManualQuery:
+    'discovery candidate was not produced by a verified manual query',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  discoveryCandidateReceiverIdIsInvalid: 'discovery candidate receiverId is invalid',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  discoveryCandidateWasRevoked: 'discovery candidate was revoked',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  receiverLimitExceeded: 'receiver limit exceeded',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  verifiedDiscoveryBindingIsNoLongerAvailable: 'verified discovery binding is no longer available',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  remoteDiscoveryTargetLimitExceeded: 'remote discovery target limit exceeded',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  manualRevocationCapacityExceeded: 'manual revocation capacity exceeded',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  discoveryCandidateUniqueTargetIdMustBeAString:
+    'discovery candidate uniqueTargetId must be a string',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  queryRejectionReasonMustBeAString: 'query rejection reason must be a string',
+  /**
+   * Stable core error text consumed by core/internal/discovery-attachment.ts; preserves its
+   * existing caller-facing wording.
+   */
+  manualDiscoveryIsUnavailable: 'manual discovery is unavailable',
+  /**
+   * Stable core error text consumed by core/internal/discovery-registry.ts; preserves its existing
+   * caller-facing wording.
+   */
+  discoveryRegistryClosed: 'discovery registry closed',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectMiddlewareIsRequired: 'connect middleware is required',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  idAndTargetIdsMustFitTheConfiguredIdentifierLimit:
+    'id and targetIds must fit the configured identifier limit',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectUniqueTargetIdFactoryFailed: 'connect.uniqueTargetId factory failed',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  outboundFrameAndTransportEncodedTypesAreIncompatible:
+    'outbound frame and transport encoded types are incompatible',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  factoryDescriptorIsInvalid: 'factory descriptor is invalid',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  factoryDescriptorIsUnreadable: 'factory descriptor is unreadable',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  idMustBeANonEmptyString: 'id must be a non-empty string',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  middlewaresMustBeAnArray: 'middlewares must be an array',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  targetIdsMustBeAnArray: 'targetIds must be an array',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  targetIdsMustContainNonEmptyStrings: 'targetIds must contain non-empty strings',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  factoryCollectionIsUnreadable: 'factory collection is unreadable',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  duplicateMiddleware: (name: string): string => `Duplicate middleware: ${name}`,
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  middlewaresAreUnreadable: 'middlewares are unreadable',
+  /**
+   * Stable core error text consumed by core/internal/endpoint-bootstrap.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectMiddlewareMustProvideTransport: 'connect middleware must provide transport',
+  /**
+   * Stable core error text consumed by core/internal/id.ts; preserves its existing caller-facing
+   * wording.
+   */
+  uuidGeneratorMustReturnANonEmptyString: 'UUID generator must return a non-empty string',
+  /**
+   * Stable core error text consumed by core/internal/id.ts; preserves its existing caller-facing
+   * wording.
+   */
+  uuidConflict: (id: string): string => `UUID conflict: ${id}`,
+  /**
+   * Stable core error text consumed by core/internal/id.ts; preserves its existing caller-facing
+   * wording.
+   */
+  uuidUnavailable: 'UUID unavailable',
+  /**
+   * Stable core error text consumed by core/internal/identity.ts; preserves its existing
+   * caller-facing wording.
+   */
+  bindingLimitsMustBePositiveSafeIntegers: 'binding limits must be positive safe integers',
+  /**
+   * Stable core error text consumed by core/internal/peers.ts; preserves its existing caller-facing
+   * wording.
+   */
+  maxLearnedMustBeAPositiveSafeInteger: 'maxLearned must be a positive safe integer',
+  /**
+   * Stable core error text consumed by core/internal/peers.ts; preserves its existing caller-facing
+   * wording.
+   */
+  learnedTtlMsMustBeAPositiveSafeInteger: 'learnedTtlMs must be a positive safe integer',
+  /**
+   * Stable core error text consumed by core/internal/provider-admission.ts; preserves its existing
+   * caller-facing wording.
+   */
+  providerAdmissionLimitsMustBePositiveSafeIntegers:
+    'provider admission limits must be positive safe integers',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  providerTransferMustBeABoundedArray: 'provider transfer must be a bounded array',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  providerFailureMessageAndCodeMustBeStrings: 'provider failure message and code must be strings',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  requestReplayLedgerIsFull: 'Request replay ledger is full',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  providerAdmissionLimitReached: 'Provider admission limit reached',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  verifiedPeerBindingExpired: 'Verified peer binding expired',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  providerContextExpired: 'Provider context expired',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  dispatchTargetIdMustBeANonEmptyString: 'dispatch target id must be a non-empty string',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  providerNotFound: 'Provider not found',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  providerDidNotSettle: 'Provider did not settle',
+  /**
+   * Stable core error text consumed by core/internal/provider-executor.ts; preserves its existing
+   * caller-facing wording.
+   */
+  providerFailed: 'Provider failed',
+  /**
+   * Stable core error text consumed by core/internal/replay.ts; preserves its existing
+   * caller-facing wording.
+   */
+  replayLimitsMustBePositiveSafeIntegers: 'replay limits must be positive safe integers',
+  /**
+   * Stable core error text consumed by core/internal/request-replay-ledger.ts; preserves its
+   * existing caller-facing wording.
+   */
+  requestReplayLimitsMustBePositiveSafeIntegers:
+    'request replay limits must be positive safe integers',
+  /**
+   * Stable core error text consumed by core/internal/web-rpc-plugin-host.ts; preserves its existing
+   * caller-facing wording.
+   */
+  pluginInstallFailureDetail: (prefix: string, detail: string): string => `${prefix}: ${detail}`,
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  authenticationDescriptorIsInvalid: 'authentication descriptor is invalid',
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  authenticationDescriptorIsUnreadable: 'authentication descriptor is unreadable',
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  authenticationTransformInvalid: (name: string): string =>
+    `authentication.${name} must be a function`,
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  authenticationEncryptDecryptMustBeConfiguredTogether:
+    'authentication encrypt/decrypt must be configured together',
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  authenticationSignVerifyMustBeConfiguredTogether:
+    'authentication sign/verify must be configured together',
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  authenticationRequiresEncryptionOrSigningTransforms:
+    'authentication requires encryption or signing transforms',
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  authenticationEncodedTypeIsInvalid: 'authentication.encodedType is invalid',
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  outboundFrameAuthenticationFailed: 'Outbound frame authentication failed',
+  /**
+   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
+   * caller-facing wording.
+   */
+  inboundFrameAuthenticationFailed: 'Inbound frame authentication failed',
+  /**
+   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
+   * caller-facing wording.
+   */
+  transportTopologyIsInvalid: 'transport topology is invalid',
+  /**
+   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectDiscoveryModeIsInvalid: 'connect.discoveryMode is invalid',
+  /**
+   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectReceiverSelectorMustBeAFunction: 'connect.receiverSelector must be a function',
+  /**
+   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectIdentifierIsRequiredWhenBaseVerificationIsDisabled:
+    'connect identifier is required when base verification is disabled',
+  /**
+   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectTransportIsRequired: 'connect transport is required',
+  /**
+   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectTransportMustProvideSendAndSubscribeFunctions:
+    'connect transport must provide send and subscribe functions',
+  /**
+   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectUseBaseIdVerifyOnlyMustBeABoolean: 'connect.useBaseIdVerifyOnly must be a boolean',
+  /**
+   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
+   * caller-facing wording.
+   */
+  connectIdentifierMustBeAFunction: 'connect identifier must be a function',
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  contractDescriptorIsInvalid: 'contract descriptor is invalid',
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  contractDescriptorIsUnreadable: 'contract descriptor is unreadable',
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  schemasMustBeAnObject: 'schemas must be an object',
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  schemaDescriptorInvalid: (method: string): string => `schema descriptor is invalid: ${method}`,
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  contractSchemasMustContainParamsResultSchemasWithParseFunctions:
+    'contract.schemas must contain params/result schemas with parse functions',
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  contractAcceptVersionsMustContainNonEmptyStrings:
+    'contract.acceptVersions must contain non-empty strings',
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  contractAcceptVersionsIsUnreadable: 'contract.acceptVersions is unreadable',
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  contractVersionMustBeANonEmptyString: 'contract version must be a non-empty string',
+  /**
+   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
+   * caller-facing wording.
+   */
+  maxIdentifierLengthMustBeAPositiveSafeInteger:
+    'maxIdentifierLength must be a positive safe integer',
+  /**
+   * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
+   * caller-facing wording.
+   */
+  hooksDescriptorIsInvalid: 'hooks descriptor is invalid',
+  /**
+   * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
+   * caller-facing wording.
+   */
+  hooksDescriptorIsUnreadable: 'hooks descriptor is unreadable',
+  /**
+   * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
+   * caller-facing wording.
+   */
+  hooksListenersMustContainFunctions: 'hooks.listeners must contain functions',
+  /**
+   * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
+   * caller-facing wording.
+   */
+  hooksOnHookErrorMustBeAFunction: 'hooks.onHookError must be a function',
+  /**
+   * Stable core error text consumed by core/middleware/timeout.ts; preserves its existing
+   * caller-facing wording.
+   */
+  timeoutDescriptorIsInvalid: 'timeout descriptor is invalid',
+  /**
+   * Stable core error text consumed by core/middleware/timeout.ts; preserves its existing
+   * caller-facing wording.
+   */
+  timeoutDescriptorIsUnreadable: 'timeout descriptor is unreadable',
+  /**
+   * Stable core error text consumed by core/middleware/timeout.ts; preserves its existing
+   * caller-facing wording.
+   */
+  timeoutMsMustBeFalseOrANonNegativeNumber: 'timeoutMs must be false or a non-negative number',
+  /**
+   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
+   * caller-facing wording.
+   */
+  uuidDescriptorIsInvalid: 'uuid descriptor is invalid',
+  /**
+   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
+   * caller-facing wording.
+   */
+  uuidDescriptorIsUnreadable: 'uuid descriptor is unreadable',
+  /**
+   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
+   * caller-facing wording.
+   */
+  uuidGenerateMustBeAFunction: 'uuid generate must be a function'
 } as const

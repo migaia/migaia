@@ -41,13 +41,20 @@ describe('safe-value utilities', () => {
   })
 
   it('contains hostile string conversion and preserves tuple boundaries', () => {
+    const reports: unknown[] = []
     const hostile = {
       toString: () => {
         throw new Error('stringify')
       }
     }
     expect(safeString('stable')).toBe('stable')
-    expect(safeString(hostile, 'fallback')).toBe('fallback')
+    expect(
+      safeString(hostile, 'fallback', ({ error }) => {
+        reports.push(error)
+        return undefined
+      })
+    ).toBe('fallback')
+    expect(reports).toHaveLength(1)
     expect(tupleKey('a|b', 'c')).not.toBe(tupleKey('a', 'b|c'))
   })
 
