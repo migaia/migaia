@@ -1,3 +1,4 @@
+import { BrowserRpcErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
 import {
   RpcPlatform,
@@ -48,17 +49,17 @@ export function createWindowMessageTransport(
   if (!receiver)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'receiver is required outside a window-like realm'
+      BrowserRpcErrorText.receiverIsRequiredOutsideAWindowLikeRealm
     )
   if (typeof targetOrigin !== 'string' || targetOrigin.length === 0)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'targetOrigin must be explicit; use "*" only intentionally'
+      BrowserRpcErrorText.targetOriginMustBeExplicitUseOnlyIntentionally
     )
   if (targetOrigin === '*' && options.allowUnsafeTargetOrigin !== true)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'wildcard targetOrigin requires allowUnsafeTargetOrigin'
+      BrowserRpcErrorText.wildcardTargetOriginRequiresAllowUnsafeTargetOrigin
     )
   const listeners = createMessageListenerHub<{
     data: unknown

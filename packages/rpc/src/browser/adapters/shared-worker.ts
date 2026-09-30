@@ -1,3 +1,4 @@
+import { BrowserRpcErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
 import {
   RpcPlatform,
@@ -8,7 +9,8 @@ import {
   observeListener,
   registerListeners,
   releaseListenerRegistration,
-  reportListenerFailure
+  reportListenerFailure,
+  tagRpcError
 } from '../../core/transport-kit.js'
 import { RpcCoreErrorCode } from '../../core/errors.js'
 
@@ -61,7 +63,10 @@ export function createSharedWorkerTransport(
   }
   const onError = (): void => {
     reportListenerFailure(
-      new Error('[rpc] shared worker message error'),
+      tagRpcError(
+        new Error(BrowserRpcErrorText.rpcSharedWorkerMessageError),
+        RpcCoreErrorCode.transport
+      ),
       transportErrors,
       secondaryFailures
     )

@@ -43,12 +43,14 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     typeof channel.removeEventListener !== 'function'
   )
     throw tagRpcError(
-      new TypeError('RTCDataChannel must expose readyState and terminal event listeners'),
+      new TypeError(
+        BrowserRpcErrorText.rtcDataChannelMustExposeReadyStateAndTerminalEventListeners
+      ),
       RpcCoreErrorCode.invalidConfig
     )
   if (channel.readyState !== 'open' && channel.readyState !== 'closed')
     throw tagRpcError(
-      new TypeError('RTCDataChannel must be open before transport construction'),
+      new TypeError(BrowserRpcErrorText.rtcDataChannelMustBeOpenBeforeTransportConstruction),
       RpcCoreErrorCode.invalidConfig
     )
   const listeners = createMessageListenerHub<{ data: unknown }>()
@@ -57,7 +59,9 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
   const secondaryFailures = createListenerFailureState()
   let closed = channel.readyState === 'closed'
   let terminalReported = closed
-  let terminalError: unknown = closed ? new Error('RTCDataChannel closed') : undefined
+  let terminalError: unknown = closed
+    ? tagRpcError(new Error(BrowserRpcErrorText.rtcClosed), RpcCoreErrorCode.transport)
+    : undefined
   let terminalListenersInstalled = false
   const installTerminalListeners = (): void => {
     if (terminalListenersInstalled) return
@@ -112,9 +116,31 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
       () => channel.removeEventListener('message', onMessage)
     ])
     if (cleanupErrors.length === 0) terminalListenersInstalled = false
-    const error = event instanceof Error ? event : new Error('RTCDataChannel closed')
+    /** Keep an attachable external Error by identity; otherwise preserve it through cause. */
+    let error: Error
+    /** Preflight or tagging failures remain behind the terminal primary. */
+    const secondary: unknown[] = []
+    if (event instanceof Error) {
+      try {
+        error =
+          Object.isExtensible(event) && !('source' in event) && !('code' in event)
+            ? tagRpcError(event, RpcCoreErrorCode.transport)
+            : tagRpcError(
+                new Error(BrowserRpcErrorText.rtcClosed, { cause: event }),
+                RpcCoreErrorCode.transport
+              )
+      } catch (failure) {
+        secondary.push(failure)
+        error = tagRpcError(
+          new Error(BrowserRpcErrorText.rtcClosed, { cause: event }),
+          RpcCoreErrorCode.transport
+        )
+      }
+    } else {
+      error = tagRpcError(new Error(BrowserRpcErrorText.rtcClosed), RpcCoreErrorCode.transport)
+    }
     terminalError = error
-    const failure = createListenerFailure([error, ...cleanupErrors], {
+    const failure = createListenerFailure([error, ...secondary, ...cleanupErrors], {
       code: RpcCoreErrorCode.transport,
       message: BrowserRpcErrorText.rtcSubscriptionCleanupFailed
     })
@@ -129,11 +155,11 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     },
     encodedType: 'string',
     send(message) {
-      if (closed) throw new RpcTransportError('RTCDataChannel is closed')
+      if (closed) throw new RpcTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
       channel.send(typeof message === 'string' ? message : JSON.stringify(message))
     },
     subscribe(listener) {
-      if (closed) throw new RpcTransportError('RTCDataChannel is closed')
+      if (closed) throw new RpcTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
       listeners.add(listener, () => {
         installTerminalListeners()
         try {

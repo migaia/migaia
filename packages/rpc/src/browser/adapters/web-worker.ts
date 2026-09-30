@@ -1,3 +1,4 @@
+import { BrowserRpcErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
 import {
   RpcPlatform,
@@ -9,9 +10,10 @@ import {
   registerListeners,
   releaseListenerRegistration,
   reportListenerFailure,
-  safeString
+  safeString,
+  tagRpcError
 } from '../../core/transport-kit.js'
-import { RpcCoreErrorCode } from '../../core/errors.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../../core/errors.js'
 
 /**
  * Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or
@@ -78,7 +80,18 @@ export function createWebWorkerTransport(
       origin = typeof eventOrigin === 'string' ? eventOrigin : undefined
       source = (event as { source?: unknown }).source
     } catch (error) {
-      emitTransportError(new Error(`[rpc] worker message could not be read: ${safeString(error)}`))
+      const detail = safeString(error, undefined, ({ error: conversionError }) => {
+        emitTransportError(
+          new RpcTransportError(BrowserRpcErrorText.workerMessageReadFailed(''), conversionError)
+        )
+        return undefined
+      })
+      emitTransportError(
+        tagRpcError(
+          new Error(BrowserRpcErrorText.workerMessageReadFailed(detail), { cause: error }),
+          RpcCoreErrorCode.transport
+        )
+      )
       return
     }
     messageListeners.dispatch({ data, origin, source }, (listener, message) => {
@@ -96,12 +109,26 @@ export function createWebWorkerTransport(
       try {
         detail = safeString(
           (event as unknown as { message?: string } | undefined)?.message || reason,
-          reason
+          reason,
+          ({ error }) => {
+            emitTransportError(
+              new RpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
+            )
+            return undefined
+          }
         )
-      } catch {
+      } catch (error) {
+        emitTransportError(
+          new RpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
+        )
         detail = reason
       }
-      emitTransportError(new Error(`[rpc] worker ${reason}: ${detail}`))
+      emitTransportError(
+        tagRpcError(
+          new Error(BrowserRpcErrorText.workerFailure(reason, detail)),
+          RpcCoreErrorCode.transport
+        )
+      )
     }
   const onError = onFailure('failed')
   const onMessageError = onFailure('could not deserialize a message')
