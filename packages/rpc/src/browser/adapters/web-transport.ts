@@ -62,7 +62,12 @@ export function createWebTransportDatagramTransport(
         if (result.done) {
           // EOF is terminal for a datagram transport. Leaving the adapter open
           // would make timeout=false operations wait forever on a dead reader.
-          transitionTerminal(new Error('WebTransport datagram stream ended'))
+          transitionTerminal(
+            tagRpcError(
+              new Error(BrowserRpcErrorText.webTransportDatagramStreamEnded),
+              RpcCoreErrorCode.transport
+            )
+          )
           break
         }
         listeners.dispatch({ data: result.value }, (listener, message) =>
@@ -95,16 +100,16 @@ export function createWebTransportDatagramTransport(
       return closed
     },
     send(message) {
-      if (closed) throw new RpcTransportError('WebTransport is closed')
+      if (closed) throw new RpcTransportError(BrowserRpcErrorText.webTransportIsClosed)
       if (!isUint8Array(message))
         throw tagRpcError(
-          new TypeError('WebTransport requires Uint8Array encoded messages'),
+          new TypeError(BrowserRpcErrorText.webTransportRequiresUint8ArrayEncodedMessages),
           RpcCoreErrorCode.invalidConfig
         )
       return writer.write(message)
     },
     subscribe(listener) {
-      if (closed) throw new RpcTransportError('WebTransport is closed')
+      if (closed) throw new RpcTransportError(BrowserRpcErrorText.webTransportIsClosed)
       listeners.add(listener, () => undefined)
       if (!readPromise) {
         readPromise = read().finally(() => {

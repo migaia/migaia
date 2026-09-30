@@ -269,7 +269,18 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
   // stringifying it must not itself throw and escape as an uncaught
   // exception from inside Node's event emitter dispatch.
   const onMessageError = (error?: unknown): void => {
-    const detail = error === undefined ? '' : `: ${safeString(error)}`
+    const detail =
+      error === undefined
+        ? ''
+        : `: ${safeString(error, RpcCoreErrorText.unknownError, ({ error: conversionError }) => {
+            emitTransportError(
+              new RpcTransportError(
+                RpcMessagePortErrorText.messagePortDeserializeFailed(''),
+                conversionError
+              )
+            )
+            return undefined
+          })}`
     emitTransportError(
       tagRpcError(
         new Error(RpcMessagePortErrorText.messagePortDeserializeFailed(detail)),
