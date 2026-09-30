@@ -37,6 +37,14 @@ export const RpcCoreErrorText = {
   endpointModuleInvalid: 'endpoint module token is invalid',
   /** Stable composition conflict text consumed by core duplicate-token admission. */
   endpointModuleDuplicated: 'endpoint module is duplicated',
+  /** IPC capacity configuration must be a positive safe integer for bounded admission. */
+  ipcCapacityInvalid: 'IPC send capacity must be a positive safe integer',
+  /** Only one send-queue wrapper and Feature may claim a physical connection. */
+  ipcGateDuplicated: 'IPC send gate is already registered',
+  /** The wrapped transport and selected native Feature must own the same gate instance. */
+  ipcGateMismatch: 'IPC send gate and Feature do not match',
+  /** A bounded IPC connection cannot admit another envelope of this class. */
+  ipcSendOverloaded: 'IPC send capacity is full',
   /** Stable internal topology text when a dependency owner was not installed. */
   endpointModuleDependencyMissing: 'endpoint module dependency is missing',
   /** Stable overload diagnostic when discovery cannot retain another automatic waiter. */
