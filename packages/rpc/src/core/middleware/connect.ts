@@ -106,18 +106,21 @@ function createConnectCapability(
     transportTopology !== 'multiplexed' &&
     transportTopology !== 'broadcast'
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'transport topology is invalid')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.transportTopologyIsInvalid)
   if (discoveryMode !== 'automatic' && discoveryMode !== 'manual')
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect.discoveryMode is invalid')
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.connectDiscoveryModeIsInvalid
+    )
   if (receiverSelector !== undefined && typeof receiverSelector !== 'function')
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'connect.receiverSelector must be a function'
+      RpcCoreErrorText.connectReceiverSelectorMustBeAFunction
     )
   if (useBaseIdVerifyOnly === false && !identifier)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'connect identifier is required when base verification is disabled'
+      RpcCoreErrorText.connectIdentifierIsRequiredWhenBaseVerificationIsDisabled
     )
   const effectiveUniqueTargetId =
     typeof uniqueTargetId === 'string' &&
@@ -133,28 +136,34 @@ function createConnectCapability(
       ? uniqueTargetId
       : undefined
   if (!transport || (typeof transport !== 'object' && typeof transport !== 'function'))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect transport is required')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.connectTransportIsRequired)
   const transportSend = safeRead<unknown>(transport, 'send')
   const transportSubscribe = safeRead<unknown>(transport, 'subscribe')
   if (typeof transportSend !== 'function' || typeof transportSubscribe !== 'function')
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'connect transport must provide send and subscribe functions'
+      RpcCoreErrorText.connectTransportMustProvideSendAndSubscribeFunctions
     )
   if (useBaseIdVerifyOnly !== undefined && typeof useBaseIdVerifyOnly !== 'boolean')
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'connect.useBaseIdVerifyOnly must be a boolean'
+      RpcCoreErrorText.connectUseBaseIdVerifyOnlyMustBeABoolean
     )
   if (identifier !== undefined && typeof identifier !== 'function')
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'connect identifier must be a function')
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.connectIdentifierMustBeAFunction
+    )
   const transportPeerId = safeRead<unknown>(transport, 'peerId')
   const transportOrigin = safeRead<unknown>(transport, 'origin')
   if (
     (transportPeerId !== undefined && typeof transportPeerId !== 'string') ||
     (transportOrigin !== undefined && typeof transportOrigin !== 'string')
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'transport identity descriptor is invalid')
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.transportIdentityDescriptorInvalid
+    )
   const capability: IRpcConnectCapability = {
     identifier,
     useBaseIdVerifyOnly,

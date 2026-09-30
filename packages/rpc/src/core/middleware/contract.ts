@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import { validateContractData } from '../internal/contract.js'
 import type {
   IRpcContractCapability,
@@ -24,7 +25,7 @@ const contractClaims = {
 /** Normalizes contract configuration and snapshots schema ownership without registry writes. */
 function createContractCapability(config: IRpcContractConfig): IRpcContractCapability {
   if (!config || typeof config !== 'object' || Array.isArray(config))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'contract descriptor is invalid')
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.contractDescriptorIsInvalid)
   let version: IRpcContractConfig['version']
   let acceptVersions: IRpcContractConfig['acceptVersions']
   let maxIdentifierLength: IRpcContractConfig['maxIdentifierLength']
@@ -33,14 +34,18 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
     acceptVersions = config.acceptVersions
     maxIdentifierLength = config.maxIdentifierLength
   } catch (error) {
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, 'contract descriptor is unreadable', error)
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.contractDescriptorIsUnreadable,
+      error
+    )
   }
   let schemas: Record<string, IRpcMethodSchema> | undefined
   try {
     const source = safeRead<unknown>(config, 'schemas')
     if (source !== undefined) {
       if (!source || typeof source !== 'object' || Array.isArray(source))
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'schemas must be an object')
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schemasMustBeAnObject)
       schemas = createSafeRecord<IRpcMethodSchema>() as Record<string, IRpcMethodSchema>
       for (const method of Object.keys(source)) {
         const methodSchema = safeRead<unknown>(source, method)
@@ -53,7 +58,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
         if (!isSchema(params) || !isSchema(result))
           throw new RpcError(
             RpcCoreErrorCode.invalidConfig,
-            `schema descriptor is invalid: ${method}`
+            RpcCoreErrorText.schemaDescriptorInvalid(method)
           )
         schemas[method] = { params, result }
       }
@@ -62,7 +67,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
     if (error instanceof RpcError) throw error
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'contract.schemas must contain params/result schemas with parse functions',
+      RpcCoreErrorText.contractSchemasMustContainParamsResultSchemasWithParseFunctions,
       error
     )
   }
@@ -74,13 +79,13 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
     )
       throw new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        'contract.acceptVersions must contain non-empty strings'
+        RpcCoreErrorText.contractAcceptVersionsMustContainNonEmptyStrings
       )
   } catch (error) {
     if (error instanceof RpcError) throw error
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'contract.acceptVersions is unreadable',
+      RpcCoreErrorText.contractAcceptVersionsIsUnreadable,
       error
     )
   }
@@ -93,7 +98,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
   if (version !== undefined && (!version || typeof version !== 'string'))
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'contract version must be a non-empty string'
+      RpcCoreErrorText.contractVersionMustBeANonEmptyString
     )
   if (
     maxIdentifierLength !== undefined &&
@@ -101,7 +106,7 @@ function createContractCapability(config: IRpcContractConfig): IRpcContractCapab
   )
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'maxIdentifierLength must be a positive safe integer'
+      RpcCoreErrorText.maxIdentifierLengthMustBeAPositiveSafeInteger
     )
   return {
     ...snapshot,

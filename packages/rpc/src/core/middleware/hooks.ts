@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcHooksConfig, IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
@@ -26,14 +27,21 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
     }),
     install: (): IRpcPluginInstallResult => {
       if (!config || typeof config !== 'object' || Array.isArray(config))
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'hooks descriptor is invalid')
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.hooksDescriptorIsInvalid
+        )
       let listenerValue: IRpcHooksConfig['listeners']
       let onHookError: IRpcHooksConfig['onHookError']
       try {
         listenerValue = config.listeners
         onHookError = config.onHookError
       } catch (error) {
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'hooks descriptor is unreadable', error)
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.hooksDescriptorIsUnreadable,
+          error
+        )
       }
       try {
         const listeners =
@@ -45,10 +53,13 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
         if (listeners.some((listener) => typeof listener !== 'function'))
           throw new RpcError(
             RpcCoreErrorCode.invalidConfig,
-            'hooks.listeners must contain functions'
+            RpcCoreErrorText.hooksListenersMustContainFunctions
           )
         if (onHookError !== undefined && typeof onHookError !== 'function')
-          throw new RpcError(RpcCoreErrorCode.invalidConfig, 'hooks.onHookError must be a function')
+          throw new RpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RpcCoreErrorText.hooksOnHookErrorMustBeAFunction
+          )
         const port = Object.freeze({
           listeners: Object.freeze(listeners),
           ...(onHookError === undefined ? {} : { onHookError }),
@@ -60,7 +71,11 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
         }
       } catch (error) {
         if (error instanceof RpcError) throw error
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'hooks descriptor is invalid', error)
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.hooksDescriptorIsInvalid,
+          error
+        )
       }
     }
   })
