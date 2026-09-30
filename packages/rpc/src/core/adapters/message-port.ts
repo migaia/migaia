@@ -1,3 +1,4 @@
+import { RpcAdapterErrorText } from './error-text.js'
 import {
   createEventChannel,
   EventAdmissionPolicy,
@@ -214,7 +215,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       }
       closeResult = drainTerminalListenerFailures(cleanupErrors, {
         code: RpcCoreErrorCode.transport,
-        message: RpcCoreErrorText.messagePortCleanupFailed,
+        message: RpcAdapterErrorText.messagePortCleanupFailed,
         secondaryFailures,
         aggregateSingle: true
       })

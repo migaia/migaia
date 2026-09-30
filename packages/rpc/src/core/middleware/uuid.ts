@@ -1,4 +1,4 @@
-import { RpcCoreErrorText } from '../error-text.js'
+import { RpcMiddlewareErrorText } from './error-text.js'
 import type { IRpcPlugin, IRpcPluginInstallResult, IRpcUuidConfig } from '../typing.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
@@ -26,21 +26,24 @@ function createUuidPlugin(config: IRpcUuidConfig): IRpcPlugin {
     }),
     install: (): IRpcPluginInstallResult => {
       if (!config || typeof config !== 'object' || Array.isArray(config))
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidDescriptorIsInvalid)
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcMiddlewareErrorText.uuidDescriptorIsInvalid
+        )
       let generate: IRpcUuidConfig['generate']
       try {
         generate = config.generate
       } catch (error) {
         throw new RpcError(
           RpcCoreErrorCode.invalidConfig,
-          RpcCoreErrorText.uuidDescriptorIsUnreadable,
+          RpcMiddlewareErrorText.uuidDescriptorIsUnreadable,
           error
         )
       }
       if (generate !== undefined && typeof generate !== 'function')
         throw new RpcError(
           RpcCoreErrorCode.invalidConfig,
-          RpcCoreErrorText.uuidGenerateMustBeAFunction
+          RpcMiddlewareErrorText.uuidGenerateMustBeAFunction
         )
       return {
         extension: Object.freeze({}),

@@ -1,8 +1,4 @@
-/**
- * Package-owned stable text for validation failures introduced by the outbound framing boundary.
- * Keeping these messages here prevents the pipeline from becoming a second owner of public error
- * text.
- */
+/** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
   /** Stable construction-hook event name consumed by endpoint diagnostics. */
   componentShadowed: 'component-shadowed',
@@ -15,18 +11,10 @@ export const RpcCoreErrorText = {
   transportIdentityDescriptorInvalid: 'transport identity descriptor is invalid',
   /** Stable fallback text when physical receiver registration throws a hostile value. */
   endpointRegistrationFailed: 'Endpoint registration failed',
-  /** Stable aggregate message when construction and rollback both fail. */
-  endpointConstructionCleanupFailed: 'Endpoint construction failed; cleanup also failed',
   /** Stable lifecycle rejection once the canonical kernel closes admission. */
   endpointDisposed: 'Endpoint disposed',
   /** Stable lifecycle message when endpoint-owned resource release reports cleanup failures. */
   endpointDisposalCleanupFailed: 'Endpoint disposal completed with cleanup errors',
-  /** Stable aggregate text when listener registration fails and rollback also reports failures. */
-  listenerRegistrationCleanupFailed: 'listener registration failed; cleanup also failed',
-  /** Stable aggregate text for listener and reporter failures surfaced at an adapter boundary. */
-  listenerCleanupFailed: 'listener cleanup failed',
-  /** Stable aggregate text for browser and Node MessagePort terminal cleanup failures. */
-  messagePortCleanupFailed: '[rpc] message port cleanup failed',
   /** Stable conflict text when two attachments claim the same decoded frame kind. */
   endpointRouteOwned: 'endpoint route is already owned',
   /** Stable diagnostic when protocol 1.1 admits a frame but no stream feature owns it. */
@@ -37,14 +25,10 @@ export const RpcCoreErrorText = {
   endpointModuleInvalid: 'endpoint module token is invalid',
   /** Stable composition conflict text consumed by core duplicate-token admission. */
   endpointModuleDuplicated: 'endpoint module is duplicated',
-  /** IPC capacity configuration must be a positive safe integer for bounded admission. */
-  ipcCapacityInvalid: 'IPC send capacity must be a positive safe integer',
   /** Only one send-queue wrapper and Feature may claim a physical connection. */
   ipcGateDuplicated: 'IPC send gate is already registered',
   /** The wrapped transport and selected native Feature must own the same gate instance. */
   ipcGateMismatch: 'IPC send gate and Feature do not match',
-  /** A bounded IPC connection cannot admit another envelope of this class. */
-  ipcSendOverloaded: 'IPC send capacity is full',
   /** Stable internal topology text when a dependency owner was not installed. */
   endpointModuleDependencyMissing: 'endpoint module dependency is missing',
   /** Stable overload diagnostic when discovery cannot retain another automatic waiter. */
@@ -99,18 +83,10 @@ export const RpcCoreErrorText = {
   transportSendFailed: 'Transport send failed',
   /** Describes a transfer option that cannot be snapshotted as a list. */
   invalidTransferList: 'Transfer list must be an array',
-  /** Describes a byte-length hook result that cannot safely represent its input. */
-  invalidByteLengthMeasurement: 'Custom byteLength returned an unsafe measurement',
-  /** Describes an encoded message that exceeds the configured message budget. */
-  encodedMessageTooLarge: 'Encoded message exceeds configured maximum',
   /** Describes a transfer list that cannot accompany chunked output. */
   transferUnsupportedForChunking: 'Transfer lists are unsupported for chunked messages',
   /** Describes a transfer list that cannot accompany authenticated output. */
   transferUnsupportedWithAuthentication: 'Transfer lists are unsupported with authentication',
-  /** Describes a splitter result that violates the bounded framing contract. */
-  invalidChunkFrames: 'Chunk splitter returned invalid frames',
-  /** Stable range text for the minimum UTF-8 chunk budget accepted by WebRPC. */
-  utf8ChunkBudgetInvalid: 'maxBytes must be at least 4 bytes',
   /** Describes a protocol codec result whose runtime type disagrees with its declaration. */
   protocolEncodedType: (encodedType: string): string =>
     `Protocol encoded output must be ${encodedType}`,
@@ -136,11 +112,6 @@ export const RpcCoreErrorText = {
     `variation handler already registered: ${variation}`,
   /** Preserves the existing duplicate manual query listener message and code. */
   manualQueryListenerDuplicate: 'only one manual query listener may be registered',
-  /**
-   * Stable core error text consumed by core/adapters/memory.ts; preserves its existing
-   * caller-facing wording.
-   */
-  rpcMemoryTransportIsClosed: '[rpc] memory transport is closed',
   /**
    * Stable core error text consumed by core/errors.ts; preserves its existing caller-facing
    * wording.
@@ -360,16 +331,6 @@ export const RpcCoreErrorText = {
    */
   bindingLimitsMustBePositiveSafeIntegers: 'binding limits must be positive safe integers',
   /**
-   * Stable core error text consumed by core/internal/peers.ts; preserves its existing caller-facing
-   * wording.
-   */
-  maxLearnedMustBeAPositiveSafeInteger: 'maxLearned must be a positive safe integer',
-  /**
-   * Stable core error text consumed by core/internal/peers.ts; preserves its existing caller-facing
-   * wording.
-   */
-  learnedTtlMsMustBeAPositiveSafeInteger: 'learnedTtlMs must be a positive safe integer',
-  /**
    * Stable core error text consumed by core/internal/provider-admission.ts; preserves its existing
    * caller-facing wording.
    */
@@ -440,194 +401,5 @@ export const RpcCoreErrorText = {
    * Stable core error text consumed by core/internal/web-rpc-plugin-host.ts; preserves its existing
    * caller-facing wording.
    */
-  pluginInstallFailureDetail: (prefix: string, detail: string): string => `${prefix}: ${detail}`,
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  authenticationDescriptorIsInvalid: 'authentication descriptor is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  authenticationDescriptorIsUnreadable: 'authentication descriptor is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  authenticationTransformInvalid: (name: string): string =>
-    `authentication.${name} must be a function`,
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  authenticationEncryptDecryptMustBeConfiguredTogether:
-    'authentication encrypt/decrypt must be configured together',
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  authenticationSignVerifyMustBeConfiguredTogether:
-    'authentication sign/verify must be configured together',
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  authenticationRequiresEncryptionOrSigningTransforms:
-    'authentication requires encryption or signing transforms',
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  authenticationEncodedTypeIsInvalid: 'authentication.encodedType is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  outboundFrameAuthenticationFailed: 'Outbound frame authentication failed',
-  /**
-   * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
-   * caller-facing wording.
-   */
-  inboundFrameAuthenticationFailed: 'Inbound frame authentication failed',
-  /**
-   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
-   * caller-facing wording.
-   */
-  transportTopologyIsInvalid: 'transport topology is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
-   * caller-facing wording.
-   */
-  connectDiscoveryModeIsInvalid: 'connect.discoveryMode is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
-   * caller-facing wording.
-   */
-  connectReceiverSelectorMustBeAFunction: 'connect.receiverSelector must be a function',
-  /**
-   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
-   * caller-facing wording.
-   */
-  connectIdentifierIsRequiredWhenBaseVerificationIsDisabled:
-    'connect identifier is required when base verification is disabled',
-  /**
-   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
-   * caller-facing wording.
-   */
-  connectTransportIsRequired: 'connect transport is required',
-  /**
-   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
-   * caller-facing wording.
-   */
-  connectTransportMustProvideSendAndSubscribeFunctions:
-    'connect transport must provide send and subscribe functions',
-  /**
-   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
-   * caller-facing wording.
-   */
-  connectUseBaseIdVerifyOnlyMustBeABoolean: 'connect.useBaseIdVerifyOnly must be a boolean',
-  /**
-   * Stable core error text consumed by core/middleware/connect.ts; preserves its existing
-   * caller-facing wording.
-   */
-  connectIdentifierMustBeAFunction: 'connect identifier must be a function',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractDescriptorIsInvalid: 'contract descriptor is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractDescriptorIsUnreadable: 'contract descriptor is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  schemasMustBeAnObject: 'schemas must be an object',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  schemaDescriptorInvalid: (method: string): string => `schema descriptor is invalid: ${method}`,
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractSchemasMustContainParamsResultSchemasWithParseFunctions:
-    'contract.schemas must contain params/result schemas with parse functions',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractAcceptVersionsMustContainNonEmptyStrings:
-    'contract.acceptVersions must contain non-empty strings',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractAcceptVersionsIsUnreadable: 'contract.acceptVersions is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractVersionMustBeANonEmptyString: 'contract version must be a non-empty string',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  maxIdentifierLengthMustBeAPositiveSafeInteger:
-    'maxIdentifierLength must be a positive safe integer',
-  /**
-   * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
-   * caller-facing wording.
-   */
-  hooksDescriptorIsInvalid: 'hooks descriptor is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
-   * caller-facing wording.
-   */
-  hooksDescriptorIsUnreadable: 'hooks descriptor is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
-   * caller-facing wording.
-   */
-  hooksListenersMustContainFunctions: 'hooks.listeners must contain functions',
-  /**
-   * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
-   * caller-facing wording.
-   */
-  hooksOnHookErrorMustBeAFunction: 'hooks.onHookError must be a function',
-  /**
-   * Stable core error text consumed by core/middleware/timeout.ts; preserves its existing
-   * caller-facing wording.
-   */
-  timeoutDescriptorIsInvalid: 'timeout descriptor is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/timeout.ts; preserves its existing
-   * caller-facing wording.
-   */
-  timeoutDescriptorIsUnreadable: 'timeout descriptor is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/timeout.ts; preserves its existing
-   * caller-facing wording.
-   */
-  timeoutMsMustBeFalseOrANonNegativeNumber: 'timeoutMs must be false or a non-negative number',
-  /**
-   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
-   * caller-facing wording.
-   */
-  uuidDescriptorIsInvalid: 'uuid descriptor is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
-   * caller-facing wording.
-   */
-  uuidDescriptorIsUnreadable: 'uuid descriptor is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
-   * caller-facing wording.
-   */
-  uuidGenerateMustBeAFunction: 'uuid generate must be a function'
+  pluginInstallFailureDetail: (prefix: string, detail: string): string => `${prefix}: ${detail}`
 } as const

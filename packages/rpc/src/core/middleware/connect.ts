@@ -1,3 +1,4 @@
+import { RpcMiddlewareErrorText } from './error-text.js'
 import { RpcPlatform } from '../transport-constants.js'
 import type {
   IRpcConnectCapability,
@@ -106,21 +107,24 @@ function createConnectCapability(
     transportTopology !== 'multiplexed' &&
     transportTopology !== 'broadcast'
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.transportTopologyIsInvalid)
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcMiddlewareErrorText.transportTopologyIsInvalid
+    )
   if (discoveryMode !== 'automatic' && discoveryMode !== 'manual')
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.connectDiscoveryModeIsInvalid
+      RpcMiddlewareErrorText.connectDiscoveryModeIsInvalid
     )
   if (receiverSelector !== undefined && typeof receiverSelector !== 'function')
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.connectReceiverSelectorMustBeAFunction
+      RpcMiddlewareErrorText.connectReceiverSelectorMustBeAFunction
     )
   if (useBaseIdVerifyOnly === false && !identifier)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.connectIdentifierIsRequiredWhenBaseVerificationIsDisabled
+      RpcMiddlewareErrorText.connectIdentifierIsRequiredWhenBaseVerificationIsDisabled
     )
   const effectiveUniqueTargetId =
     typeof uniqueTargetId === 'string' &&
@@ -136,23 +140,26 @@ function createConnectCapability(
       ? uniqueTargetId
       : undefined
   if (!transport || (typeof transport !== 'object' && typeof transport !== 'function'))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.connectTransportIsRequired)
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcMiddlewareErrorText.connectTransportIsRequired
+    )
   const transportSend = safeRead<unknown>(transport, 'send')
   const transportSubscribe = safeRead<unknown>(transport, 'subscribe')
   if (typeof transportSend !== 'function' || typeof transportSubscribe !== 'function')
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.connectTransportMustProvideSendAndSubscribeFunctions
+      RpcMiddlewareErrorText.connectTransportMustProvideSendAndSubscribeFunctions
     )
   if (useBaseIdVerifyOnly !== undefined && typeof useBaseIdVerifyOnly !== 'boolean')
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.connectUseBaseIdVerifyOnlyMustBeABoolean
+      RpcMiddlewareErrorText.connectUseBaseIdVerifyOnlyMustBeABoolean
     )
   if (identifier !== undefined && typeof identifier !== 'function')
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.connectIdentifierMustBeAFunction
+      RpcMiddlewareErrorText.connectIdentifierMustBeAFunction
     )
   const transportPeerId = safeRead<unknown>(transport, 'peerId')
   const transportOrigin = safeRead<unknown>(transport, 'origin')

@@ -1,4 +1,4 @@
-import { RpcCoreErrorText } from '../error-text.js'
+import { RpcMiddlewareErrorText } from './error-text.js'
 import type { IRpcHooksConfig, IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
@@ -29,7 +29,7 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
       if (!config || typeof config !== 'object' || Array.isArray(config))
         throw new RpcError(
           RpcCoreErrorCode.invalidConfig,
-          RpcCoreErrorText.hooksDescriptorIsInvalid
+          RpcMiddlewareErrorText.hooksDescriptorIsInvalid
         )
       let listenerValue: IRpcHooksConfig['listeners']
       let onHookError: IRpcHooksConfig['onHookError']
@@ -39,7 +39,7 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
       } catch (error) {
         throw new RpcError(
           RpcCoreErrorCode.invalidConfig,
-          RpcCoreErrorText.hooksDescriptorIsUnreadable,
+          RpcMiddlewareErrorText.hooksDescriptorIsUnreadable,
           error
         )
       }
@@ -53,12 +53,12 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
         if (listeners.some((listener) => typeof listener !== 'function'))
           throw new RpcError(
             RpcCoreErrorCode.invalidConfig,
-            RpcCoreErrorText.hooksListenersMustContainFunctions
+            RpcMiddlewareErrorText.hooksListenersMustContainFunctions
           )
         if (onHookError !== undefined && typeof onHookError !== 'function')
           throw new RpcError(
             RpcCoreErrorCode.invalidConfig,
-            RpcCoreErrorText.hooksOnHookErrorMustBeAFunction
+            RpcMiddlewareErrorText.hooksOnHookErrorMustBeAFunction
           )
         const port = Object.freeze({
           listeners: Object.freeze(listeners),
@@ -73,7 +73,7 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
         if (error instanceof RpcError) throw error
         throw new RpcError(
           RpcCoreErrorCode.invalidConfig,
-          RpcCoreErrorText.hooksDescriptorIsInvalid,
+          RpcMiddlewareErrorText.hooksDescriptorIsInvalid,
           error
         )
       }

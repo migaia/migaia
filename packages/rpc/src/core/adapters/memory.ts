@@ -1,4 +1,4 @@
-import { RpcCoreErrorText } from '../error-text.js'
+import { RpcAdapterErrorText } from './error-text.js'
 import { RpcCoreErrorCode, RpcTransportError, tagRpcError } from '../errors.js'
 import type { IRpcTransport } from '../transport.js'
 import { RpcPlatform, RpcTransportOwnership } from '../transport-constants.js'
@@ -55,7 +55,7 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
     topology: 'exclusive',
     ownership: RpcTransportOwnership.borrowed,
     send(message) {
-      if (closed) throw new RpcTransportError(RpcCoreErrorText.rpcMemoryTransportIsClosed)
+      if (closed) throw new RpcTransportError(RpcAdapterErrorText.rpcMemoryTransportIsClosed)
       queueMicrotask(() => {
         // Closed between send() and delivery — the other side is gone,
         // there is nobody left to deliver to.
@@ -83,7 +83,7 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       closed = true
       reportListenerFailure(
         tagRpcError(
-          new Error(RpcCoreErrorText.rpcMemoryTransportIsClosed),
+          new Error(RpcAdapterErrorText.rpcMemoryTransportIsClosed),
           RpcCoreErrorCode.transport
         ),
         errorsA,
@@ -91,7 +91,7 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       )
       reportListenerFailure(
         tagRpcError(
-          new Error(RpcCoreErrorText.rpcMemoryTransportIsClosed),
+          new Error(RpcAdapterErrorText.rpcMemoryTransportIsClosed),
           RpcCoreErrorCode.transport
         ),
         errorsB,

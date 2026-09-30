@@ -180,13 +180,13 @@
     },
     "rpc": {
       "lines": {
-        "covered": 6644,
-        "total": 7332,
-        "pct": 90.61
+        "covered": 6648,
+        "total": 7336,
+        "pct": 90.62
       },
       "statements": {
-        "covered": 7256,
-        "total": 8181,
+        "covered": 7260,
+        "total": 8185,
         "pct": 88.69
       },
       "functions": {
@@ -4954,6 +4954,28 @@
         "pct": 100
       }
     },
+    "packages/rpc/src/core/adapters/error-text.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
     "packages/rpc/src/core/adapters/memory.ts": {
       "lines": {
         "covered": 45,
@@ -5132,18 +5154,18 @@
     },
     "packages/rpc/src/core/error-text.ts": {
       "lines": {
-        "covered": 17,
-        "total": 17,
+        "covered": 15,
+        "total": 15,
         "pct": 100
       },
       "statements": {
-        "covered": 17,
-        "total": 17,
+        "covered": 15,
+        "total": 15,
         "pct": 100
       },
       "functions": {
-        "covered": 16,
-        "total": 16,
+        "covered": 14,
+        "total": 14,
         "pct": 100
       },
       "branches": {
@@ -5436,6 +5458,28 @@
         "covered": 28,
         "total": 30,
         "pct": 93.33
+      }
+    },
+    "packages/rpc/src/core/internal/auxiliary-error-text.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
       }
     },
     "packages/rpc/src/core/internal/canonical-chunk-attachment.ts": {
@@ -6802,6 +6846,28 @@
         "pct": 92.68
       }
     },
+    "packages/rpc/src/core/middleware/error-text.ts": {
+      "lines": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
     "packages/rpc/src/core/middleware/framer.ts": {
       "lines": {
         "covered": 3,
@@ -6943,6 +7009,28 @@
       "statements": {
         "covered": 0,
         "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/core/plugins/error-text.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
         "pct": 100
       },
       "functions": {
@@ -14331,7 +14419,23 @@
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
   "changedRuntimeFiles": [
-    "packages/rpc/src/remote/host.ts"
+    "packages/rpc/src/core/adapters/error-text.ts",
+    "packages/rpc/src/core/adapters/memory.ts",
+    "packages/rpc/src/core/adapters/message-port.ts",
+    "packages/rpc/src/core/error-text.ts",
+    "packages/rpc/src/core/internal/auxiliary-error-text.ts",
+    "packages/rpc/src/core/internal/listener-safety.ts",
+    "packages/rpc/src/core/internal/peers.ts",
+    "packages/rpc/src/core/internal/utf8.ts",
+    "packages/rpc/src/core/middleware/authentication.ts",
+    "packages/rpc/src/core/middleware/connect.ts",
+    "packages/rpc/src/core/middleware/contract.ts",
+    "packages/rpc/src/core/middleware/error-text.ts",
+    "packages/rpc/src/core/middleware/hooks.ts",
+    "packages/rpc/src/core/middleware/timeout.ts",
+    "packages/rpc/src/core/middleware/uuid.ts",
+    "packages/rpc/src/core/plugins/error-text.ts",
+    "packages/rpc/src/core/plugins/send-queue.ts"
   ],
   "deletedRuntimeFiles": []
 }

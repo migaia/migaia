@@ -1,3 +1,4 @@
+import { RpcPluginErrorText } from './error-text.js'
 import { createEventChannel } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcStreamEvent } from '../../contract/index.js'
@@ -77,7 +78,7 @@ export function createIpcSendQueueFeature(
     maxControl < 1
   )
     throw tagRpcError(
-      new TypeError(RpcCoreErrorText.ipcCapacityInvalid),
+      new TypeError(RpcPluginErrorText.ipcCapacityInvalid),
       RpcCoreErrorCode.invalidConfig
     )
   /** Stable identity included in every local backlog diagnostic. */
@@ -158,7 +159,10 @@ export function createIpcSendQueueFeature(
       const pending = sendClass === IpcSendClass.data ? pendingData : pendingControl
       const capacity = sendClass === IpcSendClass.data ? maxData : maxControl
       if (pending >= capacity) {
-        const error = new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.ipcSendOverloaded)
+        const error = new RpcError(
+          RpcCoreErrorCode.overloaded,
+          RpcPluginErrorText.ipcSendOverloaded
+        )
         emit(snapshot(IpcLogEventName['ipc.backlog.rejected'], envelope, error))
         return Promise.reject(error)
       }

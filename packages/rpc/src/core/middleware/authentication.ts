@@ -1,4 +1,4 @@
-import { RpcCoreErrorText } from '../error-text.js'
+import { RpcMiddlewareErrorText } from './error-text.js'
 import { RpcAuthenticationError, RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
@@ -39,7 +39,7 @@ function createAuthenticationCapability(
   if (!config || typeof config !== 'object' || Array.isArray(config))
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.authenticationDescriptorIsInvalid
+      RpcMiddlewareErrorText.authenticationDescriptorIsInvalid
     )
   let encrypt: IRpcAuthenticationTransform | undefined
   let decrypt: IRpcAuthenticationTransform | undefined
@@ -51,7 +51,7 @@ function createAuthenticationCapability(
   } catch (error) {
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.authenticationDescriptorIsUnreadable,
+      RpcMiddlewareErrorText.authenticationDescriptorIsUnreadable,
       error
     )
   }
@@ -59,27 +59,27 @@ function createAuthenticationCapability(
     if (transform !== undefined && typeof transform !== 'function')
       throw new RpcError(
         RpcCoreErrorCode.invalidConfig,
-        RpcCoreErrorText.authenticationTransformInvalid(name)
+        RpcMiddlewareErrorText.authenticationTransformInvalid(name)
       )
   if (!!encrypt !== !!decrypt)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.authenticationEncryptDecryptMustBeConfiguredTogether
+      RpcMiddlewareErrorText.authenticationEncryptDecryptMustBeConfiguredTogether
     )
   if (!!sign !== !!verify)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.authenticationSignVerifyMustBeConfiguredTogether
+      RpcMiddlewareErrorText.authenticationSignVerifyMustBeConfiguredTogether
     )
   if (!encrypt && !sign)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.authenticationRequiresEncryptionOrSigningTransforms
+      RpcMiddlewareErrorText.authenticationRequiresEncryptionOrSigningTransforms
     )
   if (encodedType !== undefined && !['any', 'string', 'uint8array'].includes(encodedType))
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.authenticationEncodedTypeIsInvalid
+      RpcMiddlewareErrorText.authenticationEncodedTypeIsInvalid
     )
 
   /** Runs outbound encryption before signing. */
@@ -89,7 +89,10 @@ function createAuthenticationCapability(
       return sign ? await sign(encrypted, context) : encrypted
     } catch (error) {
       if (error instanceof RpcAuthenticationError) throw error
-      throw new RpcAuthenticationError(RpcCoreErrorText.outboundFrameAuthenticationFailed, error)
+      throw new RpcAuthenticationError(
+        RpcMiddlewareErrorText.outboundFrameAuthenticationFailed,
+        error
+      )
     }
   }
   /** Runs inbound verification before decryption. */
@@ -99,7 +102,10 @@ function createAuthenticationCapability(
       return decrypt ? await decrypt(verified, context) : verified
     } catch (error) {
       if (error instanceof RpcAuthenticationError) throw error
-      throw new RpcAuthenticationError(RpcCoreErrorText.inboundFrameAuthenticationFailed, error)
+      throw new RpcAuthenticationError(
+        RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
+        error
+      )
     }
   }
   return Object.freeze({

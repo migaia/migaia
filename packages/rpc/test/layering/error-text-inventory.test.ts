@@ -1,3 +1,6 @@
+import { RpcAuxiliaryErrorText } from '../../src/core/internal/auxiliary-error-text.js'
+import { RpcAdapterErrorText } from '../../src/core/adapters/error-text.js'
+import { RpcMiddlewareErrorText } from '../../src/core/middleware/error-text.js'
 import { describe, expect, it } from 'vitest'
 import { RpcCoreErrorText } from '../../src/core/error-text.js'
 import { BrowserRpcErrorText } from '../../src/browser/error-text.js'
@@ -5,7 +8,7 @@ import { RpcAbortError, RpcTimeoutError } from '../../src/core/errors.js'
 
 describe('error text inventory', () => {
   it('[A2] preserves every core error text from the pre-migration inventory', () => {
-    expect(RpcCoreErrorText.rpcMemoryTransportIsClosed, 'rpcMemoryTransportIsClosed').toBe(
+    expect(RpcAdapterErrorText.rpcMemoryTransportIsClosed, 'rpcMemoryTransportIsClosed').toBe(
       '[rpc] memory transport is closed'
     )
     expect(RpcCoreErrorText.webRPCRequestCancelled, 'webRPCRequestCancelled').toBe(
@@ -150,11 +153,11 @@ describe('error text inventory', () => {
     ).toBe('binding limits must be positive safe integers')
     expect(RpcCoreErrorText.endpointDisposed, 'endpointDisposed').toBe('Endpoint disposed')
     expect(
-      RpcCoreErrorText.maxLearnedMustBeAPositiveSafeInteger,
+      RpcAuxiliaryErrorText.maxLearnedMustBeAPositiveSafeInteger,
       'maxLearnedMustBeAPositiveSafeInteger'
     ).toBe('maxLearned must be a positive safe integer')
     expect(
-      RpcCoreErrorText.learnedTtlMsMustBeAPositiveSafeInteger,
+      RpcAuxiliaryErrorText.learnedTtlMsMustBeAPositiveSafeInteger,
       'learnedTtlMsMustBeAPositiveSafeInteger'
     ).toBe('learnedTtlMs must be a positive safe integer')
     expect(
@@ -203,137 +206,140 @@ describe('error text inventory', () => {
       'pluginInstallFailureDetail'
     ).toBe('x: x')
     expect(
-      RpcCoreErrorText.authenticationDescriptorIsInvalid,
+      RpcMiddlewareErrorText.authenticationDescriptorIsInvalid,
       'authenticationDescriptorIsInvalid'
     ).toBe('authentication descriptor is invalid')
     expect(
-      RpcCoreErrorText.authenticationDescriptorIsUnreadable,
+      RpcMiddlewareErrorText.authenticationDescriptorIsUnreadable,
       'authenticationDescriptorIsUnreadable'
     ).toBe('authentication descriptor is unreadable')
     expect(
-      RpcCoreErrorText.authenticationTransformInvalid('x'),
+      RpcMiddlewareErrorText.authenticationTransformInvalid('x'),
       'authenticationTransformInvalid'
     ).toBe('authentication.x must be a function')
     expect(
-      RpcCoreErrorText.authenticationEncryptDecryptMustBeConfiguredTogether,
+      RpcMiddlewareErrorText.authenticationEncryptDecryptMustBeConfiguredTogether,
       'authenticationEncryptDecryptMustBeConfiguredTogether'
     ).toBe('authentication encrypt/decrypt must be configured together')
     expect(
-      RpcCoreErrorText.authenticationSignVerifyMustBeConfiguredTogether,
+      RpcMiddlewareErrorText.authenticationSignVerifyMustBeConfiguredTogether,
       'authenticationSignVerifyMustBeConfiguredTogether'
     ).toBe('authentication sign/verify must be configured together')
     expect(
-      RpcCoreErrorText.authenticationRequiresEncryptionOrSigningTransforms,
+      RpcMiddlewareErrorText.authenticationRequiresEncryptionOrSigningTransforms,
       'authenticationRequiresEncryptionOrSigningTransforms'
     ).toBe('authentication requires encryption or signing transforms')
     expect(
-      RpcCoreErrorText.authenticationEncodedTypeIsInvalid,
+      RpcMiddlewareErrorText.authenticationEncodedTypeIsInvalid,
       'authenticationEncodedTypeIsInvalid'
     ).toBe('authentication.encodedType is invalid')
     expect(
-      RpcCoreErrorText.outboundFrameAuthenticationFailed,
+      RpcMiddlewareErrorText.outboundFrameAuthenticationFailed,
       'outboundFrameAuthenticationFailed'
     ).toBe('Outbound frame authentication failed')
     expect(
-      RpcCoreErrorText.inboundFrameAuthenticationFailed,
+      RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
       'inboundFrameAuthenticationFailed'
     ).toBe('Inbound frame authentication failed')
-    expect(RpcCoreErrorText.transportTopologyIsInvalid, 'transportTopologyIsInvalid').toBe(
+    expect(RpcMiddlewareErrorText.transportTopologyIsInvalid, 'transportTopologyIsInvalid').toBe(
       'transport topology is invalid'
     )
-    expect(RpcCoreErrorText.connectDiscoveryModeIsInvalid, 'connectDiscoveryModeIsInvalid').toBe(
-      'connect.discoveryMode is invalid'
-    )
     expect(
-      RpcCoreErrorText.connectReceiverSelectorMustBeAFunction,
+      RpcMiddlewareErrorText.connectDiscoveryModeIsInvalid,
+      'connectDiscoveryModeIsInvalid'
+    ).toBe('connect.discoveryMode is invalid')
+    expect(
+      RpcMiddlewareErrorText.connectReceiverSelectorMustBeAFunction,
       'connectReceiverSelectorMustBeAFunction'
     ).toBe('connect.receiverSelector must be a function')
     expect(
-      RpcCoreErrorText.connectIdentifierIsRequiredWhenBaseVerificationIsDisabled,
+      RpcMiddlewareErrorText.connectIdentifierIsRequiredWhenBaseVerificationIsDisabled,
       'connectIdentifierIsRequiredWhenBaseVerificationIsDisabled'
     ).toBe('connect identifier is required when base verification is disabled')
-    expect(RpcCoreErrorText.connectTransportIsRequired, 'connectTransportIsRequired').toBe(
+    expect(RpcMiddlewareErrorText.connectTransportIsRequired, 'connectTransportIsRequired').toBe(
       'connect transport is required'
     )
     expect(
-      RpcCoreErrorText.connectTransportMustProvideSendAndSubscribeFunctions,
+      RpcMiddlewareErrorText.connectTransportMustProvideSendAndSubscribeFunctions,
       'connectTransportMustProvideSendAndSubscribeFunctions'
     ).toBe('connect transport must provide send and subscribe functions')
     expect(
-      RpcCoreErrorText.connectUseBaseIdVerifyOnlyMustBeABoolean,
+      RpcMiddlewareErrorText.connectUseBaseIdVerifyOnlyMustBeABoolean,
       'connectUseBaseIdVerifyOnlyMustBeABoolean'
     ).toBe('connect.useBaseIdVerifyOnly must be a boolean')
     expect(
-      RpcCoreErrorText.connectIdentifierMustBeAFunction,
+      RpcMiddlewareErrorText.connectIdentifierMustBeAFunction,
       'connectIdentifierMustBeAFunction'
     ).toBe('connect identifier must be a function')
     expect(
       RpcCoreErrorText.transportIdentityDescriptorInvalid,
       'transportIdentityDescriptorInvalid'
     ).toBe('transport identity descriptor is invalid')
-    expect(RpcCoreErrorText.contractDescriptorIsInvalid, 'contractDescriptorIsInvalid').toBe(
+    expect(RpcMiddlewareErrorText.contractDescriptorIsInvalid, 'contractDescriptorIsInvalid').toBe(
       'contract descriptor is invalid'
     )
-    expect(RpcCoreErrorText.contractDescriptorIsUnreadable, 'contractDescriptorIsUnreadable').toBe(
-      'contract descriptor is unreadable'
-    )
-    expect(RpcCoreErrorText.schemasMustBeAnObject, 'schemasMustBeAnObject').toBe(
+    expect(
+      RpcMiddlewareErrorText.contractDescriptorIsUnreadable,
+      'contractDescriptorIsUnreadable'
+    ).toBe('contract descriptor is unreadable')
+    expect(RpcMiddlewareErrorText.schemasMustBeAnObject, 'schemasMustBeAnObject').toBe(
       'schemas must be an object'
     )
-    expect(RpcCoreErrorText.schemaDescriptorInvalid('x'), 'schemaDescriptorInvalid').toBe(
+    expect(RpcMiddlewareErrorText.schemaDescriptorInvalid('x'), 'schemaDescriptorInvalid').toBe(
       'schema descriptor is invalid: x'
     )
     expect(
-      RpcCoreErrorText.contractSchemasMustContainParamsResultSchemasWithParseFunctions,
+      RpcMiddlewareErrorText.contractSchemasMustContainParamsResultSchemasWithParseFunctions,
       'contractSchemasMustContainParamsResultSchemasWithParseFunctions'
     ).toBe('contract.schemas must contain params/result schemas with parse functions')
     expect(
-      RpcCoreErrorText.contractAcceptVersionsMustContainNonEmptyStrings,
+      RpcMiddlewareErrorText.contractAcceptVersionsMustContainNonEmptyStrings,
       'contractAcceptVersionsMustContainNonEmptyStrings'
     ).toBe('contract.acceptVersions must contain non-empty strings')
     expect(
-      RpcCoreErrorText.contractAcceptVersionsIsUnreadable,
+      RpcMiddlewareErrorText.contractAcceptVersionsIsUnreadable,
       'contractAcceptVersionsIsUnreadable'
     ).toBe('contract.acceptVersions is unreadable')
     expect(
-      RpcCoreErrorText.contractVersionMustBeANonEmptyString,
+      RpcMiddlewareErrorText.contractVersionMustBeANonEmptyString,
       'contractVersionMustBeANonEmptyString'
     ).toBe('contract version must be a non-empty string')
     expect(
-      RpcCoreErrorText.maxIdentifierLengthMustBeAPositiveSafeInteger,
+      RpcMiddlewareErrorText.maxIdentifierLengthMustBeAPositiveSafeInteger,
       'maxIdentifierLengthMustBeAPositiveSafeInteger'
     ).toBe('maxIdentifierLength must be a positive safe integer')
-    expect(RpcCoreErrorText.hooksDescriptorIsInvalid, 'hooksDescriptorIsInvalid').toBe(
+    expect(RpcMiddlewareErrorText.hooksDescriptorIsInvalid, 'hooksDescriptorIsInvalid').toBe(
       'hooks descriptor is invalid'
     )
-    expect(RpcCoreErrorText.hooksDescriptorIsUnreadable, 'hooksDescriptorIsUnreadable').toBe(
+    expect(RpcMiddlewareErrorText.hooksDescriptorIsUnreadable, 'hooksDescriptorIsUnreadable').toBe(
       'hooks descriptor is unreadable'
     )
     expect(
-      RpcCoreErrorText.hooksListenersMustContainFunctions,
+      RpcMiddlewareErrorText.hooksListenersMustContainFunctions,
       'hooksListenersMustContainFunctions'
     ).toBe('hooks.listeners must contain functions')
     expect(
-      RpcCoreErrorText.hooksOnHookErrorMustBeAFunction,
+      RpcMiddlewareErrorText.hooksOnHookErrorMustBeAFunction,
       'hooksOnHookErrorMustBeAFunction'
     ).toBe('hooks.onHookError must be a function')
-    expect(RpcCoreErrorText.timeoutDescriptorIsInvalid, 'timeoutDescriptorIsInvalid').toBe(
+    expect(RpcMiddlewareErrorText.timeoutDescriptorIsInvalid, 'timeoutDescriptorIsInvalid').toBe(
       'timeout descriptor is invalid'
     )
-    expect(RpcCoreErrorText.timeoutDescriptorIsUnreadable, 'timeoutDescriptorIsUnreadable').toBe(
-      'timeout descriptor is unreadable'
-    )
     expect(
-      RpcCoreErrorText.timeoutMsMustBeFalseOrANonNegativeNumber,
+      RpcMiddlewareErrorText.timeoutDescriptorIsUnreadable,
+      'timeoutDescriptorIsUnreadable'
+    ).toBe('timeout descriptor is unreadable')
+    expect(
+      RpcMiddlewareErrorText.timeoutMsMustBeFalseOrANonNegativeNumber,
       'timeoutMsMustBeFalseOrANonNegativeNumber'
     ).toBe('timeoutMs must be false or a non-negative number')
-    expect(RpcCoreErrorText.uuidDescriptorIsInvalid, 'uuidDescriptorIsInvalid').toBe(
+    expect(RpcMiddlewareErrorText.uuidDescriptorIsInvalid, 'uuidDescriptorIsInvalid').toBe(
       'uuid descriptor is invalid'
     )
-    expect(RpcCoreErrorText.uuidDescriptorIsUnreadable, 'uuidDescriptorIsUnreadable').toBe(
+    expect(RpcMiddlewareErrorText.uuidDescriptorIsUnreadable, 'uuidDescriptorIsUnreadable').toBe(
       'uuid descriptor is unreadable'
     )
-    expect(RpcCoreErrorText.uuidGenerateMustBeAFunction, 'uuidGenerateMustBeAFunction').toBe(
+    expect(RpcMiddlewareErrorText.uuidGenerateMustBeAFunction, 'uuidGenerateMustBeAFunction').toBe(
       'uuid generate must be a function'
     )
   })
