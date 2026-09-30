@@ -81,7 +81,7 @@ def run_case(command, base_hello, case):
             hello = case.get("hello", base_hello)
             if isinstance(hello, dict) and "capabilities" in case:
                 hello = {**hello, "capabilities": case["capabilities"]}
-            process.stdin.write(frame(hello))
+            process.stdin.write(frame(hello) + bytes.fromhex(case.get("coalescedAfterHelloHex", "")))
             process.stdin.flush()
         for step in case["steps"]:
             if step.get("pauseMs"):
@@ -108,7 +108,8 @@ def run_case(command, base_hello, case):
         return False
     if any(not matches(actual, wanted) for actual, wanted in zip(output, expected["frames"])):
         return False
-    return all(stderr.count(marker) == count for marker, count in expected.get("stderr", {}).items())
+    return (all(stderr.count(marker) == count for marker, count in expected.get("stderr", {}).items())
+            and all(marker not in stderr for marker in expected.get("stderrNot", [])))
 
 
 def main():
