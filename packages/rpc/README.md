@@ -574,7 +574,7 @@ const restored = deserializeRpcError(wire)
 for (const node of reachRpcError(restored, { report })) console.error(node)
 ```
 
-`reachRpcError` 有独立的 `RpcErrorReachLimit.maxObjects === 4096` 上限，也需要必传 `report`；它遍历原生图，不受 wire 的 48 层截断约束。自定义 adapter 从 `@migaia/rpc/core/transport-kit` 使用 `safeRead(value, key, report?)` 时，第三参数只接受同步报告器；省略后若 getter 抛错，`safeRead` 抛带原异常 `cause` 的 `PROPERTY_READ_FAILED`。端点 hook 的 failure 事件对字符串属性名提供可选 `field`。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。
+`reachRpcError` 有独立的 `RpcErrorReachLimit.maxObjects === 4096` 上限，也需要必传 `report`；它遍历原生图，不受 wire 的 48 层截断约束。自定义 adapter 从 `@migaia/rpc/core/transport-kit` 使用 `safeRead(value, key, report?)` 时，第三参数只接受同步报告器；省略后若 getter 抛错，`safeRead` 抛带原异常 `cause` 的 `PROPERTY_READ_FAILED`。同一子路径的 `safeString(value, fallback?, report?)` 也要求同步 `report`：字符串化抛错时报告一次原值并返回兜底文本；省略 `report` 则抛带原异常 `cause` 的原生 `TypeError`，错误码为 `STRING_CONVERSION_FAILED`。端点 hook 的 failure 事件对字符串属性名提供可选 `field`。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。
 
 ---
 
@@ -770,7 +770,7 @@ import { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worke
 const transport = createWebWorkerTransport(worker)
 ```
 
-全部选项：`options?: { peerId?: string; origin?: string }`（静态声明已知对端身份元数据）。`error`/`messageerror` 原生事件无消息体，统一通过 `onTransportError` 让全部挂起请求立即失败。
+全部选项：`options?: { peerId?: string; origin?: string }`（静态声明已知对端身份元数据）。`error`/`messageerror` 原生事件无消息体，统一通过 `onTransportError` 让全部挂起请求立即失败。事件字段读取失败时，传输错误带 `TRANSPORT`，原读取异常留在 `cause`；若将异常转成诊断文本也失败，先报告带原异常 `cause` 的转换错误，再报告主传输错误。
 
 **`createWindowMessageTransport(options)`｜10 秒上手** —— `@migaia/rpc/browser/adapters/window`，主页面 ↔ iframe/弹出窗口：
 
