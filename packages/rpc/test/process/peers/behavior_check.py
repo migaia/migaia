@@ -79,6 +79,7 @@ def run_case(command, base_hello, case):
     try:
         if case.get("sendHello", True):
             hello = case.get("hello", base_hello)
+            hello = {**hello, **case.get("helloFields", {})} if isinstance(hello, dict) else hello
             if isinstance(hello, dict) and "capabilities" in case:
                 hello = {**hello, "capabilities": case["capabilities"]}
             process.stdin.write(frame(hello) + bytes.fromhex(case.get("coalescedAfterHelloHex", "")))

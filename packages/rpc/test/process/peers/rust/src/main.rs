@@ -84,11 +84,11 @@ fn required_str<'a>(value: &'a Value, key: &str) -> Result<&'a str, &'static str
 
 /// Validate hello and choose the highest shared major, minimum minor, first initiator codec, and ordered capability intersection.
 fn negotiate(hello: &Value) -> Result<Value, &'static str> {
-    if required_str(hello, "kind")? != "handshake"
-        || required_str(hello, "step")? != "hello"
-        || required_str(hello, "protocol")? != "migaia.rpc"
-    {
+    if required_str(hello, "kind")? != "handshake" || required_str(hello, "step")? != "hello" {
         return Err("invalid handshake");
+    }
+    if required_str(hello, "protocol")? != "migaia.rpc" {
+        return Err("incompatible handshake");
     }
     let versions = hello
         .get("versions")

@@ -321,7 +321,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
         stack: 'Error: rpc handshake incompatible'
       }
     })
-    return
+    throw new PeerFault('HANDSHAKE_INVALID')
   }
   await writeJson(destination, {
     kind: 'handshake',

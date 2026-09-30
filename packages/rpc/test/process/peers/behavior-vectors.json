@@ -613,6 +613,30 @@
         "frames": [{ "kind": "handshake", "step": "accept" }],
         "stderrNot": ["PEER_FAIL HANDSHAKE_INVALID"]
       }
+    },
+    {
+      "id": "reject-incompatible-protocol",
+      "helloFields": { "protocol": "other.rpc" },
+      "steps": [],
+      "expect": {
+        "exit": 1,
+        "frames": [
+          { "kind": "handshake", "step": "reject", "error": { "code": "HANDSHAKE_INCOMPATIBLE" } }
+        ],
+        "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 }
+      }
+    },
+    {
+      "id": "reject-incompatible-version",
+      "helloFields": { "versions": [{ "major": 2, "minor": 0 }] },
+      "steps": [],
+      "expect": {
+        "exit": 1,
+        "frames": [
+          { "kind": "handshake", "step": "reject", "error": { "code": "HANDSHAKE_INCOMPATIBLE" } }
+        ],
+        "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 }
+      }
     }
   ]
 }

@@ -645,7 +645,7 @@ func main() {
 		case errors.Is(err, errHandshakeInvalid):
 			_, _ = fmt.Fprintln(os.Stderr, "PEER_FAIL HANDSHAKE_INVALID")
 		case errors.Is(err, errHandshakeIncompatible):
-			_, _ = fmt.Fprintln(os.Stderr, "PEER_FAIL HANDSHAKE_INCOMPATIBLE")
+			_, _ = fmt.Fprintln(os.Stderr, "PEER_FAIL HANDSHAKE_INVALID")
 		default:
 			_, _ = fmt.Fprintln(os.Stderr, "ERROR peer session failed")
 		}
