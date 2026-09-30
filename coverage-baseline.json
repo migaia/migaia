@@ -180,24 +180,24 @@
     },
     "rpc": {
       "lines": {
-        "covered": 5728,
-        "total": 6299,
-        "pct": 90.93
+        "covered": 5764,
+        "total": 6329,
+        "pct": 91.07
       },
       "statements": {
-        "covered": 6257,
-        "total": 7013,
-        "pct": 89.22
+        "covered": 6306,
+        "total": 7056,
+        "pct": 89.37
       },
       "functions": {
-        "covered": 1428,
-        "total": 1563,
-        "pct": 91.36
+        "covered": 1437,
+        "total": 1572,
+        "pct": 91.41
       },
       "branches": {
-        "covered": 3776,
-        "total": 4398,
-        "pct": 85.85
+        "covered": 3816,
+        "total": 4432,
+        "pct": 86.1
       }
     },
     "serialize": {
@@ -4602,26 +4602,48 @@
         "pct": 100
       }
     },
-    "packages/rpc/src/contract/handshake.ts": {
+    "packages/rpc/src/contract/handshake-text.ts": {
       "lines": {
-        "covered": 131,
-        "total": 144,
-        "pct": 90.97
+        "covered": 2,
+        "total": 2,
+        "pct": 100
       },
       "statements": {
-        "covered": 138,
-        "total": 153,
-        "pct": 90.19
+        "covered": 2,
+        "total": 2,
+        "pct": 100
       },
       "functions": {
-        "covered": 24,
-        "total": 24,
+        "covered": 0,
+        "total": 0,
         "pct": 100
       },
       "branches": {
-        "covered": 104,
-        "total": 122,
-        "pct": 85.24
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/contract/handshake.ts": {
+      "lines": {
+        "covered": 164,
+        "total": 172,
+        "pct": 95.34
+      },
+      "statements": {
+        "covered": 184,
+        "total": 194,
+        "pct": 94.84
+      },
+      "functions": {
+        "covered": 33,
+        "total": 33,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 143,
+        "total": 156,
+        "pct": 91.66
       }
     },
     "packages/rpc/src/contract/index.ts": {
@@ -4824,14 +4846,14 @@
     },
     "packages/rpc/src/contract/v1/route.ts": {
       "lines": {
-        "covered": 66,
+        "covered": 67,
         "total": 69,
-        "pct": 95.65
+        "pct": 97.1
       },
       "statements": {
-        "covered": 71,
+        "covered": 72,
         "total": 78,
-        "pct": 91.02
+        "pct": 92.3
       },
       "functions": {
         "covered": 7,
@@ -4839,9 +4861,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 75,
+        "covered": 76,
         "total": 82,
-        "pct": 91.46
+        "pct": 92.68
       }
     },
     "packages/rpc/src/contract/v1/stream.ts": {

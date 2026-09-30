@@ -276,8 +276,24 @@ describe('handshake redaction', () => {
     const summary = error.cause as Record<string, unknown>
     expect(Object.isFrozen(summary)).toBe(true)
     expect(Object.isFrozen(summary.fields)).toBe(true)
-    expect(summary.fields).toHaveLength(16)
-    expect(summary.fields).toContain('[redacted]')
+    expect(summary.fields).toEqual([
+      '[redacted]',
+      'auth',
+      'capabilities',
+      'codecs',
+      'kind',
+      'major',
+      'peer',
+      'protocol',
+      'step',
+      'versions',
+      'z0',
+      'z1',
+      'z10',
+      'z11',
+      'z12',
+      'z13'
+    ])
     expect(summary).toMatchObject({
       redacted: true,
       kind: 'request',
@@ -287,7 +303,11 @@ describe('handshake redaction', () => {
     })
     for (const omitted of ['versions', 'peer', 'codecs'])
       expect(summary).not.toHaveProperty(omitted)
-    expect(serializeRpcError(error, { report: () => {} }).cause?.data).toEqual(summary)
+    const report = vi.fn()
+    const wireCause = serializeRpcError(error, { report }).cause
+    expect(wireCause?.data).toEqual(summary)
+    expect(wireCause).not.toHaveProperty('truncated')
+    expect(report).not.toHaveBeenCalled()
   })
 
   it('A7 preserves the frozen 1.0 handshake vector bytes', () => {
