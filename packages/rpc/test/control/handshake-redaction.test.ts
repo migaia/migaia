@@ -32,7 +32,9 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 /** Inspect visible, hidden, wire and cause values for every six-character token fragment. */
 function leaks(error: unknown, token: string): boolean {
   const seen: string[] = [inspect(error, { depth: null, showHidden: true })]
-  seen.push(JSON.stringify(serializeRpcError(error, { report: () => {} })))
+  const reported: unknown[] = []
+  seen.push(JSON.stringify(serializeRpcError(error, { report: (value) => reported.push(value) })))
+  seen.push(inspect(reported, { depth: null, showHidden: true }))
   let cause: unknown = error
   for (let depth = 0; depth < 16 && cause !== null && typeof cause === 'object'; depth++) {
     const current = cause as { cause?: unknown }
@@ -59,6 +61,19 @@ function invalid(run: () => unknown, violation: string): TypeError & { cause: un
   expect(caught).toBeInstanceOf(TypeError)
   expect(caught).toMatchObject({ code: 'HANDSHAKE_INVALID', violation })
   return caught as TypeError & { cause: unknown }
+}
+
+/** Demand that every error projection omit a chosen adversarial field or value. */
+function redacted(error: unknown, token: string, marker: string): void {
+  expect(leaks(error, token), `SDD_BASE_RED_CONTRACT:${marker}`).toBe(false)
+}
+
+/** Exercise an independently received first message with one adversarial edit. */
+function invalidHello(
+  change: Record<string, unknown>,
+  violation: string
+): TypeError & { cause: unknown } {
+  return invalid(() => normalizeRpcHandshake(JSON.stringify({ ...HELLO, ...change })), violation)
 }
 
 describe('handshake redaction', () => {
@@ -168,35 +183,26 @@ describe('handshake redaction', () => {
       }
     }
     expect(invalid(() => createRpcHello(hostile), 'read').cause).toBe(original)
-    for (const [change, violation, cause] of [
-      [{ peer: 'bad-peer' }, 'type', 'bad-peer'],
-      [
-        { peer: { id: 'caller', runtime: 'node', implementation: 'bad-implementation' } },
-        'type',
-        'bad-implementation'
-      ],
-      [{ versions: ['bad-version'] }, 'type', 'bad-version']
-    ] as const) {
-      expect(
-        invalid(() => normalizeRpcHandshake(JSON.stringify({ ...HELLO, ...change })), violation)
-          .cause
-      ).toBe(cause)
-    }
-    expect(
-      invalid(
-        () => normalizeRpcHandshake(JSON.stringify({ ...HELLO, codecs: ['json', 'json'] })),
-        'duplicate'
-      ).cause
-    ).toEqual(['json', 'json'])
-    const invalidReject = JSON.stringify({
+    const invalidRejectData = JSON.stringify({
       kind: 'handshake',
       step: 'reject',
       protocol: 'migaia.rpc',
-      error: { foo: 1 }
+      error: {
+        source: 'rpc-contract',
+        code: 'REJECTED',
+        name: 'Error',
+        message: 'rejected',
+        stack: 'Error: rejected',
+        data: { $rpc: 'x', v: TOKEN }
+      }
     })
-    expect(invalid(() => normalizeRpcHandshake(invalidReject), 'type').cause).toMatchObject({
-      code: 'INVALID_WIRE_ERROR'
+    const invalidData = invalid(() => normalizeRpcHandshake(invalidRejectData), 'type')
+    expect(invalidData.cause).toMatchObject({
+      code: 'INVALID_WIRE_ERROR',
+      violation: 'dataPortable',
+      cause: expect.objectContaining({ code: 'INVALID_ENVELOPE' })
     })
+    expect(leaks(invalidData, TOKEN)).toBe(false)
     const rejected = acceptRpcHandshake(
       { ...OFFER, versions: [{ major: 2, minor: 0 }] },
       createRpcHello(OFFER)
@@ -251,7 +257,7 @@ describe('handshake redaction', () => {
     }
   })
 
-  it('A6 bounds and freezes the summary without changing the top-level error', () => {
+  it('[A6] bounds and freezes the summary without changing the top-level error', () => {
     const unknown = Object.fromEntries(
       Array.from({ length: 20 }, (_, index) => [`z${index}`, index])
     )
@@ -276,8 +282,7 @@ describe('handshake redaction', () => {
     const summary = error.cause as Record<string, unknown>
     expect(Object.isFrozen(summary)).toBe(true)
     expect(Object.isFrozen(summary.fields)).toBe(true)
-    expect(summary.fields).toEqual([
-      '[redacted]',
+    expect(summary.fields, 'SDD_BASE_RED_CONTRACT:A6').toEqual([
       'auth',
       'capabilities',
       'codecs',
@@ -286,20 +291,15 @@ describe('handshake redaction', () => {
       'peer',
       'protocol',
       'step',
-      'versions',
-      'z0',
-      'z1',
-      'z10',
-      'z11',
-      'z12',
-      'z13'
+      'versions'
     ])
     expect(summary).toMatchObject({
       redacted: true,
-      kind: 'request',
+      kind: '[redacted]',
       protocol: '[redacted]',
       major: '[redacted]',
-      auth: '[redacted]'
+      auth: '[redacted]',
+      unknownFieldCount: 21
     })
     for (const omitted of ['versions', 'peer', 'codecs'])
       expect(summary).not.toHaveProperty(omitted)
@@ -308,6 +308,202 @@ describe('handshake redaction', () => {
     expect(wireCause?.data).toEqual(summary)
     expect(wireCause).not.toHaveProperty('truncated')
     expect(report).not.toHaveBeenCalled()
+  })
+
+  it('[A9] unknown-kind hides short unknown field names', () => {
+    const token = 'toksecret9f8e'
+    const error = invalidHello({ kind: 'request', [token]: 1 }, 'required')
+    redacted(error, token, 'A9:unknown-kind')
+    expect(error.cause).toMatchObject({ unknownFieldCount: 1 })
+  })
+
+  it('[A9] unknown-step hides short unknown field names', () => {
+    const token = 'toksecret9f8e'
+    const error = invalidHello({ step: 'resume', [token]: 1 }, 'step')
+    redacted(error, token, 'A9:unknown-step')
+    expect(error.cause).toMatchObject({ unknownFieldCount: 1 })
+  })
+
+  it('[A9] kind allows only the reserved handshake kind', () => {
+    const token = 'toksecret9f8e'
+    const error = invalidHello({ kind: token }, 'required')
+    redacted(error, token, 'A9:kind')
+    expect(error.cause).toMatchObject({ kind: '[redacted]' })
+  })
+
+  it('[A9] step allows only handshake steps', () => {
+    const token = 'toksecret9f8e'
+    const error = invalidHello({ step: token }, 'step')
+    redacted(error, token, 'A9:step')
+    expect(error.cause).toMatchObject({ step: '[redacted]' })
+  })
+
+  it('[A9] protocol hides unrecognized values across call paths', () => {
+    const token = 'toksecret9f8e'
+    for (const [run, violation] of [
+      [() => normalizeRpcHandshake(JSON.stringify({ ...HELLO, kind: 'request', protocol: token })), 'required'],
+      [() => completeRpcHandshake(OFFER, JSON.stringify({ ...HELLO, protocol: token })), 'step'],
+      [() =>
+        completeRpcHandshake(
+          OFFER,
+          JSON.stringify({
+            ...HELLO,
+            step: 'accept',
+            major: 1,
+            minor: 1,
+            codec: 'json',
+            protocol: token
+          })
+        ), 'mismatch'],
+      [() =>
+        acceptRpcHandshake(
+          OFFER,
+          JSON.stringify({
+            ...HELLO,
+            step: 'accept',
+            major: 1,
+            minor: 1,
+            codec: 'json',
+            protocol: token
+          })
+        ), 'step']
+    ] as const) {
+      const error = invalid(run, violation)
+      redacted(error, token, 'A9:protocol')
+      expect(error.cause).toMatchObject({ protocol: '[redacted]' })
+    }
+  })
+
+  it('[A9] codec hides an invalid accept label', () => {
+    const token = 'toksecret9f8e'
+    const error = invalidHello(
+      { step: 'accept', major: 0, minor: 0, codec: token.toUpperCase() },
+      'type'
+    )
+    redacted(error, token.toUpperCase(), 'A9:codec')
+    expect(error.cause).toMatchObject({ codec: '[redacted]' })
+  })
+
+  it('[A9] codec-complete uses the local offer as its allowed codec set', () => {
+    const token = 'toksecret9f8e'
+    const accept = JSON.stringify({ ...HELLO, step: 'accept', major: 1, minor: 1, codec: token })
+    for (const [run, violation] of [
+      [() => completeRpcHandshake(OFFER, accept), 'mismatch'],
+      [() => acceptRpcHandshake(OFFER, accept), 'step']
+    ] as const) {
+      const error = invalid(run, violation)
+      redacted(error, token, 'A9:codec-complete')
+      expect(error.cause).toMatchObject({ codec: '[redacted]' })
+    }
+  })
+
+  it('[A10] peer hides scalar, known value and unknown key', () => {
+    const token = 'toksecret9f8e'
+    for (const [peer, violation] of [
+      [token, 'type'],
+      [{ id: token, runtime: 'BAD', [token]: 1 }, 'required'],
+      [{ id: 'caller', runtime: token.toUpperCase() }, 'required']
+    ] as const) {
+      const error = invalidHello({ peer }, violation)
+      redacted(error, token, 'A10:peer')
+      expect(error.cause).toMatchObject({ path: '/peer' })
+    }
+  })
+
+  it('[A10] peer-runtime-version hides unknown keys and values', () => {
+    const token = 'toksecret9f8e'
+    const error = invalidHello(
+      { peer: { id: 'caller', runtime: 'node', runtimeVersion: 1, [token]: 1 } },
+      'type'
+    )
+    redacted(error, token, 'A10:peer-runtime-version')
+    expect(error.cause).toMatchObject({ path: '/peer', unknownFieldCount: 1 })
+  })
+
+  it('[A10] implementation hides scalar and nested values', () => {
+    const token = 'toksecret9f8e'
+    for (const implementation of [token, { name: 1, version: token, [token]: 1 }]) {
+      const error = invalidHello(
+        { peer: { id: 'caller', runtime: 'node', implementation } },
+        'type'
+      )
+      redacted(error, token, 'A10:implementation')
+      expect(error.cause).toMatchObject({ path: '/peer/implementation' })
+    }
+  })
+
+  it('[A10] versions hides scalar, entry and nested key', () => {
+    const token = 'toksecret9f8e'
+    for (const versions of [token, [token], [{ major: 0, minor: 0, [token]: 1 }]]) {
+      const error = invalidHello({ versions }, 'type')
+      redacted(error, token, 'A10:versions')
+      expect(error.cause).toMatchObject({ path: '/versions' })
+    }
+  })
+
+  it('[A10] versions-duplicate hides repeated entries', () => {
+    const token = 'toksecret9f8e'
+    const error = invalidHello(
+      {
+        versions: [
+          { major: 1, minor: 0 },
+          { major: 1, minor: 1, [token]: 1 }
+        ]
+      },
+      'duplicate'
+    )
+    redacted(error, token, 'A10:versions-duplicate')
+    expect(error.cause).toMatchObject({ path: '/versions', length: 2 })
+  })
+
+  it('[A10] codecs hides scalar, invalid label and missing baseline', () => {
+    const token = 'toksecret9f8e'
+    for (const [codecs, violation] of [
+      [token, 'type'],
+      [['json', token.toUpperCase()], 'type'],
+      [[token], 'baseline']
+    ] as const) {
+      const error = invalidHello({ codecs }, violation)
+      redacted(error, token, 'A10:codecs')
+      expect(error.cause).toMatchObject({ path: '/codecs' })
+    }
+  })
+
+  it('[A10] codecs-duplicate hides array contents', () => {
+    const token = 'toksecret9f8e'
+    for (const codecs of [
+      ['json', token, token],
+      ['json', 'json']
+    ]) {
+      const error = invalidHello({ codecs }, 'duplicate')
+      redacted(error, token, 'A10:codecs-duplicate')
+      expect(error.cause).toMatchObject({ redacted: true, path: '/codecs', length: codecs.length })
+    }
+  })
+
+  it('[A10] capabilities hides labels in hello and accept', () => {
+    const token = 'toksecret9f8e'
+    for (const message of [
+      { ...HELLO, capabilities: [token] },
+      { ...HELLO, step: 'accept', major: 1, minor: 1, codec: 'json', capabilities: [token] }
+    ]) {
+      const error = invalid(() => normalizeRpcHandshake(JSON.stringify(message)), 'type')
+      redacted(error, token, 'A10:capabilities')
+      expect(error.cause).toMatchObject({ path: '/capabilities' })
+    }
+  })
+
+  it('[A10] reject hides invalid wire-error subtrees', () => {
+    const token = 'toksecret9f8e'
+    for (const wireError of [
+      { [token]: 1 },
+      { foo: 1 },
+      { source: 'rpc-contract', code: 5, message: token }
+    ]) {
+      const error = invalidHello({ step: 'reject', error: wireError }, 'type')
+      redacted(error, token, 'A10:reject')
+      expect(error.cause).toMatchObject({ path: '/error', wireCode: 'INVALID_WIRE_ERROR' })
+    }
   })
 
   it('A7 preserves the frozen 1.0 handshake vector bytes', () => {
