@@ -25,7 +25,7 @@ import { allocateRpcId } from '../id.js'
 import { OperationScope } from '../operation-scope.js'
 import type { IRpcFrameAdmission, IRpcOutboundOperationsPort } from '../plugin-shared-keys.js'
 import { tupleKey } from '../safe-value.js'
-import type { IAbortSignal } from '../async-control.js'
+import { resolveAbortReason, type IAbortSignal } from '../async-control.js'
 import type { IEndpointTimer } from '../time-port.js'
 import { RpcStreamLimit } from '../../../contract/stream-constants.js'
 
@@ -859,5 +859,5 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
 
 /** This is the stream runtime's sole direct signal-reason read for later guarded replacement. */
 function readStreamAbortReason(signal: IAbortSignal): unknown {
-  return signal.reason
+  return resolveAbortReason(signal)
 }

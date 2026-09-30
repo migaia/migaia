@@ -1,4 +1,6 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
+import { tryReadProperty } from '@migaia/utils/error'
 import { reportDiagnostic } from './diagnostic-reporter.js'
 import type { IEndpointTimePort } from './time-port.js'
 
@@ -8,6 +10,16 @@ export type IAbortSignal = {
   readonly reason?: unknown
   addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
   removeEventListener(type: 'abort', listener: () => void): void
+}
+
+/**
+ * Reads a cancellation reason once; a throwing getter becomes the reason so cancellation remains
+ * observable and its original failure is retained as the abort cause.
+ */
+export function resolveAbortReason(signal: Pick<IAbortSignal, 'reason'>): unknown {
+  /** One guarded property read; a trap failure is data for the cancellation policy. */
+  const read = tryReadProperty(signal, 'reason')
+  return read.threw ? read.error : read.value
 }
 
 /** Races an operation against timeout/abort controls while cleaning every loser. */
@@ -33,7 +45,7 @@ export function raceWithAsyncControl<T>(options: {
   )
     return Promise.reject(
       tagRpcError(
-        new TypeError('timeout must be false or a non-negative finite number'),
+        new TypeError(RpcCoreErrorText.timeoutMustBeFalseOrANonNegativeFiniteNumber),
         RpcCoreErrorCode.invalidConfig
       )
     )
@@ -62,9 +74,13 @@ export function raceWithAsyncControl<T>(options: {
       }
     }
     const onAbort = (): void =>
-      finish(() =>
-        reject(options.createAbortError(signals.find((signal) => signal.aborted)?.reason))
-      )
+      finish(() => {
+        /** The first aborted signal owns the single reason read and its diagnostic. */
+        const aborted = signals.find((signal) => signal.aborted)
+        const read = aborted === undefined ? undefined : tryReadProperty(aborted, 'reason')
+        if (read?.threw) reportDiagnostic(options.onDiagnostic, read.error)
+        reject(options.createAbortError(read?.threw ? read.error : read?.value))
+      })
     try {
       if (signals.some((signal) => signal.aborted)) {
         onAbort()
