@@ -11,7 +11,7 @@ import {
   type IRpcEnvelopeData,
   type IRpcSerializedError
 } from '../../contract/index.js'
-import type { IRpcProviderResult } from '../typing.js'
+import type { IRpcAbortSignal, IRpcContext, IRpcProviderResult } from '../typing.js'
 import type { ProviderRegistry } from './provider.js'
 import { safeRead, safeString, tupleKey } from './safe-value.js'
 import { RpcMessageKind } from '../semantic-constants.js'
@@ -97,6 +97,60 @@ export class ProviderExecutor<TTargetId extends string> {
 
   constructor(options: IProviderExecutorOptions<TTargetId>) {
     this.options = options
+  }
+
+  /** Creates the core-owned context once for an admitted request or stream open. */
+  createContext(
+    request: IProviderRequestInput,
+    signal: IRpcAbortSignal,
+    isExpired: () => boolean,
+    taskToken: object = {}
+  ): IRpcContext {
+    /** Expired callbacks retain the same task brand as live provider results. */
+    const expiredResult = (): IBrandedProviderResult => ({
+      ok: false,
+      message: RpcCoreErrorText.providerContextExpired,
+      code: RpcCoreErrorCode.contextExpired,
+      [providerResultBrand]: taskToken
+    })
+    return {
+      data: request.route.payload,
+      signal,
+      trace: request.route.route.trace,
+      success: (
+        data?: unknown,
+        options?: { readonly transfer?: readonly unknown[] }
+      ): IRpcProviderResult =>
+        isExpired()
+          ? expiredResult()
+          : Object.freeze({
+              ok: true,
+              data,
+              transfer: normalizeTransfer(options?.transfer),
+              [providerResultBrand]: taskToken
+            } as IBrandedProviderResult),
+      failed: (message: string, code: string): IRpcProviderResult => {
+        if (isExpired()) return expiredResult()
+        const failure = normalizeFailure(message, code)
+        return Object.freeze({
+          ok: false,
+          message: failure.message,
+          code: failure.code,
+          [providerResultBrand]: taskToken
+        } as IBrandedProviderResult)
+      },
+      dispatchTo: ({ id, method, data }: { id?: string; method: string; data: unknown }) => {
+        if (isExpired()) return
+        if (id !== undefined) {
+          if (typeof id !== 'string' || id.length === 0)
+            throw new RpcContractError(RpcCoreErrorText.dispatchTargetIdMustBeANonEmptyString)
+          this.options.dispatch(id as TTargetId, method, data)
+          return
+        }
+        for (const peer of this.options.peers)
+          if (peer !== request.route.route.senderId) this.options.dispatch(peer, method, data)
+      }
+    }
   }
 
   /** Validates, executes, and settles one inbound request. */
@@ -261,51 +315,8 @@ export class ProviderExecutor<TTargetId extends string> {
     if (timeoutMs === 0) controller.abort(new RpcTimeoutError())
     let expired = false
     const taskToken = {}
-    const expiredResult = (): IBrandedProviderResult => ({
-      ok: false,
-      message: RpcCoreErrorText.providerContextExpired,
-      code: RpcCoreErrorCode.contextExpired,
-      [providerResultBrand]: taskToken
-    })
     const isExpired = (): boolean => expired || controller.signal.aborted
-    const context = {
-      data: request.route.payload,
-      signal: controller.signal,
-      trace: request.route.route.trace,
-      success: (
-        data?: unknown,
-        options?: { readonly transfer?: readonly unknown[] }
-      ): IRpcProviderResult =>
-        isExpired()
-          ? expiredResult()
-          : Object.freeze({
-              ok: true,
-              data,
-              transfer: normalizeTransfer(options?.transfer),
-              [providerResultBrand]: taskToken
-            } as IBrandedProviderResult),
-      failed: (message: string, code: string): IRpcProviderResult => {
-        if (isExpired()) return expiredResult()
-        const failure = normalizeFailure(message, code)
-        return Object.freeze({
-          ok: false,
-          message: failure.message,
-          code: failure.code,
-          [providerResultBrand]: taskToken
-        } as IBrandedProviderResult)
-      },
-      dispatchTo: ({ id, method, data }: { id?: string; method: string; data: unknown }) => {
-        if (isExpired()) return
-        if (id !== undefined) {
-          if (typeof id !== 'string' || id.length === 0)
-            throw new RpcContractError(RpcCoreErrorText.dispatchTargetIdMustBeANonEmptyString)
-          this.options.dispatch(id as TTargetId, method, data)
-          return
-        }
-        for (const peer of this.options.peers)
-          if (peer !== request.route.route.senderId) this.options.dispatch(peer, method, data)
-      }
-    }
+    const context = this.createContext(request, controller.signal, isExpired, taskToken)
     try {
       if (
         request.route.route.dispatchOnly &&

@@ -10,6 +10,7 @@ import type {
 } from '../internal/feature-contract.js'
 import { RpcStreamOwner } from '../internal/stream/owner.js'
 import type { IAbortSignal } from '../internal/async-control.js'
+import type { IRpcContext } from '../typing.js'
 
 /** Connection owner answers whether a particular peer negotiated stream@1. */
 export type IRpcStreamCapabilityPort = Readonly<{ supports: (peerId: string) => boolean }>
@@ -20,7 +21,7 @@ export type IRpcStreamCapabilityPort = Readonly<{ supports: (peerId: string) => 
  */
 export type IRpcStreamRun = (
   params: unknown,
-  context: Readonly<{ signal: IAbortSignal }>
+  context: Readonly<{ signal: IAbortSignal; context: IRpcContext }>
 ) => AsyncIterable<IRpcPortableValue> | Iterable<IRpcPortableValue>
 
 /** Optional stream runtime projected into a composed endpoint. */
