@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
 /** Owns bounded active outbound identifiers and released replay tombstones. */
@@ -19,7 +20,7 @@ export class ReplayWindow {
       ttlMs < 1
     )
       throw tagRpcError(
-        new TypeError('replay limits must be positive safe integers'),
+        new TypeError(RpcCoreErrorText.replayLimitsMustBePositiveSafeIntegers),
         RpcCoreErrorCode.invalidConfig
       )
     this.#maxEntries = maxEntries

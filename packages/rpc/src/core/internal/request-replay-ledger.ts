@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import { createStringLeaseRegistry, type ILeaseRegistry } from '@migaia/lifecycle'
 import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
@@ -41,7 +42,7 @@ export class RequestReplayLedger {
       ttlMs < 1
     )
       throw tagRpcError(
-        new TypeError('request replay limits must be positive safe integers'),
+        new TypeError(RpcCoreErrorText.requestReplayLimitsMustBePositiveSafeIntegers),
         RpcCoreErrorCode.invalidConfig
       )
     this.#maxEntries = maxEntries

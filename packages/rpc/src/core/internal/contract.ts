@@ -1,7 +1,7 @@
 import { RpcError, RpcCoreErrorCode, RpcSchemaValidationError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcContractConfig } from '../typing.js'
-import { safeRead, safeString, type IRpcPropertyReadReporter } from './safe-value.js'
+import { safeRead, safeString } from './safe-value.js'
 import { RpcContractFailureKind } from '../semantic-constants.js'
 
 /** Validates one contract payload and preserves schema-library issues in the public error. */
@@ -38,7 +38,7 @@ export function validateContractData(
     /** Secondary property and collection failures remain behind the parser's primary failure. */
     const secondaryFailures: unknown[] = []
     /** Collects each failed issue read without allowing it to replace the parser error. */
-    const reportRead: IRpcPropertyReadReporter = ({ error }) => {
+    const reportRead = ({ error }: Readonly<{ error: unknown }>): undefined => {
       secondaryFailures.push(error)
       return undefined
     }
@@ -79,7 +79,10 @@ export function validateContractData(
     }
     let causeMessage: string = RpcCoreErrorText.schemaValidationFallback
     try {
-      causeMessage = cause instanceof Error ? safeString(cause.message) : safeString(cause)
+      causeMessage =
+        cause instanceof Error
+          ? safeString(cause.message, RpcCoreErrorText.unknownError, reportRead)
+          : safeString(cause, RpcCoreErrorText.unknownError, reportRead)
     } catch (error) {
       secondaryFailures.push(error)
       causeMessage = RpcCoreErrorText.schemaValidationFallback

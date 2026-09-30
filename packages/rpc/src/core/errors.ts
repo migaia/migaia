@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from './error-text.js'
 import { ERROR_SOURCE, RpcCoreErrorCode, type IRpcCoreErrorCode } from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 export { RpcCoreErrorCode, type IRpcCoreErrorCode }
@@ -127,7 +128,7 @@ export class RpcRemoteError extends Error {
 export class RpcAbortError extends RpcError {
   readonly cleanupPromise?: Promise<readonly IRpcCleanupError[]>
   constructor(
-    message = 'Web RPC request cancelled',
+    message = RpcCoreErrorText.webRPCRequestCancelled,
     cleanupPromise?: Promise<readonly IRpcCleanupError[]>,
     cause?: unknown
   ) {
@@ -140,7 +141,7 @@ export class RpcAbortError extends RpcError {
 export class RpcTimeoutError extends RpcError {
   readonly cleanupPromise?: Promise<readonly IRpcCleanupError[]>
   constructor(
-    message = 'Web RPC request deadline exceeded',
+    message = RpcCoreErrorText.webRPCRequestDeadlineExceeded,
     cleanupPromise?: Promise<readonly IRpcCleanupError[]>
   ) {
     super(RpcCoreErrorCode.deadlineExceeded, message)

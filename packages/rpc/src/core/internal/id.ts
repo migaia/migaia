@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from '../errors.js'
 import type { IRpcUuidConfig, IRpcUuidContext } from '../typing.js'
 
@@ -43,10 +44,11 @@ export function allocateRpcId(
   if (typeof generated !== 'string' || generated.length === 0)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
-      'UUID generator must return a non-empty string'
+      RpcCoreErrorText.uuidGeneratorMustReturnANonEmptyString
     )
   const id = `${variation.toUpperCase()}:${senderId}:${generated}`
-  if (isUsed(id)) throw new RpcError(RpcCoreErrorCode.invalidConfig, `UUID conflict: ${id}`)
+  if (isUsed(id))
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidConflict(id))
   return id
 }
 
@@ -60,5 +62,5 @@ function defaultRpcId(): string {
     const bytes = cryptoApi.getRandomValues(new Uint8Array(16))
     return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('')
   }
-  throw new RpcError(RpcCoreErrorCode.invalidConfig, 'UUID unavailable')
+  throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidUnavailable)
 }

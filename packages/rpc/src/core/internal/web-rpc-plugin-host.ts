@@ -184,7 +184,10 @@ function createNativeAdmissionFailure(
     firstFailure.error instanceof Error ? firstFailure.error.message : String(firstFailure.error)
   return new PluginHostError(
     PluginHostErrorCode.pluginInstallFailed,
-    `${ERROR_TEXT.PLUGIN_INSTALL_FAILED(firstFailure.failedName)}: ${failureMessage}`,
+    RpcCoreErrorText.pluginInstallFailureDetail(
+      ERROR_TEXT.PLUGIN_INSTALL_FAILED(firstFailure.failedName),
+      failureMessage
+    ),
     {
       cause: firstFailure.error,
       detail: Object.freeze({
