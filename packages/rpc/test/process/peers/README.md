@@ -1,8 +1,12 @@
 # Native process peers
 
-These four small peers are test fixtures, not SDKs. Each uses its language's
-standard library for framing and JSON. They do not install dependencies or
-write build products into the repository.
+These peers are test fixtures, not SDKs. Python, Rust, and Go are native
+counterparts. `ts-reference` is an independent TypeScript reference oracle
+for cross-checking vectors and interop. It does not count toward conformance
+R1/A1 or satisfy CF1/S2. M2 will add a separate `peers/ts` that consumes
+the package's public exports. Every peer here uses its language's standard
+library for framing and JSON; none installs dependencies or writes build
+products into the repository.
 
 ## Start a peer
 
@@ -12,7 +16,7 @@ From the repository root:
 python3 packages/rpc/test/process/peers/python/peer.py --stdio --role responder
 packages/rpc/test/process/peers/rust/run.sh --stdio --role responder
 packages/rpc/test/process/peers/go/run.sh --stdio --role responder
-packages/rpc/test/process/peers/ts/run.sh --stdio --role responder
+packages/rpc/test/process/peers/ts-reference/run.sh --stdio --role responder
 ```
 
 Use `--role initiator` with the same commands for pairwise tests. The peer
@@ -47,7 +51,7 @@ are installed outside this worktree. No wrapper installs a package.
 python3 packages/rpc/test/process/peers/python/selftest.py packages/rpc/schema/vectors
 packages/rpc/test/process/peers/rust/selftest.sh
 packages/rpc/test/process/peers/go/selftest.sh
-packages/rpc/test/process/peers/ts/selftest.sh
+packages/rpc/test/process/peers/ts-reference/selftest.sh
 python3 packages/rpc/test/process/peers/interop.py
 ```
 
