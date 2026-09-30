@@ -13,6 +13,7 @@ import {
   serializeRpcError,
   type IRpcHandshakeOffer
 } from '../../src/contract/index.js'
+import { redactWireFailure } from '../../src/contract/handshake.js'
 
 /** Distinctive synthetic credential used to detect partial disclosures. */
 const TOKEN = 'tok_SECRET_9f8e7d6c5b4a'
@@ -77,6 +78,31 @@ function invalidHello(
 }
 
 describe('handshake redaction', () => {
+  it('[A10] redacts AggregateError errors arrays before any diagnostic projection', () => {
+    const aggregate = new AggregateError([new Error(TOKEN)], 'aggregate failure')
+    const result = redactWireFailure(aggregate)
+    expect(result).not.toBe(aggregate)
+    expect(result).toMatchObject({ redacted: true, path: '/error' })
+    expect(Object.isFrozen(result)).toBe(true)
+    expect(inspect(result, { depth: null, showHidden: true })).not.toContain(TOKEN)
+    expect(JSON.stringify(result)).not.toContain(TOKEN)
+  })
+
+  it('[A10] redacts a secret beyond the 16-layer traversal limit', () => {
+    let chain: unknown = { secret: TOKEN }
+    for (let depth = 0; depth < 17; depth++) chain = new Error('clean', { cause: chain })
+    const result = redactWireFailure(chain)
+    expect(result).not.toBe(chain)
+    expect(result).toMatchObject({ redacted: true, path: '/error' })
+    expect(inspect(result, { depth: null, showHidden: true })).not.toContain(TOKEN)
+  })
+
+  it('[A5] retains an identity-safe four-layer Error chain', () => {
+    let chain: Error = new Error('leaf')
+    for (let depth = 0; depth < 3; depth++) chain = new Error('clean', { cause: chain })
+    expect(redactWireFailure(chain)).toBe(chain)
+  })
+
   it('A1 redacts responder input in all input forms', () => {
     const malformed = [
       [JSON.stringify({ ...HELLO, kind: 'request' }), 'required'],
