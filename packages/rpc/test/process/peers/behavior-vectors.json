@@ -603,6 +603,16 @@
           { "kind": "response", "id": "reuse-1", "ok": true, "data": { "payload": "reused" } }
         ]
       }
+    },
+    {
+      "id": "hello-then-bad-header-same-chunk",
+      "coalescedAfterHelloHex": "00000000",
+      "steps": [],
+      "expect": {
+        "exit": 1,
+        "frames": [{ "kind": "handshake", "step": "accept" }],
+        "stderrNot": ["PEER_FAIL HANDSHAKE_INVALID"]
+      }
     }
   ]
 }

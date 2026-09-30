@@ -40,8 +40,15 @@ export class FrameDecoder {
   #payload: Buffer | undefined
   /** Number of payload bytes already copied. */
   #payloadRead = 0
+  /** A malformed later frame is reported after earlier complete frames are consumed. */
+  #deferredFault: PeerFault | undefined
+
+  throwDeferredFault(): void {
+    if (this.#deferredFault !== undefined) throw this.#deferredFault
+  }
 
   push(chunk: Uint8Array): Buffer[] {
+    this.throwDeferredFault()
     /** Completed payloads delivered by this push. */
     const frames: Buffer[] = []
     /** Current position in the caller's reusable chunk. */
@@ -54,8 +61,12 @@ export class FrameDecoder {
         offset += take
         if (this.#headerRead < 4) continue
         const length = this.#header.readUInt32BE(0)
-        if (length === 0) throw new PeerFault('INVALID_FRAME')
-        if (length > MAX_FRAME) throw new PeerFault('FRAME_LIMIT_EXCEEDED')
+        if (length === 0 || length > MAX_FRAME) {
+          const fault = new PeerFault(length === 0 ? 'INVALID_FRAME' : 'FRAME_LIMIT_EXCEEDED')
+          if (frames.length === 0) throw fault
+          this.#deferredFault = fault
+          return frames
+        }
         this.#payload = Buffer.allocUnsafe(length)
         this.#payloadRead = 0
       }
@@ -75,6 +86,7 @@ export class FrameDecoder {
   }
 
   finish(): void {
+    this.throwDeferredFault()
     if (this.#headerRead !== 0 || this.#payload !== undefined) throw new PeerFault('INVALID_FRAME')
   }
 }
@@ -104,6 +116,7 @@ class FrameReader {
 
   async read(): Promise<Buffer | undefined> {
     while (this.#queued.length === 0) {
+      this.#decoder.throwDeferredFault()
       const next = await this.#source.next()
       if (next.done) {
         this.#decoder.finish()
