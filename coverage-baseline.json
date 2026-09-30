@@ -180,24 +180,24 @@
     },
     "rpc": {
       "lines": {
-        "covered": 5949,
-        "total": 6510,
-        "pct": 91.38
+        "covered": 6001,
+        "total": 6552,
+        "pct": 91.59
       },
       "statements": {
-        "covered": 6497,
-        "total": 7256,
-        "pct": 89.53
+        "covered": 6562,
+        "total": 7305,
+        "pct": 89.82
       },
       "functions": {
-        "covered": 1485,
-        "total": 1625,
-        "pct": 91.38
+        "covered": 1498,
+        "total": 1634,
+        "pct": 91.67
       },
       "branches": {
-        "covered": 3919,
-        "total": 4566,
-        "pct": 85.83
+        "covered": 3960,
+        "total": 4590,
+        "pct": 86.27
       }
     },
     "serialize": {
@@ -5066,14 +5066,14 @@
     },
     "packages/rpc/src/core/composed.ts": {
       "lines": {
-        "covered": 135,
-        "total": 159,
-        "pct": 84.9
+        "covered": 144,
+        "total": 168,
+        "pct": 85.71
       },
       "statements": {
-        "covered": 147,
-        "total": 171,
-        "pct": 85.96
+        "covered": 158,
+        "total": 182,
+        "pct": 86.81
       },
       "functions": {
         "covered": 45,
@@ -5081,9 +5081,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 82,
-        "total": 104,
-        "pct": 78.84
+        "covered": 86,
+        "total": 108,
+        "pct": 79.62
       }
     },
     "packages/rpc/src/core/endpoint-kernel.ts": {
@@ -5682,18 +5682,18 @@
     },
     "packages/rpc/src/core/internal/endpoint-bootstrap.ts": {
       "lines": {
-        "covered": 204,
-        "total": 216,
-        "pct": 94.44
+        "covered": 207,
+        "total": 219,
+        "pct": 94.52
       },
       "statements": {
-        "covered": 214,
-        "total": 229,
-        "pct": 93.44
+        "covered": 217,
+        "total": 232,
+        "pct": 93.53
       },
       "functions": {
-        "covered": 25,
-        "total": 25,
+        "covered": 27,
+        "total": 27,
         "pct": 100
       },
       "branches": {
@@ -5990,58 +5990,58 @@
     },
     "packages/rpc/src/core/internal/outbound-attachment.ts": {
       "lines": {
-        "covered": 305,
-        "total": 328,
-        "pct": 92.98
+        "covered": 307,
+        "total": 329,
+        "pct": 93.31
       },
       "statements": {
-        "covered": 328,
-        "total": 374,
-        "pct": 87.7
+        "covered": 332,
+        "total": 375,
+        "pct": 88.53
       },
       "functions": {
-        "covered": 79,
-        "total": 86,
-        "pct": 91.86
+        "covered": 81,
+        "total": 87,
+        "pct": 93.1
       },
       "branches": {
-        "covered": 196,
-        "total": 247,
-        "pct": 79.35
+        "covered": 203,
+        "total": 251,
+        "pct": 80.87
       }
     },
     "packages/rpc/src/core/internal/outbound-gate.ts": {
       "lines": {
-        "covered": 8,
-        "total": 10,
-        "pct": 80
+        "covered": 25,
+        "total": 25,
+        "pct": 100
       },
       "statements": {
-        "covered": 8,
-        "total": 10,
-        "pct": 80
+        "covered": 29,
+        "total": 29,
+        "pct": 100
       },
       "functions": {
-        "covered": 4,
-        "total": 4,
+        "covered": 8,
+        "total": 8,
         "pct": 100
       },
       "branches": {
-        "covered": 2,
-        "total": 4,
-        "pct": 50
+        "covered": 9,
+        "total": 10,
+        "pct": 90
       }
     },
     "packages/rpc/src/core/internal/outbound-sender.ts": {
       "lines": {
-        "covered": 111,
+        "covered": 113,
         "total": 123,
-        "pct": 90.24
+        "pct": 91.86
       },
       "statements": {
-        "covered": 119,
+        "covered": 122,
         "total": 138,
-        "pct": 86.23
+        "pct": 88.4
       },
       "functions": {
         "covered": 34,
@@ -6049,9 +6049,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 57,
+        "covered": 59,
         "total": 79,
-        "pct": 72.15
+        "pct": 74.68
       }
     },
     "packages/rpc/src/core/internal/peers.ts": {
@@ -6980,19 +6980,41 @@
     },
     "packages/rpc/src/core/plugins/log.ts": {
       "lines": {
-        "covered": 13,
+        "covered": 14,
         "total": 14,
-        "pct": 92.85
+        "pct": 100
       },
       "statements": {
-        "covered": 13,
+        "covered": 15,
         "total": 15,
-        "pct": 86.66
+        "pct": 100
       },
       "functions": {
-        "covered": 5,
+        "covered": 6,
         "total": 6,
-        "pct": 83.33
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/core/plugins/reporter-context.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
       },
       "branches": {
         "covered": 0,
@@ -7002,24 +7024,24 @@
     },
     "packages/rpc/src/core/plugins/send-queue.ts": {
       "lines": {
-        "covered": 94,
-        "total": 103,
-        "pct": 91.26
+        "covered": 111,
+        "total": 116,
+        "pct": 95.68
       },
       "statements": {
-        "covered": 100,
-        "total": 114,
-        "pct": 87.71
+        "covered": 120,
+        "total": 128,
+        "pct": 93.75
       },
       "functions": {
-        "covered": 27,
-        "total": 33,
-        "pct": 81.81
+        "covered": 31,
+        "total": 35,
+        "pct": 88.57
       },
       "branches": {
-        "covered": 59,
-        "total": 77,
-        "pct": 76.62
+        "covered": 80,
+        "total": 87,
+        "pct": 91.95
       }
     },
     "packages/rpc/src/core/protocol-constants.ts": {
@@ -14001,9 +14023,12 @@
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
   "changedRuntimeFiles": [
+    "packages/rpc/src/core/composed.ts",
+    "packages/rpc/src/core/internal/endpoint-bootstrap.ts",
     "packages/rpc/src/core/internal/outbound-attachment.ts",
     "packages/rpc/src/core/internal/outbound-gate.ts",
     "packages/rpc/src/core/plugins/log.ts",
+    "packages/rpc/src/core/plugins/reporter-context.ts",
     "packages/rpc/src/core/plugins/send-queue.ts"
   ],
   "deletedRuntimeFiles": []

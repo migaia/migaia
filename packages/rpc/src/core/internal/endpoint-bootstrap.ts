@@ -47,6 +47,22 @@ import type { IRpcPluginConstraint } from './plugin-contract.js'
 import type { IRpcEndpointOptions, IRpcSelectedComponents } from './endpoint-options.js'
 import type { IRpcHooksPort } from './plugin-shared-keys.js'
 
+/** Construction claims follow the transport identity without pulling optional plugins into core. */
+const transportConstructionRollbacks = new WeakMap<object, () => void>()
+
+/** Registers a transport wrapper's local claim rollback for failed endpoint construction. */
+export function registerTransportConstructionRollback(
+  transport: object,
+  rollback: () => void
+): void {
+  transportConstructionRollbacks.set(transport, rollback)
+}
+
+/** Releases only construction claims; resource disposal remains with the kernel and Host. */
+export function rollbackTransportConstruction(transport: object): void {
+  transportConstructionRollbacks.get(transport)?.()
+}
+
 /** Canonical validated factory snapshot consumed by WebRPC attachments. */
 export type IPreparedEndpoint<TTargetId extends string> = {
   readonly id: string

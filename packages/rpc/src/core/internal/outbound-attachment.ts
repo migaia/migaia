@@ -256,6 +256,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     kernel.resources.addSync('outbound unknown fields', () => this.#unknownFields.clear())
     kernel.resources.addSync('outbound response bindings', () => this.#responseBindings.clear())
     if (this.#outboundGate) {
+      /** Endpoint diagnostics own their subscription until kernel scope release. */
       const unsubscribe = this.#outboundGate.onEvent((event) => {
         const snapshot = event as { readonly name: string; readonly error?: unknown }
         this.emitDiagnostic({ name: snapshot.name, contract: event, error: snapshot.error })
@@ -541,7 +542,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               })
             )
           })
-          .catch((error) => this.emitFailure(error, RpcCoreErrorCode.transport))
+          .catch((error) => this.#reportOutboundFailure(error))
       }
       const onAbort = (): void => {
         notifyRemoteAbort(registeredSignals.find((signal) => signal.aborted)?.reason)
@@ -648,7 +649,17 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Sends one dispatch-only request without creating pending response state. */
   dispatch(targetId: string, method: string, data: unknown): void {
     void this.#sendDispatchOnly(targetId, method, data).catch((error) =>
-      this.emitFailure(error, RpcCoreErrorCode.transport)
+      this.#reportOutboundFailure(error)
+    )
+  }
+
+  /** Keeps capacity refusal distinct from a physical transport failure in fire-and-forget paths. */
+  #reportOutboundFailure(error: unknown): void {
+    this.emitFailure(
+      error,
+      error instanceof RpcError && error.code === RpcCoreErrorCode.overloaded
+        ? RpcCoreErrorCode.overloaded
+        : RpcCoreErrorCode.transport
     )
   }
 
