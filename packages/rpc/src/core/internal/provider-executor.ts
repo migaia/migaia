@@ -76,7 +76,7 @@ const maxProviderTransferItems = 64
 function normalizeTransfer(value: readonly unknown[] | undefined): readonly unknown[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value) || value.length > maxProviderTransferItems)
-    throw new RpcContractError('provider transfer must be a bounded array')
+    throw new RpcContractError(RpcCoreErrorText.providerTransferMustBeABoundedArray)
   const snapshot = Array.from(value)
   return Object.freeze(snapshot)
 }
@@ -87,7 +87,7 @@ function normalizeFailure(
   code: string
 ): { readonly message: string; readonly code: string } {
   if (typeof message !== 'string' || typeof code !== 'string')
-    throw new RpcContractError('provider failure message and code must be strings')
+    throw new RpcContractError(RpcCoreErrorText.providerFailureMessageAndCodeMustBeStrings)
   return Object.freeze({ message, code })
 }
 
@@ -111,7 +111,7 @@ export class ProviderExecutor<TTargetId extends string> {
       if (!request.route.route.dispatchOnly)
         await this.failureResponse(
           request,
-          new Error('Request replay ledger is full'),
+          new Error(RpcCoreErrorText.requestReplayLedgerIsFull),
           RpcCoreErrorCode.overloaded
         )
       return
@@ -120,7 +120,7 @@ export class ProviderExecutor<TTargetId extends string> {
       if (!request.route.route.dispatchOnly)
         await this.failureResponse(
           request,
-          new Error('Provider admission limit reached'),
+          new Error(RpcCoreErrorText.providerAdmissionLimitReached),
           RpcCoreErrorCode.overloaded
         )
       return
@@ -130,7 +130,7 @@ export class ProviderExecutor<TTargetId extends string> {
         if (!request.route.route.dispatchOnly)
           await this.failureResponse(
             request,
-            new Error('Verified peer binding expired'),
+            new Error(RpcCoreErrorText.verifiedPeerBindingExpired),
             RpcCoreErrorCode.overloaded
           )
       } finally {
@@ -263,7 +263,7 @@ export class ProviderExecutor<TTargetId extends string> {
     const taskToken = {}
     const expiredResult = (): IBrandedProviderResult => ({
       ok: false,
-      message: 'Provider context expired',
+      message: RpcCoreErrorText.providerContextExpired,
       code: RpcCoreErrorCode.contextExpired,
       [providerResultBrand]: taskToken
     })
@@ -298,7 +298,7 @@ export class ProviderExecutor<TTargetId extends string> {
         if (isExpired()) return
         if (id !== undefined) {
           if (typeof id !== 'string' || id.length === 0)
-            throw new RpcContractError('dispatch target id must be a non-empty string')
+            throw new RpcContractError(RpcCoreErrorText.dispatchTargetIdMustBeANonEmptyString)
           this.options.dispatch(id as TTargetId, method, data)
           return
         }
@@ -319,7 +319,7 @@ export class ProviderExecutor<TTargetId extends string> {
           responseSendStarted = true
           await this.failureResponse(
             request,
-            new Error('Provider not found'),
+            new Error(RpcCoreErrorText.providerNotFound),
             RpcCoreErrorCode.providerNotFound,
             false,
             sendResponse
@@ -337,7 +337,7 @@ export class ProviderExecutor<TTargetId extends string> {
           ? (result as IRpcProviderResult)
           : {
               ok: false,
-              message: 'Provider did not settle',
+              message: RpcCoreErrorText.providerDidNotSettle,
               code: RpcCoreErrorCode.providerNotSettled
             }
       if (response.ok) this.options.validate(request.envelope.method, 'result', response.data)
@@ -417,9 +417,13 @@ export class ProviderExecutor<TTargetId extends string> {
               )
               return undefined
             }),
-            RpcCoreErrorText.schemaValidationFallback
+            RpcCoreErrorText.schemaValidationFallback,
+            ({ error: conversionError }) => {
+              this.options.emitFailure(conversionError, RpcCoreErrorCode.schemaInvalid)
+              return undefined
+            }
           )
-        : 'Provider failed',
+        : RpcCoreErrorText.providerFailed,
       data: error instanceof RpcSchemaValidationError ? error.data : undefined,
       sentAt: this.options.timestamp(),
       ...(schemaError || includeSerializedError
