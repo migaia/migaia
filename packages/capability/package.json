@@ -39,12 +39,13 @@
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "fmt": "oxfmt src test",
+    "fmt": "oxfmt src test bench",
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc --noEmit -p test/tsconfig.json",
-    "lint": "oxlint src test",
+    "lint": "oxlint src test bench",
     "test": "vitest run test",
+    "bench:resume": "pnpm run build && node bench/resume-planner.mjs",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
