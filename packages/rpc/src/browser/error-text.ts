@@ -65,6 +65,10 @@ export const BrowserRpcErrorText = {
    * caller-facing wording.
    */
   workerFailure: (reason: string, detail: string): string => `[rpc] worker ${reason}: ${detail}`,
+  /** Stable reason for a Worker error event consumed by the Web Worker adapter. */
+  workerFailedReason: 'failed',
+  /** Stable reason for a Worker messageerror event consumed by the Web Worker adapter. */
+  workerMessageErrorReason: 'could not deserialize a message',
   /**
    * Stable browser error text consumed by browser/adapters/window.ts; preserves its existing
    * caller-facing wording.

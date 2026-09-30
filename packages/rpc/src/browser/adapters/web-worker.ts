@@ -130,8 +130,8 @@ export function createWebWorkerTransport(
         )
       )
     }
-  const onError = onFailure('failed')
-  const onMessageError = onFailure('could not deserialize a message')
+  const onError = onFailure(BrowserRpcErrorText.workerFailedReason)
+  const onMessageError = onFailure(BrowserRpcErrorText.workerMessageErrorReason)
 
   return {
     platform: RpcPlatform.worker,
