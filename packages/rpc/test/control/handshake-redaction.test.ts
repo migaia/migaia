@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   acceptRpcHandshake,
   completeRpcHandshake,
@@ -220,6 +220,35 @@ describe('handshake redaction', () => {
         'type'
       ).cause
     ).toMatchObject({ code: 'INVALID_ENVELOPE' })
+  })
+
+  it('A4/A5 retains a clean engine instance and withholds a four-unit excerpt', () => {
+    const clean = new SyntaxError('clean engine failure')
+    const cleanParse = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+      throw clean
+    })
+    try {
+      expect(invalid(() => normalizeRpcHandshake('{"x":123}'), 'type').cause).toBe(clean)
+    } finally {
+      cleanParse.mockRestore()
+    }
+
+    const excerpt = new SyntaxError('unexpected z9Qv token')
+    const excerptParse = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+      throw excerpt
+    })
+    try {
+      const error = invalid(() => normalizeRpcHandshake('{"x":z9Qv}'), 'type')
+      expect(error.cause).not.toBe(excerpt)
+      expect(error.cause).toMatchObject({
+        redacted: true,
+        form: 'text',
+        parsed: false,
+        syntaxError: '[redacted]'
+      })
+    } finally {
+      excerptParse.mockRestore()
+    }
   })
 
   it('A6 bounds and freezes the summary without changing the top-level error', () => {
