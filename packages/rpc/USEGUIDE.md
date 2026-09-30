@@ -84,6 +84,8 @@ Endpoint 代表通信链路里“我方”这一端。它实际具备哪些方�
 
 Transport 是最底层的抽象，只关心"把一个消息对象发出去"和"收到消息对象时通知我"，完全不理解 RPC 语义（不知道什么是请求、响应、超时）。它的最小接口只有两个必需方法：
 
+内置 Memory、RTCDataChannel、WebTransport、SharedWorker 和 Web Worker 适配器的原生终止/读取错误在 `onTransportError` 边界带 `source: '@migaia/rpc/core'` 与 `code: 'TRANSPORT'`；原生错误类型、消息和 stack 保留。RTC 外部错误能原地附码时仍是同一对象；不能附码时沿包装错误的 `cause` 取原对象。自定义适配器应使用 `@migaia/rpc/core/transport-kit` 的 `safeRead`/`safeString` 同步报告器，转换失败先报告原异常，再报告主传输错误。
+
 ```ts
 type IRpcTransport = {
   send(message: unknown, options?: { transfer?: readonly unknown[] }): void | Promise<void>
@@ -659,6 +661,7 @@ try {
 | `DEADLINE_EXCEEDED`                                   | 请求超时                                                          | 由调用方按业务策略处理                                                                   |
 | `PROVIDER_CONTEXT_EXPIRED`                            | provider 在其 `context` 已过期后才尝试结算                        | 检查 provider 是否有异步逻辑跑得太久                                                     |
 | `TRANSPORT`                                           | 底层传输发送/接收失败                                             | 传输层问题，检查连接状态                                                                 |
+| `STRING_CONVERSION_FAILED`                            | `safeString` 转换抛错且没有可用的同步报告器                       | 修复输入值，或在自定义适配器边界提供同步 `report` 并检查原异常 `cause`                 |
 | `AUTHENTICATION_FAILED`                               | `authentication()`/`connect()` 校验未通过                         | 安全相关，不建议自动重试                                                                 |
 | `SCHEMA_INVALID`                                      | `contract()` 配置的 schema 校验未通过                             | 检查参数/返回值是否符合约定的 schema                                                     |
 | `CAPABILITY_CONFLICT`                                 | 多个中间件/配置之间的能力声明冲突                                 | 检查中间件组合是否合理                                                                   |
@@ -693,6 +696,8 @@ try {
 ```
 
 构造期的取消/失败（`RpcConstructionError`/`RpcAbortError`）同样携带清理信息——即便构造还没完成就被取消，已经安装成功的那部分中间件依然会被正确回滚，不会留下半初始化的资源。
+
+调用方 `AbortSignal.reason` 的 getter 若抛错，请求与构造仍按 `CANCELLED` 结束，`RpcAbortError.cause` 保留该抛出值。出站中止只读一次 reason，并向远端发送一次取消通知；安装中的资源照常回滚。
 
 ---
 
