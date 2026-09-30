@@ -181,7 +181,13 @@ export const RpcCoreErrorCode = {
    * A keyed call already executed but its result was not retained for replay. The caller must
    * resolve the outcome before issuing another non-idempotent attempt.
    */
-  idempotencyResultUnavailable: 'IDEMPOTENCY_RESULT_UNAVAILABLE'
+  idempotencyResultUnavailable: 'IDEMPOTENCY_RESULT_UNAVAILABLE',
+
+  /**
+   * A string conversion throws without a synchronous reporter, or its reporter throws (cleanup
+   * R12). The caller must repair the input or provide a synchronous diagnostic sink.
+   */
+  stringConversionFailed: 'STRING_CONVERSION_FAILED'
 } as const
 
 export type IRpcCoreErrorCode = (typeof RpcCoreErrorCode)[keyof typeof RpcCoreErrorCode]
