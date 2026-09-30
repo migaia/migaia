@@ -403,3 +403,18 @@ export const RpcCoreErrorText = {
    */
   pluginInstallFailureDetail: (prefix: string, detail: string): string => `${prefix}: ${detail}`
 } as const
+
+/** Builds the stable role admission diagnostic at the core text owner. */
+export function roleAdmissionMessage(
+  role: string,
+  slot: string,
+  key: PropertyKey | undefined
+): string {
+  const safeKey =
+    key === undefined
+      ? 'unavailable'
+      : typeof key === 'symbol'
+        ? `symbol:${key.description ?? '<anonymous>'}`
+        : `string:${key}`
+  return `${RpcCoreErrorText.endpointModuleInvalid}; role=${role}; slot=${slot}; key=${safeKey}`
+}

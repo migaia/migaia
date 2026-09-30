@@ -19,8 +19,24 @@ function violations(path: string, text: string): string[] {
   const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true)
   const found = new Set<ts.Node>()
   const addLiteral = (node: ts.Node): void => {
-    if (ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)) found.add(node)
+    if (ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)) {
+      found.add(node)
+      return
+    }
+    // Arguments of a named factory describe data; that factory owns its own text contract.
+    if (ts.isCallExpression(node) || ts.isNewExpression(node)) return
+    // `typeof value === 'string'` is a type discriminator, not response text.
+    if (
+      ts.isBinaryExpression(node) &&
+      ts.isTypeOfExpression(node.left) &&
+      ts.isStringLiteral(node.right) &&
+      node.right.text === 'string'
+    )
+      return
+    ts.forEachChild(node, addLiteral)
   }
+  /** Text factories may live only in an error-text owner, not at an adapter call site. */
+  const isTextOwner = /(?:^|\/)error-text\.ts$/u.test(path)
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
       const callee = node.expression
@@ -71,6 +87,23 @@ function violations(path: string, text: string): string[] {
             if (parameter.initializer) addLiteral(parameter.initializer)
         }
     }
+    if (
+      !isTextOwner &&
+      ts.isFunctionDeclaration(node) &&
+      /(?:Message|Text)$/u.test(node.name?.text ?? '')
+    ) {
+      for (const statement of node.body?.statements ?? [])
+        if (ts.isReturnStatement(statement) && statement.expression)
+          addLiteral(statement.expression)
+    }
+    if (
+      !isTextOwner &&
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'onFailure'
+    ) {
+      for (const argument of node.arguments) addLiteral(argument)
+    }
     ts.forEachChild(node, visit)
   }
   visit(file)
@@ -87,6 +120,15 @@ describe('error text ownership', () => {
       'tagRpcError(new TypeError(`y ${z}`), c)',
       "class CustomError extends Error { constructor(message = 'm') { super(message) } }",
       "const record = { message: 'n' }"
+    ].join('\n')
+    expect(violations('fixture.ts', fixture)).toHaveLength(4)
+  })
+
+  it('[A1] rejects nested error arguments and local text factory fragments', () => {
+    const fixture = [
+      "new Error(flag ? 'left' : 'right')",
+      'function roleAdmissionMessage() { return `role=${role}` }',
+      "onFailure('failed')"
     ].join('\n')
     expect(violations('fixture.ts', fixture)).toHaveLength(4)
   })

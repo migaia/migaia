@@ -1,5 +1,5 @@
 import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from '../errors.js'
-import { RpcCoreErrorText } from '../error-text.js'
+import { RpcCoreErrorText, roleAdmissionMessage } from '../error-text.js'
 import type { IRpcFeature } from '../feature.js'
 import type { IRpcPluginClaims } from '../typing.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
@@ -298,21 +298,6 @@ function snapshotFeatureClaimAdmission(source: IRpcClaimAdmission): IRpcClaimAdm
     sharedConsumes: read('sharedConsumes', () => source.sharedConsumes),
     sharedOptionalConsumes: read('sharedOptionalConsumes', () => source.sharedOptionalConsumes)
   })
-}
-
-/** Builds the stable role-admission diagnostic shared by pure policy checks. */
-export function roleAdmissionMessage(
-  role: string,
-  slot: string,
-  key: PropertyKey | undefined
-): string {
-  const safeKey =
-    key === undefined
-      ? 'unavailable'
-      : typeof key === 'symbol'
-        ? `symbol:${key.description ?? '<anonymous>'}`
-        : `string:${key}`
-  return `${RpcCoreErrorText.endpointModuleInvalid}; role=${role}; slot=${slot}; key=${safeKey}`
 }
 
 /** Returns the first provider/control role violation without giving it a Host lifecycle owner. */
