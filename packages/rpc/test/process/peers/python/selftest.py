@@ -6,9 +6,12 @@ from __future__ import annotations
 import json
 import math
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable
+
+sys.dont_write_bytecode = True
 
 from peer import CAPABILITIES, MAX_FRAME, PeerFailure, negotiate, validate_hello
 
@@ -579,6 +582,21 @@ def run_selftest(path: str | None = None) -> int:
             results.missing(name)
         else:
             check(data)
+    behavior = subprocess.run(
+        [sys.executable, "-B", str(Path(__file__).resolve().parents[1] / "behavior_check.py"), "--language", "python"],
+        capture_output=True, text=True, check=False,
+    )
+    try:
+        summary = json.loads(behavior.stdout.strip())
+        behavior_vectors = json.loads((Path(__file__).resolve().parents[1] / "behavior-vectors.json").read_text())
+        if summary["language"] != "python" or summary["passed"] + summary["failed"] != len(behavior_vectors["cases"]):
+            raise ValueError("invalid behavior summary")
+        results.passed += summary["passed"]
+        results.failed += summary["failed"]
+        print(f"BEHAVIOR passed={summary['passed']} failed={summary['failed']}")
+    except (ValueError, KeyError, TypeError):
+        results.failed += 1
+        print("FAIL behavior-harness")
     print(f"SUMMARY passed={results.passed} failed={results.failed} pending={results.pending} skipped={results.skipped}")
     return 1 if results.failed else 0
 
