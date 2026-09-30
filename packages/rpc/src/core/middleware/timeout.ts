@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import type {
   IRpcPlugin,
   IRpcPluginInstallResult,
@@ -23,21 +24,32 @@ function snapshotTimeout(
 ): { readonly timeoutMs?: number | false } | { readonly error: RpcError } {
   if (!config || typeof config !== 'object' || Array.isArray(config))
     return {
-      error: new RpcError(RpcCoreErrorCode.invalidConfig, 'timeout descriptor is invalid')
+      error: new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.timeoutDescriptorIsInvalid
+      )
     }
   let timeoutMs: IRpcTimeoutConfig['timeoutMs']
   try {
     timeoutMs = config.timeoutMs
   } catch (error) {
     return {
-      error: new RpcError(RpcCoreErrorCode.invalidConfig, 'timeout descriptor is unreadable', error)
+      error: new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.timeoutDescriptorIsUnreadable,
+        error
+      )
     }
   }
   try {
     return Object.freeze({ timeoutMs })
   } catch (error) {
     return {
-      error: new RpcError(RpcCoreErrorCode.invalidConfig, 'timeout descriptor is unreadable', error)
+      error: new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.timeoutDescriptorIsUnreadable,
+        error
+      )
     }
   }
 }
@@ -58,7 +70,7 @@ function createTimeoutPlugin(config: IRpcTimeoutConfig): IRpcPlugin {
       )
         throw new RpcError(
           RpcCoreErrorCode.invalidConfig,
-          'timeoutMs must be false or a non-negative number'
+          RpcCoreErrorText.timeoutMsMustBeFalseOrANonNegativeNumber
         )
       const port: IRpcTimeoutCapability = Object.freeze({
         timeoutMs,

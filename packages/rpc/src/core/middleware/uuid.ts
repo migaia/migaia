@@ -1,3 +1,4 @@
+import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcPlugin, IRpcPluginInstallResult, IRpcUuidConfig } from '../typing.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
@@ -25,15 +26,22 @@ function createUuidPlugin(config: IRpcUuidConfig): IRpcPlugin {
     }),
     install: (): IRpcPluginInstallResult => {
       if (!config || typeof config !== 'object' || Array.isArray(config))
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'uuid descriptor is invalid')
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidDescriptorIsInvalid)
       let generate: IRpcUuidConfig['generate']
       try {
         generate = config.generate
       } catch (error) {
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'uuid descriptor is unreadable', error)
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.uuidDescriptorIsUnreadable,
+          error
+        )
       }
       if (generate !== undefined && typeof generate !== 'function')
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, 'uuid generate must be a function')
+        throw new RpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.uuidGenerateMustBeAFunction
+        )
       return {
         extension: Object.freeze({}),
         ports: Object.freeze({ [RpcPortName.uuid]: Object.freeze({ generate }) })
