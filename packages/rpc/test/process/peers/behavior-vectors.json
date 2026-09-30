@@ -706,6 +706,16 @@
           }
         ]
       }
+    },
+    {
+      "id": "post-handshake-error-marker",
+      "steps": [{ "rawHex": "000000017b" }],
+      "expect": {
+        "exit": 1,
+        "frames": [{ "kind": "handshake", "step": "accept" }],
+        "stderrContains": ["PEER_FAIL "],
+        "stderrNot": ["ERROR peer session failed"]
+      }
     }
   ]
 }
