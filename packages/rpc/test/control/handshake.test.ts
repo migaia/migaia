@@ -189,7 +189,12 @@ describe('handshake 1.0 (A5)', () => {
     expect(() => normalizeRpcHandshake(invalidReject)).toThrow(
       expect.objectContaining({
         code: 'HANDSHAKE_INVALID',
-        cause: expect.objectContaining({ code: 'INVALID_WIRE_ERROR' })
+        cause: expect.objectContaining({
+          redacted: true,
+          path: '/error',
+          wireCode: 'INVALID_WIRE_ERROR',
+          wireViolation: 'required'
+        })
       })
     )
   })

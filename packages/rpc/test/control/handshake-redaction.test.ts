@@ -308,6 +308,11 @@ describe('handshake redaction', () => {
     expect(wireCause?.data).toEqual(summary)
     expect(wireCause).not.toHaveProperty('truncated')
     expect(report).not.toHaveBeenCalled()
+    const empty = invalid(() => normalizeRpcHandshake('{}'), 'required')
+    expect(empty.cause).toMatchObject({ fields: [], parsed: true })
+    expect(empty.cause).not.toHaveProperty('kind')
+    expect(empty.cause).not.toHaveProperty('step')
+    expect(empty.cause).not.toHaveProperty('protocol')
   })
 
   it('[A9] unknown-kind hides short unknown field names', () => {
@@ -341,32 +346,41 @@ describe('handshake redaction', () => {
   it('[A9] protocol hides unrecognized values across call paths', () => {
     const token = 'toksecret9f8e'
     for (const [run, violation] of [
-      [() => normalizeRpcHandshake(JSON.stringify({ ...HELLO, kind: 'request', protocol: token })), 'required'],
+      [
+        () => normalizeRpcHandshake(JSON.stringify({ ...HELLO, kind: 'request', protocol: token })),
+        'required'
+      ],
       [() => completeRpcHandshake(OFFER, JSON.stringify({ ...HELLO, protocol: token })), 'step'],
-      [() =>
-        completeRpcHandshake(
-          OFFER,
-          JSON.stringify({
-            ...HELLO,
-            step: 'accept',
-            major: 1,
-            minor: 1,
-            codec: 'json',
-            protocol: token
-          })
-        ), 'mismatch'],
-      [() =>
-        acceptRpcHandshake(
-          OFFER,
-          JSON.stringify({
-            ...HELLO,
-            step: 'accept',
-            major: 1,
-            minor: 1,
-            codec: 'json',
-            protocol: token
-          })
-        ), 'step']
+      [
+        () =>
+          completeRpcHandshake(
+            OFFER,
+            JSON.stringify({
+              ...HELLO,
+              step: 'accept',
+              major: 1,
+              minor: 1,
+              codec: 'json',
+              protocol: token
+            })
+          ),
+        'mismatch'
+      ],
+      [
+        () =>
+          acceptRpcHandshake(
+            OFFER,
+            JSON.stringify({
+              ...HELLO,
+              step: 'accept',
+              major: 1,
+              minor: 1,
+              codec: 'json',
+              protocol: token
+            })
+          ),
+        'step'
+      ]
     ] as const) {
       const error = invalid(run, violation)
       redacted(error, token, 'A9:protocol')
@@ -382,6 +396,12 @@ describe('handshake redaction', () => {
     )
     redacted(error, token.toUpperCase(), 'A9:codec')
     expect(error.cause).toMatchObject({ codec: '[redacted]' })
+    const permittedShape = invalidHello(
+      { step: 'accept', major: 0, minor: 0, codec: token },
+      'type'
+    )
+    redacted(permittedShape, token, 'A9:codec')
+    expect(permittedShape.cause).toMatchObject({ codec: '[redacted]' })
   })
 
   it('[A9] codec-complete uses the local offer as its allowed codec set', () => {
@@ -395,6 +415,20 @@ describe('handshake redaction', () => {
       redacted(error, token, 'A9:codec-complete')
       expect(error.cause).toMatchObject({ codec: '[redacted]' })
     }
+    const known = invalid(
+      () =>
+        completeRpcHandshake(
+          { ...OFFER, codecs: ['json', 'cbor'] },
+          JSON.stringify({ ...HELLO, step: 'accept', major: 2, minor: 0, codec: 'cbor' })
+        ),
+      'mismatch'
+    )
+    expect(known.cause).toMatchObject({
+      codec: 'cbor',
+      kind: 'handshake',
+      step: 'accept',
+      protocol: 'migaia.rpc'
+    })
   })
 
   it('[A10] peer hides scalar, known value and unknown key', () => {
@@ -408,6 +442,31 @@ describe('handshake redaction', () => {
       redacted(error, token, 'A10:peer')
       expect(error.cause).toMatchObject({ path: '/peer' })
     }
+    for (const [peer, valueType] of [
+      [null, 'null'],
+      [5, 'number'],
+      [false, 'boolean']
+    ] as const) {
+      const error = invalidHello({ peer }, 'type')
+      expect(error.cause).toMatchObject({ path: '/peer', valueType })
+    }
+    const acceptPeer = invalid(
+      () =>
+        completeRpcHandshake(
+          OFFER,
+          JSON.stringify({
+            ...HELLO,
+            step: 'accept',
+            major: 1,
+            minor: 1,
+            codec: 'json',
+            peer: { id: token, runtime: 'BAD' }
+          })
+        ),
+      'required'
+    )
+    redacted(acceptPeer, token, 'A10:peer')
+    expect(acceptPeer.cause).toMatchObject({ path: '/peer' })
   })
 
   it('[A10] peer-runtime-version hides unknown keys and values', () => {
@@ -422,10 +481,13 @@ describe('handshake redaction', () => {
 
   it('[A10] implementation hides scalar and nested values', () => {
     const token = 'toksecret9f8e'
-    for (const implementation of [token, { name: 1, version: token, [token]: 1 }]) {
+    for (const [implementation, violation] of [
+      [token, 'type'],
+      [{ name: 1, version: token, [token]: 1 }, 'required']
+    ] as const) {
       const error = invalidHello(
         { peer: { id: 'caller', runtime: 'node', implementation } },
-        'type'
+        violation
       )
       redacted(error, token, 'A10:implementation')
       expect(error.cause).toMatchObject({ path: '/peer/implementation' })
@@ -434,7 +496,12 @@ describe('handshake redaction', () => {
 
   it('[A10] versions hides scalar, entry and nested key', () => {
     const token = 'toksecret9f8e'
-    for (const versions of [token, [token], [{ major: 0, minor: 0, [token]: 1 }]]) {
+    for (const versions of [
+      token,
+      [token],
+      [{ major: 0, minor: 0, [token]: 1 }],
+      { major: 1, minor: 0, [token]: 1 }
+    ]) {
       const error = invalidHello({ versions }, 'type')
       redacted(error, token, 'A10:versions')
       expect(error.cause).toMatchObject({ path: '/versions' })
@@ -460,6 +527,7 @@ describe('handshake redaction', () => {
     const token = 'toksecret9f8e'
     for (const [codecs, violation] of [
       [token, 'type'],
+      [{ [token]: 1 }, 'type'],
       [['json', token.toUpperCase()], 'type'],
       [[token], 'baseline']
     ] as const) {
