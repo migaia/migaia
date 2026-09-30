@@ -55,6 +55,7 @@ export type IRemoteRegistration = Readonly<{
   featureProxies(): Readonly<
     Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>
   >
+  revoke(reason: unknown): void
   release(): Promise<void>
 }>
 
@@ -509,6 +510,12 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
       features[featureName] = Object.freeze(methods)
     }
     return Object.freeze(features)
+  }
+
+  /** Revokes a prepared generation when its external PluginHost enable step fails. */
+  revoke(reason: unknown): void {
+    const generation = this.#current?.number
+    if (generation !== undefined) this.#leave(generation, reason)
   }
 
   /** Releases owned resources once and rejects pending readiness observers. */

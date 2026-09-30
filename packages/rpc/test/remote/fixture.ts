@@ -138,6 +138,8 @@ export function remoteHarness(
   })
   return {
     registration,
+    served,
+    channel,
     calls,
     sends,
     owned,
