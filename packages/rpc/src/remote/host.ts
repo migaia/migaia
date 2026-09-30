@@ -41,6 +41,8 @@ export function createRemoteHost<TUnit, TSpec>(
   let lastReadyGeneration = 0
   /** Initial preparation runs at most once, even if first operation is use. */
   let initialPromise: Promise<void> | undefined
+  /** The start ready event must not begin a second preparation while the first is pending. */
+  let preparingInitial = false
   /** Ready promise is stable within one active or unavailable generation. */
   let readyPromise: Promise<void> | undefined
   /** Rebind work is serialized across supervisor state observations. */
@@ -48,7 +50,8 @@ export function createRemoteHost<TUnit, TSpec>(
   /** Release settles once and prevents later channel publication. */
   let releasePromise: Promise<void> | undefined
   const scheduleRebind = (): void => {
-    if (releasePromise || rebinding || registration.events.current().active) return
+    if (releasePromise || preparingInitial || rebinding || registration.events.current().active)
+      return
     if (options.binding.supervisor.state !== 'ready') return
     rebinding = true
     void holder
@@ -68,10 +71,19 @@ export function createRemoteHost<TUnit, TSpec>(
     }
     if (event.type === 'state' && event.to === 'ready') scheduleRebind()
   })
-  const ensureInitial = (): Promise<void> =>
-    (initialPromise ??= holder.prepareInitial(lifecycle.signal).then((generation) => {
-      lastReadyGeneration = generation
-    }))
+  const ensureInitial = (): Promise<void> => {
+    if (initialPromise) return initialPromise
+    preparingInitial = true
+    initialPromise = holder
+      .prepareInitial(lifecycle.signal)
+      .then((generation) => {
+        lastReadyGeneration = generation
+      })
+      .finally(() => {
+        preparingInitial = false
+      })
+    return initialPromise
+  }
   const ready = (): Promise<void> => {
     if (releasePromise)
       return Promise.reject(createRemoteLayerError(RpcRemoteLayerErrorCode.closed))

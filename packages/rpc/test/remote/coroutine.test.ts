@@ -46,6 +46,11 @@ describe('remote coroutine loopback', () => {
       features: { f: { methods: { m: { mode: 'request', idempotent: true } } } }
     }
     const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 2, launchRate: false })
+    /** Every generation's task observes cancellation before final release returns. */
+    const signals: IAbortSignal[] = []
+    /** Client resources must close once for each completed generation. */
+    let channelCloses = 0
+    let endpointCloses = 0
     const report = (error: unknown): void => {
       throw error
     }
@@ -54,6 +59,7 @@ describe('remote coroutine loopback', () => {
         budget,
         report,
         task: async ({ signal, serve }) => {
+          signals.push(signal)
           await serve(servedHost, () => target)
           await waitForAbort(signal)
         }
@@ -61,7 +67,34 @@ describe('remote coroutine loopback', () => {
       { catalog: { p: replayContract } }
     )
     const remote = createRemoteHost({
-      ...ports,
+      binding: {
+        ...ports.binding,
+        openChannel: async (unit, signal) => {
+          const channel = await ports.binding.openChannel(unit, signal)
+          expect(channel.agreement.source).toBe('static')
+          expect(channel.agreement.capabilities).toContain('stream@1')
+          return {
+            ...channel,
+            close: async () => {
+              channelCloses += 1
+              await channel.close()
+            }
+          }
+        }
+      },
+      endpointFactory: async (channel, signal) => {
+        const served = await ports.endpointFactory(channel, signal)
+        return {
+          ...served,
+          endpoint: {
+            ...served.endpoint,
+            dispose: async () => {
+              endpointCloses += 1
+              await served.endpoint.dispose()
+            }
+          }
+        }
+      },
       catalog: { p: replayContract },
       report
     })
@@ -82,6 +115,10 @@ describe('remote coroutine loopback', () => {
       await servedHost.dispose()
       budget.close()
     }
+    expect(signals).toHaveLength(2)
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
+    expect(channelCloses).toBe(2)
+    expect(endpointCloses).toBe(2)
   })
 
   it('serves a Host catalog over a static in-memory channel', async () => {
