@@ -39,9 +39,11 @@ by a future channel test, must be passed separately; never place the token in
 argv or environment. These fixtures do not replace I14 authentication.
 
 Rust compiles offline to `${TMPDIR:-/tmp}/migaia-rpc-peer-rust-target`. Go's
-wrapper compiles to a system temporary directory. TypeScript's `run.sh` uses
-Node 24's built-in type stripping and emits no JavaScript file. Its selftest
-compiles to a fresh temporary directory using the already installed `tsc`
+wrapper reuses one fixed system temporary build directory and rebuilds only
+when Go source changes. TypeScript's `run.sh` uses Node 24's built-in type
+stripping and emits no JavaScript file. Its selftest reuses one fixed system
+temporary build directory and rebuilds only when TypeScript source changes,
+using the already installed `tsc`
 and Node type definitions. Set `RPC_PEERS_TSC` and `RPC_PEERS_TYPES` if those
 are installed outside this worktree. No wrapper installs a package.
 
