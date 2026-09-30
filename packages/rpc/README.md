@@ -2,6 +2,8 @@
 
 统一提供运行时中立的语义契约、RPC 核心和按需导入的浏览器传输适配器。没有根入口 `@migaia/rpc`；从下面的层级子路径导入。
 
+`@migaia/rpc/remote` 提供显式 `IRemoteContract`、Plugin/Host 远程装配和协程内存回环。客户端只传插件名与可移植配置；服务端用本地同步 resolver 取得由 `definePlugin` 创建的真实定义。`serveRemoteHost` 在调用 Host 前拒绝 Promise、伪定义及目录外名称。`createCoroutinePlugin` 和 `createCoroutineHost` 使用同一 remote 代理、内存通道和 supervisor，任务调用 `serve` 发布一次端口，并在收到 `signal` 中止后协作退出。进程和线程门面复用此层的装配接口。
+
 ## Contract
 
 Runtime-neutral semantic RPC descriptors, portable values, hostile-safe envelope normalization, and whole-message framing contracts.

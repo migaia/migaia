@@ -1,6 +1,14 @@
 # @migaia/rpc 使用手册
 
-本手册按 Contract、Core、Browser 三层组织。包没有根导出；按层级子路径导入。
+本手册按 Remote、Contract、Core、Browser 层组织。包没有根导出；按层级子路径导入。
+
+## Remote
+
+从 `@migaia/rpc/remote` 导入 `createRemotePlugin`、`serveRemotePlugin`、`createRemoteHost`、`serveRemoteHost`，或协程内存门面 `createCoroutinePlugin`、`createCoroutineHost`。描述必须声明 `schemaVersion: 1`、插件名、非空 Feature/方法表，以及每个方法的 `mode` 和 `idempotent`。Host catalog 是名称到描述的非空映射；Schema 校验结构，`normalizeRemoteHostCatalog` 额外校验映射键与描述的 `plugin` 相同。
+
+客户端 `createRemoteHost(...).ready()` 等待本代通道与 describe 匹配。`use(name, config?)` 只发送名称和可移植配置，成功后返回本地 Feature 代理；`inspect()` 返回服务端当前登记的有限投影；`unUse(name, { policy?, dryRun? })` 仅支持 `reject` 与 `suspend`。服务端 `serveRemoteHost` 的 `resolvePlugin(name, config?)` 必须同步返回同名的 `definePlugin` 定义。`release()` 与服务端 `close()` 都可重复调用，且只释放各自拥有的通道或 endpoint。协程门面由 task 的 `serve(servedHost, resolvePlugin?)` 发布端口一次；Host 模式必须给 resolver，任务需要在 `signal` 中止时退出。
+
+request 使用 core 的单次发送与幂等键；one-way 只确认发送；generator/async-generator 使用 stream Feature。调用失败沿 wire-error 保留 source、code、stack 与 cause。失活期间的新调用在发帧前以 `REMOTE_CLOSED` 拒绝；新 generation 描述校验完成后才恢复代理。进程/线程部署的安全鉴权和终止能力由各自 launcher 与 channel 负责。
 
 ## Contract
 

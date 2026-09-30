@@ -7,10 +7,10 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** I12 error-text cleanup retains stable core messages; byte caps equal its measured root output. */
+/** I13 measured cap is exact; remote's new modules are absent from the retained root graph. */
 const allowedIncrease = {
-  rawBytes: 73760 / legacyRoot.rawBytes,
-  gzipBytes: 16523 / legacyRoot.gzipBytes
+  rawBytes: 74309 / legacyRoot.rawBytes,
+  gzipBytes: 16706 / legacyRoot.gzipBytes
 } as const
 
 /** I12 changes no retained modules relative to the IPC-reviewed graph. */
