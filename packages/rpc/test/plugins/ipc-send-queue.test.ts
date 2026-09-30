@@ -40,7 +40,7 @@ function deferredWrite() {
 }
 
 /** Uses a canonical request so gate classification reads only validated protocol fields. */
-function request(id: string) {
+function request(id: string, trace?: string) {
   return normalizeRpcEnvelope({
     kind: 'request',
     id,
@@ -52,7 +52,8 @@ function request(id: string) {
         applicationVersion: '1',
         senderId: 'client',
         targetId: 'server',
-        sentAt: 0
+        sentAt: 0,
+        ...(trace === undefined ? {} : { trace })
       }
     }
   })
@@ -417,22 +418,75 @@ describe('IPC send queue contract', () => {
       maxPendingData: 1
     })
     const records: unknown[] = []
+    const reportErrors: unknown[] = []
+    const sinkFailure = new Error('log sink failed')
     const logging = log.createIpcLogFeature({
       gate: installed.gate,
       report(record) {
         records.push(record)
+        if (record.name === 'ipc.backlog.rejected') throw sinkFailure
+        if (record.name === 'ipc.send.failed') return Promise.reject(sinkFailure)
       },
       onReportError(error) {
-        throw error
+        reportErrors.push(error)
       }
     })
     expect(logging.feature, '[A5] log must be a native feature').toBeDefined()
+    const [wire] = createMemoryTransportPair()
+    const wrapped = queue.createIpcSendQueueTransport(wire, installed.gate)
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'a5',
+        transport: wrapped,
+        middlewares: [connect({ transport: wrapped })],
+        features: [installed.feature, logging.feature] as const
+      },
+      createFirstPartyRoots(new Set(['first-party-outbound']))
+    )
+    const hooks: unknown[] = []
+    endpoint.hooks.on((event) => {
+      hooks.push(event)
+    })
     logging.recordStderr({
       name: 'ipc.stderr',
       connectionId: 'a5',
       sessionId: 'session',
       text: 'stderr line'
     })
+    const blocked = deferredWrite()
+    const active = installed.gate.run(request('active'), () => blocked.promise)
+    const rejected = installed.gate.run(request('rejected', 't1'), () => undefined)
+    await expect(
+      rejected,
+      '[A5] reporter failure must not rewrite capacity error'
+    ).rejects.toMatchObject({
+      code: 'OVERLOADED'
+    })
+    await vi.waitFor(() => expect(reportErrors).toContain(sinkFailure))
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        name: 'ipc.backlog.rejected',
+        connectionId: 'a5',
+        sessionId: 'session',
+        pendingData: 1,
+        trace: 't1'
+      })
+    )
+    expect(hooks).toContainEqual(
+      expect.objectContaining({
+        name: 'ipc.backlog.rejected',
+        contract: expect.objectContaining({ connectionId: 'a5', trace: 't1' })
+      })
+    )
+    blocked.release()
+    await active
+    await expect(
+      installed.gate.run(request('failure'), () =>
+        Promise.reject(new Error('physical send failed'))
+      )
+    ).rejects.toBeDefined()
+    await vi.waitFor(() => expect(reportErrors).toHaveLength(2))
+    await endpoint.dispose()
     expect(
       records,
       '[A5] stderr must retain connection/session without invented trace'
@@ -451,12 +505,16 @@ describe('IPC send queue contract', () => {
     const [transport] = createMemoryTransportPair()
     const installed = queue.createIpcSendQueueFeature({ connectionId: 'a6' })
     const wrapped = queue.createIpcSendQueueTransport(transport, installed.gate)
-    await expect(
-      createComposedEndpoint(
-        { id: 'a6', transport: wrapped, middlewares: [connect({ transport: wrapped })] },
-        createFirstPartyRoots(new Set(['first-party-outbound']))
-      )
-    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    expect(
+      () => queue.createIpcSendQueueTransport(transport, installed.gate),
+      '[A6] one physical connection cannot be wrapped twice'
+    ).toThrowError(TypeError)
+    const missingFeature = createComposedEndpoint(
+      { id: 'a6', transport: wrapped, middlewares: [connect({ transport: wrapped })] },
+      createFirstPartyRoots(new Set(['first-party-outbound']))
+    )
+    await expect(missingFeature).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    await expect(missingFeature).rejects.toBeInstanceOf(TypeError)
     const [plain] = createMemoryTransportPair()
     await expect(
       createComposedEndpoint(

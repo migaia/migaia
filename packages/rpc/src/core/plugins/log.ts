@@ -1,5 +1,6 @@
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { defineFeature } from '../feature.js'
+import type { IRpcFeatureExpose } from '../internal/feature-contract.js'
 import type { IIpcLogInstallation, IIpcLogRecord, IIpcSendGate } from './flow-control.js'
 
 /** Observational reporter does not change a gate admission or business Promise result. */
@@ -30,9 +31,12 @@ export function createIpcLogFeature(
       handleReportError(error, record)
     }
   }
-  const feature = defineFeature(() => {
-    options.gate.onEvent(publish)
-    return Object.freeze({})
-  })
+  const feature = defineFeature<Record<never, never>, Record<never, never>, IRpcFeatureExpose>(
+    (core) => {
+      const unsubscribe = options.gate.onEvent(publish)
+      core.featureExpose.getKernel().resources.addSync('IPC log', unsubscribe)
+      return Object.freeze({})
+    }
+  )
   return Object.freeze({ feature, recordStderr: publish })
 }
