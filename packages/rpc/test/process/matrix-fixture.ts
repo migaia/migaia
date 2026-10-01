@@ -7,7 +7,7 @@ import {
   createProcessSupervisor,
   type IProcessSpec
 } from '@migaia/supervision/process'
-import { PluginHost } from '@migaia/plugin-host'
+import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { createComposedEndpoint } from '../../src/core/composed.js'
@@ -436,6 +436,37 @@ export async function matrixFixture(
         )
       }
       await rm(directory, { recursive: true, force: true })
+    }
+  }
+}
+
+/** Captures the installed remote proxy without rebuilding it after generation changes. */
+export function matrixDependency(fixture: Awaited<ReturnType<typeof matrixFixture>>) {
+  const install = vi.fn(() => ({}))
+  let feature!: IMatrixFeature
+  let immediate!: Promise<unknown>
+  const definition = definePlugin({
+    name: 'dependent',
+    features: {
+      use: defineFeature(
+        (_core, dependencies) => {
+          feature = dependencies.remote as IMatrixFeature
+          immediate = feature.request(['ready'])
+          return {}
+        },
+        { remote: fixture.plugin.getFeature('f') }
+      )
+    },
+    install
+  })
+  return {
+    definition,
+    install,
+    get feature() {
+      return feature
+    },
+    get immediate() {
+      return immediate
     }
   }
 }
