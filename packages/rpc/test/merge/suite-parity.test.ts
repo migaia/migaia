@@ -140,10 +140,10 @@ describe('A7 migrated suite parity', () => {
     for (const file of testSources(join(packageRoot, 'test'))) {
       for (const literal of stringsIn(file)) {
         if (
-          /^(?:\.\.?\/)*src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$))/.test(
+          /^(?:\.\.?\/)*src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$))/.test(
             literal
           ) ||
-          /packages\/(?:rpc|web-rpc|rpc-contract)\/src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$))/.test(
+          /packages\/(?:rpc|web-rpc|rpc-contract)\/src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$))/.test(
             literal
           ) ||
           literal.includes(['src/core/', 'core.ts'].join('')) ||
