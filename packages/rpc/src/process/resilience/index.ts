@@ -12,7 +12,7 @@ import {
   type IProcessDependentDiagnostic
 } from './liquidation.js'
 import { listenProcessRegistrations } from './rendezvous.js'
-import { createProcessSessionManager } from './session.js'
+import { createProcessSessionManager, type IProcessSessionManager } from './session.js'
 import { createProcessTerminalRegistration, type IProcessTerminalRegistration } from './terminal.js'
 import type {
   IProcessRegistration,
@@ -22,6 +22,17 @@ import type {
   IProcessResilienceSnapshot,
   IProcessDependencyHostPort
 } from './types.js'
+
+/** Package-local session ownership lets both service facades reuse the same governor. */
+const sessionManagers = new WeakMap<IProcessResilience, IProcessSessionManager>()
+
+/** Obtain the canonical quotas and store for a service-owned governor. */
+export function processSessionManager(
+  resilience: IProcessResilience
+): IProcessSessionManager | undefined {
+  const manager = sessionManagers.get(resilience)
+  return manager
+}
 
 /** One close outcome retains every independently failing listener or registration. */
 function closeFailure(errors: readonly unknown[]): AggregateError {
@@ -135,7 +146,7 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
     dependents.set(name, diagnostic)
   }
 
-  return Object.freeze({
+  const resilience: IProcessResilience = Object.freeze({
     sessionOptions: manager.sessionOptions,
     async listenRegistrations(input): Promise<IProcessRegistrationListener> {
       if (closed) throw createProcessError(RpcProcessErrorCode.channelClosed)
@@ -282,4 +293,6 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
       })())
     }
   })
+  sessionManagers.set(resilience, manager)
+  return resilience
 }

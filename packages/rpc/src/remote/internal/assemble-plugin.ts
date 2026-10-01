@@ -14,7 +14,7 @@ const ENABLE_RETRY_BASE_MS = 10
 /** Package-internal lifecycle observations let a facade reject stale definition commands. */
 type IRemoteAssemblyLifecycle = Readonly<{
   onInstalled?(): void
-  onReleased?(): void
+  onReleased?(): void | Promise<void>
 }>
 
 /** Builds one trusted definition before PluginHost freezes its package-owned metadata. */

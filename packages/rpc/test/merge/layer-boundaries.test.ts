@@ -53,6 +53,17 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('A2 layer dependency direction', () => {
+  it('[A10] keeps remote retry independent of process and coroutine launchers', () => {
+    const source = readFileSync(join(sourceRoot, 'remote/retry.ts'), 'utf8')
+    const parsed = ts.createSourceFile('retry.ts', source, ts.ScriptTarget.Latest, true)
+    const imports = parsed.statements
+      .filter(ts.isImportDeclaration)
+      .map((statement) =>
+        ts.isStringLiteral(statement.moduleSpecifier) ? statement.moduleSpecifier.text : ''
+      )
+    expect(imports.some((specifier) => /(?:process|threads|coroutine)/.test(specifier))).toBe(false)
+  })
+
   it('accepts the complete real source tree', () => {
     const failures = sourceFiles(sourceRoot).flatMap((file) =>
       layerViolations(file, readFileSync(file, 'utf8'))

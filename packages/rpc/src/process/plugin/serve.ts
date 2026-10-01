@@ -16,6 +16,11 @@ import {
   createProcessInstanceFallback,
   type IProcessInstanceFallback
 } from '../resilience/fallback.js'
+import { createProcessResilience, processSessionManager } from '../resilience/index.js'
+import type { IProcessResilience } from '../resilience/types.js'
+import { RpcCapability } from '../../contract/wire-constants.js'
+import type { IProcessServeListenerIngress, IProcessServeEndpointFactory } from './types.js'
+import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IProcessSessionIdentity } from '../resilience/types.js'
 import { invalidOption, reportSafely } from './binding.js'
 import { ProcessPluginChannelKind } from './constants.js'
@@ -50,8 +55,7 @@ function createSession(
   lease: IProcessConnectionLease,
   closeAdmission: () => void,
   identity: IProcessSessionIdentity,
-  fallback: IProcessInstanceFallback,
-  closeHost?: () => Promise<void>
+  fallback?: IProcessInstanceFallback
 ): IProcessServeSession {
   /** Repeated EOF, listener close, and explicit close share one cleanup outcome. */
   let closePromise: Promise<void> | undefined
@@ -78,13 +82,6 @@ function createSession(
         } catch (error) {
           errors.push(error)
         }
-        if (closeHost) {
-          try {
-            await closeHost()
-          } catch (error) {
-            errors.push(error)
-          }
-        }
         lease.release()
         sessions.delete(session)
         unregisterFallback?.()
@@ -95,69 +92,52 @@ function createSession(
   unsubscribe = channel.transport.onTransportError?.(() => {
     void session.close().catch((error: unknown) => reportSafely(report, error))
   })
-  unregisterFallback = fallback.add({ connectionId: identity.connectionId, close: session.close })
+  unregisterFallback = fallback?.add({ connectionId: identity.connectionId, close: session.close })
   return session
 }
 
-/** A late ready service belongs to the closing ingress and cannot outlive its handle. */
-async function rejectLateService(
-  service: IRemoteServePluginHandle,
-  report: (error: unknown) => void
-): Promise<never> {
-  try {
-    await service.close()
-  } catch (error) {
-    reportSafely(report, error)
-  }
-  throw createProcessError(RpcProcessErrorCode.channelClosed)
+/** Invoking the service callback transfers endpoint ownership, including failed-startup rollback. */
+export type IProcessReadySession = Readonly<{
+  channel: IRemoteChannel
+  endpoint: IRemoteServeEndpoint
+  identity: IProcessSessionIdentity
+  signal: IAbortSignal
+}>
+
+/** Native service endpoints must support the control capability their peer will probe. */
+function validateServiceEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): void {
+  if (
+    channel.agreement.capabilities.includes(RpcCapability.ping) &&
+    typeof endpoint.endpoint.ping !== 'function'
+  )
+    throw createProcessError(RpcProcessErrorCode.resilienceInvalidOption, undefined, {
+      field: 'endpointFactory'
+    })
 }
 
-/** Serve either a child channel or an authenticated listener without duplicating remote methods. */
-export async function createServeProcessPlugin(
-  options: IProcessServePluginOptions
-): Promise<IProcessPluginServeHandle> {
-  if (
-    !options ||
-    !options.ingress ||
-    typeof options.report !== 'function' ||
-    typeof options.endpointFactory !== 'function'
-  )
-    invalidOption('serve')
-  const mode = options.instanceMode ?? 'shared'
-  if (mode === 'per-connection') {
-    if (typeof options.createSessionHost !== 'function') invalidOption('createSessionHost')
-  } else if (mode === 'shared') {
-    if (
-      typeof options.createSharedTarget !== 'function' ||
-      typeof options.onInstanceUnhealthy !== 'function'
-    )
-      invalidOption('createSharedTarget/onInstanceUnhealthy')
-  } else invalidOption('instanceMode')
-  const contract = normalizeRemoteContract(options.contract)
-  if (options.ingress.kind === 'listener' && typeof options.ingress.verify !== 'function')
+/** Own one accept/parent-loss loop for Plugin and Host services, with canonical session quotas. */
+export async function serveProcessSessions(
+  ingress: IProcessServeChildIngress | IProcessServeListenerIngress,
+  endpointFactory: IProcessServeEndpointFactory,
+  onReadySession: (session: IProcessReadySession) => Promise<IRemoteServePluginHandle>,
+  resilience: IProcessResilience,
+  report: (error: unknown) => void,
+  fallback?: IProcessInstanceFallback
+): Promise<Readonly<{ close(): Promise<void> }>> {
+  if (ingress.kind === 'listener' && typeof ingress.verify !== 'function')
     invalidOption('ingress.verify')
-  if (
-    options.ingress.kind === 'child' &&
-    (!options.ingress.parentLoss || typeof options.ingress.parentLoss.exit !== 'function')
-  )
+  if (ingress.kind === 'child' && typeof ingress.parentLoss?.exit !== 'function')
     invalidOption('ingress.parentLoss.exit')
-  /** A default owner bounds physical sessions even before registration policy is attached. */
-  const manager = createProcessSessionManager({
-    scheduler:
-      options.ingress.kind === 'listener'
-        ? (options.ingress.scheduler ?? systemScheduler)
-        : systemScheduler,
-    report: options.report
-  })
-  /** Explicit instance events, never ordinary call failures, trigger target replacement. */
-  const fallback = createProcessInstanceFallback({
-    mode,
-    targetName: contract.plugin,
-    host: options.host,
-    createSharedTarget: options.createSharedTarget,
-    onInstanceUnhealthy: options.onInstanceUnhealthy,
-    report: (error) => reportSafely(options.report, error)
-  })
+  /** Both facades borrow the exact manager held by their one service governor. */
+  const borrowedManager = processSessionManager(resilience)
+  /** Structural custom governors retain their own sessionOptions and use default admission quotas. */
+  const manager =
+    borrowedManager ??
+    createProcessSessionManager({
+      scheduler:
+        ingress.kind === 'listener' ? (ingress.scheduler ?? systemScheduler) : systemScheduler,
+      report
+    })
   const controller = new AbortController()
   /** A service owns only sessions accepted through this invocation. */
   const sessions = new Set<IProcessServeSession>()
@@ -174,7 +154,7 @@ export async function createServeProcessPlugin(
   const close = (): Promise<void> =>
     (closePromise ??= (async () => {
       controller.abort()
-      const fallbackClose = fallback.close()
+      const fallbackClose = fallback?.close()
       removeParentClose?.()
       removeProbe?.()
       const errors: unknown[] = []
@@ -191,19 +171,20 @@ export async function createServeProcessPlugin(
           errors.push(error)
         }
       }
-      manager.close()
+
       await fallbackClose
+      if (!borrowedManager) manager.close()
       if (errors.length > 0) throw cleanupFailure(errors)
     })())
 
-  if (options.ingress.kind === 'listener') {
-    const ingress = options.ingress
+  if (ingress.kind === 'listener') {
+    const listenerIngress = ingress
     try {
-      listener = await ingress.listen({
-        address: ingress.address,
+      listener = await listenerIngress.listen({
+        address: listenerIngress.address,
         signal: controller.signal,
-        auth: { mode: 'required', verify: ingress.verify },
-        report: options.report,
+        auth: { mode: 'required', verify: listenerIngress.verify },
+        report: report,
         onConnection(pending) {
           /** The listener may invoke callbacks without awaiting their Promise. */
           const acceptingOne = (async () => {
@@ -211,24 +192,25 @@ export async function createServeProcessPlugin(
             let channel: IRemoteChannel | undefined
             /** A failed candidate returns its physical capacity before reporting the error. */
             let lease: IProcessConnectionLease | undefined
-            /** A per-connection Host remains owned by this candidate until session publication. */
-            let closeSessionHost: (() => Promise<void>) | undefined
             /** The frame observer is removed on either candidate rollback or session close. */
             let closeAdmission: (() => void) | undefined
+            let candidateEndpoint: IRemoteServeEndpoint | undefined
+            /** A returned service remains a candidate until recovery and cancellation checks pass. */
+            let candidateService: IRemoteServePluginHandle | undefined
             try {
               if (controller.signal.aborted) {
                 await pending.close()
                 return
               }
               lease = manager.claimConnection()
-              const context = ingress.createConnectionContext(pending)
+              const context = listenerIngress.createConnectionContext(pending)
               const accepted = await pending.accept({
-                offer: ingress.offer,
+                offer: listenerIngress.offer,
                 peerId: context.peerId,
                 ipc: context.ipc,
-                scheduler: ingress.scheduler,
+                scheduler: listenerIngress.scheduler,
                 signal: controller.signal,
-                report: options.report
+                report: report
               })
               channel = accepted.channel
               if (controller.signal.aborted)
@@ -239,19 +221,14 @@ export async function createServeProcessPlugin(
                 principalId: accepted.principalId,
                 ...(context.ipc.processId ? { processId: context.ipc.processId } : {})
               })
-              await fallback.ready()
-              const fallbackVersion = fallback.version
-              const sessionOptions =
-                options.resilience?.sessionOptions(identity) ?? manager.sessionOptions(identity)
+              await fallback?.ready()
+              const fallbackVersion = fallback?.version
+              const sessionOptions = resilience.sessionOptions(identity)
               const drain = createProcessBindingDrain(
                 channel.scheduler,
-                (error) => reportSafely(options.report, error),
+                (error) => reportSafely(report, error),
                 manager.options.drainMs
               )
-              const builtEndpoint = await options.endpointFactory(channel, controller.signal, {
-                identity,
-                ...sessionOptions
-              })
               /** A policy violation closes only this accepted connection. */
               let publishedSession: IProcessServeSession | undefined
               const admission = createProcessProviderAdmission(
@@ -259,75 +236,87 @@ export async function createServeProcessPlugin(
                 manager.options,
                 channel.scheduler,
                 () => publishedSession?.close() ?? Promise.resolve(),
-                (error) => reportSafely(options.report, error)
+                (error) => reportSafely(report, error)
               )
               closeAdmission = admission.close
+              const builtEndpoint = (candidateEndpoint = await endpointFactory(
+                channel,
+                controller.signal,
+                {
+                  identity,
+                  ...sessionOptions,
+                  limits: admission.limits(sessionOptions.limits)
+                }
+              ))
+              validateServiceEndpoint(channel, builtEndpoint)
               const endpoint = admission.wrap(drain.wrap(channel, builtEndpoint))
               if (controller.signal.aborted) {
+                candidateEndpoint = undefined
                 try {
                   await endpoint.endpoint.dispose()
                 } catch (cleanupError) {
-                  reportSafely(options.report, cleanupError)
+                  reportSafely(report, cleanupError)
                 }
                 throw createProcessError(RpcProcessErrorCode.channelClosed)
               }
-              let targetHost = options.host
-              if (mode === 'per-connection') {
-                const sessionHost = await options.createSessionHost!(identity)
-                targetHost = sessionHost
-                closeSessionHost = async () => {
-                  await sessionHost.dispose()
-                }
-              }
-              const service = await serveRemotePlugin({
-                host: targetHost,
-                contract,
+              candidateEndpoint = undefined
+              const service = (candidateService = await onReadySession({
+                channel,
                 endpoint,
-                report: options.report,
-                invocationContext: (rpcContext) =>
-                  Object.freeze({ session: identity, signal: rpcContext.signal })
-              })
-              if (controller.signal.aborted) await rejectLateService(service, options.report)
-              await fallback.ready()
-              if (controller.signal.aborted) await rejectLateService(service, options.report)
-              if (fallback.version !== fallbackVersion)
-                await rejectLateService(service, options.report)
+                identity,
+                signal: controller.signal
+              }))
+              if (controller.signal.aborted)
+                throw createProcessError(RpcProcessErrorCode.channelClosed)
+              await fallback?.ready()
+              if (controller.signal.aborted)
+                throw createProcessError(RpcProcessErrorCode.channelClosed)
+              if (fallback?.version !== fallbackVersion)
+                throw createProcessError(RpcProcessErrorCode.channelClosed)
               publishedSession = createSession(
                 channel,
                 service,
                 sessions,
-                options.report,
+                report,
                 drain,
                 lease,
                 admission.close,
                 identity,
-                fallback,
-                closeSessionHost
+                fallback
               )
+              candidateService = undefined
               lease = undefined
-              closeSessionHost = undefined
               closeAdmission = undefined
             } catch (error) {
               closeAdmission?.()
-              lease?.release()
-              try {
-                await closeSessionHost?.()
-              } catch (cleanupError) {
-                reportSafely(options.report, cleanupError)
+              if (candidateService) {
+                try {
+                  await candidateService.close()
+                } catch (cleanupError) {
+                  reportSafely(report, cleanupError)
+                }
               }
+              if (candidateEndpoint) {
+                try {
+                  await candidateEndpoint.endpoint.dispose()
+                } catch (cleanupError) {
+                  reportSafely(report, cleanupError)
+                }
+              }
+              lease?.release()
               if (!channel) {
                 try {
                   await pending.close()
                 } catch (cleanupError) {
-                  reportSafely(options.report, cleanupError)
+                  reportSafely(report, cleanupError)
                 }
               }
               try {
                 await channel?.close()
               } catch (cleanupError) {
-                reportSafely(options.report, cleanupError)
+                reportSafely(report, cleanupError)
               }
-              reportSafely(options.report, error)
+              reportSafely(report, error)
             }
           })()
           accepting.add(acceptingOne)
@@ -339,33 +328,32 @@ export async function createServeProcessPlugin(
         }
       })
     } catch (error) {
-      manager.close()
       try {
-        await fallback.close()
+        await fallback?.close()
       } catch (cleanupError) {
-        reportSafely(options.report, cleanupError)
+        reportSafely(report, cleanupError)
       }
       throw error
     }
-    return Object.freeze({ close, inspectRecovery: () => fallback.inspect() })
+    return Object.freeze({ close })
   }
 
-  const ingress: IProcessServeChildIngress = options.ingress
   const guard = createParentLossGuard({
     shutdown: () => close(),
     exit: ingress.parentLoss.exit,
     graceMs: ingress.parentLoss.graceMs,
-    report: options.report
+    report: report
   })
   removeProbe = ingress.parentLoss.probe?.((reason) => guard.trigger(reason))
   let raw: IProcessByteChannel | IProcessMessageChannel | undefined
   let channel: IRemoteChannel | undefined
   /** A failed child startup must return the one physical connection lease. */
   let lease: IProcessConnectionLease | undefined
-  /** Per-connection Hosts created before publication are rolled back on failure. */
-  let closeSessionHost: (() => Promise<void>) | undefined
   /** A failed child setup removes its own frame observer. */
   let closeAdmission: (() => void) | undefined
+  let candidateEndpoint: IRemoteServeEndpoint | undefined
+  /** A returned child service is rolled back if readiness fails before publication. */
+  let candidateService: IRemoteServePluginHandle | undefined
   try {
     lease = manager.claimConnection()
     const sessionInfo = Object.freeze({ connectionId: defaultRpcId(), sessionId: defaultRpcId() })
@@ -403,19 +391,14 @@ export async function createServeProcessPlugin(
       ...sessionInfo,
       principalId: sessionInfo.connectionId
     })
-    await fallback.ready()
-    const fallbackVersion = fallback.version
-    const sessionOptions =
-      options.resilience?.sessionOptions(identity) ?? manager.sessionOptions(identity)
+    await fallback?.ready()
+    const fallbackVersion = fallback?.version
+    const sessionOptions = resilience.sessionOptions(identity)
     const drain = createProcessBindingDrain(
       channel.scheduler,
-      (error) => reportSafely(options.report, error),
+      (error) => reportSafely(report, error),
       manager.options.drainMs
     )
-    const builtEndpoint = await options.endpointFactory(channel, controller.signal, {
-      identity,
-      ...sessionOptions
-    })
     /** Child ingress uses the same bounded admission path as listener sessions. */
     let publishedSession: IProcessServeSession | undefined
     const admission = createProcessProviderAdmission(
@@ -423,75 +406,220 @@ export async function createServeProcessPlugin(
       manager.options,
       channel.scheduler,
       () => publishedSession?.close() ?? Promise.resolve(),
-      (error) => reportSafely(options.report, error)
+      (error) => reportSafely(report, error)
     )
     closeAdmission = admission.close
+
+    const builtEndpoint = (candidateEndpoint = await endpointFactory(channel, controller.signal, {
+      identity,
+      ...sessionOptions,
+      limits: admission.limits(sessionOptions.limits)
+    }))
+    validateServiceEndpoint(channel, builtEndpoint)
     const endpoint: IRemoteServeEndpoint = admission.wrap(drain.wrap(channel, builtEndpoint))
     if (controller.signal.aborted) {
+      candidateEndpoint = undefined
       try {
         await endpoint.endpoint.dispose()
       } catch (cleanupError) {
-        reportSafely(options.report, cleanupError)
+        reportSafely(report, cleanupError)
       }
       throw createProcessError(RpcProcessErrorCode.channelClosed)
     }
-    let targetHost = options.host
-    if (mode === 'per-connection') {
-      const sessionHost = await options.createSessionHost!(identity)
-      targetHost = sessionHost
-      closeSessionHost = async () => {
-        await sessionHost.dispose()
-      }
-    }
-    const service = await serveRemotePlugin({
-      host: targetHost,
-      contract,
+    candidateEndpoint = undefined
+    const service = (candidateService = await onReadySession({
+      channel,
       endpoint,
-      report: options.report,
-      invocationContext: (rpcContext) =>
-        Object.freeze({ session: identity, signal: rpcContext.signal })
-    })
-    if (controller.signal.aborted) await rejectLateService(service, options.report)
-    await fallback.ready()
-    if (controller.signal.aborted) await rejectLateService(service, options.report)
-    if (fallback.version !== fallbackVersion) await rejectLateService(service, options.report)
+      identity,
+      signal: controller.signal
+    }))
+    if (controller.signal.aborted) throw createProcessError(RpcProcessErrorCode.channelClosed)
+    await fallback?.ready()
+    if (controller.signal.aborted) throw createProcessError(RpcProcessErrorCode.channelClosed)
+    if (fallback?.version !== fallbackVersion)
+      throw createProcessError(RpcProcessErrorCode.channelClosed)
     publishedSession = createSession(
       channel,
       service,
       sessions,
-      options.report,
+      report,
       drain,
       lease,
       admission.close,
       identity,
-      fallback,
-      closeSessionHost
+      fallback
     )
+    candidateService = undefined
     lease = undefined
-    closeSessionHost = undefined
     closeAdmission = undefined
     removeParentClose = raw.onClose((reason) => guard.trigger(reason))
-    return Object.freeze({ close, inspectRecovery: () => fallback.inspect() })
+    return Object.freeze({ close })
   } catch (error) {
     closeAdmission?.()
-    lease?.release()
-    try {
-      await closeSessionHost?.()
-    } catch (cleanupError) {
-      reportSafely(options.report, cleanupError)
+    if (candidateService) {
+      try {
+        await candidateService.close()
+      } catch (cleanupError) {
+        reportSafely(report, cleanupError)
+      }
     }
+    if (candidateEndpoint) {
+      try {
+        await candidateEndpoint.endpoint.dispose()
+      } catch (cleanupError) {
+        reportSafely(report, cleanupError)
+      }
+    }
+    lease?.release()
     try {
       await channel?.close()
       if (!channel) await raw?.close()
     } catch (cleanupError) {
-      reportSafely(options.report, cleanupError)
+      reportSafely(report, cleanupError)
     }
     try {
-      await fallback.close()
+      await fallback?.close()
     } catch (cleanupError) {
-      reportSafely(options.report, cleanupError)
+      reportSafely(report, cleanupError)
     }
     guard.trigger(error)
+    throw error
+  }
+}
+
+/** Add Plugin instance recovery and invocation context to the shared process session owner. */
+export async function createServeProcessPlugin(
+  options: IProcessServePluginOptions
+): Promise<IProcessPluginServeHandle> {
+  if (
+    !options ||
+    !options.ingress ||
+    typeof options.report !== 'function' ||
+    typeof options.endpointFactory !== 'function'
+  )
+    invalidOption('serve')
+  const mode = options.instanceMode ?? 'shared'
+  if (mode === 'per-connection') {
+    if (typeof options.createSessionHost !== 'function') invalidOption('createSessionHost')
+  } else if (mode === 'shared') {
+    if (
+      typeof options.createSharedTarget !== 'function' ||
+      typeof options.onInstanceUnhealthy !== 'function'
+    )
+      invalidOption('createSharedTarget/onInstanceUnhealthy')
+  } else invalidOption('instanceMode')
+  const contract = normalizeRemoteContract(options.contract)
+  const resilience =
+    options.resilience ??
+    createProcessResilience({
+      scheduler:
+        options.ingress.kind === 'listener'
+          ? (options.ingress.scheduler ?? systemScheduler)
+          : systemScheduler,
+      report: options.report
+    })
+  const fallback = createProcessInstanceFallback({
+    mode,
+    targetName: contract.plugin,
+    host: options.host,
+    createSharedTarget: options.createSharedTarget,
+    onInstanceUnhealthy: options.onInstanceUnhealthy,
+    report: (error) => reportSafely(options.report, error)
+  })
+  try {
+    const sessions = await serveProcessSessions(
+      options.ingress,
+      options.endpointFactory,
+      async ({ endpoint, identity }) => {
+        let targetHost: IProcessServePluginOptions['host'] | undefined
+        let closeTarget: (() => Promise<unknown>) | undefined
+        let transferred = false
+        try {
+          if (mode === 'per-connection') {
+            const ownedTarget = await options.createSessionHost!(identity)
+            targetHost = ownedTarget
+            closeTarget = () => ownedTarget.dispose()
+          } else targetHost = options.host
+          transferred = true
+          const service = await serveRemotePlugin({
+            host: targetHost,
+            contract,
+            endpoint,
+            report: options.report,
+            invocationContext: (context) =>
+              Object.freeze({ session: identity, signal: context.signal })
+          })
+          return {
+            close: async () => {
+              const errors: unknown[] = []
+              try {
+                await service.close()
+              } catch (error) {
+                errors.push(error)
+              }
+              if (mode === 'per-connection') {
+                try {
+                  await closeTarget?.()
+                } catch (error) {
+                  errors.push(error)
+                }
+              }
+              if (errors.length === 1) throw errors[0]
+              if (errors.length > 1) throw cleanupFailure(errors)
+            }
+          }
+        } catch (error) {
+          if (!transferred) {
+            try {
+              await endpoint.endpoint.dispose()
+            } catch (cleanupError) {
+              reportSafely(options.report, cleanupError)
+            }
+          }
+          if (mode === 'per-connection' && targetHost) {
+            try {
+              await closeTarget?.()
+            } catch (cleanupError) {
+              reportSafely(options.report, cleanupError)
+            }
+          }
+          throw error
+        }
+      },
+      resilience,
+      options.report,
+      fallback
+    )
+    let closing: Promise<void> | undefined
+    return Object.freeze({
+      inspectRecovery: () => fallback.inspect(),
+      close: () =>
+        (closing ??= (async () => {
+          const errors: unknown[] = []
+          try {
+            await sessions.close()
+          } catch (error) {
+            errors.push(error)
+          }
+          if (!options.resilience) {
+            try {
+              await resilience.close()
+            } catch (error) {
+              errors.push(error)
+            }
+          }
+          if (errors.length === 1) throw errors[0]
+          if (errors.length > 1) throw cleanupFailure(errors)
+        })())
+    })
+  } catch (error) {
+    if (!options.resilience) {
+      try {
+        await resilience.close()
+      } catch (cleanupError) {
+        reportSafely(options.report, cleanupError)
+      }
+    }
     throw error
   }
 }

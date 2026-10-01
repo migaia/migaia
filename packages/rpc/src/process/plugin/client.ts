@@ -1,4 +1,6 @@
-import type { IProcessHandle } from '@migaia/supervision/process'
+import { createProcessResilience } from '../resilience/index.js'
+import type { IProcessRegistration } from '../resilience/types.js'
+import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import type { IPluginBeforeReleaseContext } from '@migaia/plugin-host'
 import { ReplaceStrategy } from '@migaia/supervision'
 import { SUPERVISION_SOURCE, SupervisionErrorCode, SupervisionErrorText } from '@migaia/supervision'
@@ -14,7 +16,12 @@ import {
   type IProcessPluginBinding,
   validateSpawnProcessPluginDeployment
 } from './binding.js'
-import type { IProcessPlugin, IProcessPluginOptions, IProcessPluginReplaceResult } from './types.js'
+import type {
+  IProcessConnectionHandle,
+  IProcessPlugin,
+  IProcessPluginOptions,
+  IProcessPluginReplaceResult
+} from './types.js'
 
 /** Keep failed endpoint admission inside the generation's rollback boundary. */
 function processEndpointFactory<TUnit extends object, TSpec>(
@@ -56,9 +63,72 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
     typeof options.registrationOwner.host?.unUse !== 'function'
   )
     invalidOption('registrationOwner')
+  /** One governor lives across supervisor generations, rather than per endpoint. */
+  const binding: IProcessPluginBinding<
+    IProcessHandle | IProcessConnectionHandle,
+    IProcessSpec | string
+  > = (
+    options.deployment.kind === 'spawn'
+      ? createSpawnProcessBinding(options.deployment, options.report)
+      : createConnectProcessBinding(options.deployment, options.report)
+  ) as IProcessPluginBinding<IProcessHandle | IProcessConnectionHandle, IProcessSpec | string>
+  /** Borrowed governance is never closed by this definition. */
+  const resilience =
+    options.resilience ??
+    createProcessResilience({
+      scheduler: binding.scheduler,
+      report: options.report
+    })
+  /** Liquidation releases the Plugin through its real local Host, retaining the tombstone. */
+  let liquidating = false
+  /** Candidate preparation has no installed registration; installation owns terminal diagnostics. */
+  let registration: IProcessRegistration | undefined
+  const attachRegistration = (): void => {
+    registration = resilience.attachRegistration(
+      options.name,
+      {
+        ownership: options.deployment.kind === 'spawn' ? 'spawn-owned' : 'connection-borrowed',
+        health: binding.health,
+        supervisor: {
+          restart: () => binding.supervisor.restart(),
+          inspect: () => binding.supervisor.inspect(),
+          dispose: () => binding.supervisor.dispose(),
+          onTerminal: (listener) =>
+            binding.supervisor.subscribe((event) => {
+              if (event.type === 'terminal') listener(event)
+            })
+        }
+      },
+      {
+        kind: 'proxy-plugin',
+        name: options.name,
+        host: {
+          unUse: (async (
+            name: string,
+            removal: { policy: 'suspend' | 'cascade'; dryRun?: boolean }
+          ) => {
+            if (removal.dryRun)
+              return options.registrationOwner.host.unUse(name, { ...removal, dryRun: true })
+            liquidating = true
+            try {
+              return await options.registrationOwner.host.unUse(name, { ...removal, dryRun: false })
+            } finally {
+              liquidating = false
+            }
+          }) as typeof options.registrationOwner.host.unUse
+        }
+      }
+    )
+  }
+  /** Normal release awaits diagnostics cleanup; committed liquidation retains its tombstone. */
+  const releaseRegistration = async (): Promise<void> => {
+    if (liquidating) return
+    await registration?.close()
+    if (!options.resilience) await resilience.close()
+  }
   if (options.deployment.kind === 'spawn') {
     const deployment = options.deployment
-    const binding = createSpawnProcessBinding(deployment, options.report)
+
     /** Only Host installation makes this exact definition eligible for replacement. */
     let installed = false
     /** Admission stays synchronous; the selected owner performs the actual replacement. */
@@ -112,7 +182,8 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
         report: options.report,
         callDeadlineCapMs: deployment.supervision.spec.limits?.callWallTimeMs,
         keyFactory: options.keyFactory,
-        retryPort: options.retryPort
+        retryPort: options.retryPort,
+        callGuard: resilience.callGuard(options.name)
       },
       {
         replace,
@@ -121,15 +192,17 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
       },
       {
         onInstalled: () => {
+          attachRegistration()
           installed = true
         },
         onReleased: () => {
           installed = false
+          return releaseRegistration()
         }
       }
     )
   }
-  const binding = createConnectProcessBinding(options.deployment, options.report)
+
   /** A borrowed external process has no whole-process replacement command. */
   const replace: IProcessPlugin['replace'] = (): Promise<IProcessPluginReplaceResult> =>
     invalidOption('deployment.kind')
@@ -142,12 +215,14 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
       endpointFactory: processEndpointFactory(binding, options.endpointFactory, options.report),
       report: options.report,
       keyFactory: options.keyFactory,
-      retryPort: options.retryPort
+      retryPort: options.retryPort,
+      callGuard: resilience.callGuard(options.name)
     },
     {
       replace,
       beforeRelease: (context: IPluginBeforeReleaseContext) =>
         binding.drainCurrent({ hostRemainingMs: context.remainingMs() })
-    }
+    },
+    { onInstalled: attachRegistration, onReleased: releaseRegistration }
   )
 }
