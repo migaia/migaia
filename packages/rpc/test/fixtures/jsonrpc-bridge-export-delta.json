@@ -1,0 +1,10 @@
+{
+  "added": {
+    "@migaia/rpc/bridge/jsonrpc": [
+      "createJsonRpcRemoteChannel",
+      "JsonRpcBridgeErrorCode",
+      "JsonRpcBridgeErrorText"
+    ]
+  },
+  "removed": {}
+}
