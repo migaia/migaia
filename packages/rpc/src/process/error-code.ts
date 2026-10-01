@@ -12,7 +12,12 @@ export const RpcProcessErrorCode = {
   /** Dial or launch could not establish a channel; caller may inspect the original cause. */
   connectFailed: 'PROCESS_CHANNEL_CONNECT_FAILED',
   /** The requested local listener could not bind; caller must choose an available address. */
-  listenFailed: 'PROCESS_CHANNEL_LISTEN_FAILED'
+  listenFailed: 'PROCESS_CHANNEL_LISTEN_FAILED',
+  /**
+   * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named
+   * field.
+   */
+  pluginInvalidOption: 'PROCESS_PLUGIN_INVALID_OPTION'
 } as const
 
 export type IRpcProcessErrorCode = (typeof RpcProcessErrorCode)[keyof typeof RpcProcessErrorCode]
