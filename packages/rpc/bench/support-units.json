@@ -1,0 +1,280 @@
+{
+  "revision": "I20-H-2026-10-02",
+  "frozen": true,
+  "baseline": "be19788",
+  "units": [
+    {
+      "id": "node:stdio-framed:64",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:stdio-framed:1024",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 1024,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:stdio-framed:65536",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 65536,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:stdio-framed:1048576",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 1048576,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:socket-framed:64",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "socket-framed",
+      "codec": "json",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:socket-framed:1024",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "socket-framed",
+      "codec": "json",
+      "payloadBytes": 1024,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:socket-framed:65536",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "socket-framed",
+      "codec": "json",
+      "payloadBytes": 65536,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:socket-framed:1048576",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "socket-framed",
+      "codec": "json",
+      "payloadBytes": 1048576,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:worker:64",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:worker:1024",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 1024,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:worker:65536",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 65536,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "node:worker:1048576",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 1048576,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "bun:stdio-framed:64",
+      "executable": "bun",
+      "runtime": "bun",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "bun:stdio-framed:1024",
+      "executable": "bun",
+      "runtime": "bun",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 1024,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "bun:stdio-framed:65536",
+      "executable": "bun",
+      "runtime": "bun",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 65536,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "bun:stdio-framed:1048576",
+      "executable": "bun",
+      "runtime": "bun",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 1048576,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "bun:socket-framed:64",
+      "executable": "bun",
+      "runtime": "bun",
+      "carrier": "socket-framed",
+      "codec": "json",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "bun:socket-framed:1024",
+      "executable": "bun",
+      "runtime": "bun",
+      "carrier": "socket-framed",
+      "codec": "json",
+      "payloadBytes": 1024,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "bun:socket-framed:65536",
+      "executable": "bun",
+      "runtime": "bun",
+      "carrier": "socket-framed",
+      "codec": "json",
+      "payloadBytes": 65536,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    },
+    {
+      "id": "bun:socket-framed:1048576",
+      "executable": "bun",
+      "runtime": "bun",
+      "carrier": "socket-framed",
+      "codec": "json",
+      "payloadBytes": 1048576,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+    }
+  ],
+  "unsupported": [
+    {
+      "codec": "cbor",
+      "carriers": ["stdio-framed", "socket-framed"],
+      "reason": "createProcessTransport requires negotiated json; src/process/handshake.ts:208; byteProcessPipeline only defineJsonCodec; src/process/pipeline.ts:10"
+    },
+    {
+      "codec": "msgpack",
+      "carriers": ["stdio-framed", "socket-framed"],
+      "reason": "createProcessTransport requires negotiated json; src/process/handshake.ts:208; byteProcessPipeline only defineJsonCodec; src/process/pipeline.ts:10"
+    },
+    {
+      "codec": "advanced",
+      "carriers": ["stdio-framed", "socket-framed"],
+      "reason": "createProcessTransport requires negotiated json; src/process/handshake.ts:208; byteProcessPipeline only defineJsonCodec; src/process/pipeline.ts:10"
+    },
+    {
+      "codec": "json",
+      "carriers": ["worker"],
+      "reason": "THREAD_CHANNEL_PROFILE identity codec/message-framer; src/threads/constants.ts:16; no byte codec negotiation"
+    },
+    {
+      "codec": "cbor",
+      "carriers": ["worker"],
+      "reason": "THREAD_CHANNEL_PROFILE identity codec/message-framer; src/threads/constants.ts:16; no byte codec negotiation"
+    },
+    {
+      "codec": "msgpack",
+      "carriers": ["worker"],
+      "reason": "THREAD_CHANNEL_PROFILE identity codec/message-framer; src/threads/constants.ts:16; no byte codec negotiation"
+    },
+    {
+      "codec": "advanced",
+      "carriers": ["worker"],
+      "reason": "THREAD_CHANNEL_PROFILE identity codec/message-framer; src/threads/constants.ts:16; no byte codec negotiation"
+    },
+    {
+      "carrier": "Bun Web Worker",
+      "reason": "termination/exit-observation unsupported, required isolation rejects; src/threads/adapters/bun.ts; producer rpc-threads K31"
+    },
+    {
+      "carrier": "Node IPC/Bun IPC process",
+      "reason": "No published process adapter exports a message IPC launcher. Node/Bun process launchers expose byte stdio only; src/process/adapters/node-child-process.ts:25,151; message IProcessMessageChannel is caller-provided static identity, not a delivered IPC launch profile."
+    }
+  ],
+  "blocked": [
+    {
+      "id": "jsonrpc-typescript-responder",
+      "required": true,
+      "reason": "CF1 public-only TS peer; createJsonRpcRemoteChannel public initiator only. No TS public bridge responder, so required bridge performance/public-business peer not delivered."
+    }
+  ],
+  "platform": "darwin; libproc native PID observer required"
+}
