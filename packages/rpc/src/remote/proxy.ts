@@ -67,6 +67,8 @@ export type IRemoteRegistration = Readonly<{
     pluginName?: string
   ): Readonly<Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>>
   revoke(reason: unknown): void
+  whenClosed(generation: number): Promise<void>
+  departedReasonCount(): number
   release(): Promise<void>
 }>
 
@@ -75,6 +77,7 @@ export type IRemoteGenerationHolder = Readonly<{
   readonly registration: IRemoteRegistration
   prepareInitial(signal: IAbortSignal, rollbackOnFailure?: boolean): Promise<number>
   prepareRebind(signal: IAbortSignal): Promise<number>
+  retainedResourceCount(): number
   release(): Promise<void>
 }>
 
@@ -120,6 +123,8 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   #current: IRemoteGeneration | undefined
   /** Departures retain their original reason for late listeners. */
   readonly #departed = new Map<number, unknown>()
+  /** Active generation closures remain observable until their cleanup settles. */
+  readonly #closing = new Map<number, Promise<void>>()
   /** Leave subscribers are notified before endpoint disposal. */
   readonly #leaveListeners = new Map<number, Set<(reason: unknown) => void>>()
   /** Waiters are resolved only after description and pointer switch. */
@@ -128,6 +133,8 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   readonly #unsubscribe: () => void
   /** Release remains idempotent and returns the same Promise. */
   #releasePromise: Promise<void> | undefined
+  /** Once release starts, later leave subscriptions observe the closed registration. */
+  #releaseReason: unknown
 
   /** Validates local options before any launcher side effect. */
   constructor(options: IRemoteProxyOptions<TUnit, TSpec>, kind: 'plugin' | 'host') {
@@ -145,10 +152,12 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         active: this.#current !== undefined
       }),
       onLeave: (generation: number, listener: (reason: unknown) => void) => {
-        if (this.#departed.has(generation)) {
+        if (this.#releaseReason !== undefined || this.#departed.has(generation)) {
+          /** Capture before release clears historical reasons. */
+          const reason = this.#releaseReason ?? this.#departed.get(generation)
           queueMicrotask(() => {
             try {
-              listener(this.#departed.get(generation))
+              listener(reason)
             } catch (error) {
               this.#options.report(error)
             }
@@ -234,7 +243,15 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
       }
     }
     this.#leaveListeners.delete(generation)
-    if (current) void current.close().catch((error: unknown) => this.#options.report(error))
+    if (current) {
+      const closing = current.close()
+      this.#closing.set(generation, closing)
+      void closing
+        .catch((error: unknown) => this.#options.report(error))
+        .then(() => {
+          this.#closing.delete(generation)
+        })
+    }
   }
 
   /** Rejects an unavailable preparation before a newly acquired resource is published. */
@@ -640,18 +657,41 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
     if (generation !== undefined) this.#leave(generation, reason)
   }
 
+  /** Waits for one departed generation's resource closure, if it is still active. */
+  whenClosed(generation: number): Promise<void> {
+    return (
+      this.#closing.get(generation)?.then(
+        () => undefined,
+        () => undefined
+      ) ?? Promise.resolve()
+    )
+  }
+
+  /** Exposes internal reason retention for the generation lifecycle oracle. */
+  departedReasonCount(): number {
+    return this.#departed.size
+  }
+
   /** Releases owned resources once and rejects pending readiness observers. */
   release(): Promise<void> {
     if (this.#releasePromise) return this.#releasePromise
     this.#unsubscribe()
     const error = createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+    this.#releaseReason = error
     this.#rejectWaiters(error)
     const current = this.#current
     if (current) this.#leave(current.number, error)
+    const currentClose = current ? this.#closing.get(current.number) : undefined
     this.#releasePromise = (async () => {
-      if (current) await current.close()
-      if (this.#options.binding.ownership === 'owned')
-        await this.#options.binding.supervisor.dispose()
+      try {
+        if (currentClose) await currentClose
+        if (this.#options.binding.ownership === 'owned')
+          await this.#options.binding.supervisor.dispose()
+      } finally {
+        await Promise.allSettled(this.#closing.values())
+        this.#departed.clear()
+        this.#leaveListeners.clear()
+      }
     })()
     return this.#releasePromise
   }
@@ -708,8 +748,10 @@ export function createRemoteGenerationHolder(
         group.add(dispose)
       })
       registration.events.onLeave(generation, () => {
-        group.clear()
-        retained.delete(group)
+        void registration.whenClosed(generation).then(() => {
+          group.clear()
+          retained.delete(group)
+        })
       })
       return generation
     } catch (error) {
@@ -725,6 +767,7 @@ export function createRemoteGenerationHolder(
     prepareInitial: (signal, rollbackOnFailure = false) =>
       prepare(signal, rollbackOnFailure, false),
     prepareRebind: (signal) => prepare(signal, true, true),
+    retainedResourceCount: () => [...retained].reduce((count, group) => count + group.size, 0),
     release: () => {
       if (releasePromise) return releasePromise
       releasePromise = (async () => {

@@ -195,6 +195,72 @@ describe('A2 remote generation proxy', () => {
     expect(fixture.calls.filter((entry) => entry === 'channel.close')).toHaveLength(2)
   })
 
+  it('retains a departing group until closure finishes, then keeps only the current generation', async () => {
+    const fixture = remoteHarness()
+    /** The first endpoint remains open until the test explicitly completes its close. */
+    let finishClose: (() => void) | undefined
+    const closeGate = new Promise<void>((resolve) => {
+      finishClose = resolve
+    })
+    const dispose = fixture.served.endpoint.dispose
+    fixture.served.endpoint.dispose = async () => {
+      await closeGate
+      await dispose()
+    }
+    const holder = createRemoteGenerationHolder(fixture.registration, () => undefined)
+    await holder.prepareInitial(new AbortController().signal)
+    expect(holder.retainedResourceCount()).toBe(2)
+    fixture.emit({ type: 'exit', generation: 1, reason: 'crashed' })
+    expect(holder.retainedResourceCount()).toBe(2)
+    finishClose?.()
+    await fixture.registration.whenClosed(1)
+    await Promise.resolve()
+    expect(holder.retainedResourceCount()).toBe(0)
+
+    for (let generation = 2; generation <= 6; generation += 1) {
+      fixture.nextGeneration()
+      await holder.prepareRebind(new AbortController().signal)
+      expect(holder.retainedResourceCount()).toBe(2)
+      if (generation === 6) break
+      fixture.emit({ type: 'exit', generation, reason: 'crashed' })
+      await fixture.registration.whenClosed(generation)
+      await Promise.resolve()
+    }
+    await holder.release()
+    expect(holder.retainedResourceCount()).toBe(0)
+  })
+
+  it('preserves every old leave reason by identity until release, then reports closed', async () => {
+    const fixture = remoteHarness()
+    const holder = createRemoteGenerationHolder(fixture.registration, () => undefined)
+    /** Each reason represents one distinct supervisor exit object. */
+    const reasons = Array.from({ length: 5 }, (_, index) => new Error(`exit ${index + 1}`))
+    for (const [index, reason] of reasons.entries()) {
+      const generation = index + 1
+      if (generation === 1) await holder.prepareInitial(new AbortController().signal)
+      else {
+        fixture.nextGeneration()
+        await holder.prepareRebind(new AbortController().signal)
+      }
+      fixture.emit({ type: 'exit', generation, reason: 'crashed', error: reason })
+      await fixture.registration.whenClosed(generation)
+    }
+    expect(fixture.registration.departedReasonCount()).toBe(5)
+    for (const [index, reason] of reasons.entries()) {
+      const seen = await new Promise<unknown>((resolve) => {
+        fixture.registration.events.onLeave(index + 1, resolve)
+      })
+      expect(seen).toBe(reason)
+    }
+    await holder.release()
+    expect(fixture.registration.departedReasonCount()).toBe(0)
+    const afterRelease = await new Promise<unknown>((resolve) => {
+      fixture.registration.events.onLeave(1, resolve)
+    })
+    expect(afterRelease).toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
+    expect(afterRelease).not.toBe(reasons[0])
+  })
+
   it('codes native aggregate errors from release and rebind rollback', async () => {
     const fixture = remoteHarness()
     const releaseFailure = new Error('release failed')
