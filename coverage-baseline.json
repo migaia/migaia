@@ -180,18 +180,18 @@
     },
     "rpc": {
       "lines": {
-        "covered": 7454,
-        "total": 8246,
+        "covered": 7455,
+        "total": 8247,
         "pct": 90.39
       },
       "statements": {
-        "covered": 8127,
-        "total": 9209,
+        "covered": 8128,
+        "total": 9210,
         "pct": 88.25
       },
       "functions": {
-        "covered": 1820,
-        "total": 2017,
+        "covered": 1821,
+        "total": 2018,
         "pct": 90.23
       },
       "branches": {
@@ -8056,7 +8056,7 @@
         "pct": 100
       }
     },
-    "packages/rpc/src/remote/plugin.ts": {
+    "packages/rpc/src/remote/internal/assemble-plugin.ts": {
       "lines": {
         "covered": 74,
         "total": 76,
@@ -8076,6 +8076,28 @@
         "covered": 34,
         "total": 42,
         "pct": 80.95
+      }
+    },
+    "packages/rpc/src/remote/plugin.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
       }
     },
     "packages/rpc/src/remote/proxy.ts": {
@@ -14990,9 +15012,6 @@
   "exclusions": {
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
-  "changedRuntimeFiles": [
-    "packages/rpc/src/process/adapters/web-byte-stream.ts",
-    "packages/rpc/src/process/bootstrap.ts"
-  ],
+  "changedRuntimeFiles": [],
   "deletedRuntimeFiles": []
 }
