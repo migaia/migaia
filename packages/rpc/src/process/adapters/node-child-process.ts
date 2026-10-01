@@ -88,6 +88,16 @@ export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle
           spec.stdio.stderr === 'ignore' ? 'ignore' : 'pipe'
         ]
       })
+      /** Node emits EPIPE on stdin independently of the bootstrap write callback. */
+      let stdinFailure: Error | undefined
+      /** A pending bootstrap must reject when the child closes stdin early. */
+      let rejectBootstrap: ((error: Error) => void) | undefined
+      /** Hold the error listener until nodeByteStream takes ownership of stdin. */
+      const onStdinError = (error: Error): void => {
+        stdinFailure ??= error
+        rejectBootstrap?.(error)
+      }
+      child.stdin?.on('error', onStdinError)
       /** Stderr must drain from spawn, including while the child waits for bootstrap. */
       if (child.stderr)
         child.stderr.on('data', (chunk: Buffer) => deliverOutput(context.output, 'stderr', chunk))
@@ -109,13 +119,17 @@ export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle
         /** A framed bootstrap is always the first stdin write. */
         if (spec.bootstrap?.via === 'stdin') {
           if (!child.stdin) throw createProcessError(RpcProcessErrorCode.connectFailed)
+          if (stdinFailure) throw stdinFailure
           await new Promise<void>((resolve, reject) => {
+            rejectBootstrap = reject
             child.stdin!.write(encodeRpcStreamFrame(spec.bootstrap!.payload), (error) => {
               if (error) reject(error)
               else resolve()
             })
           })
+          rejectBootstrap = undefined
         }
+        if (stdinFailure) throw stdinFailure
         if (spec.bootstrap?.via === 'fd')
           throw tagRpcError(
             new TypeError(RpcProcessErrorText.optionsInvalid),
@@ -132,6 +146,7 @@ export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle
                 child.stdin?.destroy()
               })
             : undefined
+        child.stdin?.removeListener('error', onStdinError)
         return Object.freeze({
           identity: Object.freeze({ fingerprint: randomUUID(), pid: child.pid }),
           exited,
@@ -141,6 +156,7 @@ export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle
       } catch (error) {
         terminateChild(child, 'force')
         await exited
+        child.stdin?.removeListener('error', onStdinError)
         throw createProcessError(RpcProcessErrorCode.connectFailed, error)
       }
     }
