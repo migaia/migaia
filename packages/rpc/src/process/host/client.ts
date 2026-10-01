@@ -4,6 +4,8 @@ import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { defaultRpcId } from '../../core/internal/id.js'
 import { normalizeRemoteHostCatalog } from '../../remote/contract.js'
+import { createRemoteRetryPort } from '../../remote/retry.js'
+import type { IRemoteRetryPort } from '../../remote/types.js'
 import { createRemoteHost, type IRemoteHostHandle } from '../../remote/host.js'
 import {
   createConnectProcessBinding,
@@ -64,6 +66,7 @@ export function createProcessHost<THandle extends IProcessHandle = IProcessHandl
   const suppliedScheduler = options.deployment.supervision?.scheduler
   if (options.scheduler && suppliedScheduler && options.scheduler !== suppliedScheduler)
     invalidHostOption('scheduler')
+  /** Use the established channel clock for all supervision and drain work. */
   const scheduler = options.scheduler ?? suppliedScheduler ?? systemScheduler
   /** The current deployment retains the exact spec and pool until an explicit replacement. */
   let deployment = {
@@ -107,6 +110,19 @@ export function createProcessHost<THandle extends IProcessHandle = IProcessHandl
     let candidateClose: Promise<void> | undefined
     /** Publication distinguishes a live draining endpoint from a cancellable preparation. */
     let published = false
+    /** One canonical retry port settles logical requests before this candidate's drain completes. */
+    let retry = options.retryPort
+    /** Join logical settlement through the same canonical retry owner without changing its Promise. */
+    const retryPort: IRemoteRetryPort = {
+      dispatch(input) {
+        retry ??= createRemoteRetryPort({
+          events: input.events,
+          scheduler: binding.scheduler,
+          report: options.report
+        })
+        return binding.trackRequest(() => retry!.dispatch(input))
+      }
+    }
     /** RPC description, generation cancellation and transport ownership remain with remote. */
     const remote = createRemoteHost({
       catalog,
@@ -127,7 +143,7 @@ export function createProcessHost<THandle extends IProcessHandle = IProcessHandl
       },
       report: options.report,
       keyFactory: options.keyFactory,
-      retryPort: options.retryPort,
+      retryPort,
       callGuard: resilience.callGuard(id),
       ...(next.kind === 'spawn'
         ? { callDeadlineCapMs: next.supervision.spec.limits?.callWallTimeMs }
@@ -231,12 +247,20 @@ export function createProcessHost<THandle extends IProcessHandle = IProcessHandl
     /** Removal and dependency policy are owned by the remote target Host. */
     unUse(name, removal) {
       requireOpen()
-      return current.remote.unUse(name, removal)
+      const selected = current
+      return selected.remote.unUse(name, removal).then((result) => {
+        selected.markReady()
+        return result
+      })
     },
     /** Return the actual target's inspection instead of maintaining local plugin state. */
     inspect() {
       requireOpen()
-      return current.remote.inspect()
+      const selected = current
+      return selected.remote.inspect().then((result) => {
+        selected.markReady()
+        return result
+      })
     },
     inspectRegistration: () => resilience.inspect(current.id),
     /** Manual restart preserves the registration and joins the replacement queue. */
