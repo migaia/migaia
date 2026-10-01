@@ -187,6 +187,19 @@ describe('process Host reverse native registration', () => {
     })
     /** Only authenticated rejected candidates have a close barrier in this scenario. */
     let rejectedCandidates = 0
+    /** Authentication rejection has no candidate callback, but still owns a physical lease. */
+    let observeRejectedClose!: () => void
+    /** The manager returns the failed handshake lease in the close caller's finally. */
+    const rejectedClosed = new Promise<void>((resolve) => {
+      observeRejectedClose = resolve
+    })
+    /** The first physical connection is deliberately the unauthenticated rejection. */
+    let physicalConnections = 0
+    /** EOF-driven removal also finishes its physical lease before the replacement connects. */
+    let observeFirstClose!: () => void
+    const firstClosed = new Promise<void>((resolve) => {
+      observeFirstClose = resolve
+    })
     let listener: IProcessRegistrationListener | undefined
     const closeGovernor = vi.fn(() => governor.close())
     const external = {
@@ -195,7 +208,32 @@ describe('process Host reverse native registration', () => {
       async listenRegistrations(options: Parameters<typeof governor.listenRegistrations>[0]) {
         listener = await governor.listenRegistrations({
           ...options,
+          listen: (listenOptions) =>
+            options.listen({
+              ...listenOptions,
+              onConnection(pending) {
+                /** Only the first connection bypasses the authenticated candidate callback. */
+                const ordinal = ++physicalConnections
+                listenOptions.onConnection({
+                  ...pending,
+                  async close() {
+                    await pending.close()
+                    // The next event-loop turn follows the manager's synchronous finally.
+                    if (ordinal === 1) setImmediate(observeRejectedClose)
+                  }
+                })
+              }
+            }),
           async onCandidate(candidate) {
+            if (candidate.identity.principalId === 'approved-principal' && !observedFirst) {
+              candidate.signal.addEventListener(
+                'abort',
+                () => {
+                  void candidate.close().then(observeFirstClose, report)
+                },
+                { once: true }
+              )
+            }
             /** Observe the real close Promise, which includes the manager's lease return. */
             const [outcome] = await Promise.allSettled([options.onCandidate(candidate)])
             if (outcome!.status === 'rejected' || outcome!.value !== 'adopt') {
@@ -310,6 +348,8 @@ describe('process Host reverse native registration', () => {
       }
     })
     const rejected = reversePeer(address, 'wrong-fixture-token')
+    await rejected.exited
+    await rejectedClosed
     const first = reversePeer(address)
     let replacement: ReturnType<typeof reversePeer> | undefined
     let independent: ReturnType<typeof reversePeer> | undefined
@@ -354,6 +394,7 @@ describe('process Host reverse native registration', () => {
       await firstLost
       expect(unUse).toHaveBeenCalledTimes(1)
       await unUse.mock.results[0]!.value
+      await firstClosed
       expect(unUse.mock.calls[0]).toEqual(['p', { policy: 'suspend' }])
       expect(await independentFeature.request!(['unaffected'])).toMatchObject({
         pid: independent.child.pid
