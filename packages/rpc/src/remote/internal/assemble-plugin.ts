@@ -11,10 +11,17 @@ const MAX_ENABLE_ATTEMPTS = 3
 /** Each failed enable doubles this initial scheduler delay. */
 const ENABLE_RETRY_BASE_MS = 10
 
+/** Package-internal lifecycle observations let a facade reject stale definition commands. */
+type IRemoteAssemblyLifecycle = Readonly<{
+  onInstalled?(): void
+  onReleased?(): void
+}>
+
 /** Builds one trusted definition before PluginHost freezes its package-owned metadata. */
 export function assembleRemotePluginDefinition<TUnit, TSpec, TMetadata extends object = object>(
   options: IRemotePluginOptions<TUnit, TSpec>,
-  metadata?: TMetadata
+  metadata?: TMetadata,
+  lifecycle?: IRemoteAssemblyLifecycle
 ): IRemotePluginDefinition & TMetadata {
   const contract = normalizeRemoteContract(options.contract)
   if (options.name !== contract.plugin)
@@ -126,13 +133,17 @@ export function assembleRemotePluginDefinition<TUnit, TSpec, TMetadata extends o
         retryTask?.cancel()
         unsubscribe()
       })
+      context.onDispose(() => lifecycle?.onReleased?.())
       return holder
     },
     featureExpose: (_core, holder) => {
       const proxies = holder.registration.featureProxies()
       return Object.freeze({ getProxy: (name: string) => proxies[name]! })
     },
-    install: () => ({})
+    install: () => {
+      lifecycle?.onInstalled?.()
+      return {}
+    }
   })
   return definition as unknown as IRemotePluginDefinition & TMetadata
 }

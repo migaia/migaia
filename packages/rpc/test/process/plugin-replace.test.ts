@@ -98,6 +98,36 @@ function fixture(withHostReplace = true) {
 }
 
 describe('process plugin whole-process replacement', () => {
+  it('[A9] synchronously rejects both strategies on a replaced definition', async () => {
+    const test = fixture()
+    let currentFeature: { request(params: unknown[]): Promise<unknown> } | undefined
+    const plugin = createProcessPlugin({
+      ...test.options,
+      host: {
+        ...test.options.host,
+        replace: async (name, candidate) => {
+          const handle = await test.host.replace(name, candidate)
+          currentFeature = handle.getFeature('f') as typeof currentFeature
+        }
+      }
+    })
+    try {
+      await test.host.use(plugin)
+      await plugin.replace({ strategy: ReplaceStrategy.startThenSwitch })
+      expect(test.launch).toHaveBeenCalledTimes(2)
+      expect(() => plugin.replace({ strategy: ReplaceStrategy.stopThenStart })).toThrowError(
+        expect.objectContaining({ code: 'SCOPE_TERMINAL' })
+      )
+      expect(() => plugin.replace({ strategy: ReplaceStrategy.startThenSwitch })).toThrowError(
+        expect.objectContaining({ code: 'SCOPE_TERMINAL' })
+      )
+      expect(test.launch).toHaveBeenCalledTimes(2)
+      expect(await currentFeature?.request(['live'])).toBe('result')
+    } finally {
+      await test.host.dispose()
+    }
+  })
+
   it('[A2/A5] rejects an invalid local owner or missing default ping before launch', async () => {
     const test = fixture()
     try {
@@ -178,6 +208,7 @@ describe('process plugin whole-process replacement', () => {
     const test = fixture()
     const plugin = createProcessPlugin(test.options)
     try {
+      await test.host.use(plugin)
       expect(() => plugin.replace({ strategy: 'hot' as ReplaceStrategy })).toThrowError(
         expect.objectContaining({ code: 'PROCESS_PLUGIN_INVALID_OPTION' })
       )
@@ -187,7 +218,7 @@ describe('process plugin whole-process replacement', () => {
           detail: { field: 'spec.bootstrap' }
         })
       )
-      expect(test.launch).not.toHaveBeenCalled()
+      expect(test.launch).toHaveBeenCalledTimes(1)
       expect(test.hostReplace).not.toHaveBeenCalled()
     } finally {
       await test.host.dispose()
@@ -198,6 +229,7 @@ describe('process plugin whole-process replacement', () => {
     const test = fixture()
     const plugin = createProcessPlugin(test.options)
     try {
+      await test.host.use(plugin)
       const result = await plugin.replace({ strategy: ReplaceStrategy.startThenSwitch })
       expect(result.strategy).toBe(ReplaceStrategy.startThenSwitch)
       expect(test.hostReplace).toHaveBeenCalledTimes(1)
@@ -206,7 +238,7 @@ describe('process plugin whole-process replacement', () => {
         expect(result.plugin).not.toBe(plugin)
         expect(isDefinedPlugin(result.plugin)).toBe(true)
       }
-      expect(test.launch).not.toHaveBeenCalled()
+      expect(test.launch).toHaveBeenCalledTimes(1)
     } finally {
       await test.host.dispose()
     }
@@ -229,7 +261,7 @@ describe('process plugin whole-process replacement', () => {
       dispose: async () => undefined
     }
     const hostReplace = vi.fn(async (_name: string, candidate: IRemotePluginDefinition) => {
-      await test.host.use(candidate)
+      await test.host.replace('p', candidate)
     })
     const plugin = createProcessPlugin({
       ...test.options,
@@ -240,6 +272,8 @@ describe('process plugin whole-process replacement', () => {
       }
     })
     try {
+      await test.host.use(plugin)
+      const initialTakeCount = take.mock.calls.length
       expect(() =>
         plugin.replace({
           strategy: ReplaceStrategy.startThenSwitch,
@@ -251,8 +285,8 @@ describe('process plugin whole-process replacement', () => {
       const result = await plugin.replace({ strategy: ReplaceStrategy.startThenSwitch })
       expect(result.strategy).toBe(ReplaceStrategy.startThenSwitch)
       expect(invalidate).toHaveBeenCalledTimes(1)
-      expect(take).not.toHaveBeenCalled()
-      expect(test.launch).toHaveBeenCalledTimes(1)
+      expect(take).toHaveBeenCalledTimes(initialTakeCount)
+      expect(test.launch).toHaveBeenCalledTimes(2)
     } finally {
       await test.host.dispose()
     }
@@ -262,6 +296,7 @@ describe('process plugin whole-process replacement', () => {
     const test = fixture(false)
     const spawn = createProcessPlugin(test.options)
     try {
+      await test.host.use(spawn)
       expect(() => spawn.replace({ strategy: ReplaceStrategy.startThenSwitch })).toThrowError(
         expect.objectContaining({ detail: { field: 'host.replace' } })
       )
@@ -282,7 +317,7 @@ describe('process plugin whole-process replacement', () => {
       expect(() => connect.replace()).toThrowError(
         expect.objectContaining({ detail: { field: 'deployment.kind' } })
       )
-      expect(test.launch).not.toHaveBeenCalled()
+      expect(test.launch).toHaveBeenCalledTimes(1)
     } finally {
       await test.host.dispose()
     }
