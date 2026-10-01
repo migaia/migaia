@@ -98,6 +98,21 @@ function violations(path: string, text: string): string[] {
     }
     if (
       !isTextOwner &&
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      /(?:Message|Text)$/u.test(node.name.text) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+      const body = node.initializer.body
+      if (ts.isBlock(body)) {
+        for (const statement of body.statements)
+          if (ts.isReturnStatement(statement) && statement.expression)
+            addLiteral(statement.expression)
+      } else addLiteral(body)
+    }
+    if (
+      !isTextOwner &&
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
       node.expression.text === 'onFailure'
@@ -128,9 +143,10 @@ describe('error text ownership', () => {
     const fixture = [
       "new Error(flag ? 'left' : 'right')",
       'function roleAdmissionMessage() { return `role=${role}` }',
+      'const roleAdmissionText = () => `role=${role}`',
       "onFailure('failed')"
     ].join('\n')
-    expect(violations('fixture.ts', fixture)).toHaveLength(4)
+    expect(violations('fixture.ts', fixture)).toHaveLength(5)
   })
 
   it('[A1] keeps all error text in package-owned contracts', () => {
