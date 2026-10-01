@@ -1,16 +1,24 @@
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import type { IRemoteChannel } from '../../src/remote/types.js'
 import { createServeProcessPlugin } from '../../src/process/plugin/serve.js'
 import type { IProcessPendingByteConnection } from '../../src/process/types.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
+import type { IProcessSessionIdentity } from '../../src/process/resilience/types.js'
 
 /** A single request contract lets the test observe per-connection service ownership. */
 const contract = {
   schemaVersion: 1 as const,
   plugin: 'p',
   features: { f: { methods: { request: { mode: 'request' as const, idempotent: false } } } }
+}
+
+/** Existing shared fixtures declare their recovery ports before accepting a connection. */
+const sharedRecovery = {
+  createSharedTarget: async () => undefined,
+  onInstanceUnhealthy: () => () => undefined
 }
 
 /** Creates a target that remote services may reference without owning it. */
@@ -34,7 +42,10 @@ function acceptedChannel(id: string) {
   const close = vi.fn(async () => undefined)
   const channel = {
     peerId: id,
+    scheduler: createManualScheduler(),
+    agreement: { capabilities: [] },
     transport: {
+      subscribe: () => () => undefined,
       onTransportError(listener: (error: unknown) => void) {
         onError = listener
         return () => {
@@ -53,6 +64,108 @@ async function settle(): Promise<void> {
 }
 
 describe('process plugin service ingress', () => {
+  it('[A2] rejects missing recovery factories before listener binding', async () => {
+    const { host } = await targetHost()
+    const listen = vi.fn()
+    try {
+      await expect(
+        createServeProcessPlugin({
+          host,
+          contract,
+          instanceMode: 'per-connection',
+          endpointFactory: vi.fn(),
+          report: vi.fn(),
+          ingress: {
+            kind: 'listener',
+            address: 'fixture',
+            verify: () => 'principal',
+            offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+            createConnectionContext: () => ({
+              peerId: 'peer',
+              ipc: { connectionId: 'c', sessionId: 's', log: () => undefined }
+            }),
+            listen
+          }
+        })
+      ).rejects.toMatchObject({ detail: { field: 'createSessionHost' } })
+      expect(listen).not.toHaveBeenCalled()
+    } finally {
+      await host.dispose()
+    }
+  })
+
+  it('[A2] creates one target Host per authenticated connection', async () => {
+    const { host: fallback } = await targetHost()
+    const first = acceptedChannel('first')
+    const second = acceptedChannel('second')
+    const created: Array<Awaited<ReturnType<typeof targetHost>>> = []
+    let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
+    const createSessionHost = vi.fn(async (_session: IProcessSessionIdentity) => {
+      const next = await targetHost()
+      created.push(next)
+      return next.host
+    })
+    const serving = await createServeProcessPlugin({
+      host: fallback,
+      contract,
+      instanceMode: 'per-connection',
+      createSessionHost,
+      endpointFactory: async () => ({
+        endpoint: {
+          provide: vi.fn(),
+          dispose: vi.fn(async () => undefined)
+        } as unknown as IRpcEndpoint
+      }),
+      report: vi.fn(),
+      ingress: {
+        kind: 'listener',
+        address: 'fixture',
+        verify: () => 'principal',
+        offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+        createConnectionContext: (pending) => ({
+          peerId: pending === firstPending ? 'first' : 'second',
+          ipc: {
+            connectionId: pending === firstPending ? 'c1' : 'c2',
+            sessionId: pending === firstPending ? 's1' : 's2',
+            log: () => undefined
+          }
+        }),
+        listen: async ({ onConnection: callback }) => {
+          onConnection = callback
+          return { address: 'fixture', close: async () => undefined }
+        }
+      }
+    })
+    const firstPending: IProcessPendingByteConnection = {
+      accept: async () => ({ channel: first.channel, principalId: 'alice' }),
+      close: async () => undefined
+    }
+    const secondPending: IProcessPendingByteConnection = {
+      accept: async () => ({ channel: second.channel, principalId: 'bob' }),
+      close: async () => undefined
+    }
+    try {
+      await onConnection(firstPending)
+      await onConnection(secondPending)
+      expect(createSessionHost).toHaveBeenCalledTimes(2)
+      expect(createSessionHost.mock.calls[0]?.[0]).toMatchObject({
+        sessionId: 's1',
+        principalId: 'alice'
+      })
+      expect(createSessionHost.mock.calls[1]?.[0]).toMatchObject({
+        sessionId: 's2',
+        principalId: 'bob'
+      })
+      expect(created[0]!.host).not.toBe(created[1]!.host)
+      first.fail()
+      await settle()
+      expect(second.close).not.toHaveBeenCalled()
+    } finally {
+      await serving.close()
+      await fallback.dispose()
+    }
+  })
+
   it('[A4] rejects a listener without a verifier before binding', async () => {
     const { host } = await targetHost()
     const listen = vi.fn()
@@ -62,6 +175,7 @@ describe('process plugin service ingress', () => {
         createServeProcessPlugin({
           host,
           contract,
+          ...sharedRecovery,
           endpointFactory,
           report: () => undefined,
           ingress: {
@@ -92,6 +206,7 @@ describe('process plugin service ingress', () => {
         createServeProcessPlugin({
           host,
           contract,
+          ...sharedRecovery,
           endpointFactory,
           report: () => undefined,
           ingress: {
@@ -148,6 +263,7 @@ describe('process plugin service ingress', () => {
       const serving = await createServeProcessPlugin({
         host,
         contract,
+        ...sharedRecovery,
         endpointFactory,
         report,
         ingress: {
@@ -200,12 +316,20 @@ describe('process plugin service ingress', () => {
       expect(provide[1]).toHaveBeenCalled()
       const firstRequest = provide[0]!.mock.calls.find(([method]) => method === 'p.f.request')?.[1]
       const secondRequest = provide[1]!.mock.calls.find(([method]) => method === 'p.f.request')?.[1]
-      expect(await firstRequest?.({ data: [], success: (value: unknown) => value } as never)).toBe(
-        'live'
-      )
-      expect(await secondRequest?.({ data: [], success: (value: unknown) => value } as never)).toBe(
-        'live'
-      )
+      expect(
+        await firstRequest?.({
+          data: [],
+          signal: { aborted: false },
+          success: (value: unknown) => value
+        } as never)
+      ).toBe('live')
+      expect(
+        await secondRequest?.({
+          data: [],
+          signal: { aborted: false },
+          success: (value: unknown) => value
+        } as never)
+      ).toBe('live')
       first.fail()
       await settle()
       expect(dispose[0]).toHaveBeenCalledTimes(1)
@@ -242,6 +366,7 @@ describe('process plugin service ingress', () => {
     const serving = await createServeProcessPlugin({
       host,
       contract,
+      ...sharedRecovery,
       endpointFactory,
       report,
       ingress: {
@@ -295,6 +420,7 @@ describe('process plugin service ingress', () => {
     const serving = await createServeProcessPlugin({
       host,
       contract,
+      ...sharedRecovery,
       endpointFactory,
       report,
       ingress: {
@@ -349,6 +475,7 @@ describe('process plugin service ingress', () => {
     const serving = await createServeProcessPlugin({
       host,
       contract,
+      ...sharedRecovery,
       report,
       endpointFactory: async () => ({
         endpoint: { provide: vi.fn(), dispose } as unknown as IRpcEndpoint

@@ -28,6 +28,8 @@ export const RpcProcessErrorText = {
   pluginInvalidOption: 'process plugin options are invalid',
   /** Resilience construction rejects an invalid limit or missing ownership or health port. */
   resilienceInvalidOption: 'process resilience options are invalid',
+  /** The report schedule field name is stable in invalid-option detail diagnostics. */
+  resilienceReportOffsetsField: 'reportAtMs',
   /** A session or request exceeded its assigned connection-level capacity before dispatch. */
   connectionLimit: 'process connection limit exceeded',
   /** Explicit instance-health failure keeps a shared target closed until replacement is ready. */

@@ -22,6 +22,10 @@ import type {
 import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../../contract/handshake.js'
 import type { IRpcPortableValue } from '../../contract/types.js'
 import type { ProcessPluginChannelKind, ProcessPluginWire } from './constants.js'
+import type { IProcessDependencyHostPort, IProcessResilience } from '../resilience/types.js'
+import type { IProcessSessionIdentity } from '../resilience/types.js'
+import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../../core/typing.js'
+import type { IRemoteServeEndpoint } from '../../remote/types.js'
 
 /** Session labels are created once per generation and forwarded unchanged to the channel adapter. */
 export type IProcessPluginSession = Readonly<{
@@ -74,7 +78,7 @@ export type IConnectProcessPluginDeployment = Readonly<{
   establish: IProcessPluginEstablish
   supervision?: Pick<
     ISupervisorBaseOptions<IProcessConnectionHandle>,
-    'restart' | 'startupTimeoutMs' | 'stop' | 'terminalPolicy' | 'scheduler'
+    'restart' | 'startupTimeoutMs' | 'stop' | 'terminalPolicy' | 'scheduler' | 'health'
   >
 }>
 
@@ -90,6 +94,10 @@ export type IProcessConnectionHandle = Readonly<{
 export type IProcessPluginOptions<THandle extends IProcessHandle = IProcessHandle> = Readonly<{
   name: string
   contract: IRemoteContract
+  /** The local Host that will own and, if necessary, liquidate this exact registration. */
+  registrationOwner: Readonly<{ name: string; host: IProcessDependencyHostPort }>
+  /** Caller-owned governance may replace the default process registration policy. */
+  resilience?: IProcessResilience
   host: IRemotePluginHostPort & {
     replace?(name: string, candidate: IRemotePluginDefinition): Promise<unknown>
   }
@@ -146,11 +154,42 @@ export type IProcessServeListenerIngress = Readonly<{
 /** A serve handle owns its sessions while the caller retains the target Host. */
 export type IProcessPluginServeHandle = Readonly<{ close(): Promise<void> }>
 
+/** Session configuration is supplied after authentication and before endpoint construction. */
+export type IProcessServeEndpointFactory = (
+  channel: IRemoteChannel,
+  signal: IAbortSignal,
+  session: Readonly<{
+    identity: IProcessSessionIdentity
+    idempotency: IRpcIdempotencyConfig
+    limits: IRpcProviderLimits
+  }>
+) => Promise<IRemoteServeEndpoint>
+
 /** The service facade delegates method registration to the remote owner. */
 export type IProcessServePluginOptions = Readonly<{
   host: IRemoteServePluginOptions['host']
   contract: IRemoteContract
   ingress: IProcessServeChildIngress | IProcessServeListenerIngress
-  endpointFactory: IRemoteEndpointFactory
+  endpointFactory: IProcessServeEndpointFactory
   report(error: unknown): void
+  /** Shared targets recover inside one process; per-connection targets own separate Hosts. */
+  instanceMode?: 'shared' | 'per-connection'
+  /** A caller-owned governor replaces the default bounded session owner. */
+  resilience?: IProcessResilience
+  /** Required by per-connection mode before opening the ingress. */
+  createSessionHost?(
+    session: IProcessSessionIdentity
+  ):
+    | Promise<IRemoteServePluginOptions['host'] & Readonly<{ dispose(): Promise<unknown> }>>
+    | (IRemoteServePluginOptions['host'] & Readonly<{ dispose(): Promise<unknown> }>)
+  /** Required by shared mode so instance replacement can rebuild a healthy candidate. */
+  createSharedTarget?(
+    input: Readonly<{ reason: unknown; signal: IAbortSignal }>
+  ): Promise<unknown> | unknown
+  /** Required by shared mode to distinguish instance faults from call failures. */
+  onInstanceUnhealthy?(
+    listener: (
+      event: Readonly<{ targetName: string; connectionId?: string; reason: unknown }>
+    ) => void
+  ): () => void
 }>

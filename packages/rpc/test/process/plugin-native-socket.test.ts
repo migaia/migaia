@@ -9,6 +9,7 @@ import { abort } from '../../src/core/middleware/abort.js'
 import { codec } from '../../src/core/middleware/codec.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { framer } from '../../src/core/middleware/framer.js'
+import { ping } from '../../src/core/middleware/ping.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
@@ -38,7 +39,8 @@ async function endpointFor(channel: IRemoteChannel, id: string): Promise<IRemote
       codec(channel.pipeline.codec),
       framer(channel.pipeline.framer),
       abort(),
-      connect({ transport: channel.transport })
+      connect({ transport: channel.transport }),
+      ping()
     ]
   })
   return { endpoint: endpoint as unknown as IRpcEndpoint }
@@ -67,6 +69,8 @@ describe('native process plugin socket', () => {
     const serving = await createServeProcessPlugin({
       host: serverHost,
       contract,
+      createSharedTarget: async () => undefined,
+      onInstanceUnhealthy: () => () => undefined,
       report: () => undefined,
       endpointFactory: async (channel) => {
         endpoints += 1
@@ -109,6 +113,7 @@ describe('native process plugin socket', () => {
       createProcessPlugin({
         name: 'p',
         contract,
+        registrationOwner: { name: 'p', host },
         host: host.plugin,
         report: () => undefined,
         endpointFactory: (channel) => endpointFor(channel, clientId),

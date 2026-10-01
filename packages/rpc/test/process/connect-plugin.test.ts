@@ -36,6 +36,7 @@ describe('process plugin connect binding', () => {
     const plugin = createProcessPlugin({
       name: 'p',
       contract: REMOTE_FIXTURE_CONTRACT,
+      registrationOwner: { name: 'p', host },
       host: host.plugin,
       endpointFactory: async () => fixture.served,
       report: () => undefined,
@@ -44,7 +45,10 @@ describe('process plugin connect binding', () => {
         address: '/tmp/external-peer.sock',
         token: 'signed-token',
         dial,
-        supervision: { scheduler: fixture.binding.scheduler },
+        supervision: {
+          scheduler: fixture.binding.scheduler,
+          health: { check: async () => undefined }
+        },
         establish: async (_raw, options) => {
           expect(options.token).toBe('signed-token')
           expect(options.offer).toMatchObject({

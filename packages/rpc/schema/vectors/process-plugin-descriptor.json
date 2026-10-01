@@ -51,6 +51,57 @@
       "semanticValid": true
     },
     {
+      "id": "spawn-native-per-connection",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        },
+        "instanceMode": "per-connection"
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
       "id": "spawn-native-fd",
       "value": {
         "descriptorVersion": 1,
@@ -670,7 +721,7 @@
             }
           }
         },
-        "instanceMode": "per-connection"
+        "instanceMode": "per-process"
       },
       "schemaValid": false,
       "semanticValid": false,

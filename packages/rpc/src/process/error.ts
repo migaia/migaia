@@ -35,3 +35,15 @@ export function createProcessError(
       : new Error(TEXT_BY_CODE[code], options)
   return attachErrorIdentity(error, { source: ERROR_SOURCE, code, ...(detail ? { detail } : {}) })
 }
+
+/** Numeric resilience configuration keeps RangeError identity with the registered process code. */
+export function createProcessRangeError(field: string): RangeError {
+  return attachErrorIdentity(
+    new RangeError(TEXT_BY_CODE[RpcProcessErrorCode.resilienceInvalidOption]),
+    {
+      source: ERROR_SOURCE,
+      code: RpcProcessErrorCode.resilienceInvalidOption,
+      detail: { field }
+    }
+  )
+}

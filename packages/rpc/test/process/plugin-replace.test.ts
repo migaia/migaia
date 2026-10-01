@@ -4,6 +4,7 @@ import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import type { IRemotePluginDefinition } from '../../src/remote/plugin.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
+import { createNativeProcessOffer } from '../../src/process/offer.js'
 import type { IProcessPluginOptions } from '../../src/process/plugin/types.js'
 import type { IProcessByteChannel } from '../../src/process/types.js'
 import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../remote/fixture.js'
@@ -64,6 +65,7 @@ function fixture(withHostReplace = true) {
   const options: IProcessPluginOptions = {
     name: 'p',
     contract: REMOTE_FIXTURE_CONTRACT,
+    registrationOwner: { name: 'p', host },
     host: {
       disable: (name, policy) => host.plugin.disable(name, policy),
       enable: (name) => host.plugin.enable(name),
@@ -81,6 +83,7 @@ function fixture(withHostReplace = true) {
         spec: original,
         budget,
         scheduler,
+        health: { check: async () => undefined },
         launcher,
         report: () => undefined
       },
@@ -95,6 +98,60 @@ function fixture(withHostReplace = true) {
 }
 
 describe('process plugin whole-process replacement', () => {
+  it('[A2/A5] rejects an invalid local owner or missing default ping before launch', async () => {
+    const test = fixture()
+    try {
+      expect(() =>
+        createProcessPlugin({
+          ...test.options,
+          registrationOwner: { name: 'another-plugin', host: test.host }
+        })
+      ).toThrowError(
+        expect.objectContaining({
+          code: 'PROCESS_PLUGIN_INVALID_OPTION',
+          detail: { field: 'registrationOwner' }
+        })
+      )
+      const deployment = test.options.deployment
+      if (deployment.kind !== 'spawn') throw new Error('fixture must spawn')
+      const offer = {
+        ...createNativeProcessOffer({ peer: { id: 'probe', runtime: 'node' } }),
+        capabilities: ['close@1']
+      }
+      expect(() =>
+        createProcessPlugin({
+          ...test.options,
+          deployment: {
+            ...deployment,
+            offer,
+            supervision: { ...deployment.supervision, health: undefined }
+          }
+        })
+      ).toThrowError(
+        expect.objectContaining({
+          code: 'PROCESS_RESILIENCE_INVALID_OPTION',
+          detail: { field: 'deployment.offer.capabilities' }
+        })
+      )
+      expect(test.launch).not.toHaveBeenCalled()
+      expect(() =>
+        createProcessPlugin({
+          ...test.options,
+          deployment: {
+            ...deployment,
+            offer,
+            supervision: {
+              ...deployment.supervision,
+              health: { check: async () => undefined }
+            }
+          }
+        })
+      ).not.toThrow()
+    } finally {
+      await test.host.dispose()
+    }
+  })
+
   it('[A9] keeps trusted frozen metadata and delegates stop-then-start to its supervisor', async () => {
     const test = fixture()
     const plugin = createProcessPlugin(test.options)

@@ -103,6 +103,7 @@ describe('process plugin spawn binding', () => {
     const plugin = createProcessPlugin({
       name: 'p',
       contract: REMOTE_FIXTURE_CONTRACT,
+      registrationOwner: { name: 'p', host },
       host: host.plugin,
       endpointFactory: async () => fixture.served,
       report: () => undefined,
@@ -127,6 +128,7 @@ describe('process plugin spawn binding', () => {
             },
             launch
           },
+          health: { check: async () => undefined },
           report: () => undefined
         },
         rawChannel: async () => raw,

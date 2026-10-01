@@ -5,6 +5,8 @@ import { createUnitBudget } from '@migaia/supervision'
 import { describe, expect, it, vi } from 'vitest'
 import { createComposedEndpoint } from '../../src/core/composed.js'
 import { createCanonicalChunkFeature } from '../../src/core/features/canonical-chunk.js'
+import { createControlFeature } from '../../src/core/features/control.js'
+import { createDiscoveryFeature } from '../../src/core/features/discovery.js'
 import { createOutboundFeature } from '../../src/core/features/outbound.js'
 import { createProviderFeature } from '../../src/core/features/provider.js'
 import { createStreamFeature } from '../../src/core/features/stream.js'
@@ -13,6 +15,7 @@ import { abort } from '../../src/core/middleware/abort.js'
 import { codec } from '../../src/core/middleware/codec.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { framer } from '../../src/core/middleware/framer.js'
+import { ping } from '../../src/core/middleware/ping.js'
 import { createNodeProcessLauncher } from '../../src/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../src/process/handshake.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
@@ -44,10 +47,14 @@ const contract: IRemoteContract = {
 function streamRoots() {
   const chunk = createCanonicalChunkFeature()
   const outbound = createOutboundFeature(chunk)
+  const discovery = createDiscoveryFeature(outbound)
+  const control = createControlFeature(outbound, discovery)
   const provider = createProviderFeature(outbound)
   return {
     'first-party-chunk': chunk,
     'first-party-outbound': outbound,
+    'first-party-discovery': discovery,
+    'first-party-control': control,
     'first-party-provider': provider,
     'first-party-stream': createStreamFeature(outbound, provider)
   }
@@ -75,6 +82,7 @@ describe('native process plugin', () => {
     const plugin = createProcessPlugin({
       name: 'p',
       contract,
+      registrationOwner: { name: 'p', host },
       host: host.plugin,
       report: () => undefined,
       deployment: {
@@ -117,7 +125,8 @@ describe('native process plugin', () => {
               codec(channel.pipeline.codec),
               framer(channel.pipeline.framer),
               abort(),
-              connect({ transport: channel.transport })
+              connect({ transport: channel.transport }),
+              ping()
             ]
           },
           {

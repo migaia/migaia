@@ -13,7 +13,7 @@
     },
     "runtime": { "type": "string", "minLength": 1 },
     "strategy": { "enum": ["stop-then-start", "start-then-switch"] },
-    "instanceMode": { "enum": ["shared"] },
+    "instanceMode": { "enum": ["shared", "per-connection"] },
     "bootstrap": {
       "type": "object",
       "required": ["via"],
