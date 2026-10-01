@@ -63,6 +63,10 @@ function validateByteOptions(options: IProcessByteOptions): string {
   /** Control owns local offer grammar and secret-safe invalid-offer diagnostics. */
   const hello = createRpcHello(options.offer)
   const parsed = normalizeRpcHandshake(hello)
+  /**
+   * Defense in depth: current hello normalization already requires JSON, but keep the local
+   * byte-channel invariant explicit if the generic handshake evolves.
+   */
   if (parsed.step !== RpcHandshakeStep.hello || !parsed.codecs.includes(RpcCodecId.json))
     throw invalidOption(RpcProcessErrorText.jsonCodecRequired)
   if (

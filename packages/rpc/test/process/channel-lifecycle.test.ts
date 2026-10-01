@@ -201,6 +201,28 @@ describe('process channel boundary', () => {
     await wire.close()
   })
 
+  it('[D3] bounds early business bytes independently of the frame count', async () => {
+    const port = createBytePort()
+    const reports: unknown[] = []
+    const wire = bindProcessByteWire(port.channel, {
+      peerId: 'peer',
+      report: (error) => reports.push(error)
+    })
+    const handshake = wire.readHandshakeFrame()
+    port.emitText('hello')
+    await handshake
+    wire.activate()
+    /** Three valid frames exceed 1 MiB in total while staying far below 256 frames. */
+    const payload = 'x'.repeat(350_000)
+    port.emitText(payload)
+    port.emitText(payload)
+    expect(wire.closed).toBe(false)
+    port.emitText(payload)
+    expect(wire.closed).toBe(true)
+    expect(reports).toEqual([expect.objectContaining({ code: 'PROCESS_CHANNEL_CLOSED' })])
+    await wire.close()
+  })
+
   it('[D4] rejects a 16 MiB unauthenticated frame at its header', async () => {
     const port = createBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })

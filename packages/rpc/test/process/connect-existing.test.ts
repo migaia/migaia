@@ -29,6 +29,91 @@ function ipc(id: string) {
 }
 
 describe('Node rendezvous sockets', () => {
+  it('[L7] rejects a held pending accept after listener close', async () => {
+    let capture: (pending: IProcessPendingByteConnection) => void = () => undefined
+    const held = new Promise<IProcessPendingByteConnection>((resolve) => {
+      capture = resolve
+    })
+    let verifierCalls = 0
+    const listener = await listenProcessByteChannel({
+      address: 'tcp://127.0.0.1:0',
+      auth: {
+        mode: 'required',
+        verify: () => {
+          verifierCalls += 1
+          return 'principal'
+        }
+      },
+      report: () => undefined,
+      onConnection(pending) {
+        capture(pending)
+        /** Keep ownership until the listener closes this still-pending connection. */
+        return new Promise<void>(() => undefined)
+      }
+    })
+    const raw = await dialProcessByteChannel({ address: listener.address })
+    try {
+      const pending = await held
+      await listener.close()
+      await expect(
+        pending.accept({
+          peerId: 'held',
+          offer: responderOffer,
+          report: () => undefined,
+          ipc: ipc('held')
+        })
+      ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
+      expect(verifierCalls).toBe(0)
+    } finally {
+      await raw.close()
+      await listener.close()
+    }
+  })
+
+  it('[L1b] aborts an in-flight accept when the listener closes', async () => {
+    let capture: (value: { outcome: Promise<unknown> }) => void = () => undefined
+    const started = new Promise<{ outcome: Promise<unknown> }>((resolve) => {
+      capture = resolve
+    })
+    let verifierCalls = 0
+    const listener = await listenProcessByteChannel({
+      address: 'tcp://127.0.0.1:0',
+      auth: {
+        mode: 'required',
+        verify: () => {
+          verifierCalls += 1
+          return 'principal'
+        }
+      },
+      report: () => undefined,
+      onConnection(pending) {
+        const outcome = pending
+          .accept({
+            peerId: 'in-flight',
+            offer: responderOffer,
+            report: () => undefined,
+            ipc: ipc('in-flight')
+          })
+          .then(
+            () => undefined,
+            (error: unknown) => error
+          )
+        capture({ outcome })
+        return outcome.then(() => undefined)
+      }
+    })
+    const raw = await dialProcessByteChannel({ address: listener.address })
+    try {
+      const { outcome } = await started
+      await listener.close()
+      await expect(outcome).resolves.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
+      expect(verifierCalls).toBe(0)
+    } finally {
+      await raw.close()
+      await listener.close()
+    }
+  })
+
   it('[D4] rejects a 16 MiB header before verifier admission', async () => {
     let verifierCalls = 0
     /** The server's rejected accept is the observable pre-auth boundary. */
