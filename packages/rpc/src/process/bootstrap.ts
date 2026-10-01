@@ -1,7 +1,11 @@
 import { createContractError } from '../contract/contract-error.js'
 import { RpcContractErrorCode } from '../contract/error-code.js'
-import { createRpcStreamFrameDecoder } from '../contract/framing/stream.js'
+import {
+  createRpcStreamFrameDecoderWithLimit,
+  RPC_STREAM_MAX_FRAME_BYTES
+} from '../contract/framing/stream.js'
 import { registerProcessFrameSource } from './channel.js'
+import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from './constants.js'
 import { RpcProcessErrorCode } from './error-code.js'
 import { createProcessError } from './error.js'
 import type { IProcessByteChannel } from './types.js'
@@ -14,6 +18,8 @@ export async function openBootstrapFrameChannel(
   if (bootstrap === 'none') return Object.freeze({ channel })
   /** The first decoded frame is bootstrap; all later frames retain this same decoder. */
   let bootstrapped = false
+  /** The transferred decoder returns to the normal limit only after handshake activation. */
+  let ready = false
   let resolveBootstrap: (payload: Uint8Array) => void = () => undefined
   let rejectBootstrap: (error: unknown) => void = () => undefined
   const payload = new Promise<Uint8Array>((resolve, reject) => {
@@ -28,29 +34,35 @@ export async function openBootstrapFrameChannel(
   /** Decoder failure and the awaiting caller share one physical teardown. */
   let closing: Promise<void> | undefined
   const close = (): Promise<void> => (closing ??= Promise.resolve().then(() => channel.close()))
-  const decoder = createRpcStreamFrameDecoder({
-    onFrame(frame) {
-      if (!bootstrapped) {
-        bootstrapped = true
-        resolveBootstrap(frame)
-      } else if (onFrame) onFrame(frame)
-      else if (queued === undefined) queued = frame
-      else {
-        /** A second pre-ready frame is a handshake violation, not another bootstrap. */
-        const error = createContractError(RpcContractErrorCode.handshakeInvalid)
-        queuedError = error
+  const decoder = createRpcStreamFrameDecoderWithLimit(
+    {
+      onFrame(frame) {
+        if (!bootstrapped) {
+          bootstrapped = true
+          resolveBootstrap(frame)
+        } else if (onFrame) onFrame(frame)
+        else if (queued === undefined) queued = frame
+        else {
+          /** A second pre-ready frame is a handshake violation, not another bootstrap. */
+          const error = createContractError(RpcContractErrorCode.handshakeInvalid)
+          queuedError = error
+          void close()
+        }
+      },
+      onError(error) {
+        if (!bootstrapped) rejectBootstrap(error)
+        else if (onError) onError(error)
+        else queuedError = error
         void close()
       }
     },
-    onError(error) {
-      if (!bootstrapped) rejectBootstrap(error)
-      else if (onError) onError(error)
-      else queuedError = error
-      void close()
-    }
-  })
+    () => (ready ? RPC_STREAM_MAX_FRAME_BYTES : PROCESS_HANDSHAKE_MAX_FRAME_BYTES)
+  )
   registerProcessFrameSource(channel, {
     decoder,
+    activate() {
+      ready = true
+    },
     attach(frame, error) {
       onFrame = frame
       onError = error

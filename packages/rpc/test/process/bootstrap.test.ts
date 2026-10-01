@@ -89,6 +89,12 @@ describe('process bootstrap decoder ownership', () => {
     invalidPort.push(new Uint8Array([0, 0, 0, 0]))
     await expect(invalid).rejects.toMatchObject({ code: 'INVALID_FRAME' })
     expect(invalidPort.closes).toBe(1)
+
+    const oversizedPort = source()
+    const oversized = openBootstrapFrameChannel(oversizedPort.channel, 'stdin')
+    oversizedPort.push(new Uint8Array([1, 0, 0, 0]))
+    await expect(oversized).rejects.toMatchObject({ code: 'FRAME_LIMIT_EXCEEDED' })
+    expect(oversizedPort.closes).toBe(1)
   })
 
   it('[A7] rejects two pre-ready control frames after one bootstrap', async () => {
@@ -97,5 +103,18 @@ describe('process bootstrap decoder ownership', () => {
     port.push(frames('bootstrap', 'hello-one', 'hello-two'))
     await opened
     expect(port.closes).toBe(1)
+  })
+
+  it('[D4] caps the transferred decoder after bootstrap and before handshake', async () => {
+    const port = source()
+    const opening = openBootstrapFrameChannel(port.channel, 'stdin')
+    port.push(frames('bootstrap'))
+    await opening
+    const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
+    const handshake = wire.readHandshakeFrame()
+    port.push(new Uint8Array([1, 0, 0, 0]))
+    await expect(handshake).rejects.toMatchObject({ code: 'FRAME_LIMIT_EXCEEDED' })
+    expect(wire.closed).toBe(true)
+    await wire.close()
   })
 })
