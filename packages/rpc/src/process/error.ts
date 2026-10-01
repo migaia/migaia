@@ -4,6 +4,8 @@ import { RpcProcessErrorText } from './error-text.js'
 
 /** One stable text is assigned to each process code at its single construction site. */
 const TEXT_BY_CODE: Readonly<Record<IRpcProcessErrorCode, string>> = {
+  [RpcProcessErrorCode.hostInvalidOption]: RpcProcessErrorText.hostInvalidOption,
+  [RpcProcessErrorCode.hostClosed]: RpcProcessErrorText.hostClosed,
   [RpcProcessErrorCode.handshakeTimeout]: RpcProcessErrorText.handshakeTimeout,
   [RpcProcessErrorCode.authRejected]: RpcProcessErrorText.authRejected,
   [RpcProcessErrorCode.channelClosed]: RpcProcessErrorText.channelClosed,
@@ -29,6 +31,7 @@ export function createProcessError(
   /** Authentication and option errors retain TypeError identity; other channel failures are Error. */
   const error =
     code === RpcProcessErrorCode.authRejected ||
+    code === RpcProcessErrorCode.hostInvalidOption ||
     code === RpcProcessErrorCode.pluginInvalidOption ||
     code === RpcProcessErrorCode.resilienceInvalidOption
       ? new TypeError(TEXT_BY_CODE[code], options)

@@ -1,5 +1,9 @@
 /** Canonical process diagnostics never contain token, frame, or stderr payload bytes. */
 export const RpcProcessErrorText = {
+  /** Host admission rejects invalid deployment or replacement options before side effects. */
+  hostInvalidOption: 'process host options are invalid',
+  /** Facade release permanently rejects new and queued Host commands. */
+  hostClosed: 'process host is closed',
   /** Local scheduler timed out before byte handshake completed. */
   handshakeTimeout: 'process channel handshake timed out',
   /** Authentication failed without exposing the verifier's secret-bearing exception. */

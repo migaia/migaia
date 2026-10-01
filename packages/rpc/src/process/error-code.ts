@@ -3,6 +3,10 @@ export const ERROR_SOURCE = '@migaia/rpc/process'
 
 /** Process boundary failures; callers close or recreate the affected connection. */
 export const RpcProcessErrorCode = {
+  /** Host options violate R1/R2 before launch; callers must correct the named field. */
+  hostInvalidOption: 'PROCESS_HOST_INVALID_OPTION',
+  /** Facade release has begun; callers must create a new facade instead of enqueueing work. */
+  hostClosed: 'PROCESS_HOST_CLOSED',
   /** Handshake exceeded its scheduler deadline; caller must open a new channel. */
   handshakeTimeout: 'PROCESS_HANDSHAKE_TIMEOUT',
   /** Peer authorization failed; caller must not retry without valid credentials. */
