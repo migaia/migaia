@@ -23,6 +23,10 @@ const controlDelta = JSON.parse(
 const streamingDelta = JSON.parse(
   readFileSync(join(root, 'packages/rpc/test/fixtures/streaming-export-delta.json'), 'utf8')
 )
+/** I18's additive subpath extends the frozen forty entries without changing their counts. */
+const bridgeDelta = JSON.parse(
+  readFileSync(join(root, 'packages/rpc/test/fixtures/jsonrpc-bridge-export-delta.json'), 'utf8')
+)
 const checks = [
   'subpath-imports',
   'obsolete-subpaths',
@@ -97,7 +101,9 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
       return match ? [[match[1], Number(match[2])]] : []
     })
   )
-  assert.equal(subpaths.size, 40)
+  assert.equal(subpaths.size, 40 + Object.keys(bridgeDelta.added).length)
+  for (const [name, names] of Object.entries(bridgeDelta.added))
+    assert.equal(subpaths.get(name), names.length, name)
   assert.equal(subpaths.get('@migaia/rpc/core/transport-kit'), 16)
   assert.equal(subpaths.get('@migaia/rpc/core/stream'), 2)
   for (const [name, record] of Object.entries(legacy)) {
