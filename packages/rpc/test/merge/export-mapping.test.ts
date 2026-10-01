@@ -135,7 +135,14 @@ describe('A1 merged public exports', () => {
     const processEntry = manifest.exports['./process']
     expect(
       Object.keys(await import(pathToFileURL(join(packageRoot, processEntry.default)).href))
-    ).toEqual(expect.arrayContaining(['createProcessPlugin', 'createServeProcessPlugin']))
+    ).toEqual(
+      expect.arrayContaining([
+        'createProcessPlugin',
+        'createServeProcessPlugin',
+        'parseProcessPluginDescriptor',
+        'ProcessPluginWire'
+      ])
+    )
   })
 
   it('keeps contract protocol and normalizer implementations outside compiled core', () => {

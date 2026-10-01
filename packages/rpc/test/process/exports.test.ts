@@ -35,6 +35,8 @@ describe('process package layering and exports', () => {
     expect(common.createNativeProcessOffer).toBeTypeOf('function')
     expect(common.createProcessPlugin).toBeTypeOf('function')
     expect(common.createServeProcessPlugin).toBeTypeOf('function')
+    expect(common.parseProcessPluginDescriptor).toBeTypeOf('function')
+    expect(common.ProcessPluginWire).toEqual({ native: 'native', jsonrpc: 'jsonrpc' })
     expect(framing.encodeRpcStreamFrame).toBeTypeOf('function')
   })
 

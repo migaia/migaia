@@ -308,12 +308,14 @@
     },
     "@migaia/rpc": {
       "./process": [
+        "ProcessPluginWire",
         "RpcProcessErrorCode",
         "RpcProcessErrorText",
         "createNativeProcessOffer",
         "createProcessPlugin",
         "createProcessTransport",
-        "createServeProcessPlugin"
+        "createServeProcessPlugin",
+        "parseProcessPluginDescriptor"
       ],
       "./process/adapters/node-child-process": [
         "createNodeProcessLauncher",

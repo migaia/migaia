@@ -1,0 +1,1583 @@
+{
+  "cases": [
+    {
+      "id": "spawn-native-stdin",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "spawn-native-fd",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "fd",
+              "fd": 3
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "spawn-jsonrpc-fd",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "jsonrpc",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "fd",
+              "fd": 3
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "spawn-message",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "message",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "connect",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "connect",
+          "address": "/tmp/rpc.sock"
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "host-spawn",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host",
+        "catalog": {
+          "p": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          },
+          "q": {
+            "schemaVersion": 1,
+            "plugin": "q",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "host-connect",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "connect",
+          "address": "/tmp/rpc.sock"
+        },
+        "target": "host",
+        "catalog": {
+          "p": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          },
+          "q": {
+            "schemaVersion": 1,
+            "plugin": "q",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "missing-version",
+      "value": {
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.descriptorVersion"
+    },
+    {
+      "id": "wrong-version",
+      "value": {
+        "descriptorVersion": 2,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.descriptorVersion"
+    },
+    {
+      "id": "unknown-top",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        },
+        "extra": true
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.extra"
+    },
+    {
+      "id": "name-mismatch",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "other",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": false,
+      "field": "descriptor.name"
+    },
+    {
+      "id": "connect-replace-strategy",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "connect",
+          "address": "/tmp/rpc.sock"
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        },
+        "replaceStrategy": "stop-then-start"
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.replaceStrategy"
+    },
+    {
+      "id": "unknown-replace-strategy",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        },
+        "replaceStrategy": "hot"
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.replaceStrategy"
+    },
+    {
+      "id": "unsupported-instance-mode",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        },
+        "instanceMode": "per-connection"
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.instanceMode"
+    },
+    {
+      "id": "host-missing-catalog",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host"
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.catalog"
+    },
+    {
+      "id": "host-empty-catalog",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host",
+        "catalog": {}
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "code": "REMOTE_CONTRACT_INVALID"
+    },
+    {
+      "id": "host-bad-catalog-key",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host",
+        "catalog": {
+          "bad.name": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "code": "REMOTE_CONTRACT_INVALID"
+    },
+    {
+      "id": "host-key-mismatch",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host",
+        "catalog": {
+          "other": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": false,
+      "code": "REMOTE_CONTRACT_INVALID"
+    },
+    {
+      "id": "host-duplicate-plugin-value",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host",
+        "catalog": {
+          "p": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          },
+          "q": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": false,
+      "code": "REMOTE_CONTRACT_INVALID"
+    },
+    {
+      "id": "host-invalid-contract",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host",
+        "catalog": {
+          "p": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {}
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "code": "REMOTE_CONTRACT_INVALID"
+    },
+    {
+      "id": "host-has-contract",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host",
+        "catalog": {
+          "p": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          },
+          "q": {
+            "schemaVersion": 1,
+            "plugin": "q",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.contract"
+    },
+    {
+      "id": "host-has-instance-mode",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "hostOne",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "target": "host",
+        "catalog": {
+          "p": {
+            "schemaVersion": 1,
+            "plugin": "p",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          },
+          "q": {
+            "schemaVersion": 1,
+            "plugin": "q",
+            "features": {
+              "f": {
+                "methods": {
+                  "request": {
+                    "mode": "request",
+                    "idempotent": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "instanceMode": "shared"
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.instanceMode"
+    },
+    {
+      "id": "unknown-target",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        },
+        "target": "worker"
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.target"
+    },
+    {
+      "id": "byte-missing-wire",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.deployment.wire"
+    },
+    {
+      "id": "jsonrpc-missing-bootstrap",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "jsonrpc",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.deployment.spec.bootstrap"
+    },
+    {
+      "id": "jsonrpc-stdin-bootstrap",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "jsonrpc",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.deployment.spec.bootstrap.via"
+    },
+    {
+      "id": "message-has-wire",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "message",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.deployment.wire"
+    },
+    {
+      "id": "bootstrap-payload",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin",
+              "payload": [
+                1,
+                2,
+                3
+              ]
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.deployment.spec.bootstrap.payload"
+    },
+    {
+      "id": "nested-token",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {
+                "token": "secret"
+              }
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.deployment.spec.env.set.token"
+    },
+    {
+      "id": "invalid-contract",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": 1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {}
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "code": "REMOTE_CONTRACT_INVALID"
+    },
+    {
+      "id": "budget-negative",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "p",
+        "runtime": "node",
+        "deployment": {
+          "kind": "spawn",
+          "channelKind": "byte",
+          "wire": "native",
+          "spec": {
+            "command": "node",
+            "args": [
+              "child.mjs"
+            ],
+            "env": {
+              "inherit": [],
+              "set": {}
+            },
+            "stdio": {
+              "stdin": "channel",
+              "stdout": "channel",
+              "stderr": "drain"
+            },
+            "bootstrap": {
+              "via": "stdin"
+            }
+          },
+          "budget": {
+            "maxUnits": -1
+          }
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "p",
+          "features": {
+            "f": {
+              "methods": {
+                "request": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.deployment.budget.maxUnits"
+    }
+  ]
+}
