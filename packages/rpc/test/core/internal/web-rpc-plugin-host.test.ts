@@ -235,7 +235,11 @@ describe('B12a WebRPC PluginHost shell', () => {
 
   it('closes construction ownership when injected timer setup fails', async () => {
     const timerFailure = new Error('timer setup failed')
-    const endpointTime = createEndpointTimePort(systemScheduler)
+    /**
+     * This fault injection tests setup failure, so CPU scheduling must not consume its 10ms
+     * deadline.
+     */
+    const endpointTime = createEndpointTimePort(createManualScheduler())
     const time = Object.freeze({
       ...endpointTime,
       setTimeout: () => {
