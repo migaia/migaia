@@ -70,4 +70,22 @@ describe('A8 release hook error contract', () => {
       expect(jsdoc).toContain('beforeRelease')
     }
   })
+
+  it('documents the release ordering, affected result, migration, and reused error codes', async () => {
+    const [readme, useguide] = await Promise.all([
+      readFile(new URL('../README.md', import.meta.url), 'utf8'),
+      readFile(new URL('../USEGUIDE.md', import.meta.url), 'utf8')
+    ])
+    for (const text of [readme, useguide]) {
+      expect(text).toContain('beforeRelease')
+      expect(text).toContain('affected')
+      expect(text).toContain('dryRun: true')
+      expect(text).toContain('BC1')
+      expect(text).toContain('BC3')
+    }
+    for (const code of ['PLUGIN_DISPOSE_FAILED', 'LIFECYCLE_MUTATION', 'DISPOSE_STEP_TIMEOUT']) {
+      const row = useguide.split('\n').find((line) => line.startsWith(`| \`${code}\``))
+      expect(row).toContain('beforeRelease')
+    }
+  })
 })

@@ -85,7 +85,7 @@ const host = new Host({
 | API                                     | 参数                                                               | 返回                                                    | 作用                                                                              |
 | --------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `host.use(...plugins)`                  | 至少 1 个 `IPlugin`，按顺序安装                                    | `Promise<Host & Extensions>`                            | 运行期安装插件；批次内任一失败按逆序回滚整批，见 [§8](#8-生命周期与错误)。        |
-| `host.unUse(name)`                      | `name: string`                                                     | `Promise<IPluginRemoval>`                               | 依赖安全地卸载插件及其 extension/stage/资源。                                     |
+| `host.unUse(name)`                      | `name: string`；`dryRun: true` 可选                                  | 执行时 `Promise<IPluginRemoval>`；dry run 时 `Promise<IPluginDependencyPlan>` | 依赖安全地卸载插件；执行结果带冻结的实际 `affected`。 |
 | `host.dispose()`                        | 无                                                                 | `Promise<void>`                                         | 卸载全部插件并永久关闭宿主；重复调用复用同一 Promise。                            |
 | `host.config.get(path)`                 | `path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`        | `unknown \| undefined`                                  | 同步读取；对象/数组返回 Readonly 懒代理；未知插件或路径返回 `undefined`。         |
 | `host.config.update(name, recipe)`      | `name: string`；`recipe(previous) => Partial<patch>`（须同步返回） | `Promise<void>`                                         | Copy-on-Write 合并 patch，跑 `plugin.update(next, core)` 成功才提交。             |
@@ -182,7 +182,7 @@ const configurable = definePlugin({
 
 `onDispose` 接受函数、`{ [Symbol.dispose]() }` 或 `{ [Symbol.asyncDispose]() }`。同步安装（构造函数期通过 `useSync` 安装）的插件也可注册 async disposer：Host 会先同步撤销可见状态，再通过 `PLUGIN_INSTALL_FAILED.detail.completion` 提供包含完整 rollback identities 的冻结结果；需要完整 secondary identity 的错误转换必须 await completion。资源、shared、pipeline stage 和 extension 都由这次安装记录拥有；`unUse()` 时会按逆序撤销它们（见 [§10](#10-资源清理协议)）。
 
-**不要把 `use`、`unUse`、`config.update` 或 `dispose` 暴露给插件 core。** 插件也不得在自己的 lifecycle hook（包括 `setup`、`install`、`update`、`dispose`）内部调用当前 Host 的这些方法；setup 等待期间从外部调用 Host mutation 或 `config.update` 同样同步抛 `LIFECYCLE_MUTATION`，见 [§8](#8-生命周期与错误)。
+**不要把 `use`、`unUse`、`config.update` 或 `dispose` 暴露给插件 core。** 插件也不得在自己的 lifecycle hook（包括 `setup`、`install`、`update`、`beforeRelease`、`dispose`）内部调用当前 Host 的这些方法；setup 或 beforeRelease 等待期间从外部调用 Host mutation 或 `config.update` 同样同步抛 `LIFECYCLE_MUTATION`，见 [§8](#8-生命周期与错误)。
 
 ### 安装前的异步 setup
 
@@ -334,8 +334,8 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 ## 8. 生命周期与错误
 
 1. `use()` 逐个安装批次内的插件；任一安装失败会把这次批次里已安装的插件按逆序回滚。
-2. `unUse()` 依次移除 pipeline stage → 插件自身的 `dispose()`/`Symbol.dispose`/`Symbol.asyncDispose` → 释放 shared key → `onDispose()` 登记的资源 disposer → 移除已挂载的 extension 属性。
-3. **插件 lifecycle hook（包括 setup）内禁止调用当前 Host 的 `use`、`unUse`、`config.update` 或 `dispose`**；setup 等待期间外部代码调用 Host mutation 或 `config.update` 也同步抛 `LIFECYCLE_MUTATION`。应用组合层负责维护插件之间的安装/卸载拓扑。
+2. `unUse()` 先调用已安装该代注册的可选 `beforeRelease(context)`；此时发布与已有调用仍可用。钩子结束后才排空租约，再依次移除 pipeline stage → 插件自身的 `dispose()`/`Symbol.dispose`/`Symbol.asyncDispose` → 释放 shared key → `onDispose()` 登记的资源 disposer → 移除已挂载的 extension 属性。`context.signal` 是该代生命周期信号，`deadlineAt` 与 `remainingMs()` 使用 Host 调度器和 `disposeStepTimeoutMs`；每代最多调用一次，钩子错误或超时被收集但不阻止后续释放。
+3. **插件 lifecycle hook（包括 setup、beforeRelease）内禁止调用当前 Host 的 `use`、`unUse`、`config.update` 或 `dispose`**；setup 或 beforeRelease 等待期间外部代码调用 Host mutation 或 `config.update` 也同步抛 `LIFECYCLE_MUTATION`。应用组合层负责维护插件之间的安装/卸载拓扑。
 4. cleanup 报错时，Host 仍会移除该插件的可发现状态（从注册表移除、撤销 extension），随后返回的 Promise 才 reject——错误上报和状态清理是分离的两件事，一个失败不会阻塞另一个。
 5. Host 被 dispose 后，所有访问/变更 API 都会以 `PluginHostError` reject 或抛出；入口守卫（如内部的 `#assertActive()`）同步抛出，队列内运行时失败以 rejected Promise 返回。
 
@@ -360,6 +360,8 @@ setup 运行期间 Host mutation 与 `config.update` 由同步守卫拒绝，不
 安装依赖者时，必需 Feature provider 被禁用抛 `PREREQUISITE_DISABLED`，被卸载抛 `PREREQUISITE_REMOVED`，从未安装抛 `PREREQUISITE_MISSING`，批内成环抛 `DEPENDENCY_CYCLE`；它们都在任何 install 执行前、以顶层错误抛出。provider 仍被禁用时单独 `enable` 依赖者抛 `PREREQUISITE_DISABLED`；`token.enable()` 会先检查整组恢复集合，不满足则一个都不启用。
 
 依赖感知的 `disable`/`unUse` 接受 `{ policy?: 'reject' | 'cascade' | 'suspend'; dryRun?: boolean }`，默认 `reject`；`detail.blockedBy` 按级联处理顺序列出**全部**传递依赖者。`policy: 'cascade'` 连同依赖者一起处理；`policy: 'suspend'` 保留已激活依赖者的实例与资源，但句柄和已取出的 extension 抛 `PLUGIN_SUSPENDED`，stage 暂时离开 pipeline。`dryRun` 返回 `{ policy, order, steps, edges }`。旧 `{ cascade: true }` 被拒绝为 `INVALID_OPTION`。同一 provider 重新启用时直接恢复；同名新 provider 安装后按 capability `planResume` 对直接依赖者 rebind/restart，其余可满足的传递依赖者 resume。托管组合协议仍拒绝留下必需依赖者，并按依赖者优先顺序清理；`host.dispose()` 也按依赖者优先顺序释放，包括挂起注册。
+
+**卸载迁移（BC1–BC3）**：真实 `unUse` 的成功和清理失败结果现在都带冻结的 `affected: { policy, order, steps, edges }`，只记录已生效步骤；原先严格比较 `{ok:true}` 的读者改为检查 `ok` 并读取 `affected`。TypeScript 的 `unUse(name, {dryRun:true})` 返回计划，省略 `dryRun` 或传字面量 `false` 返回执行结果；宽 `boolean` 须先按值分支。插件定义可增加 `beforeRelease(context)`，在该代已安装注册撤销前运行一次；以前被当作普通元数据的同名非函数值现在于定义或准入时以原生 `TypeError`（`INVALID_OPTION`）拒绝。钩子 throw/reject 作为 `PLUGIN_DISPOSE_FAILED` 收集，原错误在 `cause`；超时内层为 `DISPOSE_STEP_TIMEOUT`，清理继续。
 
 ## 热替换与惰性激活
 
@@ -398,7 +400,7 @@ setup 运行期间 Host mutation 与 `config.update` 由同步守卫拒绝，不
 | `PLUGIN_INSTALL_ROLLBACK_FAILED`   | 诊断（非抛出）：插件安装失败且回滚清理也失败；原始安装错误**保持 primary**（顶层码 `PLUGIN_INSTALL_FAILED`），回滚失败经 `diagnostic` 上报。                                                                                                                                     |
 | `INSTALL_RESULT_THENABLE`          | 插件 `install()` 返回值自带 `then` key；同步 `useSync()` 与异步 `use()` 一致拒绝，不会发布可被误当作 Promise 的扩展。                                                                                                                                                            |
 | `COMPOSITION_TARGET_UNMANAGED`     | `openComposition()` 的目标不是本包登记的托管宿主。托管协议只对本包构造出的宿主开放，普通对象、另一份包副本产出的宿主都会被拒绝；组合方应先用 `isManagedHost()` 判定。                                                                                                            |
-| `PLUGIN_DISPOSE_FAILED`            | 单个插件卸载失败；原始错误位于 `cause`。                                                                                                                                                                                                                                         |
+| `PLUGIN_DISPOSE_FAILED`            | 插件 `beforeRelease` 或卸载步骤失败；原始错误位于 `cause`，后续清理继续。                                                                                                                                                                                                        |
 | `EXTENSION_DUPLICATE`              | extension key 与已有成员冲突。                                                                                                                                                                                                                                                   |
 | `EXTENSION_OBJECT_PROTOTYPE`       | extension key 与 `Object.prototype` 上的成员冲突（如 `toString`）。                                                                                                                                                                                                              |
 | `EXTENSION_RESERVED`               | extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。                                                                                                                                                                                                   |
@@ -406,7 +408,7 @@ setup 运行期间 Host mutation 与 `config.update` 由同步守卫拒绝，不
 | `PREREQUISITE_DISABLED`            | feature provider 被禁用；可启用该插件后重试。                                                                                                                                                                                                                                    |
 | `PREREQUISITE_REMOVED`             | feature provider 已卸载；需重新安装 provider。                                                                                                                                                                                                                                   |
 | `RESOURCE_OUTSIDE_INSTALL`         | 在允许的插件生命周期之外注册资源或 pipeline stage；setup 尝试关闭后的 `context.onDispose` 先释放有效资源再抛此码。                                                                                                                                                              |
-| `LIFECYCLE_MUTATION`               | 插件生命周期钩子内或 setup 等待期间尝试变更 Host；setup 期间的 `config.update` 也同步抛此码，见 [§8](#8-生命周期与错误)。                                                                                                                                                     |
+| `LIFECYCLE_MUTATION`               | 插件生命周期钩子内，或 setup / beforeRelease 等待期间尝试变更 Host；该期间的 `config.update` 也同步抛此码，见 [§8](#8-生命周期与错误)。                                                                                                                                    |
 | `INVALID_PIPELINE_MODE`            | 构造时传入的 pipeline mode 无效。                                                                                                                                                                                                                                                |
 | `PIPELINE_MODE_MISMATCH`           | stage 不能由 middleware-pipeline runner 提升到 Host mode；顶层为带 Host 身份的 `PluginHostError`，`cause` 保留上游 `TypeError`（`INVALID_OPTION`，source 为 `@migaia/middleware-pipeline`）。                                                                                       |
 | `PIPELINE_NEXT_DUPLICATE`          | 同一次 stage 调用里重复调用了 `next()`。                                                                                                                                                                                                                                         |
@@ -414,7 +416,7 @@ setup 运行期间 Host mutation 与 `config.update` 由同步守卫拒绝，不
 | `PIPELINE_EXECUTING`               | pipeline 执行期间尝试注册新 stage。                                                                                                                                                                                                                                              |
 | `PIPELINE_FAILED`                  | async pipeline 的 stage 与 downstream 同时失败，聚合为 `errors` 顺序固定为 `[stageError, downstreamError]` 的 `AggregateError`。                                                                                                                                                 |
 | `MUTATION_QUEUE_TIMEOUT`           | mutation 在 FIFO 队列中等待超过**已配置**的 `queueAdmissionTimeoutMs` 阈值后被拒绝（默认未配置该阈值，不会触发）；不会中断已经开始执行的插件代码。语义是**终止**：该 mutation 不会再被执行。                                                                                     |
-| `DISPOSE_STEP_TIMEOUT`             | disposal 期间单个 pipeline disposer / 插件 dispose 钩子 / resource disposer 等待超过 `disposeStepTimeoutMs`（默认 5000ms）仍未完成（含反过来 await 触发它的那次 `dispose()` 调用这种自依赖）。语义是**降级继续**：该步骤被计为失败，disposal 事务继续推进直至收敛到 `disposed`。 |
+| `DISPOSE_STEP_TIMEOUT`             | `beforeRelease` 或 disposal 期间单个 pipeline disposer / 插件 dispose 钩子 / resource disposer 等待超过 `disposeStepTimeoutMs`（默认 5000ms）仍未完成（含自依赖等待）。语义是**降级继续**：该步骤被计为失败，disposal 事务继续推进直至收敛到 `disposed`。 |
 | `MUTATION_EXECUTION_TIMEOUT`       | 已取得执行权的 lifecycle hook 超过 mutation 预算；提交资格已撤销，协作插件应停止并清理其 operation 资源。                                                                                                                                                                        |
 | `REGISTRATION_REVOKED`             | 已取出的 extension 函数所属 registration 已被卸载、禁用或替换；调用方应从当前句柄重新读取 extension。                                                                                                                                                                            |
 | `PIPELINE_DRAIN_TIMEOUT`           | Host 进入逻辑终态前 active pipeline 未在 drain 预算内归零；检查返回的 disposal result 与 physical completion。                                                                                                                                                                   |
@@ -443,7 +445,7 @@ core.onDispose({ [Symbol.asyncDispose]: async () => await cleanup() }) // 异步
 
 `onDispose(resource)` 接受三种形状（`IPluginResource`）：普通函数、带 `[disposeKey]`/`Symbol.dispose` 的同步 disposable、带 `[asyncDisposeKey]`/`Symbol.asyncDispose` 的异步 disposable。同一个资源如果同时提供多种清理方式，优先级是：显式的函数形态 > `Symbol.asyncDispose`/`asyncDisposeKey` > `Symbol.dispose`/`disposeKey`（源码 `src/disposal.ts` 的 `snapshotDisposer`：先扫描全部 async 候选键，再扫描 sync 候选键，取第一个值为函数的）。异步（`use()` 或 `useSync`）插件的资源清理支持完整的 async disposer；`useSync` 安装失败时通过 `detail.completion` 取得最终 rollback detail，见 [§4](#4-插件-core-api-参考)。
 
-`unUse()`/`dispose()` 清理某个插件时，按以下顺序逆序执行：pipeline disposer → 插件自身的 `dispose()`/`Symbol.dispose`/`Symbol.asyncDispose` → 释放 shared key → 通过 `onDispose()` 登记的资源 disposer → 移除已挂载的 extension 属性。每一步都以自己的 `disposeStepTimeoutMs` 为界（见 [§8](#8-生命周期与错误)）；任何一步失败都会被收集而不是让后续步骤中断，最终如果同一次卸载/dispose 有多个失败会聚合成 `AggregateError`（单个失败则直接是携带该 `cause` 的 `Error`）。
+`unUse()`/`dispose()` 清理某个插件时，先运行该代可选的 `beforeRelease`，随后按以下顺序逆序执行：pipeline disposer → 插件自身的 `dispose()`/`Symbol.dispose`/`Symbol.asyncDispose` → 释放 shared key → 通过 `onDispose()` 登记的资源 disposer → 移除已挂载的 extension 属性。每一步都以自己的 `disposeStepTimeoutMs` 为界（见 [§8](#8-生命周期与错误)）；任何一步失败都会被收集而不是让后续步骤中断，最终如果同一次卸载/dispose 有多个失败会聚合成 `AggregateError`（单个失败则直接是携带该 `cause` 的 `Error`）。
 
 ---
 
