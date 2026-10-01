@@ -329,6 +329,14 @@ def main() -> int:
     parser.add_argument("--listen-unix")
     parser.add_argument("--connect-unix")
     parser.add_argument("--role", choices=("responder", "initiator"), default="responder")
+    parser.add_argument("--business", action="store_true")
+    parser.add_argument("--descendant", action="store_true")
+    parser.add_argument("--jsonrpc", action="store_true")
+    parser.add_argument("--bare-jsonrpc", action="store_true")
+    parser.add_argument("--host", action="store_true")
+    parser.add_argument("--contract")
+    parser.add_argument("--bootstrap", choices=("none", "stdin"), default="none")
+    parser.add_argument("--auth-fd", type=int)
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--vectors")
     args = parser.parse_args()
@@ -337,6 +345,9 @@ def main() -> int:
         return run_selftest(args.vectors)
     if int(args.stdio) + int(bool(args.listen_unix)) + int(bool(args.connect_unix)) != 1:
         parser.error("select exactly one transport")
+    if args.business:
+        from business import run_business
+        return run_business(args)
     if args.stdio:
         reader, writer = sys.stdin.buffer, sys.stdout.buffer
         sock = listener = None

@@ -1,0 +1,220 @@
+{
+  "schema": "migaia.rpc.process-business/1",
+  "hostProfiles": [
+    false,
+    true
+  ],
+  "cases": [
+    {
+      "id": "native-public-facades",
+      "producer": "independent-language-peer",
+      "consumer": [
+        "createProcessPlugin",
+        "createProcessHost"
+      ],
+      "runtimes": [
+        "python",
+        "rust",
+        "go",
+        "node",
+        "bun"
+      ],
+      "deployments": [
+        "owned-stdio",
+        "borrowed-unix"
+      ],
+      "businessOracle": "test/process/peers/ts/public-behavior.json",
+      "methods": [
+        "request",
+        "oneWay",
+        "generator",
+        "asyncGenerator"
+      ]
+    },
+    {
+      "id": "response-receiver-binding",
+      "incomingReceiver": "provider",
+      "responseReceiver": "caller",
+      "expected": "caller-settles"
+    },
+    {
+      "id": "borrowed-session-release",
+      "sessions": 2,
+      "releaseFirst": true,
+      "secondRequest": "still-alive",
+      "expected": "still-alive",
+      "listenerExitBeforeCleanup": false
+    },
+    {
+      "id": "owned-session-release",
+      "launches": 1,
+      "expected": "exited",
+      "terminationDeclaration": "unsupported",
+      "capabilityReport": "CAPABILITY_UNSUPPORTED"
+    },
+    {
+      "id": "native-core-trace-isolation",
+      "concurrent": [
+        "h-trace-one",
+        "h-trace-two",
+        null
+      ],
+      "providerObserved": [
+        "h-trace-one",
+        "h-trace-two",
+        null
+      ],
+      "facadeTrace": null
+    },
+    {
+      "id": "native-listener-wrong-token",
+      "first": "rejected-before-ready",
+      "second": "valid-session-still-alive"
+    },
+    {
+      "id": "jsonrpc-public-facades",
+      "producer": "independent-language-peer",
+      "runtimes": [
+        "python",
+        "rust",
+        "go"
+      ],
+      "requiredBlocked": [
+        "typescript-public-responder"
+      ],
+      "consumer": [
+        "createProcessPlugin",
+        "createProcessHost"
+      ],
+      "deployments": [
+        "owned-stdio-caller-fd-launcher",
+        "borrowed-unix-explicit-custom-health"
+      ],
+      "methods": [
+        "request",
+        "oneWay"
+      ],
+      "firstStdinByte": 67,
+      "notification": {
+        "id": "absent",
+        "meta": "absent"
+      },
+      "requestMeta": {
+        "idempotencyKey": "h-bridge-key",
+        "timeoutMs": {
+          "minExclusive": 0,
+          "maxInclusive": 1000
+        }
+      }
+    },
+    {
+      "id": "jsonrpc-late-cancel-response",
+      "cancel": "notification",
+      "lateResponse": "late-after-cancel",
+      "expectedReport": {
+        "source": "@migaia/rpc/bridge/jsonrpc",
+        "code": "JSONRPC_PROFILE_INVALID"
+      },
+      "subsequentRequest": "after-cancel"
+    },
+    {
+      "id": "jsonrpc-listener-wrong-token",
+      "first": "rejected-before-ready",
+      "sentinelMinimumSubstring": 6,
+      "second": "valid-session-still-alive"
+    },
+    {
+      "id": "jsonrpc-bare-physical-echo",
+      "runtimes": [
+        "python",
+        "rust",
+        "go"
+      ],
+      "parentRuntimes": [
+        "node",
+        "bun"
+      ],
+      "deployments": [
+        "stdio-content-length",
+        "socket-content-length"
+      ],
+      "payloadBytes": [
+        64,
+        1024,
+        65536,
+        1048576
+      ],
+      "bare": "exact-body-bytes-no-json-or-business-dispatch",
+      "rpc": "public-bridge-p.f.request",
+      "bootstrap": "dedicated-fd-both-sides",
+      "oracle": "test/process/conformance-bench.test.ts",
+      "preparationEchoesPerSide": 3
+    },
+    {
+      "id": "native-physical-fault-hooks",
+      "runtimes": [
+        "python",
+        "go",
+        "rust",
+        "node"
+      ],
+      "deployment": "stdio",
+      "methods": {
+        "peer.busy": "ACK-then-real-infinite-CPU",
+        "peer.pause": "ACK-then-SIGSTOP-until-SIGCONT",
+        "peer.crash": "ACK-then-exit-17"
+      }
+    },
+    {
+      "id": "actual-descendant-parent-kill9",
+      "runtimes": [
+        "python",
+        "go",
+        "rust",
+        "node"
+      ],
+      "parent": "public-processHost",
+      "descendant": "sleep-600-no-protocol-fds",
+      "before": "native-PID-list-child-present",
+      "after": "parent-SIGKILL-peer-and-descendant-ESRCH-within-10000ms"
+    },
+    {
+      "id": "typescript-public-service-EOF-cleanup",
+      "physicalEOF": "without-caller-abort-frame",
+      "closeCalls": 1,
+      "closeSettlements": 1,
+      "pendingProviderAborts": 1
+    },
+    {
+      "id": "native-missing-stream-capability",
+      "runtimes": [
+        "python",
+        "go",
+        "rust",
+        "node"
+      ],
+      "offer": "public-native-stream-false",
+      "negotiatedStream": false,
+      "consumer": "public-composed-stream-owner",
+      "expected": {
+        "source": "@migaia/rpc/core",
+        "code": "CAPABILITY_CONFLICT"
+      },
+      "physicalStreamWrites": 0
+    },
+    {
+      "id": "native-declared-non-idempotent-request",
+      "runtimes": [
+        "python",
+        "rust",
+        "go",
+        "node",
+        "bun"
+      ],
+      "argument": "--contract caller-owned-remote-contract.json",
+      "contractPath": "contracts[0].value.features.f.methods.request.idempotent",
+      "declaration": false,
+      "expected": "actual-describe-declaration-false-same-request-business"
+    }
+  ]
+}

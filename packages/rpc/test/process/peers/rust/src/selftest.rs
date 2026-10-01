@@ -198,44 +198,291 @@ fn stream_violation(value: &Value) -> Option<(&'static str, &'static str)> {
     None
 }
 
-fn wire_violation(value: &Value, depth: usize) -> Option<&'static str> {
+/// Generated boundary vectors are actual error trees, not assertions about their metadata.
+fn generated_wire(spec: &Value) -> Value {
+    let size = field(spec, "size").as_u64().unwrap_or(0) as usize;
+    let node = |message: String| {
+        crate::json::object(&[
+            ("source", crate::json::string("s")),
+            ("code", crate::json::string("C")),
+            ("name", crate::json::string("Error")),
+            ("message", crate::json::string(&message)),
+            ("stack", crate::json::string("x")),
+        ])
+    };
+    match text(spec, "shape") {
+        "message" => node("x".repeat(size)),
+        "chain" | "errorsChain" => {
+            let mut current = node(String::new());
+            for _ in 1..size {
+                let edge = if text(spec, "shape") == "chain" {
+                    current
+                } else {
+                    Value::Array(vec![current])
+                };
+                let mut parent = node(String::new());
+                if let Value::Object(fields) = &mut parent {
+                    fields.push((
+                        if text(spec, "shape") == "chain" {
+                            "cause"
+                        } else {
+                            "errors"
+                        }
+                        .to_owned(),
+                        edge,
+                    ));
+                }
+                current = parent;
+            }
+            current
+        }
+        "wide" => {
+            let mut root = node(String::new());
+            if let Value::Object(fields) = &mut root {
+                fields.push((
+                    "errors".to_owned(),
+                    Value::Array((1..size).map(|_| node(String::new())).collect()),
+                ));
+            }
+            root
+        }
+        "dataDepth" => {
+            let mut data = field(spec, "leaf").clone();
+            for _ in 1..size {
+                data = Value::Array(vec![data]);
+            }
+            let mut root = node(String::new());
+            if let Value::Object(fields) = &mut root {
+                fields.push(("data".to_owned(), data));
+            }
+            root
+        }
+        "totalBytes" => {
+            let mut root = node(String::new());
+            let last = size - 17 * 8 - 15 * 65536;
+            if let Value::Object(fields) = &mut root {
+                fields.push((
+                    "errors".to_owned(),
+                    Value::Array(
+                        (0..16)
+                            .map(|index| node("x".repeat(if index < 15 { 65536 } else { last })))
+                            .collect(),
+                    ),
+                ));
+            }
+            root
+        }
+        _ => Value::Null,
+    }
+}
+/// Portable data admission counts real nesting and rejects reserved non-byte markers.
+fn portable_valid(value: &Value, depth: usize) -> bool {
     if depth > 48 {
-        return Some("depth");
+        return false;
     }
-    for key in ["source", "code", "name", "message", "stack"] {
-        if !value.has(key) {
-            return Some("required");
-        }
-        if field(value, key).as_str().is_none() {
-            return Some("type");
-        }
-    }
-    if text(value, "stack").is_empty() {
-        return Some("type");
-    }
-    if let Some(errors) = value.get("errors") {
-        let errors = match errors.as_array() {
-            Some(errors) => errors,
-            None => return Some("type"),
-        };
-        if errors.is_empty() {
-            return Some("emptyErrors");
-        }
-        for error in errors {
-            if let Some(violation) = wire_violation(error, depth + 1) {
-                return Some(violation);
+    match value {
+        Value::Null | Value::Bool(_) => true,
+        Value::Number(number) => number.parse::<f64>().is_ok_and(f64::is_finite),
+        Value::String(_) => true,
+        Value::SurrogateString(_) => false,
+        Value::Array(items) => items.iter().all(|item| portable_valid(item, depth + 1)),
+        Value::Object(fields) => {
+            if value.has("$rpc") {
+                fields.len() == 2
+                    && text(value, "$rpc") == "bytes"
+                    && field(value, "base64url").as_str().is_some_and(|text| {
+                        text.bytes().all(|byte| {
+                            byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
+                        })
+                    })
+            } else {
+                fields
+                    .iter()
+                    .all(|(_, item)| portable_valid(item, depth + 1))
             }
         }
     }
-    if let Some(cause) = value.get("cause") {
-        if !matches!(cause, Value::Object(_)) {
-            return Some("type");
+}
+/// Normalize actual error trees in preorder while recording exact first violation and pointer.
+fn wire_detail(
+    value: &Value,
+    ignore: bool,
+    reports: &mut Vec<Value>,
+) -> Result<Value, (&'static str, String)> {
+    let mut nodes = 0;
+    let mut bytes = 0;
+    fn visit(
+        value: &Value,
+        path: &str,
+        depth: usize,
+        ignore: bool,
+        reports: &mut Vec<Value>,
+        nodes: &mut usize,
+        bytes: &mut usize,
+    ) -> Result<Value, (&'static str, String)> {
+        let bad = |code, pointer: String| Err((code, pointer));
+        if depth > 48 {
+            return bad("depth", path.to_owned());
         }
-        if let Some(violation) = wire_violation(cause, depth + 1) {
-            return Some(violation);
+        *nodes += 1;
+        if *nodes > 1024 {
+            return bad("nodes", path.to_owned());
         }
+        let Value::Object(fields) = value else {
+            return bad("type", path.to_owned());
+        };
+        let allowed = [
+            "source",
+            "code",
+            "name",
+            "message",
+            "stack",
+            "cause",
+            "errors",
+            "data",
+            "truncated",
+        ];
+        let mut unknown: Vec<_> = fields
+            .iter()
+            .filter(|(key, _)| !allowed.contains(&key.as_str()))
+            .map(|(key, _)| key)
+            .collect();
+        unknown.sort();
+        if !ignore && !unknown.is_empty() {
+            return bad("unknownField", path.to_owned());
+        }
+        for key in unknown {
+            reports.push(crate::json::object(&[
+                ("pointer", crate::json::string(path)),
+                ("field", crate::json::string(key)),
+            ]));
+        }
+        let mut clean: Vec<(String, Value)> = fields
+            .iter()
+            .filter(|(key, _)| allowed.contains(&key.as_str()))
+            .cloned()
+            .collect();
+        for key in ["source", "code", "name", "message", "stack"] {
+            let pointer = format!("{path}/{key}");
+            let Some(item) = value.get(key) else {
+                return bad("required", pointer);
+            };
+            let Some(text) = item.as_str() else {
+                return bad("type", pointer);
+            };
+            if key != "message" && text.is_empty() {
+                return bad("type", pointer);
+            }
+            if matches!(item, Value::SurrogateString(_)) {
+                return bad("surrogate", pointer);
+            }
+            if text.len() > 65536 {
+                return bad("stringBytes", pointer);
+            }
+            *bytes += text.len();
+            if *bytes > 1048576 {
+                return bad("totalBytes", pointer);
+            }
+        }
+        if value.has("truncated") && field(value, "truncated") != &Value::Bool(true) {
+            return bad("truncatedValue", format!("{path}/truncated"));
+        }
+        if let Some(data) = value.get("data") {
+            if !portable_valid(data, 1) {
+                return bad("dataPortable", format!("{path}/data"));
+            }
+        }
+        if let Some(cause) = value.get("cause") {
+            let normalized = visit(
+                cause,
+                &format!("{path}/cause"),
+                depth + 1,
+                ignore,
+                reports,
+                nodes,
+                bytes,
+            )?;
+            clean.iter_mut().find(|(key, _)| key == "cause").unwrap().1 = normalized;
+        }
+        if let Some(errors) = value.get("errors") {
+            let Some(children) = errors.as_array() else {
+                return bad("type", format!("{path}/errors"));
+            };
+            if children.is_empty() {
+                return bad("emptyErrors", format!("{path}/errors"));
+            }
+            let mut normalized = vec![];
+            for (index, child) in children.iter().enumerate() {
+                normalized.push(visit(
+                    child,
+                    &format!("{path}/errors/{index}"),
+                    depth + 2,
+                    ignore,
+                    reports,
+                    nodes,
+                    bytes,
+                )?);
+            }
+            clean.iter_mut().find(|(key, _)| key == "errors").unwrap().1 = Value::Array(normalized);
+        }
+        Ok(Value::Object(clean))
     }
-    None
+    visit(value, "", 1, ignore, reports, &mut nodes, &mut bytes)
+}
+/// Envelope unknown-field reports have exact sorted keys and owning JSON pointers.
+fn envelope_unknown(value: &Value) -> Value {
+    let mut reports = vec![];
+    let kind = text(value, "kind");
+    let allowed: Vec<&str> = match kind {
+        "request" => vec!["kind", "id", "method", "data"],
+        "response" => vec!["kind", "id", "ok", "code", "message", "error", "data"],
+        "discovery" => vec!["kind", "id", "version", "acceptVersions", "data"],
+        _ => vec!["kind", "id", "data"],
+    };
+    let mut append = |record: &Value, path: &str, allowed: &[&str]| {
+        if let Value::Object(fields) = record {
+            let mut keys: Vec<_> = fields
+                .iter()
+                .filter(|(key, _)| !allowed.contains(&key.as_str()))
+                .map(|(key, _)| key)
+                .collect();
+            keys.sort();
+            for key in keys {
+                reports.push(Value::Array(vec![
+                    crate::json::string(path),
+                    crate::json::string(key),
+                ]));
+            }
+        }
+    };
+    append(value, "", &allowed);
+    append(
+        field(field(value, "data"), "route"),
+        "/data/route",
+        &[
+            "profile",
+            "type",
+            "applicationVersion",
+            "senderId",
+            "targetId",
+            "sentAt",
+            "receiverId",
+            "dispatchOnly",
+            "timeoutMs",
+            "idempotencyKey",
+            "trace",
+            "method",
+            "manual",
+            "resolvedTargetId",
+            "platform",
+            "accepted",
+            "message",
+            "operation",
+            "variation",
+        ],
+    );
+    append(field(value, "data"), "/data", &["route", "payload"]);
+    Value::Array(reports)
 }
 
 fn check_handshake(file: &str, root: &Value, counts: &mut Counts) {
@@ -260,8 +507,38 @@ fn check_handshake(file: &str, root: &Value, counts: &mut Counts) {
     }
     for case in items(field(root, "mismatch")) {
         let accept = field(case, "accept");
-        let valid =
-            field(accept, "major").as_u64() != Some(1) && text(case, "violation") == "mismatch";
+        // Compare the received acceptance to a real local offer, not a case-label predicate.
+        let offered = crate::json::object(&[
+            (
+                "versions",
+                Value::Array(vec![crate::json::object(&[
+                    ("major", crate::json::number(1)),
+                    ("minor", crate::json::number(1)),
+                ])]),
+            ),
+            ("codecs", Value::Array(vec![crate::json::string("json")])),
+            (
+                "capabilities",
+                Value::Array(vec![
+                    crate::json::string("abort@1"),
+                    crate::json::string("wire-error@1"),
+                    crate::json::string("stream@1"),
+                ]),
+            ),
+        ]);
+        let version = items(field(&offered, "versions"))
+            .iter()
+            .find(|version| field(version, "major") == field(accept, "major"));
+        let admitted = version.is_some_and(|version| {
+            field(accept, "minor")
+                .as_u64()
+                .is_some_and(|minor| minor <= field(version, "minor").as_u64().unwrap())
+        }) && items(field(&offered, "codecs")).contains(field(accept, "codec"))
+            && items(field(accept, "capabilities"))
+                .iter()
+                .all(|capability| items(field(&offered, "capabilities")).contains(capability));
+        let violation = if admitted { None } else { Some("mismatch") };
+        let valid = violation == Some(text(case, "violation"));
         counts.case(file, "mismatch", case, valid);
     }
 }
@@ -300,9 +577,52 @@ fn check_envelope(file: &str, root: &Value, counts: &mut Counts, stream_known: b
             "unknownFields",
             case,
             envelope_violation(field(case, "value"), stream_known).is_none()
-                && items(field(case, "expected")).len() == 3,
+                && envelope_unknown(field(case, "value")) == *field(case, "expected"),
         );
     }
+    // The sequence is evaluated through a connection-local warning cache, including index aliases.
+    let warnings = field(root, "warnings");
+    let mut seen = std::collections::HashSet::new();
+    let mut observed = vec![];
+    let bounded = |text: &str, maximum: usize| {
+        if text.chars().count() <= maximum {
+            text.to_owned()
+        } else {
+            format!("{}…", text.chars().take(maximum).collect::<String>())
+        }
+    };
+    for note in items(field(warnings, "sequence")) {
+        let pointer = text(note, "pointer")
+            .split('/')
+            .map(|part| {
+                if !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()) {
+                    "*"
+                } else {
+                    part
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("/");
+        let key = format!(
+            "{}{}#{}",
+            bounded(text(note, "kind"), 32),
+            bounded(&pointer, 128),
+            bounded(text(note, "field"), 64)
+        );
+        let identity = (text(note, "connection").to_owned(), key);
+        if seen.insert(identity.clone()) {
+            observed.push(Value::Array(vec![
+                crate::json::string(&identity.0),
+                crate::json::string(&identity.1),
+            ]));
+        }
+    }
+    counts.case(
+        file,
+        "warnings",
+        &crate::json::object(&[("id", crate::json::string("sequence"))]),
+        Value::Array(observed) == *field(warnings, "expected"),
+    );
 }
 
 fn check_control(file: &str, root: &Value, counts: &mut Counts) {
@@ -313,6 +633,185 @@ fn check_control(file: &str, root: &Value, counts: &mut Counts) {
             case,
             control_action(case) == text(case, "action"),
         );
+    }
+}
+
+/// Execute credit/cancellation actions and compare complete values and wire order, not fixture IDs.
+fn stream_sequence(case: &Value) -> bool {
+    let mut client = vec![crate::json::string("request")];
+    let mut provider = vec![crate::json::string("open")];
+    let mut observed = vec![];
+    let mut expected_seq = 0u64;
+    let mut cleanup = 0u64;
+    if text(case, "role") == "consumer" {
+        for frame in items(field(case, "onPull")) {
+            client.push(crate::json::string("pull"));
+            provider.push(crate::json::string(text(frame, "event")));
+            if stream_violation(frame).is_some() {
+                return false;
+            }
+            if field(frame, "seq").as_u64() != Some(expected_seq) {
+                observed.push(crate::json::object(&[(
+                    "error",
+                    crate::json::object(&[
+                        ("code", crate::json::string("INVALID_STREAM")),
+                        ("violation", crate::json::string("seq")),
+                        ("pointer", crate::json::string("/seq")),
+                    ]),
+                )]));
+                client.push(crate::json::string("cancel"));
+                provider.push(crate::json::string("cancelled"));
+                break;
+            }
+            let done = text(frame, "event") == "end";
+            observed.push(crate::json::object(&[
+                ("done", Value::Bool(done)),
+                ("value", field(frame, "value").clone()),
+            ]));
+            expected_seq += 1;
+            if done {
+                break;
+            }
+        }
+        Value::Array(observed) == *field(case, "expectNext")
+            && Value::Array(client) == *field(case, "clientFrames")
+            && Value::Array(provider) == *field(case, "peerFrames")
+    } else {
+        let values = items(field(case, "values"));
+        let mut cursor = 0;
+        let mut closed = false;
+        for action in items(field(case, "actions")) {
+            match action.as_str() {
+                Some("next") if !closed => {
+                    client.push(crate::json::string("pull"));
+                    if cursor < values.len() {
+                        provider.push(crate::json::string("item"));
+                        observed.push(crate::json::object(&[
+                            ("done", Value::Bool(false)),
+                            ("value", values[cursor].clone()),
+                        ]));
+                        cursor += 1;
+                    } else {
+                        provider.push(crate::json::string("end"));
+                        observed.push(crate::json::object(&[("done", Value::Bool(true))]));
+                        closed = true;
+                    }
+                }
+                Some("return") => {
+                    if !closed {
+                        client.push(crate::json::string("cancel"));
+                        provider.push(crate::json::string("cancelled"));
+                        cleanup += 1;
+                        closed = true;
+                    }
+                    observed.push(crate::json::object(&[
+                        ("done", Value::Bool(true)),
+                        ("value", crate::json::string("local")),
+                    ]));
+                }
+                _ => return false,
+            }
+        }
+        Value::Array(observed) == *field(case, "expect")
+            && Value::Array(client) == *field(case, "clientFrames")
+            && Value::Array(provider) == *field(case, "providerFrames")
+            && Some(cleanup) == field(case, "cleanupCount").as_u64()
+    }
+}
+/// Serialize a logical fixture's real tree using preorder text admission and bounded data.
+fn serialize_logical(input: &Value) -> Value {
+    fn clip(text: &str) -> String {
+        let mut end = text.len().min(65536);
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text[..end].to_owned()
+    }
+    fn visit(input: &Value, total: &mut usize) -> Option<Value> {
+        let defaults = [
+            ("source", "unknown"),
+            ("code", "UNKNOWN"),
+            ("name", "Error"),
+            ("message", ""),
+            ("stack", "Error: non-error value thrown"),
+        ];
+        let mut fields = vec![];
+        let mut amount = 0;
+        let mut truncated = false;
+        for (key, fallback) in defaults {
+            let raw = input.get(key).and_then(Value::as_str).unwrap_or(fallback);
+            let text = clip(raw);
+            truncated |=
+                text.len() < raw.len() || matches!(field(input, key), Value::SurrogateString(_));
+            amount += text.len();
+            fields.push((key.to_owned(), crate::json::string(&text)));
+        }
+        if *total + amount > 1048576 {
+            return None;
+        }
+        *total += amount;
+        if let Some(data) = input.get("data") {
+            if portable_valid(data, 1) && data.text().len() <= 65536 {
+                fields.push(("data".to_owned(), data.clone()));
+            } else {
+                truncated = true;
+            }
+        }
+        if let Some(cause) = input.get("cause") {
+            if let Some(child) = visit(cause, total) {
+                fields.push(("cause".to_owned(), child));
+            } else {
+                truncated = true;
+            }
+        }
+        if let Some(errors) = input.get("errors").and_then(Value::as_array) {
+            let mut children = vec![];
+            for error in errors {
+                if let Some(child) = visit(error, total) {
+                    children.push(child);
+                } else {
+                    truncated = true;
+                    break;
+                }
+            }
+            if !children.is_empty() {
+                fields.push(("errors".to_owned(), Value::Array(children)));
+            }
+        }
+        if truncated {
+            fields.push(("truncated".to_owned(), Value::Bool(true)));
+        }
+        Some(Value::Object(fields))
+    }
+    visit(input, &mut 0).unwrap_or(Value::Null)
+}
+/// Build real large inputs and observe bounded serialization rather than comparing generator limits.
+fn generated_projection(spec: &Value) -> Value {
+    let size = field(spec, "size").as_u64().unwrap_or(0) as usize;
+    match text(spec, "shape") {
+        "longStack" => serialize_logical(&crate::json::object(&[(
+            "stack",
+            crate::json::string(&"x".repeat(size)),
+        )])),
+        "oversizedData" => serialize_logical(&crate::json::object(&[(
+            "data",
+            crate::json::string(&"x".repeat(size)),
+        )])),
+        "greedySiblings" => {
+            let bytes = field(spec, "textBytes").as_u64().unwrap_or(0) as usize;
+            let child = crate::json::object(&[
+                ("source", crate::json::string("s")),
+                ("code", crate::json::string("C")),
+                ("name", crate::json::string("Error")),
+                ("message", crate::json::string(&"x".repeat(bytes))),
+                ("stack", crate::json::string(&"x".repeat(bytes))),
+            ]);
+            serialize_logical(&crate::json::object(&[(
+                "errors",
+                Value::Array(vec![child; size]),
+            )]))
+        }
+        _ => Value::Null,
     }
 }
 
@@ -327,27 +826,7 @@ fn check_stream(root: &Value, counts: &mut Counts) {
         counts.case("stream.json", "payload", case, good);
     }
     for case in items(field(root, "sequences")) {
-        let good = match id(case) {
-            "three-items" => items(field(case, "onPull"))
-                .iter()
-                .enumerate()
-                .all(|(index, item)| field(item, "seq").as_u64() == Some(index as u64)),
-            "wrong-credit" => {
-                field(&items(field(case, "onPull"))[0], "seq").as_u64() != Some(0)
-                    && text(
-                        field(&items(field(case, "expectNext"))[0], "error"),
-                        "violation",
-                    ) == "seq"
-            }
-            "cancel" => {
-                field(case, "cleanupCount").as_u64() == Some(1)
-                    && items(field(case, "actions"))
-                        .iter()
-                        .any(|item| item.as_str() == Some("return"))
-            }
-            _ => false,
-        };
-        counts.case("stream.json", "sequences", case, good);
+        counts.case("stream.json", "sequences", case, stream_sequence(case));
     }
     for case in items(field(root, "measure")) {
         let value = field(case, "value");
@@ -389,96 +868,92 @@ fn check_stream(root: &Value, counts: &mut Counts) {
             )),
     );
     let handshake = field(root, "handshake");
+    // The actual negotiation consumes both offers and selects the lower compatible minor.
+    let offer = |version: &Value| {
+        crate::json::object(&[
+            ("kind", crate::json::string("handshake")),
+            ("step", crate::json::string("hello")),
+            ("protocol", crate::json::string("migaia.rpc")),
+            ("versions", Value::Array(vec![version.clone()])),
+            ("codecs", Value::Array(vec![crate::json::string("json")])),
+            ("capabilities", field(handshake, "capabilities").clone()),
+            (
+                "peer",
+                crate::json::object(&[
+                    ("id", crate::json::string("stream-vector")),
+                    ("runtime", crate::json::string("rust")),
+                ]),
+            ),
+        ])
+    };
+    let negotiated = agreement(
+        &offer(field(handshake, "newVersion")),
+        &offer(field(handshake, "oldVersion")),
+    );
     counts.case(
         "stream.json",
         "handshake",
         handshake,
-        field(field(handshake, "newVersion"), "minor").as_u64() == Some(1)
-            && field(field(handshake, "oldVersion"), "minor").as_u64() == Some(0)
-            && field(handshake, "negotiatedMinor").as_u64() == Some(0),
+        negotiated.as_ref().is_some_and(|actual| {
+            field(actual, "minor") == field(handshake, "negotiatedMinor")
+                && field(actual, "capabilities") == field(handshake, "capabilities")
+        }),
     );
 }
 
 fn check_error(root: &Value, counts: &mut Counts) {
-    for case in items(field(root, "valid")) {
-        let good = if case.has("wire") {
-            wire_violation(field(case, "wire"), 1).is_none()
-        } else {
-            match text(field(case, "generate"), "shape") {
-                "chain" | "errorsChain" | "dataDepth" => field(field(case, "generate"), "size")
-                    .as_u64()
-                    .is_some_and(|size| size <= 48),
-                "message" => field(field(case, "generate"), "size").as_u64() == Some(65_536),
-                "totalBytes" => field(field(case, "generate"), "size").as_u64() == Some(1_048_576),
-                "wide" => field(field(case, "generate"), "size").as_u64() == Some(1_024),
-                _ => false,
-            }
-        };
-        counts.case("error-chain.json", "valid", case, good);
-    }
-    for case in items(field(root, "invalid")) {
-        let good = if case.has("wire") {
-            match id(case) {
-                "false-truncated" => text(case, "violation") == "truncatedValue",
-                "lone-surrogate" => text(case, "violation") == "surrogate",
-                "unknown-before-required" => text(case, "violation") == "unknownField",
-                "invalid-portable-marker" => text(case, "violation") == "dataPortable",
-                _ => {
-                    wire_violation(field(case, "wire"), 1)
-                        == case.get("violation").and_then(Value::as_str)
-                }
-            }
-        } else {
-            match text(field(case, "generate"), "shape") {
-                "chain" | "errorsChain" => text(case, "violation") == "depth",
-                "message" => text(case, "violation") == "stringBytes",
-                "totalBytes" => text(case, "violation") == "totalBytes",
-                "wide" => text(case, "violation") == "nodes",
-                "dataDepth" => text(case, "violation") == "dataPortable",
-                _ => false,
-            }
-        };
-        counts.case("error-chain.json", "invalid", case, good);
+    for section in ["valid", "invalid"] {
+        for case in items(field(root, section)) {
+            let wire = if case.has("wire") {
+                field(case, "wire").clone()
+            } else {
+                generated_wire(field(case, "generate"))
+            };
+            let result = wire_detail(&wire, false, &mut vec![]);
+            let good = if section == "valid" {
+                result.is_ok()
+            } else {
+                result.err() == Some((text(case, "violation"), text(case, "pointer").to_owned()))
+            };
+            counts.case("error-chain.json", section, case, good);
+        }
     }
     for case in items(field(root, "unknownFields")) {
+        let mut reports = vec![];
+        let clean = wire_detail(field(case, "wire"), true, &mut reports);
+        let rejection = wire_detail(field(case, "wire"), false, &mut vec![]).err();
         counts.case(
             "error-chain.json",
             "unknownFields",
             case,
-            field(case, "reject")
-                .get("violation")
-                .and_then(Value::as_str)
-                == Some("unknownField")
-                && items(field(case, "ignoreReports")).len() == 2,
+            rejection
+                == Some((
+                    text(field(case, "reject"), "violation"),
+                    text(field(case, "reject"), "pointer").to_owned(),
+                ))
+                && clean.as_ref().ok() == case.get("ignoreExpected")
+                && Value::Array(reports) == *field(case, "ignoreReports"),
         );
     }
     for case in items(field(root, "truncation")) {
         let good = if let Some(expected) = case.get("expected") {
             project_thrown(field(case, "input")) == *expected
         } else {
-            match text(field(case, "generate"), "shape") {
+            let generated = field(case, "generate");
+            let projected = generated_projection(generated);
+            match text(generated, "shape") {
                 "longStack" => {
-                    let size =
-                        field(field(case, "generate"), "size").as_u64().unwrap_or(0) as usize;
-                    let bytes = "x".repeat(size);
-                    bytes.as_bytes()[..bytes.len().min(65_536)].len() as u64
-                        == field(field(case, "generate"), "expectedBytes")
-                            .as_u64()
-                            .unwrap_or(0)
+                    text(&projected, "stack").len() as u64
+                        == field(generated, "expectedBytes").as_u64().unwrap_or(0)
+                        && field(&projected, "truncated") == &Value::Bool(true)
                 }
-                "oversizedData" => field(field(case, "generate"), "size")
-                    .as_u64()
-                    .is_some_and(|size| size > 65_536),
+                "oversizedData" => {
+                    !projected.has("data") && field(&projected, "truncated") == &Value::Bool(true)
+                }
                 "greedySiblings" => {
-                    let children = field(field(case, "generate"), "size").as_u64().unwrap_or(0);
-                    let text_bytes = field(field(case, "generate"), "textBytes")
-                        .as_u64()
-                        .unwrap_or(0);
-                    let admitted = (1_048_576 / (text_bytes * 2 + 8)).min(children);
-                    admitted
-                        == field(field(case, "generate"), "expectedChildren")
-                            .as_u64()
-                            .unwrap_or(0)
+                    items(field(&projected, "errors")).len() as u64
+                        == field(generated, "expectedChildren").as_u64().unwrap_or(0)
+                        && field(&projected, "truncated") == &Value::Bool(true)
                 }
                 _ => false,
             }
@@ -490,11 +965,14 @@ fn check_error(root: &Value, counts: &mut Counts) {
             project_jsonrpc(field(case, "input")) == *expected
         } else {
             let generate = field(case, "generate");
-            text(generate, "shape") == "foreignLongMessage"
-                && field(generate, "size")
-                    .as_u64()
-                    .is_some_and(|size| size > 65_536 - 7)
-                && field(generate, "expectedStackBytes").as_u64() == Some(65_536)
+            let size = field(generate, "size").as_u64().unwrap_or(0) as usize;
+            let projected = serialize_logical(&project_jsonrpc(&crate::json::object(&[
+                ("code", crate::json::number(1)),
+                ("message", crate::json::string(&"x".repeat(size))),
+            ])));
+            text(&projected, "stack").len() as u64
+                == field(generate, "expectedStackBytes").as_u64().unwrap_or(0)
+                && field(&projected, "truncated") == &Value::Bool(true)
         };
         counts.case("error-chain.json", "jsonrpc", case, good);
     }
@@ -540,7 +1018,7 @@ fn project_thrown(input: &Value) -> Value {
                 .and_then(|cause| cause.get("ref"))
                 .and_then(Value::as_str)
                 == Some("root")
-            || message.contains('\u{fffd}');
+            || matches!(field(logical, "message"), Value::SurrogateString(_));
         if truncated {
             fields.push(("truncated".to_owned(), Value::Bool(true)));
         }

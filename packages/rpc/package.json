@@ -230,7 +230,8 @@
     "test:packed": "pnpm build && node test/core/packed-export-smoke.mjs",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
-    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "bench:ipc": "node bench/ipc.mjs"
   },
   "dependencies": {
     "@migaia/capability": "workspace:^",
