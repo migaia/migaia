@@ -1,4 +1,5 @@
 //! Dependency-free process peer for RPC protocol conformance.
+mod business;
 mod json;
 mod selftest;
 
@@ -599,6 +600,10 @@ fn run() -> io::Result<()> {
     let mut vectors: Option<PathBuf> = None;
     let mut auth_fd: Option<i32> = None;
     let mut selftest = false;
+    let mut business_profile = false;
+    let mut host_profile = false;
+    let mut bootstrap_stdin = false;
+    let mut contract_path = None;
     let mut arguments = env::args().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -615,6 +620,10 @@ fn run() -> io::Result<()> {
                     "responder"
                 };
             }
+            "--business" => business_profile = true,
+            "--host" => host_profile = true,
+            "--bootstrap" => bootstrap_stdin = arguments.next().as_deref() == Some("stdin"),
+            "--contract" => contract_path = arguments.next().map(PathBuf::from),
             "--stdio" => {}
             "--listen-unix" => listener_path = arguments.next().map(PathBuf::from),
             "--connect-unix" => connect_path = arguments.next().map(PathBuf::from),
@@ -648,7 +657,7 @@ fn run() -> io::Result<()> {
             })?,
         );
     }
-    let auth = if let Some(fd) = auth_fd {
+    let mut auth = if let Some(fd) = auth_fd {
         if fd < 3 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -670,6 +679,13 @@ fn run() -> io::Result<()> {
     } else {
         None
     };
+    let business_contract = if business_profile {
+        Some(business::contract(&contract_path.ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "missing contract")
+        })?)?)
+    } else {
+        None
+    };
     if listener_path.is_some() && connect_path.is_some() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -683,7 +699,15 @@ fn run() -> io::Result<()> {
             let (stream, _) = listener.accept()?;
             let mut input = stream.try_clone()?;
             let mut output = stream;
-            let result = if role == "initiator" {
+            let result = if let Some(contract) = &business_contract {
+                business::serve(
+                    &mut input,
+                    &mut output,
+                    host_profile,
+                    auth.as_deref(),
+                    contract,
+                )
+            } else if role == "initiator" {
                 initiate(&mut input, &mut output, auth.as_deref())
             } else {
                 serve(&mut input, &mut output, auth.as_deref())
@@ -711,7 +735,18 @@ fn run() -> io::Result<()> {
     eprintln!("READY pid={}", std::process::id());
     let mut input = io::stdin().lock();
     let mut output = io::stdout().lock();
-    if role == "initiator" {
+    if business_profile && bootstrap_stdin {
+        auth = Some(business::bootstrap(&mut input)?);
+    }
+    if let Some(contract) = &business_contract {
+        business::serve(
+            &mut input,
+            &mut output,
+            host_profile,
+            auth.as_deref(),
+            contract,
+        )
+    } else if role == "initiator" {
         initiate(&mut input, &mut output, auth.as_deref())
     } else {
         serve(&mut input, &mut output, auth.as_deref())
