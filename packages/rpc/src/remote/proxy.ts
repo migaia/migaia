@@ -302,7 +302,8 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
       const snapshot = supervisor.inspect()
       throw createRemoteLayerError(
         RpcRemoteLayerErrorCode.startFailed,
-        snapshot.terminalError ?? snapshot.lastExit?.error,
+        /** A capacity refusal is an original supervisor outcome, with no thrown error to retain. */
+        snapshot.terminalError ?? snapshot.lastExit?.error ?? outcome,
         { state: outcome.state }
       )
     }
