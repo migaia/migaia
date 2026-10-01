@@ -14,6 +14,58 @@ import { remoteHarness } from './fixture.js'
 
 /** A3 proves request and stream hooks receive their own admitted core contexts. */
 describe('remote service plugin', () => {
+  it('stops forwarding after target removal suspends the service registration', async () => {
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    let calls = 0
+    const target = definePlugin({
+      name: 'p',
+      features: {
+        f: defineFeature(() => ({
+          request: () => {
+            calls += 1
+            return 'live'
+          }
+        }))
+      },
+      install: () => ({})
+    })
+    await host.use(target)
+    /** The test endpoint preserves the provider after target removal. */
+    let provider:
+      | ((context: { data: unknown; success(value: unknown): unknown }) => unknown)
+      | undefined
+    const endpoint = {
+      provide(_method: string, next: typeof provider) {
+        provider = next
+      },
+      async dispose() {}
+    } as unknown as IRpcEndpoint
+    const service = await serveRemotePlugin({
+      host,
+      contract: {
+        schemaVersion: 1,
+        plugin: 'p',
+        features: { f: { methods: { request: { mode: 'request', idempotent: false } } } }
+      },
+      endpoint: { endpoint },
+      report: () => undefined
+    })
+    const context = { data: [], success: (value: unknown) => value }
+    try {
+      await expect(provider?.(context)).resolves.toBe('live')
+      await host.unUse('p', { policy: 'suspend' })
+      await expect(provider?.(context)).rejects.toMatchObject({
+        code: RpcRemoteLayerErrorCode.closed
+      })
+      expect(calls).toBe(1)
+    } finally {
+      await service.close()
+      await host.dispose()
+    }
+  })
+
   it('rejects an absent target before publishing providers and disposes the dedicated endpoint', async () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }

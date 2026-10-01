@@ -1,6 +1,7 @@
 import {
   defineFeature,
   definePlugin,
+  PluginHostErrorCode,
   type IDefinedPluginConstraint,
   type IFeature,
   type IPluginConstraint
@@ -85,10 +86,32 @@ export async function serveRemotePlugin(
     }
   })
   let installed = false
-  const targetDisabled = (): boolean => options.host.plugin.disabled().includes(contract.plugin)
+  /** The service handle reads current suspension state through PluginHost on every call. */
+  let serviceHandle: { getFeature(name: string): unknown } | undefined
+  /** Any declared service Feature can check whether this registration is callable. */
+  const admissionFeature = Object.keys(contract.features)[0]!
+  const targetDisabled = (): boolean => {
+    try {
+      serviceHandle?.getFeature(admissionFeature)
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error.code === PluginHostErrorCode.pluginSuspended ||
+          error.code === PluginHostErrorCode.pluginDisabled ||
+          error.code === PluginHostErrorCode.pluginNotInstalled)
+      )
+        return true
+      throw error
+    }
+    const disabled = options.host.plugin.disabled()
+    return disabled.includes(serviceName) || disabled.includes(contract.plugin)
+  }
   const streamReleases: (() => void)[] = []
   try {
-    await options.host.use(service as IDefinedPluginConstraint)
+    const [handle] = await options.host.use(service as IDefinedPluginConstraint)
+    serviceHandle = handle
     installed = true
     options.endpoint.endpoint.provide(RemoteMethodName.describe, (context) =>
       context.success(contract)
