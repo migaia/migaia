@@ -4,6 +4,7 @@ export const RpcPlatform = {
   iframe: 'Iframe',
   memory: 'Memory',
   messagePort: 'MessagePort',
+  process: 'Process',
   rtcDataChannel: 'RTCDataChannel',
   webTransport: 'WebTransport',
   worker: 'Worker'
