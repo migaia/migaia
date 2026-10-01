@@ -183,6 +183,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@types/node':
+        specifier: 24.13.2
+        version: 24.13.2
       cborg:
         specifier: 6.1.1
         version: 6.1.1
