@@ -246,8 +246,10 @@ export function parseProcessPluginDescriptor(input: unknown): IProcessPluginDesc
     /** A hostile getter may throw a value containing the forbidden token. */
     invalid('descriptor')
   }
-  rejectToken(portable, 'descriptor')
   const root = record(portable, 'descriptor')
+  /** Method and plugin names are data; only deployment fields can carry a secret. */
+  if (root.deployment !== undefined)
+    rejectToken(root.deployment as IRpcPortableValue, 'descriptor.deployment')
   const target = root.target ?? ProcessDescriptorTarget.plugin
   if (target !== ProcessDescriptorTarget.plugin && target !== ProcessDescriptorTarget.host)
     invalid('descriptor.target')
