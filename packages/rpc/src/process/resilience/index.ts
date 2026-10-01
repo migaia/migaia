@@ -229,6 +229,8 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
           }
         },
         onClose: () => {
+          // A retired handle must never detach a later registration with the same name.
+          if (registrations.get(name) !== current) return
           registrations.delete(name)
           dependents.get(name)?.close()
           dependents.delete(name)
