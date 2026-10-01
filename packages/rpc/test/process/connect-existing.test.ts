@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { lstat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createProcessTransport } from '../../src/process/handshake.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
@@ -157,8 +158,8 @@ describe('Node rendezvous sockets', () => {
 
   it('[A10] binds a Unix socket, removes only its own path, and preserves an occupied path', async () => {
     const folder = fileURLToPath(new URL('.', import.meta.url))
-    /** Darwin's Unix-domain path limit requires a short repository-local name. */
-    const path = resolve(folder, '../../../..', `.rpc-s-${randomUUID().slice(0, 8)}.sock`)
+    /** A short temporary name stays below Darwin's Unix-domain path limit. */
+    const path = join(tmpdir(), `r-${randomUUID().slice(0, 8)}.sock`)
     const listener = await listenProcessByteChannel({
       address: path,
       auth: { mode: 'required', verify: () => 'principal' },
