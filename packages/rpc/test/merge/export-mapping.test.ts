@@ -51,9 +51,13 @@ describe('A1 merged public exports', () => {
       '@migaia/rpc/process/adapters/deno-socket',
       '@migaia/rpc/process/adapters/electron-utility-process',
       '@migaia/rpc/process/adapters/windows-job',
-      '@migaia/rpc/contract/framing/stream'
+      '@migaia/rpc/contract/framing/stream',
+      '@migaia/rpc/threads',
+      ...['node', 'deno', 'bun', 'electron-main', 'electron-renderer', 'browser'].map(
+        (name) => `@migaia/rpc/threads/adapters/${name}`
+      )
     ].sort()
-    expect(expected).toHaveLength(40)
+    expect(expected).toHaveLength(47)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )

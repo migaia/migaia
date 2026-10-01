@@ -1152,3 +1152,130 @@ await serving.close()
 spawn 默认先退出旧进程再启动新进程；`replace({ spec, strategy: 'start-then-switch' })` 则要求共享预算容纳两个进程，并在新 describe 通过后切换。两种策略都兑现同一个门面。新进程从自己的 serve 启动状态开始，不重放旧 use。`restart()` 委托当前治理注册，`inspectRegistration()` 可查终态与清算原因；清算后不能用 replace 绕过。可选 `shutdownSignal.subscribe` 由调用方接平台信号，第一次排空释放，释放未完成时第二次只强制终止 owned handle；connect 只关闭本地连接。
 
 服务侧省略 resilience 时创建一个默认治理器，同一已验证主体在多连接上共享内存幂等缓存，跨进程重启要由调用方提供稳定 backing。外部治理器由调用方关闭。反向注册通过可选 registrations 提供 `verifyToken` 和 `resolveRegistration(principalId)`，后者只返回预批准的 `{ targetHost, name, contract }`；它不信任对端自报的名字或 routing peer。关闭 listener 不撤销已采用连接，EOF 以 suspend 移除代理，新连接须重新鉴权。Windows/Electron 实机保证与 JSON-RPC bridge 的 Host 接线属 M2，目前没有 PASS 声明。
+
+
+## Threads
+
+Thread facades use the same remote contracts and shared retry owner as process facades.
+They add no handshake, retry queue or health check. Provide one scheduler to the facade,
+its channel factory and endpoint factory. `spec.data` must satisfy portable RPC rules:
+functions, cyclic values, MessagePort and SharedArrayBuffer are rejected before a Worker starts.
+
+This endpoint factory can be shared by the parent and Worker. Each service passes its own local id:
+
+```ts
+import { createComposedEndpoint } from '@migaia/rpc/core/composed'
+import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc/core/stream'
+import { createOutboundFeature } from '@migaia/rpc/core/features/outbound'
+import { createProviderFeature } from '@migaia/rpc/core/features/provider'
+import { codec, framer, abort, connect } from '@migaia/rpc/core'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc/remote'
+import type { IRpcEndpoint } from '@migaia/rpc/core'
+
+/** Construct the endpoint from the channel's exact pipeline and scheduler. */
+export async function endpoint(localId: string, channel: IRemoteChannel): Promise<IRemoteServeEndpoint> {
+  const chunk = createCanonicalChunkFeature()
+  const outbound = createOutboundFeature(chunk)
+  const provider = createProviderFeature(outbound)
+  const built = await createComposedEndpoint({
+    id: localId,
+    scheduler: channel.scheduler,
+    transport: channel.transport,
+    middlewares: [codec(channel.pipeline.codec), framer(channel.pipeline.framer), abort(), connect({ transport: channel.transport })]
+  }, {
+    'first-party-chunk': chunk,
+    'first-party-outbound': outbound,
+    'first-party-provider': provider,
+    'first-party-stream': createStreamFeature(outbound, provider)
+  })
+  return { endpoint: built as unknown as IRpcEndpoint, stream: built.stream }
+}
+```
+
+The parent installs the thread definition through its local PluginHost:
+
+```ts
+import { PluginHost } from '@migaia/plugin-host'
+import { createUnitBudget } from '@migaia/supervision'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createThreadPlugin } from '@migaia/rpc/threads'
+import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc/threads/adapters/node'
+import { endpoint } from './endpoint.js'
+
+const contract = {
+  schemaVersion: 1,
+  plugin: 'echo',
+  features: { api: { methods: { echo: { mode: 'request', idempotent: true } } } }
+} as const
+const host = new PluginHost()
+const plugin = createThreadPlugin({
+  name: 'echo', contract, host: host.plugin,
+  spec: { entry: new URL('./worker.js', import.meta.url).href, data: { prefix: 'worker:' } },
+  launcher: createNodeThreadLauncher(),
+  budget: createUnitBudget({ kind: 'thread', maxUnits: 1, scheduler: systemScheduler }),
+  scheduler: systemScheduler,
+  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+  endpointFactory: (channel) => endpoint('parent', channel),
+  report: (error) => console.error(error)
+})
+const [installed] = await host.use(plugin)
+const api = installed.getFeature('api') as { echo(params: string[]): Promise<string> }
+console.log(await api.echo(['hello']))
+await host.dispose()
+```
+
+The Worker decodes its private address and original business data before serving:
+
+```ts
+import { parentPort, workerData } from 'node:worker_threads'
+import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { readThreadBootstrap, createNodeThreadChannel, createServeThreadPlugin } from '@migaia/rpc/threads'
+import { endpoint } from './endpoint.js'
+
+const { peerId, data } = readThreadBootstrap(workerData)
+const config = data as { prefix: string }
+const contract = {
+  schemaVersion: 1,
+  plugin: 'echo',
+  features: { api: { methods: { echo: { mode: 'request', idempotent: true } } } }
+} as const
+const host = new PluginHost()
+await host.use(definePlugin({
+  name: 'echo',
+  features: { api: defineFeature(() => ({ echo: (value: string) => config.prefix + value })) },
+  install: () => ({})
+}))
+const channel = createNodeThreadChannel(parentPort!, 'parent', { scheduler: systemScheduler })
+const service = await createServeThreadPlugin({
+  host, contract, channel,
+  endpointFactory: (channel) => endpoint(peerId, channel),
+  report: (error) => console.error(error)
+})
+// The returned service owns only its endpoint/channel and its internal registration.
+// Closing the caller-owned Host remains the caller's responsibility.
+```
+
+Host mode uses `createThreadHost({ catalog: { echo: contract }, ... })` and
+`createServeThreadHost({ host, catalog, resolvePlugin, channel, endpointFactory, report })`.
+The required synchronous resolver remains local; definitions and resolver functions never cross
+RPC. `release()` returns the same Promise on repeated calls. Explicit `retryPort` replaces the
+remote default. Omit that property for default shared retry. A sent idempotent request can replay
+once with its original key after the next description; a sent non-idempotent request returns
+`REMOTE_RESULT_UNKNOWN`. Unsent requests return `REMOTE_CLOSED` with no frame.
+`spec.limits.callWallTimeMs` is a total logical deadline, including rebind wait.
+A persistent deduplication store is required for cross-Worker exactly-once side effects.
+
+Web services call `receiveThreadData(self, async (data, peerId) => { ... })` before installing RPC
+listeners. The callback must fully prepare its service with endpoint id `peerId`; acknowledgement
+then releases parent channel construction. A private bootstrap is sent even when business data
+is absent, because the Worker needs its local endpoint address. All postMessage calls use an
+undefined transfer list. `self.close()` is never called by the borrowed transport shim.
+
+Current platform evidence: Node v24.16.0 actual exit, exception, heap limit and real RPC/restart;
+Bun 1.4.2 termination returns before a short interval of continued work; Deno 2.9.7 busy work
+continues after terminate. Both Web runtime exception fixtures keep the host alive. Bun/Deno
+termination and exit observation therefore remain unsupported; close is not an exit receipt.
+Electron and browser actual-runtime fixtures remain INFERRED/unverified. Provide explicit health
+and select `supervisor.isolation: 'best-effort'` only when that degradation suits the deployment.
+Without a proven actual exit, supervision keeps the lease occupied on abandonment.

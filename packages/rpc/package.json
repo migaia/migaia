@@ -177,6 +177,34 @@
     "./browser/adapters/rtc-data-channel": {
       "types": "./dist/browser/adapters/rtc-data-channel.d.ts",
       "default": "./dist/browser/adapters/rtc-data-channel.js"
+    },
+    "./threads": {
+      "types": "./dist/threads/index.d.ts",
+      "default": "./dist/threads/index.js"
+    },
+    "./threads/adapters/node": {
+      "types": "./dist/threads/adapters/node.d.ts",
+      "default": "./dist/threads/adapters/node.js"
+    },
+    "./threads/adapters/deno": {
+      "types": "./dist/threads/adapters/deno.d.ts",
+      "default": "./dist/threads/adapters/deno.js"
+    },
+    "./threads/adapters/bun": {
+      "types": "./dist/threads/adapters/bun.d.ts",
+      "default": "./dist/threads/adapters/bun.js"
+    },
+    "./threads/adapters/electron-main": {
+      "types": "./dist/threads/adapters/electron-main.d.ts",
+      "default": "./dist/threads/adapters/electron-main.js"
+    },
+    "./threads/adapters/electron-renderer": {
+      "types": "./dist/threads/adapters/electron-renderer.d.ts",
+      "default": "./dist/threads/adapters/electron-renderer.js"
+    },
+    "./threads/adapters/browser": {
+      "types": "./dist/threads/adapters/browser.d.ts",
+      "default": "./dist/threads/adapters/browser.js"
     }
   },
   "publishConfig": {

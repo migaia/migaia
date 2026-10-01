@@ -844,3 +844,19 @@ const transport = createWebTransportDatagramTransport({
 > 用不了官方适配器？实现 `IRpcTransport`（只有 `send`/`subscribe` 两个必需方法）就能接入任意自定义通道，见 [USEGUIDE.md](./USEGUIDE.md#5-自定义传输适配器)。
 
 ---
+
+
+### Threads
+
+`@migaia/rpc/threads` combines remote Plugin/Host assembly with the thread supervisor.
+Node's launcher and channel factory are exported at `@migaia/rpc/threads/adapters/node`.
+The six runtime adapter subpaths load independently; importing `threads` loads no platform adapter.
+Worker business data is portable RPC data, separate from the private bootstrap address.
+Node services decode `workerData` with `readThreadBootstrap`; Web services use
+`receiveThreadData(port, prepare)` and prepare their endpoint before acknowledging readiness.
+The endpoint's local id must equal the bootstrap `peerId`.
+
+Node termination uses the real `exit` event. Bun, Deno, browser and Electron adapters currently
+retain unsupported termination/exit capability declarations until their own actual-exit evidence
+is available. Unsupported exit observation requires explicit health; unsupported termination
+rejects default required isolation before Worker creation. See [USEGUIDE](./USEGUIDE.md#threads).
