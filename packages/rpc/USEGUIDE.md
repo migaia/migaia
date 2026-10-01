@@ -1168,8 +1168,8 @@ import { createJsonRpcRemoteChannel } from '@migaia/rpc/bridge/jsonrpc'
 import { createComposedEndpoint } from '@migaia/rpc/core/composed'
 import { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'
 import { createOutboundFeature } from '@migaia/rpc/core/features/outbound'
-import { createOneWayFeature } from '@migaia/rpc/core/features/one-way'
-import { codec, framer, abort, connect } from '@migaia/rpc/core'
+import { createOneWayFeature, type IOneWaySurface } from '@migaia/rpc/core/features/one-way'
+import { codec, framer, abort, connect, type IRpcEndpoint } from '@migaia/rpc/core'
 
 // raw, token, scheduler, wallClock, contract and report belong to the deployment.
 const channel = await createJsonRpcRemoteChannel({
@@ -1189,7 +1189,7 @@ const channel = await createJsonRpcRemoteChannel({
 })
 const chunk = createCanonicalChunkFeature()
 const outbound = createOutboundFeature(chunk)
-const endpoint = await createComposedEndpoint({
+const kernel = await createComposedEndpoint({
   id: 'client', transport: channel.transport, scheduler: channel.scheduler,
   middlewares: [codec(channel.pipeline.codec), framer(channel.pipeline.framer),
     abort(), connect({ transport: channel.transport })]
@@ -1197,9 +1197,12 @@ const endpoint = await createComposedEndpoint({
   'first-party-chunk': chunk,
   'first-party-outbound': outbound,
   'first-party-one-way': createOneWayFeature(outbound),
-  'channel-ipc-queue': channel.features[0],
-  'channel-ipc-log': channel.features[1]
+  'channel-ipc-queue': channel.features[0]!,
+  'channel-ipc-log': channel.features[1]!
 })
+// Selected first-party roots provide these surfaces; the composed declaration exposes dispose.
+const endpoint = kernel as unknown as IRpcEndpoint & IOneWaySurface
+// In endpointFactory, return { endpoint, oneWay: endpoint }.
 ```
 
 Return this assembly from remote/process `endpointFactory`, with its endpoint
