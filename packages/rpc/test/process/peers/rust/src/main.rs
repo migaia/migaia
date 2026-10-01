@@ -601,6 +601,7 @@ fn run() -> io::Result<()> {
     let mut auth_fd: Option<i32> = None;
     let mut selftest = false;
     let mut business_profile = false;
+    let mut bridge_profile = false;
     let mut host_profile = false;
     let mut bootstrap_stdin = false;
     let mut contract_path = None;
@@ -621,6 +622,7 @@ fn run() -> io::Result<()> {
                 };
             }
             "--business" => business_profile = true,
+            "--jsonrpc" => bridge_profile = true,
             "--host" => host_profile = true,
             "--bootstrap" => bootstrap_stdin = arguments.next().as_deref() == Some("stdin"),
             "--contract" => contract_path = arguments.next().map(PathBuf::from),
@@ -706,6 +708,7 @@ fn run() -> io::Result<()> {
                     host_profile,
                     auth.as_deref(),
                     contract,
+                    bridge_profile,
                 )
             } else if role == "initiator" {
                 initiate(&mut input, &mut output, auth.as_deref())
@@ -745,6 +748,7 @@ fn run() -> io::Result<()> {
             host_profile,
             auth.as_deref(),
             contract,
+            bridge_profile,
         )
     } else if role == "initiator" {
         initiate(&mut input, &mut output, auth.as_deref())

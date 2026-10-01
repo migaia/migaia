@@ -70,6 +70,58 @@
       "id": "native-listener-wrong-token",
       "first": "rejected-before-ready",
       "second": "valid-session-still-alive"
+    },
+    {
+      "id": "jsonrpc-public-facades",
+      "producer": "independent-language-peer",
+      "runtimes": [
+        "python",
+        "rust",
+        "go"
+      ],
+      "requiredBlocked": [
+        "typescript-public-responder"
+      ],
+      "consumer": [
+        "createProcessPlugin",
+        "createProcessHost"
+      ],
+      "deployments": [
+        "owned-stdio-caller-fd-launcher",
+        "borrowed-unix-explicit-custom-health"
+      ],
+      "methods": [
+        "request",
+        "oneWay"
+      ],
+      "firstStdinByte": 67,
+      "notification": {
+        "id": "absent",
+        "meta": "absent"
+      },
+      "requestMeta": {
+        "idempotencyKey": "h-bridge-key",
+        "timeoutMs": {
+          "minExclusive": 0,
+          "maxInclusive": 1000
+        }
+      }
+    },
+    {
+      "id": "jsonrpc-late-cancel-response",
+      "cancel": "notification",
+      "lateResponse": "late-after-cancel",
+      "expectedReport": {
+        "source": "@migaia/rpc/bridge/jsonrpc",
+        "code": "JSONRPC_PROFILE_INVALID"
+      },
+      "subsequentRequest": "after-cancel"
+    },
+    {
+      "id": "jsonrpc-listener-wrong-token",
+      "first": "rejected-before-ready",
+      "sentinelMinimumSubstring": 6,
+      "second": "valid-session-still-alive"
     }
   ]
 }
