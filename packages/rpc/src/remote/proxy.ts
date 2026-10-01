@@ -1,4 +1,5 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizePortable } from '../contract/normalize.js'
 import type { IRpcPortableValue } from '../contract/types.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
@@ -17,7 +18,7 @@ import {
   type IRemoteHostCatalog,
   type IRemoteMethodContract
 } from './contract.js'
-import { RpcRemoteLayerErrorCode } from './error-code.js'
+import { ERROR_SOURCE, RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
 import { RpcRemoteLayerErrorText } from './error-text.js'
 import type {
@@ -86,6 +87,16 @@ type IReadyWaiter = {
   abort?: () => void
 }
 
+/** Keeps native AggregateError identity while assigning a registered remote code. */
+function codedAggregate(
+  errors: readonly unknown[],
+  code: 'REMOTE_START_FAILED' | 'REMOTE_CLOSED'
+): AggregateError {
+  const aggregate = new AggregateError(errors)
+  attachErrorIdentity(aggregate, { source: ERROR_SOURCE, code })
+  return aggregate
+}
+
 /** Preserve a wire-restored tagged provider failure instead of core's generic remote wrapper. */
 function restoreTaggedProviderFailure(error: unknown): never {
   if (error instanceof RpcRemoteError && error.cause instanceof Error) {
@@ -151,6 +162,7 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         this.#leaveListeners.set(generation, listeners)
         return () => {
           listeners.delete(listener)
+          if (listeners.size === 0) this.#leaveListeners.delete(generation)
         }
       },
       whenReady: (afterGeneration: number, signal?: IAbortSignal) =>
@@ -212,19 +224,17 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   #leave(generation: number, reason: unknown): void {
     if (this.#departed.has(generation)) return
     this.#departed.set(generation, reason)
-    if (this.#current?.number === generation) {
-      const current = this.#current
-      this.#current = undefined
-      for (const listener of this.#leaveListeners.get(generation) ?? []) {
-        try {
-          listener(reason)
-        } catch (error) {
-          this.#options.report(error)
-        }
+    const current = this.#current?.number === generation ? this.#current : undefined
+    if (current) this.#current = undefined
+    for (const listener of this.#leaveListeners.get(generation) ?? []) {
+      try {
+        listener(reason)
+      } catch (error) {
+        this.#options.report(error)
       }
-      this.#leaveListeners.delete(generation)
-      void current.close().catch((error: unknown) => this.#options.report(error))
     }
+    this.#leaveListeners.delete(generation)
+    if (current) void current.close().catch((error: unknown) => this.#options.report(error))
   }
 
   /** Rejects an unavailable preparation before a newly acquired resource is published. */
@@ -660,47 +670,61 @@ export function createRemoteGenerationHolder(
   registration: IRemoteRegistration,
   report: (error: unknown) => void
 ): IRemoteGenerationHolder {
-  /** Every disposer is added immediately after its resource is created. */
-  const resources: (() => Promise<void>)[] = []
+  /** A departed generation drops its resource group instead of growing a lifetime stack. */
+  const retained = new Set<Set<() => Promise<void>>>()
   /** Final removal shares one settlement with repeated PluginHost cleanup. */
   let releasePromise: Promise<void> | undefined
-  const own = (dispose: () => Promise<void>): void => {
-    resources.push(dispose)
-  }
-  /** Runs only disposers created during an unsuccessful rebind. */
-  const rollback = async (from: number, primary: unknown): Promise<boolean> => {
+  /** Closes one group's disposers in reverse acquisition order. */
+  const closeGroup = async (group: Set<() => Promise<void>>): Promise<unknown[]> => {
     const failures: unknown[] = []
-    for (const dispose of resources.splice(from).reverse()) {
+    for (const dispose of [...group].reverse()) {
       try {
         await dispose()
       } catch (error) {
         failures.push(error)
       }
     }
-    if (failures.length > 0) report(new AggregateError([primary, ...failures]))
+    group.clear()
+    retained.delete(group)
+    return failures
+  }
+  /** Rolls back a failed candidate without replacing its primary error. */
+  const rollback = async (group: Set<() => Promise<void>>, primary: unknown): Promise<boolean> => {
+    const failures = await closeGroup(group)
+    if (failures.length > 0)
+      report(codedAggregate([primary, ...failures], RpcRemoteLayerErrorCode.startFailed))
     return failures.length > 0
+  }
+  /** One preparation owns a new group and releases it when its generation leaves. */
+  const prepare = async (
+    signal: IAbortSignal,
+    cleanupOnFailure: boolean,
+    reportFailure: boolean
+  ): Promise<number> => {
+    const group = new Set<() => Promise<void>>()
+    retained.add(group)
+    try {
+      const generation = await registration.prepareGeneration(signal, (dispose) => {
+        group.add(dispose)
+      })
+      registration.events.onLeave(generation, () => {
+        group.clear()
+        retained.delete(group)
+      })
+      return generation
+    } catch (error) {
+      if (cleanupOnFailure || releasePromise) {
+        const hadCleanupFailure = await rollback(group, error)
+        if (reportFailure && !hadCleanupFailure) report(error)
+      }
+      throw error
+    }
   }
   return {
     registration,
-    prepareInitial: async (signal, rollbackOnFailure = false) => {
-      const from = resources.length
-      try {
-        return await registration.prepareGeneration(signal, own)
-      } catch (error) {
-        if (rollbackOnFailure) await rollback(from, error)
-        throw error
-      }
-    },
-    prepareRebind: async (signal) => {
-      const from = resources.length
-      try {
-        return await registration.prepareGeneration(signal, own)
-      } catch (error) {
-        const hadCleanupFailure = await rollback(from, error)
-        if (!hadCleanupFailure) report(error)
-        throw error
-      }
-    },
+    prepareInitial: (signal, rollbackOnFailure = false) =>
+      prepare(signal, rollbackOnFailure, false),
+    prepareRebind: (signal) => prepare(signal, true, true),
     release: () => {
       if (releasePromise) return releasePromise
       releasePromise = (async () => {
@@ -710,14 +734,8 @@ export function createRemoteGenerationHolder(
         } catch (error) {
           failures.push(error)
         }
-        for (const dispose of resources.splice(0).reverse()) {
-          try {
-            await dispose()
-          } catch (error) {
-            failures.push(error)
-          }
-        }
-        if (failures.length > 0) throw new AggregateError(failures)
+        for (const group of retained) failures.push(...(await closeGroup(group)))
+        if (failures.length > 0) throw codedAggregate(failures, RpcRemoteLayerErrorCode.closed)
       })()
       return releasePromise
     }
