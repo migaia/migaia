@@ -114,24 +114,24 @@
     },
     "plugin-host": {
       "lines": {
-        "covered": 2024,
-        "total": 2223,
-        "pct": 91.04
+        "covered": 2083,
+        "total": 2284,
+        "pct": 91.19
       },
       "statements": {
-        "covered": 2144,
-        "total": 2393,
-        "pct": 89.59
+        "covered": 2212,
+        "total": 2465,
+        "pct": 89.73
       },
       "functions": {
-        "covered": 552,
-        "total": 632,
-        "pct": 87.34
+        "covered": 571,
+        "total": 651,
+        "pct": 87.71
       },
       "branches": {
-        "covered": 968,
-        "total": 1171,
-        "pct": 82.66
+        "covered": 1014,
+        "total": 1224,
+        "pct": 82.84
       }
     },
     "reactive": {
@@ -180,14 +180,14 @@
     },
     "rpc": {
       "lines": {
-        "covered": 7849,
+        "covered": 7853,
         "total": 8687,
-        "pct": 90.35
+        "pct": 90.39
       },
       "statements": {
-        "covered": 8562,
+        "covered": 8569,
         "total": 9705,
-        "pct": 88.22
+        "pct": 88.29
       },
       "functions": {
         "covered": 1890,
@@ -195,9 +195,9 @@
         "pct": 90.34
       },
       "branches": {
-        "covered": 5066,
+        "covered": 5080,
         "total": 5988,
-        "pct": 84.6
+        "pct": 84.83
       }
     },
     "serialize": {
@@ -2514,14 +2514,14 @@
     },
     "packages/plugin-host/src/admission-runtime.ts": {
       "lines": {
-        "covered": 33,
-        "total": 37,
-        "pct": 89.18
+        "covered": 35,
+        "total": 39,
+        "pct": 89.74
       },
       "statements": {
-        "covered": 35,
-        "total": 41,
-        "pct": 85.36
+        "covered": 37,
+        "total": 43,
+        "pct": 86.04
       },
       "functions": {
         "covered": 4,
@@ -2529,9 +2529,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 31,
-        "total": 38,
-        "pct": 81.57
+        "covered": 35,
+        "total": 42,
+        "pct": 83.33
       }
     },
     "packages/plugin-host/src/cleanup-runtime.ts": {
@@ -2551,9 +2551,9 @@
         "pct": 90.9
       },
       "branches": {
-        "covered": 13,
+        "covered": 14,
         "total": 16,
-        "pct": 81.25
+        "pct": 87.5
       }
     },
     "packages/plugin-host/src/composition-entry.ts": {
@@ -2639,9 +2639,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 15,
-        "total": 16,
-        "pct": 93.75
+        "covered": 17,
+        "total": 18,
+        "pct": 94.44
       }
     },
     "packages/plugin-host/src/config.ts": {
@@ -2756,46 +2756,46 @@
     },
     "packages/plugin-host/src/define-plugin.ts": {
       "lines": {
-        "covered": 93,
-        "total": 106,
-        "pct": 87.73
+        "covered": 100,
+        "total": 112,
+        "pct": 89.28
       },
       "statements": {
-        "covered": 97,
-        "total": 111,
-        "pct": 87.38
+        "covered": 104,
+        "total": 117,
+        "pct": 88.88
       },
       "functions": {
-        "covered": 13,
-        "total": 16,
-        "pct": 81.25
+        "covered": 14,
+        "total": 17,
+        "pct": 82.35
       },
       "branches": {
-        "covered": 64,
-        "total": 81,
-        "pct": 79.01
+        "covered": 71,
+        "total": 87,
+        "pct": 81.6
       }
     },
     "packages/plugin-host/src/dependency-runtime.ts": {
       "lines": {
-        "covered": 78,
-        "total": 81,
-        "pct": 96.29
+        "covered": 92,
+        "total": 95,
+        "pct": 96.84
       },
       "statements": {
-        "covered": 84,
-        "total": 91,
-        "pct": 92.3
+        "covered": 98,
+        "total": 107,
+        "pct": 91.58
       },
       "functions": {
-        "covered": 17,
-        "total": 17,
+        "covered": 23,
+        "total": 23,
         "pct": 100
       },
       "branches": {
-        "covered": 57,
-        "total": 64,
-        "pct": 89.06
+        "covered": 65,
+        "total": 74,
+        "pct": 87.83
       }
     },
     "packages/plugin-host/src/diagnostic-report.ts": {
@@ -2888,19 +2888,19 @@
     },
     "packages/plugin-host/src/error-text.ts": {
       "lines": {
-        "covered": 92,
-        "total": 115,
-        "pct": 80
+        "covered": 94,
+        "total": 117,
+        "pct": 80.34
       },
       "statements": {
-        "covered": 95,
-        "total": 120,
-        "pct": 79.16
+        "covered": 97,
+        "total": 122,
+        "pct": 79.5
       },
       "functions": {
-        "covered": 77,
-        "total": 100,
-        "pct": 77
+        "covered": 79,
+        "total": 102,
+        "pct": 77.45
       },
       "branches": {
         "covered": 16,
@@ -2976,14 +2976,14 @@
     },
     "packages/plugin-host/src/host-disposal-runtime.ts": {
       "lines": {
-        "covered": 24,
-        "total": 27,
-        "pct": 88.88
+        "covered": 26,
+        "total": 29,
+        "pct": 89.65
       },
       "statements": {
-        "covered": 25,
-        "total": 28,
-        "pct": 89.28
+        "covered": 28,
+        "total": 31,
+        "pct": 90.32
       },
       "functions": {
         "covered": 5,
@@ -2991,9 +2991,9 @@
         "pct": 83.33
       },
       "branches": {
-        "covered": 13,
-        "total": 15,
-        "pct": 86.66
+        "covered": 15,
+        "total": 17,
+        "pct": 88.23
       }
     },
     "packages/plugin-host/src/host-identity.ts": {
@@ -3064,24 +3064,24 @@
     },
     "packages/plugin-host/src/host-runtime.ts": {
       "lines": {
-        "covered": 316,
-        "total": 337,
-        "pct": 93.76
+        "covered": 332,
+        "total": 356,
+        "pct": 93.25
       },
       "statements": {
-        "covered": 326,
-        "total": 350,
-        "pct": 93.14
+        "covered": 346,
+        "total": 373,
+        "pct": 92.76
       },
       "functions": {
-        "covered": 138,
-        "total": 147,
-        "pct": 93.87
+        "covered": 144,
+        "total": 153,
+        "pct": 94.11
       },
       "branches": {
-        "covered": 93,
-        "total": 113,
-        "pct": 82.3
+        "covered": 99,
+        "total": 125,
+        "pct": 79.2
       }
     },
     "packages/plugin-host/src/host-state.ts": {
@@ -3284,36 +3284,14 @@
     },
     "packages/plugin-host/src/removal-runtime.ts": {
       "lines": {
-        "covered": 54,
-        "total": 65,
-        "pct": 83.07
-      },
-      "statements": {
-        "covered": 54,
-        "total": 66,
-        "pct": 81.81
-      },
-      "functions": {
-        "covered": 8,
-        "total": 8,
-        "pct": 100
-      },
-      "branches": {
-        "covered": 16,
-        "total": 19,
-        "pct": 84.21
-      }
-    },
-    "packages/plugin-host/src/replace-runtime.ts": {
-      "lines": {
         "covered": 64,
-        "total": 64,
-        "pct": 100
+        "total": 75,
+        "pct": 85.33
       },
       "statements": {
-        "covered": 72,
-        "total": 75,
-        "pct": 96
+        "covered": 65,
+        "total": 77,
+        "pct": 84.41
       },
       "functions": {
         "covered": 12,
@@ -3321,21 +3299,43 @@
         "pct": 100
       },
       "branches": {
-        "covered": 25,
+        "covered": 26,
         "total": 30,
-        "pct": 83.33
+        "pct": 86.66
+      }
+    },
+    "packages/plugin-host/src/replace-runtime.ts": {
+      "lines": {
+        "covered": 68,
+        "total": 68,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 78,
+        "total": 81,
+        "pct": 96.29
+      },
+      "functions": {
+        "covered": 12,
+        "total": 12,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 29,
+        "total": 34,
+        "pct": 85.29
       }
     },
     "packages/plugin-host/src/resume-runtime.ts": {
       "lines": {
-        "covered": 63,
-        "total": 66,
-        "pct": 95.45
+        "covered": 65,
+        "total": 68,
+        "pct": 95.58
       },
       "statements": {
-        "covered": 72,
-        "total": 83,
-        "pct": 86.74
+        "covered": 75,
+        "total": 86,
+        "pct": 87.2
       },
       "functions": {
         "covered": 13,
@@ -3343,9 +3343,9 @@
         "pct": 92.85
       },
       "branches": {
-        "covered": 35,
-        "total": 47,
-        "pct": 74.46
+        "covered": 37,
+        "total": 49,
+        "pct": 75.51
       }
     },
     "packages/plugin-host/src/setup-runtime.ts": {
@@ -7486,14 +7486,14 @@
     },
     "packages/rpc/src/process/adapters/node-child-process.ts": {
       "lines": {
-        "covered": 51,
+        "covered": 55,
         "total": 66,
-        "pct": 77.27
+        "pct": 83.33
       },
       "statements": {
-        "covered": 57,
+        "covered": 64,
         "total": 80,
-        "pct": 71.25
+        "pct": 80
       },
       "functions": {
         "covered": 15,
@@ -7501,9 +7501,9 @@
         "pct": 83.33
       },
       "branches": {
-        "covered": 29,
+        "covered": 43,
         "total": 58,
-        "pct": 50
+        "pct": 74.13
       }
     },
     "packages/rpc/src/process/adapters/node-socket.ts": {
@@ -15166,6 +15166,9 @@
   "exclusions": {
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
-  "changedRuntimeFiles": [],
+  "changedRuntimeFiles": [
+    "packages/plugin-host/src/host-runtime.ts",
+    "packages/plugin-host/src/removal-runtime.ts"
+  ],
   "deletedRuntimeFiles": []
 }
