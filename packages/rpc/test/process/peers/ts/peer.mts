@@ -1,5 +1,7 @@
 import { PeerMethod, PeerText } from './text.js'
 import { randomUUID } from 'node:crypto'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -24,6 +26,7 @@ import { endpointFor } from './runtime.js'
 const { values } = parseArgs({
   options: {
     stdio: { type: 'boolean' },
+    descendant: { type: 'boolean' },
     'peer-id': { type: 'string', default: 'caller' },
     role: { type: 'string', default: 'responder' },
     'listen-unix': { type: 'string' },
@@ -78,8 +81,25 @@ const definition = definePlugin({
 })
 /** Each connection borrows this Host and owns its endpoint service. */
 const services = new Set<{ close(): Promise<void> }>()
+/** Actual public service-port calls and settlements remain observable after EOF ends the wire. */
+const cleanups: Array<{ calls: number; settled: number; providerAborts: number }> = []
 /** Close intentions fence new peer-originated requests while admitted providers drain. */
 let closing = false
+/** Stdio fault actions run after the next physical response write, outside the protocol owner. */
+let pendingFault: string | undefined
+
+/** Execute one fixture fault only after the production byte write has settled. */
+function afterPhysicalWrite(): void {
+  if (!pendingFault) return
+  const fault = pendingFault
+  pendingFault = undefined
+  if (fault === PeerMethod.crash) process.exit(17)
+  if (fault === PeerMethod.pause) process.kill(process.pid, 'SIGSTOP')
+  else
+    for (;;) {
+      /* Keep this process busy until its owner terminates it. */
+    }
+}
 
 /** Serve an authenticated session through production remote dispatch and stream ownership. */
 async function serve(channel: IRemoteChannel): Promise<void> {
@@ -91,6 +111,12 @@ async function serve(channel: IRemoteChannel): Promise<void> {
   )
   runtime.endpoint.provide(PeerMethod.aborts, (context) => context.success(aborts))
   runtime.endpoint.provide(PeerMethod.trace, (context) => context.success(context.trace ?? null))
+  /** Public success flushes before faulting the same process rather than a wrapper or simulator. */
+  for (const method of [PeerMethod.busy, PeerMethod.pause, PeerMethod.crash])
+    runtime.endpoint.provide(method, (context) => {
+      pendingFault = method
+      return context.success(PeerText.ack)
+    })
   runtime.endpoint.provide(PeerMethod.error, () => {
     /** Two original errors stay reachable in the transmitted error graph. */
     const cause = new RpcError(RpcCoreErrorCode.internal, PeerText.cause)
@@ -117,7 +143,7 @@ async function serve(channel: IRemoteChannel): Promise<void> {
     if (event.name === 'control.close') closing = true
   })
   /** Host profile exposes catalog control; Plugin profile describes the already installed target. */
-  const service = values.host
+  const publicService = values.host
     ? await serveRemoteHost({
         host,
         catalog: { [contract.plugin]: contract },
@@ -126,6 +152,17 @@ async function serve(channel: IRemoteChannel): Promise<void> {
         report
       })
     : await serveRemotePlugin({ host, contract, endpoint: runtime, report })
+  /** Observation delegates the exact public close promise; it does not replace its ownership. */
+  const cleanup = { calls: 0, settled: 0, providerAborts: 0 }
+  cleanups.push(cleanup)
+  const service = {
+    close: async () => {
+      cleanup.calls++
+      await publicService.close()
+      cleanup.settled++
+      cleanup.providerAborts = aborts.length
+    }
+  }
   /** One close promise fences EOF and explicit shutdown against repeated disposal. */
   let closed: Promise<void> | undefined
   /** Subscription belongs to this connection and is released before closing its channel. */
@@ -243,6 +280,14 @@ async function main(): Promise<void> {
     signal: controller.signal,
     ipc: { connectionId: 'stdio', sessionId: 'stdio', log: () => undefined }
   }
+  /** Preserve the bootstrap decoder's exact channel identity while observing its opaque writes. */
+  const physicalWrite = opened.channel.write
+  Object.assign(opened.channel, {
+    write: async (chunk: Uint8Array) => {
+      await physicalWrite(chunk)
+      afterPhysicalWrite()
+    }
+  })
   const channel = await createProcessTransport(
     opened.channel,
     values.role === 'initiator'
@@ -267,14 +312,23 @@ async function main(): Promise<void> {
   )
   if (values.role === 'initiator') await initiate(channel)
   else {
-    await serve(channel)
-    if (!controller.signal.aborted)
-      await new Promise<void>((resolve) =>
-        controller.signal.addEventListener('abort', () => resolve(), { once: true })
-      )
-    for (const service of services) await service.close()
+    /** A real descendant has no inherited protocol pipes and is reaped on EOF. */
+    const child = values.descendant ? spawn('/bin/sleep', ['600'], { stdio: 'ignore' }) : undefined
+    const exited = child ? once(child, 'exit') : undefined
+    try {
+      await serve(channel)
+      if (!controller.signal.aborted)
+        await new Promise<void>((resolve) =>
+          controller.signal.addEventListener('abort', () => resolve(), { once: true })
+        )
+      for (const service of services) await service.close()
+    } finally {
+      child?.kill()
+      await exited
+    }
   }
   await host.dispose()
+  process.stderr.write(PeerText.cleanupPrefix + JSON.stringify(cleanups) + '\n')
 }
 
 main().catch((error: unknown) => {

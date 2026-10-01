@@ -191,7 +191,21 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bri
         raw = peer.read_frame(reader)
         if raw is None:
             return
-        for reply in business.native(peer.decode_frame(raw)):
+        message = peer.decode_frame(raw)
+        method = message.get("method")
+        if method in ("peer.busy", "peer.pause", "peer.crash"):
+            peer.write_json(writer, native_response(message, "ACK"))
+            import os
+            import signal
+            if method == "peer.crash":
+                os._exit(17)
+            if method == "peer.pause":
+                os.kill(os.getpid(), signal.SIGSTOP)
+            else:
+                while True:
+                    pass
+            continue
+        for reply in business.native(message):
             peer.write_json(writer, reply)
 
 
@@ -294,8 +308,15 @@ def run_business(args: Any) -> int:
             if raw is None:
                 raise peer.PeerFailure("BOOTSTRAP_INVALID")
             token = raw.decode("utf-8")
+        import subprocess
+        child = subprocess.Popen(["/bin/sleep", "600"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) if args.descendant else None
         print(f"READY pid={os.getpid()}", file=sys.stderr, flush=True)
-        serve(sys.stdin.buffer, sys.stdout.buffer, args.host, token, args.jsonrpc, args.bare_jsonrpc)
+        try:
+            serve(sys.stdin.buffer, sys.stdout.buffer, args.host, token, args.jsonrpc, args.bare_jsonrpc)
+        finally:
+            if child is not None:
+                child.terminate()
+                child.wait()
         return 0
     if not args.listen_unix or token is None:
         raise peer.PeerFailure("AUTH_REQUIRED")

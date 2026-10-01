@@ -5,7 +5,10 @@ export const PeerMethod = {
   trace: 'peer.trace',
   error: 'peer.error',
   wait: 'peer.wait',
-  aborts: 'peer.aborts'
+  aborts: 'peer.aborts',
+  busy: 'peer.busy',
+  pause: 'peer.pause',
+  crash: 'peer.crash'
 } as const
 
 /** Fixed fixture diagnostics never retain untrusted input or authentication material. */
@@ -19,5 +22,7 @@ export const PeerText = {
   result: 'RESULT ok\n',
   failurePrefix: 'PEER_ERROR ',
   bridgeUnsupported: 'UNSUPPORTED jsonrpc: producer bridge not integrated\n',
-  listenerUnsupported: 'UNSUPPORTED listener: auth-fd required\n'
+  listenerUnsupported: 'UNSUPPORTED listener: auth-fd required\n',
+  ack: 'ACK',
+  cleanupPrefix: 'CLEANUP '
 } as const
