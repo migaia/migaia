@@ -5,6 +5,12 @@ import type { IRemoteCallGuard } from '../../remote/types.js'
 import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
+import { MAX_LIQUIDATION_TOMBSTONES } from './constants.js'
+import {
+  createProcessDependentDiagnostic,
+  liquidateProcessOwner,
+  type IProcessDependentDiagnostic
+} from './liquidation.js'
 import { listenProcessRegistrations } from './rendezvous.js'
 import { createProcessSessionManager } from './session.js'
 import { createProcessTerminalRegistration, type IProcessTerminalRegistration } from './terminal.js'
@@ -14,7 +20,7 @@ import type {
   IProcessResilience,
   IProcessResilienceOptions,
   IProcessResilienceSnapshot,
-  IProcessLiquidationOwner
+  IProcessDependencyHostPort
 } from './types.js'
 
 /** One close outcome retains every independently failing listener or registration. */
@@ -25,11 +31,30 @@ function closeFailure(errors: readonly unknown[]): AggregateError {
   })
 }
 
+/** Keep the terminal primary and committed cleanup failures reachable from inspect. */
+function liquidationReason(primary: unknown, cleanupErrors: readonly unknown[]): unknown {
+  if (cleanupErrors.length === 0) return primary
+  return attachErrorIdentity(
+    new AggregateError(
+      [...(primary === undefined ? [] : [primary]), ...cleanupErrors],
+      RpcProcessErrorText.liquidated
+    ),
+    { source: ERROR_SOURCE, code: RpcProcessErrorCode.liquidated }
+  )
+}
+
 /** Own bounded sessions and one terminal diagnostic clock per registered supervisor. */
 export function createProcessResilience(options: IProcessResilienceOptions): IProcessResilience {
   const manager = createProcessSessionManager(options)
   /** Normal registrations are removed at their own release, not kept as tombstones. */
   const registrations = new Map<string, IProcessTerminalRegistration>()
+  /** A committed liquidation leaves only the newest bounded diagnostic snapshots. */
+  const tombstones = new Map<
+    string,
+    Readonly<{ snapshot: IProcessResilienceSnapshot; time: number }>
+  >()
+  /** Each actually suspended dependant has its own diagnostic count and timer. */
+  const dependents = new Map<string, IProcessDependentDiagnostic>()
   /** The owner closes only listeners it opened through this facade. */
   const listeners = new Set<IProcessRegistrationListener>()
   /** Subscribers observe terminal state without becoming its reporter. */
@@ -49,16 +74,65 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
     }
   }
 
-  /** Only a committed local owner may liquidate its own registration. */
-  const liquidate = async (owner: IProcessLiquidationOwner): Promise<void> => {
-    if (owner.kind === 'standalone-host') {
-      await owner.release()
-      return
-    }
-    const outcome = await owner.host.unUse(owner.name, {
-      policy: manager.options.liquidation.cascade ? 'cascade' : 'suspend'
+  const recordTombstone = (snapshot: IProcessResilienceSnapshot): void => {
+    tombstones.delete(snapshot.id)
+    tombstones.set(snapshot.id, {
+      snapshot: Object.freeze({ ...snapshot, liquidated: true }),
+      time: manager.options.scheduler.now()
     })
-    if (!outcome.ok) for (const error of outcome.errors) report(error)
+    while (tombstones.size > MAX_LIQUIDATION_TOMBSTONES) {
+      const oldest = tombstones.keys().next().value
+      if (oldest !== undefined) tombstones.delete(oldest)
+    }
+  }
+
+  const notify = async (snapshot: IProcessResilienceSnapshot): Promise<boolean> => {
+    const outcomes = await Promise.allSettled(
+      [...terminalSubscribers].map((listener) => Promise.resolve().then(() => listener(snapshot)))
+    )
+    let handled = false
+    for (const outcome of outcomes) {
+      if (outcome.status === 'fulfilled') handled = true
+      else report(outcome.reason)
+    }
+    return handled
+  }
+
+  /** Dependants come only from the mutation's actual committed plan. */
+  const followAffected = (
+    name: string,
+    reason: unknown,
+    host: IProcessDependencyHostPort
+  ): void => {
+    if (dependents.has(name) || tombstones.has(name)) return
+    const diagnostic = createProcessDependentDiagnostic({
+      name,
+      reason,
+      scheduler: manager.options.scheduler,
+      reportAtMs: manager.options.reportAtMs,
+      unhandledLimit: manager.options.unhandledLimit,
+      report,
+      notify,
+      async liquidate() {
+        const result = await liquidateProcessOwner(
+          { kind: 'proxy-plugin', name, host },
+          manager.options.liquidation.cascade,
+          report
+        )
+        const current = dependents.get(name)?.snapshot()
+        if (current)
+          recordTombstone({
+            ...current,
+            reason: liquidationReason(current.reason, result.cleanupErrors)
+          })
+        dependents.get(name)?.close()
+        dependents.delete(name)
+        for (const step of result.affected)
+          if (step.name !== name && step.action === 'suspend')
+            followAffected(step.name, reason, host)
+      }
+    })
+    dependents.set(name, diagnostic)
   }
 
   return Object.freeze({
@@ -106,6 +180,9 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
         throw createProcessError(RpcProcessErrorCode.resilienceInvalidOption, undefined, {
           field: 'liquidation'
         })
+      tombstones.delete(name)
+      dependents.get(name)?.close()
+      dependents.delete(name)
       const current = createProcessTerminalRegistration({
         name,
         binding,
@@ -113,21 +190,38 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
         report,
         reportAtMs: manager.options.reportAtMs,
         unhandledLimit: manager.options.unhandledLimit,
-        async notify(snapshot) {
-          const outcomes = await Promise.allSettled(
-            [...terminalSubscribers].map((listener) =>
-              Promise.resolve().then(() => listener(snapshot))
-            )
+        notify,
+        async liquidate() {
+          const result = await liquidateProcessOwner(
+            owner,
+            manager.options.liquidation.cascade,
+            report
           )
-          let handled = false
-          for (const outcome of outcomes) {
-            if (outcome.status === 'fulfilled') handled = true
-            else report(outcome.reason)
+          const currentSnapshot = current.snapshot()
+          const retainedReason = liquidationReason(currentSnapshot?.reason, result.cleanupErrors)
+          if (currentSnapshot) recordTombstone({ ...currentSnapshot, reason: retainedReason })
+          if (owner.kind !== 'proxy-plugin') return
+          for (const step of result.affected) {
+            if (step.name === name) continue
+            if (step.action === 'suspend') followAffected(step.name, retainedReason, owner.host)
+            else if (step.action === 'release') {
+              await registrations.get(step.name)?.registration.close()
+              recordTombstone({
+                id: step.name,
+                state: 'terminal',
+                health: 'none',
+                unhandled: 0,
+                liquidated: true,
+                reason: retainedReason
+              })
+            }
           }
-          return handled
         },
-        liquidate: () => liquidate(owner),
-        onClose: () => registrations.delete(name)
+        onClose: () => {
+          registrations.delete(name)
+          dependents.get(name)?.close()
+          dependents.delete(name)
+        }
       })
       registrations.set(name, current)
       return current.registration
@@ -137,6 +231,18 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
       if (!guard) {
         guard = Object.freeze({
           beforeDispatch(input): void {
+            const tombstone = tombstones.get(name)
+            if (tombstone)
+              throw createProcessError(RpcProcessErrorCode.liquidated, tombstone.snapshot.reason, {
+                registrationId: name
+              })
+            const dependent = dependents.get(name)
+            if (dependent) {
+              const suspended = dependent.snapshot()
+              throw createProcessError(RpcProcessErrorCode.terminalCall, suspended.reason, {
+                registrationId: name
+              })
+            }
             registrations.get(name)?.guard.beforeDispatch(input)
           }
         })
@@ -145,7 +251,11 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
       return guard
     },
     inspect(id): IProcessResilienceSnapshot | undefined {
-      return registrations.get(id)?.snapshot()
+      return (
+        tombstones.get(id)?.snapshot ??
+        dependents.get(id)?.snapshot() ??
+        registrations.get(id)?.snapshot()
+      )
     },
     onTerminal(listener): () => void {
       if (closed) throw createProcessError(RpcProcessErrorCode.channelClosed)
@@ -160,6 +270,9 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
           ...[...registrations.values()].map((current) => current.registration.close())
         ])
         manager.close()
+        for (const dependent of dependents.values()) dependent.close()
+        dependents.clear()
+        tombstones.clear()
         terminalSubscribers.clear()
         guards.clear()
         const errors = outcomes.flatMap((outcome) =>
