@@ -23,11 +23,19 @@ import { messageFramer } from '@migaia/rpc/contract/framing/v1'
 import { messageFramerV1 } from '@migaia/rpc/contract/framing'
 
 const envelope = rpcProtocol.normalize({
-  kind: 'request', id: '1', method: 'ping',
-  data: { route: {
-    profile: RpcRouteProfile, type: 'request', applicationVersion: '1',
-    senderId: 'client', targetId: 'server', sentAt: 0
-  } }
+  kind: 'request',
+  id: '1',
+  method: 'ping',
+  data: {
+    route: {
+      profile: RpcRouteProfile,
+      type: 'request',
+      applicationVersion: '1',
+      senderId: 'client',
+      targetId: 'server',
+      sentAt: 0
+    }
+  }
 })
 const sameProtocol = rpcV1.rpcProtocol === rpcProtocol
 const sameFramer = messageFramer === messageFramerV1
@@ -85,15 +93,15 @@ authenticated connections. A cancelled execution releases its key for a waiting 
 
 ### 2. 适合什么场景
 
-| 场景                                               | 说明                                                        |
-| -------------------------------------------------- | ----------------------------------------------------------- |
-| 主页面 ↔ iframe 通信                               | 需要验证消息来源、防止同源恶意脚本伪造                      |
-| 主线程 ↔ Web Worker / SharedWorker / ServiceWorker | 把耗时计算丢进 Worker，用"调用函数"的写法拿结果             |
-| 多个浏览器标签页 / 窗口互通                        | 用 BroadcastChannel 做一对多广播，或做单播路由              |
-| 点对点实时通信                                     | 基于 WebRTC DataChannel，比如协作编辑、P2P 游戏状态同步     |
-| 大文件 / 大对象跨端传输                            | 超过单次消息大小限制自动分片，接收端自动重组                |
-| 微前端子应用间通信                                 | 各子应用独立部署、独立运行时，仍需要互相调用能力            |
-| 需要断线探测的长连接场景                             | WebTransport datagram、连接可能中断，需要超时/存活探测 |
+| 场景                                               | 说明                                                    |
+| -------------------------------------------------- | ------------------------------------------------------- |
+| 主页面 ↔ iframe 通信                               | 需要验证消息来源、防止同源恶意脚本伪造                  |
+| 主线程 ↔ Web Worker / SharedWorker / ServiceWorker | 把耗时计算丢进 Worker，用"调用函数"的写法拿结果         |
+| 多个浏览器标签页 / 窗口互通                        | 用 BroadcastChannel 做一对多广播，或做单播路由          |
+| 点对点实时通信                                     | 基于 WebRTC DataChannel，比如协作编辑、P2P 游戏状态同步 |
+| 大文件 / 大对象跨端传输                            | 超过单次消息大小限制自动分片，接收端自动重组            |
+| 微前端子应用间通信                                 | 各子应用独立部署、独立运行时，仍需要互相调用能力        |
+| 需要断线探测的长连接场景                           | WebTransport datagram、连接可能中断，需要超时/存活探测  |
 
 不适合的场景：如果两端本来就在同一个 JS 线程里、能直接互相 import 调用，用这个库反而是多此一举——它解决的是"物理隔离、只能靠消息通信"这个约束下的问题。
 
@@ -152,14 +160,14 @@ pnpm add @migaia/rpc
 
 #### 7.1 先选入口，不要一律导入完整端点
 
-| 需求                               | 导入                                                     | 返回的公开能力                                                         |
-| ---------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------- |
-| 双向 RPC、发现、控制、分片全部需要 | `createEndpoint` from `@migaia/rpc/core`                  | 完整端点；它与 `createFullEndpoint` 是同一个函数值                     |
-| 显式使用完整预设                   | `createFullEndpoint` from `@migaia/rpc/core/full`         | 与 core 入口的 `createEndpoint` 相同                                             |
-| 只发请求/通知                      | `createClientEndpoint` from `@migaia/rpc/core/client`     | `send`、`sendAll`、`dispatch`、`dispatchAll`、`on`、`hooks`、`dispose` |
-| 提供方法，同时允许主动回调对端     | `createProviderEndpoint` from `@migaia/rpc/core/provider` | client 能力 + `provide`                                                |
-| 精确选择 Feature                   | `createComposedEndpoint` from `@migaia/rpc/core/composed`     | kernel 能力 + 所选 Feature 的根投影                                    |
-| 自定义原生 Feature/Middleware     | `defineFeature` / `defineMiddleware` from `@migaia/rpc/core` | 定义显式返回的 surface 决定 endpoint 投影                         |
+| 需求                               | 导入                                                         | 返回的公开能力                                                         |
+| ---------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| 双向 RPC、发现、控制、分片全部需要 | `createEndpoint` from `@migaia/rpc/core`                     | 完整端点；它与 `createFullEndpoint` 是同一个函数值                     |
+| 显式使用完整预设                   | `createFullEndpoint` from `@migaia/rpc/core/full`            | 与 core 入口的 `createEndpoint` 相同                                   |
+| 只发请求/通知                      | `createClientEndpoint` from `@migaia/rpc/core/client`        | `send`、`sendAll`、`dispatch`、`dispatchAll`、`on`、`hooks`、`dispose` |
+| 提供方法，同时允许主动回调对端     | `createProviderEndpoint` from `@migaia/rpc/core/provider`    | client 能力 + `provide`                                                |
+| 精确选择 Feature                   | `createComposedEndpoint` from `@migaia/rpc/core/composed`    | kernel 能力 + 所选 Feature 的根投影                                    |
+| 自定义原生 Feature/Middleware      | `defineFeature` / `defineMiddleware` from `@migaia/rpc/core` | 定义显式返回的 surface 决定 endpoint 投影                              |
 
 这些子路径不是兼容别名。它们是 tree-shaking 边界：例如 client 入口不会把 provider、discovery、control、chunk 的实现带入 retained graph。原生 Feature 的依赖可以自动安装，但**依赖不会偷偷扩大根对象**：只有定义显式返回的 surface 会投影到 endpoint。
 
@@ -231,11 +239,19 @@ const streamRoots = () => {
 
 const [clientTransport, serverTransport] = createMemoryTransportPair()
 const server = await createComposedEndpoint(
-  { id: 'server', transport: serverTransport, middlewares: [connect({ transport: serverTransport })] },
+  {
+    id: 'server',
+    transport: serverTransport,
+    middlewares: [connect({ transport: serverTransport })]
+  },
   streamRoots()
 )
 const client = await createComposedEndpoint(
-  { id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] },
+  {
+    id: 'client',
+    transport: clientTransport,
+    middlewares: [connect({ transport: clientTransport })]
+  },
   streamRoots()
 )
 
@@ -267,7 +283,7 @@ core 入口的 `createEndpoint` 是 `createFullEndpoint` 的公开别名，适�
 const endpoint = await createEndpoint({
   id: 'server',
   transport,
-middlewares: [contract({ version: '1' }), codec(identityCodecV1), connect({ transport })]
+  middlewares: [contract({ version: '1' }), codec(identityCodecV1), connect({ transport })]
 })
 endpoint.provide('add', (ctx) => {
   const { a, b } = ctx.data as { a: number; b: number }
@@ -295,12 +311,7 @@ endpoint.provide('add', (ctx) => {
 用 `defineFeature` 和 `defineMiddleware` 定义扩展。二者会和首方能力一起进入同一个 PluginHost 原子安装批次：依赖检查发生在 transport 订阅前；失败会回滚已经取得的资源，原始错误保留在 `cause`/`AggregateError.errors` 链上。
 
 ```ts
-import {
-  connect,
-  createFullEndpoint,
-  defineFeature,
-  defineMiddleware
-} from '@migaia/rpc/core'
+import { connect, createFullEndpoint, defineFeature, defineMiddleware } from '@migaia/rpc/core'
 
 const observed = defineFeature(() => ({ observe: () => 'ready' }))
 const metrics = defineMiddleware('metrics', (core) => ({
@@ -526,10 +537,7 @@ const transport = createBrowserMessagePortTransport(port, { ownership: 'borrowed
 ### 10. 错误处理与跨端错误序列化
 
 ```ts
-import {
-  isRpcError,
-  RpcCoreErrorCode
-} from '@migaia/rpc/core'
+import { isRpcError, RpcCoreErrorCode } from '@migaia/rpc/core'
 import {
   serializeRpcError,
   deserializeRpcError,
@@ -598,7 +606,11 @@ const transport = createWebWorkerTransport(self as unknown as Worker)
 const endpoint = await createProviderEndpoint({
   id: 'worker',
   transport,
-  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]
+  middlewares: [
+    contract({ version: '1' }),
+    codec({ encode: (value) => value, decode: (value) => value }),
+    connect({ transport })
+  ]
 })
 endpoint.provide('heavyCompute', (ctx) => ctx.success(doHeavyWork(ctx.data as number[])))
 ```
@@ -667,7 +679,11 @@ const transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync
 const endpoint = await createClientEndpoint({
   id: `tab-${crypto.randomUUID()}`,
   transport,
-  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]
+  middlewares: [
+    contract({ version: '1' }),
+    codec({ encode: (value) => value, decode: (value) => value }),
+    connect({ transport })
+  ]
 })
 
 endpoint.on('cache-invalidated', (ctx) => console.log('缓存失效通知：', ctx.data))
@@ -870,3 +886,18 @@ the built-in Node launcher currently advertises fd bootstrap as unsupported.
 For endpoint assembly, use the client outbound/one-way roots and install the
 channel's queue/log Features in the same batch. See the complete bridge
 assembly and error behavior in [USEGUIDE.md](./USEGUIDE.md#json-rpc-bridge).
+
+### Threads
+
+`@migaia/rpc/threads` combines remote Plugin/Host assembly with the thread supervisor.
+Node's launcher and channel factory are exported at `@migaia/rpc/threads/adapters/node`.
+The six runtime adapter subpaths load independently; importing `threads` loads no platform adapter.
+Worker business data is portable RPC data, separate from the private bootstrap address.
+Node services decode `workerData` with `readThreadBootstrap`; Web services use
+`receiveThreadData(port, prepare)` and prepare their endpoint before acknowledging readiness.
+The endpoint's local id must equal the bootstrap `peerId`.
+
+Node termination uses the real `exit` event. Bun, Deno, browser and Electron adapters currently
+retain unsupported termination/exit capability declarations until their own actual-exit evidence
+is available. Unsupported exit observation requires explicit health; unsupported termination
+rejects default required isolation before Worker creation. See [USEGUIDE](./USEGUIDE.md#threads).
