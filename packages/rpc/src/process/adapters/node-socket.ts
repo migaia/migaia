@@ -15,6 +15,12 @@ import type {
   IProcessPendingByteConnection
 } from '../types.js'
 import { nodeByteStream } from './node-byte-stream.js'
+import {
+  prepareUnixSocketPath,
+  recordUnixSocketOwner,
+  removeUnixSocketOwner,
+  type IUnixSocketRecord
+} from './unix-socket-ownership.js'
 
 /** Node socket addresses are absolute Unix paths, Windows pipe paths, or numeric loopback TCP URLs. */
 type INodeSocketAddress =
@@ -210,7 +216,12 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
   })
   /** Listener errors after bind are diagnostic; they never close ready channels. */
   server.on('error', (error) => reportSafely(options.report, error))
-  if (address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\')) {
+  const managedPath =
+    address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\') && options.serviceId
+      ? address.path
+      : undefined
+  if (managedPath) await prepareUnixSocketPath(managedPath, options.serviceId!)
+  else if (address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\')) {
     /** Existing paths are never removed or claimed as this listener's own. */
     let occupied = false
     try {
@@ -239,6 +250,16 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
   } catch (error) {
     throw createProcessError(RpcProcessErrorCode.listenFailed, error)
   }
+  /** The exact inode is recorded before exposing this listener as recoverable. */
+  let ownerRecord: IUnixSocketRecord | undefined
+  if (managedPath) {
+    try {
+      ownerRecord = await recordUnixSocketOwner(managedPath, options.serviceId!)
+    } catch (error) {
+      server.close()
+      throw createProcessError(RpcProcessErrorCode.listenFailed, error)
+    }
+  }
   /** Port zero is replaced with the actual loopback port exposed by Node. */
   const bound = server.address()
   const boundAddress =
@@ -253,7 +274,13 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
       server.close()
       await Promise.all([...pendingSet].map((release) => release(closeReason)))
       /** Node owns removal of a Unix socket path created by this server. */
-      if (address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\')) {
+      if (managedPath && ownerRecord) {
+        try {
+          await removeUnixSocketOwner(managedPath, ownerRecord)
+        } catch (error) {
+          reportSafely(options.report, error)
+        }
+      } else if (address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\')) {
         try {
           await unlink(address.path)
         } catch (error) {

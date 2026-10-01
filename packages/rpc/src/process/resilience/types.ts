@@ -85,6 +85,8 @@ export type IProcessRegistrationListenOptions = Readonly<{
   wire: 'native'
   listen: IListenProcessByteChannel
   address: string
+  /** Unix rendezvous paths require a stable owner identity before binding. */
+  serviceId?: string
   offer: IRpcHandshakeOffer
   createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{
     peerId: string
