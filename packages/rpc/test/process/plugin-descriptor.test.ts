@@ -1,10 +1,11 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { ReplaceStrategy } from '@migaia/supervision'
 import { describe, expect, it } from 'vitest'
 import { REMOTE_NAME_PATTERN } from '../../src/remote/contract.js'
 import { parseProcessPluginDescriptor } from '../../src/process/plugin/descriptor.js'
 import { ProcessPluginInstanceMode, ProcessPluginWire } from '../../src/process/plugin/constants.js'
+import { createNodeProcessLauncher } from '../../src/process/adapters/node-child-process.js'
 import { acceptsSchema, type ISchemaRule } from '../fixtures/schema-accepts.js'
 
 /** The published schema is checked as an independent structural contract. */
@@ -29,6 +30,27 @@ const vectors = JSON.parse(
     field?: string
     code?: string
   }[]
+  securityMutations: {
+    id: string
+    base: string
+    path: string
+    value: unknown
+    schemaValid: boolean
+    semanticValid: boolean
+    field?: string
+  }[]
+}
+
+/** Apply one published field mutation without repeating a full descriptor vector. */
+function mutatedDescriptor(vector: (typeof vectors.securityMutations)[number]): unknown {
+  const base = vectors.cases.find((candidate) => candidate.id === vector.base)
+  if (!base) throw new Error(`Missing descriptor vector: ${vector.base}`)
+  const input = structuredClone(base.value) as Record<string, unknown>
+  const parts = vector.path.split('.')
+  let owner: Record<string, unknown> = input
+  for (const part of parts.slice(0, -1)) owner = owner[part] as Record<string, unknown>
+  owner[parts.at(-1)!] = vector.value
+  return input
 }
 
 describe('process plugin descriptor', () => {
@@ -58,6 +80,88 @@ describe('process plugin descriptor', () => {
     expect(caught).toBeInstanceOf(TypeError)
     expect(caught).toMatchObject({ code: vector.code ?? 'PROCESS_PLUGIN_INVALID_OPTION' })
     if (vector.field) expect(caught).toMatchObject({ detail: { field: vector.field } })
+  })
+
+  it.each(vectors.securityMutations)(
+    '[A10/R7] $id checks persisted-secret schema and semantic admission',
+    (vector) => {
+      const input = mutatedDescriptor(vector)
+      expect(acceptsSchema(schema, input, schema)).toBe(vector.schemaValid)
+      if (vector.semanticValid) {
+        expect(parseProcessPluginDescriptor(input)).toMatchObject(input as object)
+      } else {
+        expect(() => parseProcessPluginDescriptor(input)).toThrowError(
+          expect.objectContaining({
+            code: 'PROCESS_PLUGIN_INVALID_OPTION',
+            detail: { field: vector.field }
+          })
+        )
+      }
+    }
+  )
+
+  it('[A10/R7] persists only an inherited env name and restores it in the child', async () => {
+    /** The secret belongs to the launcher environment, never the persisted descriptor. */
+    const key = 'MIGAI_DESCRIPTOR_TEST_SECRET'
+    const secret = 'runtime-only-secret-72d1'
+    const original = process.env[key]
+    const input = mutatedDescriptor(
+      vectors.securityMutations.find((item) => item.id === 'inherited-secret-reference')!
+    ) as {
+      deployment: { spec: { env: { inherit: string[] } } }
+    }
+    input.deployment.spec.env.inherit = [key]
+    const parsed = parseProcessPluginDescriptor(input)
+    if (parsed.deployment.kind !== 'spawn') throw new Error('Expected spawn descriptor')
+    const directory = mkdtempSync(resolve(import.meta.dirname, 'descriptor-secret-'))
+    try {
+      const file = resolve(directory, 'plugin.json')
+      writeFileSync(file, JSON.stringify(parsed))
+      expect(readFileSync(file, 'utf8')).not.toContain(secret)
+      process.env[key] = secret
+      let output = ''
+      const handle = await createNodeProcessLauncher().launch(
+        {
+          command: process.execPath,
+          args: ['-e', `process.stdout.write(process.env.${key} ?? '')`],
+          env: { inherit: parsed.deployment.spec.env.inherit, set: {} },
+          stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'ignore' }
+        },
+        {
+          signal: new AbortController().signal,
+          output(stream, chunk) {
+            if (stream === 'stdout') output += new TextDecoder().decode(chunk)
+          }
+        }
+      )
+      expect(await handle.exited).toMatchObject({ code: 0 })
+      expect(output).toBe(secret)
+      expect(readFileSync(file, 'utf8')).not.toContain(secret)
+    } finally {
+      if (original === undefined) delete process.env[key]
+      else process.env[key] = original
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it.each([
+    '--token=value',
+    '--secret=value',
+    '--password=value',
+    '--API-KEY=value',
+    '--access-key'
+  ])('[A10/R7] rejects secret-bearing argument %s without reflecting its value', (argument) => {
+    const vector = vectors.securityMutations.find(
+      (item) => item.id === 'secret-in-argument-rejected'
+    )!
+    const input = mutatedDescriptor({ ...vector, value: ['child.mjs', argument] })
+    expect(acceptsSchema(schema, input, schema)).toBe(true)
+    expect(() => parseProcessPluginDescriptor(input)).toThrowError(
+      expect.objectContaining({
+        code: 'PROCESS_PLUGIN_INVALID_OPTION',
+        detail: { field: 'descriptor.deployment.spec.args.1' }
+      })
+    )
   })
 
   it('[A10] sorts and freezes the two normalized host catalog entries', () => {

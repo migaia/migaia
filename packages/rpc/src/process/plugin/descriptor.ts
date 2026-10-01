@@ -20,15 +20,25 @@ import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import {
   PROCESS_PLUGIN_DESCRIPTOR_VERSION,
+  PROCESS_DESCRIPTOR_SECRET_ARGUMENTS,
   ProcessDescriptorTarget,
   ProcessPluginChannelKind,
   ProcessPluginInstanceMode,
   ProcessPluginWire
 } from './constants.js'
 
-/** Bootstrap payload is injected at runtime and never persisted. */
+/** Persisted environment entries inherit by name or declare a literal non-secret value. */
+export type IProcessDescriptorEnv = Readonly<{
+  inherit: readonly string[]
+  set?: Readonly<Record<string, Readonly<{ value: string; nonSecret: true }>>>
+}>
+
+/** Bootstrap payload is injected at runtime and environment values are explicit data. */
 export type IProcessSpecDescriptor = Readonly<
-  Omit<IProcessSpec, 'bootstrap'> & { bootstrap?: Readonly<Omit<IProcessBootstrap, 'payload'>> }
+  Omit<IProcessSpec, 'bootstrap' | 'env'> & {
+    env: IProcessDescriptorEnv
+    bootstrap?: Readonly<Omit<IProcessBootstrap, 'payload'>>
+  }
 >
 
 /** Persisted budget data has no scheduler, parent, or live lease. */
@@ -146,14 +156,30 @@ function specShape(value: unknown, path: string): IProcessSpecDescriptor {
   )
   nonempty(spec.command, `${path}.command`)
   strings(spec.args, `${path}.args`)
+  for (const [index, arg] of (spec.args as readonly string[]).entries()) {
+    /** An equals form and a separate value argument are both secret-bearing. */
+    const normalized = arg.toLowerCase()
+    if (
+      PROCESS_DESCRIPTOR_SECRET_ARGUMENTS.some(
+        (name) => normalized === name || normalized.startsWith(`${name}=`)
+      )
+    )
+      invalid(`${path}.args.${index}`)
+  }
   for (const field of ['cwd', 'tmpDir'])
     if (spec[field] !== undefined) nonempty(spec[field], `${path}.${field}`)
   const env = record(spec.env, `${path}.env`)
-  exact(env, ['inherit', 'set'], [], `${path}.env`)
+  exact(env, ['inherit'], ['set'], `${path}.env`)
   strings(env.inherit, `${path}.env.inherit`)
-  const set = record(env.set, `${path}.env.set`)
-  for (const [key, item] of Object.entries(set))
-    if (typeof item !== 'string') invalid(`${path}.env.set.${key}`)
+  if (env.set !== undefined) {
+    const set = record(env.set, `${path}.env.set`)
+    for (const [key, item] of Object.entries(set)) {
+      const literal = record(item, `${path}.env.set.${key}`)
+      exact(literal, ['value', 'nonSecret'], [], `${path}.env.set.${key}`)
+      if (typeof literal.value !== 'string' || literal.nonSecret !== true)
+        invalid(`${path}.env.set.${key}`)
+    }
+  }
   const stdio = record(spec.stdio, `${path}.stdio`)
   exact(stdio, ['stdin', 'stdout', 'stderr'], [], `${path}.stdio`)
   if (!Object.values(StdinMode).includes(stdio.stdin as StdinMode)) invalid(`${path}.stdio.stdin`)
