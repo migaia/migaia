@@ -194,6 +194,45 @@ describe('remote Host trusted control', () => {
     }
   })
 
+  it('[D5] shares an in-flight Host use across two remote connections', async () => {
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const definition = definePlugin({
+      name: 'p',
+      features: { f: defineFeature(() => ({ m: () => 'live' })) },
+      install: () => ({})
+    })
+    const use = vi.spyOn(host, 'use')
+    const first = endpointHarness()
+    const second = endpointHarness()
+    const options = {
+      host: host as never,
+      catalog,
+      resolvePlugin: () => definition,
+      report: vi.fn()
+    }
+    const a = await serveRemoteHost({ ...options, endpoint: { endpoint: first.endpoint } })
+    const b = await serveRemoteHost({ ...options, endpoint: { endpoint: second.endpoint } })
+    try {
+      const results = await Promise.all([
+        first.invoke(RemoteMethodName.hostUse, ['p']),
+        second.invoke(RemoteMethodName.hostUse, ['p'])
+      ])
+      expect(results).toEqual([
+        expect.objectContaining({ name: 'p' }),
+        expect.objectContaining({ name: 'p' })
+      ])
+      expect(use).toHaveBeenCalledTimes(1)
+      await expect(first.invoke('p.f.m', [])).resolves.toBe('live')
+      await expect(second.invoke('p.f.m', [])).resolves.toBe('live')
+    } finally {
+      await a.close()
+      await b.close()
+      await host.dispose()
+    }
+  })
+
   it('prunes an externally removed plugin before shared Host adoption', async () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
