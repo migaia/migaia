@@ -1013,3 +1013,75 @@ describe('[A4] standalone Host restart keeps local ownership and does not replay
       expect(scheduler.pendingCount).toBe(0)
     }, 15000)
 })
+
+describe('[A4] real non-idempotent request crash', () => {
+  for (const original of peers)
+    it(`${original.language} reports unknown result without replay`, async () => {
+      /** Publish the matching explicit declaration to both public caller and real independent peer. */
+      const selectedContract: IRemoteContract = {
+        ...contract,
+        features: {
+          f: {
+            methods: {
+              ...contract.features.f!.methods,
+              request: { mode: 'request', idempotent: false }
+            }
+          }
+        }
+      }
+      const directory = await mkdtemp(join(tmpdir(), 'rpc-hf-contract-'))
+      const contractPath = join(directory, 'contract.json')
+      writeFileSync(contractPath, JSON.stringify({ contracts: [{ value: selectedContract }] }), {
+        mode: 0o600
+      })
+      const peer = { ...original, args: [...original.args, '--contract', contractPath] }
+      const scheduler = createManualScheduler()
+      let active: Awaited<ReturnType<typeof faultClient>> | undefined
+      let call: Promise<unknown> | undefined
+      try {
+        active = await faultClient(peer, {
+          contract: selectedContract,
+          scheduler,
+          restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
+        })
+        expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
+        call = active.feature.request(['unknown-side-effect']).then(
+          (value) => ({ value }),
+          (error) => ({ error })
+        )
+        await vi.waitFor(() =>
+          expect(
+            wireFrames(active!.sent).filter((frame) => frame.method === 'p.f.request')
+          ).toHaveLength(1)
+        )
+        process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
+        await active.handles[0]!.exited
+        await vi.waitFor(() =>
+          expect(active!.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+        )
+        scheduler.advance(1)
+        await vi.waitFor(() =>
+          expect(active!.resilience.inspect('p')).toMatchObject({ state: 'ready' })
+        )
+        expect(await call).toMatchObject({
+          error: { source: '@migaia/rpc/remote', code: 'REMOTE_RESULT_UNKNOWN' }
+        })
+        const requests = wireFrames(active.sent).filter(
+          (frame) => frame.kind === 'request' && frame.method === 'p.f.request'
+        )
+        expect(requests).toHaveLength(1)
+        expect(requests[0].data.route).not.toHaveProperty('idempotencyKey')
+        expect(await active.feature.request(['after-unknown'])).toBe('after-unknown')
+      } finally {
+        await active?.close()
+        await call
+        if (active) {
+          await Promise.all(active.handles.map((handle) => handle.exited))
+          receipt(active, `${peer.language}-non-idempotent-crash`)
+        }
+        await rm(directory, { recursive: true, force: true })
+      }
+      expect(active!.budget.inUse).toBe(0)
+      expect(scheduler.pendingCount).toBe(0)
+    }, 15000)
+})
