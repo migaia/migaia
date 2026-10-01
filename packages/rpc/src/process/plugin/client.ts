@@ -56,6 +56,14 @@ function staleDefinition(): never {
 export function createProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle>
 ): IProcessPlugin {
+  return assembleProcessPlugin(options)
+}
+
+/** A prepared candidate transfers borrowed governance only at its canonical installation boundary. */
+function assembleProcessPlugin<THandle extends IProcessHandle>(
+  options: IProcessPluginOptions<THandle>,
+  retirePreviousRegistration?: () => Promise<void> | undefined
+): IProcessPlugin {
   const contract = normalizeRemoteContract(options.contract)
   if (options.name !== contract.plugin) invalidOption('name')
   if (
@@ -148,17 +156,20 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
        * Candidate construction reuses supervision spec validation before touching the caller's
        * pool.
        */
-      const candidate = createProcessPlugin({
-        ...options,
-        deployment: {
-          ...deployment,
-          supervision: {
-            ...deployment.supervision,
-            spec: replacement.spec ?? deployment.supervision.spec,
-            prewarm: undefined
+      const candidate = assembleProcessPlugin(
+        {
+          ...options,
+          deployment: {
+            ...deployment,
+            supervision: {
+              ...deployment.supervision,
+              spec: replacement.spec ?? deployment.supervision.spec,
+              prewarm: undefined
+            }
           }
-        }
-      })
+        },
+        options.resilience ? () => registration?.close() : undefined
+      )
       deployment.supervision.prewarm?.invalidate()
       return options.host
         .replace(options.name, candidate)
@@ -184,6 +195,13 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
       },
       {
         onInstalled: () => {
+          /** Default installation remains synchronous; only a shared-name transfer joins cleanup. */
+          const retiring = retirePreviousRegistration?.()
+          if (retiring)
+            return retiring.then(() => {
+              attachRegistration()
+              installed = true
+            })
           attachRegistration()
           installed = true
         },
