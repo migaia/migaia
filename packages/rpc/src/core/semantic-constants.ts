@@ -22,3 +22,16 @@ export const RpcDebugPhase = { active: 'active', disposed: 'disposed' } as const
 
 /** Legacy message discriminant value used by adapter internals. */
 export type IRpcMessageKind = (typeof RpcMessageKind)[keyof typeof RpcMessageKind]
+
+/** Local admission decisions; these values never become protocol errors or wire fields. */
+export const RpcProviderRejectionReason = {
+  /** Existing global or verified-peer concurrency capacity refused a provider lease. */
+  concurrency: 'concurrency',
+  /** The endpoint's bounded request replay ledger could not retain another identity. */
+  replayLedgerFull: 'replayLedgerFull',
+  /** The previously verified peer binding expired before provider execution. */
+  bindingExpired: 'bindingExpired'
+} as const
+
+/** One canonical local rejection domain, shared by runtime and typed notification consumers. */
+export type RpcProviderRejectionReason = keyof typeof RpcProviderRejectionReason

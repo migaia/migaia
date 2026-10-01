@@ -46,3 +46,6 @@ export {
   type IRpcIdempotencyStore
 } from './idempotency-store.js'
 export * from './middleware/index.js'
+
+export { RpcProviderRejectionReason } from './semantic-constants.js'
+export type { IRpcProviderRejection } from './provider-admission.js'

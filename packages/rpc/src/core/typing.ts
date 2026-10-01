@@ -1,3 +1,4 @@
+import type { IRpcProviderRejection } from './provider-admission.js'
 import type { IRpcError } from './errors.js'
 import type { IRpcTransport } from './transport.js'
 import type { IRpcFeature } from './feature.js'
@@ -27,6 +28,12 @@ export type IRpcProvider = (
 export type IRpcProviderLimits = {
   readonly maxGlobal?: number
   readonly maxPerPeer?: number
+  /**
+   * Notify the local connection owner of a refused provider execution. The provider is not invoked;
+   * observer failures are reported through endpoint hooks without replacing the existing OVERLOADED
+   * result. No wire data is inspected.
+   */
+  readonly onRejected?: (rejection: IRpcProviderRejection) => void | Promise<void>
 }
 export type IRpcEventListener = (context: IRpcContext) => void | Promise<void>
 export type ISendOptions = {

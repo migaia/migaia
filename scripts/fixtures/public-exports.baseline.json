@@ -453,6 +453,7 @@
         "RpcOperation",
         "RpcPlatform",
         "RpcProtocolError",
+        "RpcProviderRejectionReason",
         "RpcRemoteError",
         "RpcSchemaValidationError",
         "RpcSerializationError",
