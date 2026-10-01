@@ -39,9 +39,11 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
   }
 
   /** Runs one installed registration's captured hook before any lease or publication is retired. */
-  async runBeforeRelease(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]> {
+  runBeforeRelease(
+    registration: IRegistration<TDomainCore, TValue>
+  ): Promise<unknown[]> | undefined {
     const hook = registration.plugin.beforeRelease
-    if (!registration.installed || !hook || registration.beforeReleaseRan) return []
+    if (!registration.installed || !hook || registration.beforeReleaseRan) return undefined
     registration.beforeReleaseRan = true
     /** Absolute boundary in the same clock that drives the bounded disposal step. */
     const deadlineAt =
@@ -56,16 +58,16 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     })
     this.#port.setHookRegistration(registration)
     this.#port.setReleasePending(registration)
-    try {
-      return await this.#port.cleanupRuntime.disposeGroup(
+    return this.#port.cleanupRuntime
+      .disposeGroup(
         [() => invokeCaptured(hook, registration.plugin.owner, [context])],
         ERROR_TEXT.BEFORE_RELEASE_PHASE
       )
-    } finally {
-      // The bounded group returns on timeout even when its hook Promise never settles.
-      this.#port.clearHookRegistrationIfOwner(registration)
-      this.#port.clearReleasePendingIfOwner(registration)
-    }
+      .finally(() => {
+        // The bounded group returns on timeout even when its hook Promise never settles.
+        this.#port.clearHookRegistrationIfOwner(registration)
+        this.#port.clearReleasePendingIfOwner(registration)
+      })
   }
 
   /** Removes a registration from every committed registry without invoking user code. */

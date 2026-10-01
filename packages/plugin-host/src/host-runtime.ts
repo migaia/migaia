@@ -414,6 +414,7 @@ export class PluginHost<
         this.#installRuntime.installBatch(entries, publish, prepareBatch),
       publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
       drainLeases: (registration) => this.#drainRegistrationLeases(registration),
+      runBeforeRelease: (registration) => this.#removalRuntime.runBeforeRelease(registration),
       disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
       activate: (registration) => this.#installRuntime.activate(registration),
       disable: (registration) => {
@@ -432,6 +433,7 @@ export class PluginHost<
     this.#resumeRuntime = new PluginHostResumeRuntime({
       state: this.#state,
       drainLeases: (registration) => this.#drainRegistrationLeases(registration),
+      runBeforeRelease: (registration) => this.#removalRuntime.runBeforeRelease(registration),
       disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
       installBatch: (entries) => this.#installRuntime.installBatch(entries),
       activate: (registration) => this.#installRuntime.activate(registration),
@@ -504,6 +506,7 @@ export class PluginHost<
           return [...this.#state.registrations.values()].reverse()
         }
       },
+      runBeforeRelease: (registration) => this.#removalRuntime.runBeforeRelease(registration),
       disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
       clearPipelineState: () => {
         this.#state.lanes.clear()
@@ -1070,7 +1073,8 @@ export class PluginHost<
               continue
             }
             if (step.action !== DependencyAction.release) continue
-            cleanupErrors.push(...(await this.#removalRuntime.runBeforeRelease(registration)))
+            const beforeRelease = this.#removalRuntime.runBeforeRelease(registration)
+            if (beforeRelease) cleanupErrors.push(...(await beforeRelease))
             await this.#drainRegistrationLeases(registration)
             cleanupErrors.push(...(await this.#removalRuntime.disposeRegistration(registration)))
             this.#enablementRuntime.forget(step.id)

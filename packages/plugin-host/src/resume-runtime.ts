@@ -15,6 +15,8 @@ import type { IPluginHostDiagnostic } from './typing.js'
 type IPluginHostResumeRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly state: PluginHostState<TDomainCore, TValue>
   drainLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void>
+  /** Runs the captured hook before a suspended generation is restarted. */
+  runBeforeRelease(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]> | undefined
   disposeRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]>
   installBatch(entries: readonly IInstallEntry<TDomainCore, TValue>[]): Promise<{
     readonly installed: readonly IRegistration<TDomainCore, TValue>[]
@@ -124,6 +126,8 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
       .map((name) => this.#port.state.registrations.get(name))
       .filter((registration): registration is IRegistration<TDomainCore, TValue> => !!registration)
     for (const registration of [...restarting].reverse()) {
+      const beforeRelease = this.#port.runBeforeRelease(registration)
+      if (beforeRelease) cleanupErrors.push(...(await beforeRelease))
       await this.#port.drainLeases(registration)
       cleanupErrors.push(...(await this.#port.disposeRegistration(registration)))
     }
