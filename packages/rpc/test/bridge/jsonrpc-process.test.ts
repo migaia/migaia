@@ -203,6 +203,107 @@ describe('JSON-RPC real process carriers', () => {
   )
 
   it.skipIf(process.platform === 'win32')(
+    '[I15 A8/M2] forwards a wrong connect token through plugin establish without disturbing the borrowed peer',
+    async () => {
+      /** The independently owned listener retains a second authenticated connection. */
+      const address = join(tmpdir(), `ja-${randomUUID().slice(0, 8)}.sock`)
+      /** Private fd authentication leaves the RPC socket and child argv free of credentials. */
+      const child = spawn(process.execPath, [childPath, address], {
+        env: {},
+        stdio: ['ignore', 'pipe', 'pipe', 'pipe']
+      })
+      /** Attach exit observation before any possible failure can close the child. */
+      const exited = once(child, 'close')
+      ;(child.stdio[3] as Writable).end(token)
+      await once(child.stdout!, 'data')
+      /** The ordinary PluginHost must not publish an unauthenticated feature. */
+      const host = new PluginHost<Record<string, never>>({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
+      /** Physical frames prove authentication rejection occurs before business. */
+      const writes: Array<{ method: string; params: { hello?: string } }> = []
+      /** The factory cannot run before authenticated bridge readiness. */
+      let endpoints = 0
+      /** A healthy connection proves failed installation does not own the external process. */
+      const second = await createJsonRpcRemoteChannel({
+        ...bridgeFixture().options,
+        byte: await dialProcessByteChannel({ address }),
+        scheduler: systemScheduler,
+        token
+      })
+      /** Real core requests run through the independent connection's negotiated pipeline. */
+      const endpoint = await bridgeEndpoint(second)
+      try {
+        /** The bad token is passed by the deployment context rather than captured in establish. */
+        const plugin = createProcessPlugin({
+          name: 'p',
+          contract: BRIDGE_CONTRACT,
+          registrationOwner: { name: 'p', host },
+          host: host.plugin,
+          report: () => undefined,
+          deployment: {
+            kind: 'connect',
+            address,
+            token: 'wrong-credential',
+            dial: async (path, signal) => {
+              /** The borrowed byte stream is observed without changing carrier behavior. */
+              const raw = await dialProcessByteChannel({
+                address: path,
+                signal: signal as AbortSignal
+              })
+              return {
+                ...raw,
+                write(chunk) {
+                  writes.push(JSON.parse(Buffer.from(chunk).toString().split('\r\n\r\n')[1]!))
+                  return raw.write(chunk)
+                }
+              }
+            },
+            establish: establish([], [], []),
+            /** Connect wire omission remains K231; this caller supplies explicit transport health. */
+            supervision: { restart: { maxRestarts: 0 }, health: { check: async () => undefined } }
+          },
+          endpointFactory: async (channel) => {
+            endpoints++
+            return { endpoint: await bridgeEndpoint(channel) }
+          }
+        })
+        /** Retain the original authentication failure through all existing installation wrappers. */
+        const failure = await host.use(plugin).catch((error: unknown) => error)
+        expect(failure).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
+        /** A bounded cause traversal checks authentication identity without assuming wrapper count. */
+        const chain: unknown[] = []
+        /** Original causes remain reachable rather than being replaced by facade text. */
+        let current: unknown = failure
+        for (let depth = 0; depth < 8 && current && typeof current === 'object'; depth++) {
+          chain.push(current)
+          current = (current as { cause?: unknown }).cause
+        }
+        expect(chain).toContainEqual(
+          expect.objectContaining({
+            code: 'HANDSHAKE_REJECTED',
+            cause: expect.objectContaining({ code: 'AUTH_DENIED' })
+          })
+        )
+        expect(endpoints).toBe(0)
+        expect(writes).toHaveLength(1)
+        expect(writes[0]!.method).toBe('migaia.hello')
+        expect(JSON.parse(writes[0]!.params.hello!).auth).toBe('wrong-credential')
+        expect(child.exitCode).toBeNull()
+        expect(
+          await endpoint.send('peer', 'p.f.request', ['unaffected'], { timeoutMs: 1000 })
+        ).toMatchObject({ args: ['unaffected'] })
+      } finally {
+        await host.dispose()
+        await endpoint.dispose()
+        await second.close()
+        child.kill('SIGTERM')
+        await exited
+      }
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
     '[A8] borrows a Unix socket process and preserves its second connection',
     async () => {
       const address = join(tmpdir(), `jc-${randomUUID().slice(0, 8)}.sock`)
