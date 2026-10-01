@@ -18,6 +18,68 @@ import type { IIpcLogRecord } from '../../src/core/plugins/flow-control.js'
 const fixture = resolve(fileURLToPath(new URL('.', import.meta.url)), 'fixtures/node-child.mjs')
 
 describe('Node process launcher', () => {
+  it.skipIf(process.platform === 'win32')(
+    '[N3] force termination reaches a child process group',
+    async () => {
+      /** The grandchild inherits the launched child's POSIX process group. */
+      const childCode =
+        "const {spawn}=require('node:child_process'); const grand=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'}); process.stderr.write('GPID='+grand.pid+'\\n'); setInterval(()=>{},1000)"
+      let stderr = ''
+      let resolveGrandchild: (pid: number) => void = () => undefined
+      const grandchildReady = new Promise<number>((resolve) => {
+        resolveGrandchild = resolve
+      })
+      const handle = await createNodeProcessLauncher().launch(
+        {
+          command: process.execPath,
+          args: ['-e', childCode],
+          env: { inherit: [], set: {} },
+          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
+        },
+        {
+          signal: new AbortController().signal,
+          output(stream, chunk) {
+            if (stream !== 'stderr') return
+            stderr += new TextDecoder().decode(chunk)
+            const pid = /GPID=(\d+)/.exec(stderr)?.[1]
+            if (pid) resolveGrandchild(Number(pid))
+          }
+        }
+      )
+      let grandchildPid: number | undefined
+      /** A bounded wait also keeps a broken child fixture from hanging the suite. */
+      const deadline = setTimeout(() => resolveGrandchild(0), 2_000)
+      try {
+        grandchildPid = await grandchildReady
+        expect(grandchildPid).toBeGreaterThan(0)
+        handle.terminate('force')
+        await handle.exited
+        /** Process exit propagation is asynchronous on the host OS. */
+        let alive = true
+        for (let attempt = 0; attempt < 25 && alive; attempt += 1) {
+          try {
+            process.kill(grandchildPid, 0)
+            await new Promise<void>((resolve) => setTimeout(resolve, 20))
+          } catch {
+            alive = false
+          }
+        }
+        expect(alive).toBe(false)
+      } finally {
+        clearTimeout(deadline)
+        handle.terminate('force')
+        await handle.exited
+        if (grandchildPid) {
+          try {
+            process.kill(grandchildPid, 'SIGKILL')
+          } catch {
+            // The expected group termination has already reaped this process.
+          }
+        }
+      }
+    }
+  )
+
   it('[A7] drains stderr before bootstrap and keeps secrets out of IPC records', async () => {
     const launcher = createNodeProcessLauncher()
     expect(launcher.capabilities[ProcessCapability.bootstrapStdin]).toBe('enforced')

@@ -212,6 +212,16 @@ describe('process channel boundary', () => {
     await wire.close()
   })
 
+  it('[C2] rejects malformed UTF-8 before admitting a handshake', async () => {
+    const port = createBytePort()
+    const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
+    const handshake = wire.readHandshakeFrame()
+    port.emitBytes(encodeRpcStreamFrame(Uint8Array.of(0xff)))
+    await expect(handshake).rejects.toMatchObject({ code: 'HANDSHAKE_INVALID' })
+    expect(wire.closed).toBe(true)
+    await wire.close()
+  })
+
   it('[A2/A6] installs one IPC composition and redacts each stderr record', async () => {
     /** The physical transport is closed through the single gate wrapper. */
     let physicalCloses = 0
