@@ -130,7 +130,7 @@ import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'
 | API                                     | 参数                                                               | 返回                                                    | 作用                                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | `host.use(...plugins)`                  | 至少 1 个插件定义                                                  | `Promise<PluginHandle[]>`                               | 按 Feature 依赖拓扑安装；返回与输入同序的名称句柄。                                   |
-| `host.unUse(name)`                      | `name: string`                                                     | `Promise<IPluginRemoval>`                               | 依赖安全地卸载插件及其 extension/stage/资源。                                         |
+| `host.unUse(name)`                      | `name: string`；`dryRun: true` 可选                                  | 执行时 `Promise<IPluginRemoval>`；dry run 时 `Promise<IPluginDependencyPlan>` | 依赖安全地卸载插件；执行结果的冻结 `affected` 只含实际生效步骤。 |
 | `host.dispose()`                        | 无                                                                 | `Promise<void>`                                         | 卸载全部插件并永久关闭宿主；重复调用复用同一 Promise。                                |
 | `host.config.get(path)`                 | `path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`        | `unknown \| undefined`                                  | 同步读取；对象/数组返回 Readonly 懒代理；未知插件或路径返回 `undefined`。见下方说明。 |
 | `host.config.update(name, recipe)`      | `name: string`；`recipe(previous) => Partial<patch>`（须同步返回） | `Promise<void>`                                         | Copy-on-Write 合并 patch，跑 `plugin.update(next, core)` 成功才提交。                 |
@@ -183,7 +183,9 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 
 领域 core（`createPluginDomainCore()` 的返回值）不能定义与上表同名的字段（`config`/`onDispose`/`usePipeline`/`useAsyncPipeline`/`useGeneratorPipeline`/`useAsyncGeneratorPipeline` 是保留键），且必须是普通对象、字段都是可枚举 data property，否则构造时抛 `TypeError`。
 
-`useSync`（构造函数期）安装的插件允许注册 async disposer；Host 同步撤销可见状态并发布冻结的 `PLUGIN_INSTALL_FAILED.detail` 快照，随后通过 `detail.completion` 提供包含完整 rollback identities 的冻结结果。需要完整 secondary identity 的错误转换必须 await completion。**不要把 `use`/`unUse`/`config.update`/`dispose` 暴露给插件 core，插件生命周期钩子（包括 setup）内也不能调用当前 Host 的这些方法**——会同步抛 `LIFECYCLE_MUTATION`。setup 等待期间外部发起的 Host mutation 与 `config.update` 同样同步抛该码。
+`useSync`（构造函数期）安装的插件允许注册 async disposer；Host 同步撤销可见状态并发布冻结的 `PLUGIN_INSTALL_FAILED.detail` 快照，随后通过 `detail.completion` 提供包含完整 rollback identities 的冻结结果。需要完整 secondary identity 的错误转换必须 await completion。**不要把 `use`/`unUse`/`config.update`/`dispose` 暴露给插件 core，插件生命周期钩子（包括 setup、beforeRelease）内也不能调用当前 Host 的这些方法**——会同步抛 `LIFECYCLE_MUTATION`；终态已开始时抛 `HOST_DISPOSING`。setup 或 beforeRelease 等待期间外部发起的 Host mutation 与 `config.update` 同样同步抛 `LIFECYCLE_MUTATION`。
+
+插件可选声明 `beforeRelease(context)`：Host 在释放已安装的该代注册之前调用一次，钩子期间该注册仍可服务已有调用；结束后才排空租约并执行 `dispose` 和资源清理。`context.signal` 是该代生命周期信号，`deadlineAt` 与 `remainingMs()` 使用 Host 的调度器及 `disposeStepTimeoutMs`；禁用、挂起或未激活惰性注册本身不触发释放。钩子失败或超时作为清理错误收集，已提交的卸载仍继续。迁移 BC1：`unUse` 的真实执行结果两种分支均带冻结 `affected: { policy, order, steps, edges }`；`dryRun: true` 返回计划且无 `ok`，旧读者若对 `{ok:true}` 做严格相等，应改为检查 `ok` 并读取 `affected`。迁移 BC2：TypeScript 读者用字面量 `dryRun: true` 选择计划重载，省略或传 `false` 选择执行重载；宽 `boolean` 先按值分支。迁移 BC3：旧定义里的非函数 `beforeRelease` 现在准入时抛 `INVALID_OPTION`。
 
 ### 安装前的异步 setup
 
