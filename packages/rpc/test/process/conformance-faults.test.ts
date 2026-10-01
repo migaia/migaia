@@ -26,7 +26,8 @@ import {
   evidence,
   contract,
   bridgeContract,
-  deployment
+  deployment,
+  wireFrames
 } from './fixtures/conformance-business.js'
 
 /** Only the five admitted real executables participate; Node and Bun are separate TS runtimes. */
@@ -345,4 +346,60 @@ describe('[A5] real native business budget and independent session', () => {
       expect(healthy.budget.inUse).toBe(0)
       expect(healthy.budget.pending).toBe(0)
     }, 30000)
+})
+
+describe('[A4] real owned terminal guards', () => {
+  for (const peer of peers)
+    for (const host of [false, true])
+      it(`${peer.language} Host=${host} crash terminal rejects all new calls with zero frames`, async () => {
+        /** Logical timers remain deterministic while the peer exits through the actual OS. */
+        const scheduler = createManualScheduler()
+        const active = await faultClient(peer, {
+          host,
+          scheduler,
+          restart: { mode: 'on-failure', maxRestarts: 0 }
+        })
+        try {
+          const current = active.handles[0]!
+          process.kill(current.identity.pid!, 'SIGKILL')
+          await current.exited
+          await vi.waitFor(() =>
+            expect(
+              host ? active.facade!.inspectRegistration() : active.resilience.inspect('p')
+            ).toMatchObject({ state: 'terminal' })
+          )
+          const writes = active.sent.length
+          for (const method of ['request', 'oneWay'] as const)
+            await expect(active.feature[method]([])).rejects.toMatchObject({
+              source: '@migaia/rpc/process',
+              code: 'PROCESS_TERMINAL_CALL'
+            })
+          await expect(
+            active.feature.generator([])[Symbol.asyncIterator]().next()
+          ).rejects.toMatchObject({ source: '@migaia/rpc/process', code: 'PROCESS_TERMINAL_CALL' })
+          if (active.facade) {
+            await expect(active.facade.use('p')).rejects.toMatchObject({
+              source: '@migaia/rpc/process',
+              code: 'PROCESS_TERMINAL_CALL'
+            })
+            await expect(active.facade.inspect()).rejects.toMatchObject({
+              source: '@migaia/rpc/process',
+              code: 'PROCESS_TERMINAL_CALL'
+            })
+          }
+          expect(active.sent).toHaveLength(writes)
+          expect(active.handles).toHaveLength(1)
+          expect(
+            wireFrames(active.sent).filter((frame) => frame.kind === 'request').length
+          ).toBeGreaterThan(0)
+        } finally {
+          await active.close()
+          await Promise.all(active.handles.map((handle) => handle.exited))
+          receipt(active, `${peer.language}-terminal-${host}`)
+        }
+        expect(active.budget.inUse).toBe(0)
+        expect(active.budget.pending).toBe(0)
+        expect(scheduler.pendingCount).toBe(0)
+        expect(active.resilience.inspect('p')).toBeUndefined()
+      }, 15000)
 })
