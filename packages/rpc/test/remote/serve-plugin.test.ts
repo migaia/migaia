@@ -2,6 +2,7 @@ import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createComposedEndpoint } from '../../src/core/composed.js'
+import type { IRpcStreamRuntime } from '../../src/core/features/stream.js'
 import { abort } from '../../src/core/middleware/abort.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import type { IRpcContext, IRpcEndpoint } from '../../src/core/typing.js'
@@ -119,6 +120,7 @@ describe('remote service plugin', () => {
     let streamContext: IRpcContext | undefined
     let requestHookContext: IRpcContext | undefined
     let streamHookContext: IRpcContext | undefined
+    let streamProviderContext: IRpcContext | undefined
     let hookCalls = 0
     let requestCalls = 0
     const hookError = createRemoteLayerError(
@@ -156,10 +158,20 @@ describe('remote service plugin', () => {
       }
     }
     await host.use(target)
+    /** Capture the exact context core passes into the registered stream runner. */
+    const streamRuntime: IRpcStreamRuntime = {
+      open: (...args) => server.stream.open(...args),
+      provide: (method, run) =>
+        server.stream.provide(method, (params, input) => {
+          streamProviderContext = input.context
+          return run(params, input)
+        }),
+      dispose: () => server.stream.dispose()
+    }
     const service = await serveRemotePlugin({
       host,
       contract,
-      endpoint: { endpoint: server as unknown as IRpcEndpoint, stream: server.stream },
+      endpoint: { endpoint: server as unknown as IRpcEndpoint, stream: streamRuntime },
       report: (error) => {
         throw error
       },
@@ -200,6 +212,7 @@ describe('remote service plugin', () => {
       expect(streamContext?.data).toEqual(['stream'])
       expect(streamContext).not.toBe(requestContext)
       expect(streamHookContext).toBe(streamContext)
+      expect(streamHookContext).toBe(streamProviderContext)
       expect(requestHookContext).toBe(requestContext)
       expect(typeof streamContext?.dispatchTo).toBe('function')
       await expect(registration.invokeRequest('p.f.request', ['reject'])).rejects.toMatchObject({
