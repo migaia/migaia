@@ -6,6 +6,11 @@ import { createRemoteLayerError } from './error.js'
 import { createRemoteGenerationHolder, createRemoteRegistration } from './proxy.js'
 import type { IRemotePluginHostPort, IRemoteProxyOptions } from './types.js'
 
+/** A healthy replacement gets three bounded enable attempts before reporting. */
+const MAX_ENABLE_ATTEMPTS = 3
+/** Each failed enable doubles this initial scheduler delay. */
+const ENABLE_RETRY_BASE_MS = 10
+
 /** Plugin mode binds one declared contract to one PluginHost registration. */
 export type IRemotePluginOptions<TUnit, TSpec> = IRemoteProxyOptions<TUnit, TSpec> &
   Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort }>
@@ -55,30 +60,56 @@ export function createRemotePlugin<TUnit, TSpec>(
       let suspended = false
       let running = false
       let pending = false
+      /** Failed enable attempts belong to the currently prepared generation. */
+      let enableAttempts = 0
+      /** A scheduled retry is cancelled on success or registration disposal. */
+      let retryTask: { cancel(): void } | undefined
       const reconcile = async (): Promise<void> => {
         if (!subscribed || context.lifecycle.signal.aborted) return
-        if (registration.events.current().active) return
-        if (!suspended) {
+        if (registration.events.current().active && retryTask) return
+        if (!registration.events.current().active) {
+          retryTask?.cancel()
+          retryTask = undefined
+          if (!suspended) {
+            try {
+              await options.host.disable(options.name, { policy: 'suspend' })
+              if (!subscribed || context.lifecycle.signal.aborted) return
+              suspended = true
+            } catch (error) {
+              options.report(error)
+              return
+            }
+          }
+          if (options.binding.supervisor.state !== 'ready') return
           try {
-            await options.host.disable(options.name, { policy: 'suspend' })
-            suspended = true
-          } catch (error) {
-            options.report(error)
-            return
+            await holder.prepareRebind(context.lifecycle.signal)
+            if (!subscribed || context.lifecycle.signal.aborted) return
+            enableAttempts = 0
+          } catch {
+            return // The holder reports a failed replacement and keeps the proxy revoked.
           }
         }
-        if (options.binding.supervisor.state !== 'ready') return
-        try {
-          await holder.prepareRebind(context.lifecycle.signal)
-        } catch {
-          return // The holder reports a failed replacement and keeps the proxy revoked.
-        }
+        if (!suspended || enableAttempts >= MAX_ENABLE_ATTEMPTS) return
         try {
           await options.host.enable(options.name)
           suspended = false
+          enableAttempts = 0
+          retryTask?.cancel()
+          retryTask = undefined
         } catch (error) {
-          registration.revoke(error)
-          options.report(error)
+          enableAttempts += 1
+          if (enableAttempts >= MAX_ENABLE_ATTEMPTS) {
+            options.report(error)
+            return
+          }
+          retryTask?.cancel()
+          retryTask = options.binding.scheduler.schedule(
+            () => {
+              retryTask = undefined
+              schedule()
+            },
+            ENABLE_RETRY_BASE_MS * 2 ** (enableAttempts - 1)
+          )
         }
       }
       /** Coalesces concurrent supervisor observations without a second lifecycle queue. */
@@ -105,6 +136,7 @@ export function createRemotePlugin<TUnit, TSpec>(
       })
       context.onDispose(() => {
         subscribed = false
+        retryTask?.cancel()
         unsubscribe()
       })
       return holder

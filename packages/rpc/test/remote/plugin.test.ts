@@ -141,4 +141,67 @@ describe('remote PluginHost assembly', () => {
       await host.dispose()
     }
   })
+
+  it('keeps a healthy replacement bound while retrying a failed enable', async () => {
+    const fixture = remoteHarness()
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const report = vi.fn()
+    let enables = 0
+    let failAlways = false
+    const remote = createRemotePlugin({
+      name: 'p',
+      contract: REMOTE_FIXTURE_CONTRACT,
+      binding: fixture.binding,
+      endpointFactory: async () => fixture.served,
+      host: {
+        disable: (name, options) => host.plugin.disable(name, options),
+        enable: async (name) => {
+          enables += 1
+          if (failAlways || enables < 3) throw new Error('busy enable')
+          await host.plugin.enable(name)
+        }
+      },
+      report
+    })
+    const [handle] = await host.use(remote)
+    const request = (handle.getFeature('f') as { request(params: unknown[]): Promise<unknown> })
+      .request
+    try {
+      fixture.emit({ type: 'exit', generation: 1, reason: 'crashed' })
+      fixture.nextGeneration()
+      fixture.emit({ type: 'state', from: 'backoff', to: 'ready', generation: 2 })
+      /** The scheduler, not elapsed wall time, drives each enable retry. */
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      expect(enables).toBe(1)
+      await expect(request([])).resolves.toBe('result')
+      const scheduler = fixture.binding.scheduler as { advance(ms: number): void }
+      scheduler.advance(10)
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      expect(enables).toBe(2)
+      scheduler.advance(20)
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      expect(enables).toBe(3)
+      expect(host.plugin.disabled()).not.toContain('p')
+      expect(report).not.toHaveBeenCalled()
+      failAlways = true
+      fixture.emit({ type: 'exit', generation: 2, reason: 'crashed' })
+      fixture.nextGeneration()
+      fixture.emit({ type: 'state', from: 'backoff', to: 'ready', generation: 3 })
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      scheduler.advance(10)
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      scheduler.advance(20)
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      expect(enables).toBe(6)
+      expect(report).toHaveBeenCalledTimes(1)
+      await expect(request([])).resolves.toBe('result')
+      scheduler.advance(1000)
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      expect(enables).toBe(6)
+    } finally {
+      await host.dispose()
+    }
+  })
 })
