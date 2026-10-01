@@ -49,7 +49,7 @@ describe('host identity', () => {
     const [handle] = await host.use(plugin)
     expect(handle.config.get()).toEqual({ enabled: true })
     const removal = await host.unUse('plain')
-    expect(removal).toEqual({ ok: true })
+    expect(removal).toMatchObject({ ok: true })
     await host.dispose()
   })
 

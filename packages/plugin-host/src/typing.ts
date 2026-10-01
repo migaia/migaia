@@ -72,6 +72,13 @@ export type IPluginDisposalContext = Readonly<{
   readonly deadlineAt: number | undefined
 }>
 
+/** Gives a pre-release hook the Host clock's remaining relative cleanup budget. */
+export type IPluginBeforeReleaseContext = Readonly<
+  IPluginDisposalContext & {
+    remainingMs(): number | undefined
+  }
+>
+
 /** Plugin-facing config capability; TConfig is fixed by the plugin declaration. */
 export type IPluginLifecycleCore<TConfig extends IPluginConfig = IPluginConfig> = {
   readonly config: IPluginLifecycleConfig<TConfig>
@@ -151,6 +158,8 @@ export type IPluginCommon<
     outputs: Readonly<Record<string, object>>
   ) => IPluginAwaitable<void>
   dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
+  /** Runs while an installed registration still owns its leases and lifecycle signal. */
+  beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
 }
@@ -265,6 +274,8 @@ export type IPluginConstraint<
     outputs: Readonly<Record<string, object>>
   ) => IPluginAwaitable<void>
   dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
+  /** Captured before the registration enters its bounded release step. */
+  beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
 } & (
@@ -340,8 +351,12 @@ export type IPluginHandleTuple<TPlugins extends readonly IPluginConstraint<any>[
 
 /** Structured logical removal result; cleanup failures remain observable. */
 export type IPluginRemoval =
-  | Readonly<{ readonly ok: true }>
-  | Readonly<{ readonly ok: false; readonly errors: readonly unknown[] }>
+  | Readonly<{ readonly ok: true; readonly affected: IPluginDependencyPlan }>
+  | Readonly<{
+      readonly ok: false
+      readonly errors: readonly unknown[]
+      readonly affected: IPluginDependencyPlan
+    }>
 
 /**
  * Host diagnostic outlet. `message` stays the human-readable line; `error`, when present, is the

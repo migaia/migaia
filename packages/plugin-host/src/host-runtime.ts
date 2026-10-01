@@ -87,6 +87,7 @@ import {
   admitDependencyMutationOptions,
   PluginInactiveProviderPolicy,
   toPluginPlan,
+  projectAffected,
   validateInstallBatch
 } from './dependency-runtime.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
@@ -1041,11 +1042,13 @@ export class PluginHost<
         )
       if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
       const cleanupErrors: unknown[] = []
+      /** Names whose planned removal or suspension actually changed this Host. */
+      const applied: string[] = []
       for (const step of plan.steps) {
         const registration = this.#state.registrations.get(step.id)
         if (!registration) continue
         if (step.action === DependencyAction.suspend) {
-          this.#enablementRuntime.suspend(registration)
+          if (this.#enablementRuntime.suspend(registration)) applied.push(step.id)
           continue
         }
         if (step.action !== DependencyAction.release) continue
@@ -1053,11 +1056,13 @@ export class PluginHost<
         cleanupErrors.push(...(await this.#removalRuntime.disposeRegistration(registration)))
         this.#enablementRuntime.forget(step.id)
         this.#state.removedNames.add(step.id)
+        applied.push(step.id)
       }
       this.#state.commit()
+      const affected = projectAffected(plan, applied, admitted.policy)
       return cleanupErrors.length === 0
-        ? Object.freeze({ ok: true as const })
-        : Object.freeze({ ok: false as const, errors: Object.freeze(cleanupErrors) })
+        ? Object.freeze({ ok: true as const, affected })
+        : Object.freeze({ ok: false as const, errors: Object.freeze(cleanupErrors), affected })
     })
   }
 

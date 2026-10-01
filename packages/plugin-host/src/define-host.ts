@@ -97,8 +97,12 @@ export type IHostHandle<
   ): Promise<IPluginHandleTuple<TPlugins>>
   unUse(
     name: string,
-    options?: IPluginDependencyMutationOptions
-  ): Promise<IPluginRemoval | IPluginDependencyPlan>
+    options: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
+  ): Promise<IPluginDependencyPlan>
+  unUse(
+    name: string,
+    options?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
+  ): Promise<IPluginRemoval>
   activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>>
   replace<TPlugin extends IPluginConstraint<any>>(
     name: string,
@@ -160,6 +164,23 @@ export function defineHost<TDomainCore extends object = Record<string, never>, T
     }
   }
   const runtime = new Runtime(options.host, readDefinedPluginDefinition)
+  /** Routes each literal dry-run form to the matching class overload. */
+  function unUse(
+    name: string,
+    mutationOptions: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
+  ): Promise<IPluginDependencyPlan>
+  function unUse(
+    name: string,
+    mutationOptions?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
+  ): Promise<IPluginRemoval>
+  function unUse(
+    name: string,
+    mutationOptions?: IPluginDependencyMutationOptions
+  ): Promise<IPluginRemoval | IPluginDependencyPlan> {
+    return mutationOptions?.dryRun === true
+      ? runtime.unUse(name, { ...mutationOptions, dryRun: true })
+      : runtime.unUse(name, { ...mutationOptions, dryRun: false })
+  }
   /** Memoized disposal chain, so the middleware and the runtime each run exactly once. */
   let disposal: Promise<IPluginHostDisposalResult> | undefined
   const handleSurface = {
@@ -178,10 +199,7 @@ export function defineHost<TDomainCore extends object = Record<string, never>, T
     useSync: (...plugins: readonly IPluginConstraint<any>[]) => runtime.useSyncPublic(plugins),
     use: (...plugins: readonly IPluginConstraint<any>[]) =>
       runtime.use(...(plugins as [IPluginConstraint<any>])),
-    unUse: (name: string, mutationOptions?: IPluginDependencyMutationOptions) =>
-      mutationOptions?.dryRun === true
-        ? runtime.unUse(name, { ...mutationOptions, dryRun: true })
-        : runtime.unUse(name, { ...mutationOptions, dryRun: false }),
+    unUse,
     activate: (name: string) => runtime.activate(name),
     replace: (name: string, next: IPluginConstraint<any>) => runtime.replace(name, next),
     usePipeline: (stage: ISyncMiddlewareStage<TValue>) => {

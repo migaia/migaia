@@ -14,8 +14,8 @@ describe('plugin handles', () => {
 
     expect(handles.map((handle) => handle.name)).toEqual(['a', 'b'])
     expect(handles[0].extensions.a()).toBe('a')
-    expect(await host.unUse('a')).toEqual({ ok: true })
-    expect(await host.unUse('b')).toEqual({ ok: true })
+    expect(await host.unUse('a')).toMatchObject({ ok: true })
+    expect(await host.unUse('b')).toMatchObject({ ok: true })
   })
 
   it('enforces per-registration liveness', async () => {

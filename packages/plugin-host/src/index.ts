@@ -83,6 +83,7 @@ export type {
   IPluginOperationContext,
   IPluginRegistrationContext,
   IPluginDisposalContext,
+  IPluginBeforeReleaseContext,
   IPluginSetup,
   IPluginSetupContext,
   IPluginSetupOperation,

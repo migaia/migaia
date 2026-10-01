@@ -218,6 +218,42 @@ export const toPluginPlan = (
     edges: plan.edges
   }) as IPluginDependencyPlan
 
+/** Projects only the steps applied by this removal transaction, not an earlier dry run. */
+export const projectAffected = (
+  plan: IDependencyPlan,
+  applied: readonly string[],
+  policy: DependencyPolicy
+): IPluginDependencyPlan => {
+  const names = new Set(applied)
+  /** Tracks projected names so a repeated planner entry cannot duplicate an affected step. */
+  const seenOrder = new Set<string>()
+  const seenSteps = new Set<string>()
+  return Object.freeze({
+    policy,
+    order: Object.freeze(
+      plan.order.filter((name) => {
+        if (!names.has(name) || seenOrder.has(name)) return false
+        seenOrder.add(name)
+        return true
+      })
+    ),
+    steps: Object.freeze(
+      plan.steps
+        .filter((step) => {
+          if (!names.has(step.id) || seenSteps.has(step.id)) return false
+          seenSteps.add(step.id)
+          return true
+        })
+        .map((step) => Object.freeze({ name: step.id, action: step.action }))
+    ),
+    edges: Object.freeze(
+      plan.edges
+        .filter((edge) => names.has(edge.consumer) || names.has(edge.provider))
+        .map((edge) => Object.freeze({ ...edge }))
+    )
+  }) as IPluginDependencyPlan
+}
+
 /**
  * Required providers of `consumer` that are currently unusable, as the first prerequisite error.
  * Used when a dependent is re-enabled: it may not serve while a required provider is disabled.
