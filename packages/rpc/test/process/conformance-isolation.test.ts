@@ -12,7 +12,8 @@ import { encodeRpcStreamFrame } from '@migaia/rpc/contract/framing/stream'
 import {
   createNativeProcessOffer,
   createProcessTransport,
-  createServeProcessHost
+  createServeProcessHost,
+  RpcProcessErrorCode
 } from '@migaia/rpc/process'
 import {
   dialProcessByteChannel,
@@ -27,7 +28,7 @@ import {
   contract
 } from './fixtures/conformance-business.js'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createProcessPlugin } from '@migaia/rpc/process'
 import { endpointFor } from './peers/ts/runtime.js'
 
@@ -39,15 +40,18 @@ function descriptors(pid: number): number {
 }
 
 /** Existing deployment helper provides the authenticated facade while retaining its physical port. */
-async function observedClient(token: string, address: string) {
+async function observedClient(token: string, address: string, scheduler?: IScheduler) {
   /** Production deployment retains encoded outbound bytes for replay injection. */
   const fixture = deployment(fixturePeer, false, token, address)
+  if (fixture.selected.kind !== 'connect')
+    throw new TypeError('isolation observer requires connect deployment')
   /** The canonical establish callback remains the channel owner. */
   const establish = fixture.selected.establish
   /** This observer only exposes the existing physical port for a literal captured-frame replay. */
   let raw: Awaited<ReturnType<typeof dialProcessByteChannel>> | undefined
   const selected = {
     ...fixture.selected,
+    supervision: { ...fixture.selected.supervision, ...(scheduler ? { scheduler } : {}) },
     establish: async (
       channel: Parameters<typeof establish>[0],
       context: Parameters<typeof establish>[1]
@@ -60,6 +64,8 @@ async function observedClient(token: string, address: string) {
   const host = new PluginHost<Record<string, never>>({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
+  /** The timeout oracle uses this exact public endpoint already owned by the installed facade. */
+  let runtime: Awaited<ReturnType<typeof endpointFor>> | undefined
   /** No alternate replay or idempotency implementation participates in this fixture. */
   const definition = createProcessPlugin({
     name: 'p',
@@ -67,7 +73,10 @@ async function observedClient(token: string, address: string) {
     registrationOwner: { name: 'p', host },
     host: host.plugin,
     deployment: selected,
-    endpointFactory: (channel) => endpointFor(channel, 'caller'),
+    endpointFactory: async (channel) => {
+      runtime = await endpointFor(channel, 'caller')
+      return runtime
+    },
     report: (error) => fixture.reports.push(error)
   })
   /** The installed feature is the production proxy, rather than a test provider stand-in. */
@@ -75,6 +84,7 @@ async function observedClient(token: string, address: string) {
   return {
     ...fixture,
     raw: raw!,
+    runtime: runtime!,
     feature: installed!.getFeature('f') as Awaited<ReturnType<typeof client>>['feature'],
     close: async () => {
       await host.dispose()
@@ -98,7 +108,7 @@ type IResult = {
 type IStats = {
   executions: number
   contexts: Array<IResult['session'] & { method: string }>
-  aborts: Array<IResult['session'] & { label: string; code?: string }>
+  aborts: Array<IResult['session'] & { label: string; code?: string; localTimeout: boolean }>
   replacements: number
   revision: number
   pid: number
@@ -619,7 +629,9 @@ describe('[A7] real process session and principal isolation', () => {
       /** One real child contains either one shared Host or one Host per physical connection. */
       const peer = await listener(mode)
       /** Two independently installed facades borrow the same provider PID. */
-      const first = await observedClient(peer.tokens.alice, peer.address)
+      /** Caller timers remain unadvanced; only the actual child's local deadline can fire. */
+      const callerScheduler = createManualScheduler()
+      const first = await observedClient(peer.tokens.alice, peer.address, callerScheduler)
       const other = await observedClient(peer.tokens.bob, peer.address)
       /**
        * These callbacks observe actual remote socket EOF rather than disposal requested by the
@@ -633,17 +645,57 @@ describe('[A7] real process session and principal isolation', () => {
         first,
         other
       ]
+      /**
+       * Finally may release a failed oracle's local waits without changing the deadline
+       * observation.
+       */
+      const controller = new AbortController()
+      /** Core calls use the already-installed channel and avoid proxy retry of completed timeouts. */
+      const pending = Array.from({ length: 3 }, (_, index) =>
+        first.runtime.endpoint
+          .send(fixturePeer.id, 'p.f.request', [['wait', `timeout-${index}`]], {
+            timeoutMs: 30,
+            signal: controller.signal
+          })
+          .then(
+            (value) => value,
+            (error: unknown) => error
+          )
+      )
       try {
-        for (let index = 0; index < 3; index++)
-          await expect(
-            sessions[0]!.feature.request([['wait', `timeout-${index}`]], { timeoutMs: 30 })
-          ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
-        /** Persist provider cancellation evidence before the decisive physical-close assertion. */
-        writeFileSync(
-          join(evidence, `isolation-${mode}-timeouts.receipt.json`),
-          JSON.stringify(await stats(other), null, 2)
-        )
         await vi.waitFor(() => expect(offenderClosed).toHaveBeenCalledTimes(1))
+        /** EOF naturally rejects every core caller before finally performs any cancellation. */
+        const outcomes = await Promise.all(pending)
+        expect(outcomes).toHaveLength(3)
+        expect(outcomes.every((error) => error instanceof Error)).toBe(true)
+        for (const error of outcomes) {
+          expect(error).toMatchObject({
+            source: '@migaia/rpc/process',
+            code: RpcProcessErrorCode.channelClosed
+          })
+        }
+        /** The actual provider proves trusted local timeout instances, not deserialized wire codes. */
+        const receipt = await stats(other)
+        expect(receipt.aborts).toHaveLength(3)
+        expect(
+          receipt.aborts.every((event) => event.localTimeout && event.code === 'DEADLINE_EXCEEDED')
+        ).toBe(true)
+        writeFileSync(
+          join(evidence, `isolation-${mode}-provider-deadlines.receipt.json`),
+          JSON.stringify(
+            {
+              receipt,
+              outcomes: outcomes.map((error) =>
+                serializeRpcError(error, { report: () => undefined })
+              ),
+              callerTime: callerScheduler.now(),
+              callerPending: callerScheduler.pendingCount
+            },
+            null,
+            2
+          )
+        )
+        expect(callerScheduler.now()).toBe(0)
         expect(otherClosed).not.toHaveBeenCalled()
         /** The peer still serves the unaffected session without rebuilding its shared target. */
         const unaffected = (await sessions[1]!.feature.request(['after-timeouts'])) as IResult
@@ -652,6 +704,8 @@ describe('[A7] real process session and principal isolation', () => {
         await sessions[0]!.close()
         expect(unaffected.session.principalId).toBe('bob')
       } finally {
+        controller.abort()
+        await Promise.all(pending)
         await Promise.allSettled(sessions.map((session) => session.close()))
         expect(peer.child.exitCode).toBeNull()
         await peer.close()
