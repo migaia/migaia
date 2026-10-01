@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import math
 import re
@@ -13,7 +14,7 @@ from typing import Any, Callable
 
 sys.dont_write_bytecode = True
 
-from peer import CAPABILITIES, MAX_FRAME, PeerFailure, negotiate, validate_hello
+from peer import CAPABILITIES, MAX_FRAME, PeerFailure, negotiate, validate_hello, read_frame, write_frame
 
 
 VECTOR_ROOT = Path(__file__).resolve().parents[4] / "schema" / "vectors"
@@ -541,23 +542,109 @@ def check_jsonrpc(case: dict[str, Any]) -> None:
     expect(expected["message"], source["message"])
 
 
-def check_framing(results: Results, data: dict[str, Any]) -> None:
-    """Interpret channel byte vectors without accepting zero or oversized frames."""
-    for key, cases in data.items():
-        if not isinstance(cases, list):
-            continue
-        for case in cases:
-            def framing(case: dict[str, Any] = case) -> None:
-                payload = case.get("payload")
-                if isinstance(payload, str):
-                    raw = payload.encode("utf-8")
-                    if case.get("valid") is True:
-                        expect(1 <= len(raw) <= MAX_FRAME, True)
-                elif "length" in case:
-                    expect(1 <= case["length"] <= MAX_FRAME, bool(case.get("valid")))
-                else:
-                    raise AssertionError("unrecognized framing vector")
-            results.check(f"framing/{key}/{case.get('id', '?')}", framing)
+def check_framing(results: Results, data: list[dict[str, Any]]) -> None:
+    """Compare every decoded byte, prefix and first framing failure."""
+    def expand(value: Any) -> bytes:
+        return bytes.fromhex(value) if isinstance(value, str) else bytes.fromhex(value["repeatHex"]) * value["count"]
+    for case in data:
+        def framing(case: dict[str, Any] = case) -> None:
+            chunks = [expand(item) for item in case.get("chunksHex", case.get("chunks", []))]
+            wire = b"".join(chunks)
+            class ChunkReader:
+                """Keep vector chunk boundaries visible to the production peer reader."""
+                def read(self, size: int) -> bytes:
+                    if not chunks:
+                        return b""
+                    value = chunks[0][:size]
+                    chunks[0] = chunks[0][size:]
+                    if not chunks[0]:
+                        chunks.pop(0)
+                    return value
+            actual = []
+            error = None
+            try:
+                reader = ChunkReader()
+                while True:
+                    frame = read_frame(reader)
+                    if frame is None:
+                        break
+                    actual.append(frame)
+            except PeerFailure as failure:
+                consumed = sum(4 + len(frame) for frame in actual)
+                announced = int.from_bytes(wire[consumed:consumed + 4], "big")
+                error = "FRAME_LIMIT_EXCEEDED" if failure.code == "INVALID_FRAME_LENGTH" and announced > MAX_FRAME else "INVALID_FRAME"
+            expect(actual, [expand(item) for item in case.get("framesHex", case.get("frames", []))])
+            expect(error, case.get("error", {}).get("code"))
+            if "encodedPrefixHex" in case:
+                payload = expand(case.get("payloadHex", case.get("payload")))
+                encoded = io.BytesIO()
+                write_frame(encoded, payload)
+                expect(encoded.getvalue(), bytes.fromhex(case["encodedPrefixHex"]) + payload)
+        results.check(f"framing/{case['id']}", framing)
+
+
+def schema_accepts(value: Any, rule: dict[str, Any], definitions: dict[str, Any]) -> bool:
+    """Interpret the published remote schema constructs without a third-party validator."""
+    if "$ref" in rule:
+        return schema_accepts(value, definitions[rule["$ref"].split("/")[-1]], definitions)
+    if "oneOf" in rule and sum(schema_accepts(value, child, definitions) for child in rule["oneOf"]) != 1:
+        return False
+    if "anyOf" in rule and not any(schema_accepts(value, child, definitions) for child in rule["anyOf"]):
+        return False
+    if "not" in rule and schema_accepts(value, rule["not"], definitions):
+        return False
+    if "if" in rule and schema_accepts(value, rule["if"], definitions) and not schema_accepts(value, rule["then"], definitions):
+        return False
+    if "const" in rule and (type(value) != type(rule["const"]) or value != rule["const"]):
+        return False
+    if "enum" in rule and value not in rule["enum"]:
+        return False
+    expected = rule.get("type")
+    types = {"object": isinstance(value, dict), "array": isinstance(value, list), "string": isinstance(value, str), "boolean": isinstance(value, bool), "null": value is None, "number": type(value) in (int, float), "integer": type(value) is int}
+    if expected and not types[expected]:
+        return False
+    if isinstance(value, str):
+        if len(value) > rule.get("maxLength", len(value)) or ("pattern" in rule and not re.search(rule["pattern"], value)):
+            return False
+    if type(value) in (int, float) and value < rule.get("minimum", value):
+        return False
+    if isinstance(value, list):
+        if not rule.get("minItems", 0) <= len(value) <= rule.get("maxItems", len(value)):
+            return False
+        for index, item in enumerate(value):
+            child = rule.get("prefixItems", [])[index] if index < len(rule.get("prefixItems", [])) else rule.get("items", {})
+            if not schema_accepts(item, child, definitions):
+                return False
+    if isinstance(value, dict):
+        if len(value) < rule.get("minProperties", 0) or any(key not in value for key in rule.get("required", [])):
+            return False
+        for key, item in value.items():
+            if not schema_accepts(key, rule.get("propertyNames", {}), definitions):
+                return False
+            child = rule.get("properties", {}).get(key, rule.get("additionalProperties", {}))
+            if child is False or not schema_accepts(item, child, definitions):
+                return False
+    return True
+
+
+def check_host_control(results: Results, data: dict[str, Any]) -> None:
+    """Check schema and semantic catalog identity and inspect ordering per case."""
+    definitions = json.loads((VECTOR_ROOT.parent / "remote-contract.schema.json").read_text())["$defs"]
+    for section in ("contracts", "catalogs", "controls"):
+        for case in data.get(section, []):
+            def check(case: dict[str, Any] = case, section: str = section) -> None:
+                value = case["value"]
+                definition = "contract" if section == "contracts" else "catalog" if section == "catalogs" else case["definition"]
+                valid = schema_accepts(value, definitions[definition], definitions)
+                semantic = valid
+                catalog = value if definition == "catalog" else value.get("catalog") if definition == "describeHost" else None
+                if semantic and catalog is not None:
+                    semantic = all(name == contract["plugin"] for name, contract in catalog.items())
+                if semantic and definition == "hostInspectResult":
+                    names = [item["name"] for item in value["plugins"]]
+                    semantic = names == sorted(set(names)) and all(item["features"] == sorted(set(item["features"])) for item in value["plugins"])
+                expect((valid, semantic), (case["schemaValid"], case["semanticValid"]))
+            results.check(f"host/{section}/{case['id']}", check)
 
 
 def run_selftest(path: str | None = None) -> int:
@@ -573,6 +660,7 @@ def run_selftest(path: str | None = None) -> int:
         ("handshake.json", lambda data: check_handshake(results, data, "current/handshake")),
         ("stream.json", lambda data: check_stream(results, data)),
         ("error-chain.json", lambda data: check_wire(results, data)),
+        ("remote-contract.json", lambda data: check_host_control(results, data)),
         ("remote-host-control.json", lambda data: check_host_control(results, data)),
         ("stream-framing.json", lambda data: check_framing(results, data)),
     ]
@@ -600,10 +688,6 @@ def run_selftest(path: str | None = None) -> int:
     print(f"SUMMARY passed={results.passed} failed={results.failed} pending={results.pending} skipped={results.skipped}")
     return 1 if results.failed else 0
 
-
-def check_host_control(results: Results, data: dict[str, Any]) -> None:
-    """Block false PASS until the Host vector layout and cases are published."""
-    results.missing("remote-host-control.json semantic mapping")
 
 
 if __name__ == "__main__":
