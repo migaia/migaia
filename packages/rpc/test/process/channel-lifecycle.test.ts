@@ -160,6 +160,43 @@ describe('process channel boundary', () => {
     await expect(wire.close()).resolves.toBeUndefined()
   })
 
+  it('[D2] delivers activated frames in order to the first late subscriber', async () => {
+    const port = createBytePort()
+    const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
+    const handshake = wire.readHandshakeFrame()
+    port.emitText('hello')
+    await handshake
+    wire.activate()
+    for (let index = 0; index < 200; index += 1) port.emitText(`frame-${index}`)
+    const received: unknown[] = []
+    wire.transport.subscribe((message) => received.push(message.data))
+    expect(received).toEqual(Array.from({ length: 200 }, (_, index) => `frame-${index}`))
+    const later: unknown[] = []
+    wire.transport.subscribe((message) => later.push(message.data))
+    expect(later).toEqual([])
+    await wire.close()
+  })
+
+  it('[D2] reports and closes instead of discarding an overflowing early queue', async () => {
+    const port = createBytePort()
+    const reports: unknown[] = []
+    const wire = bindProcessByteWire(port.channel, {
+      peerId: 'peer',
+      report: (error) => reports.push(error)
+    })
+    const handshake = wire.readHandshakeFrame()
+    port.emitText('hello')
+    await handshake
+    wire.activate()
+    for (let index = 0; index < 257; index += 1) port.emitText(`frame-${index}`)
+    expect(wire.closed).toBe(true)
+    expect(reports).toEqual([expect.objectContaining({ code: 'PROCESS_CHANNEL_CLOSED' })])
+    const received: unknown[] = []
+    wire.transport.subscribe((message) => received.push(message.data))
+    expect(received).toEqual([])
+    await wire.close()
+  })
+
   it('[A2/A6] installs one IPC composition and redacts each stderr record', async () => {
     /** The physical transport is closed through the single gate wrapper. */
     let physicalCloses = 0

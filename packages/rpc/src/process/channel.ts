@@ -25,6 +25,11 @@ import type { IProcessByteChannel, IProcessCommonOptions, IProcessMessageChannel
 /** Prevent a second adapter from installing another physical reader on the same channel. */
 const boundChannels = new WeakSet<object>()
 
+/** Bound early frames until the endpoint installs its first business subscriber. */
+const MAX_EARLY_BUSINESS_FRAMES = 256
+/** Bound retained UTF-8 payloads even when every early frame is individually valid. */
+const MAX_EARLY_BUSINESS_BYTES = 1024 * 1024
+
 /** A child adapter may consume bootstrap with the decoder later owned by the wire. */
 export type IProcessFrameSource = Readonly<{
   decoder: IRpcStreamFrameDecoder
@@ -80,6 +85,10 @@ export function bindProcessByteWire(
   const textEncoder = new TextEncoder()
   /** Business listeners become active only after the control handshake completes. */
   const listeners = new Set<(message: { data: unknown; peerId: string }) => void>()
+  /** Frames received after activation wait for the first endpoint subscriber. */
+  const earlyBusiness: string[] = []
+  /** The queue's byte total is released with its frames on delivery or close. */
+  let earlyBusinessBytes = 0
   /** Core observes the first physical terminal reason. */
   const errorListeners = new Set<(error: unknown) => void>()
   /** All writes remain owned by this connection until drain or close. */
@@ -122,6 +131,8 @@ export function bindProcessByteWire(
     handshakeWaiter?.reject(terminalError)
     handshakeWaiter = undefined
     handshakeFrame = undefined
+    earlyBusiness.length = 0
+    earlyBusinessBytes = 0
     for (const write of pendingWrites) {
       write.settled = true
       write.reject(terminalError)
@@ -141,6 +152,32 @@ export function bindProcessByteWire(
       await channel.close()
     })()
     return closing
+  }
+
+  /** Deliver one frame to current subscribers while isolating callback failures. */
+  const deliverBusiness = (text: string): void => {
+    for (const listener of listeners) {
+      try {
+        listener({ data: text, peerId: options.peerId })
+      } catch (error) {
+        report(error)
+      }
+    }
+  }
+
+  /** Retain a bounded early frame; overflow is a reported connection failure. */
+  const queueBusiness = (text: string, bytes: number): void => {
+    if (
+      earlyBusiness.length === MAX_EARLY_BUSINESS_FRAMES ||
+      earlyBusinessBytes + bytes > MAX_EARLY_BUSINESS_BYTES
+    ) {
+      const error = createProcessError(RpcProcessErrorCode.channelClosed)
+      report(error)
+      void terminate(error)
+      return
+    }
+    earlyBusiness.push(text)
+    earlyBusinessBytes += bytes
   }
 
   /** Each complete byte payload is an independent UTF-8 text message. */
@@ -169,13 +206,8 @@ export function bindProcessByteWire(
       } else handshakeFrame = text
       return
     }
-    for (const listener of listeners) {
-      try {
-        listener({ data: text, peerId: options.peerId })
-      } catch (error) {
-        report(error)
-      }
-    }
+    if (listeners.size === 0) queueBusiness(text, frame.byteLength)
+    else deliverBusiness(text)
   }
   /** A bootstrap reader can hand its existing decoder to this wire. */
   const frameSource = frameSources.get(channel)
@@ -268,6 +300,15 @@ export function bindProcessByteWire(
     send: (value) => writeText(asProcessString(value)),
     subscribe(listener) {
       listeners.add(listener)
+      if (earlyBusiness.length > 0) {
+        /** Clear before callbacks so reentrant subscriptions cannot replay frames. */
+        const queued = earlyBusiness.splice(0)
+        earlyBusinessBytes = 0
+        for (const text of queued) {
+          if (closed) break
+          deliverBusiness(text)
+        }
+      }
       return () => {
         listeners.delete(listener)
       }
