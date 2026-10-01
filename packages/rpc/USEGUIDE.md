@@ -1152,3 +1152,103 @@ await serving.close()
 spawn 默认先退出旧进程再启动新进程；`replace({ spec, strategy: 'start-then-switch' })` 则要求共享预算容纳两个进程，并在新 describe 通过后切换。两种策略都兑现同一个门面。新进程从自己的 serve 启动状态开始，不重放旧 use。`restart()` 委托当前治理注册，`inspectRegistration()` 可查终态与清算原因；清算后不能用 replace 绕过。可选 `shutdownSignal.subscribe` 由调用方接平台信号，第一次排空释放，释放未完成时第二次只强制终止 owned handle；connect 只关闭本地连接。
 
 服务侧省略 resilience 时创建一个默认治理器，同一已验证主体在多连接上共享内存幂等缓存，跨进程重启要由调用方提供稳定 backing。外部治理器由调用方关闭。反向注册通过可选 registrations 提供 `verifyToken` 和 `resolveRegistration(principalId)`，后者只返回预批准的 `{ targetHost, name, contract }`；它不信任对端自报的名字或 routing peer。关闭 listener 不撤销已采用连接，EOF 以 suspend 移除代理，新连接须重新鉴权。Windows/Electron 实机保证与 JSON-RPC bridge 的 Host 接线属 M2，目前没有 PASS 声明。
+
+### JSON-RPC bridge
+
+The bridge is an initiator for one authenticated JSON-RPC server. Supply a raw
+byte channel, a caller-issued nonempty token, scheduler/wall clock and IPC
+identity. Keep the raw channel exclusive to this factory. The offer accepts
+`abort@1`, `jsonrpc-bridge@1`, `wire-error@1`, `deadline@1`, `trace@1` and
+`idempotency@1`; the first three are required and added by the bridge. JSON is
+the only codec. The default hello deadline is 10,000 relative milliseconds.
+No native health ping or close frame is produced.
+
+```ts
+import { createJsonRpcRemoteChannel } from '@migaia/rpc/bridge/jsonrpc'
+import { createComposedEndpoint } from '@migaia/rpc/core/composed'
+import { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'
+import { createOutboundFeature } from '@migaia/rpc/core/features/outbound'
+import { createOneWayFeature, type IOneWaySurface } from '@migaia/rpc/core/features/one-way'
+import { codec, framer, abort, connect, type IRpcEndpoint } from '@migaia/rpc/core'
+
+// raw, token, scheduler, wallClock, contract and report belong to the deployment.
+const channel = await createJsonRpcRemoteChannel({
+  byte: raw,
+  peerId: 'server',
+  target: { kind: 'plugin', contract },
+  offer: {
+    versions: [{ major: 1, minor: 1 }],
+    capabilities: ['deadline@1', 'trace@1'],
+    peer: { id: 'client', runtime: 'node' }
+  },
+  token,
+  scheduler,
+  wallClock,
+  ipc: { connectionId: 'connection', sessionId: 'session', log: recordIpc },
+  report
+})
+const chunk = createCanonicalChunkFeature()
+const outbound = createOutboundFeature(chunk)
+const kernel = await createComposedEndpoint({
+  id: 'client', transport: channel.transport, scheduler: channel.scheduler,
+  middlewares: [codec(channel.pipeline.codec), framer(channel.pipeline.framer),
+    abort(), connect({ transport: channel.transport })]
+}, {
+  'first-party-chunk': chunk,
+  'first-party-outbound': outbound,
+  'first-party-one-way': createOneWayFeature(outbound),
+  'channel-ipc-queue': channel.features[0]!,
+  'channel-ipc-log': channel.features[1]!
+})
+// Selected first-party roots provide these surfaces; the composed declaration exposes dispose.
+const endpoint = kernel as unknown as IRpcEndpoint & IOneWaySurface
+// In endpointFactory, return { endpoint, oneWay: endpoint }.
+```
+
+Return this assembly from remote/process `endpointFactory`, with its endpoint
+and one-way surface; remote performs the single describe itself. For Host,
+replace target with `{ kind: 'host', catalog }`; keep the same assembly and
+pass it to `createRemoteHost` or `createProcessHost`. Host use/unUse/inspect
+remain their canonical `migaia.remote.host.*` methods inside invoke. Avoid
+full/discovery/control roots: this profile has no native discovery or ping.
+
+A spawn deployment uses `wire: 'jsonrpc'`, byte channels and
+`bootstrap: { via: 'fd', fd, payload }`, with the same token bytes. Its establish
+callback forwards the generation's token, scheduler, signal and IPC session
+into the bridge; optional `ipc.stderr` uses the provided stderr subscription.
+Each stderr block logs only `CHILD_STDERR_REDACTED`. Current built-in launchers
+cannot supply the fd carrier; the focused Node path uses a caller-owned fd
+launcher. Connect owns just its socket. Its current process facade defaults
+to native ping and has no wire selector, so JSON-RPC connect must explicitly
+supply caller health; a default `health: none` connect path remains an upstream
+API gap. The bridge itself adds no health check.
+
+Peer handlers follow this exact profile:
+
+- `migaia.hello({ hello })`: normalize/verify the control hello and return
+  `{ reply: <control accept/reject JSON text>, methods: [four profile names] }`.
+- `migaia.describe({ args: [] })`: return Plugin contract or Host catalog wrapper.
+- `migaia.invoke({ method, args, meta? })`: resolve only a declared portable
+  method, echo the string request id in result/error; a notification has no id
+  or meta and receives no response. Relative timeout starts at peer receipt.
+- `migaia.cancel({ id, reason? })`: cooperate with cancellation for that id;
+  reason is the original wire-error payload. It has no response or rollback
+  guarantee. All frames use Content-Length; never write logs to RPC stdout.
+
+Use `toJsonRpcError(serializeRpcError(error), -32000)` from the contract owner
+in TS peers, or its wire schema in other languages. Missing business extensions
+fail only that call (`JSONRPC_EXTENSION_MISSING`); malformed embedded graphs
+fail only that call (`JSONRPC_PROFILE_INVALID`). Ordinary standard JSON-RPC
+errors keep foreign `jsonrpc-2.0/<number>` identity. Unknown/late/number ids are
+reported and discarded. Batch, reverse messages, malformed response shapes,
+`id: null`, framing/UTF-8/JSON faults terminate that connection. Streams reject
+before business publication (`JSONRPC_UNSUPPORTED_MODE`); transfer rejects its
+send Promise as a native TypeError before bytes. Hello timeout uses
+`JSONRPC_HANDSHAKE_TIMEOUT`. All five bridge codes have source
+`@migaia/rpc/bridge/jsonrpc`.
+
+The portable profile vectors ship in `schema/vectors/jsonrpc-bridge.json`.
+Integers outside ±(2^53−1) must travel as strings. The focused fixtures use a
+handwritten peer; compatibility with an arbitrary JSON-RPC library is inferred,
+not verified. Four-language/platform, packed, custody and repository gates
+remain separate integration evidence.
