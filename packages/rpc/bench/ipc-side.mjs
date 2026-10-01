@@ -14,6 +14,11 @@ import { measureBare } from './ipc.mjs'
  * @throws {Error} Ready, observer, echo and cleanup failures retain their first cause.
  */
 export async function runIpcSide(unit, side, options = {}) {
+  /** The exact shared admission stops preparation before starting a peer or a measured window. */
+  const { admitConformanceToolchains } =
+    await import('../test/process/fixtures/conformance-toolchains.mjs')
+  const admission = admitConformanceToolchains()
+  if (!admission.accepted) throw new Error(JSON.stringify(admission))
   /** Portable business bytes are fixed by the selected unit, independent of the side. */
   const payload = 'x'.repeat(unit.payloadBytes)
   /** Session ownership is acquired before the separately prestarted observer. */
@@ -40,7 +45,8 @@ export async function runIpcSide(unit, side, options = {}) {
       parentPid: process.pid,
       peerPid: session.peerPid,
       encodedBytes: Buffer.byteLength(JSON.stringify(payload)),
-      concurrency: 1
+      concurrency: 1,
+      toolchains: admission
     }
   } catch (error) {
     failures.push(error)
