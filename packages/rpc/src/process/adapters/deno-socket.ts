@@ -8,7 +8,7 @@ import {
 
 /** Deno's Windows transport has no named-pipe support in this adapter. */
 function rejectUnsupportedPipe(address: string): void {
-  if (process.platform === 'win32' && address.startsWith('\\\\.\\pipe\\'))
+  if (address.startsWith('\\\\.\\pipe\\'))
     throw tagRpcError(
       new TypeError(RpcProcessErrorText.optionsInvalid),
       RpcCoreErrorCode.invalidConfig
