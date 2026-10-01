@@ -292,7 +292,12 @@ describe('JSON-RPC bridge readiness', () => {
       expect(error).toMatchObject({
         code: kind === 'shape' ? 'JSONRPC_PROFILE_INVALID' : 'JSONRPC_FRAME_INVALID'
       })
-      expect(inspect(error, { depth: null, showHidden: true })).not.toContain(fixture.options.token)
+      /** Every diagnostic surface must exclude partial credentials, not only the whole token. */
+      const evidence =
+        inspect({ error, reports: fixture.reports }, { depth: null, showHidden: true }) +
+        JSON.stringify(serializeRpcError(error, { report: () => undefined }))
+      for (let offset = 0; offset <= fixture.options.token.length - 6; offset++)
+        expect(evidence).not.toContain(fixture.options.token.slice(offset, offset + 6))
     }
   })
 })
