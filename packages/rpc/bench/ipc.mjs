@@ -351,7 +351,8 @@ async function pairedMain() {
       console.log(
         JSON.stringify({
           type: 'bench-unit',
-          status: 'error',
+          status: 'fail',
+          failureKind: 'measurement-incomplete',
           unit,
           rounds,
           error: { name: error.name, message: error.message }
