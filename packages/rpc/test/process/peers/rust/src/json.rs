@@ -7,6 +7,8 @@ pub enum Value {
     Bool(bool),
     Number(String),
     String(String),
+    /// Vector-only invalid Unicode retains provenance instead of becoming a valid U+FFFD.
+    SurrogateString(String),
     Array(Vec<Value>),
     Object(Vec<(String, Value)>),
 }
@@ -23,7 +25,7 @@ impl Value {
     }
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            Self::String(value) => Some(value),
+            Self::String(value) | Self::SurrogateString(value) => Some(value),
             _ => None,
         }
     }
@@ -52,7 +54,7 @@ impl Value {
             Self::Null => out.push_str("null"),
             Self::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
             Self::Number(value) => out.push_str(value),
-            Self::String(value) => {
+            Self::String(value) | Self::SurrogateString(value) => {
                 out.push('"');
                 for ch in value.chars() {
                     match ch {
@@ -111,6 +113,7 @@ fn parse_impl(input: &[u8], allow_lone_surrogate: bool) -> Result<Value, String>
         bytes: input,
         offset: 0,
         allow_lone_surrogate,
+        string_had_surrogate: false,
     };
     let value = parser
         .value(0)
@@ -126,6 +129,7 @@ struct Parser<'a> {
     bytes: &'a [u8],
     offset: usize,
     allow_lone_surrogate: bool,
+    string_had_surrogate: bool,
 }
 impl Parser<'_> {
     fn space(&mut self) {
@@ -161,7 +165,14 @@ impl Parser<'_> {
                 self.literal(b"false")?;
                 Ok(Value::Bool(false))
             }
-            Some(b'"') => Ok(Value::String(self.string()?)),
+            Some(b'"') => {
+                let text = self.string()?;
+                Ok(if self.string_had_surrogate {
+                    Value::SurrogateString(text)
+                } else {
+                    Value::String(text)
+                })
+            }
             Some(b'[') => self.array(depth),
             Some(b'{') => self.object(depth),
             Some(b'-' | b'0'..=b'9') => self.number(),
@@ -177,6 +188,7 @@ impl Parser<'_> {
     }
     fn string(&mut self) -> Result<String, &'static str> {
         self.byte(b'"')?;
+        self.string_had_surrogate = false;
         let mut out = String::new();
         let mut start = self.offset;
         while let Some(&byte) = self.bytes.get(self.offset) {
@@ -219,12 +231,14 @@ impl Parser<'_> {
                                 }
                                 0x10000 + ((first as u32 - 0xd800) << 10) + (second as u32 - 0xdc00)
                             } else if self.allow_lone_surrogate {
+                                self.string_had_surrogate = true;
                                 0xfffd
                             } else {
                                 return Err("lone surrogate");
                             }
                         } else if (0xdc00..=0xdfff).contains(&first) {
                             if self.allow_lone_surrogate {
+                                self.string_had_surrogate = true;
                                 0xfffd
                             } else {
                                 return Err("lone surrogate");
