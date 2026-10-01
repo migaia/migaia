@@ -58,6 +58,60 @@ function ipc(name: string) {
 }
 
 describe('native process handshake', () => {
+  it('[H5] rejects a local byte offer without JSON before touching the wire', async () => {
+    const [initiator, , writes] = createBytePair()
+    const offer = createNativeProcessOffer({ peer: { id: 'node-a', runtime: 'node' } })
+    await expect(
+      createProcessTransport(initiator, {
+        role: 'initiator',
+        offer: { ...offer, codecs: ['other'] },
+        peerId: 'node-b',
+        report: () => undefined,
+        ipc: ipc('without-json')
+      })
+    ).rejects.toMatchObject({ code: 'HANDSHAKE_INVALID' })
+    expect(writes).toEqual([])
+  })
+
+  it('[H6] rejects a negotiated non-JSON codec before activation', async () => {
+    const [initiator, responder] = createBytePair()
+    const offerA = createNativeProcessOffer({ peer: { id: 'node-a', runtime: 'node' } })
+    const offerB = createNativeProcessOffer({ peer: { id: 'node-b', runtime: 'node' } })
+    const results = await Promise.allSettled([
+      createProcessTransport(initiator, {
+        role: 'initiator',
+        offer: { ...offerA, codecs: ['other', 'json'] },
+        peerId: 'node-b',
+        report: () => undefined,
+        ipc: ipc('non-json-a')
+      }),
+      createProcessTransport(responder, {
+        role: 'responder',
+        offer: { ...offerB, codecs: ['other', 'json'] },
+        auth: { mode: 'none' },
+        peerId: 'node-a',
+        report: () => undefined,
+        ipc: ipc('non-json-b')
+      })
+    ])
+    expect(results.map((result) => result.status)).toEqual(['rejected', 'rejected'])
+    expect(results[0]).toMatchObject({ reason: { code: 'INVALID_CONFIG' } })
+  })
+
+  it('[H7] requires an explicit responder authentication policy before reading', async () => {
+    const [responder, , writes] = createBytePair()
+    await expect(
+      createProcessTransport(responder, {
+        role: 'responder',
+        offer: createNativeProcessOffer({ peer: { id: 'node-b', runtime: 'node' } }),
+        peerId: 'node-a',
+        report: () => undefined,
+        ipc: ipc('missing-auth')
+      } as never)
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    expect(writes).toEqual([])
+  })
+
   it.each(['one chunk', 'consecutive writes'] as const)(
     '[D3] queues business after accept before initiator activation (%s)',
     async (mode) => {
@@ -215,41 +269,51 @@ describe('native process handshake', () => {
     ])
   })
 
-  it('[A13] keeps hostile handshake fields out of the local cause and wire report', async () => {
-    const [attacker, responder] = createBytePair()
-    const token = 'hostile-kind-token'
-    const pending = createProcessTransport(responder, {
-      role: 'responder',
-      offer: createNativeProcessOffer({ peer: { id: 'node-b', runtime: 'node' } }),
-      auth: { mode: 'none' },
-      peerId: 'untrusted',
-      report: () => undefined,
-      ipc: ipc('hostile')
-    })
-    /** The invalid kind is deliberately short enough to expose the historical C2 leak. */
-    const hostile = JSON.stringify({
-      kind: token,
-      step: 'hello',
-      protocol: RpcProtocol.id,
-      versions: [{ major: 1, minor: 1 }],
-      codecs: [RpcCodecId.json],
-      capabilities: [],
-      peer: { id: 'attacker', runtime: 'node' }
-    })
-    await attacker.write(encodeRpcStreamFrame(new TextEncoder().encode(hostile)))
-    /** Inspection and error serialization must both traverse the whole cause graph safely. */
-    let observed: unknown
-    try {
-      await pending
-    } catch (error) {
-      observed = error
+  it.each(['kind', 'step', 'unknown-field'] as const)(
+    '[A13] keeps hostile %s out of the local cause and wire report',
+    async (position) => {
+      const [attacker, responder] = createBytePair()
+      const token = 'hostile-field-token'
+      const pending = createProcessTransport(responder, {
+        role: 'responder',
+        offer: createNativeProcessOffer({ peer: { id: 'node-b', runtime: 'node' } }),
+        auth: { mode: 'none' },
+        peerId: 'untrusted',
+        report: () => undefined,
+        ipc: ipc('hostile')
+      })
+      /** All hostile positions are short enough to expose the old redaction leak. */
+      const base = {
+        kind: 'handshake',
+        step: 'hello',
+        protocol: RpcProtocol.id,
+        versions: [{ major: 1, minor: 1 }],
+        codecs: [RpcCodecId.json],
+        capabilities: [],
+        peer: { id: 'attacker', runtime: 'node' }
+      }
+      const hostile = JSON.stringify(
+        position === 'kind'
+          ? { ...base, kind: token }
+          : position === 'step'
+            ? { ...base, step: token }
+            : { ...base, kind: 'invalid', [token]: 'unexpected' }
+      )
+      await attacker.write(encodeRpcStreamFrame(new TextEncoder().encode(hostile)))
+      /** Inspection and error serialization must both traverse the whole cause graph safely. */
+      let observed: unknown
+      try {
+        await pending
+      } catch (error) {
+        observed = error
+      }
+      expect(observed).toMatchObject({ code: 'HANDSHAKE_INVALID' })
+      expect(inspect(observed, { depth: null, showHidden: true })).not.toContain(token)
+      expect(
+        JSON.stringify(serializeRpcError(observed, { report: () => undefined }))
+      ).not.toContain(token)
     }
-    expect(observed).toMatchObject({ code: 'HANDSHAKE_INVALID' })
-    expect(inspect(observed, { depth: null, showHidden: true })).not.toContain(token)
-    expect(JSON.stringify(serializeRpcError(observed, { report: () => undefined }))).not.toContain(
-      token
-    )
-  })
+  )
 
   it('[A5/A6] uses the manual scheduler deadline and closes a silent byte peer', async () => {
     /** The silent peer never resolves a handshake read. */

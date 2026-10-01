@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   RPC_STREAM_MAX_FRAME_BYTES,
   createRpcStreamFrameDecoder,
@@ -96,6 +96,31 @@ describe('rpc native stream framing', () => {
     expect(() => decoder.push(Uint8Array.of(0))).toThrowError(
       expect.objectContaining({ code: 'INVALID_FRAME' })
     )
+  })
+
+  it('[A4/F3] never allocates an oversized payload before rejecting its header', () => {
+    const errors: Error[] = []
+    const decoder = createRpcStreamFrameDecoder({
+      onFrame: () => expect.unreachable(),
+      onError: (error) => errors.push(error)
+    })
+    /** Track product allocations during push, not test fixture construction. */
+    const NativeUint8Array = globalThis.Uint8Array
+    const allocations: number[] = []
+    const tracked = new Proxy(NativeUint8Array, {
+      construct(target, args) {
+        if (typeof args[0] === 'number') allocations.push(args[0])
+        return Reflect.construct(target, args)
+      }
+    })
+    try {
+      vi.stubGlobal('Uint8Array', tracked)
+      decoder.push(NativeUint8Array.of(1, 0, 0, 1))
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    expect(errors.map((error) => Reflect.get(error, 'code'))).toEqual(['FRAME_LIMIT_EXCEEDED'])
+    expect(allocations.every((size) => size < RPC_STREAM_MAX_FRAME_BYTES)).toBe(true)
   })
 
   it('[A3/A4] owns delivered bytes and distinguishes EOF from intentional close', () => {
