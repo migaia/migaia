@@ -175,13 +175,39 @@ describe('process Host reverse native registration', () => {
       report,
       maxConnections: 2
     })
+    /** The rejected description releases its canonical physical lease before another candidate. */
+    let observeBadClose!: () => void
+    const badClosed = new Promise<void>((resolve) => {
+      observeBadClose = resolve
+    })
+    /** The duplicate also returns its lease before the independently authorized connection. */
+    let observeDuplicateClose!: () => void
+    const duplicateClosed = new Promise<void>((resolve) => {
+      observeDuplicateClose = resolve
+    })
+    /** Only authenticated rejected candidates have a close barrier in this scenario. */
+    let rejectedCandidates = 0
     let listener: IProcessRegistrationListener | undefined
     const closeGovernor = vi.fn(() => governor.close())
     const external = {
       ...governor,
       close: closeGovernor,
       async listenRegistrations(options: Parameters<typeof governor.listenRegistrations>[0]) {
-        listener = await governor.listenRegistrations(options)
+        listener = await governor.listenRegistrations({
+          ...options,
+          async onCandidate(candidate) {
+            /** Observe the real close Promise, which includes the manager's lease return. */
+            const [outcome] = await Promise.allSettled([options.onCandidate(candidate)])
+            if (outcome!.status === 'rejected' || outcome!.value !== 'adopt') {
+              await candidate.close()
+              rejectedCandidates += 1
+              if (rejectedCandidates === 1) observeBadClose()
+              if (rejectedCandidates === 2) observeDuplicateClose()
+            }
+            if (outcome!.status === 'rejected') throw outcome!.reason
+            return outcome!.value
+          }
+        })
         return listener
       }
     }
@@ -295,9 +321,11 @@ describe('process Host reverse native registration', () => {
       expect(resolveRegistration.mock.calls).toEqual([['approved-principal']])
       const bad = reversePeer(address, nativeHostToken, true)
       await bad.exited
+      await badClosed
       expect(use).toHaveBeenCalledTimes(1)
       const duplicate = reversePeer(address)
       await duplicate.exited
+      await duplicateClosed
       expect(use).toHaveBeenCalledTimes(2)
       expect(unUse).not.toHaveBeenCalled()
       independent = reversePeer(address, 'second-reverse-fixture')
