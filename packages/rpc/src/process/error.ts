@@ -9,7 +9,13 @@ const TEXT_BY_CODE: Readonly<Record<IRpcProcessErrorCode, string>> = {
   [RpcProcessErrorCode.channelClosed]: RpcProcessErrorText.channelClosed,
   [RpcProcessErrorCode.connectFailed]: RpcProcessErrorText.connectFailed,
   [RpcProcessErrorCode.listenFailed]: RpcProcessErrorText.listenFailed,
-  [RpcProcessErrorCode.pluginInvalidOption]: RpcProcessErrorText.pluginInvalidOption
+  [RpcProcessErrorCode.pluginInvalidOption]: RpcProcessErrorText.pluginInvalidOption,
+  [RpcProcessErrorCode.resilienceInvalidOption]: RpcProcessErrorText.resilienceInvalidOption,
+  [RpcProcessErrorCode.connectionLimit]: RpcProcessErrorText.connectionLimit,
+  [RpcProcessErrorCode.instanceUnhealthy]: RpcProcessErrorText.instanceUnhealthy,
+  [RpcProcessErrorCode.healthPingFailed]: RpcProcessErrorText.healthPingFailed,
+  [RpcProcessErrorCode.terminalCall]: RpcProcessErrorText.terminalCall,
+  [RpcProcessErrorCode.liquidated]: RpcProcessErrorText.liquidated
 }
 
 /** Construct a tagged native error while preserving any non-secret original cause. */
@@ -22,7 +28,9 @@ export function createProcessError(
   const options = cause === undefined ? undefined : { cause }
   /** Authentication and option errors retain TypeError identity; other channel failures are Error. */
   const error =
-    code === RpcProcessErrorCode.authRejected || code === RpcProcessErrorCode.pluginInvalidOption
+    code === RpcProcessErrorCode.authRejected ||
+    code === RpcProcessErrorCode.pluginInvalidOption ||
+    code === RpcProcessErrorCode.resilienceInvalidOption
       ? new TypeError(TEXT_BY_CODE[code], options)
       : new Error(TEXT_BY_CODE[code], options)
   return attachErrorIdentity(error, { source: ERROR_SOURCE, code, ...(detail ? { detail } : {}) })
