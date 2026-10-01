@@ -4,6 +4,8 @@
 
 `@migaia/rpc/remote` 提供显式 `IRemoteContract`、Plugin/Host 远程装配和协程内存回环。客户端只传插件名与可移植配置；服务端用本地同步 resolver 取得由 `definePlugin` 创建的真实定义。`serveRemoteHost` 在调用 Host 前拒绝 Promise、伪定义及目录外名称。`createCoroutinePlugin` 和 `createCoroutineHost` 使用同一 remote 代理、内存通道和 supervisor，任务调用 `serve` 发布一次端口，并在收到 `signal` 中止后协作退出。进程和线程门面复用此层的装配接口。
 
+`@migaia/rpc/process` 提供进程字节/消息通道的 `createProcessTransport` 与原生握手 offer。`@migaia/rpc/contract/framing/stream` 提供 4 字节大端长度前缀编码器和增量解码器；它们不进入 core 根入口。Node、Bun、Deno 的 launcher、stdio 与 socket 入口仅从 `@migaia/rpc/process/adapters/*` 深路径按需导入。Byte 通道先完成带认证的握手，再把返回的 `transport`、`pipeline`、`scheduler` 和 `features` 交给 remote endpoint factory；监听方必须在接纳前提供 verifier。Electron 与 Windows Job 的整树终止和安全引导尚无实机证据，能力保持 `unsupported`。
+
 ## Contract
 
 Runtime-neutral semantic RPC descriptors, portable values, hostile-safe envelope normalization, and whole-message framing contracts.

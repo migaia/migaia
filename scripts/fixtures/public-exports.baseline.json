@@ -307,6 +307,42 @@
       ]
     },
     "@migaia/rpc": {
+      "./process": [
+        "RpcProcessErrorCode",
+        "RpcProcessErrorText",
+        "createNativeProcessOffer",
+        "createProcessTransport"
+      ],
+      "./process/adapters/node-child-process": [
+        "createNodeProcessLauncher",
+        "openProcessStdioChannel"
+      ],
+      "./process/adapters/node-socket": [
+        "dialProcessByteChannel",
+        "listenProcessByteChannel"
+      ],
+      "./process/adapters/bun-spawn": [
+        "createBunProcessLauncher",
+        "openProcessStdioChannel"
+      ],
+      "./process/adapters/bun-socket": [
+        "dialProcessByteChannel",
+        "listenProcessByteChannel"
+      ],
+      "./process/adapters/deno-command": [
+        "createDenoProcessLauncher",
+        "openProcessStdioChannel"
+      ],
+      "./process/adapters/deno-socket": [
+        "dialProcessByteChannel",
+        "listenProcessByteChannel"
+      ],
+      "./process/adapters/electron-utility-process": [
+        "createElectronUtilityProcessLauncher"
+      ],
+      "./process/adapters/windows-job": [
+        "createWindowsJobProcessLauncher"
+      ],
       "./remote": [
         "REMOTE_METHOD_MAX_LENGTH",
         "REMOTE_METHOD_MODES",
@@ -390,6 +426,11 @@
       ],
       "./contract/framing/v1": [
         "messageFramer"
+      ],
+      "./contract/framing/stream": [
+        "RPC_STREAM_MAX_FRAME_BYTES",
+        "createRpcStreamFrameDecoder",
+        "encodeRpcStreamFrame"
       ],
       "./core": [
         "RPC_CORE_ERROR_SOURCE",

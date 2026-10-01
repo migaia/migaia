@@ -9,8 +9,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** Audit M1 split measures the exact retained root after owner-local error text extraction. */
 const allowedIncrease = {
-  rawBytes: 64526 / legacyRoot.rawBytes,
-  gzipBytes: 15371 / legacyRoot.gzipBytes
+  rawBytes: 64547 / legacyRoot.rawBytes,
+  gzipBytes: 15386 / legacyRoot.gzipBytes
 } as const
 
 /** I12 changes no retained modules relative to the IPC-reviewed graph. */

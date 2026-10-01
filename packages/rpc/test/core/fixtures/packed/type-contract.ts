@@ -17,6 +17,12 @@ import { buildCapabilityTopology, type ITopologyNode } from '@migaia/capability/
 import rpcV1, { rpcProtocol } from '@migaia/rpc/contract/v1'
 import { messageFramer } from '@migaia/rpc/contract/framing/v1'
 import { createBinaryFramer, createStringFramer } from '@migaia/rpc/contract/framing'
+import { encodeRpcStreamFrame } from '@migaia/rpc/contract/framing/stream'
+import {
+  createProcessTransport,
+  type IProcessByteChannel,
+  type IProcessByteOptions
+} from '@migaia/rpc/process'
 import type { IRpcEnvelope, IRpcFramer, IRpcStringFrame } from '@migaia/rpc/contract'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { identityCodecV1 } from '@migaia/serialize/codec'
@@ -29,6 +35,8 @@ declare const opaque: IRpcTransport<unknown>
 declare const text: IRpcTransport<string>
 declare const textFrames: IRpcTransport<string | IRpcStringFrame>
 declare const customStringFramer: IRpcFramer<string, string, 'custom', 1>
+declare const processByteChannel: IProcessByteChannel
+declare const processByteOptions: IProcessByteOptions
 declare const stagedInboundMismatch: Omit<IRpcTransport<string | IRpcStringFrame>, 'subscribe'> & {
   readonly subscribe: (listener: (message: { readonly data: Uint8Array }) => void) => () => void
 }
@@ -39,6 +47,10 @@ function config(id: string) {
 }
 
 async function verifyPackedContracts(): Promise<void> {
+  const encodedProcessFrame: Uint8Array = encodeRpcStreamFrame(new Uint8Array([1]))
+  void encodedProcessFrame
+  const processChannel = await createProcessTransport(processByteChannel, processByteOptions)
+  void processChannel.pipeline.codec
   const literal: { readonly packed: true } = identityCodec.encode({ packed: true } as const)
   const decoded: { readonly packed: true } = identityCodec.decode(literal)
   /** Preserves the legacy frame call shape while proving the identity generic remains concrete. */

@@ -202,6 +202,9 @@ contract({
 | `@migaia/rpc/core/adapters/{memory,message-port}` | transport factory | 不改变 endpoint 表面 | 内存或 MessagePort 传输 |
 | `@migaia/rpc/browser/adapters/<transport>` | transport factory | 不改变 endpoint 表面 | 浏览器与 Worker 传输 |
 | `@migaia/rpc/core/stream` | `createStreamFeature`、`createCanonicalChunkFeature` | 组合后投影 `endpoint.stream` | 按需异步多值流 |
+| `@migaia/rpc/process` | `createProcessTransport`、`createNativeProcessOffer` | 经握手后交 remote endpoint factory | 进程 byte/message 通道 |
+| `@migaia/rpc/contract/framing/stream` | `encodeRpcStreamFrame`、`createRpcStreamFrameDecoder` | 无端点表面 | 原生 4 字节长度前缀 |
+| `@migaia/rpc/process/adapters/*` | Node/Bun/Deno launcher、stdio 与 socket 入口 | 经 supervision 管理 | 按运行时选用的进程线材 |
 
 所有 endpoint 都有 kernel 表面：`on()`、`hooks.on()`、`dispose()`。只有完整预设或显式选择的 Feature 才增加其他方法。要获得可靠 tree-shaking，应直接导入最窄预设或 `/core` 与单独 Feature 子路径，不要从 core 入口导入完整预设后再只使用其中一部分。
 
