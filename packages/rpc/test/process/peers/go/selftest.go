@@ -2,12 +2,16 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -459,13 +463,34 @@ func runSelftest(directory string) int {
 	} else {
 		suite.unavailable("stream")
 	}
-	for _, name := range []string{"remote-host-control", "stream-framing"} {
-		if _, err := os.Stat(filepath.Join(directory, name+".json")); err != nil {
-			suite.unavailable(name)
+	if vector, err := loadVector(filepath.Join(directory, "remote-host-control.json")); err == nil {
+		schema, schemaErr := loadVector(filepath.Join(directory, "..", "remote-contract.schema.json"))
+		if schemaErr != nil {
+			suite.unavailable("remote-schema")
 		} else {
-			suite.unavailable(name + "/semantic-runner")
+			hostVectors(suite, vector, field(schema["$defs"]))
+			if contracts, err := loadVector(filepath.Join(directory, "remote-contract.json")); err == nil {
+				hostVectors(suite, contracts, field(schema["$defs"]))
+			} else {
+				suite.unavailable("remote-contract")
+			}
 		}
+	} else {
+		suite.unavailable("remote-host-control")
 	}
+	if content, err := os.ReadFile(filepath.Join(directory, "stream-framing.json")); err == nil {
+		decoder := json.NewDecoder(bytes.NewReader(content))
+		decoder.UseNumber()
+		var vectors []any
+		if decoder.Decode(&vectors) == nil {
+			framingVectors(suite, vectors)
+		} else {
+			suite.unavailable("stream-framing")
+		}
+	} else {
+		suite.unavailable("stream-framing")
+	}
+
 	// Wire-error cases are checked by the dedicated validator in this same binary.
 	if vector, err := loadVector(filepath.Join(directory, "error-chain.json")); err == nil {
 		rawFile, readErr := os.ReadFile(filepath.Join(directory, "error-chain.json"))
@@ -562,4 +587,271 @@ func runtimeChecks(suite *vectorSuite) {
 	_ = send(&badInput, malformedHello)
 	badErr := responder(&badInput, &badOutput)
 	suite.check("runtime/secret/malformed-hello", badErr != nil && !strings.Contains(badErr.Error(), secret) && !bytes.Contains(badOutput.Bytes(), []byte(secret)))
+}
+
+// schemaAccepts executes the constructs used by the published remote schema.
+func schemaAccepts(value any, rule record, definitions record) bool {
+	if ref := stringField(rule, "$ref"); ref != "" {
+		parts := strings.Split(ref, "/")
+		return schemaAccepts(value, field(definitions[parts[len(parts)-1]]), definitions)
+	}
+	for _, key := range []string{"oneOf", "anyOf"} {
+		if choices, exists := rule[key]; exists {
+			count := 0
+			for _, child := range entries(choices) {
+				if schemaAccepts(value, field(child), definitions) {
+					count++
+				}
+			}
+			if key == "oneOf" && count != 1 || key == "anyOf" && count == 0 {
+				return false
+			}
+		}
+	}
+	if child, exists := rule["not"]; exists && schemaAccepts(value, field(child), definitions) {
+		return false
+	}
+	if child, exists := rule["if"]; exists && schemaAccepts(value, field(child), definitions) && !schemaAccepts(value, field(rule["then"]), definitions) {
+		return false
+	}
+	if constant, exists := rule["const"]; exists && !reflect.DeepEqual(value, constant) {
+		return false
+	}
+	if choices, exists := rule["enum"]; exists {
+		found := false
+		for _, item := range entries(choices) {
+			found = found || reflect.DeepEqual(item, value)
+		}
+		if !found {
+			return false
+		}
+	}
+	kind := stringField(rule, "type")
+	switch kind {
+	case "object":
+		if field(value) == nil {
+			return false
+		}
+	case "array":
+		if _, ok := value.([]any); !ok {
+			return false
+		}
+	case "string":
+		if _, ok := value.(string); !ok {
+			return false
+		}
+	case "boolean":
+		if _, ok := value.(bool); !ok {
+			return false
+		}
+	case "null":
+		if value != nil {
+			return false
+		}
+	case "number", "integer":
+		if _, ok := value.(json.Number); !ok {
+			return false
+		}
+		if kind == "integer" {
+			if _, ok := asInt(value); !ok {
+				return false
+			}
+		}
+	}
+	if number, ok := value.(json.Number); ok {
+		if minimum, exists := rule["minimum"]; exists {
+			n, _ := number.Float64()
+			m, _ := minimum.(json.Number).Float64()
+			if n < m {
+				return false
+			}
+		}
+	}
+	if text, ok := value.(string); ok {
+		if max, exists := rule["maxLength"]; exists {
+			length, _ := asInt(max)
+			if len([]rune(text)) > length {
+				return false
+			}
+		}
+		if pattern := stringField(rule, "pattern"); pattern != "" {
+			match, err := regexp.MatchString(pattern, text)
+			if err != nil || !match {
+				return false
+			}
+		}
+	}
+	if array, ok := value.([]any); ok {
+		if minimum, exists := rule["minItems"]; exists {
+			n, _ := asInt(minimum)
+			if len(array) < n {
+				return false
+			}
+		}
+		if maximum, exists := rule["maxItems"]; exists {
+			n, _ := asInt(maximum)
+			if len(array) > n {
+				return false
+			}
+		}
+		prefix := entries(rule["prefixItems"])
+		for index, item := range array {
+			child := field(rule["items"])
+			if index < len(prefix) {
+				child = field(prefix[index])
+			}
+			if !schemaAccepts(item, child, definitions) {
+				return false
+			}
+		}
+	}
+	if object := field(value); object != nil {
+		if minimum, exists := rule["minProperties"]; exists {
+			n, _ := asInt(minimum)
+			if len(object) < n {
+				return false
+			}
+		}
+		for _, key := range stringSlice(rule["required"]) {
+			if _, exists := object[key]; !exists {
+				return false
+			}
+		}
+		for key, item := range object {
+			if !schemaAccepts(key, field(rule["propertyNames"]), definitions) {
+				return false
+			}
+			child, exists := field(rule["properties"])[key]
+			if !exists {
+				child = rule["additionalProperties"]
+			}
+			if child == false || !schemaAccepts(item, field(child), definitions) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// hostVectors compares schema acceptance and the independent semantic projection per case.
+func hostVectors(suite *vectorSuite, vector record, definitions record) {
+	for _, section := range []string{"contracts", "catalogs", "controls"} {
+		for _, item := range entries(vector[section]) {
+			entry := field(item)
+			definition := stringField(entry, "definition")
+			if section == "catalogs" {
+				definition = "catalog"
+			}
+			if section == "contracts" {
+				definition = "contract"
+			}
+			value := entry["value"]
+			valid := schemaAccepts(value, field(definitions[definition]), definitions)
+			semantic := valid
+			var catalog record
+			if definition == "catalog" {
+				catalog = field(value)
+			} else if definition == "describeHost" {
+				catalog = field(field(value)["catalog"])
+			}
+			if semantic && catalog != nil {
+				for name, child := range catalog {
+					semantic = semantic && name == stringField(field(child), "plugin")
+				}
+			}
+			if semantic && definition == "hostInspectResult" {
+				previous := ""
+				for _, plugin := range entries(field(value)["plugins"]) {
+					name := stringField(field(plugin), "name")
+					if name <= previous {
+						semantic = false
+					}
+					previous = name
+					features := stringSlice(field(plugin)["features"])
+					for index := 1; index < len(features); index++ {
+						if features[index] <= features[index-1] {
+							semantic = false
+						}
+					}
+				}
+			}
+			suite.check("host/"+section+"/"+stringField(entry, "id"), valid == entry["schemaValid"] && semantic == entry["semanticValid"])
+		}
+	}
+}
+
+// expandFrame expands binary vector specifications independently of JSON wire encoding.
+func expandFrame(value any) []byte {
+	if text, ok := value.(string); ok {
+		raw, err := hex.DecodeString(text)
+		if err != nil {
+			panic(err)
+		}
+		return raw
+	}
+	spec := field(value)
+	raw, err := hex.DecodeString(stringField(spec, "repeatHex"))
+	if err != nil {
+		panic(err)
+	}
+	return bytes.Repeat(raw, integerField(spec, "count"))
+}
+
+// framingVectors preserves chunk boundaries and compares bytes and first error classification.
+func framingVectors(suite *vectorSuite, vectors []any) {
+	for _, item := range vectors {
+		entry := field(item)
+		chunks := entries(entry["chunksHex"])
+		if chunks == nil {
+			chunks = entries(entry["chunks"])
+		}
+		readers := []io.Reader{}
+		for _, chunk := range chunks {
+			readers = append(readers, bytes.NewReader(expandFrame(chunk)))
+		}
+		var wire []byte
+		for _, chunk := range chunks {
+			wire = append(wire, expandFrame(chunk)...)
+		}
+		reader := io.MultiReader(readers...)
+		actual := [][]byte{}
+		code := ""
+		for {
+			frame, err := readFrame(reader)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				code = "INVALID_FRAME"
+				consumed := 0
+				for _, frame := range actual {
+					consumed += 4 + len(frame)
+				}
+				if len(wire)-consumed >= 4 && binary.BigEndian.Uint32(wire[consumed:consumed+4]) > maxFrameBytes {
+					code = "FRAME_LIMIT_EXCEEDED"
+				}
+				break
+			}
+			actual = append(actual, frame)
+		}
+		frames := entries(entry["framesHex"])
+		if frames == nil {
+			frames = entries(entry["frames"])
+		}
+		expected := [][]byte{}
+		for _, frame := range frames {
+			expected = append(expected, expandFrame(frame))
+		}
+		good := reflect.DeepEqual(actual, expected) && code == stringField(field(entry["error"]), "code")
+		if prefix := stringField(entry, "encodedPrefixHex"); prefix != "" {
+			payload := entry["payloadHex"]
+			if payload == nil {
+				payload = entry["payload"]
+			}
+			var encoded bytes.Buffer
+			err := writeFrame(&encoded, expandFrame(payload))
+			good = good && err == nil && bytes.Equal(encoded.Bytes(), append(expandFrame(prefix), expandFrame(payload)...))
+		}
+		suite.check("framing/"+stringField(entry, "id"), good)
+	}
 }

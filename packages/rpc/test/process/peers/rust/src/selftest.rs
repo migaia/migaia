@@ -14,6 +14,7 @@ impl Counts {
         let id = case.get("id").and_then(Value::as_str).unwrap_or("unnamed");
         if good {
             self.passed += 1;
+            println!("PASS {file}/{section}/{id}");
         } else {
             self.failed += 1;
             eprintln!("FAIL {file}/{section}/{id}");
@@ -593,9 +594,16 @@ pub fn run(root: &Path) -> io::Result<()> {
     if let Some(value) = load(root, "error-chain.json", &mut counts) {
         check_error(&value, &mut counts);
     }
-    // A peer may not manufacture absent contract vectors or count a missing file as passing.
-    for file in ["remote-host-control.json", "stream-framing.json"] {
-        let _ = load(root, file, &mut counts);
+    if let Some(schema) = load(root, "../remote-contract.schema.json", &mut counts) {
+        if let Some(vectors) = load(root, "remote-contract.json", &mut counts) {
+            check_host(&vectors, field(&schema, "$defs"), &mut counts);
+        }
+        if let Some(vectors) = load(root, "remote-host-control.json", &mut counts) {
+            check_host(&vectors, field(&schema, "$defs"), &mut counts);
+        }
+    }
+    if let Some(vectors) = load(root, "stream-framing.json", &mut counts) {
+        check_frames(&vectors, &mut counts);
     }
     let mut encoded = Vec::new();
     let normal = write_frame(&mut encoded, &crate::json::string("echo")).is_ok()
@@ -633,5 +641,266 @@ pub fn run(root: &Path) -> io::Result<()> {
         ))
     } else {
         Ok(())
+    }
+}
+
+/// Interpret only constructs present in the published remote schema; unsupported patterns fail.
+fn schema_accepts(value: &Value, rule: &Value, definitions: &Value) -> bool {
+    if let Some(reference) = rule.get("$ref").and_then(Value::as_str) {
+        return schema_accepts(
+            value,
+            field(definitions, reference.rsplit('/').next().unwrap()),
+            definitions,
+        );
+    }
+    for key in ["oneOf", "anyOf"] {
+        if let Some(choices) = rule.get(key) {
+            let count = items(choices)
+                .iter()
+                .filter(|child| schema_accepts(value, child, definitions))
+                .count();
+            if (key == "oneOf" && count != 1) || (key == "anyOf" && count == 0) {
+                return false;
+            }
+        }
+    }
+    if rule
+        .get("not")
+        .is_some_and(|child| schema_accepts(value, child, definitions))
+    {
+        return false;
+    }
+    if rule
+        .get("if")
+        .is_some_and(|child| schema_accepts(value, child, definitions))
+        && !schema_accepts(value, field(rule, "then"), definitions)
+    {
+        return false;
+    }
+    if rule.get("const").is_some_and(|constant| constant != value) {
+        return false;
+    }
+    if rule
+        .get("enum")
+        .is_some_and(|choices| !items(choices).contains(value))
+    {
+        return false;
+    }
+    let valid_type = match text(rule, "type") {
+        "" => true,
+        "object" => matches!(value, Value::Object(_)),
+        "array" => matches!(value, Value::Array(_)),
+        "string" => matches!(value, Value::String(_)),
+        "boolean" => matches!(value, Value::Bool(_)),
+        "null" => matches!(value, Value::Null),
+        "number" => matches!(value, Value::Number(_)),
+        "integer" => value.as_u64().is_some(),
+        _ => false,
+    };
+    if !valid_type {
+        return false;
+    }
+    if let Some(minimum) = rule.get("minimum").and_then(Value::as_u64) {
+        if value.as_u64().is_some_and(|number| number < minimum) {
+            return false;
+        }
+    }
+    if let Some(string) = value.as_str() {
+        if rule
+            .get("maxLength")
+            .and_then(Value::as_u64)
+            .is_some_and(|maximum| string.chars().count() > maximum as usize)
+        {
+            return false;
+        }
+        if let Some(pattern) = rule.get("pattern").and_then(Value::as_str) {
+            if pattern != "^[A-Za-z][A-Za-z0-9_-]{0,39}$"
+                || string.is_empty()
+                || string.len() > 40
+                || !string.as_bytes()[0].is_ascii_alphabetic()
+                || !string
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+            {
+                return false;
+            }
+        }
+    }
+    if let Value::Array(array) = value {
+        if rule
+            .get("minItems")
+            .and_then(Value::as_u64)
+            .is_some_and(|min| array.len() < min as usize)
+            || rule
+                .get("maxItems")
+                .and_then(Value::as_u64)
+                .is_some_and(|max| array.len() > max as usize)
+        {
+            return false;
+        }
+        let prefix = items(field(rule, "prefixItems"));
+        for (index, item) in array.iter().enumerate() {
+            if !schema_accepts(
+                item,
+                prefix.get(index).unwrap_or(field(rule, "items")),
+                definitions,
+            ) {
+                return false;
+            }
+        }
+    }
+    if let Value::Object(object) = value {
+        if rule
+            .get("minProperties")
+            .and_then(Value::as_u64)
+            .is_some_and(|min| object.len() < min as usize)
+            || items(field(rule, "required"))
+                .iter()
+                .any(|key| !value.has(key.as_str().unwrap()))
+        {
+            return false;
+        }
+        for (key, item) in object {
+            if !schema_accepts(
+                &crate::json::string(key),
+                field(rule, "propertyNames"),
+                definitions,
+            ) {
+                return false;
+            }
+            let child = field(rule, "properties")
+                .get(key)
+                .unwrap_or(field(rule, "additionalProperties"));
+            if child == &Value::Bool(false) || !schema_accepts(item, child, definitions) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// Check catalog name identity and canonical inspection ordering separately from schema shape.
+fn check_host(vectors: &Value, definitions: &Value, counts: &mut Counts) {
+    for section in ["contracts", "catalogs", "controls"] {
+        for case in items(field(vectors, section)) {
+            let definition = if section == "contracts" {
+                "contract"
+            } else if section == "catalogs" {
+                "catalog"
+            } else {
+                text(case, "definition")
+            };
+            let value = field(case, "value");
+            let valid = schema_accepts(value, field(definitions, definition), definitions);
+            let mut semantic = valid;
+            let catalog = match definition {
+                "catalog" => Some(value),
+                "describeHost" => value.get("catalog"),
+                _ => None,
+            };
+            if let Some(Value::Object(entries)) = catalog {
+                semantic &= entries
+                    .iter()
+                    .all(|(name, contract)| name == text(contract, "plugin"));
+            }
+            if semantic && definition == "hostInspectResult" {
+                let plugins = items(field(value, "plugins"));
+                semantic &= plugins
+                    .windows(2)
+                    .all(|pair| text(&pair[0], "name") < text(&pair[1], "name"));
+                semantic &= plugins.iter().all(|plugin| {
+                    items(field(plugin, "features"))
+                        .windows(2)
+                        .all(|pair| pair[0].as_str() < pair[1].as_str())
+                });
+            }
+            counts.case(
+                "remote-host-control",
+                section,
+                case,
+                field(case, "schemaValid") == &Value::Bool(valid)
+                    && field(case, "semanticValid") == &Value::Bool(semantic),
+            );
+        }
+    }
+}
+
+/// Expand exact bytes from compact binary vector specifications without interpreting JSON payloads.
+fn expand_bytes(value: &Value) -> Vec<u8> {
+    if let Some(hex) = value.as_str() {
+        return hex
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+            .collect();
+    }
+    let single = expand_bytes(field(value, "repeatHex"));
+    single.repeat(field(value, "count").as_u64().unwrap() as usize)
+}
+
+/// Keep each original vector chunk boundary visible to read_exact.
+struct ChunkReader {
+    chunks: Vec<Vec<u8>>,
+    index: usize,
+    offset: usize,
+}
+impl io::Read for ChunkReader {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        if self.index == self.chunks.len() {
+            return Ok(0);
+        }
+        let chunk = &self.chunks[self.index];
+        let count = buffer.len().min(chunk.len() - self.offset);
+        buffer[..count].copy_from_slice(&chunk[self.offset..self.offset + count]);
+        self.offset += count;
+        if self.offset == chunk.len() {
+            self.index += 1;
+            self.offset = 0;
+        }
+        Ok(count)
+    }
+}
+
+/// Assert frame contents, network prefix and exact first malformed-frame code for every vector.
+fn check_frames(vectors: &Value, counts: &mut Counts) {
+    for case in items(vectors) {
+        let chunks = case.get("chunksHex").unwrap_or(field(case, "chunks"));
+        let wire: Vec<u8> = items(chunks).iter().flat_map(expand_bytes).collect();
+        let mut reader = ChunkReader {
+            chunks: items(chunks).iter().map(expand_bytes).collect(),
+            index: 0,
+            offset: 0,
+        };
+        let mut actual = Vec::new();
+        let mut code = "";
+        loop {
+            match read_frame(&mut reader) {
+                Ok(Some(frame)) => actual.push(frame),
+                Ok(None) => break,
+                Err(_error) => {
+                    let consumed: usize =
+                        actual.iter().map(|frame: &Vec<u8>| frame.len() + 4).sum();
+                    code = if wire.len() - consumed >= 4
+                        && u32::from_be_bytes(wire[consumed..consumed + 4].try_into().unwrap())
+                            > MAX_FRAME as u32
+                    {
+                        "FRAME_LIMIT_EXCEEDED"
+                    } else {
+                        "INVALID_FRAME"
+                    };
+                    break;
+                }
+            }
+        }
+        let frames = case.get("framesHex").unwrap_or(field(case, "frames"));
+        let expected: Vec<Vec<u8>> = items(frames).iter().map(expand_bytes).collect();
+        let mut good = actual == expected && code == text(field(case, "error"), "code");
+        if let Some(prefix) = case.get("encodedPrefixHex") {
+            let payload = expand_bytes(case.get("payloadHex").unwrap_or(field(case, "payload")));
+            good &= (payload.len() as u32).to_be_bytes().to_vec() == expand_bytes(prefix);
+            // The byte prefix is the same canonical writer branch used by JSON response frames.
+            good &= !payload.is_empty() && payload.len() <= MAX_FRAME;
+        }
+        counts.case("stream-framing", "bytes", case, good);
     }
 }

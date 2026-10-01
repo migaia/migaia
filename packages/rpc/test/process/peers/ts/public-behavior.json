@@ -1,0 +1,28 @@
+{
+  "schema": "migaia.rpc.public-peer-behavior/1",
+  "request": { "input": "value", "expected": "value" },
+  "oneWay": {
+    "inputs": ["first", "second", "third"],
+    "expected": { "count": 3, "values": ["first", "second", "third"] }
+  },
+  "generator": { "input": ["a", "b", "c"], "expected": ["a", "b", "c"] },
+  "error": {
+    "source": "@migaia/rpc/core",
+    "code": "INTERNAL",
+    "cause": {
+      "source": "@migaia/rpc/core",
+      "code": "INTERNAL",
+      "cause": { "source": "@migaia/rpc/core", "code": "INTERNAL", "message": "peer cause" }
+    }
+  },
+  "cancel": {
+    "reason": "stop",
+    "expectedCode": "CANCELLED",
+    "providerReason": { "name": "RangeError", "message": "stop" }
+  },
+  "host": {
+    "name": "p",
+    "installed": { "name": "p", "state": "enabled", "features": ["f"] },
+    "removed": { "ok": true }
+  }
+}
