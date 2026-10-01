@@ -23,5 +23,7 @@ export const RpcProcessErrorText = {
   /** The peer selected a codec for which this channel has no implementation. */
   negotiatedCodecUnsupported: 'process channel negotiated codec is unsupported',
   /** Handshake deadlines must be finite and non-negative. */
-  handshakeTimeoutInvalid: 'process channel handshake timeout is invalid'
+  handshakeTimeoutInvalid: 'process channel handshake timeout is invalid',
+  /** Process plugin admission rejects malformed deployment configuration before any side effect. */
+  pluginInvalidOption: 'process plugin options are invalid'
 } as const
