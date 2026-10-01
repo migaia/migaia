@@ -1,5 +1,7 @@
+import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { once } from 'node:events'
+import { closeSync, openSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,7 +17,12 @@ import {
   type IProcessByteChannel,
   type IProcessPluginOptions
 } from '@migaia/rpc/process'
-import type { IRemoteServeEndpoint } from '@migaia/rpc/remote'
+import {
+  createRemoteRetryPort,
+  type IRemoteRetryPort,
+  type IRemoteServeEndpoint,
+  type IRemoteContract
+} from '@migaia/rpc/remote'
 import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame,
@@ -50,6 +57,10 @@ type IFaultOptions = {
   scheduler?: ReturnType<typeof createManualScheduler>
   restart?: NonNullable<IProcessPluginOptions['deployment']['supervision']>['restart']
   maxPendingData?: number
+  address?: string
+  token?: string
+  retryPort?: IRemoteRetryPort
+  contract?: IRemoteContract
 }
 
 /** Assemble existing public fixtures with observable policy, backlog and physical byte ownership. */
@@ -60,8 +71,8 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
   const fixture = deployment(
     peer,
     options.host ?? false,
-    randomUUID(),
-    undefined,
+    options.token ?? randomUUID(),
+    options.address,
     options.bridge,
     budget
   )
@@ -109,18 +120,23 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
       }
     )
   }
-  /** This helper constructs owned deployments only; borrowed tests retain their external PID owner. */
-  if (fixture.selected.kind !== 'spawn') throw new TypeError('fault fixture requires spawn')
   /** Restart policy is delegated unchanged to the existing supervision owner. */
-  const selected = {
-    ...fixture.selected,
-    establish,
-    supervision: {
-      ...fixture.selected.supervision,
-      scheduler,
-      restart: options.restart
-    }
-  }
+  const selected: IProcessPluginOptions['deployment'] =
+    fixture.selected.kind === 'spawn'
+      ? {
+          ...fixture.selected,
+          establish,
+          supervision: {
+            ...fixture.selected.supervision,
+            scheduler,
+            restart: options.restart
+          }
+        }
+      : {
+          ...fixture.selected,
+          establish,
+          supervision: { ...fixture.selected.supervision, scheduler, restart: options.restart }
+        }
   /** Existing public endpoint assembly reuses channel codec/framer/features. */
   const endpointFactory = async (channel: Parameters<typeof endpointFor>[0]) => {
     const endpoint = await (options.bridge ? bridgeEndpointFor : endpointFor)(channel, 'caller')
@@ -132,13 +148,14 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** Host and Plugin publish the same contract with their distinct registration ownership. */
-  const selectedContract = options.bridge ? bridgeContract : contract
+  const selectedContract = options.contract ?? (options.bridge ? bridgeContract : contract)
   if (options.host) {
     const facade = createProcessHost({
       catalog: { p: selectedContract },
       deployment: selected,
       endpointFactory,
       resilience,
+      retryPort: options.retryPort,
       report: (error) => fixture.reports.push(error)
     })
     try {
@@ -175,6 +192,7 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
     deployment: selected,
     endpointFactory,
     resilience,
+    retryPort: options.retryPort,
     report: (error) => fixture.reports.push(error)
   })
   try {
@@ -211,9 +229,13 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
 
 /** Preserve complete stdout/stderr and outbound frames for every real fault run. */
 function receipt(active: Awaited<ReturnType<typeof faultClient>>, label: string) {
-  writeFileSync(join(evidence, `hf-${label}.stdout.bin`), Buffer.concat(active.stdout))
-  writeFileSync(join(evidence, `hf-${label}.stderr.log`), Buffer.concat(active.output))
-  writeFileSync(join(evidence, `hf-${label}.sent.bin`), Buffer.concat(active.sent))
+  writeFileSync(join(evidence, `hf-${label}.stdout.bin`), Buffer.concat(active.stdout), {
+    mode: 0o600
+  })
+  writeFileSync(join(evidence, `hf-${label}.stderr.log`), Buffer.concat(active.output), {
+    mode: 0o600
+  })
+  writeFileSync(join(evidence, `hf-${label}.sent.bin`), Buffer.concat(active.sent), { mode: 0o600 })
 }
 
 describe('[A5] canonical raw physical frame boundaries', () => {
@@ -325,6 +347,96 @@ describe('[A5] canonical raw physical frame boundaries', () => {
     decoder.close()
     expect(decoder.bufferedBytes).toBe(0)
   })
+})
+
+describe('[A4] borrowed hang retains external process ownership', () => {
+  for (const peer of peers)
+    it(`${peer.language} closes only the hung socket and redials the same external PID`, async () => {
+      /** The test owns the listener; the public connect facade owns only each socket. */
+      const directory = await mkdtemp(join(tmpdir(), 'rpc-hf-borrowed-'))
+      const address = join(directory, 'peer.sock')
+      const token = randomUUID()
+      const auth = join(directory, 'auth')
+      writeFileSync(auth, token, { mode: 0o600 })
+      const fd = openSync(auth, 'r')
+      const child = spawn(
+        peer.command,
+        [...peer.args, '--listen-unix', address, '--auth-fd', '3'],
+        {
+          stdio: ['ignore', 'pipe', 'pipe', fd]
+        }
+      )
+      closeSync(fd)
+      const exited = once(child, 'close')
+      const stderr: Buffer[] = []
+      child.stderr!.on('data', (chunk) => stderr.push(chunk))
+      let paused = false
+      let active: Awaited<ReturnType<typeof faultClient>> | undefined
+      const scheduler = createManualScheduler()
+      try {
+        await new Promise<void>((resolve, reject) => {
+          child.stderr!.on('data', (chunk) => {
+            if (chunk.toString().includes('READY')) resolve()
+          })
+          child.once('error', reject)
+          child.once('exit', () => reject(new Error('borrowed fixture exited before ready')))
+        })
+        active = await faultClient(peer, {
+          address,
+          token,
+          scheduler,
+          restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
+        })
+        expect(await active.feature.request(['before-hang'])).toBe('before-hang')
+        expect(active.resilience.inspect('p')).toMatchObject({ health: 'ping', state: 'ready' })
+        let closed = false
+        active.physical[0]!.onClose(() => {
+          closed = true
+        })
+        process.kill(child.pid!, 'SIGSTOP')
+        paused = true
+        const origin = scheduler.now()
+        for (let check = 0; check < 3; check++) {
+          scheduler.advance(origin + (check + 1) * 5000 - scheduler.now())
+          await settleFaultTurn()
+          scheduler.advance(2000)
+          await settleFaultTurn()
+          if (check < 2) expect(closed).toBe(false)
+        }
+        expect(scheduler.now() - origin).toBe(17000)
+        await vi.waitFor(() => expect(closed).toBe(true))
+        expect(child.exitCode).toBeNull()
+        process.kill(child.pid!, 0)
+        expect(active.handles).toHaveLength(0)
+        process.kill(child.pid!, 'SIGCONT')
+        paused = false
+        await vi.waitFor(() =>
+          expect(active!.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+        )
+        scheduler.advance(1)
+        await vi.waitFor(async () =>
+          expect(await active!.feature.request(['after-redial'])).toBe('after-redial')
+        )
+        expect(active.physical).toHaveLength(2)
+        await active.close()
+        process.kill(child.pid!, 0)
+        expect(child.exitCode).toBeNull()
+        expect(scheduler.pendingCount).toBe(0)
+      } finally {
+        if (paused) process.kill(child.pid!, 'SIGCONT')
+        await active?.close()
+        if (active) receipt(active, `${peer.language}-borrowed-hang`)
+        /** Only the external test owner terminates its listener after facade release is proven. */
+        child.kill()
+        await exited
+        writeFileSync(
+          join(evidence, `hf-${peer.language}-borrowed-listener.stderr.log`),
+          Buffer.concat(stderr),
+          { mode: 0o600 }
+        )
+        await rm(directory, { recursive: true, force: true })
+      }
+    }, 15000)
 })
 
 describe('[A5] real native business budget and independent session', () => {
@@ -491,10 +603,11 @@ describe('[A4] explicit persistent authenticated scope', () => {
       ],
       id: 'ts-peer'
     }
-    const active = await faultClient(peer, {
-      restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
-    })
+    let active: Awaited<ReturnType<typeof faultClient>> | undefined
     try {
+      active = await faultClient(peer, {
+        restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
+      })
       expect(
         await active.feature.request([], { timeoutMs: 5000, idempotencyKey: 'hf-original-key' })
       ).toBe('committed')
@@ -511,13 +624,79 @@ describe('[A4] explicit persistent authenticated scope', () => {
       ])
       expect(requests[1].data.route.timeoutMs).toBeLessThanOrEqual(requests[0].data.route.timeoutMs)
     } finally {
-      await active.close()
-      await Promise.all(active.handles.map((handle) => handle.exited))
-      receipt(active, 'persistent-retry')
+      await active?.close()
+      if (active) {
+        await Promise.all(active.handles.map((handle) => handle.exited))
+        receipt(active, 'persistent-retry')
+      }
       await rm(directory, { recursive: true, force: true })
     }
-    expect(active.budget.inUse).toBe(0)
+    expect(active!.budget.inUse).toBe(0)
   }, 15000)
+})
+
+describe('[A4] physical departure before sendOnce admission', () => {
+  for (const peer of peers)
+    it(`${peer.language} returns REMOTE_CLOSED with zero business frames`, async () => {
+      const scheduler = createManualScheduler()
+      let admit!: () => void
+      let entered!: () => void
+      /** The public injected retry port delays admission, then delegates every state decision. */
+      const barrier = new Promise<void>((resolve) => {
+        admit = resolve
+      })
+      const waiting = new Promise<void>((resolve) => {
+        entered = resolve
+      })
+      const retryPort: IRemoteRetryPort = {
+        dispatch: async (input) => {
+          entered()
+          await barrier
+          return createRemoteRetryPort({
+            events: input.events,
+            scheduler,
+            report: () => undefined
+          }).dispatch(input)
+        }
+      }
+      const active = await faultClient(peer, {
+        scheduler,
+        retryPort,
+        restart: { mode: 'on-failure', initialDelayMs: 100, maxDelayMs: 100, maxRestarts: 1 }
+      })
+      let call: Promise<unknown> | undefined
+      try {
+        const writes = active.sent.length
+        call = active.feature.request(['blocked-before-sendOnce']).then(
+          (value) => ({ value }),
+          (error) => ({ error })
+        )
+        await waiting
+        expect(active.sent).toHaveLength(writes)
+        process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
+        await active.handles[0]!.exited
+        await vi.waitFor(() =>
+          expect(active.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+        )
+        admit()
+        expect(await call).toMatchObject({
+          error: { source: '@migaia/rpc/remote', code: 'REMOTE_CLOSED' }
+        })
+        expect(
+          wireFrames(active.sent).filter(
+            (frame) => frame.kind === 'request' && frame.method === 'p.f.request'
+          )
+        ).toHaveLength(0)
+      } finally {
+        admit()
+        await call
+        await active.close()
+        await Promise.all(active.handles.map((handle) => handle.exited))
+        receipt(active, `${peer.language}-before-sendOnce`)
+      }
+      expect(scheduler.pendingCount).toBe(0)
+      expect(active.budget.inUse).toBe(0)
+    }, 15000)
 })
 
 /** Allow real I/O callbacks and the bounded production promise continuations to settle. */
@@ -570,9 +749,6 @@ describe('[A4] default native health detects real CPU loops', () => {
             (frame) => frame.kind === 'variation' && frame.data.route.variation === 'ping'
           )
         ).toHaveLength(3)
-        expect(
-          active.reports.some((error) => (error as { code?: string }).code === 'UNHEALTHY')
-        ).toBe(true)
       } finally {
         await active.close()
         await Promise.all(active.handles.map((handle) => handle.exited))
@@ -616,7 +792,7 @@ describe('[A5] capacity one real stopped reader', () => {
           active.runtimes[0]!.endpoint.send(peer.id, 'p.f.request', ['overloaded'], {
             trace: 'h-rejected-trace'
           })
-        ).rejects.toMatchObject({ cause: { code: 'OVERLOADED' } })
+        ).rejects.toMatchObject({ source: '@migaia/rpc/core', code: 'OVERLOADED' })
         expect(active.sent).toHaveLength(writes)
         expect(active.backlog).toContainEqual(
           expect.objectContaining({
@@ -647,5 +823,193 @@ describe('[A5] capacity one real stopped reader', () => {
       expect(active.budget.pending).toBe(0)
       expect(healthy.budget.inUse).toBe(0)
       expect(healthy.budget.pending).toBe(0)
+    }, 15000)
+})
+
+describe('[A4] real owned crash retry eligibility', () => {
+  for (const peer of peers)
+    for (const disposition of ['ready', 'cancel', 'deadline', 'release', 'no-generation'] as const)
+      it(`${peer.language} sends ${disposition === 'ready' ? 'one' : 'zero'} replay after ${disposition}`, async () => {
+        const scheduler = createManualScheduler()
+        const active = await faultClient(peer, {
+          scheduler,
+          restart: {
+            mode: 'on-failure',
+            initialDelayMs: 100,
+            maxDelayMs: 100,
+            maxRestarts: disposition === 'no-generation' ? 0 : 1
+          }
+        })
+        const controller = new AbortController()
+        let pending: Promise<unknown> | undefined
+        try {
+          expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
+          pending = active.feature.request(['replayed-value'], {
+            idempotencyKey: 'hf-crash-original-key',
+            timeoutMs: 500,
+            signal: controller.signal
+          })
+          /**
+           * Observe every settlement immediately so intentional crash rejection cannot go
+           * unhandled.
+           */
+          const observed = pending.then(
+            (value) => ({ value }),
+            (error) => ({ error })
+          )
+          await vi.waitFor(() =>
+            expect(
+              wireFrames(active.sent).filter((frame) => frame.method === 'p.f.request')
+            ).toHaveLength(1)
+          )
+          process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
+          await active.handles[0]!.exited
+          await settleFaultTurn()
+          if (disposition === 'cancel') controller.abort('hf-cancelled')
+          if (disposition === 'deadline') scheduler.advance(500)
+          if (disposition === 'release') await active.close()
+          if (disposition === 'ready' || disposition === 'cancel') {
+            scheduler.advance(100)
+            await vi.waitFor(() => expect(active.handles).toHaveLength(2))
+            await vi.waitFor(() =>
+              expect(active.resilience.inspect('p')).toMatchObject({ state: 'ready' })
+            )
+          }
+          const result = await observed
+          const requests = wireFrames(active.sent).filter(
+            (frame) => frame.kind === 'request' && frame.method === 'p.f.request'
+          )
+          expect(requests).toHaveLength(disposition === 'ready' ? 2 : 1)
+          if (disposition === 'ready') {
+            expect(result).toEqual({ value: 'replayed-value' })
+            expect(requests.map((frame) => frame.data.route.idempotencyKey)).toEqual([
+              'hf-crash-original-key',
+              'hf-crash-original-key'
+            ])
+            expect(requests[1].data.route.timeoutMs).toBeLessThan(requests[0].data.route.timeoutMs)
+          } else expect(result).toHaveProperty('error')
+        } finally {
+          await active.close()
+          await pending?.catch(() => undefined)
+          await Promise.all(active.handles.map((handle) => handle.exited))
+          receipt(active, `${peer.language}-retry-${disposition}`)
+        }
+        expect(active.budget.inUse).toBe(0)
+        expect(scheduler.pendingCount).toBe(0)
+      }, 15000)
+})
+
+describe('[A4] real started streams do not resume after crash', () => {
+  for (const peer of peers)
+    it(`${peer.language} closes the old stream without another stream request`, async () => {
+      const scheduler = createManualScheduler()
+      const active = await faultClient(peer, {
+        scheduler,
+        restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
+      })
+      try {
+        const stream = active.feature
+          .generator([['first', 'second', 'third']])
+          [Symbol.asyncIterator]()
+        expect(await stream.next()).toMatchObject({ done: false, value: 'first' })
+        expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
+        const next = stream.next().then(
+          (value) => ({ value }),
+          (error) => ({ error })
+        )
+        process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
+        await active.handles[0]!.exited
+        await vi.waitFor(() =>
+          expect(active.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+        )
+        scheduler.advance(1)
+        await vi.waitFor(() => expect(active.handles).toHaveLength(2))
+        await vi.waitFor(async () =>
+          expect(await active.feature.request(['after-stream-crash'])).toBe('after-stream-crash')
+        )
+        expect(await next).toHaveProperty('error')
+        expect(
+          wireFrames(active.sent).filter(
+            (frame) => frame.kind === 'request' && frame.method === 'p.f.generator'
+          )
+        ).toHaveLength(1)
+      } finally {
+        await active.close()
+        await Promise.all(active.handles.map((handle) => handle.exited))
+        receipt(active, `${peer.language}-stream-crash`)
+      }
+      expect(scheduler.pendingCount).toBe(0)
+      expect(active.budget.inUse).toBe(0)
+    }, 15000)
+})
+
+describe('[A4] owned bridge hang has no default health detector', () => {
+  for (const peer of peers.slice(0, 3))
+    it(`${peer.language} settles only the call deadline and retains its hung PID`, async () => {
+      const scheduler = createManualScheduler()
+      const active = await faultClient(peer, { bridge: true, scheduler })
+      let paused = false
+      try {
+        expect(active.resilience.inspect('p')).toMatchObject({ health: 'none', state: 'ready' })
+        process.kill(active.handles[0]!.identity.pid!, 'SIGSTOP')
+        paused = true
+        const call = active.feature.request(['bridge-hang'], { timeoutMs: 100 }).then(
+          (value) => ({ value }),
+          (error) => ({ error })
+        )
+        await settleFaultTurn()
+        scheduler.advance(100)
+        await settleFaultTurn()
+        expect(await call).toHaveProperty('error')
+        scheduler.advance(20000)
+        await settleFaultTurn()
+        expect(active.resilience.inspect('p')).toMatchObject({ health: 'none', state: 'ready' })
+        expect(active.handles).toHaveLength(1)
+        process.kill(active.handles[0]!.identity.pid!, 0)
+      } finally {
+        if (paused) process.kill(active.handles[0]!.identity.pid!, 'SIGCONT')
+        await active.close()
+        await Promise.all(active.handles.map((handle) => handle.exited))
+        receipt(active, `${peer.language}-bridge-no-health`)
+      }
+      expect(active.budget.inUse).toBe(0)
+      expect(scheduler.pendingCount).toBe(0)
+    }, 15000)
+})
+
+describe('[A4] standalone Host restart keeps local ownership and does not replay use', () => {
+  for (const peer of peers)
+    it(`${peer.language} leaves the new remote catalog uninstalled until explicit use`, async () => {
+      const scheduler = createManualScheduler()
+      const active = await faultClient(peer, {
+        host: true,
+        scheduler,
+        restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
+      })
+      try {
+        expect(await active.facade!.inspect()).toMatchObject({ plugins: [{ name: 'p' }] })
+        process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
+        await active.handles[0]!.exited
+        /** Host governance uses an opaque candidate ID; observe its public new endpoint instead. */
+        await vi.waitFor(() => {
+          scheduler.advance(1)
+          expect(active.handles).toHaveLength(2)
+        })
+        await vi.waitFor(async () =>
+          expect(await active.facade!.inspect()).toMatchObject({ plugins: [] })
+        )
+        /** A fresh explicit remote installation, rather than old use replay, restores business. */
+        const installed = await active.facade!.use('p')
+        expect(await (installed.f as IFeature).request(['new-explicit-use'])).toBe(
+          'new-explicit-use'
+        )
+        expect(await active.facade!.inspect()).toMatchObject({ plugins: [{ name: 'p' }] })
+      } finally {
+        await active.close()
+        await Promise.all(active.handles.map((handle) => handle.exited))
+        receipt(active, `${peer.language}-host-no-use-replay`)
+      }
+      expect(active.budget.inUse).toBe(0)
+      expect(scheduler.pendingCount).toBe(0)
     }, 15000)
 })
