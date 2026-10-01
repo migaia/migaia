@@ -122,6 +122,33 @@
       "first": "rejected-before-ready",
       "sentinelMinimumSubstring": 6,
       "second": "valid-session-still-alive"
+    },
+    {
+      "id": "jsonrpc-bare-physical-echo",
+      "runtimes": [
+        "python",
+        "rust",
+        "go"
+      ],
+      "parentRuntimes": [
+        "node",
+        "bun"
+      ],
+      "deployments": [
+        "stdio-content-length",
+        "socket-content-length"
+      ],
+      "payloadBytes": [
+        64,
+        1024,
+        65536,
+        1048576
+      ],
+      "bare": "exact-body-bytes-no-json-or-business-dispatch",
+      "rpc": "public-bridge-p.f.request",
+      "bootstrap": "dedicated-fd-both-sides",
+      "oracle": "test/process/conformance-bench.test.ts",
+      "preparationEchoesPerSide": 3
     }
   ]
 }

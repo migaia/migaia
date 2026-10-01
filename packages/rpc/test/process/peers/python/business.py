@@ -167,9 +167,13 @@ class Business:
         return [native_response(message, result, error)]
 
 
-def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bridge: bool = False) -> None:
+def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bridge: bool = False, bare: bool = False) -> None:
     """Authenticate before publishing the independent native service; EOF releases session state."""
     if bridge:
+        if bare:
+            while (body := bridge_body(reader)) is not None:
+                bridge_write_body(writer, body)
+            return
         serve_bridge(reader, writer, host, token)
         return
     raw = peer.read_frame(reader, peer.MAX_HANDSHAKE)
@@ -195,7 +199,7 @@ BRIDGE_METHODS = ["migaia.hello", "migaia.describe", "migaia.invoke", "migaia.ca
 BRIDGE_CAPABILITIES = ["abort@1", "jsonrpc-bridge@1", "wire-error@1", "deadline@1", "trace@1", "idempotency@1"]
 
 
-def bridge_read(reader: BinaryIO) -> Any:
+def bridge_body(reader: BinaryIO) -> bytes | None:
     """Bound a Content-Length header before reading its exact UTF-8 body."""
     header = bytearray()
     while not header.endswith(b"\r\n\r\n"):
@@ -209,14 +213,25 @@ def bridge_read(reader: BinaryIO) -> Any:
     lengths = [line.split(":", 1)[1].strip() for line in fields if line.lower().startswith("content-length:")]
     if len(lengths) != 1 or not lengths[0].isdigit() or not 1 <= int(lengths[0]) <= peer.MAX_FRAME:
         raise peer.PeerFailure("INVALID_FRAME_LENGTH")
-    return peer.decode_frame(peer.read_exact(reader, int(lengths[0])))
+    return peer.read_exact(reader, int(lengths[0]))
+
+
+def bridge_read(reader: BinaryIO) -> Any:
+    """Apply the existing strict JSON decoder only on RPC business sides."""
+    body = bridge_body(reader)
+    return None if body is None else peer.decode_frame(body)
+
+
+def bridge_write_body(writer: BinaryIO, body: bytes) -> None:
+    """Physical echo and RPC replies share this same byte-counted carrier writer."""
+    writer.write(f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body)
+    writer.flush()
 
 
 def bridge_write(writer: BinaryIO, message: Any) -> None:
     """Content-Length counts UTF-8 bytes and never emits native framing or controls."""
     body = json.dumps(message, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
-    writer.write(f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body)
-    writer.flush()
+    bridge_write_body(writer, body)
 
 
 def serve_bridge(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None) -> None:
@@ -280,7 +295,7 @@ def run_business(args: Any) -> int:
                 raise peer.PeerFailure("BOOTSTRAP_INVALID")
             token = raw.decode("utf-8")
         print(f"READY pid={os.getpid()}", file=sys.stderr, flush=True)
-        serve(sys.stdin.buffer, sys.stdout.buffer, args.host, token, args.jsonrpc)
+        serve(sys.stdin.buffer, sys.stdout.buffer, args.host, token, args.jsonrpc, args.bare_jsonrpc)
         return 0
     if not args.listen_unix or token is None:
         raise peer.PeerFailure("AUTH_REQUIRED")
@@ -292,6 +307,6 @@ def run_business(args: Any) -> int:
             conn, _ = listener.accept()
             with conn, conn.makefile("rb") as reader, conn.makefile("wb") as writer:
                 try:
-                    serve(reader, writer, args.host, token, args.jsonrpc)
+                    serve(reader, writer, args.host, token, args.jsonrpc, args.bare_jsonrpc)
                 except (peer.PeerFailure, BrokenPipeError, ConnectionResetError):
                     print("PEER_FAIL BUSINESS_SESSION", file=sys.stderr, flush=True)

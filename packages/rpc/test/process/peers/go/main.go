@@ -611,6 +611,7 @@ func serveUnix(path, role string) error {
 func main() {
 	business := flag.Bool("business", false, "serve published business profile")
 	bridge := flag.Bool("jsonrpc", false, "serve Content-Length bridge profile")
+	bare := flag.Bool("bare-jsonrpc", false, "echo physical Content-Length frames")
 	host := flag.Bool("host", false, "serve portable Host controls")
 	bootstrap := flag.String("bootstrap", "none", "native stdin bootstrap")
 	authFD := flag.Int("auth-fd", -1, "inherited auth descriptor")
@@ -635,7 +636,7 @@ func main() {
 	}
 	var err error
 	if *business {
-		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *contractPath, *bridge)
+		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *contractPath, *bridge, *bare)
 	} else if *listenUnix != "" {
 		err = serveUnix(*listenUnix, *role)
 	} else if *connectUnix != "" {
