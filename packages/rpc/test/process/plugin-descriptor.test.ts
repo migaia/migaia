@@ -164,6 +164,20 @@ describe('process plugin descriptor', () => {
     )
   })
 
+  it('[A10/BC4] rejects an explicitly false nonSecret literal marker', () => {
+    /** A valid descriptor changes only the public literal's required explicit opt-in. */
+    const input = JSON.parse(
+      JSON.stringify(vectors.cases.find((item) => item.id === 'spawn-native-stdin')!.value)
+    )
+    input.deployment.spec.env.set = { PUBLIC: { value: 'public', nonSecret: false } }
+    expect(() => parseProcessPluginDescriptor(input)).toThrowError(
+      expect.objectContaining({
+        code: 'PROCESS_PLUGIN_INVALID_OPTION',
+        detail: { field: 'descriptor.deployment.spec.env.set.PUBLIC' }
+      })
+    )
+  })
+
   it('[A10] sorts and freezes the two normalized host catalog entries', () => {
     const input = vectors.cases.find((vector) => vector.id === 'host-spawn')!.value
     const result = parseProcessPluginDescriptor(input) as {
