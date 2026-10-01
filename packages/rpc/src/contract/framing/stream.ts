@@ -35,6 +35,14 @@ export function encodeRpcStreamFrame(payload: Uint8Array): Uint8Array {
 export function createRpcStreamFrameDecoder(
   options: IRpcStreamFrameDecoderOptions
 ): IRpcStreamFrameDecoder {
+  return createRpcStreamFrameDecoderWithLimit(options, () => RPC_STREAM_MAX_FRAME_BYTES)
+}
+
+/** Internal process boundary supplies a phase-specific cap before payload allocation. */
+export function createRpcStreamFrameDecoderWithLimit(
+  options: IRpcStreamFrameDecoderOptions,
+  maxFrameBytes: () => number
+): IRpcStreamFrameDecoder {
   /** Partial prefix, reused for each frame. */
   const header = new Uint8Array(4)
   /** Number of prefix bytes received so far. */
@@ -76,7 +84,7 @@ export function createRpcStreamFrameDecoder(
             fail(RpcContractErrorCode.invalidFrame)
             return
           }
-          if (length > RPC_STREAM_MAX_FRAME_BYTES) {
+          if (length > maxFrameBytes()) {
             fail(RpcContractErrorCode.frameLimitExceeded)
             return
           }

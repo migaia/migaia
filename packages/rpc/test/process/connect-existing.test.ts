@@ -28,6 +28,49 @@ function ipc(id: string) {
 }
 
 describe('Node rendezvous sockets', () => {
+  it('[D4] rejects a 16 MiB header before verifier admission', async () => {
+    let verifierCalls = 0
+    /** The server's rejected accept is the observable pre-auth boundary. */
+    let settle: (error: unknown) => void = () => undefined
+    const rejected = new Promise<unknown>((resolve) => {
+      settle = resolve
+    })
+    const listener = await listenProcessByteChannel({
+      address: 'tcp://127.0.0.1:0',
+      auth: {
+        mode: 'required',
+        verify: () => {
+          verifierCalls += 1
+          return 'principal'
+        }
+      },
+      report: () => undefined,
+      async onConnection(pending) {
+        try {
+          await pending.accept({
+            peerId: 'untrusted',
+            offer: responderOffer,
+            report: () => undefined,
+            ipc: ipc('oversized')
+          })
+          settle(undefined)
+        } catch (error) {
+          settle(error)
+        }
+      }
+    })
+    const raw = await dialProcessByteChannel({ address: listener.address })
+    try {
+      /** The four-byte prefix alone declares 16 MiB; no payload is transmitted. */
+      await raw.write(new Uint8Array([1, 0, 0, 0])).catch(() => undefined)
+      await expect(rejected).resolves.toMatchObject({ code: 'FRAME_LIMIT_EXCEEDED' })
+      expect(verifierCalls).toBe(0)
+    } finally {
+      await raw.close()
+      await listener.close()
+    }
+  })
+
   it('[A10] accepts only a verified pending connection and keeps it after listener close', async () => {
     /** Responder fulfillment proves the socket reached the authenticated ready state. */
     let resolveAccepted: (value: IAuthenticatedProcessChannel) => void = () => undefined

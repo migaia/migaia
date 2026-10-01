@@ -15,6 +15,7 @@ import type { IIpcLogRecord } from '../../src/core/plugins/flow-control.js'
 function createBytePort(): Readonly<{
   channel: IProcessByteChannel
   emitText(text: string): void
+  emitBytes(bytes: Uint8Array): void
   settleWrite(error?: unknown): void
   readonly writes: readonly Uint8Array[]
   readonly removals: number
@@ -61,6 +62,9 @@ function createBytePort(): Readonly<{
     channel,
     emitText(text) {
       dataListener?.(encodeRpcStreamFrame(new TextEncoder().encode(text)))
+    },
+    emitBytes(bytes) {
+      dataListener?.(bytes)
     },
     settleWrite(error) {
       if (error === undefined) pendingWrite?.resolve()
@@ -194,6 +198,17 @@ describe('process channel boundary', () => {
     const received: unknown[] = []
     wire.transport.subscribe((message) => received.push(message.data))
     expect(received).toEqual([])
+    await wire.close()
+  })
+
+  it('[D4] rejects a 16 MiB unauthenticated frame at its header', async () => {
+    const port = createBytePort()
+    const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
+    const handshake = wire.readHandshakeFrame()
+    /** No payload bytes are sent; rejection must happen before payload allocation. */
+    port.emitBytes(new Uint8Array([1, 0, 0, 0]))
+    await expect(handshake).rejects.toMatchObject({ code: 'FRAME_LIMIT_EXCEEDED' })
+    expect(wire.closed).toBe(true)
     await wire.close()
   })
 

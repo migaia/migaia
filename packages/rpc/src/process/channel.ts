@@ -4,8 +4,9 @@ import { resolveAbortReason } from '../core/internal/async-control.js'
 import { RpcContractErrorCode } from '../contract/error-code.js'
 import { RpcHandshakeStep, RpcReservedKind } from '../contract/wire-constants.js'
 import {
-  createRpcStreamFrameDecoder,
+  createRpcStreamFrameDecoderWithLimit,
   encodeRpcStreamFrame,
+  RPC_STREAM_MAX_FRAME_BYTES,
   type IRpcStreamFrameDecoder
 } from '../contract/framing/stream.js'
 import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
@@ -17,6 +18,7 @@ import {
   RpcTransportTopology
 } from '../core/transport-constants.js'
 import { RpcProcessErrorCode } from './error-code.js'
+import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from './constants.js'
 import { createProcessError } from './error.js'
 import { RpcProcessErrorText } from './error-text.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
@@ -35,6 +37,7 @@ const MAX_EARLY_BUSINESS_BYTES = 1024 * 1024
 export type IProcessFrameSource = Readonly<{
   decoder: IRpcStreamFrameDecoder
   attach(onFrame: (frame: Uint8Array) => void, onError: (error: Error) => void): () => void
+  activate?(): void
 }>
 
 /** Registration is internal to the process package and never changes the byte-port contract. */
@@ -252,12 +255,15 @@ export function bindProcessByteWire(
   frameSources.delete(channel)
   const decoder =
     frameSource?.decoder ??
-    createRpcStreamFrameDecoder({
-      onFrame,
-      onError(error) {
-        void terminate(error)
-      }
-    })
+    createRpcStreamFrameDecoderWithLimit(
+      {
+        onFrame,
+        onError(error) {
+          void terminate(error)
+        }
+      },
+      () => (ready ? RPC_STREAM_MAX_FRAME_BYTES : PROCESS_HANDSHAKE_MAX_FRAME_BYTES)
+    )
 
   /** One data subscription owns the decoder for this physical channel. */
   removeData = frameSource
@@ -376,6 +382,7 @@ export function bindProcessByteWire(
       if (closed) throw terminalError
       if (!handshakeReceived) throw createContractError(RpcContractErrorCode.handshakeInvalid)
       ready = true
+      frameSource?.activate?.()
       flushBusiness()
     },
     writeText,
