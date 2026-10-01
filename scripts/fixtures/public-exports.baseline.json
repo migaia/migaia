@@ -307,6 +307,11 @@
       ]
     },
     "@migaia/rpc": {
+      "./bridge/jsonrpc": [
+        "JsonRpcBridgeErrorCode",
+        "JsonRpcBridgeErrorText",
+        "createJsonRpcRemoteChannel"
+      ],
       "./process": [
         "ProcessPluginWire",
         "RpcProcessErrorCode",
