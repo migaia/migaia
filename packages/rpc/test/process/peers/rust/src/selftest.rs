@@ -507,8 +507,38 @@ fn check_handshake(file: &str, root: &Value, counts: &mut Counts) {
     }
     for case in items(field(root, "mismatch")) {
         let accept = field(case, "accept");
-        let valid =
-            field(accept, "major").as_u64() != Some(1) && text(case, "violation") == "mismatch";
+        // Compare the received acceptance to a real local offer, not a case-label predicate.
+        let offered = crate::json::object(&[
+            (
+                "versions",
+                Value::Array(vec![crate::json::object(&[
+                    ("major", crate::json::number(1)),
+                    ("minor", crate::json::number(1)),
+                ])]),
+            ),
+            ("codecs", Value::Array(vec![crate::json::string("json")])),
+            (
+                "capabilities",
+                Value::Array(vec![
+                    crate::json::string("abort@1"),
+                    crate::json::string("wire-error@1"),
+                    crate::json::string("stream@1"),
+                ]),
+            ),
+        ]);
+        let version = items(field(&offered, "versions"))
+            .iter()
+            .find(|version| field(version, "major") == field(accept, "major"));
+        let admitted = version.is_some_and(|version| {
+            field(accept, "minor")
+                .as_u64()
+                .is_some_and(|minor| minor <= field(version, "minor").as_u64().unwrap())
+        }) && items(field(&offered, "codecs")).contains(field(accept, "codec"))
+            && items(field(accept, "capabilities"))
+                .iter()
+                .all(|capability| items(field(&offered, "capabilities")).contains(capability));
+        let violation = if admitted { None } else { Some("mismatch") };
+        let valid = violation == Some(text(case, "violation"));
         counts.case(file, "mismatch", case, valid);
     }
 }
@@ -550,6 +580,49 @@ fn check_envelope(file: &str, root: &Value, counts: &mut Counts, stream_known: b
                 && envelope_unknown(field(case, "value")) == *field(case, "expected"),
         );
     }
+    // The sequence is evaluated through a connection-local warning cache, including index aliases.
+    let warnings = field(root, "warnings");
+    let mut seen = std::collections::HashSet::new();
+    let mut observed = vec![];
+    let bounded = |text: &str, maximum: usize| {
+        if text.chars().count() <= maximum {
+            text.to_owned()
+        } else {
+            format!("{}…", text.chars().take(maximum).collect::<String>())
+        }
+    };
+    for note in items(field(warnings, "sequence")) {
+        let pointer = text(note, "pointer")
+            .split('/')
+            .map(|part| {
+                if !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()) {
+                    "*"
+                } else {
+                    part
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("/");
+        let key = format!(
+            "{}{}#{}",
+            bounded(text(note, "kind"), 32),
+            bounded(&pointer, 128),
+            bounded(text(note, "field"), 64)
+        );
+        let identity = (text(note, "connection").to_owned(), key);
+        if seen.insert(identity.clone()) {
+            observed.push(Value::Array(vec![
+                crate::json::string(&identity.0),
+                crate::json::string(&identity.1),
+            ]));
+        }
+    }
+    counts.case(
+        file,
+        "warnings",
+        &crate::json::object(&[("id", crate::json::string("sequence"))]),
+        Value::Array(observed) == *field(warnings, "expected"),
+    );
 }
 
 fn check_control(file: &str, root: &Value, counts: &mut Counts) {
@@ -795,13 +868,36 @@ fn check_stream(root: &Value, counts: &mut Counts) {
             )),
     );
     let handshake = field(root, "handshake");
+    // The actual negotiation consumes both offers and selects the lower compatible minor.
+    let offer = |version: &Value| {
+        crate::json::object(&[
+            ("kind", crate::json::string("handshake")),
+            ("step", crate::json::string("hello")),
+            ("protocol", crate::json::string("migaia.rpc")),
+            ("versions", Value::Array(vec![version.clone()])),
+            ("codecs", Value::Array(vec![crate::json::string("json")])),
+            ("capabilities", field(handshake, "capabilities").clone()),
+            (
+                "peer",
+                crate::json::object(&[
+                    ("id", crate::json::string("stream-vector")),
+                    ("runtime", crate::json::string("rust")),
+                ]),
+            ),
+        ])
+    };
+    let negotiated = agreement(
+        &offer(field(handshake, "newVersion")),
+        &offer(field(handshake, "oldVersion")),
+    );
     counts.case(
         "stream.json",
         "handshake",
         handshake,
-        field(field(handshake, "newVersion"), "minor").as_u64() == Some(1)
-            && field(field(handshake, "oldVersion"), "minor").as_u64() == Some(0)
-            && field(handshake, "negotiatedMinor").as_u64() == Some(0),
+        negotiated.as_ref().is_some_and(|actual| {
+            field(actual, "minor") == field(handshake, "negotiatedMinor")
+                && field(actual, "capabilities") == field(handshake, "capabilities")
+        }),
     );
 }
 

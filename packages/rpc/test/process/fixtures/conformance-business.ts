@@ -124,6 +124,8 @@ function deployment(
   /** An observer retains emitted wire frames without implementing framing or changing backpressure. */
   const sent: Uint8Array[] = []
   const reports: unknown[] = []
+  /** Exact public byte ports permit a physical EOF independent of endpoint abort/close messages. */
+  const rawChannels: IProcessByteChannel[] = []
   const launcher = bridge ? fdLauncher() : createNodeProcessLauncher()
   /** Borrowed bridge uses the existing explicit health override; default none remains K231 blocked. */
   let established: IRemoteChannel | undefined
@@ -137,6 +139,7 @@ function deployment(
       : peer
   const establish: IProcessPluginOptions['deployment']['establish'] = (raw, context) => {
     if (raw.kind !== 'byte') throw new TypeError('business peer requires bytes')
+    rawChannels.push(raw)
     raw.onData((chunk) => stdout.push(chunk.slice()))
     const observed = {
       ...raw,
@@ -261,7 +264,7 @@ function deployment(
         },
         establish
       }
-  return { selected, handles, output, stdout, sent, reports }
+  return { selected, handles, output, stdout, sent, reports, rawChannels }
 }
 /**
  * Install the public processPlugin or processHost and retain its exact composed endpoint for
