@@ -41,9 +41,19 @@ describe('A1 merged public exports', () => {
       '@migaia/rpc/core/plugins/flow-control',
       '@migaia/rpc/core/plugins/send-queue',
       '@migaia/rpc/core/plugins/log',
-      '@migaia/rpc/remote'
+      '@migaia/rpc/remote',
+      '@migaia/rpc/process',
+      '@migaia/rpc/process/adapters/node-child-process',
+      '@migaia/rpc/process/adapters/node-socket',
+      '@migaia/rpc/process/adapters/bun-spawn',
+      '@migaia/rpc/process/adapters/bun-socket',
+      '@migaia/rpc/process/adapters/deno-command',
+      '@migaia/rpc/process/adapters/deno-socket',
+      '@migaia/rpc/process/adapters/electron-utility-process',
+      '@migaia/rpc/process/adapters/windows-job',
+      '@migaia/rpc/contract/framing/stream'
     ].sort()
-    expect(expected).toHaveLength(30)
+    expect(expected).toHaveLength(40)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )

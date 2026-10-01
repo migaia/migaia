@@ -18,6 +18,42 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./process": {
+      "types": "./dist/process/index.d.ts",
+      "default": "./dist/process/index.js"
+    },
+    "./process/adapters/node-child-process": {
+      "types": "./dist/process/adapters/node-child-process.d.ts",
+      "default": "./dist/process/adapters/node-child-process.js"
+    },
+    "./process/adapters/node-socket": {
+      "types": "./dist/process/adapters/node-socket.d.ts",
+      "default": "./dist/process/adapters/node-socket.js"
+    },
+    "./process/adapters/bun-spawn": {
+      "types": "./dist/process/adapters/bun-spawn.d.ts",
+      "default": "./dist/process/adapters/bun-spawn.js"
+    },
+    "./process/adapters/bun-socket": {
+      "types": "./dist/process/adapters/bun-socket.d.ts",
+      "default": "./dist/process/adapters/bun-socket.js"
+    },
+    "./process/adapters/deno-command": {
+      "types": "./dist/process/adapters/deno-command.d.ts",
+      "default": "./dist/process/adapters/deno-command.js"
+    },
+    "./process/adapters/deno-socket": {
+      "types": "./dist/process/adapters/deno-socket.d.ts",
+      "default": "./dist/process/adapters/deno-socket.js"
+    },
+    "./process/adapters/electron-utility-process": {
+      "types": "./dist/process/adapters/electron-utility-process.d.ts",
+      "default": "./dist/process/adapters/electron-utility-process.js"
+    },
+    "./process/adapters/windows-job": {
+      "types": "./dist/process/adapters/windows-job.d.ts",
+      "default": "./dist/process/adapters/windows-job.js"
+    },
     "./remote": {
       "types": "./dist/remote/index.d.ts",
       "default": "./dist/remote/index.js"
@@ -37,6 +73,10 @@
     "./contract/framing/v1": {
       "types": "./dist/contract/framing/v1.d.ts",
       "default": "./dist/contract/framing/v1.js"
+    },
+    "./contract/framing/stream": {
+      "types": "./dist/contract/framing/stream-index.d.ts",
+      "default": "./dist/contract/framing/stream-index.js"
     },
     "./core": {
       "types": "./dist/core/index.d.ts",
@@ -167,6 +207,14 @@
     "@migaia/serialize": "workspace:^",
     "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
+  },
+  "peerDependencies": {
+    "electron": "^44.0.0",
+    "koffi": "^3.1.6"
+  },
+  "peerDependenciesMeta": {
+    "electron": { "optional": true },
+    "koffi": { "optional": true }
   },
   "devDependencies": {
     "@types/node": "24.13.2",
