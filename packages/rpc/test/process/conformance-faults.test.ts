@@ -348,6 +348,66 @@ describe('[A5] real native business budget and independent session', () => {
     }, 30000)
 })
 
+describe('[A5] independent peer rejects raw malformed input', () => {
+  for (const peer of peers)
+    it(`${peer.language} rejects malicious length, UTF-8, JSON and truncated EOF independently`, async () => {
+      /** Every malformed connection is independent of this continuously usable deployment. */
+      const healthy = await faultClient(peer)
+      try {
+        for (const [label, bytes, eof] of [
+          ['oversize', Uint8Array.of(1, 0, 0, 1), false],
+          ['malicious', Uint8Array.of(255, 255, 255, 255), false],
+          ['half-header', Uint8Array.of(0, 0), true],
+          ['half-body', Uint8Array.of(0, 0, 0, 4, 123), true],
+          ['utf8', encodeRpcStreamFrame(Uint8Array.of(255)), false],
+          ['json', encodeRpcStreamFrame(Buffer.from('[')), false]
+        ] as const) {
+          const active = await faultClient(peer, {
+            restart: { mode: 'on-failure', maxRestarts: 0 }
+          })
+          /** Physical closure proves parser rejection; process exit belongs to later owner release. */
+          let closed = false
+          const unsubscribe = active.physical[0]!.onClose(() => {
+            closed = true
+          })
+          try {
+            /** Bypass business normalization only to inject these explicit physical faults. */
+            await active.physical[0]!.write(bytes)
+            if (eof) await active.physical[0]!.close()
+            if (label === 'json' && ['node', 'bun'].includes(peer.language)) {
+              /**
+               * Ready JSON is rejected by the canonical core decoder and reported, without
+               * requiring fatal transport closure.
+               */
+              await vi.waitFor(() =>
+                expect(Buffer.concat(active.output).toString()).toContain(
+                  'PEER_ERROR DECODE_FAILED'
+                )
+              )
+              expect(await active.feature.request(['after-invalid-json'])).toBe(
+                'after-invalid-json'
+              )
+            } else await vi.waitFor(() => expect(closed, label).toBe(true), { timeout: 2000 })
+            expect(active.handles).toHaveLength(1)
+            expect(await healthy.feature.request([label])).toBe(label)
+          } finally {
+            unsubscribe()
+            await active.close()
+            await Promise.all(active.handles.map((handle) => handle.exited))
+            receipt(active, `${peer.language}-raw-${label}`)
+            writeFileSync(join(evidence, `hf-${peer.language}-raw-${label}.injected.bin`), bytes)
+          }
+          expect(active.budget.inUse).toBe(0)
+          expect(active.budget.pending).toBe(0)
+        }
+      } finally {
+        await healthy.close()
+        await Promise.all(healthy.handles.map((handle) => handle.exited))
+      }
+      expect(healthy.budget.inUse).toBe(0)
+    }, 30000)
+})
+
 describe('[A4] real owned terminal guards', () => {
   for (const peer of peers)
     for (const host of [false, true])
