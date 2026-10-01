@@ -29,14 +29,21 @@ function layerViolations(file: string, source: string): string[] {
       invalid ||= isRelative
         ? outside || !target.startsWith('contract/')
         : !contractBareAllowlist.has(specifier)
+    if (owner === 'threads')
+      invalid ||= outside || target.startsWith('process/') || target.startsWith('browser/')
+    if (owner === 'process')
+      invalid ||= target.startsWith('threads/') || target.startsWith('browser/')
     if (owner === 'core')
       invalid ||=
         outside ||
         target.startsWith('browser/') ||
         target.startsWith('remote/') ||
-        target.startsWith('bridge/')
-    if (owner === 'remote') invalid ||= outside || target.startsWith('browser/')
+        target.startsWith('bridge/') ||
+        target.startsWith('threads/')
+    if (owner === 'remote')
+      invalid ||= outside || target.startsWith('browser/') || target.startsWith('threads/')
     if (owner === 'browser') {
+      invalid ||= target.startsWith('process/') || target.startsWith('threads/')
       invalid ||=
         outside ||
         (!isRelative && specifier !== '@migaia/utils/bytes') ||
@@ -82,6 +89,12 @@ describe('A2 layer dependency direction', () => {
   })
 
   it.each([
+    ['threads to process', 'threads/plugin.ts', "import '../process/index.js'"],
+    ['threads to browser', 'threads/plugin.ts', "import '../browser/adapters/web-worker.js'"],
+    ['process to threads', 'process/x.ts', "import '../threads/index.js'"],
+    ['browser to threads', 'browser/x.ts', "import '../threads/index.js'"],
+    ['core to threads', 'core/x.ts', "import '../threads/index.js'"],
+    ['remote to threads', 'remote/x.ts', "import '../threads/index.js'"],
     ['contract bare import', 'contract/x.ts', "import '@migaia/utils'"],
     ['contract to core', 'contract/framing/x.ts', "import '../../core/errors.js'"],
     ['core to browser', 'core/x.ts', "import '../browser/adapters/window.js'"],

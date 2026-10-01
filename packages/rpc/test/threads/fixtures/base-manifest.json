@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@migaia/capability": "workspace:^",
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/serialize": "workspace:^",
+    "@migaia/supervision": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "peerDependencies": {
+    "electron": "^44.0.0",
+    "koffi": "^3.1.6"
+  }
+}

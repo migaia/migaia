@@ -23,6 +23,7 @@ import { messageFramer } from '@migaia/rpc/contract/framing/v1'
 aggregate of `rpcProtocol` and `normalizeRpcEnvelope`; its named `rpcProtocol` is the same V1 identity.
 `messageFramer` is the modern V1 whole-message identity framer, while retained `messageFramerV1` is the same object.
 Fixed `createStringFramer` and `createBinaryFramer` entries validate their selected carriers and do not place chunk metadata in semantic messages.
+
 ### V1 semantic contract
 
 ```ts
@@ -154,9 +155,7 @@ Feature 与 Middleware 必须分开理解：Feature 返回的 surface 才会投�
 `provider` 是通过 `endpoint.provide(method, fn)` 注册的函数，签名固定为：
 
 ```ts
-type IRpcProvider = (
-  context: IRpcContext
-) => IRpcProviderResult | Promise<IRpcProviderResult>
+type IRpcProvider = (context: IRpcContext) => IRpcProviderResult | Promise<IRpcProviderResult>
 
 type IRpcContext = {
   readonly data: unknown // 调用方传入的参数（已经过 contract() 的 schema 校验，如果配置了的话）
@@ -193,20 +192,20 @@ contract({
 
 #### 2.1 应该从哪里导入
 
-| 入口                                   | 工厂/定义                            | endpoint 根对象的公开能力                         | 适用场景                     |
-| -------------------------------------- | ------------------------------------ | ------------------------------------------------- | ---------------------------- |
-| `@migaia/rpc/core`                      | `createEndpoint`                     | 完整预设；等同 `createFullEndpoint`               | 需要全部一等能力 |
-| `@migaia/rpc/core/full`                 | `createFullEndpoint`                 | outbound + provider + discovery + control + chunk | 显式完整端点                 |
-| `@migaia/rpc/core/client`               | `createClientEndpoint`               | kernel + outbound                                 | 只发请求/事件                |
-| `@migaia/rpc/core/provider`             | `createProviderEndpoint`             | kernel + outbound + `provide`                     | 暴露方法且可能回调对端       |
-| `@migaia/rpc/core/composed`                 | `createComposedEndpoint`             | kernel + 显式原生 Feature 的根投影                | 自定义最小能力集合           |
-| `@migaia/rpc/core`                      | `defineFeature` / `defineMiddleware` | 定义返回的 surface 决定                           | 原生扩展                     |
-| `@migaia/rpc/core/adapters/{memory,message-port}` | transport factory | 不改变 endpoint 表面 | 内存或 MessagePort 传输 |
-| `@migaia/rpc/browser/adapters/<transport>` | transport factory | 不改变 endpoint 表面 | 浏览器与 Worker 传输 |
-| `@migaia/rpc/core/stream` | `createStreamFeature`、`createCanonicalChunkFeature` | 组合后投影 `endpoint.stream` | 按需异步多值流 |
-| `@migaia/rpc/process` | `createProcessTransport`、`createNativeProcessOffer`、`createProcessPlugin`、`createServeProcessPlugin`、`createProcessHost`、`createServeProcessHost`、`parseProcessPluginDescriptor` | 经握手后交 remote endpoint factory；服务侧逐连接持有 endpoint；描述只含纯数据 | 进程 byte/message 通道与 PluginHost 装配 |
-| `@migaia/rpc/contract/framing/stream` | `encodeRpcStreamFrame`、`createRpcStreamFrameDecoder` | 无端点表面 | 原生 4 字节长度前缀 |
-| `@migaia/rpc/process/adapters/*` | Node/Bun/Deno launcher、stdio 与 socket 入口 | 经 supervision 管理 | 按运行时选用的进程线材 |
+| 入口                                              | 工厂/定义                                                                                                                                                                              | endpoint 根对象的公开能力                                                     | 适用场景                                 |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------- |
+| `@migaia/rpc/core`                                | `createEndpoint`                                                                                                                                                                       | 完整预设；等同 `createFullEndpoint`                                           | 需要全部一等能力                         |
+| `@migaia/rpc/core/full`                           | `createFullEndpoint`                                                                                                                                                                   | outbound + provider + discovery + control + chunk                             | 显式完整端点                             |
+| `@migaia/rpc/core/client`                         | `createClientEndpoint`                                                                                                                                                                 | kernel + outbound                                                             | 只发请求/事件                            |
+| `@migaia/rpc/core/provider`                       | `createProviderEndpoint`                                                                                                                                                               | kernel + outbound + `provide`                                                 | 暴露方法且可能回调对端                   |
+| `@migaia/rpc/core/composed`                       | `createComposedEndpoint`                                                                                                                                                               | kernel + 显式原生 Feature 的根投影                                            | 自定义最小能力集合                       |
+| `@migaia/rpc/core`                                | `defineFeature` / `defineMiddleware`                                                                                                                                                   | 定义返回的 surface 决定                                                       | 原生扩展                                 |
+| `@migaia/rpc/core/adapters/{memory,message-port}` | transport factory                                                                                                                                                                      | 不改变 endpoint 表面                                                          | 内存或 MessagePort 传输                  |
+| `@migaia/rpc/browser/adapters/<transport>`        | transport factory                                                                                                                                                                      | 不改变 endpoint 表面                                                          | 浏览器与 Worker 传输                     |
+| `@migaia/rpc/core/stream`                         | `createStreamFeature`、`createCanonicalChunkFeature`                                                                                                                                   | 组合后投影 `endpoint.stream`                                                  | 按需异步多值流                           |
+| `@migaia/rpc/process`                             | `createProcessTransport`、`createNativeProcessOffer`、`createProcessPlugin`、`createServeProcessPlugin`、`createProcessHost`、`createServeProcessHost`、`parseProcessPluginDescriptor` | 经握手后交 remote endpoint factory；服务侧逐连接持有 endpoint；描述只含纯数据 | 进程 byte/message 通道与 PluginHost 装配 |
+| `@migaia/rpc/contract/framing/stream`             | `encodeRpcStreamFrame`、`createRpcStreamFrameDecoder`                                                                                                                                  | 无端点表面                                                                    | 原生 4 字节长度前缀                      |
+| `@migaia/rpc/process/adapters/*`                  | Node/Bun/Deno launcher、stdio 与 socket 入口                                                                                                                                           | 经 supervision 管理                                                           | 按运行时选用的进程线材                   |
 
 所有 endpoint 都有 kernel 表面：`on()`、`hooks.on()`、`dispose()`。只有完整预设或显式选择的 Feature 才增加其他方法。要获得可靠 tree-shaking，应直接导入最窄预设或 `/core` 与单独 Feature 子路径，不要从 core 入口导入完整预设后再只使用其中一部分。
 
@@ -546,7 +545,10 @@ type IRpcEndpoint<TTargetId extends string = string> = {
   sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IRpcFanoutResult<T>>
   dispatch(targetId: TTargetId, method: string, data: unknown): void
   dispatchAll(method: string, data: unknown): void
-  announceClose(targetId: TTargetId, options: { drainMs: number; receiverId?: string }): Promise<void>
+  announceClose(
+    targetId: TTargetId,
+    options: { drainMs: number; receiverId?: string }
+  ): Promise<void>
   ping(targetId: TTargetId, receiverId?: string, options?: IRpcPingOptions): Promise<boolean> // control Feature + ping() middleware
   pingAll(): Promise<IRpcFanoutResult<boolean>> // control Feature + ping() middleware
   readonly connect: IRpcConnectControlForMode<TTargetId, TMode>
@@ -556,20 +558,20 @@ type IRpcEndpoint<TTargetId extends string = string> = {
 }
 ```
 
-| 方法                                                  | 参数类型                                                                                                                                                                            | 同步/异步                                                                                                                                  | 说明                                                                                                                                    |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `provide(method, fn)`                                 | `method: string`；`fn: IRpcProvider`（即 `(context: IRpcContext) => IRpcProviderResult \| Promise<IRpcProviderResult>`）                                                | 同步（直接返回 `this`）                                                                                                                    | 注册一个方法处理函数，返回 `this` 以支持链式调用；`method` 重复注册会抛错                                                               |
-| `on(event, listener)`                                 | `event: string`；`listener: IRpcEventListener`（即 `(context: IRpcContext) => void \| Promise<void>`）                                                                        | 同步（直接返回取消订阅函数）                                                                                                               | 监听对端通过 `dispatch()`/`dispatchAll()` 发来的单向通知，返回取消订阅函数                                                              |
-| `send<T>(targetId, method, data, options?)`           | `targetId: TTargetId`；`method: string`；`data: unknown`；`options?: ISendOptions`（`signal`、`timeoutMs`、`trace`、`idempotencyKey`、`transfer`） | 异步（返回 `Promise<T>`） | 发起一次双向调用；剩余相对时长、追踪值与幂等键随请求路由头传递 |
-| `announceClose(targetId, options)`                    | `targetId: TTargetId`；`options: { drainMs: number; receiverId?: string }` | 异步（返回 `Promise<void>`） | 向对端通知排空窗口，不关闭传输 |
-| `sendAll<T>(method, data, options?)`                  | `method: string`；`data: unknown`；`options?: ISendOptions`                                                                                                                         | 异步（返回 `Promise<IRpcFanoutResult<T>>`）                                                                                             | 向当前全部已知/存活的对端发起同一次调用，返回按目标聚合的结果集，见下方 `IRpcFanoutResult`                                           |
-| `dispatch(targetId, method, data)`                    | `targetId: TTargetId`；`method: string`；`data: unknown`                                                                                                                            | 同步（返回 `void`）                                                                                                                        | 单向通知，不等待、不产生响应，同步返回（内部异步执行）                                                                                  |
-| `dispatchAll(method, data)`                           | `method: string`；`data: unknown`                                                                                                                                                   | 同步（返回 `void`）                                                                                                                        | 单向广播给全部已知/存活对端                                                                                                             |
-| `ping(targetId, receiverId?, options?)` / `pingAll()` | `targetId: string`；`receiverId?: string`；`options?: IRpcPingOptions`（`{ timeoutMs?: number; signal?: IRpcAbortSignal }`）；`pingAll()` 无参数                              | 异步（分别返回 `Promise<boolean>` / `Promise<IRpcFanoutResult<boolean>>`）                                                              | 存活探测；不可达/超时/传输失败/调用取消返回 `false`，本地契约和生命周期错误仍抛出                                                       |
-| `connect`                                             | 不适用（只读属性，非函数；其下各方法各自的参数见 §7）                                                                                                                               | 视情况（`getServerList`/`pinReceiver`/`unpinReceiver`/`onQuery`/`register` 是同步方法，`query`/`unregister`/`ping` 返回 `Promise`，见 §7） | 服务发现的读写控制，自动模式下只读（`getServerList`/`pinReceiver`/`unpinReceiver`），手动模式下额外有查询/注册控制，见 §7               |
-| `discovery`                                           | 不适用（只读属性，非函数）                                                                                                                                                          | 同步（暴露的 `getServerList`/`pinReceiver`/`unpinReceiver` 均为同步方法，不返回 `Promise`）                                                | 只读的远端服务发现快照，等价于 `connect` 的只读子集，命名上更强调"这是给调试/观测用的"                                                  |
-| `hooks.on(listener)`                                  | `listener: IRpcHook`（即 `(event: IRpcHookEvent) => void \| Promise<void>`）                                                                                                  | 同步（直接返回取消订阅函数）                                                                                                               | 运行时动态订阅生命周期事件，等价于 `hooks()` 中间件的 `listeners` 配置项                                                                |
-| `dispose()`                                           | 无参数                                                                                                                                                                              | 异步（返回 `Promise<void>`）                                                                                                               | 释放 endpoint，见 [§9](#9-生命周期与资源释放)                                                                                           |
+| 方法                                                  | 参数类型                                                                                                                                           | 同步/异步                                                                                                                                  | 说明                                                                                                                      |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `provide(method, fn)`                                 | `method: string`；`fn: IRpcProvider`（即 `(context: IRpcContext) => IRpcProviderResult \| Promise<IRpcProviderResult>`）                           | 同步（直接返回 `this`）                                                                                                                    | 注册一个方法处理函数，返回 `this` 以支持链式调用；`method` 重复注册会抛错                                                 |
+| `on(event, listener)`                                 | `event: string`；`listener: IRpcEventListener`（即 `(context: IRpcContext) => void \| Promise<void>`）                                             | 同步（直接返回取消订阅函数）                                                                                                               | 监听对端通过 `dispatch()`/`dispatchAll()` 发来的单向通知，返回取消订阅函数                                                |
+| `send<T>(targetId, method, data, options?)`           | `targetId: TTargetId`；`method: string`；`data: unknown`；`options?: ISendOptions`（`signal`、`timeoutMs`、`trace`、`idempotencyKey`、`transfer`） | 异步（返回 `Promise<T>`）                                                                                                                  | 发起一次双向调用；剩余相对时长、追踪值与幂等键随请求路由头传递                                                            |
+| `announceClose(targetId, options)`                    | `targetId: TTargetId`；`options: { drainMs: number; receiverId?: string }`                                                                         | 异步（返回 `Promise<void>`）                                                                                                               | 向对端通知排空窗口，不关闭传输                                                                                            |
+| `sendAll<T>(method, data, options?)`                  | `method: string`；`data: unknown`；`options?: ISendOptions`                                                                                        | 异步（返回 `Promise<IRpcFanoutResult<T>>`）                                                                                                | 向当前全部已知/存活的对端发起同一次调用，返回按目标聚合的结果集，见下方 `IRpcFanoutResult`                                |
+| `dispatch(targetId, method, data)`                    | `targetId: TTargetId`；`method: string`；`data: unknown`                                                                                           | 同步（返回 `void`）                                                                                                                        | 单向通知，不等待、不产生响应，同步返回（内部异步执行）                                                                    |
+| `dispatchAll(method, data)`                           | `method: string`；`data: unknown`                                                                                                                  | 同步（返回 `void`）                                                                                                                        | 单向广播给全部已知/存活对端                                                                                               |
+| `ping(targetId, receiverId?, options?)` / `pingAll()` | `targetId: string`；`receiverId?: string`；`options?: IRpcPingOptions`（`{ timeoutMs?: number; signal?: IRpcAbortSignal }`）；`pingAll()` 无参数   | 异步（分别返回 `Promise<boolean>` / `Promise<IRpcFanoutResult<boolean>>`）                                                                 | 存活探测；不可达/超时/传输失败/调用取消返回 `false`，本地契约和生命周期错误仍抛出                                         |
+| `connect`                                             | 不适用（只读属性，非函数；其下各方法各自的参数见 §7）                                                                                              | 视情况（`getServerList`/`pinReceiver`/`unpinReceiver`/`onQuery`/`register` 是同步方法，`query`/`unregister`/`ping` 返回 `Promise`，见 §7） | 服务发现的读写控制，自动模式下只读（`getServerList`/`pinReceiver`/`unpinReceiver`），手动模式下额外有查询/注册控制，见 §7 |
+| `discovery`                                           | 不适用（只读属性，非函数）                                                                                                                         | 同步（暴露的 `getServerList`/`pinReceiver`/`unpinReceiver` 均为同步方法，不返回 `Promise`）                                                | 只读的远端服务发现快照，等价于 `connect` 的只读子集，命名上更强调"这是给调试/观测用的"                                    |
+| `hooks.on(listener)`                                  | `listener: IRpcHook`（即 `(event: IRpcHookEvent) => void \| Promise<void>`）                                                                       | 同步（直接返回取消订阅函数）                                                                                                               | 运行时动态订阅生命周期事件，等价于 `hooks()` 中间件的 `listeners` 配置项                                                  |
+| `dispose()`                                           | 无参数                                                                                                                                             | 异步（返回 `Promise<void>`）                                                                                                               | 释放 endpoint，见 [§9](#9-生命周期与资源释放)                                                                             |
 
 `IRpcFanoutResult<T>`：
 
@@ -656,30 +658,30 @@ try {
 
 #### 错误码完整参考
 
-| Code                                                  | 触发场景                                                          | 建议处理                                                                                 |
-| ----------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `MIDDLEWARE_DUPLICATED`                               | 同一个中间件被重复安装                                            | 检查 `middlewares` 数组，构造期问题，修配置                                              |
-| `MIDDLEWARE_MISSING`                                  | 调用了需要某个中间件（如 `ping`）但没安装它的方法                 | 补齐对应中间件                                                                           |
-| `INVALID_CONFIG`                                      | `createEndpoint()` 配置本身不合法（含读取配置字段时抛出的异常）   | 修配置；这类错误在任何中间件产生副作用**之前**抛出                                       |
-| `PROVIDER_DUPLICATED`                                 | 同一个方法名被 `provide()` 注册了两次                             | 检查方法名是否冲突                                                                       |
-| `PROTOCOL_INVALID`                                    | 协议编解码失败                                                    | 检查 codec descriptor 的 `encode`/`decode` 实现或对端协议是否一致                        |
-| `CONTRACT_INVALID`                                    | 契约配置本身不合法                                                | 检查 `contract()` 配置                                                                   |
-| `PAYLOAD_INVALID`                                     | 序列化/反序列化失败，或分片校验失败                               | 检查发送的数据是否可序列化                                                               |
-| `PROVIDER_NOT_SETTLED`                                | provider 函数没有正确返回 `success()`/`failed()` 结果             | 检查 provider 实现                                                                       |
-| `INTERNAL`                                            | 框架内部未分类错误                                                | 附带原始 `cause`，需要具体排查                                                           |
-| `TARGET_UNKNOWN`                                      | 目标 `targetId` 未知且发现失败                                    | 确认目标 id 正确、对端在线                                                               |
-| `TARGET_NOT_IDENTIFIABLE`                             | 目标存在但无法唯一定位到具体接收端                                | 检查是否需要 `uniqueTargetId`/`pinReceiver`                                              |
-| `ENDPOINT_DISPOSED`                                   | 在 `dispose()` 之后继续使用 endpoint                              | 检查生命周期管理，不要在释放后调用                                                       |
-| `CANCELLED`                                           | 请求被 `AbortSignal` 主动取消                                     | 业务预期内的取消，通常不需要当作异常处理                                                 |
-| `DEADLINE_EXCEEDED`                                   | 请求超时                                                          | 由调用方按业务策略处理                                                                   |
-| `PROVIDER_CONTEXT_EXPIRED`                            | provider 在其 `context` 已过期后才尝试结算                        | 检查 provider 是否有异步逻辑跑得太久                                                     |
-| `TRANSPORT`                                           | 底层传输发送/接收失败                                             | 传输层问题，检查连接状态                                                                 |
-| `STRING_CONVERSION_FAILED`                            | `safeString` 转换抛错且没有可用的同步报告器                       | 修复输入值，或在自定义适配器边界提供同步 `report` 并检查原异常 `cause`                 |
-| `AUTHENTICATION_FAILED`                               | `authentication()`/`connect()` 校验未通过                         | 安全相关，不建议自动重试                                                                 |
-| `SCHEMA_INVALID`                                      | `contract()` 配置的 schema 校验未通过                             | 检查参数/返回值是否符合约定的 schema                                                     |
-| `CAPABILITY_CONFLICT`                                 | 多个中间件/配置之间的能力声明冲突                                 | 检查中间件组合是否合理                                                                   |
-| `OVERLOADED`                                          | 出站 id 账本、并发限制等资源预算耗尽                              | 降低发送频率或调大对应限制（如 `replay.maxEntries`）                                     |
-| `CHUNK_INVALID`                                       | 分片帧不合法                                                      | 检查 framer descriptor 自定义 `split`/`byteLength` 实现                                  |
+| Code                       | 触发场景                                                        | 建议处理                                                               |
+| -------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `MIDDLEWARE_DUPLICATED`    | 同一个中间件被重复安装                                          | 检查 `middlewares` 数组，构造期问题，修配置                            |
+| `MIDDLEWARE_MISSING`       | 调用了需要某个中间件（如 `ping`）但没安装它的方法               | 补齐对应中间件                                                         |
+| `INVALID_CONFIG`           | `createEndpoint()` 配置本身不合法（含读取配置字段时抛出的异常） | 修配置；这类错误在任何中间件产生副作用**之前**抛出                     |
+| `PROVIDER_DUPLICATED`      | 同一个方法名被 `provide()` 注册了两次                           | 检查方法名是否冲突                                                     |
+| `PROTOCOL_INVALID`         | 协议编解码失败                                                  | 检查 codec descriptor 的 `encode`/`decode` 实现或对端协议是否一致      |
+| `CONTRACT_INVALID`         | 契约配置本身不合法                                              | 检查 `contract()` 配置                                                 |
+| `PAYLOAD_INVALID`          | 序列化/反序列化失败，或分片校验失败                             | 检查发送的数据是否可序列化                                             |
+| `PROVIDER_NOT_SETTLED`     | provider 函数没有正确返回 `success()`/`failed()` 结果           | 检查 provider 实现                                                     |
+| `INTERNAL`                 | 框架内部未分类错误                                              | 附带原始 `cause`，需要具体排查                                         |
+| `TARGET_UNKNOWN`           | 目标 `targetId` 未知且发现失败                                  | 确认目标 id 正确、对端在线                                             |
+| `TARGET_NOT_IDENTIFIABLE`  | 目标存在但无法唯一定位到具体接收端                              | 检查是否需要 `uniqueTargetId`/`pinReceiver`                            |
+| `ENDPOINT_DISPOSED`        | 在 `dispose()` 之后继续使用 endpoint                            | 检查生命周期管理，不要在释放后调用                                     |
+| `CANCELLED`                | 请求被 `AbortSignal` 主动取消                                   | 业务预期内的取消，通常不需要当作异常处理                               |
+| `DEADLINE_EXCEEDED`        | 请求超时                                                        | 由调用方按业务策略处理                                                 |
+| `PROVIDER_CONTEXT_EXPIRED` | provider 在其 `context` 已过期后才尝试结算                      | 检查 provider 是否有异步逻辑跑得太久                                   |
+| `TRANSPORT`                | 底层传输发送/接收失败                                           | 传输层问题，检查连接状态                                               |
+| `STRING_CONVERSION_FAILED` | `safeString` 转换抛错且没有可用的同步报告器                     | 修复输入值，或在自定义适配器边界提供同步 `report` 并检查原异常 `cause` |
+| `AUTHENTICATION_FAILED`    | `authentication()`/`connect()` 校验未通过                       | 安全相关，不建议自动重试                                               |
+| `SCHEMA_INVALID`           | `contract()` 配置的 schema 校验未通过                           | 检查参数/返回值是否符合约定的 schema                                   |
+| `CAPABILITY_CONFLICT`      | 多个中间件/配置之间的能力声明冲突                               | 检查中间件组合是否合理                                                 |
+| `OVERLOADED`               | 出站 id 账本、并发限制等资源预算耗尽                            | 降低发送频率或调大对应限制（如 `replay.maxEntries`）                   |
+| `CHUNK_INVALID`            | 分片帧不合法                                                    | 检查 framer descriptor 自定义 `split`/`byteLength` 实现                |
 
 `RpcRemoteError` 专门代表"对端 provider 主动调用 `ctx.failed(message, code)` 返回的业务失败"，其 `data` 字段携带 provider 传回的附加数据。它继承原生 `Error` 而不是 `RpcError`，但仍有 `source` / `code`，所以 `isRpcError()` 能按结构识别它。
 
@@ -742,7 +744,7 @@ type IRpcHookEvent = {
 
 | 事件名                                                  | 何时触发                                                                     |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `failure`                                               | 收到无法处理的入站消息，或控制载荷校验失败；`code` 指出具体错误               |
+| `failure`                                               | 收到无法处理的入站消息，或控制载荷校验失败；`code` 指出具体错误              |
 | `authentication.rejected`                               | `authentication()`/`connect()` 的身份或完整性校验未通过                      |
 | `response.unmatched`                                    | 收到一条响应，但找不到匹配的挂起请求（可能是重复响应或超时后晚到）           |
 | `transport.failure`                                     | 传输层报告的错误（通过 `onTransportError`）                                  |
@@ -750,8 +752,8 @@ type IRpcHookEvent = {
 | `dispatch.failure`                                      | `dispatch()`/`dispatchAll()` 发送失败                                        |
 | `dispose.failure`                                       | 释放过程中某个资源清理失败（对应 `cleanupErrors` 里的一项）                  |
 | `variation.failure` / `variation.unmatched`             | ping/pong/abort 这类控制帧发送失败，或收到的控制帧找不到匹配的挂起状态       |
-| `protocol.unknown-field`                                | 未识别的字段、kind 或控制子类型；`field` 给出去重后的字段标识 |
-| `control.close`                                         | 对端通知排空窗口；`requesterId` 标识对端，`durationMs` 是相对时长 |
+| `protocol.unknown-field`                                | 未识别的字段、kind 或控制子类型；`field` 给出去重后的字段标识                |
+| `control.close`                                         | 对端通知排空窗口；`requesterId` 标识对端，`durationMs` 是相对时长            |
 | `connect.receiver-registered`                           | 一个新的接收端被发现并注册进路由表                                           |
 | `connect.server-unregistered`                           | 一个接收端注销（比如所在的 endpoint 被 dispose）                             |
 | `connect.receiver-pinned` / `connect.receiver-unpinned` | `pinReceiver`/`unpinReceiver` 被调用                                         |
@@ -999,8 +1001,8 @@ const transport = {
 
 公开常量与用途：
 
-| 常量                        | 用途                                         |
-| --------------------------- | -------------------------------------------- |
+| 常量                     | 用途                                         |
+| ------------------------ | -------------------------------------------- |
 | `RpcPlatform`            | adapter 平台标签                             |
 | `RpcTransportTopology`   | exclusive/multiplexed/broadcast 信任拓扑     |
 | `RpcTransportOwnership`  | owned/borrowed 资源释放契约                  |
@@ -1189,17 +1191,26 @@ const channel = await createJsonRpcRemoteChannel({
 })
 const chunk = createCanonicalChunkFeature()
 const outbound = createOutboundFeature(chunk)
-const kernel = await createComposedEndpoint({
-  id: 'client', transport: channel.transport, scheduler: channel.scheduler,
-  middlewares: [codec(channel.pipeline.codec), framer(channel.pipeline.framer),
-    abort(), connect({ transport: channel.transport })]
-}, {
-  'first-party-chunk': chunk,
-  'first-party-outbound': outbound,
-  'first-party-one-way': createOneWayFeature(outbound),
-  'channel-ipc-queue': channel.features[0]!,
-  'channel-ipc-log': channel.features[1]!
-})
+const kernel = await createComposedEndpoint(
+  {
+    id: 'client',
+    transport: channel.transport,
+    scheduler: channel.scheduler,
+    middlewares: [
+      codec(channel.pipeline.codec),
+      framer(channel.pipeline.framer),
+      abort(),
+      connect({ transport: channel.transport })
+    ]
+  },
+  {
+    'first-party-chunk': chunk,
+    'first-party-outbound': outbound,
+    'first-party-one-way': createOneWayFeature(outbound),
+    'channel-ipc-queue': channel.features[0]!,
+    'channel-ipc-log': channel.features[1]!
+  }
+)
 // Selected first-party roots provide these surfaces; the composed declaration exposes dispose.
 const endpoint = kernel as unknown as IRpcEndpoint & IOneWaySurface
 // In endpointFactory, return { endpoint, oneWay: endpoint }.
@@ -1252,3 +1263,153 @@ Integers outside ±(2^53−1) must travel as strings. The focused fixtures use a
 handwritten peer; compatibility with an arbitrary JSON-RPC library is inferred,
 not verified. Four-language/platform, packed, custody and repository gates
 remain separate integration evidence.
+
+## Threads
+
+Thread facades use the same remote contracts and shared retry owner as process facades.
+They add no handshake, retry queue or health check. Provide one scheduler to the facade,
+its channel factory and endpoint factory. `spec.data` must satisfy portable RPC rules:
+functions, cyclic values, MessagePort and SharedArrayBuffer are rejected before a Worker starts.
+
+This endpoint factory can be shared by the parent and Worker. Each service passes its own local id:
+
+```ts
+import { createComposedEndpoint } from '@migaia/rpc/core/composed'
+import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc/core/stream'
+import { createOutboundFeature } from '@migaia/rpc/core/features/outbound'
+import { createProviderFeature } from '@migaia/rpc/core/features/provider'
+import { codec, framer, abort, connect } from '@migaia/rpc/core'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc/remote'
+import type { IRpcEndpoint } from '@migaia/rpc/core'
+
+/** Construct the endpoint from the channel's exact pipeline and scheduler. */
+export async function endpoint(
+  localId: string,
+  channel: IRemoteChannel
+): Promise<IRemoteServeEndpoint> {
+  const chunk = createCanonicalChunkFeature()
+  const outbound = createOutboundFeature(chunk)
+  const provider = createProviderFeature(outbound)
+  const built = await createComposedEndpoint(
+    {
+      id: localId,
+      scheduler: channel.scheduler,
+      transport: channel.transport,
+      middlewares: [
+        codec(channel.pipeline.codec),
+        framer(channel.pipeline.framer),
+        abort(),
+        connect({ transport: channel.transport })
+      ]
+    },
+    {
+      'first-party-chunk': chunk,
+      'first-party-outbound': outbound,
+      'first-party-provider': provider,
+      'first-party-stream': createStreamFeature(outbound, provider)
+    }
+  )
+  return { endpoint: built as unknown as IRpcEndpoint, stream: built.stream }
+}
+```
+
+The parent installs the thread definition through its local PluginHost:
+
+```ts
+import { PluginHost } from '@migaia/plugin-host'
+import { createUnitBudget } from '@migaia/supervision'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createThreadPlugin } from '@migaia/rpc/threads'
+import {
+  createNodeThreadLauncher,
+  createNodeThreadChannelFactory
+} from '@migaia/rpc/threads/adapters/node'
+import { endpoint } from './endpoint.js'
+
+const contract = {
+  schemaVersion: 1,
+  plugin: 'echo',
+  features: { api: { methods: { echo: { mode: 'request', idempotent: true } } } }
+} as const
+const host = new PluginHost()
+const plugin = createThreadPlugin({
+  name: 'echo',
+  contract,
+  host: host.plugin,
+  spec: { entry: new URL('./worker.js', import.meta.url).href, data: { prefix: 'worker:' } },
+  launcher: createNodeThreadLauncher(),
+  budget: createUnitBudget({ kind: 'thread', maxUnits: 1, scheduler: systemScheduler }),
+  scheduler: systemScheduler,
+  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+  endpointFactory: (channel) => endpoint('parent', channel),
+  report: (error) => console.error(error)
+})
+const [installed] = await host.use(plugin)
+const api = installed.getFeature('api') as { echo(params: string[]): Promise<string> }
+console.log(await api.echo(['hello']))
+await host.dispose()
+```
+
+The Worker decodes its private address and original business data before serving:
+
+```ts
+import { parentPort, workerData } from 'node:worker_threads'
+import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import {
+  readThreadBootstrap,
+  createNodeThreadChannel,
+  createServeThreadPlugin
+} from '@migaia/rpc/threads'
+import { endpoint } from './endpoint.js'
+
+const { peerId, data } = readThreadBootstrap(workerData)
+const config = data as { prefix: string }
+const contract = {
+  schemaVersion: 1,
+  plugin: 'echo',
+  features: { api: { methods: { echo: { mode: 'request', idempotent: true } } } }
+} as const
+const host = new PluginHost()
+await host.use(
+  definePlugin({
+    name: 'echo',
+    features: { api: defineFeature(() => ({ echo: (value: string) => config.prefix + value })) },
+    install: () => ({})
+  })
+)
+const channel = createNodeThreadChannel(parentPort!, 'parent', { scheduler: systemScheduler })
+const service = await createServeThreadPlugin({
+  host,
+  contract,
+  channel,
+  endpointFactory: (channel) => endpoint(peerId, channel),
+  report: (error) => console.error(error)
+})
+// The returned service owns only its endpoint/channel and its internal registration.
+// Closing the caller-owned Host remains the caller's responsibility.
+```
+
+Host mode uses `createThreadHost({ catalog: { echo: contract }, ... })` and
+`createServeThreadHost({ host, catalog, resolvePlugin, channel, endpointFactory, report })`.
+The required synchronous resolver remains local; definitions and resolver functions never cross
+RPC. `release()` returns the same Promise on repeated calls. Explicit `retryPort` replaces the
+remote default. Omit that property for default shared retry. A sent idempotent request can replay
+once with its original key after the next description; a sent non-idempotent request returns
+`REMOTE_RESULT_UNKNOWN`. Unsent requests return `REMOTE_CLOSED` with no frame.
+`spec.limits.callWallTimeMs` is a total logical deadline, including rebind wait.
+A persistent deduplication store is required for cross-Worker exactly-once side effects.
+
+Web services call `receiveThreadData(self, async (data, peerId) => { ... })` before installing RPC
+listeners. The callback must fully prepare its service with endpoint id `peerId`; acknowledgement
+then releases parent channel construction. A private bootstrap is sent even when business data
+is absent, because the Worker needs its local endpoint address. All postMessage calls use an
+undefined transfer list. `self.close()` is never called by the borrowed transport shim.
+
+Current platform evidence: Node v24.16.0 actual exit, exception, heap limit and real RPC/restart;
+Bun 1.4.2 termination returns before a short interval of continued work; Deno 2.9.7 busy work
+continues after terminate. Both Web runtime exception fixtures keep the host alive. Bun/Deno
+termination and exit observation therefore remain unsupported; close is not an exit receipt.
+Electron and browser actual-runtime fixtures remain INFERRED/unverified. Provide explicit health
+and select `supervisor.isolation: 'best-effort'` only when that degradation suits the deployment.
+Without a proven actual exit, supervision keeps the lease occupied on abandonment.
