@@ -1,6 +1,13 @@
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '@migaia/plugin-host'
+import {
+  defineFeature,
+  definePlugin,
+  isDefinedPlugin,
+  PluginHost,
+  PluginHostErrorCode
+} from '@migaia/plugin-host'
 import { describe, expect, it } from 'vitest'
 import { createRemotePlugin } from '../../src/remote/plugin.js'
+import { assembleRemotePluginDefinition } from '../../src/remote/internal/assemble-plugin.js'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import { RpcCoreErrorCode, RpcError } from '../../src/core/errors.js'
 import { RpcCoreErrorText } from '../../src/core/error-text.js'
@@ -8,6 +15,40 @@ import { vi } from 'vitest'
 import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from './fixture.js'
 
 describe('remote PluginHost assembly', () => {
+  it('keeps internal metadata on the trusted frozen definition', async () => {
+    const fixture = remoteHarness()
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const options = {
+      name: 'p',
+      contract: REMOTE_FIXTURE_CONTRACT,
+      binding: fixture.binding,
+      endpointFactory: async () => fixture.served,
+      host: host.plugin,
+      report: (error: unknown) => {
+        throw error
+      }
+    }
+    const publicDefinition = createRemotePlugin(options)
+    const replace = vi.fn(async () => undefined)
+    const processDefinition = assembleRemotePluginDefinition(options, { replace })
+    try {
+      expect(isDefinedPlugin(publicDefinition)).toBe(true)
+      expect(Object.hasOwn(publicDefinition, 'replace')).toBe(false)
+      expect(isDefinedPlugin(processDefinition)).toBe(true)
+      expect(processDefinition.replace).toBe(replace)
+      expect(Object.isFrozen(processDefinition)).toBe(true)
+      expect(Object.getOwnPropertyDescriptor(processDefinition, 'replace')).toMatchObject({
+        writable: false,
+        configurable: false
+      })
+      await expect(host.use(processDefinition)).resolves.toHaveLength(1)
+    } finally {
+      await host.dispose()
+    }
+  })
+
   it('reports a channel rollback failure through the Host without replacing setup failure', async () => {
     const fixture = remoteHarness()
     const cleanupError = new Error('channel cleanup failed')
