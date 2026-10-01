@@ -586,6 +586,40 @@
       ],
       "./browser/adapters/rtc-data-channel": [
         "createRtcDataChannelTransport"
+      ],
+      "./threads": [
+        "createNodeThreadChannel",
+        "createServeThreadHost",
+        "createServeThreadPlugin",
+        "createThreadHost",
+        "createThreadPlugin",
+        "createWebThreadChannel",
+        "readThreadBootstrap",
+        "receiveThreadData"
+      ],
+      "./threads/adapters/node": [
+        "createNodeThreadChannelFactory",
+        "createNodeThreadLauncher"
+      ],
+      "./threads/adapters/deno": [
+        "createDenoThreadChannelFactory",
+        "createDenoThreadLauncher"
+      ],
+      "./threads/adapters/bun": [
+        "createBunThreadChannelFactory",
+        "createBunThreadLauncher"
+      ],
+      "./threads/adapters/electron-main": [
+        "createElectronMainThreadChannelFactory",
+        "createElectronMainThreadLauncher"
+      ],
+      "./threads/adapters/electron-renderer": [
+        "createElectronRendererThreadChannelFactory",
+        "createElectronRendererThreadLauncher"
+      ],
+      "./threads/adapters/browser": [
+        "createBrowserThreadChannelFactory",
+        "createBrowserThreadLauncher"
       ]
     },
     "@migaia/serialize": {
