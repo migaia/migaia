@@ -39,6 +39,8 @@ export type IProcessPluginEstablish = (
     session: IProcessPluginSession
     scheduler: IScheduler
     token?: string
+    /** The client deployment's exact native proposal; responders may omit it. */
+    offer?: IRpcHandshakeOffer
     verify?: (value: unknown) => void | Promise<void>
     stderr?: (listener: (chunk: Uint8Array) => void) => () => void
   }>
@@ -56,6 +58,8 @@ export type ISpawnProcessPluginDeployment<THandle extends IProcessHandle = IProc
     channelKind: ProcessPluginChannelKind
     wire?: ProcessPluginWire
     token?: string
+    /** An optional native proposal shared with every establish call for this deployment. */
+    offer?: IRpcHandshakeOffer
     establish: IProcessPluginEstablish
   }>
 
@@ -64,6 +68,8 @@ export type IConnectProcessPluginDeployment = Readonly<{
   kind: 'connect'
   address: string
   token: string
+  /** An optional native proposal shared with every establish call for this deployment. */
+  offer?: IRpcHandshakeOffer
   dial(address: string, signal: IAbortSignal): Promise<IProcessByteChannel>
   establish: IProcessPluginEstablish
   supervision?: Pick<

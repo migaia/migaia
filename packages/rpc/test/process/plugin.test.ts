@@ -5,6 +5,7 @@ import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import { RpcPlatform } from '../../src/core/transport-constants.js'
 import { byteProcessPipeline } from '../../src/process/pipeline.js'
+import { createNativeProcessOffer } from '../../src/process/offer.js'
 import { createSpawnProcessBinding } from '../../src/process/plugin/binding.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { ProcessPluginChannelKind, ProcessPluginWire } from '../../src/process/plugin/constants.js'
@@ -53,6 +54,11 @@ describe('process plugin spawn binding', () => {
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const token = 'private-bootstrap-token'
+    /** The caller's proposal must be the exact one handed to establish. */
+    const offer = createNativeProcessOffer({
+      peer: { id: 'client', runtime: 'node' },
+      auth: token
+    })
     const scheduler = fixture.binding.scheduler
     const spec = processSpec(token)
     const budget = createUnitBudget({ kind: 'process', maxUnits: 1, scheduler })
@@ -86,6 +92,7 @@ describe('process plugin spawn binding', () => {
         options: Parameters<IProcessPluginEstablish>[1]
       ) => {
         expect(options.token).toBe(token)
+        expect(options.offer).toBe(offer)
         expect(options.session.processId).toBe('installed-child')
         return {
           ...fixture.channel,
@@ -106,6 +113,7 @@ describe('process plugin spawn binding', () => {
         channelKind: ProcessPluginChannelKind.byte,
         wire: ProcessPluginWire.native,
         token,
+        offer,
         supervision: {
           id: 'client',
           spec,
