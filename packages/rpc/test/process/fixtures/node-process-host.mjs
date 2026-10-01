@@ -1,0 +1,233 @@
+import { readFileSync } from 'node:fs'
+import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { openProcessStdioChannel } from '../../../dist/process/adapters/node-child-process.js'
+import {
+  dialProcessByteChannel,
+  listenProcessByteChannel
+} from '../../../dist/process/adapters/node-socket.js'
+import { createProcessTransport } from '../../../dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../dist/process/offer.js'
+import { serveRemotePlugin } from '../../../dist/remote/serve-plugin.js'
+import { createServeProcessHost } from '../../../dist/process/host/serve.js'
+import { RpcProcessErrorCode } from '../../../dist/process/error-code.js'
+import { createProcessError } from '../../../dist/process/error.js'
+import { createComposedEndpoint } from '../../../dist/core/composed.js'
+import { createFirstPartyRoots } from '../../../dist/core/internal/first-party-roots.js'
+import { createStreamFeature } from '../../../dist/core/features/stream.js'
+import { codec } from '../../../dist/core/middleware/codec.js'
+import { framer } from '../../../dist/core/middleware/framer.js'
+import { abort } from '../../../dist/core/middleware/abort.js'
+import { connect } from '../../../dist/core/middleware/connect.js'
+import { ping } from '../../../dist/core/middleware/ping.js'
+
+/** One canonical catalog fixture is shared with the real stdio and Unix clients. */
+const catalog = JSON.parse(readFileSync(new URL('./host-catalog.json', import.meta.url), 'utf8'))
+/** This target starts empty; every installed definition must come through the local resolver. */
+const host = new PluginHost({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+})
+/** Counters distinguish actual provider execution from cached results on another connection. */
+let calls = 0
+/** Resolver calls distinguish local authority from portable declarations. */
+let resolutions = 0
+/** Disposal counts prove remote unUse executes local cleanup exactly once. */
+let disposals = 0
+/** Portable configuration is retained only as fixture result data. */
+let portableConfig = null
+/** Held business requests let real connections exercise provider concurrency and drain. */
+const held = new Set()
+/** A stable trusted definition lets the canonical remote owner share one installation. */
+const definition = definePlugin({
+  name: 'p',
+  features: {
+    f: defineFeature(() => ({
+      request: async (input) => {
+        if (input === 'count') return { calls }
+        if (input === 'delay') await new Promise((resolve) => setTimeout(resolve, 25))
+        if (input === 'release-held') {
+          for (const resume of held) resume()
+          held.clear()
+        }
+        const invocation = ++calls
+        if (input === 'hold') await new Promise((resolve) => held.add(resolve))
+        return {
+          pid: process.pid,
+          value: process.env.RPC_VALUE ?? 'child',
+          input,
+          config: portableConfig,
+          calls: invocation,
+          resolutions,
+          disposals
+        }
+      },
+      generator: function* (input) {
+        yield input
+      }
+    }))
+  },
+  install: (core) => {
+    core.onDispose(() => {
+      disposals += 1
+    })
+    return {}
+  }
+})
+/** Errors preserve their canonical public text while bootstrap/token payloads remain private. */
+const report = (error) => process.stderr.write(`${String(error)}\n`)
+/** Both ingress modes use the same native offer and process session owner. */
+const offer = createNativeProcessOffer({
+  peer: { id: 'host-child', runtime: 'node' },
+  stream: true
+})
+/** A listener fixture runs independently of every borrowed client connection. */
+const address = process.env.RPC_HOST_ADDRESS
+/** Child mode reads its secret through the actual launcher bootstrap prefix. */
+const ingress = address
+  ? {
+      kind: 'listener',
+      address,
+      listen: (options) => listenProcessByteChannel({ ...options, serviceId: 'host-fixture' }),
+      offer,
+      verify(auth) {
+        if (auth !== process.env.RPC_HOST_TOKEN && auth !== process.env.RPC_HOST_SECOND_TOKEN)
+          throw createProcessError(RpcProcessErrorCode.authRejected)
+        return auth === process.env.RPC_HOST_SECOND_TOKEN ? 'second-principal' : 'principal'
+      },
+      createConnectionContext: () => {
+        const id = crypto.randomUUID()
+        return {
+          peerId: 'host-parent',
+          ipc: { connectionId: id, sessionId: id, log: () => undefined }
+        }
+      }
+    }
+  : {
+      kind: 'child',
+      channelKind: 'byte',
+      openRaw: async () => {
+        const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
+        return { raw: opened.channel, bootstrap: opened.bootstrap }
+      },
+      createVerifier: (bootstrap) => {
+        const expected = new TextDecoder().decode(bootstrap)
+        return (actual) => {
+          if (actual !== expected) throw createProcessError(RpcProcessErrorCode.authRejected)
+        }
+      },
+      establish: (raw, options) =>
+        createProcessTransport(raw, {
+          role: 'responder',
+          offer,
+          auth: { mode: 'required', verify: options.verify },
+          peerId: 'host-parent',
+          scheduler: options.scheduler,
+          signal: options.signal,
+          ipc: { ...options.session, log: () => undefined },
+          report
+        }),
+      parentLoss: { exit: (code) => process.exit(code) }
+    }
+
+/**
+ * Compose the same actual core endpoint for Host ingress and reverse Plugin registration.
+ *
+ * @param {import('../../../dist/remote/types.js').IRemoteChannel} channel
+ * @param {Parameters<
+ *   import('../../../dist/process/plugin/types.js').IProcessServeEndpointFactory
+ * >[2]} [session]
+ * @returns {Promise<import('../../../dist/remote/types.js').IRemoteServeEndpoint>}
+ */
+async function createEndpoint(channel, session) {
+  const roots = createFirstPartyRoots(new Set(['first-party-provider', 'first-party-control']))
+  const endpoint = await createComposedEndpoint(
+    {
+      id: process.env.RPC_REGISTRATION_ADDRESS ? 'registration-peer' : 'host-child',
+      scheduler: channel.scheduler,
+      transport: channel.transport,
+      ...(session ? { idempotency: session.idempotency, providerLimits: session.limits } : {}),
+      middlewares: [
+        codec(channel.pipeline.codec),
+        framer(channel.pipeline.framer),
+        abort(),
+        connect({ transport: channel.transport }),
+        ping()
+      ]
+    },
+    {
+      ...roots,
+      'first-party-stream': createStreamFeature(
+        roots['first-party-outbound'],
+        roots['first-party-provider']
+      ),
+      'channel-ipc-log': channel.features[0],
+      'channel-ipc-gate': channel.features[1]
+    }
+  )
+  return { endpoint, stream: endpoint.stream }
+}
+
+/** Reverse mode initiates once, then serves only its approved Plugin contract on that channel. */
+if (process.env.RPC_REGISTRATION_ADDRESS) {
+  await host.use(definition)
+  const raw = await dialProcessByteChannel({ address: process.env.RPC_REGISTRATION_ADDRESS })
+  const id = crypto.randomUUID()
+  const channel = await createProcessTransport(raw, {
+    role: 'initiator',
+    offer: createNativeProcessOffer({
+      peer: { id: 'registration-peer', runtime: 'node' },
+      auth: process.env.RPC_HOST_TOKEN,
+      stream: true
+    }),
+    peerId: 'registration-server',
+    scheduler: systemScheduler,
+    ipc: { connectionId: id, sessionId: id, log: () => undefined },
+    report
+  })
+  const service = await serveRemotePlugin({
+    host,
+    contract: process.env.RPC_BAD_DESCRIPTION
+      ? {
+          ...catalog.p,
+          features: { f: { methods: { request: { mode: 'request', idempotent: false } } } }
+        }
+      : catalog.p,
+    endpoint: await createEndpoint(channel),
+    report
+  })
+  channel.transport.onTransportError(() => {
+    void service.close().then(
+      () => process.exit(0),
+      (error) => {
+        report(error)
+        process.exit(1)
+      }
+    )
+  })
+  process.stderr.write('registration-peer-ready\n')
+} else {
+  /** The process Host facade receives only local executable ports; definitions never cross the wire. */
+  await createServeProcessHost({
+    host,
+    catalog,
+    ingress,
+    scheduler: systemScheduler,
+    report,
+    resolvePlugin: (_name, config) => {
+      resolutions += 1
+      if (process.env.RPC_RESOLVER_MODE === 'wrong-name')
+        return definePlugin({ name: 'wrong', install: () => ({}) })
+      if (process.env.RPC_RESOLVER_MODE === 'promise') return Promise.resolve(definition)
+      if (process.env.RPC_RESOLVER_MODE === 'invalid') return null
+      if (process.env.RPC_RESOLVER_MODE === 'throw')
+        throw createProcessError(
+          RpcProcessErrorCode.hostInvalidOption,
+          createProcessError(RpcProcessErrorCode.channelClosed)
+        )
+      portableConfig = config ?? null
+      return definition
+    },
+    endpointFactory: (channel, _signal, session) => createEndpoint(channel, session)
+  })
+  if (address) process.stderr.write('host-listener-ready\n')
+}

@@ -28,6 +28,8 @@ export function hostFixture() {
   const report = vi.fn()
   /** Each actual supervised candidate gets its own exit, so replacements cannot reuse a dead unit. */
   const handles: IProcessHandle[] = []
+  /** Crash hooks settle the actual supervised exits without manufacturing terminal events. */
+  const crashes: ((status: { code: number; signal: null }) => void)[] = []
   /** Aggregate termination counts do not own any particular handle's exit promise. */
   const terminate = vi.fn((_mode: string) => undefined)
   /** Launch order is observable separately from termination and spec identity. */
@@ -46,6 +48,7 @@ export function hostFixture() {
         exit({ code: 0, signal: null })
       }
     }
+    crashes.push(exit)
     handles.push(handle)
     order.push(`launch:${id}`)
     return handle
@@ -96,5 +99,5 @@ export function hostFixture() {
       }
     }
   }
-  return { options, launch, terminate, send, upstream, scheduler, report, handles, order }
+  return { options, launch, terminate, send, upstream, scheduler, report, handles, order, crashes }
 }

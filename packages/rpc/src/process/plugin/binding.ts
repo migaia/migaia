@@ -8,6 +8,8 @@ import {
   createUnitBudget,
   TerminationMode,
   type ISupervisor,
+  type IUnitLauncher,
+  type ISupervisorBaseOptions,
   type IUnitProfile
 } from '@migaia/supervision'
 import {
@@ -56,12 +58,14 @@ export type IProcessPluginBinding<TUnit extends object, TSpec> = IRemoteBinding<
     registrationSupervisor: IProcessRegistrationSupervisorPort
     /** Owned bindings alone can escalate a live handle during shutdown. */
     forceCurrent?(): void
+    /** Preserve logical request Promise identity while joining the canonical drain barrier. */
+    trackRequest<T>(operation: () => Promise<T>): Promise<T>
     bindEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
     drainCurrent(options?: Readonly<{ hostRemainingMs?: number }>): Promise<void>
   }>
 
 /** Project the canonical supervisor without storing another lifecycle or restart policy. */
-function registrationSupervisor<TUnit, TSpec>(
+export function registrationSupervisor<TUnit, TSpec>(
   supervisor: ISupervisor<TUnit, TSpec>
 ): IProcessRegistrationSupervisorPort {
   return {
@@ -106,7 +110,7 @@ function requirePingCapabilities(capabilities: readonly string[]): void {
 }
 
 /** A ready endpoint must support the capability that the supervisor will probe. */
-function requirePingEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): void {
+export function requirePingEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): void {
   requirePingCapabilities(channel.agreement.capabilities)
   if (typeof endpoint.endpoint.ping !== 'function')
     throw createProcessError(RpcProcessErrorCode.resilienceInvalidOption, undefined, {
@@ -115,7 +119,7 @@ function requirePingEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndp
 }
 
 /** One supervisor check delegates to the endpoint installed for its current unit. */
-async function checkNativePing(
+export async function checkNativePing(
   ready: Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }> | undefined,
   signal: IAbortSignal
 ): Promise<void> {
@@ -321,6 +325,7 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
     scheduler,
     health,
     registrationSupervisor: registrationSupervisor(supervisor),
+    trackRequest: drain.trackCurrent,
     forceCurrent() {
       if (!currentHandle || forced.has(currentHandle)) return
       const unit = currentHandle
@@ -396,6 +401,51 @@ function createConnectionHandle(raw: IProcessByteChannel): IProcessConnectionHan
   }
 }
 
+/** Borrowed socket and adopted channel units share the same local close-only supervision profile. */
+export type IProcessConnectionUnit = Pick<IProcessConnectionHandle, 'identity' | 'exited' | 'close'>
+
+/** Reuse PP2 supervision without dialing or inventing another borrowed lifecycle state machine. */
+export function createProcessConnectionSupervisor<THandle extends IProcessConnectionUnit>(
+  address: string,
+  scheduler: IScheduler,
+  report: (error: unknown) => void,
+  launcher: IUnitLauncher<string, THandle>,
+  supervision: Pick<
+    ISupervisorBaseOptions<THandle>,
+    'restart' | 'startupTimeoutMs' | 'stop' | 'terminalPolicy' | 'scheduler' | 'health'
+  > = {}
+): ISupervisor<THandle, string> {
+  /** Local socket supervision owns a single connection unit, independently of service quota. */
+  const budget = createUnitBudget({ kind: ProcessConnectionProfile.kind, maxUnits: 1, scheduler })
+  /** Both borrowed and adopted units retire through their close handle without PID access. */
+  const profile: IUnitProfile<string, THandle, Readonly<{ reason: unknown }>> = {
+    kind: ProcessConnectionProfile.kind,
+    gracefulTermination: true,
+    requirements: () => [],
+    validateSpec(address) {
+      if (typeof address !== 'string' || address.length === 0) invalidOption('deployment.address')
+    },
+    terminate(handle) {
+      void handle.close().catch((error: unknown) => reportSafely(report, error))
+    },
+    classifyExit(status) {
+      return status.reason === undefined
+        ? { reason: 'exited' }
+        : { reason: 'crashed', cause: status.reason }
+    }
+  }
+  return createSupervisor({
+    id: defaultRpcId(),
+    spec: address,
+    budget,
+    scheduler,
+    report,
+    ...supervision,
+    profile,
+    launcher
+  })
+}
+
 /** Maps a borrowed external process to an owned, single-session socket supervisor. */
 export function createConnectProcessBinding(
   deployment: IConnectProcessPluginDeployment,
@@ -422,43 +472,11 @@ export function createConnectProcessBinding(
   >()
   const scheduler = deployment.supervision?.scheduler ?? systemScheduler
   const drain = createProcessBindingDrain(scheduler, (error) => reportSafely(report, error))
-  const budget = createUnitBudget({ kind: ProcessConnectionProfile.kind, maxUnits: 1, scheduler })
-  const profile: IUnitProfile<string, IProcessConnectionHandle, Readonly<{ reason: unknown }>> = {
-    kind: ProcessConnectionProfile.kind,
-    gracefulTermination: true,
-    requirements: () => [],
-    validateSpec(address) {
-      if (typeof address !== 'string' || address.length === 0) invalidOption('deployment.address')
-    },
-    terminate(handle) {
-      void handle.close().catch((error: unknown) => reportSafely(report, error))
-    },
-    classifyExit(status) {
-      return status.reason === undefined
-        ? { reason: 'exited' }
-        : { reason: 'crashed', cause: status.reason }
-    }
-  }
-  const supervisor = createSupervisor({
-    id: defaultRpcId(),
-    spec: deployment.address,
-    budget,
+  const supervisor = createProcessConnectionSupervisor(
+    deployment.address,
     scheduler,
     report,
-    ...deployment.supervision,
-    ...(health === 'ping'
-      ? {
-          health: {
-            check: (unit: IProcessConnectionHandle, signal: IAbortSignal) =>
-              checkNativePing(readyEndpoints.get(unit), signal),
-            intervalMs: DEFAULT_HEALTH_INTERVAL_MS,
-            timeoutMs: DEFAULT_HEALTH_TIMEOUT_MS,
-            failureThreshold: DEFAULT_HEALTH_FAILURE_THRESHOLD
-          }
-        }
-      : {}),
-    profile,
-    launcher: {
+    {
       capabilities: {},
       async launch(address, context) {
         const raw = await deployment.dial(address, context.signal)
@@ -468,14 +486,29 @@ export function createConnectProcessBinding(
         }
         return createConnectionHandle(raw)
       }
+    },
+    {
+      ...deployment.supervision,
+      ...(health === 'ping'
+        ? {
+            health: {
+              check: (unit: IProcessConnectionHandle, signal: IAbortSignal) =>
+                checkNativePing(readyEndpoints.get(unit), signal),
+              intervalMs: DEFAULT_HEALTH_INTERVAL_MS,
+              timeoutMs: DEFAULT_HEALTH_TIMEOUT_MS,
+              failureThreshold: DEFAULT_HEALTH_FAILURE_THRESHOLD
+            }
+          }
+        : {})
     }
-  })
+  )
   return {
     ownership: 'owned',
     supervisor,
     scheduler,
     health,
     registrationSupervisor: registrationSupervisor(supervisor),
+    trackRequest: drain.trackCurrent,
     drainCurrent: (options) =>
       supervisor.state === 'ready' ? drain.drainCurrent(options) : Promise.resolve(),
     bindEndpoint(channel, endpoint) {
