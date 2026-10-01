@@ -27,6 +27,8 @@ export type IPluginDefinition<TCore> = {
   readonly onDependencyReplaced?: IPluginConstraint<TCore>['onDependencyReplaced']
   readonly activation: 'eager' | 'lazy'
   readonly dispose?: IPluginConstraint<TCore>['dispose']
+  /** Captured release hook; never re-read from a mutable owner object. */
+  readonly beforeRelease?: IPluginConstraint<TCore>['beforeRelease']
   /** Symbol disposer captured with the plugin admission snapshot; never re-probe owner at cleanup. */
   readonly disposer?: IPluginDisposer
   readonly features: Readonly<Record<string, object>>
@@ -65,6 +67,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
     Readonly<{ readonly resource: unknown; readonly dispose: IPluginDisposer }>
   >
   installed: boolean
+  /** Prevents a published registration from running its release hook twice. */
+  beforeReleaseRan?: boolean
   /** Orthogonal reachability state; disabling never changes lifecycle or releases resources. */
   enabled: boolean
   /** Whether a missing or unavailable required provider has temporarily gated this registration. */

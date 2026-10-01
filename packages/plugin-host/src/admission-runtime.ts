@@ -1,6 +1,7 @@
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { snapshotFeatureRecord } from './define-feature.js'
+import { readPluginDefinitionData } from './define-plugin.js'
 import ERROR_TEXT, {
   PluginHostError,
   createPluginDefinitionTypeError,
@@ -46,6 +47,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       readonly onDependencyReplaced: unknown
       readonly activation: unknown
       readonly dispose: unknown
+      readonly beforeRelease: unknown
       readonly retiredShared: unknown
       readonly features: unknown
       readonly featureExpose: unknown
@@ -63,6 +65,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
         onDependencyReplaced: plugin?.onDependencyReplaced,
         activation: plugin?.activation ?? 'eager',
         dispose: plugin?.dispose,
+        beforeRelease: readPluginDefinitionData(plugin, 'beforeRelease'),
         retiredShared: (plugin as { readonly shared?: unknown })?.shared,
         features: plugin?.features,
         featureExpose: plugin?.featureExpose,
@@ -82,6 +85,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       onDependencyReplaced,
       activation,
       dispose,
+      beforeRelease,
       retiredShared,
       features,
       featureExpose,
@@ -94,6 +98,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       throw createPluginHostTypeError('plugin install must be a function')
     if (setup !== undefined && typeof setup !== 'function')
       throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_SETUP_FUNCTION)
+    if (beforeRelease !== undefined && typeof beforeRelease !== 'function')
+      throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_BEFORE_RELEASE_FUNCTION)
     for (const [key, hook] of [
       ['update', update],
       ['onEnable', onEnable],
@@ -128,6 +134,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       onDependencyReplaced: onDependencyReplaced as IPluginConstraint<any>['onDependencyReplaced'],
       activation,
       dispose: dispose as IPluginConstraint<any>['dispose'],
+      beforeRelease: beforeRelease as IPluginConstraint<any>['beforeRelease'],
       disposer: disposer.disposer,
       features: snapshotFeatureRecord(features),
       featureExpose: featureExpose as IPluginDefinition<any>['featureExpose']
