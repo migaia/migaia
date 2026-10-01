@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { RpcRemoteLayerErrorCode } from '../../src/remote/error-code.js'
-import { createRemoteGenerationHolder } from '../../src/remote/proxy.js'
+import { createRemoteGenerationHolder, createRemoteRegistration } from '../../src/remote/proxy.js'
 import { remoteHarness } from './fixture.js'
 
 describe('A2 remote generation proxy', () => {
@@ -53,10 +53,17 @@ describe('A2 remote generation proxy', () => {
     const describeGate = new Promise<void>((resolve) => {
       releaseDescribe = resolve
     })
+    let enteredDescribe: (() => void) | undefined
+    const describing = new Promise<void>((resolve) => {
+      enteredDescribe = resolve
+    })
     const fixture = remoteHarness()
     const send = fixture.served.endpoint.send
     fixture.served.endpoint.send = async (peer, method, data, options) => {
-      if (method === 'migaia.remote.describe') await describeGate
+      if (method === 'migaia.remote.describe') {
+        enteredDescribe?.()
+        await describeGate
+      }
       return send(peer, method, data, options)
     }
     const ready = fixture.registration.events.whenReady(0)
@@ -64,7 +71,7 @@ describe('A2 remote generation proxy', () => {
       new AbortController().signal,
       fixture.own
     )
-    await Promise.resolve()
+    await describing
     fixture.emit({ type: 'exit', generation: 1, reason: 'crashed', error: 'gone' })
     releaseDescribe?.()
     await expect(pending).rejects.toMatchObject({
@@ -76,6 +83,73 @@ describe('A2 remote generation proxy', () => {
     expect(fixture.calls).toContain('channel.close')
     await fixture.registration.release()
     await expect(ready).rejects.toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
+  })
+
+  it('closes a channel returned after release before endpoint construction', async () => {
+    const fixture = remoteHarness()
+    /** The opening gate models a channel delivered after the registration is released. */
+    let deliverChannel: (() => void) | undefined
+    let opening: (() => void) | undefined
+    const opened = new Promise<void>((resolve) => {
+      opening = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      deliverChannel = resolve
+    })
+    const registration = createRemoteRegistration({
+      contract: fixture.registration.contract,
+      binding: {
+        ...fixture.binding,
+        async openChannel() {
+          opening?.()
+          await gate
+          return fixture.channel
+        }
+      },
+      endpointFactory: async () => fixture.served,
+      report: () => undefined
+    })
+    const holder = createRemoteGenerationHolder(registration, () => undefined)
+    const pending = holder.prepareInitial(new AbortController().signal)
+    await opened
+    await holder.release()
+    deliverChannel?.()
+    await expect(pending).rejects.toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
+    expect(fixture.calls.filter((call) => call === 'channel.close')).toHaveLength(1)
+    expect(fixture.calls).not.toContain('endpoint.dispose')
+  })
+
+  it('disposes a late endpoint and channel after setup cancellation', async () => {
+    const fixture = remoteHarness()
+    const controller = new AbortController()
+    /** Endpoint construction pauses after the channel was acquired. */
+    let deliverEndpoint: (() => void) | undefined
+    let constructing: (() => void) | undefined
+    const entered = new Promise<void>((resolve) => {
+      constructing = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      deliverEndpoint = resolve
+    })
+    const registration = createRemoteRegistration({
+      contract: fixture.registration.contract,
+      binding: fixture.binding,
+      endpointFactory: async () => {
+        constructing?.()
+        await gate
+        return fixture.served
+      },
+      report: () => undefined
+    })
+    const holder = createRemoteGenerationHolder(registration, () => undefined)
+    const pending = holder.prepareInitial(controller.signal)
+    await entered
+    controller.abort(new Error('setup cancelled'))
+    deliverEndpoint?.()
+    await expect(pending).rejects.toThrow('setup cancelled')
+    expect(fixture.calls.filter((call) => call === 'endpoint.dispose')).toHaveLength(1)
+    expect(fixture.calls.filter((call) => call === 'channel.close')).toHaveLength(1)
+    await holder.release()
   })
 
   it('runs guard before the unavailable-generation gate and reports listener errors', async () => {

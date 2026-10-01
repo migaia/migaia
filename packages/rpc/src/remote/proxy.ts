@@ -72,7 +72,7 @@ export type IRemoteRegistration = Readonly<{
 /** One setup-scoped resource owner also accepts replacement generation resources. */
 export type IRemoteGenerationHolder = Readonly<{
   readonly registration: IRemoteRegistration
-  prepareInitial(signal: IAbortSignal): Promise<number>
+  prepareInitial(signal: IAbortSignal, rollbackOnFailure?: boolean): Promise<number>
   prepareRebind(signal: IAbortSignal): Promise<number>
   release(): Promise<void>
 }>
@@ -227,6 +227,27 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
     }
   }
 
+  /** Rejects an unavailable preparation before a newly acquired resource is published. */
+  #assertPreparing(signal: IAbortSignal, generation: number): void {
+    if (signal.aborted) throw resolveAbortReason(signal)
+    if (this.#releasePromise) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+    if (this.#departed.has(generation))
+      throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed, this.#departed.get(generation), {
+        generation
+      })
+  }
+
+  /** Cleanup errors are reported without replacing the preparation failure. */
+  async #closeFailedCandidate(disposers: readonly (() => Promise<void>)[]): Promise<void> {
+    for (const dispose of disposers) {
+      try {
+        await dispose()
+      } catch (error) {
+        this.#options.report(error)
+      }
+    }
+  }
+
   /** Same preparation path is called by first setup and later rebinding. */
   async prepareGeneration(
     signal: IAbortSignal,
@@ -246,6 +267,7 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         { state: outcome.state }
       )
     }
+    this.#assertPreparing(signal, outcome.generation)
     let channel: IRemoteChannel
     try {
       channel = await this.#options.binding.openChannel(outcome.unit, signal)
@@ -255,6 +277,12 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
     /** The channel is owned before any later validation or endpoint construction can fail. */
     let channelClose: Promise<void> | undefined
     const closeChannel = (): Promise<void> => (channelClose ??= channel.close())
+    try {
+      this.#assertPreparing(signal, outcome.generation)
+    } catch (error) {
+      await this.#closeFailedCandidate([closeChannel])
+      throw error
+    }
     own(closeChannel)
     if (channel.scheduler !== this.#options.binding.scheduler)
       throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schedulerInvalid)
@@ -279,6 +307,12 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
     /** Endpoint is registered before the first describe frame. */
     let endpointClose: Promise<void> | undefined
     const closeEndpoint = (): Promise<void> => (endpointClose ??= served.endpoint.dispose())
+    try {
+      this.#assertPreparing(signal, outcome.generation)
+    } catch (error) {
+      await this.#closeFailedCandidate([closeEndpoint, closeChannel])
+      throw error
+    }
     own(closeEndpoint)
     if (hasStream && !served.stream)
       throw new RpcError(
@@ -299,8 +333,6 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
       !sameRemoteContract(this.contract as IRemoteContract, normalizeRemoteContract(description))
     )
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-    if (signal.aborted) throw resolveAbortReason(signal)
-    if (this.#releasePromise) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     /** Close endpoint before channel regardless of who owns the registration. */
     const generation: IRemoteGeneration = Object.freeze({
       number: outcome.generation,
@@ -311,17 +343,11 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         await closeChannel()
       }
     })
-    if (this.#departed.has(generation.number)) {
-      try {
-        await generation.close()
-      } catch (error) {
-        this.#options.report(error)
-      }
-      throw createRemoteLayerError(
-        RpcRemoteLayerErrorCode.closed,
-        this.#departed.get(generation.number),
-        { generation: generation.number }
-      )
+    try {
+      this.#assertPreparing(signal, generation.number)
+    } catch (error) {
+      await this.#closeFailedCandidate([closeEndpoint, closeChannel])
+      throw error
     }
     this.#current = generation
     for (const waiter of this.#readyWaiters)
@@ -654,7 +680,15 @@ export function createRemoteGenerationHolder(
   }
   return {
     registration,
-    prepareInitial: (signal) => registration.prepareGeneration(signal, own),
+    prepareInitial: async (signal, rollbackOnFailure = false) => {
+      const from = resources.length
+      try {
+        return await registration.prepareGeneration(signal, own)
+      } catch (error) {
+        if (rollbackOnFailure) await rollback(from, error)
+        throw error
+      }
+    },
     prepareRebind: async (signal) => {
       const from = resources.length
       try {
