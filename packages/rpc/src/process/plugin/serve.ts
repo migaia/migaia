@@ -155,10 +155,11 @@ export async function serveProcessSessions(
   let closePromise: Promise<void> | undefined
   const close = (): Promise<void> =>
     (closePromise ??= (async () => {
-      controller.abort()
-      const fallbackClose = fallback?.close()
+      /** Detach parent-loss observers before abort synchronously closes this owned channel. */
       removeParentClose?.()
       removeProbe?.()
+      controller.abort()
+      const fallbackClose = fallback?.close()
       const errors: unknown[] = []
       try {
         await listener?.close()
@@ -344,6 +345,8 @@ export async function serveProcessSessions(
     shutdown: () => close(),
     exit: ingress.parentLoss.exit,
     graceMs: ingress.parentLoss.graceMs,
+    /** The session owner supplies the same clock for shutdown and its original grace deadline. */
+    scheduler,
     report: report
   })
   removeProbe = ingress.parentLoss.probe?.((reason) => guard.trigger(reason))

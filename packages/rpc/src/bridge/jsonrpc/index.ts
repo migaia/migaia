@@ -1,4 +1,12 @@
 import type { IScheduledTask } from '@migaia/utils/scheduler'
+import {
+  collectListenerCleanupFailures,
+  createListenerFailure,
+  createListenerFailureState,
+  reportListenerFailure,
+  drainTerminalListenerFailures,
+  drainListenerFailures
+} from '../../core/transport-kit.js'
 import { RpcCodecId } from '../../contract/wire-constants.js'
 import { attachIpcConnection } from '../../process/ipc-connection.js'
 import { byteProcessPipeline } from '../../process/pipeline.js'
@@ -27,6 +35,13 @@ export async function createJsonRpcRemoteChannel(
   const wire = bindJsonRpcWire(options)
   /** Deadline rejects exchange even when the underlying byte writer never drains. */
   let timer: IScheduledTask | undefined
+  /** Detach the owned task before invoking its possibly throwing disposer. */
+  const cancelTimer = (): void => {
+    /** Taking ownership first prevents a failed cancellation from being attempted twice. */
+    const owned = timer
+    timer = undefined
+    owned?.cancel()
+  }
   try {
     timer = options.scheduler.schedule(() => {
       void wire
@@ -39,6 +54,8 @@ export async function createJsonRpcRemoteChannel(
     /** Only the control owner authenticates the negotiated reply grammar. */
     const agreement = completeJsonRpcHello(prepared.offer, result)
     wire.assertOpen()
+    // Timer cleanup must finish before the physical connection can be published.
+    drainListenerFailures(collectListenerCleanupFailures([cancelTimer]))
     /** Adopt exactly one canonical gate, log Feature and stderr subscription. */
     const ipc = attachIpcConnection(wire.transport, options.ipc, options.report)
     return Object.freeze({
@@ -56,9 +73,26 @@ export async function createJsonRpcRemoteChannel(
     })
   } catch (error) {
     // Shared cleanup may throw an aggregate whose first error is the original primary failure.
-    await wire.close(error)
-    throw error
-  } finally {
-    timer?.cancel()
+    /** An earlier primary remains first while failed timer cleanup is reported and collected. */
+    const cleanup = collectListenerCleanupFailures([cancelTimer]).map((failure) =>
+      createListenerFailure([failure])!
+    )
+    /** Physical close may already have started on abort; join it without losing timer failures. */
+    let primary = error
+    try {
+      await wire.close(error)
+    } catch (failure) {
+      primary = failure
+    }
+    if (cleanup.length > 0) {
+      /** The timer owns these reporters even when the byte owner has completed its close. */
+      const failures = createListenerFailureState()
+      for (const failure of cleanup) reportListenerFailure(failure, [options.report], failures)
+      await drainTerminalListenerFailures([primary, ...cleanup], {
+        secondaryFailures: failures,
+        aggregateSingle: true
+      })
+    }
+    throw primary
   }
 }
