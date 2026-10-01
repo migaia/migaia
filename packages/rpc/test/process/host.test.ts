@@ -5,6 +5,44 @@ import { hostFixture } from './fixtures/host-control.js'
 import { nativeHostOptions } from './fixtures/host-native.js'
 
 describe('process Host facade admission and ownership', () => {
+  it('[A1] forwards the process call wall cap through the existing remote dispatcher', async () => {
+    /** The neutral endpoint records the effective deadline rather than waiting on real time. */
+    const fixture = hostFixture()
+    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
+    /** One typed observer preserves every endpoint argument at the canonical dispatch boundary. */
+    const sends: unknown[][] = []
+    const original = fixture.options.endpointFactory
+    const host = createProcessHost({
+      ...fixture.options,
+      deployment: {
+        ...fixture.options.deployment,
+        supervision: {
+          ...fixture.options.deployment.supervision,
+          spec: { ...fixture.options.deployment.supervision.spec, limits: { callWallTimeMs: 60 } }
+        }
+      },
+      endpointFactory: async (...args) => {
+        const served = await original(...args)
+        return {
+          ...served,
+          endpoint: {
+            ...served.endpoint,
+            send<T>(...input: Parameters<typeof served.endpoint.send>) {
+              sends.push(input)
+              return served.endpoint.send<T>(...input)
+            }
+          }
+        }
+      }
+    })
+    try {
+      const features = await host.use('p')
+      await features.f!.m!([], { timeoutMs: 120 })
+      expect(sends.at(-1)?.[3]).toMatchObject({ timeoutMs: 60 })
+    } finally {
+      await host.release()
+    }
+  })
   it('[A1] announces one close and waits for the real in-flight request before child exit', async () => {
     const fixture = nativeHostOptions()
     const original = fixture.options.endpointFactory
