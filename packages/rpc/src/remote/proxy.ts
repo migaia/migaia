@@ -302,7 +302,8 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
       const snapshot = supervisor.inspect()
       throw createRemoteLayerError(
         RpcRemoteLayerErrorCode.startFailed,
-        snapshot.terminalError ?? snapshot.lastExit?.error,
+        /** A capacity refusal is an original supervisor outcome, with no thrown error to retain. */
+        snapshot.terminalError ?? snapshot.lastExit?.error ?? outcome,
         { state: outcome.state }
       )
     }
@@ -342,6 +343,14 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
+    /**
+     * Local physical closure must revoke the generation before endpoint sends reject. A peer error
+     * code alone is not departure evidence; only this transport's closed state is.
+     */
+    const removeTransportError = channel.transport.onTransportError?.((reason) => {
+      if (channel.transport.closed === true) this.#leave(outcome.generation, reason)
+    })
+    if (removeTransportError) own(async () => removeTransportError())
     const served = await this.#options.endpointFactory(channel, signal)
     /** Endpoint is registered before the first describe frame. */
     let endpointClose: Promise<void> | undefined

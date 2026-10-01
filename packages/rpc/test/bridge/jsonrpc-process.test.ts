@@ -2,110 +2,25 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
-import { resolve, join } from 'node:path'
+import { join } from 'node:path'
 import type { Writable } from 'node:stream'
 import { inspect } from 'node:util'
 import { PluginHost } from '@migaia/plugin-host'
-import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
-import {
-  ProcessCapability,
-  type IProcessHandle,
-  type IProcessLauncher
-} from '@migaia/supervision/process'
+import { createUnitBudget } from '@migaia/supervision'
+
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { createJsonRpcRemoteChannel } from '../../src/bridge/jsonrpc/index.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { createProcessResilience } from '../../src/process/resilience/index.js'
 import { CHILD_STDERR_REDACTED } from '../../src/process/constants.js'
-import type { IProcessPluginEstablish } from '../../src/process/plugin/types.js'
 import { nodeByteStream } from '../../src/process/adapters/node-byte-stream.js'
-import { createNodeProcessLauncher } from '../../src/process/adapters/node-child-process.js'
 import { dialProcessByteChannel } from '../../src/process/adapters/node-socket.js'
 import type { IProcessByteChannel } from '../../src/process/types.js'
 import type { IIpcLogRecord } from '../../src/core/plugins/flow-control.js'
 import { BRIDGE_CONTRACT, bridgeEndpoint, bridgeFixture } from './fixture.js'
 
-/** A short dedicated-fd peer tests actual Node pipes without changing the native launcher. */
-const childPath = resolve(import.meta.dirname, 'fixtures/jsonrpc-child.mjs')
-/** This fixture token is deliberately unrelated to source paths and ordinary error text. */
-const token = 'Q7X9Z3V5K8W2R6T4Y1N0'
-/** The fixture adds only the explicitly supported fd carrier to Node's advertised capabilities. */
-type IFixtureHandle = IProcessHandle & { channel: IProcessByteChannel; child: ChildProcess }
-
-/** Launch a real child with a private fd, while stdout/stdin contain only JSON-RPC frames. */
-function fdLauncher(): IProcessLauncher<IFixtureHandle> {
-  return {
-    capabilities: {
-      ...createNodeProcessLauncher().capabilities,
-      [ProcessCapability.bootstrapFd]: CapabilityLevel.enforced
-    },
-    async launch(spec, context) {
-      const child = spawn(spec.command, [...spec.args], {
-        env: {},
-        stdio: ['pipe', 'pipe', 'pipe', 'pipe']
-      })
-      const exited = new Promise<{ code: number | null; signal: string | null }>((done) =>
-        child.once('close', (code, signal) => done({ code, signal }))
-      )
-      child.stderr!.on('data', (chunk: Buffer) => context.output('stderr', chunk))
-      await once(child, 'spawn')
-      ;(child.stdio[3] as Writable).end(spec.bootstrap!.payload)
-      return {
-        identity: { fingerprint: randomUUID(), pid: child.pid },
-        exited,
-        child,
-        channel: nodeByteStream(child.stdout!, child.stdin!, () => {
-          child.stdout!.destroy()
-          child.stdin!.destroy()
-        }),
-        terminate: (mode) => {
-          if (child.exitCode === null && child.signalCode === null)
-            child.kill(mode === 'force' ? 'SIGKILL' : 'SIGTERM')
-        }
-      }
-    }
-  }
-}
-
-/** Bind the caller's generation identity, token and stderr into the bridge's canonical channel. */
-function establish(
-  logs: IIpcLogRecord[],
-  reports: unknown[],
-  removals: number[],
-  retained: Array<(chunk: Uint8Array) => void> = []
-): IProcessPluginEstablish {
-  return (raw, options) => {
-    if (raw.kind !== 'byte') throw new TypeError('fixture requires byte channel')
-    return createJsonRpcRemoteChannel({
-      byte: raw,
-      peerId: 'peer',
-      target: { kind: 'plugin', contract: BRIDGE_CONTRACT },
-      offer: bridgeFixture().options.offer,
-      token: options.token!,
-      scheduler: options.scheduler,
-      wallClock: { timestamp: () => Date.now() },
-      signal: options.signal as AbortSignal,
-      ipc: {
-        ...options.session,
-        log: (entry) => {
-          logs.push(entry)
-        },
-        stderr:
-          options.stderr &&
-          ((listener) => {
-            retained.push(listener)
-            const remove = options.stderr!(listener)
-            return () => {
-              removals.push(1)
-              remove()
-            }
-          })
-      },
-      report: (error) => reports.push(error)
-    })
-  }
-}
+import { childPath, token, fdLauncher, establish } from './fixtures/jsonrpc-process.js'
 
 /** Invoke the real remote proxy, then inspect only independently recorded wire events. */
 async function exercise(
@@ -282,6 +197,107 @@ describe('JSON-RPC real process carriers', () => {
       } finally {
         await raw.close()
         if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
+        await exited
+      }
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    '[I15 A8/M2] forwards a wrong connect token through plugin establish without disturbing the borrowed peer',
+    async () => {
+      /** The independently owned listener retains a second authenticated connection. */
+      const address = join(tmpdir(), `ja-${randomUUID().slice(0, 8)}.sock`)
+      /** Private fd authentication leaves the RPC socket and child argv free of credentials. */
+      const child = spawn(process.execPath, [childPath, address], {
+        env: {},
+        stdio: ['ignore', 'pipe', 'pipe', 'pipe']
+      })
+      /** Attach exit observation before any possible failure can close the child. */
+      const exited = once(child, 'close')
+      ;(child.stdio[3] as Writable).end(token)
+      await once(child.stdout!, 'data')
+      /** The ordinary PluginHost must not publish an unauthenticated feature. */
+      const host = new PluginHost<Record<string, never>>({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
+      /** Physical frames prove authentication rejection occurs before business. */
+      const writes: Array<{ method: string; params: { hello?: string } }> = []
+      /** The factory cannot run before authenticated bridge readiness. */
+      let endpoints = 0
+      /** A healthy connection proves failed installation does not own the external process. */
+      const second = await createJsonRpcRemoteChannel({
+        ...bridgeFixture().options,
+        byte: await dialProcessByteChannel({ address }),
+        scheduler: systemScheduler,
+        token
+      })
+      /** Real core requests run through the independent connection's negotiated pipeline. */
+      const endpoint = await bridgeEndpoint(second)
+      try {
+        /** The bad token is passed by the deployment context rather than captured in establish. */
+        const plugin = createProcessPlugin({
+          name: 'p',
+          contract: BRIDGE_CONTRACT,
+          registrationOwner: { name: 'p', host },
+          host: host.plugin,
+          report: () => undefined,
+          deployment: {
+            kind: 'connect',
+            address,
+            token: 'wrong-credential',
+            dial: async (path, signal) => {
+              /** The borrowed byte stream is observed without changing carrier behavior. */
+              const raw = await dialProcessByteChannel({
+                address: path,
+                signal: signal as AbortSignal
+              })
+              return {
+                ...raw,
+                write(chunk) {
+                  writes.push(JSON.parse(Buffer.from(chunk).toString().split('\r\n\r\n')[1]!))
+                  return raw.write(chunk)
+                }
+              }
+            },
+            establish: establish([], [], []),
+            /** Connect wire omission remains K231; this caller supplies explicit transport health. */
+            supervision: { restart: { maxRestarts: 0 }, health: { check: async () => undefined } }
+          },
+          endpointFactory: async (channel) => {
+            endpoints++
+            return { endpoint: await bridgeEndpoint(channel) }
+          }
+        })
+        /** Retain the original authentication failure through all existing installation wrappers. */
+        const failure = await host.use(plugin).catch((error: unknown) => error)
+        expect(failure).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
+        /** A bounded cause traversal checks authentication identity without assuming wrapper count. */
+        const chain: unknown[] = []
+        /** Original causes remain reachable rather than being replaced by facade text. */
+        let current: unknown = failure
+        for (let depth = 0; depth < 8 && current && typeof current === 'object'; depth++) {
+          chain.push(current)
+          current = (current as { cause?: unknown }).cause
+        }
+        expect(chain).toContainEqual(
+          expect.objectContaining({
+            code: 'HANDSHAKE_REJECTED',
+            cause: expect.objectContaining({ code: 'AUTH_DENIED' })
+          })
+        )
+        expect(endpoints).toBe(0)
+        expect(writes).toHaveLength(1)
+        expect(writes[0]!.method).toBe('migaia.hello')
+        expect(JSON.parse(writes[0]!.params.hello!).auth).toBe('wrong-credential')
+        expect(child.exitCode).toBeNull()
+        expect(
+          await endpoint.send('peer', 'p.f.request', ['unaffected'], { timeoutMs: 1000 })
+        ).toMatchObject({ args: ['unaffected'] })
+      } finally {
+        await host.dispose()
+        await endpoint.dispose()
+        await second.close()
+        child.kill('SIGTERM')
         await exited
       }
     }
