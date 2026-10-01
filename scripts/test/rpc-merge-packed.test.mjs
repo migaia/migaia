@@ -102,11 +102,16 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
   assert.equal(subpaths.get('@migaia/rpc/core/stream'), 2)
   for (const [name, record] of Object.entries(legacy)) {
     /** Count each reviewed export delta against the frozen merge surface. */
-    const removed = [...(errorFormatDelta.removed[name] ?? []), ...(controlDelta.removed[name] ?? [])]
+    const removed = [
+      ...(errorFormatDelta.removed[name] ?? []),
+      ...(controlDelta.removed[name] ?? [])
+    ]
     const added = [
       ...(errorFormatDelta.added[name] ?? []),
       ...(controlDelta.added[name] ?? []),
-      ...(streamingDelta.added[name] ?? [])
+      ...(streamingDelta.added[name] ?? []),
+      // K215 admits exactly one core runtime export; every other packed count stays frozen.
+      ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : [])
     ]
     assert.equal(subpaths.get(name), record.names.length - removed.length + added.length, name)
   }
