@@ -90,6 +90,13 @@ describe('Node process launcher', () => {
     const stderrListeners = new Set<(chunk: Uint8Array) => void>()
     const records: IIpcLogRecord[] = []
     let stderrBytes = 0
+    /** Separate pipes may deliver the reply before the parent's last stderr data event. */
+    const expectedStderrBytes = 1024 * 1024 + token.length
+    /** An output event, rather than elapsed time, proves the complete drain. */
+    let completeStderr: () => void = () => undefined
+    const stderrComplete = new Promise<void>((resolve) => {
+      completeStderr = resolve
+    })
     const controller = new AbortController()
     const handle = await launcher.launch(
       {
@@ -104,6 +111,7 @@ describe('Node process launcher', () => {
         output(stream, chunk) {
           if (stream !== 'stderr') return
           stderrBytes += chunk.byteLength
+          if (stderrBytes >= expectedStderrBytes) completeStderr()
           for (const listener of stderrListeners) listener(chunk)
         }
       }
@@ -142,7 +150,8 @@ describe('Node process launcher', () => {
       allowed: 'allowed',
       argument: '; $(echo untouched)'
     })
-    expect(stderrBytes).toBeGreaterThanOrEqual(1024 * 1024 + token.length)
+    await stderrComplete
+    expect(stderrBytes).toBeGreaterThanOrEqual(expectedStderrBytes)
     expect(JSON.stringify(records)).not.toContain(token)
     const stderrRecords = records.filter((record) => record.name === 'ipc.stderr')
     expect(stderrRecords.length).toBeGreaterThan(0)
