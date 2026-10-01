@@ -165,3 +165,212 @@ export async function measureBare(options) {
     observer: { method: options.observer.method, intervalMs: options.observer.intervalMs, pids }
   }
 }
+
+/**
+ * Compute each ratio from complete paired receipts; incomplete observations are preparation
+ * failures, never a performance assertion marker.
+ *
+ * @param {object} bare Bare receipt.
+ * @param {object} rpc RPC receipt from the same frozen unit.
+ * @returns {{ p99: number; throughput: number; cpu: number; rss: number }} Exact round ratios.
+ * @throws {Error} Missing samples, endpoint attribution, nonpositive denominator or mismatch.
+ */
+export function pairedRatios(bare, rpc) {
+  for (const side of [bare, rpc]) {
+    if (
+      !side ||
+      side.samples < 1000 ||
+      side.latenciesNs?.length !== side.samples ||
+      !(side.p99Ns > 0) ||
+      !(side.throughputPerSecond > 0) ||
+      !(side.cpuNsPerRequest > 0) ||
+      !(side.rssAbsolutePeakSumBytes > 0) ||
+      !side.cpuByPid?.length ||
+      !side.rssPeaksByPid?.length ||
+      new Set(side.cpuByPid.map((row) => row.pid)).size !== side.cpuByPid.length ||
+      side.cpuByPid.length !== side.rssPeaksByPid.length ||
+      side.cpuByPid.some((row) => !Number.isFinite(row.cpuNs) || row.cpuNs < 0) ||
+      side.rssPeaksByPid.some(
+        (row) => !(row.rssBytes > 0) || !side.cpuByPid.some((cpu) => cpu.pid === row.pid)
+      )
+    )
+      throw new Error('Incomplete paired measurement')
+    /** Distinct processes must both be observed; a worker PID is charged exactly once. */
+    const expected = new Set([side.parentPid, side.peerPid])
+    if (
+      expected.size !== side.cpuByPid.length ||
+      side.cpuByPid.some((row) => !expected.has(row.pid))
+    )
+      throw new Error('Incomplete endpoint attribution')
+    if (
+      side.cpuByPid.reduce((sum, row) => sum + row.cpuNs, 0) / side.samples !==
+        side.cpuNsPerRequest ||
+      side.rssPeaksByPid.reduce((sum, row) => sum + row.rssBytes, 0) !==
+        side.rssAbsolutePeakSumBytes
+    )
+      throw new Error('Inconsistent endpoint totals')
+  }
+  if (
+    JSON.stringify(bare.unit) !== JSON.stringify(rpc.unit) ||
+    bare.encodedBytes !== rpc.encodedBytes ||
+    bare.concurrency !== rpc.concurrency ||
+    bare.runtime !== rpc.runtime
+  )
+    throw new Error('Paired configuration mismatch')
+  /** All ratios retain the RPC/bare direction; throughput has a minimum, the others maxima. */
+  const ratios = {
+    p99: rpc.p99Ns / bare.p99Ns,
+    throughput: rpc.throughputPerSecond / bare.throughputPerSecond,
+    cpu: rpc.cpuNsPerRequest / bare.cpuNsPerRequest,
+    rss: rpc.rssAbsolutePeakSumBytes / bare.rssAbsolutePeakSumBytes
+  }
+  if (Object.values(ratios).some((ratio) => !Number.isFinite(ratio) || ratio <= 0))
+    throw new Error('Invalid paired ratio')
+  return ratios
+}
+
+/**
+ * Judge at least three retained alternating rounds without dropping or replacing failed rounds.
+ *
+ * @param {{ order: string[]; bare: object; rpc: object }[]} rounds Original paired observations.
+ * @returns {object} Four ratio medians and threshold status.
+ * @throws {Error} Invalid round order or incomplete measurement.
+ */
+export function judgePairs(rounds) {
+  if (rounds.length < 3) throw new Error('At least three paired rounds required')
+  /** Preserve every round's ratios and actual execution order in the final receipt. */
+  const ratiosByRound = rounds.map((round, index) => {
+    if (
+      JSON.stringify(round.order) !== JSON.stringify(index % 2 ? ['rpc', 'bare'] : ['bare', 'rpc'])
+    )
+      throw new Error('Paired order must alternate')
+    return pairedRatios(round.bare, round.rpc)
+  })
+  /** Median is arithmetic mean of two central values for an even retained round count. */
+  const median = (values) => {
+    const sorted = [...values].sort((a, b) => a - b)
+    const index = Math.floor(sorted.length / 2)
+    return sorted.length % 2 ? sorted[index] : (sorted[index - 1] + sorted[index]) / 2
+  }
+  const ratios = Object.fromEntries(
+    Object.keys(IpcBenchThreshold).map((key) => [
+      key,
+      median(ratiosByRound.map((round) => round[key]))
+    ])
+  )
+  return {
+    type: 'bench-ratio',
+    status:
+      ratios.p99 <= 3 && ratios.throughput >= 0.5 && ratios.cpu <= 3 && ratios.rss <= 2
+        ? 'pass'
+        : 'fail',
+    samples: {
+      bare: Math.min(...rounds.map((round) => round.bare.samples)),
+      rpc: Math.min(...rounds.map((round) => round.rpc.samples))
+    },
+    ratios,
+    thresholds: IpcBenchThreshold,
+    ratiosByRound
+  }
+}
+
+/**
+ * Run the complete frozen matrix exclusively from the root's serial performance queue.
+ *
+ * @returns {Promise<void>} Emits full side receipts, original rounds and ratio medians.
+ * @throws {Error} Frozen missing capability, launch, observer or metric failure; no ratio marker.
+ */
+async function pairedMain() {
+  const { admitConformanceToolchains } =
+    await import('../test/process/fixtures/conformance-toolchains.mjs')
+  const admission = admitConformanceToolchains()
+  console.log(JSON.stringify({ type: 'toolchain-admission', ...admission }))
+  if (!admission.accepted) throw new Error(JSON.stringify(admission))
+  const { spawn } = await import('node:child_process')
+  const { readFile } = await import('node:fs/promises')
+  const { fileURLToPath } = await import('node:url')
+  /** Capability inventory is frozen before any measurement, not reconstructed after failures. */
+  const inventory = JSON.parse(
+    await readFile(new URL('./support-units.json', import.meta.url), 'utf8')
+  )
+  if (
+    !inventory.frozen ||
+    !inventory.units?.length ||
+    inventory.units.some((unit) => unit.status !== 'supported' || !unit.evidence)
+  )
+    throw new Error('Support inventory is not frozen')
+  /** A parent subprocess owns each side's CPU/RSS accounting; coordinator is never charged. */
+  const run = (unit, side) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(
+        unit.executable,
+        [fileURLToPath(new URL('./ipc-side.mjs', import.meta.url)), JSON.stringify({ unit, side })],
+        { stdio: ['ignore', 'pipe', 'pipe'] }
+      )
+      let output = ''
+      let stderr = ''
+      child.stdout.on('data', (chunk) => {
+        output += chunk.toString()
+      })
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString()
+      })
+      child.once('error', reject)
+      child.once('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`IPC side preparation/measurement failed (${code}): ${stderr}`))
+          return
+        }
+        try {
+          resolve(JSON.parse(output))
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+  let failed = inventory.blocked?.some((unit) => unit.required) ?? false
+  for (const unit of inventory.blocked ?? [])
+    console.log(JSON.stringify({ type: 'bench-unit', status: 'blocked', unit }))
+  for (const unit of inventory.units) {
+    /** Each frozen cell retains its original three rounds, including a measurement failure. */
+    const rounds = []
+    try {
+      for (let index = 0; index < 3; index++) {
+        const order = index % 2 ? ['rpc', 'bare'] : ['bare', 'rpc']
+        const round = { order }
+        rounds.push(round)
+        for (const side of order) {
+          round[side] = await run(unit, side)
+          console.log(JSON.stringify({ type: 'bench-side-receipt', round: index, ...round[side] }))
+        }
+      }
+      const judged = judgePairs(rounds)
+      console.log(JSON.stringify({ type: 'bench-unit', unit, rounds, ...judged }))
+      if (judged.status === 'fail') {
+        failed = true
+        console.log(JSON.stringify({ ...judged, unit, code: 'A10_BENCH_RATIO_ASSERTION' }))
+      }
+    } catch (error) {
+      failed = true
+      /** An invalid round stays visible; never rerun it until a lucky result passes. */
+      console.log(
+        JSON.stringify({
+          type: 'bench-unit',
+          status: 'fail',
+          failureKind: 'measurement-incomplete',
+          unit,
+          rounds,
+          error: { name: error.name, message: error.message }
+        })
+      )
+    }
+  }
+  if (failed) process.exitCode = 1
+}
+
+/** Imports by preparation tests and bare-side modules never execute a measured window. */
+if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1])
+  pairedMain().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })

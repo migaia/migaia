@@ -65,3 +65,32 @@ export async function endpointFor(
     oneWay: endpoint
   }
 }
+
+/** Compose only request/notification owners for the bridge's published initiator profile. */
+export async function bridgeEndpointFor(
+  channel: IRemoteChannel,
+  id: string
+): Promise<IRemoteServeEndpoint> {
+  const chunk = createCanonicalChunkFeature()
+  const outbound = createOutboundFeature(chunk)
+  const endpoint = await createComposedEndpoint(
+    {
+      id,
+      transport: channel.transport,
+      scheduler: channel.scheduler,
+      middlewares: [
+        codec(channel.pipeline.codec),
+        framer(channel.pipeline.framer),
+        abort(),
+        connect({ transport: channel.transport })
+      ]
+    },
+    {
+      'first-party-chunk': chunk,
+      'first-party-outbound': outbound,
+      'first-party-one-way': createOneWayFeature(outbound),
+      ...Object.fromEntries(channel.features.map((feature, index) => [`channel-${index}`, feature]))
+    }
+  )
+  return { endpoint: endpoint as unknown as IRpcEndpoint, oneWay: endpoint }
+}
