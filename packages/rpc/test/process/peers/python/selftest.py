@@ -364,6 +364,22 @@ def check_envelope(results: Results, data: dict[str, Any], label: str, minor: in
         results.check(f"{label}/unknown/{case['id']}", unknown_case)
     for case in data["order"]:
         results.check(f"{label}/order/{case['id']}", lambda case=case: expect_failure(lambda: normalize_envelope(case["value"], minor), case["violation"], case["pointer"]))
+    def warning_sequence() -> None:
+        """Evaluate deduplication independently per connection after numeric-index normalization."""
+        import re
+        seen: set[tuple[str, str]] = set()
+        observed: list[list[str]] = []
+        def bounded(value: str, maximum: int) -> str:
+            return value if len(value) <= maximum else value[:maximum] + "…"
+        for note in data["warnings"]["sequence"]:
+            pointer = re.sub(r"/[0-9]+(?=/|$)", "/*", note["pointer"])
+            key = bounded(note["kind"], 32) + bounded(pointer, 128) + "#" + bounded(note["field"], 64)
+            identity = (note["connection"], key)
+            if identity not in seen:
+                seen.add(identity)
+                observed.append(list(identity))
+        expect(observed, data["warnings"]["expected"])
+    results.check(f"{label}/warnings/sequence", warning_sequence)
 
 
 def check_handshake(results: Results, data: dict[str, Any], label: str) -> None:
