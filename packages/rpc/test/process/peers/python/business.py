@@ -167,8 +167,11 @@ class Business:
         return [native_response(message, result, error)]
 
 
-def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None) -> None:
+def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bridge: bool = False) -> None:
     """Authenticate before publishing the independent native service; EOF releases session state."""
+    if bridge:
+        serve_bridge(reader, writer, host, token)
+        return
     raw = peer.read_frame(reader, peer.MAX_HANDSHAKE)
     if raw is None:
         raise peer.PeerFailure("HANDSHAKE_INVALID")
@@ -188,6 +191,79 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None) -> 
             peer.write_json(writer, reply)
 
 
+BRIDGE_METHODS = ["migaia.hello", "migaia.describe", "migaia.invoke", "migaia.cancel"]
+BRIDGE_CAPABILITIES = ["abort@1", "jsonrpc-bridge@1", "wire-error@1", "deadline@1", "trace@1", "idempotency@1"]
+
+
+def bridge_read(reader: BinaryIO) -> Any:
+    """Bound a Content-Length header before reading its exact UTF-8 body."""
+    header = bytearray()
+    while not header.endswith(b"\r\n\r\n"):
+        byte = reader.read(1)
+        if not byte and not header:
+            return None
+        if not byte or len(header) >= 1024:
+            raise peer.PeerFailure("INVALID_FRAME_LENGTH")
+        header.extend(byte)
+    fields = header.decode("ascii").split("\r\n")
+    lengths = [line.split(":", 1)[1].strip() for line in fields if line.lower().startswith("content-length:")]
+    if len(lengths) != 1 or not lengths[0].isdigit() or not 1 <= int(lengths[0]) <= peer.MAX_FRAME:
+        raise peer.PeerFailure("INVALID_FRAME_LENGTH")
+    return peer.decode_frame(peer.read_exact(reader, int(lengths[0])))
+
+
+def bridge_write(writer: BinaryIO, message: Any) -> None:
+    """Content-Length counts UTF-8 bytes and never emits native framing or controls."""
+    body = json.dumps(message, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    writer.write(f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body)
+    writer.flush()
+
+
+def serve_bridge(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None) -> None:
+    """Serve the four negotiated extensions using the same independent local business owner."""
+    business = Business(host)
+    business.contract = json.loads(json.dumps(CONTRACT))
+    for method in ["generator", "asyncGenerator"]:
+        del business.contract["features"]["f"]["methods"][method]
+    authenticated = False
+    while (message := bridge_read(reader)) is not None:
+        if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or isinstance(message, list):
+            raise peer.PeerFailure("INVALID_ENVELOPE")
+        method, params, identifier = message.get("method"), message.get("params", {}), message.get("id")
+        if method == "migaia.hello":
+            hello = peer.decode_frame(params["hello"].encode("utf-8"))
+            local = {**peer.own_offer(), "capabilities": BRIDGE_CAPABILITIES}
+            agreed = peer.negotiate(hello, local)
+            authenticated = agreed is not None and token is not None and hello.get("auth") == token
+            reply = {"kind": "handshake", "step": "accept", "protocol": peer.PROTOCOL, **agreed, "peer": local["peer"]} if authenticated else {"kind": "handshake", "step": "reject", "protocol": peer.PROTOCOL, "error": peer.wire_error("AUTH_REJECTED", "authentication rejected")}
+            result, error = {"reply": json.dumps(reply, separators=(",", ":")), "methods": BRIDGE_METHODS}, None
+        elif not authenticated:
+            raise peer.PeerFailure("AUTH_REQUIRED")
+        elif method == "migaia.cancel":
+            if business.waiting.pop(params.get("id"), None) is not None:
+                business.aborts.append(params.get("reason"))
+                bridge_write(writer, {"jsonrpc": "2.0", "id": params["id"], "result": "late-after-cancel"})
+            continue
+        elif method == "migaia.describe":
+            result = {"schemaVersion": 1, "catalog": {"p": business.contract}} if host else business.contract
+            error = None
+        elif method == "migaia.invoke":
+            called, args = params["method"], params["args"]
+            if called == "peer.wait" or called == "p.f.request" and args == ["__wait"]:
+                business.waiting[identifier] = message
+                continue
+            result, error = business.invoke(called, args, params.get("meta", {}).get("trace"))
+        else:
+            result, error = None, peer.wire_error("METHOD_NOT_FOUND", "bridge peer method unavailable")
+        if identifier is not None:
+            reply = {"jsonrpc": "2.0", "id": identifier}
+            if error is None:
+                reply["result"] = result
+            else:
+                reply["error"] = {"code": -32000, "message": error["message"], "data": {"migaiaWireError": error}}
+            bridge_write(writer, reply)
+
+
 def run_business(args: Any) -> int:
     """Select existing framing over true owned stdio or borrowed reusable Unix listener."""
     import os
@@ -204,7 +280,7 @@ def run_business(args: Any) -> int:
                 raise peer.PeerFailure("BOOTSTRAP_INVALID")
             token = raw.decode("utf-8")
         print(f"READY pid={os.getpid()}", file=sys.stderr, flush=True)
-        serve(sys.stdin.buffer, sys.stdout.buffer, args.host, token)
+        serve(sys.stdin.buffer, sys.stdout.buffer, args.host, token, args.jsonrpc)
         return 0
     if not args.listen_unix or token is None:
         raise peer.PeerFailure("AUTH_REQUIRED")
@@ -216,6 +292,6 @@ def run_business(args: Any) -> int:
             conn, _ = listener.accept()
             with conn, conn.makefile("rb") as reader, conn.makefile("wb") as writer:
                 try:
-                    serve(reader, writer, args.host, token)
+                    serve(reader, writer, args.host, token, args.jsonrpc)
                 except (peer.PeerFailure, BrokenPipeError, ConnectionResetError):
                     print("PEER_FAIL BUSINESS_SESSION", file=sys.stderr, flush=True)

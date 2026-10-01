@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { inspect } from 'node:util'
@@ -21,8 +21,11 @@ import {
 import { createProcessHost } from '@migaia/rpc/process'
 import { createNodeProcessLauncher } from '@migaia/rpc/process/adapters/node-child-process'
 import { dialProcessByteChannel } from '@migaia/rpc/process/adapters/node-socket'
-import type { IRemoteContract, IRemoteServeEndpoint } from '@migaia/rpc/remote'
-import { endpointFor } from './peers/ts/runtime.js'
+import type { IRemoteContract, IRemoteServeEndpoint, IRemoteChannel } from '@migaia/rpc/remote'
+import { endpointFor, bridgeEndpointFor } from './peers/ts/runtime.js'
+import { fdLauncher } from '../bridge/fixtures/jsonrpc-process.js'
+import { createJsonRpcRemoteChannel } from '@migaia/rpc/bridge/jsonrpc'
+import { systemScheduler } from '@migaia/utils/scheduler'
 
 /** Portable business outputs are observed on the provider, never inferred from send completion. */
 const expected = JSON.parse(
@@ -39,6 +42,18 @@ const businessVectors = JSON.parse(
 const contract = JSON.parse(
   await readFile(new URL('../../schema/vectors/remote-contract.json', import.meta.url), 'utf8')
 ).contracts[0].value as IRemoteContract
+/** The bridge's published contract deliberately contains only its two supported modes. */
+const bridgeContract: IRemoteContract = {
+  ...contract,
+  features: {
+    f: {
+      methods: {
+        request: contract.features.f!.methods.request!,
+        oneWay: contract.features.f!.methods.oneWay!
+      }
+    }
+  }
+}
 /**
  * Four public/independent executables run directly, without language wrapping or protocol
  * forwarding.
@@ -87,7 +102,10 @@ const peers = [
 ]
 /** Real feature calls use the public facade's contract-projected methods. */
 type IBusinessFeature = {
-  request(params: unknown[], options?: { signal: AbortSignal }): Promise<unknown>
+  request(
+    params: unknown[],
+    options?: { signal?: AbortSignal; timeoutMs?: number; idempotencyKey?: string }
+  ): Promise<unknown>
   oneWay(params: unknown[]): Promise<void>
   generator(params: unknown[]): AsyncIterable<unknown>
   asyncGenerator(params: unknown[]): AsyncIterable<unknown>
@@ -99,14 +117,30 @@ const offer = createNativeProcessOffer({
   capabilities: ['abort@1', 'wire-error@1']
 })
 /** Deployment creation retains actual handles and raw outputs for release and error attribution. */
-function deployment(peer: (typeof peers)[number], host: boolean, token: string, address?: string) {
+function deployment(
+  peer: (typeof peers)[number],
+  host: boolean,
+  token: string,
+  address?: string,
+  bridge = false
+) {
   const handles: IProcessHandle[] = []
   const output: Uint8Array[] = []
   const stdout: Uint8Array[] = []
   /** An observer retains emitted wire frames without implementing framing or changing backpressure. */
   const sent: Uint8Array[] = []
   const reports: unknown[] = []
-  const launcher = createNodeProcessLauncher()
+  const launcher = bridge ? fdLauncher() : createNodeProcessLauncher()
+  /** Borrowed bridge uses the existing explicit health override; default none remains K231 blocked. */
+  let established: IRemoteChannel | undefined
+  /** Build with the real tool environment before the existing FD fixture's intentionally empty env. */
+  const executable =
+    bridge && (peer.language === 'go' || peer.language === 'rust')
+      ? {
+          command: execFileSync('sh', [peer.args[0]!, '--executable'], { encoding: 'utf8' }).trim(),
+          args: peer.args.slice(1)
+        }
+      : peer
   const establish: IProcessPluginOptions['deployment']['establish'] = (raw, context) => {
     if (raw.kind !== 'byte') throw new TypeError('business peer requires bytes')
     raw.onData((chunk) => stdout.push(chunk.slice()))
@@ -117,6 +151,28 @@ function deployment(peer: (typeof peers)[number], host: boolean, token: string, 
         await raw.write(chunk)
       }
     }
+    if (bridge)
+      return createJsonRpcRemoteChannel({
+        byte: observed,
+        peerId: peer.id,
+        target: host
+          ? { kind: 'host', catalog: { p: bridgeContract } }
+          : { kind: 'plugin', contract: bridgeContract },
+        offer: {
+          versions: [{ major: 1, minor: 1 }],
+          capabilities: ['deadline@1', 'trace@1', 'idempotency@1'],
+          peer: { id: 'caller', runtime: 'node' }
+        },
+        token,
+        scheduler: context.scheduler,
+        wallClock: { timestamp: () => Date.now() },
+        signal: context.signal as AbortSignal,
+        report: (error) => reports.push(error),
+        ipc: { ...context.session, log: () => undefined }
+      }).then((channel) => {
+        established = channel
+        return channel
+      })
     return createProcessTransport(observed, {
       role: 'initiator',
       peerId: peer.id,
@@ -127,13 +183,40 @@ function deployment(peer: (typeof peers)[number], host: boolean, token: string, 
       ipc: { ...context.session, log: () => undefined }
     })
   }
-  const proposal = { ...offer, auth: token }
+  const proposal = bridge
+    ? {
+        versions: [{ major: 1, minor: 1 }],
+        codecs: ['json'],
+        capabilities: [
+          'jsonrpc-bridge@1',
+          'abort@1',
+          'wire-error@1',
+          'deadline@1',
+          'trace@1',
+          'idempotency@1'
+        ],
+        peer: { id: 'caller', runtime: 'node' },
+        auth: token
+      }
+    : { ...offer, auth: token }
   const selected: IProcessPluginOptions['deployment'] = address
     ? {
         kind: 'connect',
         address,
         token,
         offer: proposal,
+        ...(bridge
+          ? {
+              supervision: {
+                health: {
+                  check: async () => {
+                    if (established?.transport.closed)
+                      throw new Error('bridge fixture channel closed')
+                  }
+                }
+              }
+            }
+          : {}),
         dial: (target, signal) =>
           dialProcessByteChannel({ address: target, signal: signal as AbortSignal }),
         establish
@@ -141,7 +224,7 @@ function deployment(peer: (typeof peers)[number], host: boolean, token: string, 
     : {
         kind: 'spawn',
         channelKind: 'byte',
-        wire: 'native',
+        wire: bridge ? 'jsonrpc' : 'native',
         token,
         offer: proposal,
         supervision: {
@@ -150,11 +233,18 @@ function deployment(peer: (typeof peers)[number], host: boolean, token: string, 
           budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),
           report: (error) => reports.push(error),
           spec: {
-            command: peer.command,
-            args: [...peer.args, '--stdio', '--bootstrap', 'stdin', ...(host ? ['--host'] : [])],
+            command: executable.command,
+            args: [
+              ...executable.args,
+              '--stdio',
+              ...(bridge ? ['--jsonrpc', '--auth-fd', '3'] : ['--bootstrap', 'stdin']),
+              ...(host ? ['--host'] : [])
+            ],
             env: { inherit: ['PATH'], set: {} },
             stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-            bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
+            bootstrap: bridge
+              ? { via: 'fd', fd: 3, payload: new TextEncoder().encode(token) }
+              : { via: 'stdin', payload: new TextEncoder().encode(token) }
           },
           launcher: {
             ...launcher,
@@ -187,12 +277,14 @@ async function client(
   peer: (typeof peers)[number],
   hostProfile: boolean,
   token: string,
-  address?: string
+  address?: string,
+  bridge = false
 ) {
-  const fixture = deployment(peer, hostProfile, token, address)
+  const fixture = deployment(peer, hostProfile, token, address, bridge)
+  const selectedContract = bridge ? bridgeContract : contract
   let runtime: IRemoteServeEndpoint | undefined
   const endpointFactory = async (channel: Parameters<typeof endpointFor>[0]) => {
-    runtime = await endpointFor(channel, 'caller')
+    runtime = await (bridge ? bridgeEndpointFor : endpointFor)(channel, 'caller')
     return runtime
   }
   const local = new PluginHost<Record<string, never>>({
@@ -200,7 +292,7 @@ async function client(
   })
   if (hostProfile) {
     const facade = createProcessHost({
-      catalog: { p: contract },
+      catalog: { p: selectedContract },
       deployment: fixture.selected,
       endpointFactory,
       report: (error) => fixture.reports.push(error)
@@ -224,7 +316,7 @@ async function client(
   }
   const definition = createProcessPlugin({
     name: 'p',
-    contract,
+    contract: selectedContract,
     registrationOwner: { name: 'p', host: local },
     host: local.plugin,
     deployment: fixture.selected,
@@ -252,12 +344,23 @@ async function client(
  * Facade methods prove actual request/one-way/stream behavior; same endpoint observes error and
  * cancellation controls.
  */
-async function business(active: Awaited<ReturnType<typeof client>>, peerId: string) {
+async function business(
+  active: Awaited<ReturnType<typeof client>>,
+  peerId: string,
+  bridge = false
+) {
   const { feature, runtime } = active
-  expect(await feature.request([expected.request.input])).toBe(expected.request.expected)
+  expect(
+    await feature.request(
+      [expected.request.input],
+      bridge ? { timeoutMs: 1000, idempotencyKey: 'h-bridge-key' } : undefined
+    )
+  ).toBe(expected.request.expected)
   for (const input of expected.oneWay.inputs) await feature.oneWay([input])
   expect(await runtime.endpoint.send(peerId, 'peer.received', [])).toEqual(expected.oneWay.expected)
-  for (const method of ['generator', 'asyncGenerator'] as const) {
+  for (const method of (bridge ? [] : ['generator', 'asyncGenerator']) as Array<
+    'generator' | 'asyncGenerator'
+  >) {
     const values: unknown[] = []
     for await (const value of feature[method]([expected.generator.input])) values.push(value)
     expect(values).toEqual(expected.generator.expected)
@@ -269,14 +372,20 @@ async function business(active: Awaited<ReturnType<typeof client>>, peerId: stri
       throw error
     })
   ).rejects.toMatchObject(expected.error)
-  const failedWire = wireFrames(active.stdout).find(
-    (frame) =>
-      frame.kind === 'response' && frame.ok === false && frame.data.route.method === 'peer.error'
-  )
+  const failedWire = bridge
+    ? bridgeFrames(active.stdout).find((frame) => frame.error)?.error.data.migaiaWireError
+    : wireFrames(active.stdout).find(
+        (frame) =>
+          frame.kind === 'response' &&
+          frame.ok === false &&
+          frame.data.route.method === 'peer.error'
+      )?.error
   expect(failedWire).toBeDefined()
-  assertWireGraph((receivedError as { cause: unknown }).cause, failedWire.error)
+  assertWireGraph((receivedError as { cause: unknown }).cause, failedWire)
   const controller = new AbortController()
-  const waiting = runtime.endpoint.send(peerId, 'peer.wait', [], { signal: controller.signal })
+  const waiting = bridge
+    ? feature.request(['__wait'], { signal: controller.signal })
+    : runtime.endpoint.send(peerId, 'peer.wait', [], { signal: controller.signal })
   await new Promise((resolve) => setTimeout(resolve, 20))
   controller.abort(new RangeError(expected.cancel.reason))
   await expect(waiting).rejects.toMatchObject({ code: expected.cancel.expectedCode })
@@ -284,6 +393,17 @@ async function business(active: Awaited<ReturnType<typeof client>>, peerId: stri
     expected.cancel.providerReason
   ])
   expect(await feature.request(['after-cancel'])).toBe('after-cancel')
+  if (bridge)
+    expect(
+      active.reports.filter(
+        (error) => (error as { source?: string }).source === '@migaia/rpc/bridge/jsonrpc'
+      )
+    ).toEqual([
+      expect.objectContaining({
+        source: '@migaia/rpc/bridge/jsonrpc',
+        code: 'JSONRPC_PROFILE_INVALID'
+      })
+    ])
   /** Explicit core trace remains request-local; facade invocations above never gain a trace. */
   expect(
     await Promise.all([
@@ -292,13 +412,186 @@ async function business(active: Awaited<ReturnType<typeof client>>, peerId: stri
       runtime.endpoint.send(peerId, 'peer.trace', [])
     ])
   ).toEqual(['h-trace-one', 'h-trace-two', null])
-  expect(await runtime.endpoint.ping(peerId, undefined, { timeoutMs: 1000 })).toBe(true)
+  if (!bridge)
+    expect(await runtime.endpoint.ping(peerId, undefined, { timeoutMs: 1000 })).toBe(true)
   if (active.remove) {
     expect(await active.remove()).toEqual({ ok: true })
     expect(await active.inspect!()).toMatchObject({ plugins: [] })
     await expect(feature.request(['old'])).rejects.toMatchObject({ code: 'REMOTE_CLOSED' })
   }
 }
+
+describe('[A3] independent JSON-RPC business through public process facades', () => {
+  for (const peer of peers.slice(0, 3))
+    for (const host of [false, true]) {
+      it(`${peer.language} JSON-RPC owned stdio Host=${host}`, async () => {
+        const active = await client(peer, host, randomUUID(), undefined, true)
+        try {
+          await business(active, peer.id, true)
+        } finally {
+          await active.close()
+          for (const handle of active.handles) await handle.exited
+          writeFileSync(
+            join(evidence, `${peer.language}-jsonrpc-stdio-${host}.stderr.log`),
+            Buffer.concat(active.output)
+          )
+          writeFileSync(
+            join(evidence, `${peer.language}-jsonrpc-stdio-${host}.frames.bin`),
+            Buffer.concat(active.stdout)
+          )
+        }
+        const frames = bridgeFrames(active.sent)
+        expect(Buffer.concat(active.sent)[0]).toBe(67)
+        expect(frames[0].method).toBe('migaia.hello')
+        expect(frames.some((frame) => frame.method === 'migaia.describe')).toBe(true)
+        const request = frames.find(
+          (frame) => frame.method === 'migaia.invoke' && frame.params.method === 'p.f.request'
+        )
+        expect(request.id).toEqual(expect.any(String))
+        expect(request.params.meta.idempotencyKey).toBe('h-bridge-key')
+        expect(request.params.meta.timeoutMs).toBeGreaterThan(0)
+        expect(request.params.meta.timeoutMs).toBeLessThanOrEqual(1000)
+        expect(
+          frames
+            .filter(
+              (frame) => frame.method === 'migaia.invoke' && frame.params.method === 'peer.trace'
+            )
+            .map((frame) => frame.params.meta?.trace ?? null)
+        ).toEqual(['h-trace-one', 'h-trace-two', null])
+        const notifications = frames.filter(
+          (frame) => frame.method === 'migaia.invoke' && frame.params.method === 'p.f.oneWay'
+        )
+        expect(notifications).toHaveLength(expected.oneWay.inputs.length)
+        expect(
+          notifications.every((frame) => frame.id === undefined && frame.params.meta === undefined)
+        ).toBe(true)
+        const cancels = frames.filter((frame) => frame.method === 'migaia.cancel')
+        expect(cancels).toHaveLength(1)
+        expect(cancels[0]).not.toHaveProperty('id')
+        expect(frames.findIndex((frame) => frame.id === cancels[0].params.id)).toBeLessThan(
+          frames.indexOf(cancels[0])
+        )
+        expect(frames.every((frame) => frame.jsonrpc === '2.0' && frame.kind === undefined)).toBe(
+          true
+        )
+        expect(active.handles).toHaveLength(1)
+      }, 15000)
+      it(`${peer.language} JSON-RPC borrowed Unix Host=${host}`, async () => {
+        const directory = await mkdtemp(join(tmpdir(), 'rpc-h-bridge-'))
+        const token = randomUUID()
+        const authPath = join(directory, 'auth')
+        writeFileSync(authPath, token, { mode: 0o600 })
+        const fd = openSync(authPath, 'r')
+        const address = join(directory, 'peer.sock')
+        const child = spawn(
+          peer.command,
+          [
+            ...peer.args,
+            '--jsonrpc',
+            '--listen-unix',
+            address,
+            '--auth-fd',
+            '3',
+            ...(host ? ['--host'] : [])
+          ],
+          { stdio: ['ignore', 'pipe', 'pipe', fd] }
+        )
+        closeSync(fd)
+        const exited = once(child, 'close')
+        const output: Buffer[] = []
+        child.stderr!.on('data', (chunk) => output.push(chunk))
+        try {
+          await new Promise<void>((resolve, reject) => {
+            child.stderr!.on('data', (chunk) => {
+              if (chunk.toString().includes('READY')) resolve()
+            })
+            child.once('error', reject)
+            child.once('exit', () =>
+              reject(
+                new Error('bridge peer exited before ready: ' + Buffer.concat(output).toString())
+              )
+            )
+          })
+          /** A denied JSON-RPC hello preserves fixed errors and cannot poison the next session. */
+          const deniedToken = randomUUID()
+          const denied = await dialProcessByteChannel({ address })
+          const deniedFrames: Uint8Array[] = []
+          denied.onData((chunk) => deniedFrames.push(chunk.slice()))
+          const deniedReports: unknown[] = []
+          let deniedError: unknown
+          try {
+            await expect(
+              createJsonRpcRemoteChannel({
+                byte: denied,
+                peerId: peer.id,
+                target: host
+                  ? { kind: 'host', catalog: { p: bridgeContract } }
+                  : { kind: 'plugin', contract: bridgeContract },
+                offer: {
+                  versions: [{ major: 1, minor: 1 }],
+                  capabilities: [],
+                  peer: { id: 'caller', runtime: 'node' }
+                },
+                token: deniedToken,
+                scheduler: systemScheduler,
+                wallClock: { timestamp: () => Date.now() },
+                ipc: {
+                  connectionId: 'denied-bridge',
+                  sessionId: 'denied-bridge',
+                  log: () => undefined
+                },
+                report: (error) => deniedReports.push(error)
+              }).catch((error) => {
+                deniedError = error
+                throw error
+              })
+            ).rejects.toBeInstanceOf(Error)
+          } finally {
+            await denied.close()
+          }
+          const deniedSnapshot = inspect(
+            {
+              error: deniedError,
+              reports: deniedReports,
+              wire: bridgeFrames(deniedFrames),
+              serialized: serializeRpcError(deniedError, { report: () => undefined })
+            },
+            { depth: null, showHidden: true }
+          )
+          for (let offset = 0; offset <= deniedToken.length - 6; offset++)
+            expect(deniedSnapshot).not.toContain(deniedToken.slice(offset, offset + 6))
+          for (let index = 0; index < 2; index++) {
+            const active = await client(peer, host, token, address, true)
+            try {
+              if (index === 0) await business(active, peer.id, true)
+              else expect(await active.feature.request(['still-alive'])).toBe('still-alive')
+            } finally {
+              await active.close()
+              writeFileSync(
+                join(evidence, `${peer.language}-jsonrpc-socket-${host}-${index}.frames.bin`),
+                Buffer.concat(active.stdout)
+              )
+            }
+            expect(child.exitCode).toBeNull()
+            expect(active.reports).toHaveLength(index === 0 ? 1 : 0)
+            expect(
+              bridgeFrames(active.sent).every(
+                (frame) => frame.jsonrpc === '2.0' && frame.kind === undefined
+              )
+            ).toBe(true)
+          }
+        } finally {
+          child.kill()
+          await exited
+          writeFileSync(
+            join(evidence, `${peer.language}-jsonrpc-socket-${host}.stderr.log`),
+            Buffer.concat(output)
+          )
+          await rm(directory, { recursive: true, force: true })
+        }
+      }, 15000)
+    }
+})
 
 describe('[A1] independent native business peers through public process facades', () => {
   for (const peer of peers)
@@ -450,6 +743,21 @@ describe('[A1] independent native business peers through public process facades'
 })
 
 /** Decode observed bytes exclusively with the published framing owner. */
+function bridgeFrames(chunks: readonly Uint8Array[]) {
+  /** This observer decodes retained receipts only; production bridge owns all live framing. */
+  let bytes = Buffer.concat(chunks)
+  const messages: any[] = []
+  while (bytes.length) {
+    const end = bytes.indexOf('\r\n\r\n')
+    expect(end).toBeGreaterThan(-1)
+    const length = Number(/Content-Length: (\d+)/i.exec(bytes.subarray(0, end).toString())![1])
+    expect(bytes.length).toBeGreaterThanOrEqual(end + 4 + length)
+    messages.push(JSON.parse(bytes.subarray(end + 4, end + 4 + length).toString()))
+    bytes = bytes.subarray(end + 4 + length)
+  }
+  return messages
+}
+/** Native receipts use the package's published frame decoder. */
 function wireFrames(chunks: readonly Uint8Array[]) {
   const frames: any[] = []
   const decoder = createRpcStreamFrameDecoder({

@@ -23,4 +23,8 @@ if [ "$needs_build" -eq 1 ]; then
   GOTOOLCHAIN=local GO111MODULE=off GOCACHE="$build_dir/cache" GOTMPDIR="$build_dir" go build -o "$candidate" "$script_dir"/*.go
   mv "$candidate" "$binary"
 fi
+if [ "${1:-}" = "--executable" ]; then
+  printf '%s\n' "$binary"
+  exit 0
+fi
 exec "$binary" "$@"

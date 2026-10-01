@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 )
 
 // businessStream retains the original correlation route and the next credited item.
@@ -205,7 +208,10 @@ func (b *businessState) native(message record) ([]record, error) {
 }
 
 // serveBusiness reuses the peer's strict native framing and hello parser before serving any business.
-func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, contract any) error {
+func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, contract any, bridge bool) error {
+	if bridge {
+		return serveBridge(reader, writer, host, token, contract)
+	}
 	hello, err := receive(reader, true)
 	if err != nil {
 		return err
@@ -242,8 +248,158 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 	}
 }
 
+// bridgeReceive bounds header/body allocations before strict standard-library JSON decoding.
+func bridgeReceive(reader io.Reader) (record, error) {
+	header := []byte{}
+	one := make([]byte, 1)
+	for !strings.HasSuffix(string(header), "\r\n\r\n") {
+		_, err := io.ReadFull(reader, one)
+		if err == io.EOF && len(header) == 0 {
+			return nil, io.EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(header) >= 1024 {
+			return nil, fmt.Errorf("invalid bridge header")
+		}
+		header = append(header, one[0])
+	}
+	length, count := 0, 0
+	for _, line := range strings.Split(string(header), "\r\n") {
+		key, raw, ok := strings.Cut(line, ":")
+		if ok && strings.EqualFold(key, "content-length") {
+			count++
+			value, err := strconv.Atoi(strings.TrimSpace(raw))
+			if err != nil {
+				return nil, err
+			}
+			length = value
+		}
+	}
+	if count != 1 || length < 1 || length > maxFrameBytes {
+		return nil, fmt.Errorf("invalid bridge length")
+	}
+	body := make([]byte, length)
+	if _, err := io.ReadFull(reader, body); err != nil {
+		return nil, err
+	}
+	var message record
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(&message); err != nil {
+		return nil, err
+	}
+	if message["jsonrpc"] != "2.0" {
+		return nil, fmt.Errorf("invalid bridge envelope")
+	}
+	return message, nil
+}
+
+// bridgeSend writes one byte-counted Content-Length response without native control packets.
+func bridgeSend(writer io.Writer, message record) error {
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+	if _, err = fmt.Fprintf(writer, "Content-Length: %d\r\n\r\n", len(body)); err != nil {
+		return err
+	}
+	_, err = writer.Write(body)
+	return err
+}
+
+// serveBridge shares real business state while exposing only the negotiated bridge extension surface.
+func serveBridge(reader io.Reader, writer io.Writer, host bool, token string, contract any) error {
+	methods := field(field(field(contract)["features"])["f"])["methods"].(map[string]any)
+	delete(methods, "generator")
+	delete(methods, "asyncGenerator")
+	b := businessState{host: host, installed: !host, received: []any{}, aborts: []any{}, waiting: map[string]record{}, streams: map[string]*businessStream{}, contract: contract}
+	authenticated := false
+	for {
+		message, err := bridgeReceive(reader)
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		params := field(message["params"])
+		var result any
+		var failure record
+		switch message["method"] {
+		case "migaia.hello":
+			var hello record
+			decoder := json.NewDecoder(strings.NewReader(params["hello"].(string)))
+			decoder.UseNumber()
+			if err := decoder.Decode(&hello); err != nil {
+				return err
+			}
+			remote, err := parseHello(hello)
+			if err != nil {
+				return err
+			}
+			local := localOffer()
+			local.Capabilities = []string{"abort@1", "jsonrpc-bridge@1", "wire-error@1", "deadline@1", "trace@1", "idempotency@1"}
+			chosen, ok := negotiate(remote, local)
+			authenticated = ok && token != "" && hello["auth"] == token
+			reply := rejectRecord("AUTH_REJECTED", "authentication rejected")
+			if authenticated {
+				reply = acceptRecord(chosen, local)
+			}
+			bytes, err := json.Marshal(reply)
+			if err != nil {
+				return err
+			}
+			result = record{"reply": string(bytes), "methods": []string{"migaia.hello", "migaia.describe", "migaia.invoke", "migaia.cancel"}}
+		case "migaia.cancel":
+			if !authenticated {
+				return fmt.Errorf("authentication required")
+			}
+			id, _ := params["id"].(string)
+			if _, ok := b.waiting[id]; ok {
+				delete(b.waiting, id)
+				b.aborts = append(b.aborts, params["reason"])
+				if err := bridgeSend(writer, record{"jsonrpc": "2.0", "id": id, "result": "late-after-cancel"}); err != nil {
+					return err
+				}
+			}
+			continue
+		case "migaia.describe":
+			if !authenticated {
+				return fmt.Errorf("authentication required")
+			}
+			result, failure = b.invoke("migaia.remote.describe", []any{}, nil)
+		case "migaia.invoke":
+			if !authenticated {
+				return fmt.Errorf("authentication required")
+			}
+			called, _ := params["method"].(string)
+			args, _ := params["args"].([]any)
+			if called == "peer.wait" || called == "p.f.request" && len(args) == 1 && args[0] == "__wait" {
+				b.waiting[message["id"].(string)] = message
+				continue
+			}
+			result, failure = b.invoke(called, args, field(params["meta"])["trace"])
+		default:
+			failure = wireError("METHOD_NOT_FOUND", "bridge peer method unavailable")
+		}
+		if id, exists := message["id"]; exists {
+			reply := record{"jsonrpc": "2.0", "id": id}
+			if failure == nil {
+				reply["result"] = result
+			} else {
+				reply["error"] = record{"code": -32000, "message": failure["message"], "data": record{"migaiaWireError": failure}}
+			}
+			if err := bridgeSend(writer, reply); err != nil {
+				return err
+			}
+		}
+	}
+}
+
 // runBusiness selects real owned stdio or a borrowed listener; only inherited/bootstrap bytes carry auth.
-func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, contractPath string) error {
+func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, contractPath string, bridge bool) error {
 	raw, err := os.ReadFile(contractPath)
 	if err != nil {
 		return err
@@ -272,7 +428,7 @@ func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD
 			token = string(bytes)
 		}
 		fmt.Fprintf(os.Stderr, "READY pid=%d\n", os.Getpid())
-		return serveBusiness(os.Stdin, os.Stdout, host, token, contract)
+		return serveBusiness(os.Stdin, os.Stdout, host, token, contract, bridge)
 	}
 	if address == "" || token == "" {
 		return fmt.Errorf("authentication required")
@@ -288,7 +444,7 @@ func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD
 		if err != nil {
 			return err
 		}
-		if err := serveBusiness(conn, conn, host, token, contract); err != nil {
+		if err := serveBusiness(conn, conn, host, token, contract, bridge); err != nil {
 			fmt.Fprintln(os.Stderr, "PEER_FAIL BUSINESS_SESSION")
 		}
 		conn.Close()
