@@ -1,0 +1,254 @@
+{
+  "profile": "jsonrpc-bridge@1",
+  "inbound": [
+    {
+      "id": "batch",
+      "value": [
+        {
+          "jsonrpc": "2.0",
+          "id": "pending",
+          "result": 1
+        }
+      ],
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "empty-batch",
+      "value": [],
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "wrong-version",
+      "value": {
+        "jsonrpc": "1.0",
+        "id": "pending",
+        "result": 1
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "reverse-invoke",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "reverse",
+        "method": "migaia.invoke",
+        "params": {}
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "reverse-cancel",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "$/cancelRequest",
+        "params": {
+          "id": "pending"
+        }
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "server-notification",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "progress",
+        "params": {}
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "missing-id",
+      "value": {
+        "jsonrpc": "2.0",
+        "result": 1
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "boolean-id",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": true,
+        "result": 1
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "both-slots",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "pending",
+        "result": 1,
+        "error": {
+          "code": -32603,
+          "message": "bad"
+        }
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "neither-slot",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "pending"
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "invalid-error",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "pending",
+        "error": {
+          "code": 1.5,
+          "message": "bad"
+        }
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "null-id",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "error": {
+          "code": -32700,
+          "message": "parse error"
+        }
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID",
+      "causeCode": "-32700"
+    },
+    {
+      "id": "null-result",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": null,
+        "result": 1
+      },
+      "action": "close",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "number-id",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "result": 1
+      },
+      "action": "report",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "unknown-id",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "unknown",
+        "result": 1
+      },
+      "action": "report",
+      "code": "JSONRPC_PROFILE_INVALID"
+    },
+    {
+      "id": "valid-result",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "pending",
+        "result": null
+      },
+      "action": "settle",
+      "code": null
+    }
+  ],
+  "outbound": [
+    {
+      "id": "hello",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "migaia.hello",
+        "method": "migaia.hello",
+        "params": {
+          "hello": "{\"kind\":\"handshake\",\"step\":\"hello\",\"protocol\":\"migaia.rpc\",\"versions\":[{\"major\":1,\"minor\":1}],\"codecs\":[\"json\"],\"capabilities\":[\"jsonrpc-bridge@1\",\"abort@1\",\"wire-error@1\"],\"peer\":{\"id\":\"vector-client\",\"runtime\":\"node\"},\"auth\":\"vector-only-token\"}"
+        }
+      }
+    },
+    {
+      "id": "describe",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "describe-1",
+        "method": "migaia.describe",
+        "params": {
+          "args": []
+        }
+      }
+    },
+    {
+      "id": "request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": "call-1",
+        "method": "migaia.invoke",
+        "params": {
+          "method": "p.f.request",
+          "args": [],
+          "meta": {
+            "timeoutMs": 500,
+            "idempotencyKey": "key-1",
+            "trace": "trace-1"
+          }
+        }
+      }
+    },
+    {
+      "id": "one-way",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "migaia.invoke",
+        "params": {
+          "method": "p.f.oneWay",
+          "args": []
+        }
+      }
+    },
+    {
+      "id": "cancel",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "migaia.cancel",
+        "params": {
+          "id": "call-1"
+        }
+      }
+    }
+  ],
+  "portableNumbers": [
+    {
+      "id": "safe-max",
+      "value": 9007199254740991,
+      "portable": true
+    },
+    {
+      "id": "int64-as-string",
+      "value": "9223372036854775807",
+      "portable": true
+    },
+    {
+      "id": "int64",
+      "json": "9223372036854775807",
+      "portable": false
+    }
+  ]
+}

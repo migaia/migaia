@@ -18,6 +18,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./bridge/jsonrpc": {
+      "types": "./dist/bridge/jsonrpc/index.d.ts",
+      "default": "./dist/bridge/jsonrpc/index.js"
+    },
     "./process": {
       "types": "./dist/process/index.d.ts",
       "default": "./dist/process/index.js"
