@@ -4,6 +4,43 @@ import { createRemoteGenerationHolder, createRemoteRegistration } from '../../sr
 import { remoteHarness } from './fixture.js'
 
 describe('A2 remote generation proxy', () => {
+  it('[A8] uses the default retry port for a sent idempotent request', async () => {
+    const fixture = remoteHarness()
+    const originalSend = fixture.served.endpoint.send
+    /** The first generation leaves while its provider result remains unsettled. */
+    let rejectFirst: ((reason: unknown) => void) | undefined
+    fixture.served.endpoint.send = async (peer, method, params, options) => {
+      if (method === 'p.f.request' && !rejectFirst)
+        return new Promise((_, reject) => {
+          rejectFirst = reject
+        })
+      return originalSend(peer, method, params, options)
+    }
+    await fixture.registration.prepareGeneration(new AbortController().signal, fixture.own)
+    const result = fixture.registration.invokeRequest('p.f.request', [])
+    fixture.emit({ type: 'exit', generation: 1, reason: 'crashed', error: new Error('gone') })
+    fixture.nextGeneration()
+    await fixture.registration.prepareGeneration(new AbortController().signal, fixture.own)
+    await expect(result).resolves.toBe('result')
+    expect(fixture.sends.filter((entry) => entry.method === 'p.f.request')).toHaveLength(1)
+    rejectFirst?.(new Error('late failure'))
+    for (let turn = 0; turn < 5; turn += 1) await Promise.resolve()
+    expect(fixture.calls.filter((entry) => entry.startsWith('report:'))).toHaveLength(1)
+    await fixture.registration.release()
+  })
+
+  it('[A9] settles a sent request when release leaves its active generation', async () => {
+    const fixture = remoteHarness()
+    const send = fixture.served.endpoint.send
+    fixture.served.endpoint.send = async (peer, method, params, options) =>
+      method === 'p.f.request' ? new Promise(() => undefined) : send(peer, method, params, options)
+    await fixture.registration.prepareGeneration(new AbortController().signal, fixture.own)
+    const result = fixture.registration.invokeRequest('p.f.request', [])
+    const release = fixture.registration.release()
+    await expect(result).rejects.toMatchObject({ code: 'REMOTE_RESULT_UNKNOWN' })
+    await release
+  })
+
   it('describes before publishing, revokes on leave, then rebinds the same proxy', async () => {
     const fixture = remoteHarness()
     const signal = new AbortController().signal

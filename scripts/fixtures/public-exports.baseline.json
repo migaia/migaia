@@ -360,6 +360,7 @@
         "createCoroutinePlugin",
         "createRemoteHost",
         "createRemotePlugin",
+        "createRemoteRetryPort",
         "normalizeRemoteContract",
         "normalizeRemoteControlShape",
         "normalizeRemoteHostCatalog",
