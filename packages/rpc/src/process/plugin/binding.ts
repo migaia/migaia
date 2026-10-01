@@ -29,7 +29,7 @@ import type {
 } from './types.js'
 
 /** Reports secondary diagnostics without replacing the error that triggered cleanup. */
-function reportSafely(report: (error: unknown) => void, error: unknown): void {
+export function reportSafely(report: (error: unknown) => void, error: unknown): void {
   try {
     report(error)
   } catch (reporterError) {

@@ -33,6 +33,8 @@ describe('process package layering and exports', () => {
     const framing = await import('@migaia/rpc/contract/framing/stream')
     expect(common.createProcessTransport).toBeTypeOf('function')
     expect(common.createNativeProcessOffer).toBeTypeOf('function')
+    expect(common.createProcessPlugin).toBeTypeOf('function')
+    expect(common.createServeProcessPlugin).toBeTypeOf('function')
     expect(framing.encodeRpcStreamFrame).toBeTypeOf('function')
   })
 
