@@ -887,7 +887,15 @@ describe('[A4] real owned crash retry eligibility', () => {
               'hf-crash-original-key'
             ])
             expect(requests[1].data.route.timeoutMs).toBeLessThan(requests[0].data.route.timeoutMs)
-          } else expect(result).toHaveProperty('error')
+          } else if (disposition === 'cancel') {
+            expect(result).toMatchObject({ error: { name: 'AbortError', cause: 'hf-cancelled' } })
+          } else if (disposition === 'deadline') {
+            expect(result).toMatchObject({ error: { name: 'TimeoutError' } })
+          } else {
+            expect(result).toMatchObject({
+              error: { source: '@migaia/rpc/remote', code: 'REMOTE_RESULT_UNKNOWN' }
+            })
+          }
         } finally {
           await active.close()
           await pending?.catch(() => undefined)
@@ -1071,7 +1079,10 @@ describe('[A4] real non-idempotent request crash', () => {
         )
         expect(requests).toHaveLength(1)
         expect(requests[0].data.route).not.toHaveProperty('idempotencyKey')
-        expect(await active.feature.request(['after-unknown'])).toBe('after-unknown')
+        /** Supervisor ready precedes remote describe publication; join the actual business gate. */
+        await vi.waitFor(async () =>
+          expect(await active!.feature.request(['after-unknown'])).toBe('after-unknown')
+        )
       } finally {
         await active?.close()
         await call
