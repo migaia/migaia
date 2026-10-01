@@ -24,9 +24,10 @@ type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly setHookRegistration: (
     registration: IRegistration<TDomainCore, TValue> | undefined
   ) => void
-  readonly clearHookRegistrationIfOwner: (registration: IRegistration<TDomainCore, TValue>) => void
-  readonly setReleasePending: (registration: IRegistration<TDomainCore, TValue>) => void
-  readonly clearReleasePendingIfOwner: (registration: IRegistration<TDomainCore, TValue>) => void
+  readonly setBeforeReleaseRegistration: (registration: IRegistration<TDomainCore, TValue>) => void
+  readonly clearBeforeReleaseRegistrationIfOwner: (
+    registration: IRegistration<TDomainCore, TValue>
+  ) => void
 }>
 
 /** Owns logical revocation and ordered physical cleanup for plugin registrations. */
@@ -56,8 +57,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
       remainingMs: () =>
         deadlineAt === undefined ? undefined : Math.max(0, deadlineAt - this.#port.scheduler.now())
     })
-    this.#port.setHookRegistration(registration)
-    this.#port.setReleasePending(registration)
+    this.#port.setBeforeReleaseRegistration(registration)
     return this.#port.cleanupRuntime
       .disposeGroup(
         [() => invokeCaptured(hook, registration.plugin.owner, [context])],
@@ -65,8 +65,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
       )
       .finally(() => {
         // The bounded group returns on timeout even when its hook Promise never settles.
-        this.#port.clearHookRegistrationIfOwner(registration)
-        this.#port.clearReleasePendingIfOwner(registration)
+        this.#port.clearBeforeReleaseRegistrationIfOwner(registration)
       })
   }
 

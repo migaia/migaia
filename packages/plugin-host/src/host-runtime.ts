@@ -397,13 +397,12 @@ export class PluginHost<
       setHookRegistration: (registration) => {
         this.#hookRegistration = registration
       },
-      clearHookRegistrationIfOwner: (registration) => {
-        if (this.#hookRegistration === registration) this.#hookRegistration = undefined
-      },
-      setReleasePending: (registration) => {
+      setBeforeReleaseRegistration: (registration) => {
+        this.#hookRegistration = registration
         this.#releasePending = registration
       },
-      clearReleasePendingIfOwner: (registration) => {
+      clearBeforeReleaseRegistrationIfOwner: (registration) => {
+        if (this.#hookRegistration === registration) this.#hookRegistration = undefined
         if (this.#releasePending === registration) this.#releasePending = undefined
       }
     })

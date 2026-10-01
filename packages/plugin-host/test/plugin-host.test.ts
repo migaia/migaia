@@ -1096,9 +1096,8 @@ describe('PluginHost', () => {
       scheduler: createManualScheduler(),
       disposeStepTimeoutMs: false,
       setHookRegistration: () => undefined,
-      clearHookRegistrationIfOwner: () => undefined,
-      setReleasePending: () => undefined,
-      clearReleasePendingIfOwner: () => undefined
+      setBeforeReleaseRegistration: () => undefined,
+      clearBeforeReleaseRegistrationIfOwner: () => undefined
     })
     runtime.revokeRegistration(registration)
     expect(registration.featureExposeValid).toBe(false)
@@ -1233,9 +1232,8 @@ describe('PluginHost', () => {
       scheduler: createManualScheduler(),
       disposeStepTimeoutMs: false,
       setHookRegistration: () => undefined,
-      clearHookRegistrationIfOwner: () => undefined,
-      setReleasePending: () => undefined,
-      clearReleasePendingIfOwner: () => undefined
+      setBeforeReleaseRegistration: () => undefined,
+      clearBeforeReleaseRegistrationIfOwner: () => undefined
     })
     runtime.revokeRegistration(registration)
     expect(stage.retired).toBe(false)
