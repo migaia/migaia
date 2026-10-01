@@ -87,6 +87,15 @@ export async function createMacPidObserver(pids, intervalMs = 10) {
     method: 'macOS proc_pid_rusage(RUSAGE_INFO_V0); no child totals; resident bytes',
     intervalMs,
     read,
+    /**
+     * Resource runs reuse the same native observer; benchmark reads retain their exact CPU/RSS
+     * path.
+     */
+    readResources: () =>
+      new Promise((resolve, reject) => {
+        pending.push({ resolve, reject })
+        child.stdin.write(JSON.stringify({ pids: uniquePids, resources: true }) + '\n')
+      }),
     start(receive) {
       /** All samples are serialized; one slow read cannot create overlapping sampler children. */
       let sampling = Promise.resolve()
