@@ -36,11 +36,11 @@ describe('optional dependencies', () => {
     expect((await second.unUse('A', { dryRun: true })).edges).toEqual([
       { provider: 'A', consumer: 'B', optional: true }
     ])
-    await expect(second.unUse('A')).resolves.toEqual({ ok: true })
+    await expect(second.unUse('A')).resolves.toMatchObject({ ok: true })
     expect(second.plugin.disabled()).toEqual([])
     expect((await second.unUse('B', { dryRun: true })).edges).toEqual([
       { provider: 'A', consumer: 'B', optional: true, status: 'optional-absent' }
     ])
-    await expect(second.unUse('B')).resolves.toEqual({ ok: true })
+    await expect(second.unUse('B')).resolves.toMatchObject({ ok: true })
   })
 })

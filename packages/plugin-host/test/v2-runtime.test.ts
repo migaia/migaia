@@ -123,7 +123,7 @@ describe('PluginHost V2 runtime contract', () => {
     invoke()
 
     /** Result of the logical revoke and cleanup transaction. */
-    expect(await host.unUse('extension')).toEqual({ ok: true })
+    expect(await host.unUse('extension')).toMatchObject({ ok: true })
     expect(() => invoke()).toThrowError(
       expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
     )

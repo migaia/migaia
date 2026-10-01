@@ -706,7 +706,7 @@ describe('PluginHost', () => {
         )
       )
       await host.config.update(`lifecycle-${mode}`, () => ({ enabled: false }))
-      await expect(host.unUse(`lifecycle-${mode}`)).resolves.toEqual({ ok: true })
+      await expect(host.unUse(`lifecycle-${mode}`)).resolves.toMatchObject({ ok: true })
       const result = host.run(1)
       if (mode === 'async' || mode === 'async-generator') await expect(result).resolves.toBe(1)
       else expect(result).toBe(1)

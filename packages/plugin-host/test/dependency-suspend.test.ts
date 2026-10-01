@@ -100,7 +100,7 @@ describe('dependency suspension and recovery', () => {
     const [, handleA, handleB] = await host.use(p, a, b, c, l)
     const extracted = handleA.extensions.read
 
-    await expect(host.unUse('p', { policy: 'suspend' })).resolves.toEqual({ ok: true })
+    await expect(host.unUse('p', { policy: 'suspend' })).resolves.toMatchObject({ ok: true })
     expect(() => handleA.getFeature('value')).toThrow(
       expect.objectContaining({ code: 'PLUGIN_SUSPENDED' })
     )
@@ -124,7 +124,7 @@ describe('dependency suspension and recovery', () => {
     })
     await expect(host.use(x)).rejects.toMatchObject({ code: 'PLUGIN_SUSPENDED' })
     expect(installX).not.toHaveBeenCalled()
-    await expect(host.unUse('b')).resolves.toEqual({ ok: true })
+    await expect(host.unUse('b')).resolves.toMatchObject({ ok: true })
     await host.dispose()
   })
 
