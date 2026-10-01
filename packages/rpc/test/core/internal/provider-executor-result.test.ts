@@ -462,3 +462,68 @@ describe('ProviderExecutor result normalization', () => {
     expect(send).not.toHaveBeenCalled()
   })
 })
+
+describe('local provider refusal identity', () => {
+  it.each(['concurrency', 'replayLedgerFull', 'bindingExpired'] as const)(
+    '[K215] reports %s for request and dispatchOnly without payload',
+    async (reason) => {
+      for (const dispatchOnly of [false, true]) {
+        /** Each row uses the original executor and its actual admission owner. */
+        const admission = new ProviderAdmissionRegistry(1, 1)
+        if (reason === 'concurrency') admission.acquire('occupied', 'verified-peer')
+        /** A refused request must never reach this business provider. */
+        const provider = vi.fn((context: IRpcContext) => context.success(null))
+        /** Registration and controller state remain owned by the existing executor. */
+        const registry = new ProviderRegistry()
+        registry.register('test', provider)
+        /** Snapshot the local callback and unchanged wire response independently. */
+        const notices: unknown[] = []
+        const sent: unknown[] = []
+        /** Deny exactly the selected existing local admission decision. */
+        const executor = new ProviderExecutor<string>({
+          ...testTime,
+          timestamp: () => 1,
+          id: 'host',
+          registry,
+          controllers: new Map(),
+          admission,
+          peers: [],
+          dispatch: () => undefined,
+          send: async (response) => {
+            sent.push(response)
+          },
+          validate: () => undefined,
+          emitFailure: () => undefined,
+          onRejected: (notice) => {
+            notices.push(notice)
+          },
+          ...(reason === 'replayLedgerFull' ? { admitReplay: () => false } : {}),
+          ...(reason === 'bindingExpired' ? { retainBinding: () => false } : {})
+        })
+        /** The same normalized request has only its one-way routing bit changed. */
+        const input = {
+          ...request,
+          route: { ...request.route, route: { ...request.route.route, dispatchOnly } }
+        }
+        await executor.execute(input, 'verified-peer')
+        expect(notices).toEqual([
+          expect.objectContaining({
+            verifiedPeerKey: 'verified-peer',
+            controllerKey: expect.any(String),
+            method: 'test',
+            reason
+          })
+        ])
+        expect(Object.keys(notices[0] as object).sort()).toEqual([
+          'controllerKey',
+          'method',
+          'reason',
+          'verifiedPeerKey'
+        ])
+        expect(provider).not.toHaveBeenCalled()
+        expect(sent).toHaveLength(dispatchOnly ? 0 : 1)
+        if (!dispatchOnly) expect(sent[0]).toMatchObject({ code: 'OVERLOADED', ok: false })
+      }
+    }
+  )
+})

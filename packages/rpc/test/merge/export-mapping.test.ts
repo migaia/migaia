@@ -89,7 +89,8 @@ describe('A1 merged public exports', () => {
           ),
           ...((errorFormatDelta.added as Record<string, string[]>)[name] ?? []),
           ...((controlSemanticsDelta.added as Record<string, string[]>)[name] ?? []),
-          ...((streamingDelta.added as Record<string, string[]>)[name] ?? [])
+          ...((streamingDelta.added as Record<string, string[]>)[name] ?? []),
+          ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : [])
         ].sort()
       )
       // A leaf export maps to its own source path; index entries map to directory roots.

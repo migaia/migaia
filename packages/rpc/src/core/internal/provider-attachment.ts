@@ -1,5 +1,5 @@
 import { RpcPlatform } from '../transport-constants.js'
-import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcConfigurationError, RpcError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import { RpcMessageKind } from '../semantic-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcAbortSignal, IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
@@ -102,6 +102,14 @@ export class RpcProviderAttachment {
       prepared.options.providerLimits?.maxGlobal ?? 256,
       prepared.options.providerLimits?.maxPerPeer ?? 64
     )
+    if (
+      prepared.options.providerLimits?.onRejected !== undefined &&
+      typeof prepared.options.providerLimits.onRejected !== 'function'
+    )
+      throw tagRpcError(
+        new TypeError(RpcCoreErrorText.providerAdmissionObserverMustBeAFunction),
+        RpcCoreErrorCode.invalidConfig
+      )
     this.#transaction = kernel
     this.#replay = new RequestReplayLedger(4096, 1024, 310_000)
     this.#executor = new ProviderExecutor({
@@ -115,6 +123,7 @@ export class RpcProviderAttachment {
       registry: this.#registry,
       controllers: this.#controllers,
       admission: this.#admission,
+      onRejected: prepared.options.providerLimits?.onRejected,
       peers: this.#targetIds,
       dispatch: (targetId, method, data) => {
         this.#outbound.send({ kind: 'dispatch', targetId, method, data })

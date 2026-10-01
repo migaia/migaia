@@ -1,4 +1,6 @@
+import type { IRpcProviderRejection } from '../provider-admission.js'
 import {
+  RpcError,
   RpcContractError,
   RpcCoreErrorCode,
   RpcSchemaValidationError,
@@ -14,7 +16,7 @@ import {
 import type { IRpcAbortSignal, IRpcContext, IRpcProviderResult } from '../typing.js'
 import type { ProviderRegistry } from './provider.js'
 import { safeRead, safeString, tupleKey } from './safe-value.js'
-import { RpcMessageKind } from '../semantic-constants.js'
+import { RpcMessageKind, RpcProviderRejectionReason } from '../semantic-constants.js'
 import { serializeRpcError } from '../../contract/error.js'
 import type {
   IRpcIdempotencyClaim,
@@ -61,6 +63,8 @@ type IProviderExecutorOptions<TTargetId extends string> = {
     readonly reason: unknown
   }
   readonly admission: IProviderAdmission
+  /** Local owner notification for the three canonical admission refusals. */
+  readonly onRejected?: (rejection: IRpcProviderRejection) => void | Promise<void>
   readonly retainBinding?: (verifiedPeerKey: string) => boolean
   readonly releaseBinding?: (verifiedPeerKey: string) => void
   /** Selects response receiver identity for composed attachment admission. */
@@ -153,6 +157,37 @@ export class ProviderExecutor<TTargetId extends string> {
     }
   }
 
+  /** Report observer failures locally; neither synchronous nor asynchronous failure changes replies. */
+  #notifyRejection(
+    request: IProviderRequestInput,
+    verifiedPeerKey: string,
+    controllerKey: string,
+    reason: RpcProviderRejectionReason
+  ): void {
+    if (!this.options.onRejected) return
+    /** Preserve the original observer failure under a core-owned coded wrapper. */
+    const report = (cause: unknown): void => {
+      this.options.emitFailure(
+        new RpcError(
+          RpcCoreErrorCode.internal,
+          RpcCoreErrorText.providerAdmissionObserverFailed,
+          cause
+        ),
+        RpcCoreErrorCode.internal
+      )
+    }
+    try {
+      /** Snapshot only already verified local identity; payloads never enter this notification. */
+      void Promise.resolve(
+        this.options.onRejected(
+          Object.freeze({ verifiedPeerKey, controllerKey, method: request.envelope.method, reason })
+        )
+      ).catch(report)
+    } catch (error) {
+      report(error)
+    }
+  }
+
   /** Validates, executes, and settles one inbound request. */
   async execute(request: IProviderRequestInput, verifiedPeerKey = ''): Promise<void> {
     const controllerKey = tupleKey(
@@ -162,6 +197,12 @@ export class ProviderExecutor<TTargetId extends string> {
     )
     if (this.options.isReplay?.(request, verifiedPeerKey)) return
     if (this.options.admitReplay && !this.options.admitReplay(request, verifiedPeerKey)) {
+      this.#notifyRejection(
+        request,
+        verifiedPeerKey,
+        controllerKey,
+        RpcProviderRejectionReason.replayLedgerFull
+      )
       if (!request.route.route.dispatchOnly)
         await this.failureResponse(
           request,
@@ -171,6 +212,12 @@ export class ProviderExecutor<TTargetId extends string> {
       return
     }
     if (!this.options.admission.acquire(controllerKey, verifiedPeerKey)) {
+      this.#notifyRejection(
+        request,
+        verifiedPeerKey,
+        controllerKey,
+        RpcProviderRejectionReason.concurrency
+      )
       if (!request.route.route.dispatchOnly)
         await this.failureResponse(
           request,
@@ -180,6 +227,12 @@ export class ProviderExecutor<TTargetId extends string> {
       return
     }
     if (this.options.retainBinding && !this.options.retainBinding(verifiedPeerKey)) {
+      this.#notifyRejection(
+        request,
+        verifiedPeerKey,
+        controllerKey,
+        RpcProviderRejectionReason.bindingExpired
+      )
       try {
         if (!request.route.route.dispatchOnly)
           await this.failureResponse(

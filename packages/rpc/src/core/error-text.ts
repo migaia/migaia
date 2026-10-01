@@ -330,10 +330,11 @@ export const RpcCoreErrorText = {
    * caller-facing wording.
    */
   bindingLimitsMustBePositiveSafeIntegers: 'binding limits must be positive safe integers',
-  /**
-   * Stable core error text consumed by core/internal/provider-admission.ts; preserves its existing
-   * caller-facing wording.
-   */
+  /** Invalid local admission observers are rejected before provider activation. */
+  providerAdmissionObserverMustBeAFunction: 'Provider admission observer must be a function',
+  /** Observer failures are local diagnostics; the original remains on the cause chain. */
+  providerAdmissionObserverFailed: 'Provider admission observer failed',
+  /** Existing concurrency configuration text remains unchanged for legacy consumers. */
   providerAdmissionLimitsMustBePositiveSafeIntegers:
     'provider admission limits must be positive safe integers',
   /**
