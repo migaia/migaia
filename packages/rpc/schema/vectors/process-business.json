@@ -201,6 +201,20 @@
         "code": "CAPABILITY_CONFLICT"
       },
       "physicalStreamWrites": 0
+    },
+    {
+      "id": "native-declared-non-idempotent-request",
+      "runtimes": [
+        "python",
+        "rust",
+        "go",
+        "node",
+        "bun"
+      ],
+      "argument": "--contract caller-owned-remote-contract.json",
+      "contractPath": "contracts[0].value.features.f.methods.request.idempotent",
+      "declaration": false,
+      "expected": "actual-describe-declaration-false-same-request-business"
     }
   ]
 }
