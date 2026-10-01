@@ -40,7 +40,7 @@ function scannedFiles(): string[] {
     })
 }
 
-/** Parses one file with the TypeScript parser. */
+/** Parses one source file for the storage-web import ownership check. */
 function parse(path: string): ts.SourceFile {
   return ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true)
 }
@@ -80,6 +80,14 @@ const formerOwners = new Set([
 /** Relative path of the one canonical scheduler module. */
 const canonicalModule = 'utils/src/scheduler.ts'
 
+/** A plain-text superset skips AST work only when no checked symbol can occur. */
+const candidateTokens = [
+  ...deletedTypes,
+  ...singleImplementations,
+  ...movedSymbols,
+  '@migaia/utils/scheduler'
+]
+
 describe('A1 single scheduler contract across the workspace', () => {
   it('keeps no deleted type, duplicate implementation, former-owner import or re-export', () => {
     /** Identifier hits of deleted type names as `file:name`. */
@@ -91,6 +99,9 @@ describe('A1 single scheduler contract across the workspace', () => {
     /** Re-exports of the utils scheduler subpath from forbidden modules. */
     const reexports: string[] = []
     for (const path of scannedFiles()) {
+      /** Every assertion below requires one of these exact spellings in the source. */
+      const source = readFileSync(path, 'utf8')
+      if (!candidateTokens.some((token) => source.includes(token))) continue
       /** Package-relative path used in diagnostics and ownership checks. */
       const file = relative(packagesRoot, path)
       /** Whether this file may not re-export the utils scheduler subpath. */
@@ -98,7 +109,7 @@ describe('A1 single scheduler contract across the workspace', () => {
         file.startsWith('lifecycle/src/') ||
         file === 'utils/src/promise.ts' ||
         file.startsWith('serialize/src/')
-      walk(parse(path), (node) => {
+      walk(ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true), (node) => {
         if (ts.isIdentifier(node) && deletedTypes.has(node.text))
           deletedHits.push(`${file}:${node.text}`)
         if (
