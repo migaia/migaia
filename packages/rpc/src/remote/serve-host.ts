@@ -32,6 +32,15 @@ type IInstalledRemotePlugin = Readonly<{
 /** Only successful remote catalog operations enter this Host-scoped view. */
 const installedByHost = new WeakMap<object, Map<string, IInstalledRemotePlugin>>()
 
+/** Same-name Host admission is shared while one definition is still installing. */
+type IInstallingRemotePlugin = Readonly<{
+  definition: IDefinedPluginConstraint
+  promise: Promise<IInstalledRemotePlugin>
+}>
+
+/** In-flight admissions belong to the Host, not to a single remote connection. */
+const installingByHost = new WeakMap<object, Map<string, IInstallingRemotePlugin>>()
+
 /** Reads a name-addressed Host handle without trusting an older Feature output. */
 function registrationState(record: IInstalledRemotePlugin): 'enabled' | 'disabled' | 'stale' {
   for (const [feature, original] of record.features) {
@@ -109,6 +118,10 @@ export async function serveRemoteHost(
   }
   const installed = installedByHost.get(options.host) ?? new Map<string, IInstalledRemotePlugin>()
   installedByHost.set(options.host, installed)
+  /** Concurrent connections consult one admission record for each Host plugin name. */
+  const installing =
+    installingByHost.get(options.host) ?? new Map<string, IInstallingRemotePlugin>()
+  installingByHost.set(options.host, installing)
   /** Installed Host handles expose Feature outputs after a successful use. */
   const handles = new Map<string, IInstalledRemotePlugin>()
   /** A stale or suspended PluginHost handle cannot forward a remote method. */
@@ -116,6 +129,47 @@ export async function serveRemoteHost(
     const captured = handles.get(plugin)
     if (!captured || installed.get(plugin) !== captured) return undefined
     return registrationState(captured) === 'enabled' ? captured.features.get(feature) : undefined
+  }
+  /** Reuse one in-flight Host mutation and inspect the winning definition afterward. */
+  const ensureInstalled = async (
+    name: string,
+    candidate: IDefinedPluginConstraint
+  ): Promise<IInstalledRemotePlugin> => {
+    for (;;) {
+      let captured = installed.get(name)
+      if (captured && registrationState(captured) === 'stale') {
+        installed.delete(name)
+        captured = undefined
+      }
+      if (captured?.definition === candidate) return captured
+      const pending = installing.get(name)
+      if (pending) {
+        try {
+          await pending.promise
+        } catch (error) {
+          if (pending.definition === candidate) throw error
+        }
+        continue
+      }
+      /** Schedule admission after registration so a second caller sees this Promise. */
+      const promise = Promise.resolve().then(async (): Promise<IInstalledRemotePlugin> => {
+        const [handle] = await options.host.use(candidate)
+        const featureHandle = handle as unknown as IInstalledRemotePlugin['handle']
+        /** Snapshots detect replacement through a name-addressed PluginHost handle. */
+        const features = new Map<string, Record<string, unknown>>()
+        for (const feature of Object.keys(catalog[name]!.features))
+          features.set(feature, featureHandle.getFeature(feature))
+        const record = { definition: candidate, handle: featureHandle, features }
+        installed.set(name, record)
+        return record
+      })
+      installing.set(name, { definition: candidate, promise })
+      try {
+        return await promise
+      } finally {
+        if (installing.get(name)?.promise === promise) installing.delete(name)
+      }
+    }
   }
   /** Stream providers release their registrations before endpoint disposal. */
   const streamReleases: (() => void)[] = []
@@ -149,21 +203,7 @@ export async function serveRemoteHost(
         )
       if (!isDefinedPlugin(candidate) || candidate.name !== name)
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-      let captured = installed.get(name)
-      if (captured && registrationState(captured) === 'stale') {
-        installed.delete(name)
-        captured = undefined
-      }
-      if (captured?.definition !== candidate) {
-        const [handle] = await options.host.use(candidate as IDefinedPluginConstraint)
-        const featureHandle = handle as unknown as IInstalledRemotePlugin['handle']
-        /** Snapshots detect replacement through a name-addressed PluginHost handle. */
-        const features = new Map<string, Record<string, unknown>>()
-        for (const feature of Object.keys(catalog[name]!.features))
-          features.set(feature, featureHandle.getFeature(feature))
-        captured = { definition: candidate, handle: featureHandle, features }
-        installed.set(name, captured)
-      }
+      const captured = await ensureInstalled(name, candidate)
       handles.set(name, captured)
       return context.success(inspectItem(options.host, catalog, name, captured))
     })
