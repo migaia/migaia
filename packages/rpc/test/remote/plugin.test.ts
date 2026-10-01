@@ -204,4 +204,45 @@ describe('remote PluginHost assembly', () => {
       await host.dispose()
     }
   })
+
+  it('retries a failed disable on the next ready event before enabling a replacement', async () => {
+    const fixture = remoteHarness()
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const report = vi.fn()
+    let disables = 0
+    const remote = createRemotePlugin({
+      name: 'p',
+      contract: REMOTE_FIXTURE_CONTRACT,
+      binding: fixture.binding,
+      endpointFactory: async () => fixture.served,
+      host: {
+        disable: async (name, options) => {
+          disables += 1
+          if (disables === 1) throw new Error('temporary mutation rejection')
+          await host.plugin.disable(name, options)
+        },
+        enable: (name) => host.plugin.enable(name)
+      },
+      report
+    })
+    const [handle] = await host.use(remote)
+    const request = (handle.getFeature('f') as { request(params: unknown[]): Promise<unknown> })
+      .request
+    try {
+      fixture.emit({ type: 'exit', generation: 1, reason: 'crashed' })
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      expect(disables).toBe(1)
+      expect(report).toHaveBeenCalledTimes(1)
+      fixture.nextGeneration()
+      fixture.emit({ type: 'state', from: 'backoff', to: 'ready', generation: 2 })
+      for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+      expect(disables).toBe(2)
+      expect(host.plugin.disabled()).not.toContain('p')
+      await expect(request([])).resolves.toBe('result')
+    } finally {
+      await host.dispose()
+    }
+  })
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { RpcRemoteLayerErrorCode } from '../../src/remote/error-code.js'
 import { createRemoteGenerationHolder, createRemoteRegistration } from '../../src/remote/proxy.js'
 import { remoteHarness } from './fixture.js'
@@ -259,6 +259,51 @@ describe('A2 remote generation proxy', () => {
     })
     expect(afterRelease).toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
     expect(afterRelease).not.toBe(reasons[0])
+  })
+
+  it('caps request and stream deadlines while one-way sends without call options', async () => {
+    const fixture = remoteHarness()
+    const streamOpen = vi.spyOn(fixture.served.stream!, 'open')
+    const registration = createRemoteRegistration({
+      contract: fixture.registration.contract,
+      binding: fixture.binding,
+      endpointFactory: async () => fixture.served,
+      callDeadlineCapMs: 50,
+      report: () => undefined
+    })
+    await registration.prepareGeneration(new AbortController().signal, () => undefined)
+    await registration.invokeRequest('p.f.request', [], { timeoutMs: 90 })
+    await registration.invokeRequest('p.f.request', [], { timeoutMs: 20 })
+    expect(fixture.sends.slice(-2).map((entry) => entry.options)).toMatchObject([
+      { timeoutMs: 50 },
+      { timeoutMs: 20 }
+    ])
+    const stream = registration.invokeStream('p.f.generator', [], { timeoutMs: 90 })
+    await stream.next()
+    expect(fixture.calls).toContain('stream.open')
+    expect(streamOpen).toHaveBeenCalledWith('peer', 'p.f.generator', [], { timeoutMs: 50 })
+    const beforeOneWay = fixture.sends.length
+    await registration.invokeOneWay('p.f.oneWay', [])
+    expect(fixture.calls).toContain('oneWay.send')
+    expect(fixture.sends).toHaveLength(beforeOneWay)
+    await expect(
+      registration.featureProxies().f!.oneWay!([], { timeoutMs: 1 }) as Promise<unknown>
+    ).rejects.toMatchObject({ code: RpcRemoteLayerErrorCode.contractInvalid })
+    await registration.release()
+  })
+
+  it('rejects readiness on terminal and release without reviving an old generation', async () => {
+    const fixture = remoteHarness()
+    const waiting = fixture.registration.events.whenReady(0)
+    fixture.emit({ type: 'terminal', entry: 1, error: new Error('budget exhausted') })
+    await expect(waiting).rejects.toMatchObject({
+      code: RpcRemoteLayerErrorCode.startFailed,
+      detail: { state: 'terminal' }
+    })
+    await fixture.registration.release()
+    await expect(fixture.registration.events.whenReady(0)).rejects.toMatchObject({
+      code: RpcRemoteLayerErrorCode.closed
+    })
   })
 
   it('codes native aggregate errors from release and rebind rollback', async () => {

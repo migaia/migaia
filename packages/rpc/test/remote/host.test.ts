@@ -48,6 +48,28 @@ function endpointHarness() {
 }
 
 describe('remote Host trusted control', () => {
+  it('rejects a Host catalog key mismatch before resolver or Host admission', async () => {
+    const endpoint = endpointHarness()
+    const use = vi.fn()
+    const resolvePlugin = vi.fn()
+    await expect(
+      serveRemoteHost({
+        host: {
+          use,
+          unUse: vi.fn(),
+          plugin: { disabled: () => [] },
+          revision: 0
+        } as unknown as IRemoteServeHostOptions['host'],
+        catalog: { other: catalog.p! },
+        resolvePlugin,
+        endpoint: { endpoint: endpoint.endpoint },
+        report: vi.fn()
+      })
+    ).rejects.toMatchObject({ code: RpcRemoteLayerErrorCode.contractInvalid })
+    expect(resolvePlugin).not.toHaveBeenCalled()
+    expect(use).not.toHaveBeenCalled()
+  })
+
   it('leaves no inspect or callable ghost after Host.use fails', async () => {
     const endpoint = endpointHarness()
     const definition = definePlugin({

@@ -261,4 +261,47 @@ describe('remote coroutine loopback', () => {
       budget.close()
     }
   })
+
+  it('reports a noncooperative task as degraded without claiming forced isolation', async () => {
+    const servedHost = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const target = definePlugin({
+      name: 'p',
+      features: { f: defineFeature(() => ({ m: () => 'live' })) },
+      install: () => ({})
+    })
+    const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })
+    const reports: unknown[] = []
+    /** Task completion is withheld even after its abort signal fires. */
+    let finishTask: (() => void) | undefined
+    const taskGate = new Promise<void>((resolve) => {
+      finishTask = resolve
+    })
+    const remote = createCoroutineHost({
+      catalog: { p: contract },
+      budget,
+      report: (error) => reports.push(error),
+      task: async ({ serve }) => {
+        await serve(servedHost, () => target)
+        await taskGate
+      }
+    })
+    try {
+      await remote.ready()
+      vi.useFakeTimers()
+      const release = remote.release()
+      for (let turn = 0; turn < 45; turn += 1) await Promise.resolve()
+      await vi.advanceTimersByTimeAsync(5_000)
+      await release
+      expect(reports).toContainEqual(expect.objectContaining({ code: 'REAP_TIMEOUT' }))
+      expect(budget.inUse).toBe(1)
+    } finally {
+      finishTask?.()
+      for (let turn = 0; turn < 45; turn += 1) await Promise.resolve()
+      vi.useRealTimers()
+      await servedHost.dispose()
+      budget.close()
+    }
+  })
 })
