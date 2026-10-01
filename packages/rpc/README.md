@@ -844,3 +844,29 @@ const transport = createWebTransportDatagramTransport({
 > 用不了官方适配器？实现 `IRpcTransport`（只有 `send`/`subscribe` 两个必需方法）就能接入任意自定义通道，见 [USEGUIDE.md](./USEGUIDE.md#5-自定义传输适配器)。
 
 ---
+
+## JSON-RPC byte bridge
+
+`@migaia/rpc/bridge/jsonrpc` exports `createJsonRpcRemoteChannel`,
+`JsonRpcBridgeErrorCode` and `JsonRpcBridgeErrorText` (plus the type
+`IJsonRpcBridgeOptions`). It consumes an existing raw `IProcessByteChannel`;
+the caller owns launch/dial and token issuance. Every frame uses
+`Content-Length: <UTF-8 bytes>\r\n\r\n` followed by one JSON body. It never
+adds native four-byte framing.
+
+The peer implements `migaia.hello`, `migaia.describe`, `migaia.invoke` and
+`migaia.cancel`. Hello carries control JSON text and the token; the peer must
+verify it before accepting. Plugin describe returns the declared contract;
+Host describe returns `{ schemaVersion: 1, catalog }`. Remote setup compares
+that description before exposing any method. Request metadata forwards only
+`timeoutMs`, `idempotencyKey` and `trace`; one-way has no JSON-RPC id and abort
+sends a `migaia.cancel` notification. Business errors carry
+`error.data.migaiaWireError`, preserving source/code/stack/cause/errors.
+
+The first profile supports request/one-way only. Batch, reverse calls,
+streaming, transfer lists, native ping/close/discovery and NDJSON are excluded.
+Spawn JSON-RPC requires a caller-supplied dedicated-fd bootstrap launcher;
+the built-in Node launcher currently advertises fd bootstrap as unsupported.
+For endpoint assembly, use the client outbound/one-way roots and install the
+channel's queue/log Features in the same batch. See the complete bridge
+assembly and error behavior in [USEGUIDE.md](./USEGUIDE.md#json-rpc-bridge).

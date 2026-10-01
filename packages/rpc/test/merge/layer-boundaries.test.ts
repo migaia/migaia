@@ -30,7 +30,11 @@ function layerViolations(file: string, source: string): string[] {
         ? outside || !target.startsWith('contract/')
         : !contractBareAllowlist.has(specifier)
     if (owner === 'core')
-      invalid ||= outside || target.startsWith('browser/') || target.startsWith('remote/')
+      invalid ||=
+        outside ||
+        target.startsWith('browser/') ||
+        target.startsWith('remote/') ||
+        target.startsWith('bridge/')
     if (owner === 'remote') invalid ||= outside || target.startsWith('browser/')
     if (owner === 'browser') {
       invalid ||=
@@ -38,6 +42,12 @@ function layerViolations(file: string, source: string): string[] {
         (!isRelative && specifier !== '@migaia/utils/bytes') ||
         (target.startsWith('core/') && !browserCoreAllowlist.has(target))
     }
+    if (owner === 'bridge')
+      invalid ||=
+        outside ||
+        /^(?:browser|threads)\//.test(target) ||
+        /^process\/(?:plugin|host|resilience)\//.test(target) ||
+        /^remote\/(?:plugin|host|serve-plugin|serve-host)\.ts$/.test(target)
     if (isRelative && extname(specifier) !== '.js') invalid = true
     if (invalid) failures.push(`${relative(sourceRoot, file)}: ${specifier}`)
   }
@@ -76,6 +86,8 @@ describe('A2 layer dependency direction', () => {
     ['contract to core', 'contract/framing/x.ts', "import '../../core/errors.js'"],
     ['core to browser', 'core/x.ts', "import '../browser/adapters/window.js'"],
     ['core to remote', 'core/x.ts', "import '../remote/host.js'"],
+    ['core to bridge', 'core/x.ts', "import '../bridge/jsonrpc/index.js'"],
+    ['bridge to process plugin', 'bridge/jsonrpc/x.ts', "import '../../process/plugin/client.js'"],
     ['remote to browser', 'remote/x.ts', "import '../browser/adapters/window.js'"],
     ['browser to private core', 'browser/x.ts', "import '../../core/internal/outbound-sender.js'"],
     ['browser bare import', 'browser/x.ts', "import '@migaia/lifecycle'"],
@@ -93,7 +105,9 @@ describe('A2 layer dependency direction', () => {
     ['browser sibling', 'browser/adapters/window.ts', "import './broadcast-channel.js'"],
     ['browser approved core', 'browser/adapters/window.ts', "import '../../core/transport-kit.js'"],
     ['browser bytes', 'browser/adapters/web-transport.ts', "import '@migaia/utils/bytes'"],
-    ['remote to core', 'remote/host.ts', "import '../core/typing.js'"]
+    ['remote to core', 'remote/host.ts', "import '../core/typing.js'"],
+    ['bridge IPC owner', 'bridge/jsonrpc/x.ts', "import '../../process/ipc-connection.js'"],
+    ['bridge remote schema', 'bridge/jsonrpc/x.ts', "import '../../remote/contract.js'"]
   ])('accepts %s', (_case, file, source) => {
     expect(layerViolations(join(sourceRoot, file), source)).toEqual([])
   })

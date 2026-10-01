@@ -6,6 +6,7 @@ import legacyExports from '../fixtures/legacy-exports.json'
 import errorFormatDelta from '../fixtures/error-format-export-delta.json'
 import controlSemanticsDelta from '../fixtures/control-semantics-export-delta.json'
 import streamingDelta from '../fixtures/streaming-export-delta.json'
+import jsonrpcBridgeDelta from '../fixtures/jsonrpc-bridge-export-delta.json'
 
 /** Package root whose manifest and built files define the new public surface. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -51,9 +52,10 @@ describe('A1 merged public exports', () => {
       '@migaia/rpc/process/adapters/deno-socket',
       '@migaia/rpc/process/adapters/electron-utility-process',
       '@migaia/rpc/process/adapters/windows-job',
-      '@migaia/rpc/contract/framing/stream'
+      '@migaia/rpc/contract/framing/stream',
+      ...Object.keys(jsonrpcBridgeDelta.added)
     ].sort()
-    expect(expected).toHaveLength(40)
+    expect(expected).toHaveLength(41)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )
@@ -134,6 +136,17 @@ describe('A1 merged public exports', () => {
         'createCoroutineHost'
       ].sort()
     )
+    for (const [name, names] of Object.entries(jsonrpcBridgeDelta.added)) {
+      const entry = manifest.exports[`.${name.slice('@migaia/rpc'.length)}`]
+      expect(entry).toEqual({
+        types: './dist/bridge/jsonrpc/index.d.ts',
+        default: './dist/bridge/jsonrpc/index.js'
+      })
+      expect(existsSync(join(packageRoot, entry.types))).toBe(true)
+      expect(
+        Object.keys(await import(pathToFileURL(join(packageRoot, entry.default)).href)).sort()
+      ).toEqual([...names].sort())
+    }
     const processEntry = manifest.exports['./process']
     expect(
       Object.keys(await import(pathToFileURL(join(packageRoot, processEntry.default)).href))
