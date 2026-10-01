@@ -3,7 +3,12 @@ import { defaultRpcId } from '../../core/internal/id.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import { createSupervisor, createUnitBudget, type IUnitProfile } from '@migaia/supervision'
+import {
+  createSupervisor,
+  createUnitBudget,
+  type ISupervisor,
+  type IUnitProfile
+} from '@migaia/supervision'
 import {
   createProcessSupervisor,
   DrainedStream,
@@ -12,10 +17,18 @@ import {
 } from '@migaia/supervision/process'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRemoteBinding, IRemoteChannel } from '../../remote/types.js'
+import type { IRemoteServeEndpoint } from '../../remote/types.js'
 import type { IRpcHandshakeOffer } from '../../contract/handshake.js'
+import { RpcCapability } from '../../contract/wire-constants.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { createNativeProcessOffer } from '../offer.js'
+import {
+  DEFAULT_HEALTH_FAILURE_THRESHOLD,
+  DEFAULT_HEALTH_INTERVAL_MS,
+  DEFAULT_HEALTH_TIMEOUT_MS
+} from '../resilience/constants.js'
+import { createProcessBindingDrain } from '../resilience/drain.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import {
   ProcessConnectionProfile,
@@ -32,6 +45,15 @@ import type {
 
 /** A default peer label names the facade without claiming a specific runtime. */
 const PROCESS_PLUGIN_PEER_RUNTIME = 'process'
+
+/** Client bindings keep their process-specific governance hooks package-local. */
+export type IProcessPluginBinding<TUnit extends object, TSpec> = IRemoteBinding<TUnit, TSpec> &
+  Readonly<{
+    supervisor: ISupervisor<TUnit, TSpec>
+    health: 'ping' | 'custom' | 'none'
+    bindEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
+    drainCurrent(options?: Readonly<{ hostRemainingMs?: number }>): Promise<void>
+  }>
 
 /** Reports secondary diagnostics without replacing the error that triggered cleanup. */
 export function reportSafely(report: (error: unknown) => void, error: unknown): void {
@@ -53,6 +75,38 @@ function defaultProcessOffer(token: string | undefined): IRpcHandshakeOffer {
     peer: { id: defaultRpcId(), runtime: PROCESS_PLUGIN_PEER_RUNTIME },
     ...(token === undefined ? {} : { auth: token })
   })
+}
+
+/** Native default health may only inspect the proposal that establish will receive. */
+function requirePingCapabilities(capabilities: readonly string[]): void {
+  if (!Array.isArray(capabilities) || !capabilities.includes(RpcCapability.ping))
+    throw createProcessError(RpcProcessErrorCode.resilienceInvalidOption, undefined, {
+      field: 'deployment.offer.capabilities'
+    })
+}
+
+/** A ready endpoint must support the capability that the supervisor will probe. */
+function requirePingEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): void {
+  requirePingCapabilities(channel.agreement.capabilities)
+  if (typeof endpoint.endpoint.ping !== 'function')
+    throw createProcessError(RpcProcessErrorCode.resilienceInvalidOption, undefined, {
+      field: 'endpointFactory'
+    })
+}
+
+/** One supervisor check delegates to the endpoint installed for its current unit. */
+async function checkNativePing(
+  ready: Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }> | undefined,
+  signal: IAbortSignal
+): Promise<void> {
+  if (!ready) return
+  const passed = await ready.endpoint.endpoint.ping(ready.channel.peerId, undefined, {
+    timeoutMs: false,
+    signal
+  })
+  if (passed) return
+  if (signal.aborted) throw resolveAbortReason(signal)
+  throw createProcessError(RpcProcessErrorCode.healthPingFailed)
 }
 
 /** Ensures a bootstrap secret is exactly the token supplied to the authenticated adapter. */
@@ -175,16 +229,41 @@ async function establishGeneration(
 export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   deployment: ISpawnProcessPluginDeployment<THandle>,
   report: (error: unknown) => void
-): IRemoteBinding<THandle, IProcessSpec> {
+): IProcessPluginBinding<THandle, IProcessSpec> {
   validateSpawnProcessPluginDeployment(deployment)
   /** Every generation receives the same caller proposal or one binding-owned default. */
   const offer = deployment.offer ?? defaultProcessOffer(deployment.token)
+  /** Caller health has precedence; bridge has no native ping contract. */
+  const health = deployment.supervision.health
+    ? 'custom'
+    : deployment.wire === ProcessPluginWire.jsonrpc
+      ? 'none'
+      : 'ping'
+  if (health === 'ping') requirePingCapabilities(offer.capabilities)
+  /** Endpoints are keyed by actual supervisor handles, never by a stale generation number. */
+  const channels = new WeakMap<IRemoteChannel, THandle>()
+  const readyEndpoints = new WeakMap<
+    THandle,
+    Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }>
+  >()
   const scheduler = deployment.supervision.scheduler ?? systemScheduler
+  const drain = createProcessBindingDrain(scheduler, (error) => reportSafely(report, error))
   const stderr = createStderrSource(report)
   const callerOutput = deployment.supervision.output?.onChunk
   const supervisor = createProcessSupervisor({
     ...deployment.supervision,
     scheduler,
+    ...(health === 'ping'
+      ? {
+          health: {
+            check: (unit: THandle, signal: IAbortSignal) =>
+              checkNativePing(readyEndpoints.get(unit), signal),
+            intervalMs: DEFAULT_HEALTH_INTERVAL_MS,
+            timeoutMs: DEFAULT_HEALTH_TIMEOUT_MS,
+            failureThreshold: DEFAULT_HEALTH_FAILURE_THRESHOLD
+          }
+        }
+      : {}),
     output: {
       ...deployment.supervision.output,
       onChunk(stream, chunk) {
@@ -201,6 +280,17 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
     ownership: 'owned',
     supervisor,
     scheduler,
+    health,
+    drainCurrent: (options) =>
+      supervisor.state === 'ready' ? drain.drainCurrent(options) : Promise.resolve(),
+    bindEndpoint(channel, endpoint) {
+      if (health === 'ping') requirePingEndpoint(channel, endpoint)
+      const unit = channels.get(channel)
+      if (!unit) invalidOption('deployment.establish')
+      const tracked = drain.wrap(channel, endpoint)
+      readyEndpoints.set(unit, { channel, endpoint: tracked })
+      return tracked
+    },
     async openChannel(unit, signal) {
       const raw = await deployment.rawChannel(unit, signal)
       if (raw.kind !== deployment.channelKind) {
@@ -212,7 +302,7 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
         sessionId: defaultRpcId(),
         processId: unit.identity.fingerprint
       })
-      return establishGeneration(
+      const channel = await establishGeneration(
         raw,
         deployment.establish,
         signal,
@@ -224,6 +314,8 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
         report,
         () => Promise.resolve(raw.close())
       )
+      channels.set(channel, unit)
+      return channel
     }
   }
 }
@@ -259,7 +351,7 @@ function createConnectionHandle(raw: IProcessByteChannel): IProcessConnectionHan
 export function createConnectProcessBinding(
   deployment: IConnectProcessPluginDeployment,
   report: (error: unknown) => void
-): IRemoteBinding<IProcessConnectionHandle, string> {
+): IProcessPluginBinding<IProcessConnectionHandle, string> {
   if (
     !deployment ||
     deployment.kind !== 'connect' ||
@@ -271,7 +363,16 @@ export function createConnectProcessBinding(
     invalidOption('deployment.token')
   /** A borrowed session keeps one stable proposal across reconnect generations. */
   const offer = deployment.offer ?? defaultProcessOffer(deployment.token)
+  /** Explicit health overrides native ping, including a proposal without ping@1. */
+  const health = deployment.supervision?.health ? 'custom' : 'ping'
+  if (health === 'ping') requirePingCapabilities(offer.capabilities)
+  const channels = new WeakMap<IRemoteChannel, IProcessConnectionHandle>()
+  const readyEndpoints = new WeakMap<
+    IProcessConnectionHandle,
+    Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }>
+  >()
   const scheduler = deployment.supervision?.scheduler ?? systemScheduler
+  const drain = createProcessBindingDrain(scheduler, (error) => reportSafely(report, error))
   const budget = createUnitBudget({ kind: ProcessConnectionProfile.kind, maxUnits: 1, scheduler })
   const profile: IUnitProfile<string, IProcessConnectionHandle, Readonly<{ reason: unknown }>> = {
     kind: ProcessConnectionProfile.kind,
@@ -296,6 +397,17 @@ export function createConnectProcessBinding(
     scheduler,
     report,
     ...deployment.supervision,
+    ...(health === 'ping'
+      ? {
+          health: {
+            check: (unit: IProcessConnectionHandle, signal: IAbortSignal) =>
+              checkNativePing(readyEndpoints.get(unit), signal),
+            intervalMs: DEFAULT_HEALTH_INTERVAL_MS,
+            timeoutMs: DEFAULT_HEALTH_TIMEOUT_MS,
+            failureThreshold: DEFAULT_HEALTH_FAILURE_THRESHOLD
+          }
+        }
+      : {}),
     profile,
     launcher: {
       capabilities: {},
@@ -313,12 +425,23 @@ export function createConnectProcessBinding(
     ownership: 'owned',
     supervisor,
     scheduler,
+    health,
+    drainCurrent: (options) =>
+      supervisor.state === 'ready' ? drain.drainCurrent(options) : Promise.resolve(),
+    bindEndpoint(channel, endpoint) {
+      if (health === 'ping') requirePingEndpoint(channel, endpoint)
+      const unit = channels.get(channel)
+      if (!unit) invalidOption('deployment.establish')
+      const tracked = drain.wrap(channel, endpoint)
+      readyEndpoints.set(unit, { channel, endpoint: tracked })
+      return tracked
+    },
     async openChannel(unit, signal) {
       const session: IProcessPluginSession = Object.freeze({
         connectionId: defaultRpcId(),
         sessionId: unit.identity.fingerprint
       })
-      return establishGeneration(
+      const channel = await establishGeneration(
         unit.channel,
         deployment.establish,
         signal,
@@ -330,6 +453,8 @@ export function createConnectProcessBinding(
         report,
         unit.close
       )
+      channels.set(channel, unit)
+      return channel
     }
   }
 }

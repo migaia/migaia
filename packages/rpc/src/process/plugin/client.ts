@@ -1,14 +1,39 @@
 import type { IProcessHandle } from '@migaia/supervision/process'
+import type { IPluginBeforeReleaseContext } from '@migaia/plugin-host'
 import { ReplaceStrategy } from '@migaia/supervision'
 import { normalizeRemoteContract } from '../../remote/contract.js'
 import { assembleRemotePluginDefinition } from '../../remote/internal/assemble-plugin.js'
+import type { IRemoteEndpointFactory } from '../../remote/types.js'
 import {
   createConnectProcessBinding,
   createSpawnProcessBinding,
   invalidOption,
+  reportSafely,
+  type IProcessPluginBinding,
   validateSpawnProcessPluginDeployment
 } from './binding.js'
 import type { IProcessPlugin, IProcessPluginOptions, IProcessPluginReplaceResult } from './types.js'
+
+/** Keep failed endpoint admission inside the generation's rollback boundary. */
+function processEndpointFactory<TUnit extends object, TSpec>(
+  binding: IProcessPluginBinding<TUnit, TSpec>,
+  factory: IRemoteEndpointFactory,
+  report: (error: unknown) => void
+): IRemoteEndpointFactory {
+  return async (channel, signal) => {
+    const endpoint = await factory(channel, signal)
+    try {
+      return binding.bindEndpoint(channel, endpoint)
+    } catch (error) {
+      try {
+        await endpoint.endpoint.dispose()
+      } catch (cleanupError) {
+        reportSafely(report, cleanupError)
+      }
+      throw error
+    }
+  }
+}
 
 /** Adds one supervised process deployment to remote's single trusted PluginHost assembly. */
 export function createProcessPlugin<THandle extends IProcessHandle>(
@@ -16,6 +41,11 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
 ): IProcessPlugin {
   const contract = normalizeRemoteContract(options.contract)
   if (options.name !== contract.plugin) invalidOption('name')
+  if (
+    options.registrationOwner?.name !== options.name ||
+    typeof options.registrationOwner.host?.unUse !== 'function'
+  )
+    invalidOption('registrationOwner')
   if (options.deployment.kind === 'spawn') {
     const deployment = options.deployment
     const binding = createSpawnProcessBinding(deployment, options.report)
@@ -65,12 +95,17 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
         contract,
         host: options.host,
         binding,
-        endpointFactory: options.endpointFactory,
+        endpointFactory: processEndpointFactory(binding, options.endpointFactory, options.report),
         report: options.report,
+        callDeadlineCapMs: deployment.supervision.spec.limits?.callWallTimeMs,
         keyFactory: options.keyFactory,
         retryPort: options.retryPort
       },
-      { replace }
+      {
+        replace,
+        beforeRelease: (context: IPluginBeforeReleaseContext) =>
+          binding.drainCurrent({ hostRemainingMs: context.remainingMs() })
+      }
     )
   }
   const binding = createConnectProcessBinding(options.deployment, options.report)
@@ -83,11 +118,15 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
       contract,
       host: options.host,
       binding,
-      endpointFactory: options.endpointFactory,
+      endpointFactory: processEndpointFactory(binding, options.endpointFactory, options.report),
       report: options.report,
       keyFactory: options.keyFactory,
       retryPort: options.retryPort
     },
-    { replace }
+    {
+      replace,
+      beforeRelease: (context: IPluginBeforeReleaseContext) =>
+        binding.drainCurrent({ hostRemainingMs: context.remainingMs() })
+    }
   )
 }

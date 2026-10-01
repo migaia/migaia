@@ -15,6 +15,9 @@ export const ProcessPluginWire = {
 
 export type ProcessPluginWire = (typeof ProcessPluginWire)[keyof typeof ProcessPluginWire]
 
+/** Default offers identify the process facade without guessing a platform runtime. */
+export const PROCESS_PLUGIN_PEER_RUNTIME = 'process'
+
 /** A borrowed external process is represented only by its locally owned socket session. */
 export const ProcessConnectionProfile = {
   kind: 'process-connection'
@@ -29,7 +32,10 @@ export type ProcessDescriptorTarget =
   (typeof ProcessDescriptorTarget)[keyof typeof ProcessDescriptorTarget]
 
 /** Shared is the only instance mode accepted before the resilience extension. */
-export const ProcessPluginInstanceMode = { shared: 'shared' } as const
+export const ProcessPluginInstanceMode = {
+  shared: 'shared',
+  perConnection: 'per-connection'
+} as const
 export type ProcessPluginInstanceMode =
   (typeof ProcessPluginInstanceMode)[keyof typeof ProcessPluginInstanceMode]
 

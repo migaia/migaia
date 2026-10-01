@@ -5,6 +5,8 @@ import { createNativeProcessOffer } from '../../../dist/process/offer.js'
 import { createServeProcessPlugin } from '../../../dist/process/plugin/serve.js'
 import { createComposedEndpoint } from '../../../dist/core/composed.js'
 import { createCanonicalChunkFeature } from '../../../dist/core/features/canonical-chunk.js'
+import { createControlFeature } from '../../../dist/core/features/control.js'
+import { createDiscoveryFeature } from '../../../dist/core/features/discovery.js'
 import { createOutboundFeature } from '../../../dist/core/features/outbound.js'
 import { createProviderFeature } from '../../../dist/core/features/provider.js'
 import { createStreamFeature } from '../../../dist/core/features/stream.js'
@@ -12,6 +14,7 @@ import { codec } from '../../../dist/core/middleware/codec.js'
 import { framer } from '../../../dist/core/middleware/framer.js'
 import { abort } from '../../../dist/core/middleware/abort.js'
 import { connect } from '../../../dist/core/middleware/connect.js'
+import { ping } from '../../../dist/core/middleware/ping.js'
 
 /** The real child serves one installed feature through its process-plugin facade. */
 const contract = {
@@ -49,10 +52,14 @@ await host.use(
 function streamRoots() {
   const chunk = createCanonicalChunkFeature()
   const outbound = createOutboundFeature(chunk)
+  const discovery = createDiscoveryFeature(outbound)
+  const control = createControlFeature(outbound, discovery)
   const provider = createProviderFeature(outbound)
   return {
     'first-party-chunk': chunk,
     'first-party-outbound': outbound,
+    'first-party-discovery': discovery,
+    'first-party-control': control,
     'first-party-provider': provider,
     'first-party-stream': createStreamFeature(outbound, provider)
   }
@@ -62,6 +69,8 @@ function streamRoots() {
 await createServeProcessPlugin({
   host,
   contract,
+  createSharedTarget: async () => undefined,
+  onInstanceUnhealthy: () => () => undefined,
   report: (error) => {
     process.stderr.write(`${String(error)}\n`)
   },
@@ -100,7 +109,8 @@ await createServeProcessPlugin({
           codec(channel.pipeline.codec),
           framer(channel.pipeline.framer),
           abort(),
-          connect({ transport: channel.transport })
+          connect({ transport: channel.transport }),
+          ping()
         ]
       },
       {

@@ -58,6 +58,7 @@ describe('process plugin generation lifetime', () => {
     const plugin = createProcessPlugin({
       name: 'p',
       contract: REMOTE_FIXTURE_CONTRACT,
+      registrationOwner: { name: 'p', host },
       host: { disable, enable },
       endpointFactory: async () => fixture.served,
       report: () => undefined,
@@ -71,6 +72,7 @@ describe('process plugin generation lifetime', () => {
           spec,
           budget: createUnitBudget({ kind: 'process', maxUnits: 1, scheduler }),
           scheduler,
+          health: { check: async () => undefined },
           launcher: {
             capabilities: {
               termination: CapabilityLevel.enforced,

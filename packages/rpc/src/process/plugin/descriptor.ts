@@ -286,7 +286,11 @@ export function parseProcessPluginDescriptor(input: unknown): IProcessPluginDesc
       catalog
     })
   }
-  if (root.instanceMode !== undefined && root.instanceMode !== ProcessPluginInstanceMode.shared)
+  if (
+    root.instanceMode !== undefined &&
+    root.instanceMode !== ProcessPluginInstanceMode.shared &&
+    root.instanceMode !== ProcessPluginInstanceMode.perConnection
+  )
     invalid('descriptor.instanceMode')
   const contract = normalizeRemoteContract(root.contract)
   if (contract.plugin !== pluginName) invalid('descriptor.name')
@@ -296,7 +300,9 @@ export function parseProcessPluginDescriptor(input: unknown): IProcessPluginDesc
     name: pluginName,
     runtime,
     deployment,
-    ...(root.instanceMode === undefined ? {} : { instanceMode: ProcessPluginInstanceMode.shared }),
+    ...(root.instanceMode === undefined
+      ? {}
+      : { instanceMode: root.instanceMode as ProcessPluginInstanceMode }),
     ...replacement,
     contract
   })

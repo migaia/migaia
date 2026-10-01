@@ -47,7 +47,7 @@ type IEntry = {
 }
 
 /** Count only portable result data, using decoded byte length for the bytes marker. */
-function portableBytes(value: IRpcPortableValue | IRpcSerializedError | undefined): number {
+export function portableBytes(value: IRpcPortableValue | IRpcSerializedError | undefined): number {
   if (value === undefined) return 0
   if (typeof value === 'string') return utf8ByteLength(value)
   if (value === null || typeof value === 'boolean' || typeof value === 'number') return 8

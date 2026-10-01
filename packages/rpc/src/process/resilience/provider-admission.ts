@@ -1,0 +1,181 @@
+import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
+import { portableBytes } from '../../core/idempotency-store.js'
+import { resolveAbortReason } from '../../core/internal/async-control.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
+import type {
+  IRpcContext,
+  IRpcEndpoint,
+  IRpcProvider,
+  IRpcProviderResult
+} from '../../core/typing.js'
+import type { IRpcPortableValue } from '../../contract/types.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
+import { RpcProcessErrorCode } from '../error-code.js'
+import { createProcessError } from '../error.js'
+import type { IRequiredProcessResilienceOptions } from './session.js'
+
+/** One minute is measured by the injected monotonic scheduler, never wall time. */
+const RATE_WINDOW_MS = 60_000
+
+/** A service connection owns its quota counters and frame observer until it closes. */
+export type IProcessProviderAdmission = Readonly<{
+  wrap(endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
+  close(): void
+}>
+
+/** Enforce per-connection rate, payload, and idle limits at the provider boundary. */
+export function createProcessProviderAdmission(
+  channel: IRemoteChannel,
+  options: IRequiredProcessResilienceOptions,
+  scheduler: IScheduler,
+  closeSession: () => Promise<void>,
+  report: (error: unknown) => void
+): IProcessProviderAdmission {
+  /** A window starts with its first admitted request, not at process startup. */
+  let windowStart = scheduler.now()
+  let callsInWindow = 0
+  let violations = 0
+  let consecutiveTimeouts = 0
+  let active = 0
+  let lastInboundAt = scheduler.now()
+  let closed = false
+  let idleTimer: IScheduledTask | undefined
+
+  /** A close triggered by policy remains secondary to the provider's primary result. */
+  const requestClose = (): void => {
+    void closeSession().catch(report)
+  }
+
+  /** Only a quiet connection with no provider work is idle. */
+  const scheduleIdle = (): void => {
+    idleTimer?.cancel()
+    if (closed || active > 0) return
+    idleTimer = scheduler.schedule(
+      () => {
+        idleTimer = undefined
+        if (closed || active > 0) return
+        if (scheduler.now() - lastInboundAt >= options.idleTimeoutMs) requestClose()
+        else scheduleIdle()
+      },
+      Math.max(0, lastInboundAt + options.idleTimeoutMs - scheduler.now())
+    )
+    idleTimer.unref?.()
+  }
+
+  /** Observing after endpoint construction leaves channel's early-frame buffer to core. */
+  const unsubscribe = channel.transport.subscribe(() => {
+    lastInboundAt = scheduler.now()
+    scheduleIdle()
+  })
+  scheduleIdle()
+
+  /** Reject before invoking a provider; the second consecutive violation closes this session. */
+  const admit = (context: IRpcContext): void => {
+    const now = scheduler.now()
+    if (now - windowStart >= RATE_WINDOW_MS) {
+      windowStart = now
+      callsInWindow = 0
+    }
+    if (
+      callsInWindow >= options.maxCallsPerMinute ||
+      portableBytes(context.data as IRpcPortableValue) > options.maxPayloadBytes
+    ) {
+      violations += 1
+      if (violations >= 2) queueMicrotask(requestClose)
+      throw createProcessError(RpcProcessErrorCode.connectionLimit)
+    }
+    callsInWindow += 1
+  }
+
+  /** Classify only core-originated deadline cancellation as a connection timeout. */
+  const settle = (context: IRpcContext, succeeded: boolean): void => {
+    const reason = context.signal.aborted ? resolveAbortReason(context.signal) : undefined
+    if (
+      typeof reason === 'object' &&
+      reason !== null &&
+      'code' in reason &&
+      reason.code === RpcCoreErrorCode.deadlineExceeded
+    ) {
+      consecutiveTimeouts += 1
+      if (consecutiveTimeouts >= options.maxConsecutiveTimeouts) queueMicrotask(requestClose)
+    } else if (succeeded) {
+      consecutiveTimeouts = 0
+      violations = 0
+    }
+    active -= 1
+    scheduleIdle()
+  }
+
+  /** Preserve the provider's native result and Promise identity while tracking its activity. */
+  const guarded =
+    (provider: IRpcProvider): IRpcProvider =>
+    (context) => {
+      admit(context)
+      active += 1
+      idleTimer?.cancel()
+      idleTimer = undefined
+      let result: IRpcProviderResult | Promise<IRpcProviderResult>
+      try {
+        result = provider(context)
+      } catch (error) {
+        active -= 1
+        scheduleIdle()
+        throw error
+      }
+      void Promise.resolve(result).then(
+        (value) => settle(context, value.ok),
+        () => settle(context, false)
+      )
+      return result
+    }
+
+  return Object.freeze({
+    wrap(endpoint) {
+      /** The admission view shadows only provider registration on the frozen core endpoint. */
+      const guardedEndpoint: IRpcEndpoint = Object.create(endpoint.endpoint)
+      Object.defineProperty(guardedEndpoint, 'provide', {
+        value: (method: string, provider: IRpcProvider) => {
+          endpoint.endpoint.provide(method, guarded(provider))
+          return guardedEndpoint
+        }
+      })
+      Object.freeze(guardedEndpoint)
+      const stream = endpoint.stream
+        ? Object.freeze({
+            ...endpoint.stream,
+            provide: (
+              method: string,
+              run: Parameters<NonNullable<IRemoteServeEndpoint['stream']>['provide']>[1]
+            ) =>
+              endpoint.stream!.provide(method, (params, streamContext) =>
+                (async function* () {
+                  const context = streamContext.context
+                  admit(context)
+                  active += 1
+                  idleTimer?.cancel()
+                  idleTimer = undefined
+                  let succeeded = false
+                  try {
+                    yield* run(params, streamContext)
+                    succeeded = true
+                  } finally {
+                    settle(context, succeeded)
+                  }
+                })()
+              )
+          })
+        : undefined
+      return Object.freeze({
+        ...endpoint,
+        endpoint: guardedEndpoint,
+        ...(stream ? { stream } : {})
+      })
+    },
+    close(): void {
+      if (closed) return
+      closed = true
+      idleTimer?.cancel()
+      unsubscribe()
+    }
+  })
+}
