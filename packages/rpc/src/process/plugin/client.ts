@@ -1,6 +1,8 @@
 import type { IProcessHandle } from '@migaia/supervision/process'
 import type { IPluginBeforeReleaseContext } from '@migaia/plugin-host'
 import { ReplaceStrategy } from '@migaia/supervision'
+import { SUPERVISION_SOURCE, SupervisionErrorCode, SupervisionErrorText } from '@migaia/supervision'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizeRemoteContract } from '../../remote/contract.js'
 import { assembleRemotePluginDefinition } from '../../remote/internal/assemble-plugin.js'
 import type { IRemoteEndpointFactory } from '../../remote/types.js'
@@ -35,6 +37,14 @@ function processEndpointFactory<TUnit extends object, TSpec>(
   }
 }
 
+/** A retired definition has the same terminal identity as its disposed supervisor. */
+function staleDefinition(): never {
+  throw attachErrorIdentity(new Error(SupervisionErrorText.scopeTerminal), {
+    source: SUPERVISION_SOURCE,
+    code: SupervisionErrorCode.scopeTerminal
+  })
+}
+
 /** Adds one supervised process deployment to remote's single trusted PluginHost assembly. */
 export function createProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle>
@@ -49,10 +59,13 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
   if (options.deployment.kind === 'spawn') {
     const deployment = options.deployment
     const binding = createSpawnProcessBinding(deployment, options.report)
+    /** Only Host installation makes this exact definition eligible for replacement. */
+    let installed = false
     /** Admission stays synchronous; the selected owner performs the actual replacement. */
     const replace: IProcessPlugin['replace'] = (
       replacement = {}
     ): Promise<IProcessPluginReplaceResult> => {
+      if (!installed) staleDefinition()
       const strategy = replacement.strategy ?? ReplaceStrategy.stopThenStart
       if (
         strategy !== ReplaceStrategy.stopThenStart &&
@@ -105,6 +118,14 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
         replace,
         beforeRelease: (context: IPluginBeforeReleaseContext) =>
           binding.drainCurrent({ hostRemainingMs: context.remainingMs() })
+      },
+      {
+        onInstalled: () => {
+          installed = true
+        },
+        onReleased: () => {
+          installed = false
+        }
       }
     )
   }
