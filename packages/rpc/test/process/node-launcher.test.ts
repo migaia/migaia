@@ -147,4 +147,26 @@ describe('Node process launcher', () => {
       }
     }
   })
+
+  it('[A7][D1] contains EPIPE when a child closes stdin before a large bootstrap', async () => {
+    /** The payload exceeds a pipe buffer so the child can close stdin before drain. */
+    const bootstrap = new Uint8Array(1024 * 1024)
+    /** A live child with closed fd 0 makes the write fail without a spawn failure. */
+    const childCode = "require('node:fs').closeSync(0); setTimeout(() => {}, 200)"
+    await expect(
+      createNodeProcessLauncher().launch(
+        {
+          command: process.execPath,
+          args: ['-e', childCode],
+          env: { inherit: [], set: {} },
+          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+          bootstrap: { via: 'stdin', payload: bootstrap }
+        },
+        { signal: new AbortController().signal, output: () => undefined }
+      )
+    ).rejects.toMatchObject({
+      code: 'PROCESS_CHANNEL_CONNECT_FAILED',
+      cause: expect.objectContaining({ code: 'EPIPE' })
+    })
+  })
 })
