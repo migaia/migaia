@@ -117,6 +117,8 @@ describe('remote service plugin', () => {
     })
     let requestContext: IRpcContext | undefined
     let streamContext: IRpcContext | undefined
+    let requestHookContext: IRpcContext | undefined
+    let streamHookContext: IRpcContext | undefined
     let hookCalls = 0
     let requestCalls = 0
     const hookError = createRemoteLayerError(
@@ -163,6 +165,9 @@ describe('remote service plugin', () => {
       },
       invocationContext: (context) => {
         hookCalls += 1
+        if (Array.isArray(context.data) && context.data[0] === 'stream') streamHookContext = context
+        else if (Array.isArray(context.data) && context.data[0] === 'ordinary')
+          requestHookContext = context
         if (Array.isArray(context.data) && context.data[0] === 'reject') throw hookError
         return context
       }
@@ -194,6 +199,8 @@ describe('remote service plugin', () => {
       expect(requestContext?.data).toEqual(['ordinary'])
       expect(streamContext?.data).toEqual(['stream'])
       expect(streamContext).not.toBe(requestContext)
+      expect(streamHookContext).toBe(streamContext)
+      expect(requestHookContext).toBe(requestContext)
       expect(typeof streamContext?.dispatchTo).toBe('function')
       await expect(registration.invokeRequest('p.f.request', ['reject'])).rejects.toMatchObject({
         source: '@migaia/rpc/remote',
