@@ -327,8 +327,15 @@ pub fn serve(
     auth: Option<&str>,
     contract: &Value,
     bridge: bool,
+    bare: bool,
 ) -> io::Result<()> {
     if bridge {
+        if bare {
+            while let Some(body) = bridge_body(input)? {
+                bridge_write_body(output, &body)?;
+            }
+            return Ok(());
+        }
         return serve_bridge(input, output, host, auth, contract);
     }
     let hello = read_json(input)?
@@ -395,7 +402,7 @@ pub fn serve(
     Ok(())
 }
 /// Bound Content-Length headers before allocating the exact JSON body.
-fn bridge_read(input: &mut impl Read) -> io::Result<Option<Value>> {
+fn bridge_body(input: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
     let mut header = Vec::new();
     while !header.ends_with(b"\r\n\r\n") {
         let mut byte = [0u8];
@@ -437,6 +444,13 @@ fn bridge_read(input: &mut impl Read) -> io::Result<Option<Value>> {
     }
     let mut body = vec![0; length];
     input.read_exact(&mut body)?;
+    Ok(Some(body))
+}
+/// RPC applies the existing JSON parser; bare owns only the original physical body bytes.
+fn bridge_read(input: &mut impl Read) -> io::Result<Option<Value>> {
+    let Some(body) = bridge_body(input)? else {
+        return Ok(None);
+    };
     let message = json::parse(&body)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_JSON"))?;
     if value(&message, "jsonrpc").as_str() != Some("2.0") {
@@ -450,8 +464,12 @@ fn bridge_read(input: &mut impl Read) -> io::Result<Option<Value>> {
 /// Emit one UTF-8 byte-counted response; native control packets never enter this carrier.
 fn bridge_write(output: &mut impl Write, message: &Value) -> io::Result<()> {
     let body = message.text();
+    bridge_write_body(output, body.as_bytes())
+}
+/// One physical writer is reused by bare echoes and encoded RPC replies.
+fn bridge_write_body(output: &mut impl Write, body: &[u8]) -> io::Result<()> {
     write!(output, "Content-Length: {}\r\n\r\n", body.len())?;
-    output.write_all(body.as_bytes())?;
+    output.write_all(body)?;
     output.flush()
 }
 /// Bridge extensions share the independent local business owner and explicitly exclude streams.

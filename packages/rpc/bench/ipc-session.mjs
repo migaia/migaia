@@ -1,6 +1,8 @@
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { openSync, closeSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -102,7 +104,8 @@ async function serveRpc(channel) {
  * @returns {Promise<object>} Owned peer, exchange, readiness and close ports.
  * @throws {Error} Preparation failure never becomes a ratio assertion.
  */
-export async function createIpcSession({ carrier, side, payload }) {
+export async function createIpcSession({ carrier, side, payload, wire, peerRuntime }) {
+  if (wire === 'jsonrpc') return createBridgeIpcSession({ carrier, side, payload, peerRuntime })
   /** Owned cleanup actions are registered before the next fallible preparation step. */
   const cleanup = []
   /** Physical raw channels exist only for byte carriers. */
@@ -288,6 +291,193 @@ export async function createIpcSession({ carrier, side, payload }) {
     throw failures.length === 1
       ? primary
       : new AggregateError(failures, 'IPC preparation and cleanup failed')
+  }
+}
+
+/**
+ * Prepare one independent language peer with an unchanged carrier on bare and RPC sides.
+ *
+ * @param {{ carrier: string; side: string; payload: string; peerRuntime: string }} options Frozen
+ *   peer profile.
+ * @returns {Promise<object>} Physical/RPC echo session with actual peer PID.
+ * @throws {Error} Original launch, negotiation, mismatch or cleanup failure.
+ */
+async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
+  /** Both sides run this exact executable, argument profile and byte framing. */
+  const peerRoot = new URL('../test/process/peers/', import.meta.url)
+  const contractPath = fileURLToPath(
+    new URL('../schema/vectors/remote-contract.json', import.meta.url)
+  )
+  let command, args, id
+  if (peerRuntime === 'python') {
+    command = 'python3'
+    args = ['-B', fileURLToPath(new URL('python/peer.py', peerRoot)), '--business']
+    id = 'python-peer'
+  } else if (peerRuntime === 'rust' || peerRuntime === 'go') {
+    command = execFileSync(
+      'sh',
+      [fileURLToPath(new URL(`${peerRuntime}/run.sh`, peerRoot)), '--executable'],
+      { encoding: 'utf8' }
+    ).trim()
+    args = ['--business', '--contract', contractPath]
+    id = `${peerRuntime}-peer`
+  } else throw new Error('Undelivered bridge peer runtime')
+  args.push('--jsonrpc', '--auth-fd', '3', ...(side === 'bare' ? ['--bare-jsonrpc'] : []))
+  /** Dedicated FD bootstrap remains outside the byte stream on both paired sides. */
+  const token = randomUUID()
+  const cleanup = []
+  let raw, peerPid, runtime
+  try {
+    if (carrier === 'stdio-content-length') {
+      const { loadFdLauncher } = await import('./fd-fixture-loader.mjs')
+      const handle = await (
+        await loadFdLauncher()
+      ).launch(
+        {
+          command,
+          args: [...args, '--stdio'],
+          env: { inherit: [], set: {} },
+          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+          bootstrap: { via: 'fd', fd: 3, payload: new TextEncoder().encode(token) }
+        },
+        { signal: new AbortController().signal, output: () => undefined }
+      )
+      raw = handle.channel
+      peerPid = handle.identity.pid
+      cleanup.push(async () => {
+        await handle.terminate('force')
+        await handle.exited
+      })
+    } else if (carrier === 'socket-content-length') {
+      const directory = await mkdtemp(join(tmpdir(), 'rpc-bench-bridge-'))
+      cleanup.push(() => rm(directory, { recursive: true, force: true }))
+      const address = join(directory, 'peer.sock'),
+        authPath = join(directory, 'auth')
+      writeFileSync(authPath, token, { mode: 0o600 })
+      const fd = openSync(authPath, 'r')
+      const child = spawn(command, [...args, '--listen-unix', address], {
+        stdio: ['ignore', 'pipe', 'pipe', fd]
+      })
+      closeSync(fd)
+      const exited = once(child, 'close')
+      cleanup.push(async () => {
+        child.kill()
+        await exited
+      })
+      await new Promise((resolve, reject) => {
+        let status = ''
+        child.stderr.on('data', (chunk) => {
+          status += chunk.toString()
+          if (status.includes('READY')) resolve()
+        })
+        child.once('error', reject)
+        child.once('exit', (code) => reject(new Error(`Bridge peer exited before ready: ${code}`)))
+      })
+      peerPid = child.pid
+      raw = await dialProcessByteChannel({ address })
+    } else throw new Error('Undelivered bridge carrier')
+    cleanup.push(() => raw.close())
+    if (side === 'rpc') {
+      const { createJsonRpcRemoteChannel } = await import('@migaia/rpc/bridge/jsonrpc')
+      const { bridgeEndpointFor } = await import('../test/process/peers/ts/runtime.ts')
+      /** Contract describes the same request echo already proved by the conformance facade cases. */
+      const contract = {
+        schemaVersion: 1,
+        plugin: 'p',
+        features: {
+          f: {
+            methods: {
+              request: { mode: 'request', idempotent: true },
+              oneWay: { mode: 'one-way', idempotent: false }
+            }
+          }
+        }
+      }
+      const channel = await createJsonRpcRemoteChannel({
+        byte: raw,
+        peerId: id,
+        target: { kind: 'plugin', contract },
+        offer: {
+          versions: [{ major: 1, minor: 1 }],
+          capabilities: [],
+          peer: { id: 'parent', runtime: process.versions.bun ? 'bun' : 'node' }
+        },
+        token,
+        scheduler: systemScheduler,
+        wallClock: { timestamp: () => Date.now() },
+        ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined },
+        report: (error) => {
+          throw error
+        }
+      })
+      cleanup.push(() => channel.close())
+      runtime = await bridgeEndpointFor(channel, 'parent')
+      cleanup.push(() => runtime.endpoint.dispose())
+    }
+    /** The bare endpoint returns these exact codec-produced bytes without JSON or business dispatch. */
+    const body = Buffer.from(JSON.stringify(payload)),
+      frame = Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body])
+    let buffered = Buffer.alloc(0),
+      waiting,
+      failure
+    if (side === 'bare') {
+      const remove = raw.onData((chunk) => {
+        buffered = Buffer.concat([buffered, chunk])
+        if (buffered.length < frame.length) return
+        if (!buffered.equals(frame)) failure = new Error('Bare bridge echo mismatch')
+        buffered = Buffer.alloc(0)
+        if (failure) waiting?.reject(failure)
+        else waiting?.resolve()
+        waiting = undefined
+      })
+      const removeClose = raw.onClose((reason) => {
+        failure = reason ?? new Error('Bare bridge peer closed')
+        waiting?.reject(failure)
+      })
+      cleanup.push(async () => {
+        remove()
+        removeClose()
+      })
+    }
+    const exchange =
+      side === 'rpc'
+        ? async () => {
+            if ((await runtime.endpoint.send(id, 'p.f.request', [payload])) !== payload)
+              throw new Error('Bridge RPC echo mismatch')
+          }
+        : () =>
+            new Promise((resolve, reject) => {
+              if (failure) {
+                reject(failure)
+                return
+              }
+              waiting = { resolve, reject }
+              raw.write(frame).catch(reject)
+            })
+    const close = async () => {
+      const failures = []
+      for (const release of cleanup.reverse()) {
+        try {
+          await release()
+        } catch (error) {
+          failures.push(error)
+        }
+      }
+      if (failures.length) throw new AggregateError(failures, 'Bridge IPC cleanup failed')
+    }
+    return { peerPid, encodedBytes: body.length, ready: exchange, exchange, close }
+  } catch (primary) {
+    const failures = [primary]
+    for (const close of cleanup.reverse()) {
+      try {
+        await close()
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+    throw failures.length === 1
+      ? primary
+      : new AggregateError(failures, 'Bridge IPC preparation failed')
   }
 }
 

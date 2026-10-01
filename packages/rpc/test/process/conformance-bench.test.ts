@@ -13,7 +13,19 @@ const candidates = [
   { executable: process.execPath, runtime: 'node', carrier: 'socket-framed', codec: 'json' },
   { executable: process.execPath, runtime: 'node', carrier: 'worker', codec: 'identity' },
   { executable: 'bun', runtime: 'bun', carrier: 'stdio-framed', codec: 'json' },
-  { executable: 'bun', runtime: 'bun', carrier: 'socket-framed', codec: 'json' }
+  { executable: 'bun', runtime: 'bun', carrier: 'socket-framed', codec: 'json' },
+  ...['node', 'bun'].flatMap((runtime) =>
+    ['python', 'rust', 'go'].flatMap((peerRuntime) =>
+      ['stdio-content-length', 'socket-content-length'].map((carrier) => ({
+        executable: runtime === 'node' ? process.execPath : 'bun',
+        runtime,
+        peerRuntime,
+        wire: 'jsonrpc',
+        carrier,
+        codec: 'json'
+      }))
+    )
+  )
 ]
 
 /** Complete deterministic receipts test the ratio oracle without running real performance work. */
@@ -93,7 +105,7 @@ describe('[A10] IPC pairing contract', () => {
       [64, 1024, 65536, 1048576].map((payloadBytes) => ({ ...candidate, payloadBytes }))
     )
   )(
-    'starts independent $runtime $carrier $payloadBytes bare/RPC endpoints',
+    'starts independent $runtime $carrier $peerRuntime $payloadBytes bare/RPC endpoints',
     async (candidate) => {
       const unit = { ...candidate, payloadBytes: candidate.payloadBytes, concurrency: 1 }
       for (const side of ['bare', 'rpc']) {

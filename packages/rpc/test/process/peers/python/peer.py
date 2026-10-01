@@ -331,6 +331,7 @@ def main() -> int:
     parser.add_argument("--role", choices=("responder", "initiator"), default="responder")
     parser.add_argument("--business", action="store_true")
     parser.add_argument("--jsonrpc", action="store_true")
+    parser.add_argument("--bare-jsonrpc", action="store_true")
     parser.add_argument("--host", action="store_true")
     parser.add_argument("--bootstrap", choices=("none", "stdin"), default="none")
     parser.add_argument("--auth-fd", type=int)

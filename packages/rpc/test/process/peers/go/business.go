@@ -208,8 +208,22 @@ func (b *businessState) native(message record) ([]record, error) {
 }
 
 // serveBusiness reuses the peer's strict native framing and hello parser before serving any business.
-func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, contract any, bridge bool) error {
+func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, contract any, bridge, bare bool) error {
 	if bridge {
+		if bare {
+			for {
+				body, err := bridgeBody(reader)
+				if err == io.EOF {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				if err = bridgeWriteBody(writer, body); err != nil {
+					return err
+				}
+			}
+		}
 		return serveBridge(reader, writer, host, token, contract)
 	}
 	hello, err := receive(reader, true)
@@ -249,7 +263,7 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 }
 
 // bridgeReceive bounds header/body allocations before strict standard-library JSON decoding.
-func bridgeReceive(reader io.Reader) (record, error) {
+func bridgeBody(reader io.Reader) ([]byte, error) {
 	header := []byte{}
 	one := make([]byte, 1)
 	for !strings.HasSuffix(string(header), "\r\n\r\n") {
@@ -284,6 +298,15 @@ func bridgeReceive(reader io.Reader) (record, error) {
 	if _, err := io.ReadFull(reader, body); err != nil {
 		return nil, err
 	}
+	return body, nil
+}
+
+// bridgeReceive decodes JSON only for RPC; bare echoes the original physical body unchanged.
+func bridgeReceive(reader io.Reader) (record, error) {
+	body, err := bridgeBody(reader)
+	if err != nil {
+		return nil, err
+	}
 	var message record
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
@@ -302,11 +325,15 @@ func bridgeSend(writer io.Writer, message record) error {
 	if err != nil {
 		return err
 	}
-	if _, err = fmt.Fprintf(writer, "Content-Length: %d\r\n\r\n", len(body)); err != nil {
+	return bridgeWriteBody(writer, body)
+}
+
+// bridgeWriteBody is the common carrier writer for physical echo and serialized RPC responses.
+func bridgeWriteBody(writer io.Writer, body []byte) error {
+	if _, err := fmt.Fprintf(writer, "Content-Length: %d\r\n\r\n", len(body)); err != nil {
 		return err
 	}
-	_, err = writer.Write(body)
-	return err
+	return writeAll(writer, body)
 }
 
 // serveBridge shares real business state while exposing only the negotiated bridge extension surface.
@@ -399,7 +426,7 @@ func serveBridge(reader io.Reader, writer io.Writer, host bool, token string, co
 }
 
 // runBusiness selects real owned stdio or a borrowed listener; only inherited/bootstrap bytes carry auth.
-func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, contractPath string, bridge bool) error {
+func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, contractPath string, bridge, bare bool) error {
 	raw, err := os.ReadFile(contractPath)
 	if err != nil {
 		return err
@@ -428,7 +455,7 @@ func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD
 			token = string(bytes)
 		}
 		fmt.Fprintf(os.Stderr, "READY pid=%d\n", os.Getpid())
-		return serveBusiness(os.Stdin, os.Stdout, host, token, contract, bridge)
+		return serveBusiness(os.Stdin, os.Stdout, host, token, contract, bridge, bare)
 	}
 	if address == "" || token == "" {
 		return fmt.Errorf("authentication required")
@@ -444,7 +471,7 @@ func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD
 		if err != nil {
 			return err
 		}
-		if err := serveBusiness(conn, conn, host, token, contract, bridge); err != nil {
+		if err := serveBusiness(conn, conn, host, token, contract, bridge, bare); err != nil {
 			fmt.Fprintln(os.Stderr, "PEER_FAIL BUSINESS_SESSION")
 		}
 		conn.Close()
