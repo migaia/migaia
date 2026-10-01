@@ -147,6 +147,11 @@ export async function matrixFixture(
   const nativeLauncher = createNodeProcessLauncher()
   /** Launched physical handles prove exit and process identity. */
   const handles: Awaited<ReturnType<typeof nativeLauncher.launch>>[] = []
+  /** Production terminate-port calls establish ownership without upgrading platform capability. */
+  const terminations: {
+    processId: string
+    mode: Parameters<(typeof handles)[number]['terminate']>[0]
+  }[] = []
   /** Spec identity distinguishes replacement launches from original-spec refill. */
   const launchedSpecs: IProcessSpec[] = []
   /** One selected idle process keeps its real lease until the test releases termination. */
@@ -179,16 +184,17 @@ export async function matrixFixture(
       const index = handles.length
       handles.push(handle)
       launchedSpecs.push(value)
-      return input.holdIdle && index === 1
-        ? {
-            ...handle,
-            terminate: (mode) => {
-              delayedRetires.push(() => {
-                void handle.terminate(mode)
-              })
-            }
-          }
-        : handle
+      return {
+        ...handle,
+        terminate: (mode) => {
+          terminations.push({ processId: handle.identity.fingerprint, mode })
+          if (input.holdIdle && index === 1) {
+            delayedRetires.push(() => {
+              void handle.terminate(mode)
+            })
+          } else return handle.terminate(mode)
+        }
+      }
     }
   }
   /** The canonical pool owns warm processes and original-spec refill. */
@@ -378,6 +384,7 @@ export async function matrixFixture(
     take,
     invalidate,
     handles,
+    terminations,
     launchedSpecs,
     sessions,
     logs,
@@ -428,6 +435,7 @@ export async function matrixFixture(
               businessCount: business,
               sessions,
               children: handles.map((handle) => handle.identity),
+              terminations,
               budgetInUse: budget.inUse
             },
             null,
@@ -440,24 +448,29 @@ export async function matrixFixture(
   }
 }
 
-/** Captures the installed remote proxy without rebuilding it after generation changes. */
-export function matrixDependency(fixture: Awaited<ReturnType<typeof matrixFixture>>) {
-  const install = vi.fn(() => ({}))
+/** Captures the installed remote proxy in the dependency's first install operation. */
+export function matrixDependency(
+  fixture: Awaited<ReturnType<typeof matrixFixture>>,
+  plugin = fixture.plugin
+) {
+  /** The installer reads its resolved Feature and dispatches immediately. */
+  const install = vi.fn((resolved: IMatrixFeature) => {
+    immediate = (feature = resolved).request(['ready'])
+    return {}
+  })
+  /** Proxy identity survives all generation changes within this dependency. */
   let feature!: IMatrixFeature
+  /** The first installer request is awaited before deliberate child departure. */
   let immediate!: Promise<unknown>
+  /** Feature derivation resolves the remote reference without business dispatch. */
   const definition = definePlugin({
     name: 'dependent',
     features: {
-      use: defineFeature(
-        (_core, dependencies) => {
-          feature = dependencies.remote as IMatrixFeature
-          immediate = feature.request(['ready'])
-          return {}
-        },
-        { remote: fixture.plugin.getFeature('f') }
-      )
+      use: defineFeature((_core, dependencies) => dependencies.remote as IMatrixFeature, {
+        remote: plugin.getFeature('f')
+      })
     },
-    install
+    install: (core) => install(core.features.use)
   })
   return {
     definition,
