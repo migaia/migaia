@@ -37,14 +37,22 @@
         "tmpDir": { "type": "string", "minLength": 1 },
         "env": {
           "type": "object",
-          "required": ["inherit", "set"],
+          "required": ["inherit"],
           "additionalProperties": false,
           "properties": {
             "inherit": { "type": "array", "items": { "type": "string" } },
             "set": {
               "type": "object",
               "propertyNames": { "not": { "const": "token" } },
-              "additionalProperties": { "type": "string" }
+              "additionalProperties": {
+                "type": "object",
+                "required": ["value", "nonSecret"],
+                "additionalProperties": false,
+                "properties": {
+                  "value": { "type": "string" },
+                  "nonSecret": { "const": true }
+                }
+              }
             }
           }
         },

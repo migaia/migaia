@@ -41,3 +41,12 @@ export type ProcessPluginInstanceMode =
 
 /** The first persisted description format has no runtime ports or bootstrap payload. */
 export const PROCESS_PLUGIN_DESCRIPTOR_VERSION = 1
+
+/** Persisted argument names that can carry a secret in a following value or after '='. */
+export const PROCESS_DESCRIPTOR_SECRET_ARGUMENTS = [
+  '--token',
+  '--secret',
+  '--password',
+  '--api-key',
+  '--access-key'
+] as const

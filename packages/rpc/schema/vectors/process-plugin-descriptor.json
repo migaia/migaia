@@ -1658,5 +1658,41 @@
       "semanticValid": false,
       "field": "descriptor.deployment.budget.maxUnits"
     }
+  ],
+  "securityMutations": [
+    {
+      "id": "legacy-literal-env-rejected",
+      "base": "spawn-native-stdin",
+      "path": "deployment.spec.env.set",
+      "value": { "API_TOKEN": "secret-from-old-descriptor" },
+      "schemaValid": false,
+      "semanticValid": false,
+      "field": "descriptor.deployment.spec.env.set.API_TOKEN"
+    },
+    {
+      "id": "explicit-public-env-literal",
+      "base": "spawn-native-stdin",
+      "path": "deployment.spec.env.set",
+      "value": { "MODE": { "value": "production", "nonSecret": true } },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "inherited-secret-reference",
+      "base": "spawn-native-stdin",
+      "path": "deployment.spec.env",
+      "value": { "inherit": ["API_TOKEN"] },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
+      "id": "secret-in-argument-rejected",
+      "base": "spawn-native-stdin",
+      "path": "deployment.spec.args",
+      "value": ["child.mjs", "--token=secret-from-args"],
+      "schemaValid": true,
+      "semanticValid": false,
+      "field": "descriptor.deployment.spec.args.1"
+    }
   ]
 }
