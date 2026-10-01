@@ -311,6 +311,18 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         await closeChannel()
       }
     })
+    if (this.#departed.has(generation.number)) {
+      try {
+        await generation.close()
+      } catch (error) {
+        this.#options.report(error)
+      }
+      throw createRemoteLayerError(
+        RpcRemoteLayerErrorCode.closed,
+        this.#departed.get(generation.number),
+        { generation: generation.number }
+      )
+    }
     this.#current = generation
     for (const waiter of this.#readyWaiters)
       if (generation.number > waiter.after) this.#settleWaiter(waiter, generation.number, true)
