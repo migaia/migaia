@@ -312,9 +312,11 @@
         "RpcProcessErrorCode",
         "RpcProcessErrorText",
         "createNativeProcessOffer",
+        "createProcessHost",
         "createProcessPlugin",
         "createProcessResilience",
         "createProcessTransport",
+        "createServeProcessHost",
         "createServeProcessPlugin",
         "parseProcessPluginDescriptor"
       ],

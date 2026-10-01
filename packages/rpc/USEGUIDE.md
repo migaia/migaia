@@ -204,7 +204,7 @@ contract({
 | `@migaia/rpc/core/adapters/{memory,message-port}` | transport factory | 不改变 endpoint 表面 | 内存或 MessagePort 传输 |
 | `@migaia/rpc/browser/adapters/<transport>` | transport factory | 不改变 endpoint 表面 | 浏览器与 Worker 传输 |
 | `@migaia/rpc/core/stream` | `createStreamFeature`、`createCanonicalChunkFeature` | 组合后投影 `endpoint.stream` | 按需异步多值流 |
-| `@migaia/rpc/process` | `createProcessTransport`、`createNativeProcessOffer`、`createProcessPlugin`、`createServeProcessPlugin`、`parseProcessPluginDescriptor` | 经握手后交 remote endpoint factory；服务侧逐连接持有 endpoint；描述只含纯数据 | 进程 byte/message 通道与 PluginHost 装配 |
+| `@migaia/rpc/process` | `createProcessTransport`、`createNativeProcessOffer`、`createProcessPlugin`、`createServeProcessPlugin`、`createProcessHost`、`createServeProcessHost`、`parseProcessPluginDescriptor` | 经握手后交 remote endpoint factory；服务侧逐连接持有 endpoint；描述只含纯数据 | 进程 byte/message 通道与 PluginHost 装配 |
 | `@migaia/rpc/contract/framing/stream` | `encodeRpcStreamFrame`、`createRpcStreamFrameDecoder` | 无端点表面 | 原生 4 字节长度前缀 |
 | `@migaia/rpc/process/adapters/*` | Node/Bun/Deno launcher、stdio 与 socket 入口 | 经 supervision 管理 | 按运行时选用的进程线材 |
 
@@ -1121,3 +1121,34 @@ createWebTransportDatagramTransport({ writable: WritableStream<Uint8Array>; read
 ```
 
 包装 HTTP/3 WebTransport 的 datagram 读写流。datagram 是无连接、无内建分帧的字节流，codec/framer descriptors 需要自行处理好帧边界；适配器内部维护一个贯穿整个传输生命周期的持久 reader——取消订阅（移除所有 RPC 监听器）不会连带取消这个 reader，只有调用 `close()` 才会真正取消 reader、释放读锁、关闭 writer；第二次调用 `close()` 会复用第一次的 close 结果，不会重复执行清理。
+
+### 整进程 Host
+
+`createProcessHost` 与 Plugin 门面共用 deployment 和 endpointFactory：Node/Bun/Deno 的平台端口从 `process/adapters/*` 导入。catalog 是名称到纯数据契约的映射，客户端只发送名称和 portableConfig；服务端必须提供同步的本地 resolver，不能把插件定义或函数放进 catalog。
+
+```ts
+import { createProcessHost, createServeProcessHost } from '@migaia/rpc/process'
+
+// ingress、deployment、endpointFactory 由当前平台的通道装配提供。
+const serving = await createServeProcessHost({
+  host: localHost,
+  catalog,
+  resolvePlugin: (name, portableConfig) => localDefinitions[name],
+  ingress,
+  endpointFactory,
+  scheduler,
+  report
+})
+const processHost = createProcessHost({ catalog, deployment, endpointFactory, report })
+await processHost.ready()
+const features = await processHost.use('p', { locale: 'zh' })
+await features.f.request(['hello'])
+await processHost.inspect()
+await processHost.unUse('p', { policy: 'suspend' })
+await processHost.release()
+await serving.close()
+```
+
+spawn 默认先退出旧进程再启动新进程；`replace({ spec, strategy: 'start-then-switch' })` 则要求共享预算容纳两个进程，并在新 describe 通过后切换。两种策略都兑现同一个门面。新进程从自己的 serve 启动状态开始，不重放旧 use。`restart()` 委托当前治理注册，`inspectRegistration()` 可查终态与清算原因；清算后不能用 replace 绕过。可选 `shutdownSignal.subscribe` 由调用方接平台信号，第一次排空释放，释放未完成时第二次只强制终止 owned handle；connect 只关闭本地连接。
+
+服务侧省略 resilience 时创建一个默认治理器，同一已验证主体在多连接上共享内存幂等缓存，跨进程重启要由调用方提供稳定 backing。外部治理器由调用方关闭。反向注册通过可选 registrations 提供 `verifyToken` 和 `resolveRegistration(principalId)`，后者只返回预批准的 `{ targetHost, name, contract }`；它不信任对端自报的名字或 routing peer。关闭 listener 不撤销已采用连接，EOF 以 suspend 移除代理，新连接须重新鉴权。Windows/Electron 实机保证与 JSON-RPC bridge 的 Host 接线属 M2，目前没有 PASS 声明。

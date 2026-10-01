@@ -139,6 +139,8 @@ describe('A1 merged public exports', () => {
       Object.keys(await import(pathToFileURL(join(packageRoot, processEntry.default)).href))
     ).toEqual(
       expect.arrayContaining([
+        'createProcessHost',
+        'createServeProcessHost',
         'createProcessPlugin',
         'createProcessResilience',
         'createServeProcessPlugin',
