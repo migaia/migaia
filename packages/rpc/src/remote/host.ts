@@ -39,30 +39,31 @@ export function createRemoteHost<TUnit, TSpec>(
   const lifecycle = new AbortController()
   /** The last described generation determines the next ready promise's threshold. */
   let lastReadyGeneration = 0
-  /** Initial preparation runs at most once, even if first operation is use. */
-  let initialPromise: Promise<void> | undefined
-  /** The start ready event must not begin a second preparation while the first is pending. */
-  let preparingInitial = false
+  /** First preparation and rebind share the one in-flight generation task. */
+  let preparationPromise: Promise<number> | undefined
   /** Ready promise is stable within one active or unavailable generation. */
   let readyPromise: Promise<void> | undefined
-  /** Rebind work is serialized across supervisor state observations. */
-  let rebinding = false
   /** Release settles once and prevents later channel publication. */
   let releasePromise: Promise<void> | undefined
-  const scheduleRebind = (): void => {
-    if (releasePromise || preparingInitial || rebinding || registration.events.current().active)
-      return
-    if (options.binding.supervisor.state !== 'ready') return
-    rebinding = true
-    void holder
-      .prepareRebind(lifecycle.signal)
+  const prepare = (): Promise<number> => {
+    if (preparationPromise) return preparationPromise
+    const first = lastReadyGeneration === 0
+    preparationPromise = (
+      first ? holder.prepareInitial(lifecycle.signal, true) : holder.prepareRebind(lifecycle.signal)
+    )
       .then((generation) => {
         lastReadyGeneration = generation
+        return generation
       })
-      .catch(options.report)
       .finally(() => {
-        rebinding = false
+        preparationPromise = undefined
       })
+    return preparationPromise
+  }
+  const scheduleRebind = (): void => {
+    if (releasePromise || registration.events.current().active) return
+    if (options.binding.supervisor.state !== 'ready') return
+    void prepare().catch(options.report)
   }
   const unsubscribe = options.binding.supervisor.subscribe((event) => {
     if (event.type === 'exit' || event.type === 'switched') {
@@ -71,39 +72,26 @@ export function createRemoteHost<TUnit, TSpec>(
     }
     if (event.type === 'state' && event.to === 'ready') scheduleRebind()
   })
-  const ensureInitial = (): Promise<void> => {
-    if (initialPromise) return initialPromise
-    preparingInitial = true
-    initialPromise = holder
-      .prepareInitial(lifecycle.signal, true)
-      .then((generation) => {
-        lastReadyGeneration = generation
-      })
-      .catch((error: unknown) => {
-        initialPromise = undefined
-        readyPromise = undefined
-        throw error
-      })
-      .finally(() => {
-        preparingInitial = false
-      })
-    return initialPromise
-  }
   const ready = (): Promise<void> => {
     if (releasePromise)
       return Promise.reject(createRemoteLayerError(RpcRemoteLayerErrorCode.closed))
     if (readyPromise) return readyPromise
-    readyPromise = !initialPromise
-      ? ensureInitial()
-      : registration.events.current().active
+    readyPromise = (
+      registration.events.current().active
         ? Promise.resolve()
-        : registration.events.whenReady(lastReadyGeneration).then(() => undefined)
+        : lastReadyGeneration === 0 || options.binding.supervisor.state === 'ready'
+          ? prepare().then(() => undefined)
+          : registration.events.whenReady(lastReadyGeneration).then(() => undefined)
+    ).catch((error: unknown) => {
+      readyPromise = undefined
+      throw error
+    })
     return readyPromise
   }
   return Object.freeze({
     ready,
     use: async (name: string, config?: IRpcPortableValue) => {
-      await ensureInitial()
+      if (lastReadyGeneration === 0) await prepare()
       const params = config === undefined ? [name] : [name, config]
       await registration.invokeControl(
         RemoteMethodName.hostUse,
@@ -114,7 +102,7 @@ export function createRemoteHost<TUnit, TSpec>(
       return registration.featureProxies(name)
     },
     unUse: async (name: string, removal?: IRemoteHostRemovalOptions) => {
-      await ensureInitial()
+      if (lastReadyGeneration === 0) await prepare()
       return registration.invokeControl(
         RemoteMethodName.hostUnUse,
         removal === undefined ? [name] : [name, removal],
@@ -123,7 +111,7 @@ export function createRemoteHost<TUnit, TSpec>(
       )
     },
     inspect: async () => {
-      await ensureInitial()
+      if (lastReadyGeneration === 0) await prepare()
       return registration.invokeControl(
         RemoteMethodName.hostInspect,
         [],

@@ -84,6 +84,35 @@ describe('remote Host trusted control', () => {
     await remote.release()
   })
 
+  it('opens one borrowed channel when a ready event precedes the first ready call', async () => {
+    const fixture = remoteHarness()
+    await fixture.supervisor.start()
+    let opens = 0
+    const remote = createRemoteHost({
+      catalog,
+      binding: {
+        ...fixture.binding,
+        async openChannel() {
+          opens += 1
+          return fixture.channel
+        }
+      },
+      endpointFactory: async () => ({
+        endpoint: {
+          ...fixture.served.endpoint,
+          async send() {
+            return { schemaVersion: 1, catalog }
+          }
+        } as unknown as IRpcEndpoint
+      }),
+      report: vi.fn()
+    })
+    fixture.emit({ type: 'state', from: 'starting', to: 'ready', generation: 1 })
+    await remote.ready()
+    expect(opens).toBe(1)
+    await remote.release()
+  })
+
   it('rejects thenables, forged definitions, wrong names and unknown names before Host.use', async () => {
     const endpoint = endpointHarness()
     const use = vi.fn(async () => [])
