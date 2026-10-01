@@ -2,7 +2,11 @@ import { createManualScheduler } from '@migaia/utils/scheduler'
 import { inspect } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { serializeRpcError } from '../../src/contract/error.js'
-import { encodeRpcStreamFrame } from '../../src/contract/framing/stream.js'
+import {
+  createRpcStreamFrameDecoder,
+  encodeRpcStreamFrame
+} from '../../src/contract/framing/stream.js'
+import { acceptRpcHandshake } from '../../src/contract/handshake.js'
 import { RpcCapability, RpcCodecId, RpcProtocol } from '../../src/contract/wire-constants.js'
 import { createProcessTransport } from '../../src/process/handshake.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
@@ -54,6 +58,63 @@ function ipc(name: string) {
 }
 
 describe('native process handshake', () => {
+  it.each(['one chunk', 'consecutive writes'] as const)(
+    '[D3] queues business after accept before initiator activation (%s)',
+    async (mode) => {
+      /** The scripted peer replies during the initiator's physical hello write. */
+      let onData: ((chunk: Uint8Array) => void) | undefined
+      const encoder = new TextEncoder()
+      const frame = (text: string): Uint8Array => encodeRpcStreamFrame(encoder.encode(text))
+      const responderOffer = createNativeProcessOffer({
+        peer: { id: 'responder', runtime: 'node' }
+      })
+      const decoder = createRpcStreamFrameDecoder({
+        onFrame(payload) {
+          const accepted = acceptRpcHandshake(responderOffer, new TextDecoder().decode(payload))
+          expect(accepted.ok).toBe(true)
+          const acceptFrame = frame(accepted.reply)
+          const businessFrame = frame('{"push":1}')
+          if (mode === 'one chunk') {
+            const combined = new Uint8Array(acceptFrame.length + businessFrame.length)
+            combined.set(acceptFrame)
+            combined.set(businessFrame, acceptFrame.length)
+            onData?.(combined)
+          } else {
+            onData?.(acceptFrame)
+            onData?.(businessFrame)
+          }
+        },
+        onError: () => undefined
+      })
+      const port: IProcessByteChannel = {
+        kind: 'byte',
+        write: async (chunk) => decoder.push(chunk),
+        onData(listener) {
+          onData = listener
+          return () => {
+            onData = undefined
+          }
+        },
+        onClose: () => () => undefined,
+        close: () => undefined
+      }
+      const channel = await createProcessTransport(port, {
+        role: 'initiator',
+        offer: createNativeProcessOffer({ peer: { id: 'initiator', runtime: 'node' } }),
+        peerId: 'responder',
+        report: () => undefined,
+        ipc: ipc('early')
+      })
+      try {
+        const received: unknown[] = []
+        channel.transport.subscribe((message) => received.push(message.data))
+        expect(received).toEqual(['{"push":1}'])
+      } finally {
+        await channel.close()
+      }
+    }
+  )
+
   it('[A5] builds one frozen native offer from the canonical protocol and capabilities', () => {
     const peer = { id: 'node-1', runtime: 'node' }
     const basic = createNativeProcessOffer({ peer })

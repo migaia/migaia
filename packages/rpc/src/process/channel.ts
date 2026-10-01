@@ -2,6 +2,7 @@ import { createContractError } from '../contract/contract-error.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { resolveAbortReason } from '../core/internal/async-control.js'
 import { RpcContractErrorCode } from '../contract/error-code.js'
+import { RpcHandshakeStep, RpcReservedKind } from '../contract/wire-constants.js'
 import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame,
@@ -73,10 +74,27 @@ function claim(channel: object): void {
   boundChannels.add(channel)
 }
 
+/** Classify a control frame without leaking parser diagnostics or its contents. */
+function isHandshakeControl(text: string, step?: RpcHandshakeStep): boolean {
+  try {
+    const value: unknown = JSON.parse(text)
+    return (
+      value !== null &&
+      typeof value === 'object' &&
+      'kind' in value &&
+      value.kind === RpcReservedKind.handshake &&
+      (step === undefined || ('step' in value && value.step === step))
+    )
+  } catch {
+    return false
+  }
+}
+
 /** Establish one byte reader and decoder, with a single pre-ready handshake frame. */
 export function bindProcessByteWire(
   channel: IProcessByteChannel,
-  options: Pick<IProcessCommonOptions, 'peerId' | 'report' | 'signal'>
+  options: Pick<IProcessCommonOptions, 'peerId' | 'report' | 'signal'> &
+    Readonly<{ role?: 'initiator' | 'responder' }>
 ): IProcessByteWire {
   claim(channel)
   /** The strict decoder rejects invalid UTF-8 rather than replacing bytes. */
@@ -101,6 +119,8 @@ export function bindProcessByteWire(
     | undefined
   /** A second handshake frame before ready is a protocol failure. */
   let handshakeReceived = false
+  /** Only a validly shaped accept permits initiator business frames before activation. */
+  let acceptReceived = false
   /** Business messages may be delivered only after explicit activation. */
   let ready = false
   /** Closed is monotonic and its reason is replayed to late core subscribers. */
@@ -180,6 +200,18 @@ export function bindProcessByteWire(
     earlyBusinessBytes += bytes
   }
 
+  /** Release queued frames only after both handshake activation and subscription. */
+  const flushBusiness = (): void => {
+    if (!ready || closed || listeners.size === 0 || earlyBusiness.length === 0) return
+    /** Clear before callbacks so reentrant subscriptions cannot replay frames. */
+    const queued = earlyBusiness.splice(0)
+    earlyBusinessBytes = 0
+    for (const text of queued) {
+      if (closed) break
+      deliverBusiness(text)
+    }
+  }
+
   /** Each complete byte payload is an independent UTF-8 text message. */
   const onFrame = (frame: Uint8Array): void => {
     if (closed) return
@@ -196,10 +228,16 @@ export function bindProcessByteWire(
     }
     if (!ready) {
       if (handshakeReceived) {
+        if (options.role === 'initiator' && acceptReceived && !isHandshakeControl(text)) {
+          queueBusiness(text, frame.byteLength)
+          return
+        }
         void terminate(createContractError(RpcContractErrorCode.handshakeInvalid))
         return
       }
       handshakeReceived = true
+      acceptReceived =
+        options.role === 'initiator' && isHandshakeControl(text, RpcHandshakeStep.accept)
       if (handshakeWaiter) {
         handshakeWaiter.resolve(text)
         handshakeWaiter = undefined
@@ -300,15 +338,7 @@ export function bindProcessByteWire(
     send: (value) => writeText(asProcessString(value)),
     subscribe(listener) {
       listeners.add(listener)
-      if (earlyBusiness.length > 0) {
-        /** Clear before callbacks so reentrant subscriptions cannot replay frames. */
-        const queued = earlyBusiness.splice(0)
-        earlyBusinessBytes = 0
-        for (const text of queued) {
-          if (closed) break
-          deliverBusiness(text)
-        }
-      }
+      flushBusiness()
       return () => {
         listeners.delete(listener)
       }
@@ -346,6 +376,7 @@ export function bindProcessByteWire(
       if (closed) throw terminalError
       if (!handshakeReceived) throw createContractError(RpcContractErrorCode.handshakeInvalid)
       ready = true
+      flushBusiness()
     },
     writeText,
     close: terminate,
