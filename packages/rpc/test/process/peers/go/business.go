@@ -7,8 +7,10 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 // businessStream retains the original correlation route and the next credited item.
@@ -250,6 +252,24 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 		if err != nil {
 			return err
 		}
+		method, _ := message["method"].(string)
+		if method == "peer.busy" || method == "peer.pause" || method == "peer.crash" {
+			if err := send(writer, businessResponse(message, "ACK", nil)); err != nil {
+				return err
+			}
+			if method == "peer.crash" {
+				os.Exit(17)
+			}
+			if method == "peer.pause" {
+				if err := syscall.Kill(os.Getpid(), syscall.SIGSTOP); err != nil {
+					return err
+				}
+			} else {
+				for {
+				}
+			}
+			continue
+		}
 		replies, err := b.native(message)
 		if err != nil {
 			return err
@@ -426,7 +446,7 @@ func serveBridge(reader io.Reader, writer io.Writer, host bool, token string, co
 }
 
 // runBusiness selects real owned stdio or a borrowed listener; only inherited/bootstrap bytes carry auth.
-func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, contractPath string, bridge, bare bool) error {
+func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, contractPath string, bridge, bare, descendant bool) error {
 	raw, err := os.ReadFile(contractPath)
 	if err != nil {
 		return err
@@ -453,6 +473,14 @@ func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD
 				return err
 			}
 			token = string(bytes)
+		}
+		// A real descendant makes EOF ownership observable rather than vacuously empty.
+		if descendant {
+			child := exec.Command("/bin/sleep", "600")
+			if err := child.Start(); err != nil {
+				return err
+			}
+			defer func() { _ = child.Process.Kill(); _ = child.Wait() }()
 		}
 		fmt.Fprintf(os.Stderr, "READY pid=%d\n", os.Getpid())
 		return serveBusiness(os.Stdin, os.Stdout, host, token, contract, bridge, bare)
