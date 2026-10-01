@@ -1,14 +1,69 @@
 import { describe, expect, it, vi } from 'vitest'
+import { PluginHost } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { RpcPlatform } from '../../src/core/transport-constants.js'
 import { createConnectProcessBinding } from '../../src/process/plugin/binding.js'
+import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { RpcProcessErrorCode } from '../../src/process/error-code.js'
 import { byteProcessPipeline } from '../../src/process/pipeline.js'
 import type { IProcessByteChannel } from '../../src/process/types.js'
 import type { IRemoteChannel } from '../../src/remote/types.js'
+import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../remote/fixture.js'
 
 /** An external process stays outside the lifetime of this owned local socket. */
 describe('process plugin connect binding', () => {
+  it('[A2] installs through the borrowed connection and leaves the external target owned elsewhere', async () => {
+    const fixture = remoteHarness()
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    /** Closing the session settles the local supervisor without touching a process handle. */
+    let notifyClose: (() => void) | undefined
+    const rawClose = vi.fn(async () => notifyClose?.())
+    const raw: IProcessByteChannel = {
+      kind: 'byte',
+      write: async () => undefined,
+      onData: () => () => undefined,
+      onClose(listener) {
+        notifyClose = () => listener()
+        return () => {
+          notifyClose = undefined
+        }
+      },
+      close: rawClose
+    }
+    const dial = vi.fn(async () => raw)
+    const plugin = createProcessPlugin({
+      name: 'p',
+      contract: REMOTE_FIXTURE_CONTRACT,
+      host: host.plugin,
+      endpointFactory: async () => fixture.served,
+      report: () => undefined,
+      deployment: {
+        kind: 'connect',
+        address: '/tmp/external-peer.sock',
+        token: 'signed-token',
+        dial,
+        supervision: { scheduler: fixture.binding.scheduler },
+        establish: async (_raw, options) => {
+          expect(options.token).toBe('signed-token')
+          return {
+            ...fixture.channel,
+            agreement: { ...fixture.channel.agreement, source: 'negotiated' as const }
+          }
+        }
+      }
+    })
+    try {
+      const [installed] = await host.use(plugin)
+      const feature = installed.getFeature('f') as { request(params: unknown[]): Promise<unknown> }
+      expect(await feature.request(['value'])).toBe('result')
+      expect(dial).toHaveBeenCalledTimes(1)
+    } finally {
+      await host.dispose()
+    }
+    expect(rawClose).toHaveBeenCalledTimes(1)
+  })
   it('[A2] gives each dial a new session and closes only the owned socket', async () => {
     const scheduler = createManualScheduler()
     const close = vi.fn(async () => undefined)
