@@ -1,16 +1,42 @@
-# Native process peers
+# Process peer fixtures
 
-These peers are test fixtures, not SDKs. Python, Rust, and Go are native
-counterparts. `ts-reference` is an independent TypeScript reference oracle
-for cross-checking vectors and interop. It does not count toward conformance
-R1/A1 or satisfy CF1/S2. M2 will add a separate `peers/ts` that consumes
-the package's public exports. Every peer here uses its language's standard
-library for framing and JSON; none installs dependencies or writes build
-products into the repository.
+Python, Rust and Go are independent native protocol fixtures. `ts-reference`
+remains an independent oracle, unchanged by the public peer delivery; it does
+not count toward CF1/S2 or A1. `ts` consumes only published `@migaia/rpc`
+package exports and executes production process, core and remote modules.
+These fixtures are not language SDKs and install no dependencies.
 
-## Start a peer
+## Public TypeScript peer
 
-From the repository root:
+Build the RPC dependency closure using the workspace package manager first.
+The supervisor supplies already installed Bun or Node; no `package.json` is
+added to the peer directory.
+
+```sh
+packages/rpc/test/process/peers/ts/run.sh --stdio --bootstrap stdin
+RPC_PEERS_RUNTIME=node packages/rpc/test/process/peers/ts/run.sh --stdio --bootstrap stdin
+packages/rpc/test/process/peers/ts/run.sh --listen-unix /tmp/peer.sock --auth-fd 3 --host
+```
+
+`--bootstrap stdin` consumes the production native bootstrap supplied by
+`createNodeProcessLauncher`; it is not an interactive JSON command. Socket
+listeners require an inherited readable secret descriptor. Credentials never
+enter argv, environment, status markers or saved diagnostics. `--host` serves
+real Host catalog/use/unUse/inspect methods; the default serves one installed
+Plugin. Node 24 strips the fixture sources into a worktree-specific temporary
+directory and loads them in the same PID, retaining inherited descriptors.
+`RPC_PEERS_BUN` and `RPC_PEERS_NODE` select installed executables.
+
+The real native focused test covers stdio/socket × Plugin/Host, request,
+independent one-way receipts, generator/asyncGenerator values, error causes,
+provider cancellation reason, ping, Host removal and a second socket session.
+Its JSON oracle is `ts/public-behavior.json`. Full stdout/stderr and received
+socket frames are saved under `RPC_PEERS_EVIDENCE` (default `/tmp/m2-e-evidence`).
+The executable peer implements no manual RPC envelopes, framing or codecs.
+JSON-RPC bridge mode returns explicit `UNSUPPORTED`; bridge consumption and
+threads integration await their production owners.
+
+## Independent language fixtures
 
 ```sh
 python3 packages/rpc/test/process/peers/python/peer.py --stdio --role responder
@@ -19,49 +45,35 @@ packages/rpc/test/process/peers/go/run.sh --stdio --role responder
 packages/rpc/test/process/peers/ts-reference/run.sh --stdio --role responder
 ```
 
-Use `--role initiator` with the same commands for pairwise tests. The peer
-writes protocol bytes only to stdout and reads them only from stdin. Both are
-binary byte streams. Each message is an unsigned 4-byte big-endian payload
-length followed by UTF-8 JSON. Length 0 and lengths greater than 16 MiB are
-rejected before payload allocation. `READY pid=<pid>` and a successful
-initiator's `RESULT ok` go to stderr; no input, token, or frame is logged.
-One command is one PID and has no peer-owned child process after startup.
+The original `--role initiator`, `--listen-unix PATH` and `--connect-unix PATH`
+paths exchange length-prefixed native hello/echo/close frames. Rust and Go
+compile offline into system temporary directories. `ts-reference` uses the
+installed Node/TypeScript tools. Their current request shapes lack production
+core discovery/receiver identities, Host dispatch, stream execution and bridge
+support. The legacy interop matrix therefore does not establish production A1.
 
-For a rendezvous connection, start a responder with `--listen-unix PATH`
-instead of `--stdio`; choose a fresh socket path in the system temporary
-directory. Python, Rust, and Go initiators also accept `--connect-unix PATH`.
-The future I14 channel test can spawn one responder, wait for the stderr
-`READY pid=` marker, then attach its binary stdio pipes or connect to its
-Unix socket. I20 conformance should use that same marker and PID to attribute
-CPU and RSS. The executable protocol uses fd 0 for input, fd 1 for output,
-and fd 2 for fixed status/error markers. An inherited secret fd, if required
-by a future channel test, must be passed separately; never place the token in
-argv or environment. These fixtures do not replace I14 authentication.
-
-Rust compiles offline to `${TMPDIR:-/tmp}/migaia-rpc-peer-rust-target`. Go's
-wrapper reuses one fixed system temporary build directory and rebuilds only
-when Go source changes. TypeScript's `run.sh` uses Node 24's built-in type
-stripping and emits no JavaScript file. Its selftest reuses one fixed system
-temporary build directory and rebuilds only when TypeScript source changes,
-using the already installed `tsc`
-and Node type definitions. Set `RPC_PEERS_TSC` and `RPC_PEERS_TYPES` if those
-are installed outside this worktree. No wrapper installs a package.
-
-## Checks
+## Focused checks
 
 ```sh
 python3 packages/rpc/test/process/peers/python/selftest.py packages/rpc/schema/vectors
 packages/rpc/test/process/peers/rust/selftest.sh
 packages/rpc/test/process/peers/go/selftest.sh
-packages/rpc/test/process/peers/ts-reference/selftest.sh
+packages/rpc/test/process/peers/ts/selftest.sh
 python3 packages/rpc/test/process/peers/interop.py
+cd packages/rpc
+pnpm exec vitest run test/process/peers/ts/native-public.test.ts --coverage.enabled=false
+RPC_PEERS_RUNTIME=node pnpm exec vitest run test/process/peers/ts/native-public.test.ts --coverage.enabled=false
 ```
 
-Each language's selftest prints case counts. A missing upstream vector is
-reported as pending/failure and yields a nonzero exit status. At the branch
-base, `remote-host-control.json` and `stream-framing.json` are absent. The
-frozen 1.0 files remain untouched; `stream.json` carries the 1.1
-reclassification. `interop.py` starts every ordered pair over bridged stdio
-and requires a real handshake, request/echo, and close with both peers exiting
-successfully. Channel and conformance can invoke these commands directly;
-no package script is required.
+The available `remote-contract.json`, `remote-host-control.json` and
+`stream-framing.json` cases now have individual semantic oracles. Non-JS Host
+and contract checks execute selftest-only schema/semantic interpreters, not
+live Host dispatch. Frame decoding invokes each language peer's real reader
+and compares every byte or the first mapped normative failure. Python and Go
+also invoke their real writer; Rust's binary encoding prefix check remains an
+independent oracle because its runtime writer accepts JSON values only.
+The TS vector checks use public canonical normalizers, error graph functions,
+stream owners and frame codecs; control actions execute public endpoints.
+Missing vector files fail explicitly. The original 12 ordered interop pairs
+prove only their real native hello/echo/close exchange; `ts` is separately
+verified through the real public production client above.
