@@ -1,0 +1,39 @@
+{
+  "added": {
+    "@migaia/rpc/threads": [
+      "createThreadPlugin",
+      "createThreadHost",
+      "createServeThreadPlugin",
+      "createServeThreadHost",
+      "createNodeThreadChannel",
+      "createWebThreadChannel",
+      "receiveThreadData",
+      "readThreadBootstrap"
+    ],
+    "@migaia/rpc/threads/adapters/node": [
+      "createNodeThreadLauncher",
+      "createNodeThreadChannelFactory"
+    ],
+    "@migaia/rpc/threads/adapters/deno": [
+      "createDenoThreadLauncher",
+      "createDenoThreadChannelFactory"
+    ],
+    "@migaia/rpc/threads/adapters/bun": [
+      "createBunThreadLauncher",
+      "createBunThreadChannelFactory"
+    ],
+    "@migaia/rpc/threads/adapters/electron-main": [
+      "createElectronMainThreadLauncher",
+      "createElectronMainThreadChannelFactory"
+    ],
+    "@migaia/rpc/threads/adapters/electron-renderer": [
+      "createElectronRendererThreadLauncher",
+      "createElectronRendererThreadChannelFactory"
+    ],
+    "@migaia/rpc/threads/adapters/browser": [
+      "createBrowserThreadLauncher",
+      "createBrowserThreadChannelFactory"
+    ]
+  },
+  "removed": {}
+}
