@@ -20,7 +20,7 @@ const ENABLE_RETRY_BASE_MS = 10
 type IRemoteAssemblyLifecycle = Readonly<{
   /** Process reverse registration transfers one prevalidated holder instead of describing twice. */
   preparedHolder?: IRemoteGenerationHolder
-  onInstalled?(): void
+  onInstalled?(): void | Promise<void>
   onReleased?(): void | Promise<void>
 }>
 
@@ -152,8 +152,9 @@ export function assembleRemotePluginDefinition<TUnit, TSpec, TMetadata extends o
       return Object.freeze({ getProxy: (name: string) => proxies[name]! })
     },
     install: () => {
-      lifecycle?.onInstalled?.()
-      return {}
+      /** Borrowed process governance may transfer after preparation, before publishing features. */
+      const installed = lifecycle?.onInstalled?.()
+      return installed === undefined ? {} : installed.then(() => ({}))
     }
   })
   return definition as unknown as IRemotePluginDefinition & TMetadata
