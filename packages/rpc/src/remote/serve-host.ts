@@ -1,5 +1,6 @@
 import {
   isDefinedPlugin,
+  PluginHostErrorCode,
   type IDefinedPluginConstraint,
   type IHostHandle,
   type IPluginRemoval
@@ -21,8 +22,35 @@ import { RpcRemoteLayerErrorText } from './error-text.js'
 import { contractRequiresStream, registerRemoteMethods } from './serve-methods.js'
 import type { IRemoteServeEndpoint } from './types.js'
 
+/** One successful installation is shared by connections using the same Host definition. */
+type IInstalledRemotePlugin = Readonly<{
+  definition: IDefinedPluginConstraint
+  handle: { getFeature(name: string): Record<string, unknown> }
+  features: ReadonlyMap<string, Record<string, unknown>>
+}>
+
 /** Only successful remote catalog operations enter this Host-scoped view. */
-const installedByHost = new WeakMap<object, Set<string>>()
+const installedByHost = new WeakMap<object, Map<string, IInstalledRemotePlugin>>()
+
+/** Reads a name-addressed Host handle without trusting an older Feature output. */
+function registrationState(record: IInstalledRemotePlugin): 'enabled' | 'disabled' | 'stale' {
+  for (const [feature, original] of record.features) {
+    try {
+      if (record.handle.getFeature(feature) !== original) return 'stale'
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        if (error.code === PluginHostErrorCode.pluginNotInstalled) return 'stale'
+        if (
+          error.code === PluginHostErrorCode.pluginDisabled ||
+          error.code === PluginHostErrorCode.pluginSuspended
+        )
+          return 'disabled'
+      }
+      throw error
+    }
+  }
+  return 'enabled'
+}
 
 /** The resolver remains local and synchronous; plugin definitions never cross the wire. */
 export type IRemoteHostPluginResolver = (name: string, config?: IRpcPortableValue) => unknown
@@ -49,11 +77,15 @@ function declared(catalog: IRemoteHostCatalog, name: string): void {
 function inspectItem(
   host: IRemoteServeHostOptions['host'],
   catalog: IRemoteHostCatalog,
-  name: string
+  name: string,
+  record: IInstalledRemotePlugin
 ): IRpcPortableValue {
   return {
     name,
-    state: host.plugin.disabled().includes(name) ? 'disabled' : 'enabled',
+    state:
+      host.plugin.disabled().includes(name) || registrationState(record) === 'disabled'
+        ? 'disabled'
+        : 'enabled',
     revision: host.revision,
     features: Object.keys(catalog[name]!.features)
   }
@@ -75,10 +107,16 @@ export async function serveRemoteHost(
       RpcRemoteLayerErrorText.streamUnavailable
     )
   }
-  const installed = installedByHost.get(options.host) ?? new Set<string>()
+  const installed = installedByHost.get(options.host) ?? new Map<string, IInstalledRemotePlugin>()
   installedByHost.set(options.host, installed)
   /** Installed Host handles expose Feature outputs after a successful use. */
-  const handles = new Map<string, { getFeature(name: string): Record<string, unknown> }>()
+  const handles = new Map<string, IInstalledRemotePlugin>()
+  /** A stale or suspended PluginHost handle cannot forward a remote method. */
+  const liveFeature = (plugin: string, feature: string): Record<string, unknown> | undefined => {
+    const captured = handles.get(plugin)
+    if (!captured || installed.get(plugin) !== captured) return undefined
+    return registrationState(captured) === 'enabled' ? captured.features.get(feature) : undefined
+  }
   /** Stream providers release their registrations before endpoint disposal. */
   const streamReleases: (() => void)[] = []
   try {
@@ -87,7 +125,7 @@ export async function serveRemoteHost(
         ...registerRemoteMethods(
           contract,
           options.endpoint,
-          (featureName) => handles.get(contract.plugin)?.getFeature(featureName),
+          (featureName) => liveFeature(contract.plugin, featureName),
           () => options.host.plugin.disabled().includes(contract.plugin),
           options.report
         )
@@ -111,10 +149,23 @@ export async function serveRemoteHost(
         )
       if (!isDefinedPlugin(candidate) || candidate.name !== name)
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-      const [handle] = await options.host.use(candidate as IDefinedPluginConstraint)
-      handles.set(name, handle as unknown as { getFeature(name: string): Record<string, unknown> })
-      installed.add(name)
-      return context.success(inspectItem(options.host, catalog, name))
+      let captured = installed.get(name)
+      if (captured && registrationState(captured) === 'stale') {
+        installed.delete(name)
+        captured = undefined
+      }
+      if (captured?.definition !== candidate) {
+        const [handle] = await options.host.use(candidate as IDefinedPluginConstraint)
+        const featureHandle = handle as unknown as IInstalledRemotePlugin['handle']
+        /** Snapshots detect replacement through a name-addressed PluginHost handle. */
+        const features = new Map<string, Record<string, unknown>>()
+        for (const feature of Object.keys(catalog[name]!.features))
+          features.set(feature, featureHandle.getFeature(feature))
+        captured = { definition: candidate, handle: featureHandle, features }
+        installed.set(name, captured)
+      }
+      handles.set(name, captured)
+      return context.success(inspectItem(options.host, catalog, name, captured))
     })
     options.endpoint.endpoint.provide(RemoteMethodName.hostUnUse, async (context) => {
       const params = normalizeRemoteControlShape(
@@ -145,12 +196,14 @@ export async function serveRemoteHost(
     })
     options.endpoint.endpoint.provide(RemoteMethodName.hostInspect, (context) => {
       normalizeRemoteControlShape('hostInspectParams', context.data)
+      for (const [name, record] of installed)
+        if (registrationState(record) === 'stale') installed.delete(name)
       return context.success({
         revision: options.host.revision,
-        plugins: [...installed]
+        plugins: [...installed.keys()]
           .filter((name) => Object.hasOwn(catalog, name))
           .sort()
-          .map((name) => inspectItem(options.host, catalog, name))
+          .map((name) => inspectItem(options.host, catalog, name, installed.get(name)!))
       })
     })
   } catch (error) {
