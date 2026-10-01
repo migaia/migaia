@@ -37,6 +37,7 @@ const knownKeys = new Set<PropertyKey>([
   'onEnable',
   'onDisable',
   'dispose',
+  'beforeRelease',
   'shared',
   'features',
   'featureExpose',
@@ -55,6 +56,9 @@ const readData = (source: object, key: PropertyKey): unknown => {
   return descriptor.value
 }
 
+/** Shares the existing own-data admission rule with the raw-object release hook snapshot. */
+export { readData as readPluginDefinitionData }
+
 /** Validate and snapshot one public functional definition without running user hooks. */
 const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   source: TPlugin & object
@@ -70,6 +74,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   const activation = readData(source, 'activation') ?? 'eager'
   const retiredShared = readData(source, 'shared')
   const dispose = readData(source, 'dispose')
+  const beforeRelease = readData(source, 'beforeRelease')
   const features = readData(source, 'features')
   const featureExpose = readData(source, 'featureExpose')
   const asyncDispose = Object.getOwnPropertyDescriptor(source, Symbol.asyncDispose)
@@ -83,6 +88,8 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     throw createPluginHostTypeError('plugin install must be a function')
   if (setup !== undefined && typeof setup !== 'function')
     throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_SETUP_FUNCTION)
+  if (beforeRelease !== undefined && typeof beforeRelease !== 'function')
+    throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_BEFORE_RELEASE_FUNCTION)
   for (const [key, value] of [
     ['update', update],
     ['onEnable', onEnable],
@@ -177,6 +184,11 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
       value: (context?: unknown) => invokeCaptured(dispose as Function, source, [context]),
       enumerable: true
     })
+  if (beforeRelease !== undefined)
+    Object.defineProperty(plugin, 'beforeRelease', {
+      value: (context: unknown) => invokeCaptured(beforeRelease as Function, source, [context]),
+      enumerable: true
+    })
   if (asyncDisposer !== undefined)
     Object.defineProperty(plugin, Symbol.asyncDispose, {
       value: () => invokeCaptured(asyncDisposer as Function, source, []),
@@ -209,6 +221,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
       plugin.onDependencyReplaced as IPluginConstraint<any>['onDependencyReplaced'],
     activation: activation as 'eager' | 'lazy',
     dispose: plugin.dispose as IPluginConstraint<any>['dispose'],
+    beforeRelease: plugin.beforeRelease as IPluginConstraint<any>['beforeRelease'],
     features: Object.freeze(featureRecord),
     featureExpose: featureExpose as IPluginDefinition<any>['featureExpose'],
     disposer
