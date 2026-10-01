@@ -64,9 +64,18 @@ function violations(path: string, text: string): string[] {
       (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&
       node.name.text === 'message'
     ) {
+      /** Strip only the canonical constant assertion to find the event object's declaration. */
+      const declaration = ts.isAsExpression(node.parent.parent)
+        ? node.parent.parent.parent
+        : node.parent.parent
       /** These named fields describe wire keys or schema types, not failure text. */
       const nonErrorMessage =
         (path === 'contract/wire-constants.ts' && node.initializer.getText(file) === "'message'") ||
+        (path === 'threads/constants.ts' &&
+          node.initializer.getText(file) === "'message'" &&
+          ts.isObjectLiteralExpression(node.parent) &&
+          ts.isVariableDeclaration(declaration) &&
+          declaration.name.getText(file) === 'ThreadEvent') ||
         (path === 'core/internal/contract.ts' && node.initializer.getText(file) === "'string'") ||
         (path === 'core/internal/discovery-attachment.ts' &&
           node.initializer.getText(file) === "'discovery'") ||
@@ -154,6 +163,19 @@ describe('error text ownership', () => {
       violations(relative(sourceRoot, path), readFileSync(path, 'utf8'))
     )
     expect(found).toEqual([])
+  })
+
+  it('[A1] distinguishes canonical thread events from error messages', () => {
+    expect(
+      violations('threads/constants.ts', "const ThreadEvent = { message: 'message' } as const")
+    ).toEqual([])
+    expect(violations('threads/constants.ts', "const error = { message: 'failed' }")).toHaveLength(
+      1
+    )
+    expect(violations('threads/adapter.ts', "const error = { message: 'message' }")).toHaveLength(1)
+    expect(violations('threads/constants.ts', "const error = { message: 'message' }")).toHaveLength(
+      1
+    )
   })
 
   it('[A8] resolves abort reasons through one guarded owner', () => {
