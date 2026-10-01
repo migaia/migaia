@@ -3,7 +3,7 @@ import { portableBytes } from '../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IRpcProviderRejection } from '../../core/provider-admission.js'
 import { RpcProviderRejectionReason } from '../../core/semantic-constants.js'
-import { RpcCoreErrorCode } from '../../core/errors.js'
+import { RpcTimeoutError } from '../../core/errors.js'
 import type {
   IRpcContext,
   IRpcEndpoint,
@@ -46,6 +46,8 @@ export function createProcessProviderAdmission(
   let lastInboundAt = scheduler.now()
   let closed = false
   let idleTimer: IScheduledTask | undefined
+  /** Admission owns its abort subscriptions even when business work never settles. */
+  const abortSubscriptions = new Set<() => void>()
 
   /** A close triggered by policy remains secondary to the provider's primary result. */
   const requestClose = (): void => {
@@ -98,23 +100,42 @@ export function createProcessProviderAdmission(
     callsInWindow += 1
   }
 
-  /** Classify only core-originated deadline cancellation as a connection timeout. */
-  const settle = (context: IRpcContext, succeeded: boolean): void => {
-    const reason = context.signal.aborted ? resolveAbortReason(context.signal) : undefined
-    if (
-      typeof reason === 'object' &&
-      reason !== null &&
-      'code' in reason &&
-      reason.code === RpcCoreErrorCode.deadlineExceeded
-    ) {
+  /** Observe deadlines at abort time; settlement only releases activity and resets successful work. */
+  const track = (context: IRpcContext): ((succeeded: boolean) => void) => {
+    /** One operation contributes at most one deadline, including after a late settlement. */
+    let timedOut = false
+    /** Provider callbacks and stream finally blocks both retire this activity once. */
+    let settled = false
+    active += 1
+    idleTimer?.cancel()
+    idleTimer = undefined
+    /** The core deadline owner creates this local timeout instance; remote payloads cannot do so. */
+    const onAbort = (): void => {
+      if (closed || timedOut) return
+      /** This guarded read preserves the core-owned cancellation reason. */
+      const reason = resolveAbortReason(context.signal)
+      if (!(reason instanceof RpcTimeoutError)) return
+      timedOut = true
       consecutiveTimeouts += 1
-      if (consecutiveTimeouts >= options.maxConsecutiveTimeouts) queueMicrotask(requestClose)
-    } else if (succeeded) {
-      consecutiveTimeouts = 0
-      violations = 0
+      if (consecutiveTimeouts === options.maxConsecutiveTimeouts) queueMicrotask(requestClose)
     }
-    active -= 1
-    scheduleIdle()
+    /** Releasing admission removes listeners even from providers that ignore cancellation. */
+    const unsubscribeAbort = (): void => context.signal.removeEventListener('abort', onAbort)
+    context.signal.addEventListener('abort', onAbort, { once: true })
+    abortSubscriptions.add(unsubscribeAbort)
+    if (context.signal.aborted) onAbort()
+    return (succeeded) => {
+      if (settled) return
+      settled = true
+      unsubscribeAbort()
+      abortSubscriptions.delete(unsubscribeAbort)
+      if (!closed && succeeded && !context.signal.aborted) {
+        consecutiveTimeouts = 0
+        violations = 0
+      }
+      active -= 1
+      scheduleIdle()
+    }
   }
 
   /** Preserve the provider's native result and Promise identity while tracking its activity. */
@@ -122,20 +143,18 @@ export function createProcessProviderAdmission(
     (provider: IRpcProvider): IRpcProvider =>
     (context) => {
       admit(context)
-      active += 1
-      idleTimer?.cancel()
-      idleTimer = undefined
+      /** The deadline subscription preserves the provider's returned Promise identity. */
+      const settle = track(context)
       let result: IRpcProviderResult | Promise<IRpcProviderResult>
       try {
         result = provider(context)
       } catch (error) {
-        active -= 1
-        scheduleIdle()
+        settle(false)
         throw error
       }
       void Promise.resolve(result).then(
-        (value) => settle(context, value.ok),
-        () => settle(context, false)
+        (value) => settle(value.ok),
+        () => settle(false)
       )
       return result
     }
@@ -173,15 +192,14 @@ export function createProcessProviderAdmission(
                 (async function* () {
                   const context = streamContext.context
                   admit(context)
-                  active += 1
-                  idleTimer?.cancel()
-                  idleTimer = undefined
+                  /** Stream cancellation uses the same single deadline observer as requests. */
+                  const settle = track(context)
                   let succeeded = false
                   try {
                     yield* run(params, streamContext)
                     succeeded = true
                   } finally {
-                    settle(context, succeeded)
+                    settle(succeeded)
                   }
                 })()
               )
@@ -197,6 +215,8 @@ export function createProcessProviderAdmission(
       if (closed) return
       closed = true
       idleTimer?.cancel()
+      for (const unsubscribeAbort of abortSubscriptions) unsubscribeAbort()
+      abortSubscriptions.clear()
       unsubscribe()
     }
   })
