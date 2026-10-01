@@ -15,5 +15,13 @@ export const RpcProcessErrorText = {
   /** A channel is already owned by another transport adapter. */
   duplicateBinding: 'process channel is already bound',
   /** The message channel parties did not declare the same static agreement. */
-  staticAgreementMismatch: 'process channel static agreement does not match'
+  staticAgreementMismatch: 'process channel static agreement does not match',
+  /** Local process options are incomplete or outside the supported runtime domain. */
+  optionsInvalid: 'process channel options are invalid',
+  /** Native byte channels require the JSON codec implemented by this package. */
+  jsonCodecRequired: 'process channel offer must include the JSON codec',
+  /** The peer selected a codec for which this channel has no implementation. */
+  negotiatedCodecUnsupported: 'process channel negotiated codec is unsupported',
+  /** Handshake deadlines must be finite and non-negative. */
+  handshakeTimeoutInvalid: 'process channel handshake timeout is invalid'
 } as const

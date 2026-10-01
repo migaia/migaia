@@ -145,7 +145,7 @@ const IMPLEMENTATION_FIELDS = ['name', 'version'] as const
 const VERSION_FIELDS = ['major', 'minor'] as const
 
 /** Summarize a received handshake using only allowed scalar fields and bounded field names. */
-function redactHandshake(
+export function redactHandshake(
   input: unknown,
   record?: Readonly<Record<string, unknown>>,
   withheldSyntax?: true,
@@ -281,12 +281,12 @@ export function redactWireFailure(cause: unknown): unknown {
 }
 
 /** Describe an untrusted local offer without reading any property a second time. */
-function redactOffer(): IRpcHandshakeRedaction {
+export function redactOffer(): IRpcHandshakeRedaction {
   return Object.freeze({ redacted: true, form: RpcHandshakeInputForm.offer, parsed: false })
 }
 
 /** Retain a JSON engine error only when its message cannot quote four input code units. */
-function isExcerptFree(message: string, json: string): boolean {
+export function isExcerptFree(message: string, json: string): boolean {
   const width = REDACTION_LIMIT.excerptRun
   if (message.length < width) return true
   const windows = new Set<string>()
