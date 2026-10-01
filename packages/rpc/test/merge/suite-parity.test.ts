@@ -112,12 +112,26 @@ describe('A7 migrated suite parity', () => {
         env: { ...process.env, CI: '1' }
       }
     )
-    expect(run.status, `${run.stdout.slice(-2000)}\n${run.stderr.slice(-2000)}`).toBe(0)
     const report = JSON.parse(
       run.stdout.slice(run.stdout.indexOf('{'), run.stdout.lastIndexOf('}') + 1)
     ) as {
-      testResults: { name: string; assertionResults: { fullName: string; status: string }[] }[]
+      testResults: {
+        name: string
+        message?: string
+        assertionResults: { fullName: string; status: string; failureMessages?: string[] }[]
+      }[]
     }
+    /** Preserve the actual nested failure rather than only the last passing report rows. */
+    const failures = report.testResults.flatMap((file) =>
+      file.assertionResults
+        .filter((item) => item.status === 'failed')
+        .map((item) => ({
+          file: file.name,
+          title: item.fullName,
+          failures: item.failureMessages
+        }))
+    )
+    expect(run.status, `${JSON.stringify(failures)}\n${run.stderr}`).toBe(0)
     const actual = new Map<string, string>(
       report.testResults.flatMap((file) =>
         file.assertionResults.map(

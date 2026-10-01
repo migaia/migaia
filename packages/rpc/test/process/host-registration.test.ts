@@ -152,7 +152,20 @@ describe('process Host reverse native registration', () => {
     const secondTarget = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
-    const secondUse = vi.spyOn(secondTarget, 'use')
+    /** Observe actual installation entry so CPU load cannot outrun a polling deadline. */
+    let observeSecondUse!: () => void
+    /** This connection installs on the independent approved Host. */
+    const secondInstalling = new Promise<void>((resolve) => {
+      observeSecondUse = resolve
+    })
+    /** Capture the original method before installing the spy, without bind/call/apply. */
+    const secondMethod = secondTarget.use
+    const secondUse = vi.spyOn(secondTarget, 'use').mockImplementation((definition) => {
+      /** Native invocation preserves the private-field receiver of the original class method. */
+      const operation = Reflect.apply(secondMethod, secondTarget, [definition])
+      observeSecondUse()
+      return operation
+    })
     const reports: unknown[] = []
     const report = (error: unknown) => {
       reports.push(error)
@@ -185,8 +198,36 @@ describe('process Host reverse native registration', () => {
           ? { targetHost: secondTarget, name: 'p', contract: nativeHostCatalog.p! }
           : undefined
     )
-    const use = vi.spyOn(target, 'use')
+    /** First installation and reconnection each have a separate observable entry event. */
+    let observeFirstUse!: () => void
+    /** Replacement must not be mistaken for the duplicate registration attempt. */
+    let observeReplacementUse!: () => void
+    /** The initial approved peer waits for actual target installation. */
+    const firstInstalling = new Promise<void>((resolve) => {
+      observeFirstUse = resolve
+    })
+    /** The new physical connection must reach its own target installation. */
+    const replacementInstalling = new Promise<void>((resolve) => {
+      observeReplacementUse = resolve
+    })
+    /** Capture the original method before the spy replaces it. */
+    const targetMethod = target.use
+    const use = vi.spyOn(target, 'use').mockImplementation((definition) => {
+      /** Native invocation preserves the original private-field receiver and returned Promise. */
+      const operation = Reflect.apply(targetMethod, target, [definition])
+      if (use.mock.calls.length === 1) observeFirstUse()
+      if (use.mock.calls.length === 4) observeReplacementUse()
+      return operation
+    })
     const unUse = vi.spyOn(target, 'unUse')
+    /** Wait for the authenticated candidate's actual loss event, not a polling interval. */
+    let observeFirstLoss!: () => void
+    /** The first approved candidate alone proves EOF-driven suspension. */
+    const firstLost = new Promise<void>((resolve) => {
+      observeFirstLoss = resolve
+    })
+    /** Later duplicate and replacement candidates must not replace the original EOF observer. */
+    let observedFirst = false
     const service = await createServeProcessHost({
       host: target,
       catalog: nativeHostCatalog,
@@ -210,8 +251,13 @@ describe('process Host reverse native registration', () => {
           }
         })
       },
-      endpointFactory: (channel, _signal, session) =>
-        nativeEndpoint(channel, 'registration-server', session),
+      endpointFactory: (channel, signal, session) => {
+        if (!observedFirst && session?.identity.principalId === 'approved-principal') {
+          observedFirst = true
+          signal.addEventListener('abort', observeFirstLoss, { once: true })
+        }
+        return nativeEndpoint(channel, 'registration-server', session)
+      },
       registrations: {
         listen: listenProcessByteChannel,
         address,
@@ -243,7 +289,8 @@ describe('process Host reverse native registration', () => {
     let independent: ReturnType<typeof reversePeer> | undefined
     try {
       await rejected.exited
-      await expect.poll(() => use.mock.calls.length).toBe(1)
+      await firstInstalling
+      expect(use).toHaveBeenCalledTimes(1)
       const [proxy] = await use.mock.results[0]!.value
       expect(resolveRegistration.mock.calls).toEqual([['approved-principal']])
       const bad = reversePeer(address, nativeHostToken, true)
@@ -254,7 +301,8 @@ describe('process Host reverse native registration', () => {
       expect(use).toHaveBeenCalledTimes(2)
       expect(unUse).not.toHaveBeenCalled()
       independent = reversePeer(address, 'second-reverse-fixture')
-      await expect.poll(() => secondUse.mock.calls.length).toBe(1)
+      await secondInstalling
+      expect(secondUse).toHaveBeenCalledTimes(1)
       const [independentProxy] = await secondUse.mock.results[0]!.value
       const independentFeature = independentProxy.getFeature('f') as Record<
         string,
@@ -275,7 +323,8 @@ describe('process Host reverse native registration', () => {
         })
       )
       await first.close()
-      await expect.poll(() => unUse.mock.calls.length).toBe(1)
+      await firstLost
+      expect(unUse).toHaveBeenCalledTimes(1)
       await unUse.mock.results[0]!.value
       expect(unUse.mock.calls[0]).toEqual(['p', { policy: 'suspend' }])
       expect(await independentFeature.request!(['unaffected'])).toMatchObject({
@@ -285,7 +334,8 @@ describe('process Host reverse native registration', () => {
         expect.objectContaining({ code: 'PLUGIN_SUSPENDED' })
       )
       replacement = reversePeer(address)
-      await expect.poll(() => use.mock.calls.length).toBe(4)
+      await replacementInstalling
+      expect(use).toHaveBeenCalledTimes(4)
       const [newProxy] = await use.mock.results[3]!.value
       expect(await (newProxy.getFeature('f') as typeof feature).request!(['new'])).toMatchObject({
         pid: replacement.child.pid
