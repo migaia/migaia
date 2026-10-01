@@ -224,4 +224,181 @@ describe('process plugin service ingress', () => {
       await host.dispose()
     }
   })
+
+  it('[A6] closes a channel that authenticates after the serve handle starts closing', async () => {
+    const { host, targetHandle } = await targetHost()
+    const accepted = acceptedChannel('late')
+    /** The pending accept controls the precise close/handshake ordering. */
+    let finishAccept!: (value: { channel: IRemoteChannel; principalId: string }) => void
+    const authenticated = new Promise<{ channel: IRemoteChannel; principalId: string }>(
+      (resolve) => {
+        finishAccept = resolve
+      }
+    )
+    /** The listener invokes each pending callback without owning its completion. */
+    let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
+    const endpointFactory = vi.fn()
+    const report = vi.fn()
+    const serving = await createServeProcessPlugin({
+      host,
+      contract,
+      endpointFactory,
+      report,
+      ingress: {
+        kind: 'listener',
+        address: 'fixture',
+        verify: () => 'principal',
+        offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+        createConnectionContext: () => ({
+          peerId: 'late',
+          ipc: { connectionId: 'late', sessionId: 'late', log: () => undefined }
+        }),
+        listen: async ({ onConnection: callback }) => {
+          onConnection = callback
+          return { address: 'fixture', close: async () => undefined }
+        }
+      }
+    })
+    try {
+      const pending: IProcessPendingByteConnection = {
+        accept: () => authenticated,
+        close: vi.fn(async () => undefined)
+      }
+      const accepting = onConnection(pending)
+      const closing = serving.close()
+      finishAccept({ channel: accepted.channel, principalId: 'principal' })
+      await accepting
+      await closing
+      expect(accepted.close).toHaveBeenCalledTimes(1)
+      expect(endpointFactory).not.toHaveBeenCalled()
+      expect(report).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'PROCESS_CHANNEL_CLOSED' })
+      )
+      expect(targetHandle.getFeature('f')).toBeDefined()
+    } finally {
+      await host.dispose()
+    }
+  })
+
+  it('[A6] disposes an endpoint returned after listener close without publishing it', async () => {
+    const { host } = await targetHost()
+    const accepted = acceptedChannel('late-endpoint')
+    /** The endpoint becomes available only after the handle has begun closing. */
+    let finishEndpoint!: (value: { endpoint: IRpcEndpoint }) => void
+    const prepared = new Promise<{ endpoint: IRpcEndpoint }>((resolve) => {
+      finishEndpoint = resolve
+    })
+    const dispose = vi.fn(async () => undefined)
+    let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
+    const endpointFactory = vi.fn(() => prepared)
+    const report = vi.fn()
+    const serving = await createServeProcessPlugin({
+      host,
+      contract,
+      endpointFactory,
+      report,
+      ingress: {
+        kind: 'listener',
+        address: 'fixture',
+        verify: () => 'principal',
+        offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+        createConnectionContext: () => ({
+          peerId: 'late-endpoint',
+          ipc: { connectionId: 'late', sessionId: 'late', log: () => undefined }
+        }),
+        listen: async ({ onConnection: callback }) => {
+          onConnection = callback
+          return { address: 'fixture', close: async () => undefined }
+        }
+      }
+    })
+    try {
+      const accepting = onConnection({
+        accept: async () => ({ channel: accepted.channel, principalId: 'principal' }),
+        close: vi.fn(async () => undefined)
+      })
+      await settle()
+      expect(endpointFactory).toHaveBeenCalledTimes(1)
+      const closing = serving.close()
+      finishEndpoint({ endpoint: { dispose } as unknown as IRpcEndpoint })
+      await accepting
+      await closing
+      expect(dispose).toHaveBeenCalledTimes(1)
+      expect(accepted.close).toHaveBeenCalledTimes(1)
+      expect(report).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'PROCESS_CHANNEL_CLOSED' })
+      )
+    } finally {
+      await host.dispose()
+    }
+  })
+
+  it('[A6] retains listener, endpoint, and channel cleanup failures in order', async () => {
+    const { host } = await targetHost()
+    const listenerError = new Error('listener cleanup failed')
+    const endpointError = new Error('endpoint cleanup failed')
+    const channelError = new Error('channel cleanup failed')
+    const report = vi.fn()
+    const dispose = vi.fn(async () => {
+      throw endpointError
+    })
+    const closeChannel = vi.fn(async () => {
+      throw channelError
+    })
+    let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
+    const serving = await createServeProcessPlugin({
+      host,
+      contract,
+      report,
+      endpointFactory: async () => ({
+        endpoint: { provide: vi.fn(), dispose } as unknown as IRpcEndpoint
+      }),
+      ingress: {
+        kind: 'listener',
+        address: 'fixture',
+        verify: () => 'principal',
+        offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+        createConnectionContext: () => ({
+          peerId: 'cleanup',
+          ipc: { connectionId: 'cleanup', sessionId: 'cleanup', log: () => undefined }
+        }),
+        listen: async ({ onConnection: callback }) => {
+          onConnection = callback
+          return {
+            address: 'fixture',
+            close: async () => {
+              throw listenerError
+            }
+          }
+        }
+      }
+    })
+    try {
+      await onConnection({
+        accept: async () => ({
+          channel: {
+            ...acceptedChannel('cleanup').channel,
+            close: closeChannel
+          },
+          principalId: 'principal'
+        }),
+        close: vi.fn(async () => undefined)
+      })
+      const failure = await serving.close().then(
+        () => undefined,
+        (error: unknown) => error
+      )
+      expect(failure).toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
+      expect(failure).toBeInstanceOf(AggregateError)
+      const outer = failure as AggregateError
+      expect(outer.errors[0]).toBe(listenerError)
+      expect(outer.errors[1]).toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
+      expect((outer.errors[1] as AggregateError).errors).toEqual([endpointError, channelError])
+      expect(dispose).toHaveBeenCalledTimes(1)
+      expect(closeChannel).toHaveBeenCalledTimes(1)
+      expect(report).not.toHaveBeenCalled()
+    } finally {
+      await host.dispose()
+    }
+  })
 })

@@ -1,0 +1,114 @@
+import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { openProcessStdioChannel } from '../../../dist/process/adapters/node-child-process.js'
+import { createProcessTransport } from '../../../dist/process/handshake.js'
+import { createNativeProcessOffer } from '../../../dist/process/offer.js'
+import { createServeProcessPlugin } from '../../../dist/process/plugin/serve.js'
+import { createComposedEndpoint } from '../../../dist/core/composed.js'
+import { createCanonicalChunkFeature } from '../../../dist/core/features/canonical-chunk.js'
+import { createOutboundFeature } from '../../../dist/core/features/outbound.js'
+import { createProviderFeature } from '../../../dist/core/features/provider.js'
+import { createStreamFeature } from '../../../dist/core/features/stream.js'
+import { codec } from '../../../dist/core/middleware/codec.js'
+import { framer } from '../../../dist/core/middleware/framer.js'
+import { abort } from '../../../dist/core/middleware/abort.js'
+import { connect } from '../../../dist/core/middleware/connect.js'
+
+/** The real child serves one installed feature through its process-plugin facade. */
+const contract = {
+  schemaVersion: 1,
+  plugin: 'p',
+  features: {
+    f: {
+      methods: {
+        request: { mode: 'request', idempotent: false },
+        generator: { mode: 'generator', idempotent: false }
+      }
+    }
+  }
+}
+const host = new PluginHost({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+})
+await host.use(
+  definePlugin({
+    name: 'p',
+    features: {
+      f: defineFeature(() => ({
+        request: (value) => `${process.env.RPC_VALUE ?? 'child'}:${value}`,
+        generator: function* (value) {
+          yield `${value}:1`
+          yield `${value}:2`
+        }
+      }))
+    },
+    install: () => ({})
+  })
+)
+
+/** One stream owner composes with the same authenticated channel as requests. */
+function streamRoots() {
+  const chunk = createCanonicalChunkFeature()
+  const outbound = createOutboundFeature(chunk)
+  const provider = createProviderFeature(outbound)
+  return {
+    'first-party-chunk': chunk,
+    'first-party-outbound': outbound,
+    'first-party-provider': provider,
+    'first-party-stream': createStreamFeature(outbound, provider)
+  }
+}
+
+/** Bootstrap bytes stay private and only determine the responder verifier. */
+await createServeProcessPlugin({
+  host,
+  contract,
+  report: (error) => {
+    process.stderr.write(`${String(error)}\n`)
+  },
+  ingress: {
+    kind: 'child',
+    channelKind: 'byte',
+    openRaw: async () => {
+      const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
+      return { raw: opened.channel, bootstrap: opened.bootstrap }
+    },
+    createVerifier: (bootstrap) => {
+      const expected = new TextDecoder().decode(bootstrap)
+      return (actual) => {
+        if (actual !== expected) throw new Error('authentication rejected')
+      }
+    },
+    establish: (raw, options) =>
+      createProcessTransport(raw, {
+        role: options.role,
+        offer: createNativeProcessOffer({ peer: { id: 'child', runtime: 'node' }, stream: true }),
+        auth: { mode: 'required', verify: options.verify },
+        peerId: 'parent',
+        scheduler: options.scheduler,
+        ipc: { ...options.session, log: () => undefined },
+        signal: options.signal,
+        report: () => undefined
+      }),
+    parentLoss: { exit: (code) => process.exit(code) }
+  },
+  endpointFactory: async (channel) => {
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'child',
+        transport: channel.transport,
+        middlewares: [
+          codec(channel.pipeline.codec),
+          framer(channel.pipeline.framer),
+          abort(),
+          connect({ transport: channel.transport })
+        ]
+      },
+      {
+        ...streamRoots(),
+        'channel-ipc-log': channel.features[0],
+        'channel-ipc-gate': channel.features[1]
+      }
+    )
+    return { endpoint, stream: endpoint.stream }
+  }
+})
