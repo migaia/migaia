@@ -21,6 +21,13 @@ const contract = {
 }
 /** Host mode changes only the declared catalog and reserved control operations. */
 const hostMode = process.argv.includes('--host')
+/** Busy-loop acknowledgement is flushed before this real child stops servicing RPC. */
+process.on('SIGUSR2', () =>
+  process.stderr.write('busy-loop-entered', () => {
+    for (;;) {}
+  })
+)
+
 /** Required profile operations are the entire supported surface of this test peer. */
 const methods = ['migaia.hello', 'migaia.describe', 'migaia.invoke', 'migaia.cancel']
 
