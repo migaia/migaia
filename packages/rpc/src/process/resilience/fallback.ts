@@ -18,6 +18,7 @@ export type IProcessFallbackSession = Readonly<{
 /** The fallback owner serializes replacement and blocks candidate publication until ready. */
 export type IProcessInstanceFallback = Readonly<{
   readonly version: number
+  inspect(): Readonly<{ recoverable: boolean; fused: boolean }>
   add(session: IProcessFallbackSession): () => void
   ready(): Promise<void>
   close(): Promise<void>
@@ -57,14 +58,31 @@ export function createProcessInstanceFallback(
   /** All recovery factories receive the same owner cancellation signal. */
   const controller = new AbortController()
   let closed = false
+  /** Shared recovery requires the caller's Host to expose its trusted replacement method. */
+  const recoverable = options.mode === 'per-connection' || canReplace(options.host)
+  /** A failed instance cannot publish new sessions until a trusted replacement succeeds. */
+  let fused = false
+  /** One construction report makes a narrow Host's missing capability observable immediately. */
+  const unavailable = recoverable
+    ? undefined
+    : createProcessError(RpcProcessErrorCode.instanceUnhealthy, undefined, {
+        field: 'host.replace'
+      })
+  if (unavailable) options.report(unavailable)
 
   const recover = async (event: IProcessInstanceFault): Promise<void> => {
     if (closed) return
+    fused = true
     const affected = [...sessions].filter(
       (session) => options.mode === 'shared' || session.connectionId === event.connectionId
     )
     await Promise.all(affected.map((session) => session.close()))
-    if (closed || options.mode === 'per-connection') return
+    if (closed) return
+    if (options.mode === 'per-connection') {
+      fused = false
+      return
+    }
+    if (unavailable) throw unavailable
     if (!canReplace(options.host) || !options.createSharedTarget)
       throw createProcessError(RpcProcessErrorCode.instanceUnhealthy, event.reason)
     const candidate = await options.createSharedTarget({
@@ -75,6 +93,7 @@ export function createProcessInstanceFallback(
     if (!isDefinedPlugin(candidate))
       throw createProcessError(RpcProcessErrorCode.instanceUnhealthy, event.reason)
     await options.host.replace(options.targetName, candidate)
+    fused = false
   }
 
   const unsubscribe =
@@ -82,11 +101,16 @@ export function createProcessInstanceFallback(
       if (closed || event.targetName !== options.targetName) return
       version += 1
       pending = pending.catch(() => undefined).then(() => recover(event))
-      void pending.catch((error: unknown) => options.report(error))
+      void pending.catch((error: unknown) => {
+        if (error !== unavailable) options.report(error)
+      })
     }) ?? (() => undefined)
   return Object.freeze({
     get version() {
       return version
+    },
+    inspect(): Readonly<{ recoverable: boolean; fused: boolean }> {
+      return Object.freeze({ recoverable, fused })
     },
     add(session: IProcessFallbackSession): () => void {
       if (closed) throw createProcessError(RpcProcessErrorCode.channelClosed)

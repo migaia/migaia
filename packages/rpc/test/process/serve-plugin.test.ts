@@ -129,6 +129,7 @@ describe('process plugin service ingress', () => {
       close: async () => undefined
     }
     try {
+      expect(serving.inspectRecovery()).toEqual({ recoverable: true, fused: false })
       await onConnection(firstPending)
       await onConnection(secondPending)
       expect(targetHandle.extensions.version()).toBe(1)
@@ -139,11 +140,63 @@ describe('process plugin service ingress', () => {
       })
       expect(createSharedTarget).toHaveBeenCalledOnce()
       await vi.waitFor(() => expect(targetHandle.extensions.version()).toBe(2))
+      expect(serving.inspectRecovery()).toEqual({ recoverable: true, fused: false })
       expect(report).toHaveBeenCalledTimes(0)
       await onConnection(thirdPending)
       expect(endpointFactory).toHaveBeenCalledTimes(3)
     } finally {
       await serving.close()
+      await host.dispose()
+    }
+  })
+
+  it('[A5] reports a narrow Host before accepting and exposes its unrecoverable fuse', async () => {
+    const { host } = await targetHost()
+    /** This caller implements exactly the formerly documented service Host port. */
+    const narrow = { use: host.use, unUse: host.unUse, plugin: host.plugin }
+    const report = vi.fn()
+    const listen = vi.fn(async () => ({ address: 'fixture', close: async () => undefined }))
+    let unhealthy: (event: { targetName: string; reason: unknown }) => void = () => undefined
+    const createSharedTarget = vi.fn(async () => definePlugin({ name: 'p', install: () => ({}) }))
+    try {
+      const serving = await createServeProcessPlugin({
+        host: narrow,
+        contract,
+        createSharedTarget,
+        onInstanceUnhealthy(listener) {
+          unhealthy = listener
+          return () => undefined
+        },
+        endpointFactory: vi.fn(),
+        report,
+        ingress: {
+          kind: 'listener',
+          address: 'fixture',
+          verify: () => 'principal',
+          offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+          createConnectionContext: () => ({
+            peerId: 'peer',
+            ipc: { connectionId: 'c', sessionId: 's', log: () => undefined }
+          }),
+          listen
+        }
+      })
+      try {
+        expect(report).toHaveBeenCalledTimes(1)
+        expect(report.mock.calls[0]?.[0]).toMatchObject({
+          code: 'PROCESS_INSTANCE_UNHEALTHY',
+          detail: { field: 'host.replace' }
+        })
+        expect(serving.inspectRecovery()).toEqual({ recoverable: false, fused: false })
+        unhealthy({ targetName: 'p', reason: new Error('instance failed') })
+        await vi.waitFor(() => expect(serving.inspectRecovery().fused).toBe(true))
+        expect(serving.inspectRecovery().recoverable).toBe(false)
+        expect(report).toHaveBeenCalledTimes(1)
+        expect(createSharedTarget).not.toHaveBeenCalled()
+      } finally {
+        await serving.close()
+      }
+    } finally {
       await host.dispose()
     }
   })

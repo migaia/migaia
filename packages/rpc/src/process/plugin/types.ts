@@ -1,4 +1,5 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IHostHandle, IPluginConstraint } from '@migaia/plugin-host'
 import type { IProcessHandle, IProcessSupervisorOptions } from '@migaia/supervision/process'
 import type { IProcessSpec } from '@migaia/supervision/process'
 import type { ISupervisorBaseOptions } from '@migaia/supervision'
@@ -152,7 +153,11 @@ export type IProcessServeListenerIngress = Readonly<{
 }>
 
 /** A serve handle owns its sessions while the caller retains the target Host. */
-export type IProcessPluginServeHandle = Readonly<{ close(): Promise<void> }>
+export type IProcessPluginServeHandle = Readonly<{
+  close(): Promise<void>
+  /** Show whether instance recovery is available and whether a failed target is fenced. */
+  inspectRecovery(): Readonly<{ recoverable: boolean; fused: boolean }>
+}>
 
 /** Session configuration is supplied after authentication and before endpoint construction. */
 export type IProcessServeEndpointFactory = (
@@ -167,7 +172,11 @@ export type IProcessServeEndpointFactory = (
 
 /** The service facade delegates method registration to the remote owner. */
 export type IProcessServePluginOptions = Readonly<{
-  host: IRemoteServePluginOptions['host']
+  host: IRemoteServePluginOptions['host'] &
+    Readonly<{
+      /** A real Host can replace a trusted target after an explicit instance fault. */
+      replace?: IHostHandle<object, unknown, readonly IPluginConstraint<any>[]>['replace']
+    }>
   contract: IRemoteContract
   ingress: IProcessServeChildIngress | IProcessServeListenerIngress
   endpointFactory: IProcessServeEndpointFactory

@@ -347,7 +347,7 @@ export async function createServeProcessPlugin(
       }
       throw error
     }
-    return Object.freeze({ close })
+    return Object.freeze({ close, inspectRecovery: () => fallback.inspect() })
   }
 
   const ingress: IProcessServeChildIngress = options.ingress
@@ -471,7 +471,7 @@ export async function createServeProcessPlugin(
     closeSessionHost = undefined
     closeAdmission = undefined
     removeParentClose = raw.onClose((reason) => guard.trigger(reason))
-    return Object.freeze({ close })
+    return Object.freeze({ close, inspectRecovery: () => fallback.inspect() })
   } catch (error) {
     closeAdmission?.()
     lease?.release()
