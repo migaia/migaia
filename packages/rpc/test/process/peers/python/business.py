@@ -326,8 +326,9 @@ def run_business(args: Any) -> int:
         print(f"READY pid={os.getpid()}", file=sys.stderr, flush=True)
         while True:
             conn, _ = listener.accept()
-            with conn, conn.makefile("rb") as reader, conn.makefile("wb") as writer:
-                try:
+            try:
+                with conn, conn.makefile("rb") as reader, conn.makefile("wb") as writer:
                     serve(reader, writer, args.host, token, args.jsonrpc, args.bare_jsonrpc)
-                except (peer.PeerFailure, BrokenPipeError, ConnectionResetError):
-                    print("PEER_FAIL BUSINESS_SESSION", file=sys.stderr, flush=True)
+            except (peer.PeerFailure, BrokenPipeError, ConnectionResetError):
+                # Buffered writer close may flush after a lost borrower; the listener survives it.
+                print("PEER_FAIL BUSINESS_SESSION", file=sys.stderr, flush=True)
