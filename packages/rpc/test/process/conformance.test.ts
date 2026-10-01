@@ -242,6 +242,9 @@ describe('[A1] independent native business peers through public process facades'
         expect(frames.slice(closeAt + 1).filter((frame) => frame.kind === 'request')).toHaveLength(
           0
         )
+        expect(wireFrames(active.stdout).filter((frame) => frame.kind === 'request')).toHaveLength(
+          0
+        )
         expect(active.reports).toMatchObject([
           {
             source: '@migaia/supervision',
@@ -338,6 +341,14 @@ describe('[A1] independent native business peers through public process facades'
                 Buffer.concat(active.stdout)
               )
             }
+            expect(
+              wireFrames(active.sent).filter(
+                (frame) => frame.kind === 'variation' && frame.data.route.variation === 'close'
+              )
+            ).toHaveLength(1)
+            expect(
+              wireFrames(active.stdout).filter((frame) => frame.kind === 'request')
+            ).toHaveLength(0)
             expect(active.reports).toEqual([])
             expect(child.exitCode).toBeNull()
           }
