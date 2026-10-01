@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { PluginHostErrorCode } from '../src/typing'
 import { PluginHostError, createPluginHostTypeError } from '../src/error-text'
+import ERROR_TEXT from '../src/error-text.js'
 
 /** A12 links PLUGIN_SUSPENDED and every public error code to maintained documentation. */
 describe('PluginHost public error-code documentation', () => {
@@ -51,5 +52,22 @@ describe('PluginHost public error-code documentation', () => {
     expect(error.source).toBe('@migaia/plugin-host')
     expect(error.code).toBe(PluginHostErrorCode.invalidOption)
     expect(error.stack).toBeTruthy()
+  })
+})
+
+describe('A8 release hook error contract', () => {
+  it('keeps the release phase and invalid hook messages in the canonical text owner', () => {
+    expect(ERROR_TEXT.PLUGIN_BEFORE_RELEASE_FUNCTION).toContain('beforeRelease')
+    expect(ERROR_TEXT.BEFORE_RELEASE_PHASE).toContain('beforeRelease')
+  })
+
+  it('documents the hook at each reused error code declaration', async () => {
+    /** Reads tracked package source; workspace-local docs cannot affect this oracle. */
+    const codeSource = await readFile(new URL('../src/error-code.ts', import.meta.url), 'utf8')
+    for (const declaration of ['pluginDisposeFailed', 'lifecycleMutation', 'disposeStepTimeout']) {
+      const beforeDeclaration = codeSource.slice(0, codeSource.indexOf(`${declaration}:`))
+      const jsdoc = beforeDeclaration.slice(beforeDeclaration.lastIndexOf('/**'))
+      expect(jsdoc).toContain('beforeRelease')
+    }
   })
 })

@@ -113,7 +113,7 @@ export const PluginHostErrorCode = {
   setupRequiresAsyncInstall: 'SETUP_REQUIRES_ASYNC_INSTALL',
 
   /**
-   * 单个插件的 `unUse()` 过程中有 disposer 失败。
+   * 单个插件的 `unUse()` 或 `beforeRelease()` 过程中有清理步骤失败。
    *
    * 失败被聚合后抛出，但卸载流程仍会走完 —— 一个 disposer 失败不阻断其余资源释放。调用方应把它当作资源泄漏告警而非状态回滚信号。
    */
@@ -160,8 +160,8 @@ export const PluginHostErrorCode = {
   resourceOutsideInstall: 'RESOURCE_OUTSIDE_INSTALL',
 
   /**
-   * 在插件生命周期回调（setup / install / dispose / update）内部反过来调用 Host 的 mutation API， 或 setup 进行中由外部调用
-   * `config.update()`。
+   * 在插件生命周期回调（setup / install / dispose / update / beforeRelease）内部反过来调用 Host 的 mutation API， 或
+   * setup / beforeRelease 进行中由外部调用 `config.update()`。
    *
    * 重入会让安装事务的回滚边界无法确定。调用方应把后续 mutation 移到生命周期回调之外。
    */
@@ -240,7 +240,8 @@ export const PluginHostErrorCode = {
   mutationQueueTimeout: 'MUTATION_QUEUE_TIMEOUT',
 
   /**
-   * 单个 disposer（pipeline disposer / 插件 dispose 钩子 / resource disposer）等待超过阈值仍未 settle。
+   * 单个 disposer（pipeline disposer / 插件 dispose 或 beforeRelease 钩子 / resource disposer）等待超过阈值仍未
+   * settle。
    *
    * 覆盖 disposer 反过来 `await` 触发它的那次 `host.dispose()` 这种循环等待 —— 那种等待永远无法自行完成。
    *

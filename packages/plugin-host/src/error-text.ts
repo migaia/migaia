@@ -143,6 +143,14 @@ const ERROR_TEXT = {
   get INVALID_OPTION() {
     return localize('plugin-host 选项读取失败', 'plugin-host option read failed')
   },
+  /** Rejects an invalid release hook during definition or admission, before Host mutation. */
+  get PLUGIN_BEFORE_RELEASE_FUNCTION() {
+    return localize('plugin beforeRelease 必须是函数', 'plugin beforeRelease must be a function')
+  },
+  /** Names the bounded pre-release cleanup step in errors and diagnostics. */
+  get BEFORE_RELEASE_PHASE() {
+    return localize('plugin beforeRelease 钩子', 'plugin beforeRelease hook')
+  },
   /** Stable config-domain failure text; config.ts appends the rejected path and grammar reason. */
   INVALID_CONFIG_VALUE(path: string, reason: string) {
     return localize(
