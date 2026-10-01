@@ -1,4 +1,5 @@
 import type { IAbortSignal, IQuiescenceTracker } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -6,7 +7,7 @@ import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import { markRegistrationRevoked } from './composition.js'
-import type { IPluginDisposalContext } from './typing.js'
+import type { IPluginBeforeReleaseContext, IPluginDisposalContext } from './typing.js'
 
 type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
@@ -18,9 +19,14 @@ type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly host: object
   readonly executionSignal: IAbortSignal
   readonly cleanupRuntime: PluginHostCleanupRuntime
+  readonly scheduler: IScheduler
+  readonly disposeStepTimeoutMs: number | false
   readonly setHookRegistration: (
     registration: IRegistration<TDomainCore, TValue> | undefined
   ) => void
+  readonly clearHookRegistrationIfOwner: (registration: IRegistration<TDomainCore, TValue>) => void
+  readonly setReleasePending: (registration: IRegistration<TDomainCore, TValue>) => void
+  readonly clearReleasePendingIfOwner: (registration: IRegistration<TDomainCore, TValue>) => void
 }>
 
 /** Owns logical revocation and ordered physical cleanup for plugin registrations. */
@@ -30,6 +36,36 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
 
   constructor(port: IPluginHostRemovalRuntimePort<TDomainCore, TValue>) {
     this.#port = port
+  }
+
+  /** Runs one installed registration's captured hook before any lease or publication is retired. */
+  async runBeforeRelease(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]> {
+    const hook = registration.plugin.beforeRelease
+    if (!registration.installed || !hook || registration.beforeReleaseRan) return []
+    registration.beforeReleaseRan = true
+    /** Absolute boundary in the same clock that drives the bounded disposal step. */
+    const deadlineAt =
+      this.#port.disposeStepTimeoutMs === false
+        ? undefined
+        : this.#port.scheduler.now() + this.#port.disposeStepTimeoutMs
+    const context: IPluginBeforeReleaseContext = Object.freeze({
+      signal: registration.lifecycleController?.signal ?? this.#port.executionSignal,
+      deadlineAt,
+      remainingMs: () =>
+        deadlineAt === undefined ? undefined : Math.max(0, deadlineAt - this.#port.scheduler.now())
+    })
+    this.#port.setHookRegistration(registration)
+    this.#port.setReleasePending(registration)
+    try {
+      return await this.#port.cleanupRuntime.disposeGroup(
+        [() => invokeCaptured(hook, registration.plugin.owner, [context])],
+        ERROR_TEXT.BEFORE_RELEASE_PHASE
+      )
+    } finally {
+      // The bounded group returns on timeout even when its hook Promise never settles.
+      this.#port.clearHookRegistrationIfOwner(registration)
+      this.#port.clearReleasePendingIfOwner(registration)
+    }
   }
 
   /** Removes a registration from every committed registry without invoking user code. */

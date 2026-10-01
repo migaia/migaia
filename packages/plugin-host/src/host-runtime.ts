@@ -199,6 +199,8 @@ export class PluginHost<
   #hookRegistration: IRegistration<TDomainCore, TValue> | undefined
   /** Registration currently awaiting setup; blocks synchronous config mutation admission. */
   #setupPending: IRegistration<TDomainCore, TValue> | undefined
+  /** Exact registration inside a bounded pre-release hook; config updates reject before enqueue. */
+  #releasePending: IRegistration<TDomainCore, TValue> | undefined
   #pipelineMode: IMiddlewarePipelineMode
   /** Canonical stateless runner that owns mode dispatch, lifting, and violation semantics. */
   #pipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
@@ -329,10 +331,12 @@ export class PluginHost<
       isHostOpen: () => this.#terminal.lifecycle === 'open',
       diagnostic: this.#diagnostic
     })
+    /** One admitted cleanup budget shared by the hook context and the bounded disposer. */
+    const disposeStepTimeoutMs = options.disposeStepTimeoutMs ?? DEFAULT_DISPOSE_STEP_TIMEOUT_MS
     this.#cleanupRuntime = new PluginHostCleanupRuntime({
       scheduler: this.#scheduler,
       pending: this.#pending,
-      disposeStepTimeoutMs: options.disposeStepTimeoutMs ?? DEFAULT_DISPOSE_STEP_TIMEOUT_MS,
+      disposeStepTimeoutMs,
       markAbandoned: () => {
         this.#cleanupAbandoned = true
       },
@@ -388,8 +392,19 @@ export class PluginHost<
       host: this,
       executionSignal: this.#executionController.signal,
       cleanupRuntime: this.#cleanupRuntime,
+      scheduler: this.#scheduler,
+      disposeStepTimeoutMs,
       setHookRegistration: (registration) => {
         this.#hookRegistration = registration
+      },
+      clearHookRegistrationIfOwner: (registration) => {
+        if (this.#hookRegistration === registration) this.#hookRegistration = undefined
+      },
+      setReleasePending: (registration) => {
+        this.#releasePending = registration
+      },
+      clearReleasePendingIfOwner: (registration) => {
+        if (this.#releasePending === registration) this.#releasePending = undefined
       }
     })
     this.#replaceRuntime = new PluginHostReplaceRuntime({
@@ -446,6 +461,7 @@ export class PluginHost<
       registrations: this.#state.registrations,
       assertActive: () => this.#assertActive(),
       isSetupPending: () => this.#setupPending !== undefined,
+      isReleasePending: () => this.#releasePending !== undefined,
       decorateError: (error) => attachPluginHostIdentity(error, this),
       enqueue: (task) => this.#enqueue(task),
       beginOperation: (registration) => {
@@ -1044,21 +1060,31 @@ export class PluginHost<
       const cleanupErrors: unknown[] = []
       /** Names whose planned removal or suspension actually changed this Host. */
       const applied: string[] = []
-      for (const step of plan.steps) {
-        const registration = this.#state.registrations.get(step.id)
-        if (!registration) continue
-        if (step.action === DependencyAction.suspend) {
-          if (this.#enablementRuntime.suspend(registration)) applied.push(step.id)
-          continue
+      try {
+        for (const step of plan.steps) {
+          const registration = this.#state.registrations.get(step.id)
+          if (!registration) continue
+          try {
+            if (step.action === DependencyAction.suspend) {
+              if (this.#enablementRuntime.suspend(registration)) applied.push(step.id)
+              continue
+            }
+            if (step.action !== DependencyAction.release) continue
+            cleanupErrors.push(...(await this.#removalRuntime.runBeforeRelease(registration)))
+            await this.#drainRegistrationLeases(registration)
+            cleanupErrors.push(...(await this.#removalRuntime.disposeRegistration(registration)))
+            this.#enablementRuntime.forget(step.id)
+            this.#state.removedNames.add(step.id)
+            applied.push(step.id)
+          } catch (error) {
+            cleanupErrors.push(error)
+            if (step.action === DependencyAction.release && !this.#state.registrations.has(step.id))
+              applied.push(step.id)
+          }
         }
-        if (step.action !== DependencyAction.release) continue
-        await this.#drainRegistrationLeases(registration)
-        cleanupErrors.push(...(await this.#removalRuntime.disposeRegistration(registration)))
-        this.#enablementRuntime.forget(step.id)
-        this.#state.removedNames.add(step.id)
-        applied.push(step.id)
+      } finally {
+        this.#state.commit()
       }
-      this.#state.commit()
       const affected = projectAffected(plan, applied, admitted.policy)
       return cleanupErrors.length === 0
         ? Object.freeze({ ok: true as const, affected })
