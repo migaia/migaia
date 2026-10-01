@@ -610,6 +610,7 @@ func serveUnix(path, role string) error {
 // main selects a selftest, stdio session, or a single Unix socket session.
 func main() {
 	business := flag.Bool("business", false, "serve published business profile")
+	descendant := flag.Bool("descendant", false, "own a real child until stdin EOF")
 	bridge := flag.Bool("jsonrpc", false, "serve Content-Length bridge profile")
 	bare := flag.Bool("bare-jsonrpc", false, "echo physical Content-Length frames")
 	host := flag.Bool("host", false, "serve portable Host controls")
@@ -636,7 +637,7 @@ func main() {
 	}
 	var err error
 	if *business {
-		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *contractPath, *bridge, *bare)
+		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *contractPath, *bridge, *bare, *descendant)
 	} else if *listenUnix != "" {
 		err = serveUnix(*listenUnix, *role)
 	} else if *connectUnix != "" {

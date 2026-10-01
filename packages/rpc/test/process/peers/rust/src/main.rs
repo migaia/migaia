@@ -3,7 +3,7 @@ mod business;
 mod json;
 mod selftest;
 
-use json::{number, object, string, Value};
+use json::{Value, number, object, string};
 use std::env;
 use std::io::{self, Read, Write};
 use std::os::fd::FromRawFd;
@@ -601,6 +601,7 @@ fn run() -> io::Result<()> {
     let mut auth_fd: Option<i32> = None;
     let mut selftest = false;
     let mut business_profile = false;
+    let mut descendant = false;
     let mut bridge_profile = false;
     let mut bare_profile = false;
     let mut host_profile = false;
@@ -623,6 +624,7 @@ fn run() -> io::Result<()> {
                 };
             }
             "--business" => business_profile = true,
+            "--descendant" => descendant = true,
             "--jsonrpc" => bridge_profile = true,
             "--bare-jsonrpc" => bare_profile = true,
             "--host" => host_profile = true,
@@ -650,7 +652,7 @@ fn run() -> io::Result<()> {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "unknown argument",
-                ))
+                ));
             }
         }
     }
@@ -745,7 +747,17 @@ fn run() -> io::Result<()> {
         auth = Some(business::bootstrap(&mut input)?);
     }
     if let Some(contract) = &business_contract {
-        business::serve(
+        // This real child is owned through EOF and reaped before the peer returns.
+        let mut child = if descendant {
+            Some(
+                std::process::Command::new("/bin/sleep")
+                    .arg("600")
+                    .spawn()?,
+            )
+        } else {
+            None
+        };
+        let result = business::serve(
             &mut input,
             &mut output,
             host_profile,
@@ -753,7 +765,12 @@ fn run() -> io::Result<()> {
             contract,
             bridge_profile,
             bare_profile,
-        )
+        );
+        if let Some(child) = &mut child {
+            let _ = child.kill();
+            child.wait()?;
+        }
+        result
     } else if role == "initiator" {
         initiate(&mut input, &mut output, auth.as_deref())
     } else {

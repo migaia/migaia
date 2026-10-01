@@ -1,6 +1,6 @@
 //! Independent native business; framing/hello/JSON remain owned by the existing peer.
 use crate::{json, negotiate, read_frame, read_json, required_str, wire_error, write_frame};
-use json::{number, object, string, Value};
+use json::{Value, number, object, string};
 use std::{
     collections::HashMap,
     io::{self, Read, Write},
@@ -118,7 +118,7 @@ impl Business {
                         self.contract.clone()
                     },
                     None,
-                )
+                );
             }
             "migaia.remote.host.use" | "migaia.remote.host.unUse" => {
                 if !self.host || args.is_empty() || args.len() > 2 || args[0].as_str() != Some("p")
@@ -157,7 +157,7 @@ impl Business {
                         ),
                     ]),
                     None,
-                )
+                );
             }
             "echo" | "peer.echo" => return (payload.clone(), None),
             "peer.received" => {
@@ -167,7 +167,7 @@ impl Business {
                         ("values", Value::Array(self.received.clone())),
                     ]),
                     None,
-                )
+                );
             }
             "peer.aborts" => return (Value::Array(self.aborts.clone()), None),
             "peer.stats" => {
@@ -178,7 +178,7 @@ impl Business {
                         ("pid", number(std::process::id() as u64)),
                     ]),
                     None,
-                )
+                );
             }
             "peer.trace" => return (trace.clone(), None),
             "peer.error" => {
@@ -395,6 +395,24 @@ pub fn serve(
         contract: contract.clone(),
     };
     while let Some(message) = read_json(input)? {
+        let method = value(&message, "method").as_str().unwrap_or("");
+        if matches!(method, "peer.busy" | "peer.pause" | "peer.crash") {
+            write_frame(output, &response(&message, string("ACK"), None))?;
+            if method == "peer.crash" {
+                std::process::exit(17);
+            }
+            if method == "peer.pause" {
+                // The platform signal stops the actual reader; SIGCONT resumes the same PID.
+                std::process::Command::new("/bin/kill")
+                    .args(["-STOP", &std::process::id().to_string()])
+                    .status()?;
+            } else {
+                loop {
+                    std::hint::spin_loop();
+                }
+            }
+            continue;
+        }
         for reply in business.native(message)? {
             write_frame(output, &reply)?;
         }
@@ -600,7 +618,7 @@ fn serve_bridge(
                 return Err(io::Error::new(
                     io::ErrorKind::PermissionDenied,
                     "AUTH_REQUIRED",
-                ))
+                ));
             }
             Some("migaia.describe") => business.invoke(
                 "migaia.remote.describe",
