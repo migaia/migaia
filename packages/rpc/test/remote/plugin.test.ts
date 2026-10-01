@@ -1,4 +1,4 @@
-import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '@migaia/plugin-host'
 import { describe, expect, it } from 'vitest'
 import { createRemotePlugin } from '../../src/remote/plugin.js'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
@@ -212,6 +212,9 @@ describe('remote PluginHost assembly', () => {
     })
     const report = vi.fn()
     let disables = 0
+    const mutationError = Object.assign(new Error('temporary mutation rejection'), {
+      code: PluginHostErrorCode.lifecycleMutation
+    })
     const remote = createRemotePlugin({
       name: 'p',
       contract: REMOTE_FIXTURE_CONTRACT,
@@ -220,7 +223,7 @@ describe('remote PluginHost assembly', () => {
       host: {
         disable: async (name, options) => {
           disables += 1
-          if (disables === 1) throw new Error('temporary mutation rejection')
+          if (disables === 1) throw mutationError
           await host.plugin.disable(name, options)
         },
         enable: (name) => host.plugin.enable(name)
@@ -234,7 +237,7 @@ describe('remote PluginHost assembly', () => {
       fixture.emit({ type: 'exit', generation: 1, reason: 'crashed' })
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
       expect(disables).toBe(1)
-      expect(report).toHaveBeenCalledTimes(1)
+      expect(report).toHaveBeenCalledExactlyOnceWith(mutationError)
       fixture.nextGeneration()
       fixture.emit({ type: 'state', from: 'backoff', to: 'ready', generation: 2 })
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
