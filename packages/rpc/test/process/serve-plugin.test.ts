@@ -29,7 +29,7 @@ async function targetHost() {
   const target = definePlugin({
     name: 'p',
     features: { f: defineFeature(() => ({ request: () => 'live' })) },
-    install: () => ({})
+    install: () => ({ version: () => 1 })
   })
   const [targetHandle] = await host.use(target)
   return { host, targetHandle }
@@ -64,6 +64,90 @@ async function settle(): Promise<void> {
 }
 
 describe('process plugin service ingress', () => {
+  it('[A5] closes the unhealthy shared session and replaces its real Host target', async () => {
+    const { host, targetHandle } = await targetHost()
+    const physical = acceptedChannel('first')
+    const second = acceptedChannel('second')
+    const third = acceptedChannel('third')
+    let onConnection: (pending: IProcessPendingByteConnection) => void | Promise<void> = () =>
+      undefined
+    let unhealthy: (event: { targetName: string; reason: unknown }) => void = () => undefined
+    const createSharedTarget = vi.fn(() =>
+      definePlugin({
+        name: 'p',
+        features: { f: defineFeature(() => ({ request: () => 'new' })) },
+        install: () => ({ version: () => 2 })
+      })
+    )
+    const report = vi.fn()
+    const endpointFactory = vi.fn(async () => ({
+      endpoint: {
+        provide: vi.fn(),
+        dispose: vi.fn(async () => undefined)
+      } as unknown as IRpcEndpoint
+    }))
+    const serving = await createServeProcessPlugin({
+      host,
+      contract,
+      createSharedTarget,
+      onInstanceUnhealthy(listener) {
+        unhealthy = listener
+        return () => undefined
+      },
+      endpointFactory,
+      report,
+      ingress: {
+        kind: 'listener',
+        address: 'fixture',
+        verify: () => 'principal',
+        offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+        createConnectionContext: (pending) => ({
+          peerId:
+            pending === firstPending ? 'first' : pending === secondPending ? 'second' : 'third',
+          ipc: {
+            connectionId: pending === firstPending ? 'c1' : pending === secondPending ? 'c2' : 'c3',
+            sessionId: pending === firstPending ? 's1' : pending === secondPending ? 's2' : 's3',
+            log: () => undefined
+          }
+        }),
+        listen: async ({ onConnection: callback }) => {
+          onConnection = callback
+          return { address: 'fixture', close: async () => undefined }
+        }
+      }
+    })
+    const firstPending: IProcessPendingByteConnection = {
+      accept: async () => ({ channel: physical.channel, principalId: 'alice' }),
+      close: async () => undefined
+    }
+    const secondPending: IProcessPendingByteConnection = {
+      accept: async () => ({ channel: second.channel, principalId: 'bob' }),
+      close: async () => undefined
+    }
+    const thirdPending: IProcessPendingByteConnection = {
+      accept: async () => ({ channel: third.channel, principalId: 'carol' }),
+      close: async () => undefined
+    }
+    try {
+      await onConnection(firstPending)
+      await onConnection(secondPending)
+      expect(targetHandle.extensions.version()).toBe(1)
+      unhealthy({ targetName: 'p', reason: new Error('target failed') })
+      await vi.waitFor(() => {
+        expect(physical.close).toHaveBeenCalledOnce()
+        expect(second.close).toHaveBeenCalledOnce()
+      })
+      expect(createSharedTarget).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(targetHandle.extensions.version()).toBe(2))
+      expect(report).toHaveBeenCalledTimes(0)
+      await onConnection(thirdPending)
+      expect(endpointFactory).toHaveBeenCalledTimes(3)
+    } finally {
+      await serving.close()
+      await host.dispose()
+    }
+  })
+
   it('[A2] rejects missing recovery factories before listener binding', async () => {
     const { host } = await targetHost()
     const listen = vi.fn()
