@@ -89,15 +89,7 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
       {
         ownership: options.deployment.kind === 'spawn' ? 'spawn-owned' : 'connection-borrowed',
         health: binding.health,
-        supervisor: {
-          restart: () => binding.supervisor.restart(),
-          inspect: () => binding.supervisor.inspect(),
-          dispose: () => binding.supervisor.dispose(),
-          onTerminal: (listener) =>
-            binding.supervisor.subscribe((event) => {
-              if (event.type === 'terminal') listener(event)
-            })
-        }
+        supervisor: binding.registrationSupervisor
       },
       {
         kind: 'proxy-plugin',

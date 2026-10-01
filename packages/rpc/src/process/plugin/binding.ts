@@ -6,6 +6,7 @@ import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import {
   createSupervisor,
   createUnitBudget,
+  TerminationMode,
   type ISupervisor,
   type IUnitProfile
 } from '@migaia/supervision'
@@ -29,6 +30,7 @@ import {
   DEFAULT_HEALTH_TIMEOUT_MS
 } from '../resilience/constants.js'
 import { createProcessBindingDrain } from '../resilience/drain.js'
+import type { IProcessRegistrationSupervisorPort } from '../resilience/types.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import {
   ProcessConnectionProfile,
@@ -51,9 +53,27 @@ export type IProcessPluginBinding<TUnit extends object, TSpec> = IRemoteBinding<
   Readonly<{
     supervisor: ISupervisor<TUnit, TSpec>
     health: 'ping' | 'custom' | 'none'
+    registrationSupervisor: IProcessRegistrationSupervisorPort
+    /** Owned bindings alone can escalate a live handle during shutdown. */
+    forceCurrent?(): void
     bindEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
     drainCurrent(options?: Readonly<{ hostRemainingMs?: number }>): Promise<void>
   }>
+
+/** Project the canonical supervisor without storing another lifecycle or restart policy. */
+function registrationSupervisor<TUnit, TSpec>(
+  supervisor: ISupervisor<TUnit, TSpec>
+): IProcessRegistrationSupervisorPort {
+  return {
+    restart: () => supervisor.restart(),
+    inspect: () => supervisor.inspect(),
+    dispose: () => supervisor.dispose(),
+    onTerminal: (listener) =>
+      supervisor.subscribe((event) => {
+        if (event.type === 'terminal') listener(event)
+      })
+  }
+}
 
 /** Reports secondary diagnostics without replacing the error that triggered cleanup. */
 export function reportSafely(report: (error: unknown) => void, error: unknown): void {
@@ -228,7 +248,8 @@ async function establishGeneration(
 /** Maps an owned process supervisor into the one remote binding contract. */
 export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   deployment: ISpawnProcessPluginDeployment<THandle>,
-  report: (error: unknown) => void
+  report: (error: unknown) => void,
+  trackOwned = false
 ): IProcessPluginBinding<THandle, IProcessSpec> {
   validateSpawnProcessPluginDeployment(deployment)
   /** Every generation receives the same caller proposal or one binding-owned default. */
@@ -250,9 +271,27 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   const drain = createProcessBindingDrain(scheduler, (error) => reportSafely(report, error))
   const stderr = createStderrSource(report)
   const callerOutput = deployment.supervision.output?.onChunk
+  /** Retain only a live owned unit; a borrowed binding has no corresponding termination port. */
+  let currentHandle: THandle | undefined
+  /** Escalation is idempotent per actual handle, including repeated shutdown signals. */
+  const forced = new WeakSet<THandle>()
   const supervisor = createProcessSupervisor({
     ...deployment.supervision,
     scheduler,
+    ...(trackOwned
+      ? {
+          async ready(unit: THandle, signal: IAbortSignal) {
+            currentHandle = unit
+            void unit.exited.then(
+              () => {
+                if (currentHandle === unit) currentHandle = undefined
+              },
+              (error) => reportSafely(report, error)
+            )
+            await deployment.supervision.ready?.(unit, signal)
+          }
+        }
+      : {}),
     ...(health === 'ping'
       ? {
           health: {
@@ -281,6 +320,16 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
     supervisor,
     scheduler,
     health,
+    registrationSupervisor: registrationSupervisor(supervisor),
+    forceCurrent() {
+      if (!currentHandle || forced.has(currentHandle)) return
+      const unit = currentHandle
+      forced.add(unit)
+      // Retire through the existing stop command before exit, so it is not classified as a new
+      // unexpected departure with another force teardown. The command still awaits real exited.
+      void supervisor.stop().catch((error) => reportSafely(report, error))
+      unit.terminate(TerminationMode.force)
+    },
     drainCurrent: (options) =>
       supervisor.state === 'ready' ? drain.drainCurrent(options) : Promise.resolve(),
     bindEndpoint(channel, endpoint) {
@@ -426,6 +475,7 @@ export function createConnectProcessBinding(
     supervisor,
     scheduler,
     health,
+    registrationSupervisor: registrationSupervisor(supervisor),
     drainCurrent: (options) =>
       supervisor.state === 'ready' ? drain.drainCurrent(options) : Promise.resolve(),
     bindEndpoint(channel, endpoint) {
