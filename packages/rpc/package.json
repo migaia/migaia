@@ -187,15 +187,16 @@
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "fmt": "oxfmt src test e2e",
+    "fmt": "oxfmt src test e2e vitest.config.ts vitest.conformance.config.ts",
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:contract": "tsc --noEmit -p tsconfig.contract.json",
     "typecheck:core": "tsc --noEmit -p tsconfig.core.json",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
-    "lint": "oxlint src test e2e",
+    "lint": "oxlint src test e2e vitest.config.ts vitest.conformance.config.ts",
     "test": "vitest run --coverage",
+    "test:conformance": "vitest run --config vitest.conformance.config.ts --coverage.enabled=false",
     "test:tree-shaking-baseline": "node test/core/tree-shaking-baseline.mjs",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "test:packed": "pnpm build && node test/core/packed-export-smoke.mjs",
