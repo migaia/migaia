@@ -152,8 +152,12 @@ describe('I15 real process acceptance matrix', () => {
           })
           expect(await proxy.request(['old'])).toBe('child:old')
           expect(exited).toBe(false)
+          expect(test.terminations).toHaveLength(0)
           await test.gate('candidate')
-          expect(await replacement).toMatchObject({ strategy: 'start-then-switch' })
+          const result = await replacement
+          expect(result).toMatchObject({ strategy: 'start-then-switch' })
+          if (result.strategy === 'start-then-switch')
+            expect(result.plugin).toBe(test.hostReplace.mock.calls[0]![1])
           await test.handles[0]!.exited
           expect(() => test.plugin.replace()).toThrowError(
             expect.objectContaining({ code: 'SCOPE_TERMINAL' })

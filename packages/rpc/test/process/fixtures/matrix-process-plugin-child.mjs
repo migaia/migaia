@@ -272,14 +272,23 @@ if (scheduler) {
   serving = await serveProcessSessions(
     ingress,
     endpointFactory,
-    ({ endpoint }) =>
-      serveRemotePlugin({
+    async ({ endpoint }) => {
+      /** Observe the canonical service close port separately from endpoint disposal. */
+      const service = await serveRemotePlugin({
         host,
         contract,
         endpoint,
         report: (error) => mark(`report:${error.code}`),
         invocationContext: (context) => ({ signal: context.signal })
-      }),
+      })
+      return {
+        ...service,
+        close: () => {
+          mark('service-close')
+          return service.close()
+        }
+      }
+    },
     resilience,
     (error) => mark(`report:${error.code}`),
     undefined,
