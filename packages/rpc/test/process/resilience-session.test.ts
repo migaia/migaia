@@ -157,6 +157,9 @@ describe('process resilience session ownership', () => {
     lease.release()
     lease.release()
     const replacement = manager.claimConnection()
+    expect(() => manager.claimConnection()).toThrowError(
+      expect.objectContaining({ code: 'PROCESS_CONNECTION_LIMIT' })
+    )
     replacement.release()
     manager.close()
     expect(() => manager.claimConnection()).toThrowError(
