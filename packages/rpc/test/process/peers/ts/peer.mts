@@ -32,6 +32,7 @@ const { values } = parseArgs({
     'listen-unix': { type: 'string' },
     'connect-unix': { type: 'string' },
     host: { type: 'boolean' },
+    contract: { type: 'string' },
     bootstrap: { type: 'string', default: 'none' },
     'auth-fd': { type: 'string' },
     wire: { type: 'string', default: 'native' }
@@ -46,9 +47,10 @@ const report = (error: unknown): void => {
 /** The vector owns the portable service description, shared with non-JS oracle cases. */
 const contract = JSON.parse(
   readFileSync(
-    process.env.RPC_PEERS_VECTOR_ROOT
-      ? join(process.env.RPC_PEERS_VECTOR_ROOT, 'remote-contract.json')
-      : new URL('../../../../schema/vectors/remote-contract.json', import.meta.url),
+    values.contract ??
+      (process.env.RPC_PEERS_VECTOR_ROOT
+        ? join(process.env.RPC_PEERS_VECTOR_ROOT, 'remote-contract.json')
+        : new URL('../../../../schema/vectors/remote-contract.json', import.meta.url)),
     'utf8'
   )
 ).contracts[0].value as IRemoteContract
