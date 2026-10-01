@@ -217,8 +217,8 @@
         "defineHost",
         "definePlugin",
         "disposeKey",
-        "isDefinedPlugin",
         "invokeCaptured",
+        "isDefinedPlugin",
         "readPluginHostDisposalProvenance"
       ],
       "./composition": [
@@ -307,6 +307,26 @@
       ]
     },
     "@migaia/rpc": {
+      "./remote": [
+        "REMOTE_METHOD_MAX_LENGTH",
+        "REMOTE_METHOD_MODES",
+        "REMOTE_NAME_PATTERN",
+        "REMOTE_SCHEMA_VERSION",
+        "RemoteMethodMode",
+        "RemoteMethodName",
+        "RpcRemoteLayerErrorCode",
+        "RpcRemoteLayerErrorText",
+        "createCoroutineHost",
+        "createCoroutinePlugin",
+        "createRemoteHost",
+        "createRemotePlugin",
+        "normalizeRemoteContract",
+        "normalizeRemoteControlShape",
+        "normalizeRemoteHostCatalog",
+        "sameRemoteContract",
+        "serveRemoteHost",
+        "serveRemotePlugin"
+      ],
       "./contract": [
         "RpcCapability",
         "RpcCodecId",
@@ -326,6 +346,9 @@
         "RpcRouteKey",
         "RpcRouteProfile",
         "RpcRouteType",
+        "RpcStreamEvent",
+        "RpcStreamLimit",
+        "RpcStreamViolation",
         "RpcWireErrorFallback",
         "RpcWireErrorField",
         "RpcWireErrorLimit",
@@ -339,10 +362,13 @@
         "createRpcUnknownFieldWarner",
         "deserializeRpcError",
         "fromJsonRpcError",
+        "invalidRpcStream",
+        "measurePortableStreamValue",
         "normalizePortable",
         "normalizeRpcEnvelope",
         "normalizeRpcHandshake",
         "normalizeRpcSerializedError",
+        "normalizeStreamPayload",
         "reachRpcError",
         "rpcProtocolV1",
         "serializeRpcError",
@@ -350,7 +376,9 @@
       ],
       "./contract/v1": [
         "default",
+        "invalidRpcStream",
         "normalizeRpcEnvelope",
+        "normalizeStreamPayload",
         "rpcProtocol"
       ],
       "./contract/framing": [
@@ -460,6 +488,21 @@
       ],
       "./core/features/control": [
         "createControlFeature"
+      ],
+      "./core/stream": [
+        "createCanonicalChunkFeature",
+        "createStreamFeature"
+      ],
+      "./core/plugins/flow-control": [
+        "IpcLogEventName",
+        "IpcSendClass"
+      ],
+      "./core/plugins/send-queue": [
+        "createIpcSendQueueFeature",
+        "createIpcSendQueueTransport"
+      ],
+      "./core/plugins/log": [
+        "createIpcLogFeature"
       ],
       "./core/adapters/memory": [
         "createMemoryTransportPair"
