@@ -1,5 +1,16 @@
 export { createProcessTransport } from './handshake.js'
 export { createNativeProcessOffer } from './offer.js'
+export { createProcessHost, createServeProcessHost } from './host/index.js'
+export type {
+  IProcessHost,
+  IProcessHostOptions,
+  IProcessHostReplaceOptions,
+  IProcessHostShutdownSignal,
+  IProcessHostRegistrationApproval,
+  IProcessHostRegistrations,
+  IProcessServeHostOptions,
+  IProcessServeHostHandle
+} from './host/index.js'
 export { RpcProcessErrorCode } from './error-code.js'
 export { RpcProcessErrorText } from './error-text.js'
 export { createProcessResilience } from './resilience/index.js'
