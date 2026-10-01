@@ -180,23 +180,23 @@
     },
     "rpc": {
       "lines": {
-        "covered": 7853,
-        "total": 8687,
-        "pct": 90.39
+        "covered": 7857,
+        "total": 8691,
+        "pct": 90.4
       },
       "statements": {
-        "covered": 8569,
-        "total": 9705,
+        "covered": 8573,
+        "total": 9709,
         "pct": 88.29
       },
       "functions": {
-        "covered": 1890,
-        "total": 2092,
+        "covered": 1891,
+        "total": 2093,
         "pct": 90.34
       },
       "branches": {
-        "covered": 5080,
-        "total": 5988,
+        "covered": 5086,
+        "total": 5995,
         "pct": 84.83
       }
     },
@@ -7699,8 +7699,8 @@
         "pct": 100
       },
       "branches": {
-        "covered": 8,
-        "total": 8,
+        "covered": 9,
+        "total": 9,
         "pct": 100
       }
     },
@@ -7816,24 +7816,24 @@
     },
     "packages/rpc/src/process/plugin/binding.ts": {
       "lines": {
-        "covered": 72,
-        "total": 102,
-        "pct": 70.58
+        "covered": 76,
+        "total": 106,
+        "pct": 71.69
       },
       "statements": {
-        "covered": 75,
-        "total": 112,
-        "pct": 66.96
+        "covered": 79,
+        "total": 116,
+        "pct": 68.1
       },
       "functions": {
-        "covered": 23,
-        "total": 29,
-        "pct": 79.31
+        "covered": 24,
+        "total": 30,
+        "pct": 80
       },
       "branches": {
-        "covered": 53,
-        "total": 79,
-        "pct": 67.08
+        "covered": 58,
+        "total": 85,
+        "pct": 68.23
       }
     },
     "packages/rpc/src/process/plugin/client.ts": {
@@ -15167,8 +15167,8 @@
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
   "changedRuntimeFiles": [
-    "packages/plugin-host/src/host-runtime.ts",
-    "packages/plugin-host/src/removal-runtime.ts"
+    "packages/rpc/src/process/plugin/binding.ts",
+    "packages/rpc/src/process/plugin/types.ts"
   ],
   "deletedRuntimeFiles": []
 }

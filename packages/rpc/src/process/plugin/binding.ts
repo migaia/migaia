@@ -12,8 +12,10 @@ import {
 } from '@migaia/supervision/process'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRemoteBinding, IRemoteChannel } from '../../remote/types.js'
+import type { IRpcHandshakeOffer } from '../../contract/handshake.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
+import { createNativeProcessOffer } from '../offer.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import {
   ProcessConnectionProfile,
@@ -28,6 +30,9 @@ import type {
   ISpawnProcessPluginDeployment
 } from './types.js'
 
+/** A default peer label names the facade without claiming a specific runtime. */
+const PROCESS_PLUGIN_PEER_RUNTIME = 'process'
+
 /** Reports secondary diagnostics without replacing the error that triggered cleanup. */
 export function reportSafely(report: (error: unknown) => void, error: unknown): void {
   try {
@@ -40,6 +45,14 @@ export function reportSafely(report: (error: unknown) => void, error: unknown): 
 /** Rejects one invalid process option before launcher, dialer, or host work begins. */
 export function invalidOption(field: string): never {
   throw createProcessError(RpcProcessErrorCode.pluginInvalidOption, undefined, { field })
+}
+
+/** Creates one native offer per binding, retaining its token without platform inference. */
+function defaultProcessOffer(token: string | undefined): IRpcHandshakeOffer {
+  return createNativeProcessOffer({
+    peer: { id: defaultRpcId(), runtime: PROCESS_PLUGIN_PEER_RUNTIME },
+    ...(token === undefined ? {} : { auth: token })
+  })
 }
 
 /** Ensures a bootstrap secret is exactly the token supplied to the authenticated adapter. */
@@ -111,6 +124,7 @@ async function establishGeneration(
   scheduler: IScheduler,
   session: IProcessPluginSession,
   token: string | undefined,
+  offer: IRpcHandshakeOffer,
   stderr: (listener: (chunk: Uint8Array) => void) => () => void,
   report: (error: unknown) => void,
   closeRaw: () => Promise<void>
@@ -131,6 +145,7 @@ async function establishGeneration(
       session,
       scheduler,
       ...(token === undefined ? {} : { token }),
+      offer,
       stderr
     })
   } catch (error) {
@@ -162,6 +177,8 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   report: (error: unknown) => void
 ): IRemoteBinding<THandle, IProcessSpec> {
   validateSpawnProcessPluginDeployment(deployment)
+  /** Every generation receives the same caller proposal or one binding-owned default. */
+  const offer = deployment.offer ?? defaultProcessOffer(deployment.token)
   const scheduler = deployment.supervision.scheduler ?? systemScheduler
   const stderr = createStderrSource(report)
   const callerOutput = deployment.supervision.output?.onChunk
@@ -202,6 +219,7 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
         scheduler,
         session,
         deployment.token,
+        offer,
         stderr.subscribe,
         report,
         () => Promise.resolve(raw.close())
@@ -251,6 +269,8 @@ export function createConnectProcessBinding(
     invalidOption('deployment.address')
   if (typeof deployment.token !== 'string' || deployment.token.length === 0)
     invalidOption('deployment.token')
+  /** A borrowed session keeps one stable proposal across reconnect generations. */
+  const offer = deployment.offer ?? defaultProcessOffer(deployment.token)
   const scheduler = deployment.supervision?.scheduler ?? systemScheduler
   const budget = createUnitBudget({ kind: ProcessConnectionProfile.kind, maxUnits: 1, scheduler })
   const profile: IUnitProfile<string, IProcessConnectionHandle, Readonly<{ reason: unknown }>> = {
@@ -305,6 +325,7 @@ export function createConnectProcessBinding(
         scheduler,
         session,
         deployment.token,
+        offer,
         () => () => undefined,
         report,
         unit.close

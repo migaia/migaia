@@ -47,6 +47,10 @@ describe('process plugin connect binding', () => {
         supervision: { scheduler: fixture.binding.scheduler },
         establish: async (_raw, options) => {
           expect(options.token).toBe('signed-token')
+          expect(options.offer).toMatchObject({
+            auth: 'signed-token',
+            capabilities: ['ping@1', 'close@1']
+          })
           return {
             ...fixture.channel,
             agreement: { ...fixture.channel.agreement, source: 'negotiated' as const }
