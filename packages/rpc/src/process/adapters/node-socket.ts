@@ -25,7 +25,8 @@ type INodeSocketAddress =
 function parseAddress(address: string): INodeSocketAddress {
   if (
     typeof address === 'string' &&
-    (address.startsWith('/') || address.startsWith('\\\\.\\pipe\\'))
+    (address.startsWith('/') ||
+      (process.platform === 'win32' && address.startsWith('\\\\.\\pipe\\')))
   )
     return { kind: 'path', path: address }
   try {
