@@ -2,7 +2,11 @@ import { createContractError } from '../contract/contract-error.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { resolveAbortReason } from '../core/internal/async-control.js'
 import { RpcContractErrorCode } from '../contract/error-code.js'
-import { createRpcStreamFrameDecoder, encodeRpcStreamFrame } from '../contract/framing/stream.js'
+import {
+  createRpcStreamFrameDecoder,
+  encodeRpcStreamFrame,
+  type IRpcStreamFrameDecoder
+} from '../contract/framing/stream.js'
 import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
 import type { IRpcTransport } from '../core/transport.js'
 import {
@@ -20,6 +24,23 @@ import type { IProcessByteChannel, IProcessCommonOptions, IProcessMessageChannel
 
 /** Prevent a second adapter from installing another physical reader on the same channel. */
 const boundChannels = new WeakSet<object>()
+
+/** A child adapter may consume bootstrap with the decoder later owned by the wire. */
+export type IProcessFrameSource = Readonly<{
+  decoder: IRpcStreamFrameDecoder
+  attach(onFrame: (frame: Uint8Array) => void, onError: (error: Error) => void): () => void
+}>
+
+/** Registration is internal to the process package and never changes the byte-port contract. */
+const frameSources = new WeakMap<IProcessByteChannel, IProcessFrameSource>()
+
+/** Transfer one bootstrap decoder to the ordinary handshake without replaying raw bytes. */
+export function registerProcessFrameSource(
+  channel: IProcessByteChannel,
+  source: IProcessFrameSource
+): void {
+  frameSources.set(channel, source)
+}
 
 /** One unsettled byte write is rejected promptly when its channel closes. */
 type IPendingWrite = {
@@ -123,54 +144,64 @@ export function bindProcessByteWire(
   }
 
   /** Each complete byte payload is an independent UTF-8 text message. */
-  const decoder = createRpcStreamFrameDecoder({
-    onFrame(frame) {
-      if (closed) return
-      let text: string
-      try {
-        text = textDecoder.decode(frame)
-      } catch {
-        void terminate(
-          createContractError(
-            ready ? RpcContractErrorCode.invalidFrame : RpcContractErrorCode.handshakeInvalid
-          )
+  const onFrame = (frame: Uint8Array): void => {
+    if (closed) return
+    let text: string
+    try {
+      text = textDecoder.decode(frame)
+    } catch {
+      void terminate(
+        createContractError(
+          ready ? RpcContractErrorCode.invalidFrame : RpcContractErrorCode.handshakeInvalid
         )
-        return
-      }
-      if (!ready) {
-        if (handshakeReceived) {
-          void terminate(createContractError(RpcContractErrorCode.handshakeInvalid))
-          return
-        }
-        handshakeReceived = true
-        if (handshakeWaiter) {
-          handshakeWaiter.resolve(text)
-          handshakeWaiter = undefined
-        } else handshakeFrame = text
-        return
-      }
-      for (const listener of listeners) {
-        try {
-          listener({ data: text, peerId: options.peerId })
-        } catch (error) {
-          report(error)
-        }
-      }
-    },
-    onError(error) {
-      void terminate(error)
+      )
+      return
     }
-  })
+    if (!ready) {
+      if (handshakeReceived) {
+        void terminate(createContractError(RpcContractErrorCode.handshakeInvalid))
+        return
+      }
+      handshakeReceived = true
+      if (handshakeWaiter) {
+        handshakeWaiter.resolve(text)
+        handshakeWaiter = undefined
+      } else handshakeFrame = text
+      return
+    }
+    for (const listener of listeners) {
+      try {
+        listener({ data: text, peerId: options.peerId })
+      } catch (error) {
+        report(error)
+      }
+    }
+  }
+  /** A bootstrap reader can hand its existing decoder to this wire. */
+  const frameSource = frameSources.get(channel)
+  frameSources.delete(channel)
+  const decoder =
+    frameSource?.decoder ??
+    createRpcStreamFrameDecoder({
+      onFrame,
+      onError(error) {
+        void terminate(error)
+      }
+    })
 
   /** One data subscription owns the decoder for this physical channel. */
-  removeData = channel.onData((chunk) => {
-    if (closed) return
-    try {
-      decoder.push(chunk)
-    } catch (error) {
-      void terminate(error)
-    }
-  })
+  removeData = frameSource
+    ? frameSource.attach(onFrame, (error) => {
+        void terminate(error)
+      })
+    : channel.onData((chunk) => {
+        if (closed) return
+        try {
+          decoder.push(chunk)
+        } catch (error) {
+          void terminate(error)
+        }
+      })
   /** Underlying close completes the decoder's EOF check before terminal replay. */
   removeClose = channel.onClose((reason) => {
     if (closed) return

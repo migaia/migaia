@@ -8,6 +8,7 @@
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
     "moduleResolution": "bundler",
+    "types": ["node"],
     "declaration": true,
     "declarationMap": true,
     "stripInternal": true,
