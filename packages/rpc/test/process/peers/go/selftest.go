@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -275,6 +276,40 @@ func envelopeVectors(suite *vectorSuite, prefix string, vector record) {
 		_, hasX := field(field(clean["data"])["route"])["x"]
 		suite.check(prefix+"/unknownFields/"+stringField(entry, "id"), err == nil && reflect.DeepEqual(warnings, expected) && !hasA && !hasZ && !hasX)
 	}
+	// Evaluate the actual sequence with a connection-local, normalized warning identity.
+	warnings := field(vector["warnings"])
+	seen := map[[2]string]bool{}
+	observed := [][2]string{}
+	bounded := func(value string, maximum int) string {
+		runes := []rune(value)
+		if len(runes) <= maximum {
+			return value
+		}
+		return string(runes[:maximum]) + "…"
+	}
+	for _, item := range entries(warnings["sequence"]) {
+		note := field(item)
+		parts := strings.Split(stringField(note, "pointer"), "/")
+		for index, part := range parts {
+			if part != "" {
+				if _, err := strconv.ParseUint(part, 10, 64); err == nil {
+					parts[index] = "*"
+				}
+			}
+		}
+		key := bounded(stringField(note, "kind"), 32) + bounded(strings.Join(parts, "/"), 128) + "#" + bounded(stringField(note, "field"), 64)
+		identity := [2]string{stringField(note, "connection"), key}
+		if !seen[identity] {
+			seen[identity] = true
+			observed = append(observed, identity)
+		}
+	}
+	expected := [][2]string{}
+	for _, item := range entries(warnings["expected"]) {
+		pair := entries(item)
+		expected = append(expected, [2]string{pair[0].(string), pair[1].(string)})
+	}
+	suite.check(prefix+"/warnings/sequence", reflect.DeepEqual(observed, expected))
 }
 
 // controlVectors exercises each fixed control action, including invalid close and evolvable unknown controls.
