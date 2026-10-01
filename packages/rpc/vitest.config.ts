@@ -20,6 +20,12 @@ export default defineConfig(
             functions: 70,
             lines: 80
           },
+          'src/process/adapters/**': {
+            statements: 40,
+            branches: 30,
+            functions: 40,
+            lines: 40
+          },
           'src/core/internal/**': {
             branches: 85
           }

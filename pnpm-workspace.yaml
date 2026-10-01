@@ -7,6 +7,7 @@ allowBuilds:
   cbor-extract: true
   esbuild: true
   fsevents: true
+  koffi: false
   msgpackr-extract: true
 
 minimumReleaseAgeExclude:
