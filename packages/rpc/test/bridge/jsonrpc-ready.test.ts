@@ -207,6 +207,61 @@ describe('JSON-RPC bridge readiness', () => {
         expect(evidence).not.toContain(fixture.options.token.slice(offset, offset + 6))
     }
   )
+  it.each([true, false])(
+    '[A7] reclaims resources when timer cancellation throws (hello=%s)',
+    async (hello) => {
+      /** Both completed hello and an existing abort primary exercise the same cleanup owner. */
+      const fixture = bridgeFixture({ autoHello: hello })
+      /** The native cleanup failure must stay reachable without replacing an earlier abort. */
+      const cleanup = new Error('timer cancellation fixture')
+      /** Cancellation already owns the opening failure before the timer cleanup fails. */
+      const primary = new Error('opening abort fixture')
+      /** A structured scheduler keeps real task ownership and throws only after cancellation. */
+      const scheduler = {
+        ...fixture.scheduler,
+        schedule: ((callback, delay) => {
+          /** The original task proves cleanup attempts the same scheduled timer exactly once. */
+          const task = fixture.scheduler.schedule(callback, delay)
+          return {
+            ...task,
+            cancel() {
+              task.cancel()
+              throw cleanup
+            }
+          }
+        }) as typeof fixture.scheduler.schedule
+      }
+      /** The factory observes a real AbortSignal while its hello request is pending. */
+      const controller = new AbortController()
+      /** Capture settlement before abort so rejection cannot become unhandled. */
+      const opening = Promise.allSettled([fixture.open({ scheduler, signal: controller.signal })])
+      if (!hello) controller.abort(primary)
+      /** Both paths reject, but the previously established primary keeps precedence. */
+      const [outcome] = await opening
+      expect(outcome!.status).toBe('rejected')
+      if (outcome!.status !== 'rejected') throw new Error('fixture unexpectedly ready')
+      expect(cleanup, 'SDD_BASE_RED_CONTRACT:A7').toMatchObject({
+        source: '@migaia/rpc/core',
+        code: 'INTERNAL'
+      })
+      if (hello) expect(outcome!.reason).toBe(cleanup)
+      else {
+        expect(outcome!.reason).toBeInstanceOf(AggregateError)
+        expect(outcome!.reason.errors[0]).toBe(primary)
+        expect(outcome!.reason.errors).toContain(cleanup)
+        expect(fixture.reports).toEqual([
+          expect.objectContaining({
+            source: '@migaia/rpc/process',
+            code: 'PROCESS_CHANNEL_CLOSED',
+            cause: primary
+          }),
+          cleanup
+        ])
+      }
+      expect(fixture.closes).toBe(1)
+      expect(fixture.removals).toBe(2)
+    }
+  )
   it('[A11] redacts malformed JSON, truncated bodies and nonstring replies', async () => {
     for (const kind of ['json', 'truncated', 'shape']) {
       const fixture = bridgeFixture({ autoHello: false })
