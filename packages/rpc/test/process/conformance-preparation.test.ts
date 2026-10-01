@@ -152,12 +152,12 @@ describe('I20 preparation only; no A-total or A10 performance PASS', () => {
       expect(result.method).toContain('proc_pid_rusage')
     }
   )
-  it('lists every acceptance item and root assertion without freezing or passing supported units', () => {
+  it('retains every acceptance assertion and the frozen preparation matrix without implying performance PASS', () => {
     /** The tracked inventory contains assertion responsibilities without reading local docs. */
     const inventory = JSON.parse(
       readFileSync(new URL('./conformance-inventory.json', import.meta.url), 'utf8')
     )
-    expect(inventory.supportUnitsFrozen).toBe(false)
+    expect(inventory.supportUnitsFrozen).toBe(true)
     expect(inventory.acceptance.map((row: { id: string }) => row.id)).toEqual(
       Array.from({ length: 12 }, (_, index) => `A${index + 1}`)
     )
@@ -166,9 +166,16 @@ describe('I20 preparation only; no A-total or A10 performance PASS', () => {
       expect(row.evidenceOwner).toBeTruthy()
       expect(row.supportUnits).toBeTruthy()
       expect(row.assertions.length).toBeGreaterThan(0)
-      expect(
-        row.assertions.every((assertion: { status: string }) => assertion.status === 'pending')
-      ).toBe(true)
+      for (const assertion of row.assertions)
+        expect(['pending', 'implemented', 'verified', 'blocked']).toContain(assertion.status)
     }
+    expect(
+      inventory.acceptance.flatMap((row: { assertions: unknown[] }) => row.assertions)
+    ).toHaveLength(93)
+    expect(
+      inventory.acceptance
+        .find((row: { id: string }) => row.id === 'A10')
+        .assertions.every((assertion: { status: string }) => assertion.status === 'implemented')
+    ).toBe(true)
   })
 })
