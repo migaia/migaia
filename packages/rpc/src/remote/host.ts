@@ -75,9 +75,14 @@ export function createRemoteHost<TUnit, TSpec>(
     if (initialPromise) return initialPromise
     preparingInitial = true
     initialPromise = holder
-      .prepareInitial(lifecycle.signal)
+      .prepareInitial(lifecycle.signal, true)
       .then((generation) => {
         lastReadyGeneration = generation
+      })
+      .catch((error: unknown) => {
+        initialPromise = undefined
+        readyPromise = undefined
+        throw error
       })
       .finally(() => {
         preparingInitial = false

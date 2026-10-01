@@ -47,6 +47,43 @@ function endpointHarness() {
 }
 
 describe('remote Host trusted control', () => {
+  it('closes resources after a failed first preparation and retries the same Host', async () => {
+    const fixture = remoteHarness()
+    /** A transient endpoint factory failure must not poison later ready calls. */
+    let fail = true
+    let opens = 0
+    const remote = createRemoteHost({
+      catalog,
+      binding: {
+        ...fixture.binding,
+        async openChannel() {
+          opens += 1
+          return fixture.channel
+        }
+      },
+      endpointFactory: async () => {
+        if (fail) throw new Error('transient endpoint failure')
+        return {
+          endpoint: {
+            ...fixture.served.endpoint,
+            async send(_peer: string, method: string) {
+              return method === RemoteMethodName.describe
+                ? { schemaVersion: 1, catalog }
+                : { revision: 1, plugins: [] }
+            }
+          } as unknown as IRpcEndpoint
+        }
+      },
+      report: vi.fn()
+    })
+    await expect(remote.ready()).rejects.toThrow('transient endpoint failure')
+    expect(fixture.calls.filter((call) => call === 'channel.close')).toHaveLength(1)
+    fail = false
+    await expect(remote.ready()).resolves.toBeUndefined()
+    expect(opens).toBe(2)
+    await remote.release()
+  })
+
   it('rejects thenables, forged definitions, wrong names and unknown names before Host.use', async () => {
     const endpoint = endpointHarness()
     const use = vi.fn(async () => [])
