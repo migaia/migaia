@@ -2,8 +2,82 @@ import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { createProcessHost } from '../../src/process/host/client.js'
 import { hostFixture } from './fixtures/host-control.js'
+import { nativeHostOptions } from './fixtures/host-native.js'
 
 describe('process Host facade admission and ownership', () => {
+  it('[A1] announces one close and waits for the real in-flight request before child exit', async () => {
+    const fixture = nativeHostOptions()
+    const original = fixture.options.endpointFactory
+    const close = vi.fn()
+    let sent!: () => void
+    const businessSent = new Promise<void>((resolve) => {
+      sent = resolve
+    })
+    const host = createProcessHost({
+      ...fixture.options,
+      endpointFactory: async (...args) => {
+        const served = await original(...args)
+        return {
+          ...served,
+          endpoint: {
+            ...served.endpoint,
+            send<T>(...input: Parameters<typeof served.endpoint.send>) {
+              const pending = served.endpoint.send<T>(...input)
+              if (input[1].endsWith('.request')) sent()
+              return pending
+            },
+            announceClose(...input) {
+              close()
+              return served.endpoint.announceClose(...input)
+            }
+          }
+        }
+      }
+    })
+    try {
+      const feature = await host.use('p')
+      const request = feature.f!.request!(['delay'])
+      await businessSent
+      let finished = false
+      const releasing = host.release().then(() => {
+        finished = true
+      })
+      await Promise.resolve()
+      expect(finished).toBe(false)
+      expect(() => host.inspect()).toThrow(expect.objectContaining({ code: 'PROCESS_HOST_CLOSED' }))
+      expect(await request).toMatchObject({ pid: fixture.handles[0]!.identity.pid, input: 'delay' })
+      await releasing
+      expect(close).toHaveBeenCalledTimes(1)
+      await fixture.handles[0]!.exited
+    } finally {
+      await host.release()
+    }
+  })
+  it('[A1] controls a real initially empty Node Host through the local catalog resolver', async () => {
+    const fixture = nativeHostOptions()
+    const host = createProcessHost(fixture.options)
+    try {
+      expect(fixture.handles).toHaveLength(0)
+      await host.ready()
+      expect(await host.inspect()).toMatchObject({ plugins: [] })
+      const features = await host.use('p', { portable: 'configuration' })
+      const response = await features.f!.request!(['hello'])
+      expect(response).toMatchObject({
+        pid: fixture.handles[0]!.identity.pid,
+        input: 'hello',
+        config: { portable: 'configuration' },
+        resolutions: 1,
+        calls: 1
+      })
+      expect(await host.inspect()).toMatchObject({ plugins: [{ name: 'p', state: 'enabled' }] })
+      await host.unUse('p')
+      expect(await host.inspect()).toMatchObject({ plugins: [] })
+      await host.release()
+      await fixture.handles[0]!.exited
+    } finally {
+      await host.release()
+    }
+  })
   it('[A1] stays lazy, delegates catalog control and gates release synchronously', async () => {
     const fixture = hostFixture()
     const host = createProcessHost(fixture.options)
