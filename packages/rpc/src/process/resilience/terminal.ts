@@ -15,6 +15,21 @@ export type IProcessTerminalRegistration = Readonly<{
   snapshot(): IProcessResilienceSnapshot | undefined
 }>
 
+/** One offset rule is shared by primary registrations and suspended dependants. */
+export function scheduleProcessDiagnostic(
+  scheduler: IScheduler,
+  offsets: readonly number[],
+  beganAt: number,
+  index: number,
+  callback: () => void
+): IScheduledTask {
+  const last = offsets[offsets.length - 1]!
+  const span = last - offsets[offsets.length - 2]!
+  const offset =
+    index < offsets.length ? offsets[index]! : last + (index - offsets.length + 1) * span
+  return scheduler.schedule(callback, Math.max(0, beganAt + offset - scheduler.now()))
+}
+
 /** Create one terminal report clock without adding a second supervisor state machine. */
 export function createProcessTerminalRegistration(
   options: Readonly<{
@@ -52,21 +67,11 @@ export function createProcessTerminalRegistration(
     })
   }
 
-  /** Later ticks are relative to this entry, even when subscriber work is asynchronous. */
-  const nextOffset = (index: number): number => {
-    const offsets = options.reportAtMs
-    if (index < offsets.length) return offsets[index]!
-    const last = offsets[offsets.length - 1]!
-    const span = last - offsets[offsets.length - 2]!
-    return last + (index - offsets.length + 1) * span
-  }
-
   const scheduleNext = (currentEntry: number, index: number, beganAt: number): void => {
     if (closed || liquidated || entry !== currentEntry) return
-    const delay = Math.max(0, beganAt + nextOffset(index) - options.scheduler.now())
-    timer = options.scheduler.schedule(() => {
+    timer = scheduleProcessDiagnostic(options.scheduler, options.reportAtMs, beganAt, index, () => {
       void deliver(currentEntry, index, beganAt)
-    }, delay)
+    })
   }
 
   /** Supervision already reported index zero; this owner reports only later ticks. */
