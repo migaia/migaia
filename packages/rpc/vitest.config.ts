@@ -1,10 +1,11 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 
 export default defineConfig(
   withDistFreshness({
     test: {
       include: ['test/**/*.{test,spec}.ts'],
+      exclude: [...configDefaults.exclude, 'test/process/conformance*.test.ts'],
       coverage: {
         provider: 'v8',
         include: ['src/**/*.ts'],

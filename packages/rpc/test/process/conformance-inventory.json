@@ -1,0 +1,595 @@
+{
+  "revision": "I20-preparation-2026-10-02",
+  "status": "implemented-unverified",
+  "supportUnitsFrozen": false,
+  "supportUnitsFreezePrerequisite": "Integrate I19, inspect delivered APIs, probe supported capability and actual launch per unit. No future-supported unit is excluded by this preparation.",
+  "acceptance": [
+    {
+      "id": "A1",
+      "evidenceOwner": "H / E peer delivery",
+      "supportUnits": "native \u00d7 python,rust,go,typescript \u00d7 spawn-stdio,rendezvous-unix",
+      "assertions": [
+        {
+          "id": "A1.1",
+          "assertion": "hello/describe before publication; json only",
+          "status": "pending"
+        },
+        {
+          "id": "A1.2",
+          "assertion": "request value and error source/code/stack/two cause layers",
+          "status": "pending"
+        },
+        {
+          "id": "A1.3",
+          "assertion": "one-way independent received count and order",
+          "status": "pending"
+        },
+        {
+          "id": "A1.4",
+          "assertion": "cancel reason restored",
+          "status": "pending"
+        },
+        {
+          "id": "A1.5",
+          "assertion": "generator and async-generator each >=3 yields in order",
+          "status": "pending"
+        },
+        {
+          "id": "A1.6",
+          "assertion": "Plugin owned tree exits / borrowed PID and listener remain usable",
+          "status": "pending"
+        },
+        {
+          "id": "A1.7",
+          "assertion": "Host use/describe/proxy request/local name-config resolver",
+          "status": "pending"
+        },
+        {
+          "id": "A1.8",
+          "assertion": "Host unUse removes registration; release respects PID ownership",
+          "status": "pending"
+        },
+        {
+          "id": "A1.9",
+          "assertion": "TS peer imports public built exports; no codec/frame/handshake implementation",
+          "status": "pending"
+        },
+        {
+          "id": "A1.10",
+          "assertion": "native idle 20000ms, >=3 pong, zero unhealthy restart, stable PID",
+          "status": "pending"
+        },
+        {
+          "id": "A1.11",
+          "assertion": "release sends exactly one close; peer sends no new request afterwards",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "evidenceOwner": "H / E peer delivery",
+      "supportUnits": "all applicable upstream cases \u00d7 four languages",
+      "assertions": [
+        {
+          "id": "A2.1",
+          "assertion": "control frozen 1.0 acceptance and warning sequence unchanged",
+          "status": "pending"
+        },
+        {
+          "id": "A2.2",
+          "assertion": "stream 1.1 evolvable reclassification without frozen-byte change",
+          "status": "pending"
+        },
+        {
+          "id": "A2.3",
+          "assertion": "missing required 1.1 capabilities rejected",
+          "status": "pending"
+        },
+        {
+          "id": "A2.4",
+          "assertion": "first violation/pointer exactly matches vector",
+          "status": "pending"
+        },
+        {
+          "id": "A2.5",
+          "assertion": "wire-error graph/source/code/stack/cause matches; only absent case may skip by ID",
+          "status": "pending"
+        },
+        {
+          "id": "A2.6",
+          "assertion": "remote schema/mode/idempotent and Host retained-method vectors",
+          "status": "pending"
+        },
+        {
+          "id": "A2.7",
+          "assertion": "stream credit/seq/measurement matches",
+          "status": "pending"
+        },
+        {
+          "id": "A2.8",
+          "assertion": "4-byte big-endian framing/truncation/limit vectors byte equality",
+          "status": "pending"
+        },
+        {
+          "id": "A2.9",
+          "assertion": "non-JS independently evaluates; totals or JSON.parse insufficient",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A3",
+      "evidenceOwner": "H / E peer delivery / bridge owner",
+      "supportUnits": "jsonrpc \u00d7 four languages \u00d7 both deployments",
+      "assertions": [
+        {
+          "id": "A3.1",
+          "assertion": "Content-Length hello/describe/request/one-way/error/cancel",
+          "status": "pending"
+        },
+        {
+          "id": "A3.2",
+          "assertion": "spawn token only dedicated proven fd; first stdin byte ASCII C",
+          "status": "pending"
+        },
+        {
+          "id": "A3.3",
+          "assertion": "sentinel six-character substrings absent from error cause/inspect/serialized reject/report/snapshots",
+          "status": "pending"
+        },
+        {
+          "id": "A3.4",
+          "assertion": "original string id, relative deadline, idempotency key retained",
+          "status": "pending"
+        },
+        {
+          "id": "A3.5",
+          "assertion": "notification has no id/meta; independent receipt count/order",
+          "status": "pending"
+        },
+        {
+          "id": "A3.6",
+          "assertion": "Host local resolver/use/inspect catalog/proxy request/unUse projection",
+          "status": "pending"
+        },
+        {
+          "id": "A3.7",
+          "assertion": "release owned child exits / borrowed PID remains",
+          "status": "pending"
+        },
+        {
+          "id": "A3.8",
+          "assertion": "core send trace equals meta.trace; late cancelled response reports only",
+          "status": "pending"
+        },
+        {
+          "id": "A3.9",
+          "assertion": "missing method/capability, invalid frame, stream description/batch/reverse/NDJSON reject at specified code/time",
+          "status": "pending"
+        },
+        {
+          "id": "A3.10",
+          "assertion": "bridge stream sends zero; other connection remains usable",
+          "status": "pending"
+        },
+        {
+          "id": "A3.11",
+          "assertion": "four mandatory peers handwrite profile; no existing-library PASS claim",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A4",
+      "evidenceOwner": "H / resilience+host owners",
+      "supportUnits": "native/jsonrpc \u00d7 owned/borrowed \u00d7 crash/hang",
+      "assertions": [
+        {
+          "id": "A4.1",
+          "assertion": "native default health failure at third ping t=17000ms",
+          "status": "pending"
+        },
+        {
+          "id": "A4.2",
+          "assertion": "bridge health none; no default process detection; call deadline settles",
+          "status": "pending"
+        },
+        {
+          "id": "A4.3",
+          "assertion": "owned old tree exits before replacement ready; borrowed socket redials without killing PID",
+          "status": "pending"
+        },
+        {
+          "id": "A4.4",
+          "assertion": "local Host remains alive",
+          "status": "pending"
+        },
+        {
+          "id": "A4.5",
+          "assertion": "eligible sent idempotent call retransmits exact key once; stable scope/store side effect once",
+          "status": "pending"
+        },
+        {
+          "id": "A4.6",
+          "assertion": "cancel/expired/released/no-ready-generation retry count zero",
+          "status": "pending"
+        },
+        {
+          "id": "A4.7",
+          "assertion": "sent non-idempotent REMOTE_RESULT_UNKNOWN; unsent REMOTE_CLOSED with zero frame",
+          "status": "pending"
+        },
+        {
+          "id": "A4.8",
+          "assertion": "stream never resumes",
+          "status": "pending"
+        },
+        {
+          "id": "A4.9",
+          "assertion": "terminal Plugin request/one-way/first stream next and Host use/inspect reject PROCESS_TERMINAL_CALL before frame",
+          "status": "pending"
+        },
+        {
+          "id": "A4.10",
+          "assertion": "timers/subscriptions released; Host restart never replays use",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A5",
+      "evidenceOwner": "H / channel+IPC owners",
+      "supportUnits": "each native language + independent healthy session",
+      "assertions": [
+        {
+          "id": "A5.1",
+          "assertion": "raw 16MiB accepted and 16MiB+1 rejected without allocating payload",
+          "status": "pending"
+        },
+        {
+          "id": "A5.2",
+          "assertion": "business payload uses encoded frame budget: stream chunks or zero-write rejection",
+          "status": "pending"
+        },
+        {
+          "id": "A5.3",
+          "assertion": "malicious length, half header/body EOF, invalid UTF-8/JSON, coalesced frames",
+          "status": "pending"
+        },
+        {
+          "id": "A5.4",
+          "assertion": "capacity one slow consumer: pending send / OVERLOADED and backlog report",
+          "status": "pending"
+        },
+        {
+          "id": "A5.5",
+          "assertion": "healthy session still requests; resources return to zero",
+          "status": "pending"
+        },
+        {
+          "id": "A5.6",
+          "assertion": "bridge Content-Length physical boundaries also checked",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A6",
+      "evidenceOwner": "H / supervision owner",
+      "supportUnits": "four spawn languages, 250 rotations each",
+      "assertions": [
+        {
+          "id": "A6.1",
+          "assertion": "parent kill -9: child and descendants disappear within 10s",
+          "status": "pending"
+        },
+        {
+          "id": "A6.2",
+          "assertion": "1000 actual launch/exit cycles; fd stable; zombies zero; leases zero",
+          "status": "pending"
+        },
+        {
+          "id": "A6.3",
+          "assertion": "maxUnits=2 never exceeded; full-budget queue/rejection policy",
+          "status": "pending"
+        },
+        {
+          "id": "A6.4",
+          "assertion": "RSS limit terminates owned child; exited observed independently",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A7",
+      "evidenceOwner": "H / resilience+host owners",
+      "supportUnits": "shared/per-connection \u00d7 two sessions + flooding/untrusted registration",
+      "assertions": [
+        {
+          "id": "A7.1",
+          "assertion": "connection limit rejects and frees fd; no-token registration never installs",
+          "status": "pending"
+        },
+        {
+          "id": "A7.2",
+          "assertion": "native malformed hello/verifier failure sentinel absent from cause/inspect/serialize/report/reject",
+          "status": "pending"
+        },
+        {
+          "id": "A7.3",
+          "assertion": "split stderr sentinel becomes fixed sanitized text with connection identity only",
+          "status": "pending"
+        },
+        {
+          "id": "A7.4",
+          "assertion": "request id/abort/replay/context/result isolated per session",
+          "status": "pending"
+        },
+        {
+          "id": "A7.5",
+          "assertion": "same principal stable method/key scope shares one result and execution across sessions",
+          "status": "pending"
+        },
+        {
+          "id": "A7.6",
+          "assertion": "different principals same key remain isolated",
+          "status": "pending"
+        },
+        {
+          "id": "A7.7",
+          "assertion": "shared repeated timeout closes offending session only; explicit health event owns instance restart",
+          "status": "pending"
+        },
+        {
+          "id": "A7.8",
+          "assertion": "per-connection other instance survives; connect close never kills borrowed PID",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A8",
+      "evidenceOwner": "H / IPC+bridge owners",
+      "supportUnits": "native four languages \u00d7 both deployments; bridge trace route",
+      "assertions": [
+        {
+          "id": "A8.1",
+          "assertion": "core ISendOptions.trace t1/t2 preserved through provider/error/route/backlog",
+          "status": "pending"
+        },
+        {
+          "id": "A8.2",
+          "assertion": "peer independently returns observed trace; missing trace stays absent",
+          "status": "pending"
+        },
+        {
+          "id": "A8.3",
+          "assertion": "bridge meta.trace equals supplied core trace",
+          "status": "pending"
+        },
+        {
+          "id": "A8.4",
+          "assertion": "Plugin/Host facade missing trace never invents it",
+          "status": "pending"
+        },
+        {
+          "id": "A8.5",
+          "assertion": "stderr pseudo-trace ignored; sessions never share current trace; cause remains reachable",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A9",
+      "evidenceOwner": "H / platform owners",
+      "supportUnits": "every platform/carrier/runtime capability cell",
+      "assertions": [
+        {
+          "id": "A9.1",
+          "assertion": "macOS supported units record actual command/version/PID/capability/result/grade",
+          "status": "pending"
+        },
+        {
+          "id": "A9.2",
+          "assertion": "Windows Job, Electron bootstrap, Deno, Linux, browser, TinyJS unrun never PASS",
+          "status": "pending"
+        },
+        {
+          "id": "A9.3",
+          "assertion": "future fixture path present; install/typecheck/Node substitution insufficient",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A10",
+      "evidenceOwner": "root performance owner / G measurement preparation",
+      "supportUnits": "payload 64B,1KiB,64KiB,1MiB \u00d7 supported codec/carrier/runtime; bridge separately JSON/Content-Length",
+      "assertions": [
+        {
+          "id": "A10.1",
+          "assertion": "freeze effective units only after integrated I19 and actual capability/start checks",
+          "status": "pending"
+        },
+        {
+          "id": "A10.2",
+          "assertion": "same payload bytes/codec/carrier/runtime/concurrency/echo; isolated sides and serial exclusive execution",
+          "status": "pending"
+        },
+        {
+          "id": "A10.3",
+          "assertion": ">=3 alternating bare-RPC/RPC-bare pairs; >=1000 settled samples each side each round",
+          "status": "pending"
+        },
+        {
+          "id": "A10.4",
+          "assertion": "ready then warmup; all metrics exclude warmup and use window to last settlement",
+          "status": "pending"
+        },
+        {
+          "id": "A10.5",
+          "assertion": "nearest-rank p50/p99; throughput settled count/window",
+          "status": "pending"
+        },
+        {
+          "id": "A10.6",
+          "assertion": "CPU parent+peer PID user+sys deltas/request; no RUSAGE_CHILDREN",
+          "status": "pending"
+        },
+        {
+          "id": "A10.7",
+          "assertion": "RSS per-PID absolute window peaks sum; thread same PID once; no baseline subtraction",
+          "status": "pending"
+        },
+        {
+          "id": "A10.8",
+          "assertion": "observer method/interval recorded; no spawned sampling subprocess in window",
+          "status": "pending"
+        },
+        {
+          "id": "A10.9",
+          "assertion": "bad round retained; insufficient sample/missing RSS/nonpositive bare latency-throughput-CPU fails",
+          "status": "pending"
+        },
+        {
+          "id": "A10.10",
+          "assertion": "round ratios and medians; p99<=3 throughput>=0.5 CPU<=3 RSS<=2 all required",
+          "status": "pending"
+        },
+        {
+          "id": "A10.11",
+          "assertion": "frozen unit launch/measurement/threshold failure never reclassified unsupported",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A11",
+      "evidenceOwner": "H / E peer admission; G config preparation",
+      "supportUnits": "Python3.9.6 Rust/Cargo1.96.0 Go1.26.4 Node24.16.0 TS6.0.2",
+      "assertions": [
+        {
+          "id": "A11.1",
+          "assertion": "equal/higher version records executable and actual version",
+          "status": "pending"
+        },
+        {
+          "id": "A11.2",
+          "assertion": "lower version rejects before launch; missing tool environment failure; zero download/install",
+          "status": "pending"
+        },
+        {
+          "id": "A11.3",
+          "assertion": "cargo build --offline --locked; zero crates",
+          "status": "pending"
+        },
+        {
+          "id": "A11.4",
+          "assertion": "GOTOOLCHAIN=local; zero external Go modules",
+          "status": "pending"
+        },
+        {
+          "id": "A11.5",
+          "assertion": "Python stdlib only, no __pycache__; artifacts only system temporary directory",
+          "status": "pending"
+        },
+        {
+          "id": "A11.6",
+          "assertion": "package dependency sets unchanged; no untracked build artifacts",
+          "status": "pending"
+        },
+        {
+          "id": "A11.7",
+          "assertion": "resolved default config excludes exact conformance pattern while preserving Vitest default exclusions",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "A12",
+      "evidenceOwner": "root integration owner / H receipt delivery",
+      "supportUnits": "all mandatory A1-A11 cells and all program children",
+      "assertions": [
+        {
+          "id": "A12.1",
+          "assertion": "bridge \u00a78 receives per-non-JS-language/path S4 receipts; Host A1-A8 actual verified evidence",
+          "status": "pending"
+        },
+        {
+          "id": "A12.2",
+          "assertion": "root six A-total assertions each have command/date/count/commit or dirty baseline",
+          "status": "pending"
+        },
+        {
+          "id": "A12.3",
+          "assertion": "old names tracked + nonignored untracked scan zero",
+          "status": "pending"
+        },
+        {
+          "id": "A12.4",
+          "assertion": "fingerprint oracle PASS and child+external seam validators no stale fingerprint/pin diagnosis",
+          "status": "pending"
+        },
+        {
+          "id": "A12.5",
+          "assertion": "all package/direct-consumer/repository/preflight gate:true checks; IG3 unscoped registry and script tests",
+          "status": "pending"
+        },
+        {
+          "id": "A12.6",
+          "assertion": "explicit test:conformance and bench:ipc; four languages/two paths/vectors/performance no missing receipt",
+          "status": "pending"
+        },
+        {
+          "id": "A12.7",
+          "assertion": "child \u00a78 manual audit; tracked test/bench never reads local documentation",
+          "status": "pending"
+        },
+        {
+          "id": "A12.8",
+          "assertion": "X9 and required child delivery closed; no mock-only or design-only SHIP",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "rootATotal": [
+    {
+      "id": "A-total.1",
+      "evidenceOwner": "root integration owner",
+      "status": "pending",
+      "assertion": "tracked and nonignored-untracked old package names absent (rpc-merge A6)"
+    },
+    {
+      "id": "A-total.2",
+      "evidenceOwner": "root integration owner",
+      "status": "pending",
+      "assertion": "real Node child request and provider restored abort reason (channel A1/A2, control A1)"
+    },
+    {
+      "id": "A-total.3",
+      "evidenceOwner": "root integration owner",
+      "status": "pending",
+      "assertion": "real child core error source @migaia/rpc/core, Rpc name and complete cause chain (layering A3, error-format A1)"
+    },
+    {
+      "id": "A-total.4",
+      "evidenceOwner": "root integration owner",
+      "status": "pending",
+      "assertion": "real stopped-reader flow-control overflow policy and backlog report (IPC A1/A8)"
+    },
+    {
+      "id": "A-total.5",
+      "evidenceOwner": "root integration owner",
+      "status": "pending",
+      "assertion": "all child gate:true, package/consumer/repository, registry IG3, conformance and bench receipts; website separately"
+    },
+    {
+      "id": "A-total.6",
+      "evidenceOwner": "root integration owner",
+      "status": "pending",
+      "assertion": "all frozen supported performance cells satisfy four paired ratio medians; absolute dual-end RSS ratio <=2"
+    }
+  ]
+}
