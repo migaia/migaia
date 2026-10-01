@@ -86,6 +86,8 @@ export type IProcessPendingByteConnection = Readonly<{
 export type IListenProcessByteChannel = (
   options: Readonly<{
     address: string
+    /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */
+    serviceId?: string
     signal?: AbortSignal
     auth: Readonly<{
       mode: 'required'
