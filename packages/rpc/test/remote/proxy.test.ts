@@ -15,9 +15,15 @@ describe('A2 remote generation proxy', () => {
     const proxy = fixture.registration.featureProxies().f!.request!
     await expect(proxy(['first'])).resolves.toBe('result')
     const leaves: string[] = []
-    fixture.registration.events.onLeave(1, () => leaves.push('leave'))
+    fixture.registration.events.onLeave(1, () => {
+      leaves.push('leave')
+      fixture.calls.push('leave.listener')
+    })
     fixture.emit({ type: 'exit', generation: 1, reason: 'crashed', error: 'gone' })
     expect(leaves).toEqual(['leave'])
+    expect(fixture.calls.indexOf('leave.listener')).toBeLessThan(
+      fixture.calls.indexOf('endpoint.dispose')
+    )
     expect(fixture.registration.events.current()).toEqual({ generation: 1, active: false })
     await expect(proxy(['closed'])).rejects.toMatchObject({
       code: RpcRemoteLayerErrorCode.closed,
@@ -187,5 +193,72 @@ describe('A2 remote generation proxy', () => {
     expect(reports).toEqual([])
     expect(fixture.calls.filter((entry) => entry === 'endpoint.dispose')).toHaveLength(2)
     expect(fixture.calls.filter((entry) => entry === 'channel.close')).toHaveLength(2)
+  })
+
+  it('codes native aggregate errors from release and rebind rollback', async () => {
+    const fixture = remoteHarness()
+    const releaseFailure = new Error('release failed')
+    const reports: unknown[] = []
+    const registration = createRemoteRegistration({
+      contract: fixture.registration.contract,
+      binding: {
+        ...fixture.binding,
+        async openChannel() {
+          return {
+            ...fixture.channel,
+            async close() {
+              throw releaseFailure
+            }
+          }
+        }
+      },
+      endpointFactory: async () => fixture.served,
+      report: (error) => reports.push(error)
+    })
+    const holder = createRemoteGenerationHolder(registration, (error) => reports.push(error))
+    await holder.prepareInitial(new AbortController().signal)
+    const release = await holder.release().catch((error: unknown) => error)
+    expect(release).toBeInstanceOf(AggregateError)
+    expect(release).toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
+    expect((release as AggregateError).errors).toContain(releaseFailure)
+
+    const next = remoteHarness()
+    const primary = new Error('replacement failed')
+    const rollbackFailure = new Error('rollback failed')
+    let opens = 0
+    let factories = 0
+    const second = createRemoteRegistration({
+      contract: next.registration.contract,
+      binding: {
+        ...next.binding,
+        async openChannel() {
+          opens += 1
+          return {
+            ...next.channel,
+            async close() {
+              if (opens === 2) throw rollbackFailure
+            }
+          }
+        }
+      },
+      endpointFactory: async () => {
+        factories += 1
+        if (factories === 2) throw primary
+        return next.served
+      },
+      report: (error) => reports.push(error)
+    })
+    const replacement = createRemoteGenerationHolder(second, (error) => reports.push(error))
+    await replacement.prepareInitial(new AbortController().signal)
+    next.emit({ type: 'exit', generation: 1, reason: 'crashed' })
+    next.nextGeneration()
+    await expect(replacement.prepareRebind(new AbortController().signal)).rejects.toBe(primary)
+    const rollback = reports.find(
+      (error) =>
+        error instanceof AggregateError &&
+        (error as AggregateError & { code?: string }).code === RpcRemoteLayerErrorCode.startFailed
+    ) as AggregateError | undefined
+    expect(rollback?.errors).toEqual([primary, rollbackFailure])
+    await replacement.release()
   })
 })
