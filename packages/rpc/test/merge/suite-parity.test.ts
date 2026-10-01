@@ -150,14 +150,15 @@ describe('A7 migrated suite parity', () => {
   }, 30_000)
 
   it('contains no stale source or export-key literals in migrated tests', () => {
+    // The delivered JSON-RPC owner is a valid destination; obsolete roots still fail.
     const stale: string[] = []
     for (const file of testSources(join(packageRoot, 'test'))) {
       for (const literal of stringsIn(file)) {
         if (
-          /^(?:\.\.?\/)*src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$))/.test(
+          /^(?:\.\.?\/)*src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$)|bridge\/jsonrpc(?:\/|$))/.test(
             literal
           ) ||
-          /packages\/(?:rpc|web-rpc|rpc-contract)\/src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$))/.test(
+          /packages\/(?:rpc|web-rpc|rpc-contract)\/src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$)|bridge\/jsonrpc(?:\/|$))/.test(
             literal
           ) ||
           literal.includes(['src/core/', 'core.ts'].join('')) ||
