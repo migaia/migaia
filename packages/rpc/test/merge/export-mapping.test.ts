@@ -140,6 +140,7 @@ describe('A1 merged public exports', () => {
     ).toEqual(
       expect.arrayContaining([
         'createProcessPlugin',
+        'createProcessResilience',
         'createServeProcessPlugin',
         'parseProcessPluginDescriptor',
         'ProcessPluginWire'

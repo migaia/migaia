@@ -6,6 +6,8 @@
 
 `@migaia/rpc/process` 提供进程字节/消息通道的 `createProcessTransport`、原生握手 offer，以及 `createProcessPlugin`/`createServeProcessPlugin`。`parseProcessPluginDescriptor` 将不含 token 或 bootstrap payload 的纯数据描述校验并冻结，结构 Schema 和向量随包 `schema/` 发布。客户端 Plugin 定义交给 PluginHost 的异步 `use`；服务侧门面为每条已鉴权连接创建独立 endpoint，并在连接关闭时清理该连接的服务注册。`@migaia/rpc/contract/framing/stream` 提供 4 字节大端长度前缀编码器和增量解码器；它们不进入 core 根入口。Node、Bun、Deno 的 launcher、stdio 与 socket 入口仅从 `@migaia/rpc/process/adapters/*` 深路径按需导入。Byte 通道先完成带认证的握手，再把返回的 `transport`、`pipeline`、`scheduler` 和 `features` 交给 remote endpoint factory；监听方必须在接纳前提供 verifier。Electron 与 Windows Job 的整树终止和安全引导尚无实机证据，能力保持 `unsupported`。
 
+`createProcessResilience({ scheduler, report })` 统一持有会话配额、反向注册、终态诊断和清算。服务端用 `sessionOptions(identity)` 给 endpoint 配置同主体的稳定幂等 scope；需要跨服务进程重启去重时，传入持久的 `idempotencyStore`。客户端将 `callGuard(registrationId)` 传给 remote 门面，并用 `attachRegistration` 关联监督器及清算 owner。已发出的幂等 request 在换代后最多按原键补发一次，且使用原逻辑期限；非幂等调用若结果随代际丢失，以 `REMOTE_RESULT_UNKNOWN` 结算。`@migaia/rpc/remote` 的 `createRemoteRetryPort` 是 Plugin、Host 与 Coroutine 共用的默认策略；显式 `retryPort` 可整体替换它。
+
 ## Contract
 
 Runtime-neutral semantic RPC descriptors, portable values, hostile-safe envelope normalization, and whole-message framing contracts.

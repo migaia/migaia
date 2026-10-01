@@ -2,6 +2,19 @@ export { createProcessTransport } from './handshake.js'
 export { createNativeProcessOffer } from './offer.js'
 export { RpcProcessErrorCode } from './error-code.js'
 export { RpcProcessErrorText } from './error-text.js'
+export { createProcessResilience } from './resilience/index.js'
+export type {
+  IProcessResilience,
+  IProcessResilienceOptions,
+  IProcessResilienceSnapshot,
+  IProcessRegistration,
+  IProcessRegistrationBinding,
+  IProcessRegistrationListenOptions,
+  IProcessRegistrationListener,
+  IProcessLiquidationOwner,
+  IProcessSessionIdentity,
+  IProcessSessionLease
+} from './resilience/types.js'
 export {
   createProcessPlugin,
   createServeProcessPlugin,

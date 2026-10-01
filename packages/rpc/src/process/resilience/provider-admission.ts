@@ -1,6 +1,8 @@
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { portableBytes } from '../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
+import type { IRpcProviderRejection } from '../../core/provider-admission.js'
+import { RpcProviderRejectionReason } from '../../core/semantic-constants.js'
 import { RpcCoreErrorCode } from '../../core/errors.js'
 import type {
   IRpcContext,
@@ -19,6 +21,10 @@ const RATE_WINDOW_MS = 60_000
 
 /** A service connection owns its quota counters and frame observer until it closes. */
 export type IProcessProviderAdmission = Readonly<{
+  /** Attach the canonical local core refusal notification before endpoint construction. */
+  limits(
+    limits: import('../../core/typing.js').IRpcProviderLimits
+  ): import('../../core/typing.js').IRpcProviderLimits
   wrap(endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
   close(): void
 }>
@@ -69,6 +75,12 @@ export function createProcessProviderAdmission(
   })
   scheduleIdle()
 
+  /** Both rate/payload and core concurrency refusals share this connection's consecutive count. */
+  const violate = (): void => {
+    violations += 1
+    if (violations >= 2) queueMicrotask(requestClose)
+  }
+
   /** Reject before invoking a provider; the second consecutive violation closes this session. */
   const admit = (context: IRpcContext): void => {
     const now = scheduler.now()
@@ -80,8 +92,7 @@ export function createProcessProviderAdmission(
       callsInWindow >= options.maxCallsPerMinute ||
       portableBytes(context.data as IRpcPortableValue) > options.maxPayloadBytes
     ) {
-      violations += 1
-      if (violations >= 2) queueMicrotask(requestClose)
+      violate()
       throw createProcessError(RpcProcessErrorCode.connectionLimit)
     }
     callsInWindow += 1
@@ -130,6 +141,17 @@ export function createProcessProviderAdmission(
     }
 
   return Object.freeze({
+    /** Preserve the caller's limits and observer while linking canonical concurrency refusals. */
+    limits(limits) {
+      return Object.freeze({
+        ...limits,
+        /** Only local concurrency refusal joins the connection's consecutive violation count. */
+        onRejected(rejection: IRpcProviderRejection) {
+          if (rejection.reason === RpcProviderRejectionReason.concurrency) violate()
+          return limits.onRejected?.(rejection)
+        }
+      })
+    },
     wrap(endpoint) {
       /** The admission view shadows only provider registration on the frozen core endpoint. */
       const guardedEndpoint: IRpcEndpoint = Object.create(endpoint.endpoint)

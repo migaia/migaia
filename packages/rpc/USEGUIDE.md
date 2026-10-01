@@ -49,6 +49,8 @@ JSON 是必备基线。无共同主版本时拒绝。`peer.runtime` 只供诊断
 
 ## Core
 
+进程门面可从 `@migaia/rpc/process` 导入 `createProcessResilience`。同一服务注册的连接共用其 `sessionOptions(identity)`，按鉴权后的 `principalId` 分隔幂等 scope；远端代理调用先经过 `callGuard(registrationId)`，终态清算后返回 `PROCESS_LIQUIDATED`。默认远程重试只补发声明幂等且已发出的 request，一次换代最多补发一次，复用原键和总期限。非幂等调用失去确定结果时返回 `REMOTE_RESULT_UNKNOWN`；调用方须核对业务状态，不应盲目重发。需要自定义单发策略时，向 remote 门面显式传 `retryPort`。
+
 本文是 `@migaia/rpc/core` 的完整参考手册，面向已经读过 [README.md](./README.md) 五分钟上手部分、需要深入了解具体配置项和边界行为的开发者。README 讲"是什么、能干什么、怎么快速上手"，本文讲"每一个配置项、每一种错误、每一个坑的具体细节"。
 
 ### 目录
