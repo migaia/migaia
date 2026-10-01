@@ -10,7 +10,15 @@ import type {
 } from '../../remote/types.js'
 import type { IRemoteContract } from '../../remote/contract.js'
 import type { IRemotePluginDefinition } from '../../remote/plugin.js'
+import type { IRemoteServePluginOptions } from '../../remote/serve-plugin.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
+import type {
+  IListenProcessByteChannel,
+  IProcessCommonOptions,
+  IProcessPendingByteConnection
+} from '../types.js'
+import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../../contract/handshake.js'
+import type { IRpcPortableValue } from '../../contract/types.js'
 import type { ProcessPluginChannelKind, ProcessPluginWire } from './constants.js'
 
 /** Session labels are created once per generation and forwarded unchanged to the channel adapter. */
@@ -82,4 +90,46 @@ export type IProcessPluginOptions<THandle extends IProcessHandle = IProcessHandl
   keyFactory?: () => string
   retryPort?: IRemoteRetryPort
   deployment: ISpawnProcessPluginDeployment<THandle> | IConnectProcessPluginDeployment
+}>
+
+/** Child ingress reads bootstrap before any responder handshake or provider installation. */
+export type IProcessServeChildIngress = Readonly<{
+  kind: 'child'
+  channelKind: ProcessPluginChannelKind
+  openRaw(
+    signal: IAbortSignal
+  ): Promise<IProcessMessageChannel | Readonly<{ raw: IProcessByteChannel; bootstrap: Uint8Array }>>
+  createVerifier?(bootstrap: Uint8Array): (value: unknown) => void | Promise<void>
+  establish: IProcessPluginEstablish
+  parentLoss: Readonly<{
+    exit(code: 0 | 1): void
+    graceMs?: number
+    probe?(onLost: (reason?: unknown) => void): () => void
+  }>
+}>
+
+/** Listener ingress owns pending authentication and gives each session its own IPC identity. */
+export type IProcessServeListenerIngress = Readonly<{
+  kind: 'listener'
+  listen: IListenProcessByteChannel
+  address: string
+  verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>
+  offer: IRpcHandshakeOffer
+  scheduler?: IScheduler
+  createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{
+    peerId: string
+    ipc: IProcessCommonOptions['ipc']
+  }>
+}>
+
+/** A serve handle owns its sessions while the caller retains the target Host. */
+export type IProcessPluginServeHandle = Readonly<{ close(): Promise<void> }>
+
+/** The service facade delegates method registration to the remote owner. */
+export type IProcessServePluginOptions = Readonly<{
+  host: IRemoteServePluginOptions['host']
+  contract: IRemoteContract
+  ingress: IProcessServeChildIngress | IProcessServeListenerIngress
+  endpointFactory: IRemoteEndpointFactory
+  report(error: unknown): void
 }>

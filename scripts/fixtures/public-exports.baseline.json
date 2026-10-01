@@ -311,7 +311,9 @@
         "RpcProcessErrorCode",
         "RpcProcessErrorText",
         "createNativeProcessOffer",
-        "createProcessTransport"
+        "createProcessPlugin",
+        "createProcessTransport",
+        "createServeProcessPlugin"
       ],
       "./process/adapters/node-child-process": [
         "createNodeProcessLauncher",
