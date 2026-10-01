@@ -609,6 +609,11 @@ func serveUnix(path, role string) error {
 
 // main selects a selftest, stdio session, or a single Unix socket session.
 func main() {
+	business := flag.Bool("business", false, "serve published business profile")
+	host := flag.Bool("host", false, "serve portable Host controls")
+	bootstrap := flag.String("bootstrap", "none", "native stdin bootstrap")
+	authFD := flag.Int("auth-fd", -1, "inherited auth descriptor")
+	contractPath := flag.String("contract", "", "published business contract vector")
 	role := flag.String("role", "responder", "responder or initiator")
 	stdio := flag.Bool("stdio", false, "use framed stdin/stdout")
 	listenUnix := flag.String("listen-unix", "", "listen on a Unix socket")
@@ -628,7 +633,9 @@ func main() {
 		os.Exit(2)
 	}
 	var err error
-	if *listenUnix != "" {
+	if *business {
+		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *contractPath)
+	} else if *listenUnix != "" {
 		err = serveUnix(*listenUnix, *role)
 	} else if *connectUnix != "" {
 		err = serveUnix(*connectUnix, "initiator")
