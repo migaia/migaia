@@ -120,14 +120,14 @@ export async function listenProcessRegistrations(
               principalId: accepted.principalId,
               ...(context.ipc.processId ? { processId: context.ipc.processId } : {})
             })
-          unsubscribeTransport = channel.transport.onTransportError?.(() => {
-            void closeCandidate().catch((error: unknown) => reportSafely(report, error))
-          })
-          if (candidateController.signal.aborted) {
-            await closeCandidate()
-            return
-          }
-          const outcome = await options.onCandidate(
+            unsubscribeTransport = channel.transport.onTransportError?.(() => {
+              void closeCandidate().catch((error: unknown) => reportSafely(report, error))
+            })
+            if (candidateController.signal.aborted) {
+              await closeCandidate()
+              return
+            }
+            const outcome = await options.onCandidate(
               Object.freeze({
                 channel,
                 identity,
