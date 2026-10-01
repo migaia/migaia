@@ -244,7 +244,7 @@ describe('process resilience committed liquidation', () => {
     await resilience.close()
   })
 
-  it('[A7] retains only the newest 100 committed tombstones', async () => {
+  it('[A7] autonomously retains only the newest 100 committed tombstones', async () => {
     const scheduler = createManualScheduler()
     const resilience = createProcessResilience({
       scheduler,
@@ -254,7 +254,7 @@ describe('process resilience committed liquidation', () => {
     })
     for (let index = 0; index < 101; index += 1) {
       const source = terminalSource(() => undefined)
-      const registration = resilience.attachRegistration(`p${index}`, source.binding, {
+      resilience.attachRegistration(`p${index}`, source.binding, {
         kind: 'standalone-host',
         release: async () => undefined
       })
@@ -262,11 +262,44 @@ describe('process resilience committed liquidation', () => {
       await settle()
       scheduler.advance(1)
       await settle()
-      await registration.close()
+      expect(resilience.inspect(`p${index}`)).toMatchObject({ liquidated: true })
     }
     expect(resilience.inspect('p0')).toBeUndefined()
     expect(resilience.inspect('p1')).toMatchObject({ liquidated: true })
     expect(resilience.inspect('p100')).toMatchObject({ liquidated: true })
     await resilience.close()
+  })
+
+  it('[A7] a liquidated handle cannot remove a replacement registration', async () => {
+    /** Both generations use the governor's original monotonic report schedule. */
+    const scheduler = createManualScheduler()
+    /** Automatic retirement leaves only a bounded diagnostic entry in the owner. */
+    const resilience = createProcessResilience({
+      scheduler,
+      report: () => undefined,
+      reportAtMs: [0, 1],
+      unhandledLimit: 1
+    })
+    /** The retained caller handle outlives its successful automatic liquidation. */
+    const first = terminalSource(() => undefined)
+    const retired = resilience.attachRegistration('p', first.binding, {
+      kind: 'standalone-host',
+      release: async () => undefined
+    })
+    first.enter(new Error('first terminal'))
+    await settle()
+    scheduler.advance(1)
+    await settle()
+    expect(retired.inspect()).toMatchObject({ liquidated: true })
+    /** Reusing the identity removes the tombstone without borrowing the old registration. */
+    const second = terminalSource(() => undefined)
+    const current = resilience.attachRegistration('p', second.binding, {
+      kind: 'standalone-host',
+      release: async () => undefined
+    })
+    await retired.close()
+    expect(resilience.inspect('p')).toEqual(current.inspect())
+    await resilience.close()
+    expect(resilience.inspect('p')).toBeUndefined()
   })
 })

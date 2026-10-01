@@ -99,6 +99,9 @@ export function createProcessTerminalRegistration(
       try {
         await liquidation
         liquidated = true
+        // This delivery has consumed its timer; retain only the owner's bounded tombstone.
+        unsubscribe()
+        options.onClose()
       } catch (error) {
         liquidation = undefined
         options.report(error)
