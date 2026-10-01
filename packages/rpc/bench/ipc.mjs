@@ -281,6 +281,11 @@ export function judgePairs(rounds) {
  * @throws {Error} Frozen missing capability, launch, observer or metric failure; no ratio marker.
  */
 async function pairedMain() {
+  const { admitConformanceToolchains } =
+    await import('../test/process/fixtures/conformance-toolchains.mjs')
+  const admission = admitConformanceToolchains()
+  console.log(JSON.stringify({ type: 'toolchain-admission', ...admission }))
+  if (!admission.accepted) throw new Error(JSON.stringify(admission))
   const { spawn } = await import('node:child_process')
   const { readFile } = await import('node:fs/promises')
   const { fileURLToPath } = await import('node:url')
