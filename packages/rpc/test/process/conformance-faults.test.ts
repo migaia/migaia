@@ -519,3 +519,133 @@ describe('[A4] explicit persistent authenticated scope', () => {
     expect(active.budget.inUse).toBe(0)
   }, 15000)
 })
+
+/** Allow real I/O callbacks and the bounded production promise continuations to settle. */
+async function settleFaultTurn() {
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  for (let turn = 0; turn < 32; turn++) await Promise.resolve()
+}
+
+describe('[A4] default native health detects real CPU loops', () => {
+  for (const peer of peers)
+    it(`${peer.language} busy loop fails at 17000ms and restarts owned PID`, async () => {
+      const scheduler = createManualScheduler()
+      const active = await faultClient(peer, {
+        scheduler,
+        restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
+      })
+      try {
+        const current = active.handles[0]!
+        expect(active.resilience.inspect('p')).toMatchObject({ health: 'ping', state: 'ready' })
+        expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.busy', [])).toBe('ACK')
+        let exited = false
+        void current.exited.then(() => {
+          exited = true
+        })
+        const origin = scheduler.now()
+        for (let check = 0; check < 3; check++) {
+          scheduler.advance(origin + (check + 1) * 5000 - scheduler.now())
+          await settleFaultTurn()
+          expect(exited).toBe(false)
+          scheduler.advance(1999)
+          await settleFaultTurn()
+          expect(exited).toBe(false)
+          scheduler.advance(1)
+          await settleFaultTurn()
+          if (check < 2) expect(exited).toBe(false)
+        }
+        expect(scheduler.now() - origin).toBe(17000)
+        await current.exited
+        await vi.waitFor(() =>
+          expect(active.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+        )
+        scheduler.advance(1)
+        await vi.waitFor(() => expect(active.handles).toHaveLength(2))
+        await vi.waitFor(async () =>
+          expect(await active.feature.request(['after-busy'])).toBe('after-busy')
+        )
+        expect(active.handles[1]!.identity.pid).not.toBe(current.identity.pid)
+        expect(
+          wireFrames(active.sent).filter(
+            (frame) => frame.kind === 'variation' && frame.data.route.variation === 'ping'
+          )
+        ).toHaveLength(3)
+        expect(
+          active.reports.some((error) => (error as { code?: string }).code === 'UNHEALTHY')
+        ).toBe(true)
+      } finally {
+        await active.close()
+        await Promise.all(active.handles.map((handle) => handle.exited))
+        receipt(active, `${peer.language}-busy`)
+      }
+      expect(active.budget.inUse).toBe(0)
+      expect(scheduler.pendingCount).toBe(0)
+    }, 20000)
+})
+
+describe('[A5] capacity one real stopped reader', () => {
+  for (const peer of peers)
+    it(`${peer.language} keeps send pending, rejects overload, reports backlog and recovers`, async () => {
+      const active = await faultClient(peer, { maxPendingData: 1 })
+      const healthy = await faultClient(peer)
+      let paused = false
+      let blocked: Promise<unknown> | undefined
+      try {
+        expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
+        paused = true
+        /** This real pipe write exceeds the OS pipe buffer while remaining below the frame budget. */
+        blocked = active.runtimes[0]!.endpoint.send(
+          peer.id,
+          'p.f.request',
+          ['x'.repeat(2 * 1024 * 1024)],
+          { timeoutMs: 10000, trace: 'h-backlog-trace' }
+        )
+        let settled = false
+        void blocked.then(
+          () => {
+            settled = true
+          },
+          () => {
+            settled = true
+          }
+        )
+        await settleFaultTurn()
+        expect(settled).toBe(false)
+        const writes = active.sent.length
+        await expect(
+          active.runtimes[0]!.endpoint.send(peer.id, 'p.f.request', ['overloaded'], {
+            trace: 'h-rejected-trace'
+          })
+        ).rejects.toMatchObject({ cause: { code: 'OVERLOADED' } })
+        expect(active.sent).toHaveLength(writes)
+        expect(active.backlog).toContainEqual(
+          expect.objectContaining({
+            name: 'ipc.backlog.rejected',
+            pendingData: 1,
+            trace: 'h-rejected-trace'
+          })
+        )
+        expect(await healthy.feature.request(['healthy-during-backlog'])).toBe(
+          'healthy-during-backlog'
+        )
+        process.kill(active.handles[0]!.identity.pid!, 'SIGCONT')
+        paused = false
+        expect(await blocked).toBe('x'.repeat(2 * 1024 * 1024))
+        expect(await active.feature.request(['after-drain'])).toBe('after-drain')
+        expect(active.backlog).toContainEqual(
+          expect.objectContaining({ name: 'ipc.backlog.low', pendingData: 0 })
+        )
+      } finally {
+        if (paused) process.kill(active.handles[0]!.identity.pid!, 'SIGCONT')
+        await active.close()
+        await healthy.close()
+        await blocked?.catch(() => undefined)
+        await Promise.all([...active.handles, ...healthy.handles].map((handle) => handle.exited))
+        receipt(active, `${peer.language}-backlog`)
+      }
+      expect(active.budget.inUse).toBe(0)
+      expect(active.budget.pending).toBe(0)
+      expect(healthy.budget.inUse).toBe(0)
+      expect(healthy.budget.pending).toBe(0)
+    }, 15000)
+})
