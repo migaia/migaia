@@ -1,0 +1,61 @@
+[
+  {
+    "id": "single-ascii",
+    "payloadHex": "41",
+    "encodedPrefixHex": "00000001",
+    "chunksHex": ["0000000141"],
+    "framesHex": ["41"],
+    "finish": true
+  },
+  {
+    "id": "single-binary",
+    "payloadHex": "00ff",
+    "encodedPrefixHex": "00000002",
+    "chunksHex": ["0000000200ff"],
+    "framesHex": ["00ff"],
+    "finish": true
+  },
+  {
+    "id": "fragmented-and-coalesced",
+    "chunksHex": ["00", "00", "00", "01", "41", "0000000200", "ff0000000142"],
+    "framesHex": ["41", "00ff", "42"],
+    "finish": true
+  },
+  {
+    "id": "empty-payload",
+    "payloadHex": "",
+    "chunksHex": ["00000000"],
+    "framesHex": [],
+    "error": { "code": "INVALID_FRAME" },
+    "finish": false
+  },
+  {
+    "id": "maximum-frame",
+    "payload": { "repeatHex": "00", "count": 16777216 },
+    "encodedPrefixHex": "01000000",
+    "chunks": ["01000000", { "repeatHex": "00", "count": 16777216 }],
+    "frames": [{ "repeatHex": "00", "count": 16777216, "prefixHex": "01000000" }],
+    "finish": true
+  },
+  {
+    "id": "over-maximum-header",
+    "chunksHex": ["01000001"],
+    "framesHex": [],
+    "error": { "code": "FRAME_LIMIT_EXCEEDED" },
+    "finish": false
+  },
+  {
+    "id": "truncated-payload",
+    "chunksHex": ["0000000241"],
+    "framesHex": [],
+    "error": { "code": "INVALID_FRAME" },
+    "finish": true
+  },
+  {
+    "id": "truncated-header",
+    "chunksHex": ["000001"],
+    "framesHex": [],
+    "error": { "code": "INVALID_FRAME" },
+    "finish": true
+  }
+]
