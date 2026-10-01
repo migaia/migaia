@@ -31,7 +31,7 @@ describe('K217 frozen merge coverage guard', () => {
   it('ignores only new file additions, even when the new file has no covered statements', () => {
     /** This input changes no historical metrics, and therefore must yield identical aggregates. */
     const files = structuredClone(baseline.files)
-    files['packages/rpc/src/fixture-new-module.ts'] = Object.fromEntries(
+    files['packages/rpc/src/process/fixture-new-module.ts'] = Object.fromEntries(
       ['lines', 'statements', 'functions', 'branches'].map((metric) => [
         metric,
         { covered: 0, total: 1_000_000, pct: 0 }
