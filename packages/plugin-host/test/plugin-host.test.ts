@@ -1093,7 +1093,12 @@ describe('PluginHost', () => {
       retireLeaseOwner: () => undefined,
       executionSignal: {} as any,
       cleanupRuntime: {} as any,
-      setHookRegistration: () => undefined
+      scheduler: createManualScheduler(),
+      disposeStepTimeoutMs: false,
+      setHookRegistration: () => undefined,
+      clearHookRegistrationIfOwner: () => undefined,
+      setReleasePending: () => undefined,
+      clearReleasePendingIfOwner: () => undefined
     })
     runtime.revokeRegistration(registration)
     expect(registration.featureExposeValid).toBe(false)
@@ -1225,7 +1230,12 @@ describe('PluginHost', () => {
       retireLeaseOwner: () => undefined,
       executionSignal: {} as any,
       cleanupRuntime: {} as any,
-      setHookRegistration: () => undefined
+      scheduler: createManualScheduler(),
+      disposeStepTimeoutMs: false,
+      setHookRegistration: () => undefined,
+      clearHookRegistrationIfOwner: () => undefined,
+      setReleasePending: () => undefined,
+      clearReleasePendingIfOwner: () => undefined
     })
     runtime.revokeRegistration(registration)
     expect(stage.retired).toBe(false)
