@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost } from '@migaia/plugin-host'
@@ -194,6 +196,15 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
   } catch (error) {
     await local.dispose()
     await resilience.close()
+    await Promise.all(fixture.handles.map((handle) => handle.exited))
+    writeFileSync(
+      join(evidence, `hf-${peer.language}-startup.stderr.log`),
+      Buffer.concat(fixture.output)
+    )
+    writeFileSync(
+      join(evidence, `hf-${peer.language}-startup.stdout.bin`),
+      Buffer.concat(fixture.stdout)
+    )
     throw error
   }
 }
@@ -462,4 +473,49 @@ describe('[A4] real owned terminal guards', () => {
         expect(scheduler.pendingCount).toBe(0)
         expect(active.resilience.inspect('p')).toBeUndefined()
       }, 15000)
+})
+
+describe('[A4] explicit persistent authenticated scope', () => {
+  it('replays the original key once after committed crash without executing the side effect twice', async () => {
+    /**
+     * File backing is private, bounded to one benign result, and removed after all child ownership
+     * ends.
+     */
+    const directory = await mkdtemp(join(tmpdir(), 'rpc-hf-store-'))
+    const peer: IPeer = {
+      language: 'persistent',
+      command: process.execPath,
+      args: [
+        new URL('./fixtures/conformance-faults-persistent.mjs', import.meta.url).pathname,
+        directory
+      ],
+      id: 'ts-peer'
+    }
+    const active = await faultClient(peer, {
+      restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
+    })
+    try {
+      expect(
+        await active.feature.request([], { timeoutMs: 5000, idempotencyKey: 'hf-original-key' })
+      ).toBe('committed')
+      expect(Number(readFileSync(join(directory, 'count.txt'), 'utf8'))).toBe(1)
+      expect(active.handles).toHaveLength(2)
+      expect((await active.handles[0]!.exited).code).toBe(17)
+      const requests = wireFrames(active.sent).filter(
+        (frame) => frame.kind === 'request' && frame.method === 'p.f.request'
+      )
+      expect(requests).toHaveLength(2)
+      expect(requests.map((frame) => frame.data.route.idempotencyKey)).toEqual([
+        'hf-original-key',
+        'hf-original-key'
+      ])
+      expect(requests[1].data.route.timeoutMs).toBeLessThanOrEqual(requests[0].data.route.timeoutMs)
+    } finally {
+      await active.close()
+      await Promise.all(active.handles.map((handle) => handle.exited))
+      receipt(active, 'persistent-retry')
+      await rm(directory, { recursive: true, force: true })
+    }
+    expect(active.budget.inUse).toBe(0)
+  }, 15000)
 })
