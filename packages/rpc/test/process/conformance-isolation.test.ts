@@ -2,7 +2,7 @@ import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { closeSync, openSync, writeFileSync, unlinkSync } from 'node:fs'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { inspect } from 'node:util'
@@ -172,10 +172,15 @@ async function listener(mode: string) {
       const exited = once(child, 'exit')
       child.kill('SIGTERM')
       await exited
-      writeFileSync(join(evidence, `isolation-${mode}.stdout.log`), Buffer.concat(stdout))
-      writeFileSync(join(evidence, `isolation-${mode}.stderr.log`), Buffer.concat(stderr))
-      noSecret(Buffer.concat(stderr).toString(), tokens.alice)
-      noSecret(Buffer.concat(stderr).toString(), tokens.bob)
+      try {
+        writeFileSync(join(evidence, `isolation-${mode}.stdout.log`), Buffer.concat(stdout))
+        writeFileSync(join(evidence, `isolation-${mode}.stderr.log`), Buffer.concat(stderr))
+        noSecret(Buffer.concat(stderr).toString(), tokens.alice)
+        noSecret(Buffer.concat(stderr).toString(), tokens.bob)
+      } finally {
+        /** The exited child no longer owns a socket within this fixture-created directory. */
+        await rm(directory, { recursive: true, force: true })
+      }
     }
   }
 }
@@ -281,6 +286,8 @@ describe('[A7] real process session and principal isolation', () => {
       await raw.close()
       await service.close()
       await host.dispose()
+      /** Both listeners have closed before their fixture-created rendezvous directory is removed. */
+      await rm(directory, { recursive: true, force: true })
     }
   })
   it('[A7.1] rejects actual over-capacity socket flood and returns every rejected descriptor', async () => {
