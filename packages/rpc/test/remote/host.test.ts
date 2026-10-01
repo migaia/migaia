@@ -47,6 +47,117 @@ function endpointHarness() {
 }
 
 describe('remote Host trusted control', () => {
+  it('adopts an identical shared definition and closes stale connection handles', async () => {
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    let calls = 0
+    const definition = definePlugin({
+      name: 'p',
+      features: { f: defineFeature(() => ({ m: () => ++calls })) },
+      install: () => ({})
+    })
+    const use = vi.spyOn(host, 'use')
+    const first = endpointHarness()
+    const second = endpointHarness()
+    const options = {
+      host: host as never,
+      catalog,
+      resolvePlugin: () => definition,
+      report: vi.fn()
+    }
+    const a = await serveRemoteHost({ ...options, endpoint: { endpoint: first.endpoint } })
+    const b = await serveRemoteHost({ ...options, endpoint: { endpoint: second.endpoint } })
+    try {
+      await first.invoke(RemoteMethodName.hostUse, ['p'])
+      await expect(first.invoke('p.f.m', [])).resolves.toBe(1)
+      await expect(second.invoke(RemoteMethodName.hostUse, ['p'])).resolves.toMatchObject({
+        name: 'p'
+      })
+      expect(use).toHaveBeenCalledTimes(1)
+      await expect(second.invoke('p.f.m', [])).resolves.toBe(2)
+      const conflicting = endpointHarness()
+      const duplicate = await serveRemoteHost({
+        ...options,
+        resolvePlugin: () =>
+          definePlugin({
+            name: 'p',
+            features: { f: defineFeature(() => ({ m: () => 0 })) },
+            install: () => ({})
+          }),
+        endpoint: { endpoint: conflicting.endpoint }
+      })
+      await expect(conflicting.invoke(RemoteMethodName.hostUse, ['p'])).rejects.toMatchObject({
+        code: 'PLUGIN_DUPLICATE'
+      })
+      await duplicate.close()
+      await second.invoke(RemoteMethodName.hostUnUse, ['p'])
+      await expect(first.invoke('p.f.m', [])).rejects.toMatchObject({
+        code: RpcRemoteLayerErrorCode.closed
+      })
+      expect(calls).toBe(2)
+      const replacement = definePlugin({
+        name: 'p',
+        features: { f: defineFeature(() => ({ m: () => ++calls })) },
+        install: () => ({})
+      })
+      const third = endpointHarness()
+      const c = await serveRemoteHost({
+        ...options,
+        resolvePlugin: () => replacement,
+        endpoint: { endpoint: third.endpoint }
+      })
+      try {
+        await third.invoke(RemoteMethodName.hostUse, ['p'])
+        await expect(first.invoke('p.f.m', [])).rejects.toMatchObject({
+          code: RpcRemoteLayerErrorCode.closed
+        })
+        await expect(third.invoke('p.f.m', [])).resolves.toBe(3)
+      } finally {
+        await c.close()
+      }
+    } finally {
+      await a.close()
+      await b.close()
+      await host.dispose()
+    }
+  })
+
+  it('prunes an externally removed plugin before shared Host adoption', async () => {
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const definition = definePlugin({
+      name: 'p',
+      features: { f: defineFeature(() => ({ m: () => 'live' })) },
+      install: () => ({})
+    })
+    const first = endpointHarness()
+    const second = endpointHarness()
+    const options = { host: host as never, catalog, resolvePlugin: () => definition, report: vi.fn() }
+    const a = await serveRemoteHost({ ...options, endpoint: { endpoint: first.endpoint } })
+    const b = await serveRemoteHost({ ...options, endpoint: { endpoint: second.endpoint } })
+    try {
+      await first.invoke(RemoteMethodName.hostUse, ['p'])
+      await host.unUse('p')
+      await expect(first.invoke('p.f.m', [])).rejects.toMatchObject({
+        code: RpcRemoteLayerErrorCode.closed
+      })
+      expect(await second.invoke(RemoteMethodName.hostInspect, [])).toMatchObject({ plugins: [] })
+      await expect(second.invoke(RemoteMethodName.hostUse, ['p'])).resolves.toMatchObject({
+        name: 'p'
+      })
+      await expect(first.invoke('p.f.m', [])).rejects.toMatchObject({
+        code: RpcRemoteLayerErrorCode.closed
+      })
+      await expect(second.invoke('p.f.m', [])).resolves.toBe('live')
+    } finally {
+      await a.close()
+      await b.close()
+      await host.dispose()
+    }
+  })
+
   it('closes resources after a failed first preparation and retries the same Host', async () => {
     const fixture = remoteHarness()
     /** A transient endpoint factory failure must not poison later ready calls. */
@@ -115,7 +226,8 @@ describe('remote Host trusted control', () => {
 
   it('rejects thenables, forged definitions, wrong names and unknown names before Host.use', async () => {
     const endpoint = endpointHarness()
-    const use = vi.fn(async () => [])
+    const feature = {}
+    const use = vi.fn(async () => [{ getFeature: () => feature }])
     const unUse = vi.fn(async () => ({ ok: true }))
     /** Resolver output changes without changing the Host or the exposed providers. */
     let candidate: unknown = definePlugin({ name: 'p', install: () => ({}) })
@@ -186,7 +298,8 @@ describe('remote Host trusted control', () => {
   })
 
   it('shares inspect receipts and keeps dry runs distinct from committed removal', async () => {
-    const use = vi.fn(async () => [])
+    const feature = {}
+    const use = vi.fn(async () => [{ getFeature: () => feature }])
     const unUse = vi.fn(async (_name: string, options: { dryRun?: boolean }) =>
       options.dryRun
         ? { policy: 'reject', order: ['p'], steps: [{ name: 'p', action: 'release' }], edges: [] }
