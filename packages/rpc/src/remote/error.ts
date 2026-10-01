@@ -10,7 +10,8 @@ import { RpcRemoteLayerErrorText } from './error-text.js'
 const TEXT_BY_CODE: Readonly<Record<IRpcRemoteLayerErrorCode, string>> = {
   [RpcRemoteLayerErrorCode.contractInvalid]: RpcRemoteLayerErrorText.contractInvalid,
   [RpcRemoteLayerErrorCode.startFailed]: RpcRemoteLayerErrorText.startFailed,
-  [RpcRemoteLayerErrorCode.closed]: RpcRemoteLayerErrorText.closed
+  [RpcRemoteLayerErrorCode.closed]: RpcRemoteLayerErrorText.closed,
+  [RpcRemoteLayerErrorCode.resultUnknown]: RpcRemoteLayerErrorText.resultUnknown
 }
 
 /** Constructs a native error while preserving the original failure on cause. */

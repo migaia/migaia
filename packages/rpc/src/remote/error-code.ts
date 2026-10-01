@@ -8,7 +8,12 @@ export const RpcRemoteLayerErrorCode = {
   /** A supervisor cannot provide a ready unit or a channel cannot open; inspect the cause. */
   startFailed: 'REMOTE_START_FAILED',
   /** The registration was released or its generation left; wait for another ready generation. */
-  closed: 'REMOTE_CLOSED'
+  closed: 'REMOTE_CLOSED',
+  /**
+   * A sent request lost its result with the generation; reconcile before another non-idempotent
+   * call.
+   */
+  resultUnknown: 'REMOTE_RESULT_UNKNOWN'
 } as const
 
 export type IRpcRemoteLayerErrorCode =

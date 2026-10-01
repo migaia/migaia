@@ -21,6 +21,7 @@ import {
 import { ERROR_SOURCE, RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
 import { RpcRemoteLayerErrorText } from './error-text.js'
+import { createRemoteRetryPort } from './retry.js'
 import type {
   IRemoteCallOptions,
   IRemoteChannel,
@@ -119,6 +120,8 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   readonly events: IRemoteGenerationEvents
   /** The current binding and its single scheduler. */
   readonly #options: IRemoteProxyOptions<TUnit, TSpec>
+  /** An explicit port replaces the shared default for this registration. */
+  readonly #retryPort: IRemoteRetryPort
   /** Most recent described and active generation. */
   #current: IRemoteGeneration | undefined
   /** Departures retain their original reason for late listeners. */
@@ -177,6 +180,13 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
       whenReady: (afterGeneration: number, signal?: IAbortSignal) =>
         this.#whenReady(afterGeneration, signal)
     })
+    this.#retryPort =
+      options.retryPort ??
+      createRemoteRetryPort({
+        events: this.events,
+        scheduler: options.binding.scheduler,
+        report: options.report
+      })
     this.#unsubscribe = options.binding.supervisor.subscribe((event) => {
       if (event.type === 'exit') this.#leave(event.generation, event.error)
       if (event.type === 'switched') this.#leave(event.from, undefined)
@@ -194,8 +204,10 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
 
   /** Waits for one later generation, canceling exactly one listener on abort. */
   #whenReady(after: number, signal?: IAbortSignal): Promise<number> {
-    if (this.#releasePromise)
-      return Promise.reject(createRemoteLayerError(RpcRemoteLayerErrorCode.closed))
+    if (this.#releaseReason !== undefined || this.#releasePromise)
+      return Promise.reject(
+        this.#releaseReason ?? createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+      )
     if (this.#current && this.#current.number > after) return Promise.resolve(this.#current.number)
     return new Promise<number>((resolve, reject) => {
       /** Removed at resolution, rejection, or signal abort. */
@@ -493,10 +505,7 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
             .catch(restoreTaggedProviderFailure)
         }
       }
-      const port: IRemoteRetryPort | undefined = this.#options.retryPort
-      return port
-        ? port.dispatch(dispatch)
-        : dispatch.sendOnce({ expectedGeneration: active.number, key })
+      return this.#retryPort.dispatch(dispatch)
     } catch (error) {
       return Promise.reject(error)
     }

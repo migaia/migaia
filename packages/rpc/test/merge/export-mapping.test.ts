@@ -125,6 +125,7 @@ describe('A1 merged public exports', () => {
         'normalizeRemoteControlShape',
         'sameRemoteContract',
         'createRemotePlugin',
+        'createRemoteRetryPort',
         'serveRemotePlugin',
         'createRemoteHost',
         'serveRemoteHost',
