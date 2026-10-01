@@ -48,6 +48,54 @@ function endpointHarness() {
 }
 
 describe('remote Host trusted control', () => {
+  it('leaves no inspect or callable ghost after Host.use fails', async () => {
+    const endpoint = endpointHarness()
+    const definition = definePlugin({
+      name: 'p',
+      features: { f: defineFeature(() => ({ m: () => 'live' })) },
+      install: () => ({})
+    })
+    /** Admission fails once before a valid handle is returned. */
+    let fail = true
+    const output = { m: () => 'live' }
+    const use = vi.fn(async () => {
+      if (fail) throw new Error('admission failed')
+      return [{ getFeature: () => output }]
+    })
+    const host = {
+      use,
+      unUse: vi.fn(async () => ({ ok: true })),
+      plugin: { disabled: () => [] },
+      revision: 1
+    } as unknown as IRemoteServeHostOptions['host']
+    const service = await serveRemoteHost({
+      host,
+      catalog,
+      resolvePlugin: () => definition,
+      endpoint: { endpoint: endpoint.endpoint },
+      report: vi.fn()
+    })
+    try {
+      await expect(endpoint.invoke(RemoteMethodName.hostUse, ['p'])).rejects.toThrow(
+        'admission failed'
+      )
+      expect(await endpoint.invoke(RemoteMethodName.hostInspect, [])).toMatchObject({ plugins: [] })
+      await expect(endpoint.invoke('p.f.m', [])).rejects.toMatchObject({
+        code: RpcRemoteLayerErrorCode.closed
+      })
+      fail = false
+      await expect(endpoint.invoke(RemoteMethodName.hostUse, ['p'])).resolves.toMatchObject({
+        name: 'p'
+      })
+      expect(use).toHaveBeenCalledTimes(2)
+      expect(await endpoint.invoke(RemoteMethodName.hostInspect, [])).toMatchObject({
+        plugins: [{ name: 'p' }]
+      })
+    } finally {
+      await service.close()
+    }
+  })
+
   it('adopts an identical shared definition and closes stale connection handles', async () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
