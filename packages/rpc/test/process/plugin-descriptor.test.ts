@@ -91,4 +91,43 @@ describe('process plugin descriptor', () => {
     expect(String(caught)).not.toContain(secret)
     expect(JSON.stringify(caught)).not.toContain(secret)
   })
+
+  it.each([
+    ['deployment.spec.args', [1], 'deployment.spec.args'],
+    ['deployment.spec.cwd', '', 'deployment.spec.cwd'],
+    ['deployment.spec.env.inherit', [1], 'deployment.spec.env.inherit'],
+    ['deployment.spec.env.set', { BAD: 1 }, 'deployment.spec.env.set.BAD'],
+    ['deployment.spec.stdio.stdin', 'unknown', 'deployment.spec.stdio.stdin'],
+    ['deployment.spec.stdio.stdout', 'unknown', 'deployment.spec.stdio.stdout'],
+    ['deployment.spec.stdio.stderr', 'unknown', 'deployment.spec.stdio.stderr'],
+    ['deployment.spec.limits', { memoryBytes: 0 }, 'deployment.spec.limits.memoryBytes'],
+    ['deployment.spec.permissions', [1], 'deployment.spec.permissions'],
+    ['deployment.spec.bootstrap.fd', 3, 'deployment.spec.bootstrap.fd'],
+    ['deployment.budget.overflow', 'unknown', 'deployment.budget.overflow'],
+    ['deployment.budget.queueTimeoutMs', 0, 'deployment.budget.queueTimeoutMs'],
+    ['deployment.budget.launchRate', { max: 0, windowMs: 1 }, 'deployment.budget.launchRate.max'],
+    [
+      'deployment.budget.launchRate',
+      { max: 1, windowMs: 0 },
+      'deployment.budget.launchRate.windowMs'
+    ]
+  ] as const)(
+    '[A10] rejects malformed persisted field %s before creating a process',
+    (path, value, field) => {
+      /** A valid published vector is changed at one exact persisted field. */
+      const source = vectors.cases.find((vector) => vector.id === 'spawn-native-stdin')!.value
+      const input = structuredClone(source) as Record<string, unknown>
+      const parts = path.split('.')
+      let owner: Record<string, unknown> = input
+      for (const part of parts.slice(0, -1)) owner = owner[part] as Record<string, unknown>
+      owner[parts.at(-1)!] = value
+      expect(acceptsSchema(schema, input, schema)).toBe(false)
+      expect(() => parseProcessPluginDescriptor(input)).toThrowError(
+        expect.objectContaining({
+          code: 'PROCESS_PLUGIN_INVALID_OPTION',
+          detail: { field: `descriptor.${field}` }
+        })
+      )
+    }
+  )
 })
