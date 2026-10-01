@@ -1,6 +1,34 @@
 {
   "cases": [
     {
+      "id": "token-is-a-valid-plugin-feature-and-method-name",
+      "value": {
+        "descriptorVersion": 1,
+        "name": "token",
+        "runtime": "node",
+        "deployment": {
+          "kind": "connect",
+          "address": "local-token-name.sock"
+        },
+        "contract": {
+          "schemaVersion": 1,
+          "plugin": "token",
+          "features": {
+            "token": {
+              "methods": {
+                "token": {
+                  "mode": "request",
+                  "idempotent": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "schemaValid": true,
+      "semanticValid": true
+    },
+    {
       "id": "spawn-native-stdin",
       "value": {
         "descriptorVersion": 1,
