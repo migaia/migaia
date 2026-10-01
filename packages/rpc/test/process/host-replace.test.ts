@@ -6,10 +6,13 @@ import { hostFixture } from './fixtures/host-control.js'
 import { nativeHostOptions } from './fixtures/host-native.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
 import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createPrewarmPool } from '@migaia/supervision/process'
 import { parseProcessPluginDescriptor } from '../../src/process/plugin/descriptor.js'
 import { readFileSync } from 'node:fs'
+import { createProcessError } from '../../src/process/error.js'
+import { RpcProcessErrorCode } from '../../src/process/error-code.js'
+import { DEFAULT_DRAIN_MS } from '../../src/process/resilience/constants.js'
 
 /** Flush candidate cancellation and queued mutation continuations without changing time budgets. */
 async function settle(): Promise<void> {
@@ -17,6 +20,134 @@ async function settle(): Promise<void> {
 }
 
 describe('process Host replacement publication', () => {
+  it('[A3] never resends an old sent idempotent request into the new real child', async () => {
+    /** Real I/O retains production deadlines while the injected monotonic clock advances drain. */
+    const fixture = nativeHostOptions('old')
+    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
+    const scheduler = createManualScheduler()
+    const original = fixture.options.endpointFactory
+    let draining!: () => void
+    const drainStarted = new Promise<void>((resolve) => {
+      draining = resolve
+    })
+    const host = createProcessHost({
+      ...fixture.options,
+      scheduler,
+      deployment: {
+        ...fixture.options.deployment,
+        supervision: { ...fixture.options.deployment.supervision, scheduler }
+      },
+      endpointFactory: async (...args) => {
+        const served = await original(...args)
+        return {
+          ...served,
+          endpoint: {
+            ...served.endpoint,
+            announceClose(...input) {
+              const announced = served.endpoint.announceClose(...input)
+              draining()
+              return announced
+            }
+          }
+        }
+      }
+    })
+    try {
+      const oldFeatures = await host.use('p')
+      const pending = oldFeatures.f!.request!(['hold'], { idempotencyKey: 'old-request-fixture' })
+      const outcome = Promise.allSettled([pending])
+      expect(await oldFeatures.f!.request!(['count'])).toMatchObject({ calls: 1 })
+      const replacing = host.replace()
+      await drainStarted
+      scheduler.advance(DEFAULT_DRAIN_MS)
+      await replacing
+      expect((await outcome)[0]).toMatchObject({
+        status: 'rejected',
+        reason: { code: 'REMOTE_RESULT_UNKNOWN' }
+      })
+      await fixture.handles[0]!.exited
+      const fresh = await host.use('p')
+      expect(await fresh.f!.request!(['count'])).toMatchObject({ calls: 0 })
+      await expect(oldFeatures.f!.request!(['old-proxy'])).rejects.toMatchObject({
+        code: 'REMOTE_CLOSED'
+      })
+      expect(await fresh.f!.request!(['count'])).toMatchObject({ calls: 0 })
+    } finally {
+      await host.release()
+    }
+  })
+  it.each(['stop-then-start', 'start-then-switch'] as const)(
+    '[A3/A4] reclaims a real failed description and permits a fresh replacement (%s)',
+    async (strategy) => {
+      /** Real child exits prove the failed candidate cannot retain a process or budget lease. */
+      const fixture = nativeHostOptions('old')
+      const original = fixture.options.endpointFactory
+      const primary = createProcessError(RpcProcessErrorCode.hostInvalidOption)
+      let endpoints = 0
+      let entered!: () => void
+      let fail!: () => void
+      const describing = new Promise<void>((resolve) => {
+        entered = resolve
+      })
+      const gate = new Promise<void>((resolve) => {
+        fail = resolve
+      })
+      const host = createProcessHost({
+        ...fixture.options,
+        endpointFactory: async (...args) => {
+          const served = await original(...args)
+          const ordinal = ++endpoints
+          return {
+            ...served,
+            endpoint: {
+              ...served.endpoint,
+              async send<T>(...input: Parameters<IRpcEndpoint['send']>) {
+                if (ordinal === 2 && input[1] === RemoteMethodName.describe) {
+                  entered()
+                  await gate
+                  throw primary
+                }
+                return served.endpoint.send<T>(...input)
+              }
+            }
+          }
+        }
+      })
+      try {
+        await host.use('p')
+        const old = fixture.handles[0]!
+        const replacing = host.replace({ strategy })
+        const outcome = Promise.allSettled([replacing])
+        await describing
+        const readiness =
+          strategy === 'stop-then-start' ? Promise.allSettled([host.ready()]) : undefined
+        fail()
+        expect((await outcome)[0]).toMatchObject({ status: 'rejected', reason: primary })
+        if (readiness)
+          expect((await readiness)[0]).toMatchObject({ status: 'rejected', reason: primary })
+        await fixture.handles[1]!.exited
+        if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
+        expect(fixture.options.deployment.supervision.budget!.inUse).toBe(
+          strategy === 'start-then-switch' ? 1 : 0
+        )
+        if (strategy === 'start-then-switch') {
+          const features = await host.use('p')
+          expect(await features.f!.request!(['still-old'])).toMatchObject({ pid: old.identity.pid })
+        } else {
+          await old.exited
+          await expect(host.use('p')).rejects.toMatchObject({ code: 'REMOTE_CLOSED' })
+        }
+        expect(await host.replace({ strategy: 'stop-then-start' })).toBe(host)
+        const fresh = await host.use('p')
+        expect(await fresh.f!.request!(['recovered'])).toMatchObject({
+          pid: fixture.handles[2]!.identity.pid
+        })
+      } finally {
+        fail()
+        await host.release()
+      }
+    }
+  )
   it('[A3] invalidates a real size-one pool after old exit without taking it for replacement', async () => {
     const fixture = hostFixture()
     if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
