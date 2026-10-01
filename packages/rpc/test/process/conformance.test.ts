@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
+import { inspect } from 'node:util'
+import { serializeRpcError } from '@migaia/rpc/contract'
 import { closeSync, openSync, writeFileSync, mkdirSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -260,9 +262,19 @@ async function business(active: Awaited<ReturnType<typeof client>>, peerId: stri
     for await (const value of feature[method]([expected.generator.input])) values.push(value)
     expect(values).toEqual(expected.generator.expected)
   }
-  await expect(runtime.endpoint.send(peerId, 'peer.error', [])).rejects.toMatchObject(
-    expected.error
+  let receivedError: unknown
+  await expect(
+    runtime.endpoint.send(peerId, 'peer.error', []).catch((error) => {
+      receivedError = error
+      throw error
+    })
+  ).rejects.toMatchObject(expected.error)
+  const failedWire = wireFrames(active.stdout).find(
+    (frame) =>
+      frame.kind === 'response' && frame.ok === false && frame.data.route.method === 'peer.error'
   )
+  expect(failedWire).toBeDefined()
+  assertWireGraph((receivedError as { cause: unknown }).cause, failedWire.error)
   const controller = new AbortController()
   const waiting = runtime.endpoint.send(peerId, 'peer.wait', [], { signal: controller.signal })
   await new Promise((resolve) => setTimeout(resolve, 20))
@@ -272,6 +284,14 @@ async function business(active: Awaited<ReturnType<typeof client>>, peerId: stri
     expected.cancel.providerReason
   ])
   expect(await feature.request(['after-cancel'])).toBe('after-cancel')
+  /** Explicit core trace remains request-local; facade invocations above never gain a trace. */
+  expect(
+    await Promise.all([
+      runtime.endpoint.send(peerId, 'peer.trace', [], { trace: 'h-trace-one' }),
+      runtime.endpoint.send(peerId, 'peer.trace', [], { trace: 'h-trace-two' }),
+      runtime.endpoint.send(peerId, 'peer.trace', [])
+    ])
+  ).toEqual(['h-trace-one', 'h-trace-two', null])
   expect(await runtime.endpoint.ping(peerId, undefined, { timeoutMs: 1000 })).toBe(true)
   if (active.remove) {
     expect(await active.remove()).toEqual({ ok: true })
@@ -358,11 +378,53 @@ describe('[A1] independent native business peers through public process facades'
               )
             )
           })
+          /** Failed authentication must not affect a later valid session on this same listener. */
+          const denied = await dialProcessByteChannel({ address: join(directory, 'peer.sock') })
+          const deniedToken = randomUUID()
+          const deniedFrames: Uint8Array[] = []
+          denied.onData((chunk) => deniedFrames.push(chunk.slice()))
+          const deniedReports: unknown[] = []
+          let deniedError: unknown
+          try {
+            await expect(
+              createProcessTransport(denied, {
+                role: 'initiator',
+                peerId: peer.id,
+                offer: { ...offer, auth: deniedToken },
+                report: (error) => deniedReports.push(error),
+                ipc: { connectionId: 'denied', sessionId: 'denied', log: () => undefined }
+              }).catch((error) => {
+                deniedError = error
+                throw error
+              })
+            ).rejects.toBeInstanceOf(Error)
+          } finally {
+            await denied.close()
+          }
+          const deniedSnapshot = inspect(
+            {
+              error: deniedError,
+              reports: deniedReports,
+              wire: wireFrames(deniedFrames),
+              serialized: serializeRpcError(deniedError, { report: () => undefined })
+            },
+            { depth: null, showHidden: true }
+          )
+          for (let offset = 0; offset <= deniedToken.length - 6; offset++)
+            expect(deniedSnapshot).not.toContain(deniedToken.slice(offset, offset + 6))
           for (let index = 0; index < 2; index++) {
             const active = await client(peer, host, token, join(directory, 'peer.sock'))
             try {
-              if (index === 0) await business(active, peer.id)
-              else expect(await active.feature.request(['still-alive'])).toBe('still-alive')
+              if (index === 0) {
+                await business(active, peer.id)
+                expect(
+                  wireFrames(active.sent)
+                    .filter(
+                      (frame) => frame.kind === 'request' && String(frame.method).startsWith('p.f.')
+                    )
+                    .every((frame) => frame.data.route.trace === undefined)
+                ).toBe(true)
+              } else expect(await active.feature.request(['still-alive'])).toBe('still-alive')
             } finally {
               await active.close()
               writeFileSync(
@@ -424,3 +486,19 @@ describe('[A1] default native health stays idle without restarting', () => {
       }
     }, 25000)
 })
+
+/** Every received graph node keeps the exact remote stack and semantic identity, including causes. */
+function assertWireGraph(actual: unknown, wire: Record<string, any>) {
+  expect(actual).toMatchObject({
+    source: wire.source,
+    code: wire.code,
+    name: wire.name,
+    message: wire.message,
+    stack: wire.stack
+  })
+  expect(wire.stack.length).toBeGreaterThan(0)
+  if (wire.cause) assertWireGraph((actual as { cause: unknown }).cause, wire.cause)
+  if (wire.errors)
+    for (let index = 0; index < wire.errors.length; index++)
+      assertWireGraph((actual as { errors: unknown[] }).errors[index], wire.errors[index])
+}
