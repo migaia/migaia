@@ -30,16 +30,13 @@ const packageDependencies = [
   'middleware-pipeline',
   'plugin-host',
   'serialize',
+  'supervision',
   'utils'
 ]
-/** Frozen legacy map plus reviewed new entries cover every packed deep subpath. */
-const publicSubpaths = [
-  ...Object.keys(
-    JSON.parse(readFileSync(resolve(packageDirectory, 'test/fixtures/legacy-exports.json'), 'utf8'))
-  ),
-  '@migaia/rpc/core/transport-kit',
-  '@migaia/rpc/core/stream'
-]
+/** Resolve every declared public path from the actual packed manifest. */
+const publicSubpaths = Object.keys(
+  JSON.parse(readFileSync(resolve(packageDirectory, 'package.json'), 'utf8')).exports
+).map((subpath) => `@migaia/rpc${subpath.slice(1)}`)
 const obsoleteSubpaths = [
   '.',
   './browser',
