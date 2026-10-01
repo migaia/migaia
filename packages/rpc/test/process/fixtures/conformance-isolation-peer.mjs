@@ -12,7 +12,7 @@ import {
 import { listenProcessByteChannel } from '@migaia/rpc/process/adapters/node-socket'
 import { openProcessStdioChannel } from '@migaia/rpc/process/adapters/node-child-process'
 import { createComposedEndpoint } from '@migaia/rpc/core/composed'
-import { codec, framer, abort, connect, ping } from '@migaia/rpc/core'
+import { codec, framer, abort, connect, ping, RpcTimeoutError } from '@migaia/rpc/core'
 import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc/core/stream'
 import { createOutboundFeature } from '@migaia/rpc/core/features/outbound'
 import { createProviderFeature } from '@migaia/rpc/core/features/provider'
@@ -157,7 +157,8 @@ function target() {
                     label: input[1],
                     ...context.session,
                     code: context.signal.reason?.code ?? null,
-                    message: context.signal.reason?.message ?? null
+                    message: context.signal.reason?.message ?? null,
+                    localTimeout: context.signal.reason instanceof RpcTimeoutError
                   })
                   resolve()
                 },
