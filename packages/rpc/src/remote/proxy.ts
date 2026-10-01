@@ -319,7 +319,9 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
-    const description = await served.endpoint.send(channel.peerId, RemoteMethodName.describe, [])
+    const description = await served.endpoint.send(channel.peerId, RemoteMethodName.describe, [], {
+      signal
+    })
     if (this.#catalog) {
       const envelope = normalizeRemoteControlShape('describeHost', description) as {
         readonly catalog: IRemoteHostCatalog

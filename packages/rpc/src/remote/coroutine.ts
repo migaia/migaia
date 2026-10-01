@@ -16,6 +16,7 @@ import { createProviderFeature } from '../core/features/provider.js'
 import { createStreamFeature } from '../core/features/stream.js'
 import { createRpcIdempotencyStore } from '../core/idempotency-store.js'
 import { defaultRpcId } from '../core/internal/id.js'
+import { abort } from '../core/middleware/abort.js'
 import { connect } from '../core/middleware/connect.js'
 import type { IRpcEndpoint } from '../core/typing.js'
 import type { IRemoteContract, IRemoteHostCatalog } from './contract.js'
@@ -85,7 +86,7 @@ async function composed(
       transport,
       codec: identityCodecV1,
       framer: messageFramerV1,
-      middlewares: [connect({ transport })],
+      middlewares: [connect({ transport }), abort()],
       ...(idempotency ? { idempotency } : {})
     },
     {

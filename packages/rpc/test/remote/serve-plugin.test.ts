@@ -2,6 +2,7 @@ import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createComposedEndpoint } from '../../src/core/composed.js'
+import { abort } from '../../src/core/middleware/abort.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import type { IRpcContext, IRpcEndpoint } from '../../src/core/typing.js'
 import { serveRemotePlugin } from '../../src/remote/serve-plugin.js'
@@ -99,7 +100,7 @@ describe('remote service plugin', () => {
       {
         id: 'server',
         transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport })]
+        middlewares: [connect({ transport: serverTransport }), abort()]
       },
       streamRoots()
     )
@@ -107,7 +108,7 @@ describe('remote service plugin', () => {
       {
         id: 'client',
         transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport })]
+        middlewares: [connect({ transport: clientTransport }), abort()]
       },
       streamRoots()
     )

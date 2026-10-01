@@ -11,6 +11,7 @@ describe('A2 remote generation proxy', () => {
     expect(first).toBe(1)
     expect(fixture.calls).toEqual(['channel.open', 'endpoint.create'])
     expect(fixture.sends.map((entry) => entry.method)).toEqual(['migaia.remote.describe'])
+    expect(fixture.sends[0]?.options).toMatchObject({ signal })
     const proxy = fixture.registration.featureProxies().f!.request!
     await expect(proxy(['first'])).resolves.toBe('result')
     const leaves: string[] = []
