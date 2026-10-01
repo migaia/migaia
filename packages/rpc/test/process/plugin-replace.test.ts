@@ -128,6 +128,43 @@ describe('process plugin whole-process replacement', () => {
     }
   })
 
+  it.each([null, undefined])(
+    '[A2/K229] codes malformed bootstrap payload %s before launch',
+    async (payload) => {
+      /** The native byte deployment is valid except for the malformed bootstrap bytes. */
+      const test = fixture()
+      try {
+        const deployment = test.options.deployment
+        if (deployment.kind !== 'spawn') throw new Error('fixture must spawn')
+        expect(() =>
+          createProcessPlugin({
+            ...test.options,
+            deployment: {
+              ...deployment,
+              supervision: {
+                ...deployment.supervision,
+                spec: {
+                  ...deployment.supervision.spec,
+                  bootstrap: { via: 'stdin', payload } as unknown as IProcessSpec['bootstrap']
+                }
+              }
+            }
+          })
+        ).toThrowError(
+          expect.objectContaining({
+            source: '@migaia/rpc/process',
+            code: 'PROCESS_PLUGIN_INVALID_OPTION',
+            detail: { field: 'supervision.spec.bootstrap' }
+          })
+        )
+        expect(test.launch).not.toHaveBeenCalled()
+        expect(test.budget.inUse).toBe(0)
+      } finally {
+        await test.host.dispose()
+      }
+    }
+  )
+
   it('[A2/A5] rejects an invalid local owner or missing default ping before launch', async () => {
     const test = fixture()
     try {

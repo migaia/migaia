@@ -135,6 +135,9 @@ export async function checkNativePing(
 
 /** Ensures a bootstrap secret is exactly the token supplied to the authenticated adapter. */
 function sameUtf8(value: Uint8Array, token: string): boolean {
+  // Invalid bootstrap bytes are a deployment mismatch, not an untagged property access error.
+  if (!(value instanceof Uint8Array)) return false
+  /** The token comparison owns no copy of any malformed caller payload. */
   const expected = new TextEncoder().encode(token)
   if (value.length !== expected.length) return false
   for (let index = 0; index < value.length; index += 1)
