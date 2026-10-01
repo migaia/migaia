@@ -184,6 +184,23 @@
       "closeCalls": 1,
       "closeSettlements": 1,
       "pendingProviderAborts": 1
+    },
+    {
+      "id": "native-missing-stream-capability",
+      "runtimes": [
+        "python",
+        "go",
+        "rust",
+        "node"
+      ],
+      "offer": "public-native-stream-false",
+      "negotiatedStream": false,
+      "consumer": "public-composed-stream-owner",
+      "expected": {
+        "source": "@migaia/rpc/core",
+        "code": "CAPABILITY_CONFLICT"
+      },
+      "physicalStreamWrites": 0
     }
   ]
 }
