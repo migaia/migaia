@@ -180,24 +180,24 @@
     },
     "rpc": {
       "lines": {
-        "covered": 8130,
-        "total": 9035,
-        "pct": 89.98
+        "covered": 8252,
+        "total": 9181,
+        "pct": 89.88
       },
       "statements": {
-        "covered": 8866,
-        "total": 10084,
-        "pct": 87.92
+        "covered": 8992,
+        "total": 10246,
+        "pct": 87.76
       },
       "functions": {
-        "covered": 1950,
-        "total": 2171,
-        "pct": 89.82
+        "covered": 1971,
+        "total": 2197,
+        "pct": 89.71
       },
       "branches": {
-        "covered": 5239,
-        "total": 6184,
-        "pct": 84.71
+        "covered": 5334,
+        "total": 6302,
+        "pct": 84.63
       }
     },
     "serialize": {
@@ -7508,24 +7508,46 @@
     },
     "packages/rpc/src/process/adapters/node-socket.ts": {
       "lines": {
-        "covered": 98,
-        "total": 120,
-        "pct": 81.66
+        "covered": 107,
+        "total": 131,
+        "pct": 81.67
       },
       "statements": {
-        "covered": 105,
-        "total": 131,
-        "pct": 80.15
+        "covered": 115,
+        "total": 143,
+        "pct": 80.41
       },
       "functions": {
-        "covered": 22,
+        "covered": 23,
         "total": 29,
-        "pct": 75.86
+        "pct": 79.31
       },
       "branches": {
-        "covered": 82,
-        "total": 98,
-        "pct": 83.67
+        "covered": 95,
+        "total": 111,
+        "pct": 85.58
+      }
+    },
+    "packages/rpc/src/process/adapters/unix-socket-ownership.ts": {
+      "lines": {
+        "covered": 53,
+        "total": 65,
+        "pct": 81.53
+      },
+      "statements": {
+        "covered": 54,
+        "total": 70,
+        "pct": 77.14
+      },
+      "functions": {
+        "covered": 10,
+        "total": 11,
+        "pct": 90.9
+      },
+      "branches": {
+        "covered": 57,
+        "total": 69,
+        "pct": 82.6
       }
     },
     "packages/rpc/src/process/adapters/web-byte-stream.ts": {
@@ -8032,6 +8054,28 @@
         "covered": 22,
         "total": 36,
         "pct": 61.11
+      }
+    },
+    "packages/rpc/src/process/resilience/rendezvous.ts": {
+      "lines": {
+        "covered": 60,
+        "total": 70,
+        "pct": 85.71
+      },
+      "statements": {
+        "covered": 62,
+        "total": 80,
+        "pct": 77.5
+      },
+      "functions": {
+        "covered": 10,
+        "total": 15,
+        "pct": 66.66
+      },
+      "branches": {
+        "covered": 25,
+        "total": 36,
+        "pct": 69.44
       }
     },
     "packages/rpc/src/process/resilience/session.ts": {
