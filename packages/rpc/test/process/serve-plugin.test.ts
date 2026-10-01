@@ -456,14 +456,14 @@ describe('process plugin service ingress', () => {
       expect(
         await firstRequest?.({
           data: [],
-          signal: { aborted: false },
+          signal: new AbortController().signal,
           success: (value: unknown) => value
         } as never)
       ).toBe('live')
       expect(
         await secondRequest?.({
           data: [],
-          signal: { aborted: false },
+          signal: new AbortController().signal,
           success: (value: unknown) => value
         } as never)
       ).toBe('live')
