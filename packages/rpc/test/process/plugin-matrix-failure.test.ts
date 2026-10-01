@@ -10,6 +10,10 @@ import {
 import type { IProcessPendingByteConnection } from '../../src/process/types.js'
 import type { IRemoteServeEndpoint } from '../../src/remote/types.js'
 import {
+  createProcessResilience,
+  processSessionManager
+} from '../../src/process/resilience/index.js'
+import {
   matrixEndpoint,
   matrixFixture,
   MATRIX_CONTRACT,
@@ -200,7 +204,7 @@ describe('I15 real failure and rollback matrix', () => {
     20000
   )
 
-  it.each(['accept', 'endpoint', 'reject'] as const)(
+  it.each(['accept', 'endpoint', 'endpoint-dispose', 'reject'] as const)(
     '[A6] real socket late %s plus cleanup failure reports each original once',
     async (phase) => {
       const test = await matrixFixture({ borrowed: true })
@@ -210,8 +214,16 @@ describe('I15 real failure and rollback matrix', () => {
       const endpoint = deferred<IRemoteServeEndpoint>()
       const accepted = deferred<void>()
       const cleanup = new Error('fixture socket cleanup failure')
+      /** Endpoint failure has its own identity, independent from physical channel cleanup. */
+      const endpointCleanup = new Error('fixture late endpoint cleanup failure')
       const primary = new Error('fixture late endpoint rejected')
       const report = vi.fn()
+      /** The next admission observes the same explicit manager after candidate rollback. */
+      const resilience = createProcessResilience({
+        scheduler: test.scheduler,
+        maxConnections: 1,
+        report
+      })
       /** Late endpoint construction uses the accepted server channel, never the client transport. */
       let serverChannel!: Parameters<typeof matrixEndpoint>[0]
       const dispose = vi.fn()
@@ -229,9 +241,11 @@ describe('I15 real failure and rollback matrix', () => {
         onInstanceUnhealthy: () => () => undefined,
         endpointFactory: factory,
         report,
+        resilience,
         ingress: {
           kind: 'listener',
           address: `${test.directory}/late.sock`,
+          scheduler: test.scheduler,
           verify: () => 'fixture-principal',
           offer: createNativeProcessOffer({
             peer: { id: 'server', runtime: 'node' },
@@ -297,6 +311,7 @@ describe('I15 real failure and rollback matrix', () => {
               dispose: async () => {
                 dispose()
                 await served.endpoint.dispose()
+                if (phase === 'endpoint-dispose') throw endpointCleanup
               }
             }
           })
@@ -312,11 +327,21 @@ describe('I15 real failure and rollback matrix', () => {
             report.mock.calls.filter(([error]) => reachableCode(error, 'PROCESS_CHANNEL_CLOSED'))
           ).toHaveLength(1)
         if (phase === 'accept') expect(factory).not.toHaveBeenCalled()
-        if (phase === 'endpoint') expect(dispose).toHaveBeenCalledTimes(1)
+        if (phase === 'endpoint' || phase === 'endpoint-dispose')
+          expect(dispose).toHaveBeenCalledTimes(1)
+        if (phase === 'endpoint-dispose')
+          expect(report.mock.calls.filter(([error]) => error === endpointCleanup)).toHaveLength(1)
+        /** Borrowed resilience survives listener close, with the single slot returned. */
+        expect(() => {
+          /** Admission and release use the same canonical capacity owner as the rolled-back socket. */
+          const next = processSessionManager(resilience)!.claimConnection()
+          next.release()
+        }).not.toThrow()
         process.kill(test.handles[0]!.identity.pid!, 0)
       } finally {
         await raw?.close()
         await listener.close()
+        await resilience.close()
         await host.dispose()
         await test.cleanup()
       }
