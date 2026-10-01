@@ -25,5 +25,17 @@ export const RpcProcessErrorText = {
   /** Handshake deadlines must be finite and non-negative. */
   handshakeTimeoutInvalid: 'process channel handshake timeout is invalid',
   /** Process plugin admission rejects malformed deployment configuration before any side effect. */
-  pluginInvalidOption: 'process plugin options are invalid'
+  pluginInvalidOption: 'process plugin options are invalid',
+  /** Resilience construction rejects an invalid limit or missing ownership or health port. */
+  resilienceInvalidOption: 'process resilience options are invalid',
+  /** A session or request exceeded its assigned connection-level capacity before dispatch. */
+  connectionLimit: 'process connection limit exceeded',
+  /** Explicit instance-health failure keeps a shared target closed until replacement is ready. */
+  instanceUnhealthy: 'process instance is unhealthy',
+  /** A native ping returned false while its supervision deadline was still active. */
+  healthPingFailed: 'process health ping failed',
+  /** A terminal registration rejects a fresh remote call before any business frame is sent. */
+  terminalCall: 'process registration is terminal',
+  /** Liquidation permanently closes this registration; construct a new one to restart. */
+  liquidated: 'process registration was liquidated'
 } as const

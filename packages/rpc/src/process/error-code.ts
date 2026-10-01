@@ -17,7 +17,28 @@ export const RpcProcessErrorCode = {
    * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named
    * field.
    */
-  pluginInvalidOption: 'PROCESS_PLUGIN_INVALID_OPTION'
+  pluginInvalidOption: 'PROCESS_PLUGIN_INVALID_OPTION',
+  /**
+   * Invalid resilience limits, ownership, or health configuration; correct the named field before
+   * opening a connection.
+   */
+  resilienceInvalidOption: 'PROCESS_RESILIENCE_INVALID_OPTION',
+  /** A connection, call-rate, or payload limit rejected admission before provider execution. */
+  connectionLimit: 'PROCESS_CONNECTION_LIMIT',
+  /**
+   * A shared target is suspended after an explicit instance-health event until a ready replacement
+   * exists.
+   */
+  instanceUnhealthy: 'PROCESS_INSTANCE_UNHEALTHY',
+  /**
+   * An enabled native health ping returned false before its supervision deadline; the owner must
+   * restart the unit.
+   */
+  healthPingFailed: 'PROCESS_HEALTH_PING_FAILED',
+  /** A terminal registration rejects new remote calls before they reach its inactive generation. */
+  terminalCall: 'PROCESS_TERMINAL_CALL',
+  /** A liquidated registration cannot restart; the caller must create a new registration. */
+  liquidated: 'PROCESS_LIQUIDATED'
 } as const
 
 export type IRpcProcessErrorCode = (typeof RpcProcessErrorCode)[keyof typeof RpcProcessErrorCode]
