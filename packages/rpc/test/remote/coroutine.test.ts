@@ -23,6 +23,55 @@ async function waitForAbort(signal: IAbortSignal): Promise<void> {
 }
 
 describe('remote coroutine loopback', () => {
+  it('admits one concurrent serve attempt and closes its service once', async () => {
+    const localHost = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const servedHost = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    await servedHost.use(
+      definePlugin({
+        name: 'p',
+        features: { f: defineFeature(() => ({ m: () => 'live' })) },
+        install: () => ({})
+      })
+    )
+    const serviceUses = vi.spyOn(servedHost, 'use')
+    const serviceRemovals = vi.spyOn(servedHost, 'unUse')
+    const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })
+    /** The task records both admission results before waiting for its stop signal. */
+    let settled: (() => void) | undefined
+    const bothServed = new Promise<void>((resolve) => {
+      settled = resolve
+    })
+    let results: PromiseSettledResult<void>[] = []
+    const plugin = createCoroutinePlugin({
+      name: 'p',
+      contract,
+      host: localHost.plugin,
+      budget,
+      report: () => undefined,
+      task: async ({ signal, serve }) => {
+        results = await Promise.allSettled([serve(servedHost), serve(servedHost)])
+        settled?.()
+        await waitForAbort(signal)
+      }
+    })
+    try {
+      await localHost.use(plugin)
+      await bothServed
+      expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected'])
+      expect(results[1]).toMatchObject({ reason: { code: 'INVALID_OPTION' } })
+      expect(serviceUses).toHaveBeenCalledTimes(1)
+    } finally {
+      await localHost.dispose()
+      expect(serviceRemovals).toHaveBeenCalledTimes(1)
+      await servedHost.dispose()
+      budget.close()
+    }
+  })
+
   it('replays one explicit idempotency key after a start-then-switch replacement', async () => {
     const servedHost = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }

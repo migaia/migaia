@@ -121,6 +121,8 @@ export function coroutinePorts(
         let exposed: IMemoryTransport | undefined
         /** Closing a task releases only its own service endpoint. */
         let closeService: (() => Promise<void>) | undefined
+        /** Concurrent serve calls share one publication attempt and its close owner. */
+        let serving: Promise<void> | undefined
         const serve = async (
           host: IRemoteServeHostOptions['host'],
           resolvePlugin?: IRemoteHostPluginResolver
@@ -129,33 +131,44 @@ export function coroutinePorts(
             context.expose(exposed)
             return
           }
+          if (serving) {
+            await serving
+            context.expose(exposed!)
+            return
+          }
           if ('catalog' in mode && !resolvePlugin)
             throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-          const [clientTransport, serverTransport] = createMemoryTransportPair()
-          try {
-            const server = await composed('server', serverTransport, idempotency)
-            const service =
-              'catalog' in mode
-                ? await serveRemoteHost({
-                    host,
-                    catalog: mode.catalog,
-                    resolvePlugin: resolvePlugin!,
-                    endpoint: server,
-                    report: options.report
-                  })
-                : await serveRemotePlugin({
-                    host,
-                    contract: mode.contract,
-                    endpoint: server,
-                    report: options.report
-                  })
-            closeService = service.close
-            context.expose(clientTransport)
-            exposed = clientTransport
-          } catch (error) {
-            clientTransport.close()
+          serving = (async () => {
+            const [clientTransport, serverTransport] = createMemoryTransportPair()
+            try {
+              const server = await composed('server', serverTransport, idempotency)
+              const service =
+                'catalog' in mode
+                  ? await serveRemoteHost({
+                      host,
+                      catalog: mode.catalog,
+                      resolvePlugin: resolvePlugin!,
+                      endpoint: server,
+                      report: options.report
+                    })
+                  : await serveRemotePlugin({
+                      host,
+                      contract: mode.contract,
+                      endpoint: server,
+                      report: options.report
+                    })
+              closeService = service.close
+              context.expose(clientTransport)
+              exposed = clientTransport
+            } catch (error) {
+              clientTransport.close()
+              throw error
+            }
+          })().catch((error: unknown) => {
+            serving = undefined
             throw error
-          }
+          })
+          return serving
         }
         try {
           await options.task({ signal: context.signal, heartbeat: context.heartbeat, serve })
