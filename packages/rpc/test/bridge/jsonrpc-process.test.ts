@@ -2,110 +2,25 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
-import { resolve, join } from 'node:path'
+import { join } from 'node:path'
 import type { Writable } from 'node:stream'
 import { inspect } from 'node:util'
 import { PluginHost } from '@migaia/plugin-host'
-import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
-import {
-  ProcessCapability,
-  type IProcessHandle,
-  type IProcessLauncher
-} from '@migaia/supervision/process'
+import { createUnitBudget } from '@migaia/supervision'
+
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { createJsonRpcRemoteChannel } from '../../src/bridge/jsonrpc/index.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { createProcessResilience } from '../../src/process/resilience/index.js'
 import { CHILD_STDERR_REDACTED } from '../../src/process/constants.js'
-import type { IProcessPluginEstablish } from '../../src/process/plugin/types.js'
 import { nodeByteStream } from '../../src/process/adapters/node-byte-stream.js'
-import { createNodeProcessLauncher } from '../../src/process/adapters/node-child-process.js'
 import { dialProcessByteChannel } from '../../src/process/adapters/node-socket.js'
 import type { IProcessByteChannel } from '../../src/process/types.js'
 import type { IIpcLogRecord } from '../../src/core/plugins/flow-control.js'
 import { BRIDGE_CONTRACT, bridgeEndpoint, bridgeFixture } from './fixture.js'
 
-/** A short dedicated-fd peer tests actual Node pipes without changing the native launcher. */
-const childPath = resolve(import.meta.dirname, 'fixtures/jsonrpc-child.mjs')
-/** This fixture token is deliberately unrelated to source paths and ordinary error text. */
-const token = 'Q7X9Z3V5K8W2R6T4Y1N0'
-/** The fixture adds only the explicitly supported fd carrier to Node's advertised capabilities. */
-type IFixtureHandle = IProcessHandle & { channel: IProcessByteChannel; child: ChildProcess }
-
-/** Launch a real child with a private fd, while stdout/stdin contain only JSON-RPC frames. */
-function fdLauncher(): IProcessLauncher<IFixtureHandle> {
-  return {
-    capabilities: {
-      ...createNodeProcessLauncher().capabilities,
-      [ProcessCapability.bootstrapFd]: CapabilityLevel.enforced
-    },
-    async launch(spec, context) {
-      const child = spawn(spec.command, [...spec.args], {
-        env: {},
-        stdio: ['pipe', 'pipe', 'pipe', 'pipe']
-      })
-      const exited = new Promise<{ code: number | null; signal: string | null }>((done) =>
-        child.once('close', (code, signal) => done({ code, signal }))
-      )
-      child.stderr!.on('data', (chunk: Buffer) => context.output('stderr', chunk))
-      await once(child, 'spawn')
-      ;(child.stdio[3] as Writable).end(spec.bootstrap!.payload)
-      return {
-        identity: { fingerprint: randomUUID(), pid: child.pid },
-        exited,
-        child,
-        channel: nodeByteStream(child.stdout!, child.stdin!, () => {
-          child.stdout!.destroy()
-          child.stdin!.destroy()
-        }),
-        terminate: (mode) => {
-          if (child.exitCode === null && child.signalCode === null)
-            child.kill(mode === 'force' ? 'SIGKILL' : 'SIGTERM')
-        }
-      }
-    }
-  }
-}
-
-/** Bind the caller's generation identity, token and stderr into the bridge's canonical channel. */
-function establish(
-  logs: IIpcLogRecord[],
-  reports: unknown[],
-  removals: number[],
-  retained: Array<(chunk: Uint8Array) => void> = []
-): IProcessPluginEstablish {
-  return (raw, options) => {
-    if (raw.kind !== 'byte') throw new TypeError('fixture requires byte channel')
-    return createJsonRpcRemoteChannel({
-      byte: raw,
-      peerId: 'peer',
-      target: { kind: 'plugin', contract: BRIDGE_CONTRACT },
-      offer: bridgeFixture().options.offer,
-      token: options.token!,
-      scheduler: options.scheduler,
-      wallClock: { timestamp: () => Date.now() },
-      signal: options.signal as AbortSignal,
-      ipc: {
-        ...options.session,
-        log: (entry) => {
-          logs.push(entry)
-        },
-        stderr:
-          options.stderr &&
-          ((listener) => {
-            retained.push(listener)
-            const remove = options.stderr!(listener)
-            return () => {
-              removals.push(1)
-              remove()
-            }
-          })
-      },
-      report: (error) => reports.push(error)
-    })
-  }
-}
+import { childPath, token, fdLauncher, establish } from './fixtures/jsonrpc-process.js'
 
 /** Invoke the real remote proxy, then inspect only independently recorded wire events. */
 async function exercise(
