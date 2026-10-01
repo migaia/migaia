@@ -149,6 +149,41 @@
       "bootstrap": "dedicated-fd-both-sides",
       "oracle": "test/process/conformance-bench.test.ts",
       "preparationEchoesPerSide": 3
+    },
+    {
+      "id": "native-physical-fault-hooks",
+      "runtimes": [
+        "python",
+        "go",
+        "rust",
+        "node"
+      ],
+      "deployment": "stdio",
+      "methods": {
+        "peer.busy": "ACK-then-real-infinite-CPU",
+        "peer.pause": "ACK-then-SIGSTOP-until-SIGCONT",
+        "peer.crash": "ACK-then-exit-17"
+      }
+    },
+    {
+      "id": "actual-descendant-parent-kill9",
+      "runtimes": [
+        "python",
+        "go",
+        "rust",
+        "node"
+      ],
+      "parent": "public-processHost",
+      "descendant": "sleep-600-no-protocol-fds",
+      "before": "native-PID-list-child-present",
+      "after": "parent-SIGKILL-peer-and-descendant-ESRCH-within-10000ms"
+    },
+    {
+      "id": "typescript-public-service-EOF-cleanup",
+      "physicalEOF": "without-caller-abort-frame",
+      "closeCalls": 1,
+      "closeSettlements": 1,
+      "pendingProviderAborts": 1
     }
   ]
 }
