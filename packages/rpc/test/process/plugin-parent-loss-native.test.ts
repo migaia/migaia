@@ -57,6 +57,7 @@ describe('I15 real Node parent-loss ownership', () => {
           expect(test.chunks.join('').split('matrix:parent-lost').length - 1).toBe(1)
         }
         expect(test.chunks.join('').split('matrix:endpoint-dispose').length - 1).toBe(1)
+        expect(test.chunks.join('').split('matrix:service-close').length - 1).toBe(1)
       } finally {
         await test.cleanup()
       }
