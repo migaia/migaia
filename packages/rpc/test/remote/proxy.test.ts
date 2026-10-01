@@ -47,6 +47,37 @@ describe('A2 remote generation proxy', () => {
     expect(fixture.calls).not.toContain('endpoint.create')
   })
 
+  it('rejects a generation that exits during describe and closes its candidate', async () => {
+    /** The gate holds the describe response until the supervisor reports an exit. */
+    let releaseDescribe: (() => void) | undefined
+    const describeGate = new Promise<void>((resolve) => {
+      releaseDescribe = resolve
+    })
+    const fixture = remoteHarness()
+    const send = fixture.served.endpoint.send
+    fixture.served.endpoint.send = async (peer, method, data, options) => {
+      if (method === 'migaia.remote.describe') await describeGate
+      return send(peer, method, data, options)
+    }
+    const ready = fixture.registration.events.whenReady(0)
+    const pending = fixture.registration.prepareGeneration(
+      new AbortController().signal,
+      fixture.own
+    )
+    await Promise.resolve()
+    fixture.emit({ type: 'exit', generation: 1, reason: 'crashed', error: 'gone' })
+    releaseDescribe?.()
+    await expect(pending).rejects.toMatchObject({
+      code: RpcRemoteLayerErrorCode.closed,
+      detail: { generation: 1 }
+    })
+    expect(fixture.registration.events.current().active).toBe(false)
+    expect(fixture.calls).toContain('endpoint.dispose')
+    expect(fixture.calls).toContain('channel.close')
+    await fixture.registration.release()
+    await expect(ready).rejects.toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
+  })
+
   it('runs guard before the unavailable-generation gate and reports listener errors', async () => {
     const guardError = new Error('guard')
     const fixture = remoteHarness({
