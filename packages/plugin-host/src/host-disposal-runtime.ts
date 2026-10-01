@@ -21,6 +21,7 @@ type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly pipelineDrainTimeoutMs: number | false
   readonly enqueueTerminal: <T>(task: () => Promise<T>) => Promise<T>
   readonly registrationsInReverse: () => readonly TRegistration[]
+  readonly runBeforeRelease: (registration: TRegistration) => Promise<unknown[]> | undefined
   readonly disposeRegistration: (registration: TRegistration) => Promise<unknown[]>
   readonly clearPipelineState: () => void
   readonly resetCleanupAbandoned: () => void
@@ -76,8 +77,11 @@ export class PluginHostDisposalRuntime<TRegistration> {
             ERROR_TEXT.PIPELINE_DRAIN_TIMEOUT(this.#port.pipelineDrainTimeoutMs as number)
           )
         )
-      for (const registration of this.#port.registrationsInReverse())
+      for (const registration of this.#port.registrationsInReverse()) {
+        const beforeRelease = this.#port.runBeforeRelease(registration)
+        if (beforeRelease) errors.push(...(await beforeRelease))
         errors.push(...(await this.#port.disposeRegistration(registration)))
+      }
       this.#port.clearPipelineState()
       this.#port.terminal.forceTerminal()
       this.#port.commitRevision()

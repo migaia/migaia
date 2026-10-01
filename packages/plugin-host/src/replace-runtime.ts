@@ -31,6 +31,8 @@ type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonl
   drainLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void>
   /** Runs the registration's cleanup and returns every collected cleanup failure. */
   disposeRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]>
+  /** Runs a captured pre-release hook before the old generation loses its leases. */
+  runBeforeRelease(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]> | undefined
   /** Activates one committed lazy registration that was active before its restart. */
   activate(registration: IRegistration<TDomainCore, TValue>): Promise<void>
   /** Disables one current registration so a restarted or replaced plugin keeps its disabled state. */
@@ -143,10 +145,14 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
       const registration = this.#port.registrations.get(restartName)
       if (!registration) continue
       restarted.push(registration)
+      const beforeRelease = this.#port.runBeforeRelease(registration)
+      if (beforeRelease) cleanupErrors.push(...(await beforeRelease))
       await this.#port.drainLeases(registration)
       cleanupErrors.push(...(await this.#port.disposeRegistration(registration)))
     }
 
+    const beforeRelease = this.#port.runBeforeRelease(previous)
+    if (beforeRelease) cleanupErrors.push(...(await beforeRelease))
     await this.#port.drainLeases(previous)
     cleanupErrors.push(...(await this.#port.disposeRegistration(previous)))
 
