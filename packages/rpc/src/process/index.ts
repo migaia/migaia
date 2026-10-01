@@ -5,6 +5,8 @@ export { RpcProcessErrorText } from './error-text.js'
 export { createProcessPlugin, createServeProcessPlugin } from './plugin/index.js'
 export type {
   IProcessPluginOptions,
+  IProcessPlugin,
+  IProcessPluginReplaceResult,
   IProcessPluginServeHandle,
   IProcessServePluginOptions,
   IProcessServeChildIngress,

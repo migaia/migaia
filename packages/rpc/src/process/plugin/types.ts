@@ -1,6 +1,8 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IProcessHandle, IProcessSupervisorOptions } from '@migaia/supervision/process'
+import type { IProcessSpec } from '@migaia/supervision/process'
 import type { ISupervisorBaseOptions } from '@migaia/supervision'
+import type { IReplaceOutcome, ReplaceStrategy } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type {
   IRemoteChannel,
@@ -91,6 +93,19 @@ export type IProcessPluginOptions<THandle extends IProcessHandle = IProcessHandl
   retryPort?: IRemoteRetryPort
   deployment: ISpawnProcessPluginDeployment<THandle> | IConnectProcessPluginDeployment
 }>
+
+/** The process facade returns the underlying supervisor result or the trusted Host candidate. */
+export type IProcessPluginReplaceResult =
+  | Readonly<{ strategy: 'stop-then-start'; outcome: IReplaceOutcome }>
+  | Readonly<{ strategy: 'start-then-switch'; plugin: IProcessPlugin }>
+
+/** A trusted remote definition carries one whole-process replacement entry. */
+export type IProcessPlugin = IRemotePluginDefinition &
+  Readonly<{
+    replace(
+      options?: Readonly<{ spec?: IProcessSpec; strategy?: ReplaceStrategy }>
+    ): Promise<IProcessPluginReplaceResult>
+  }>
 
 /** Child ingress reads bootstrap before any responder handshake or provider installation. */
 export type IProcessServeChildIngress = Readonly<{

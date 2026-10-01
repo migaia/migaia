@@ -53,7 +53,8 @@ function sameUtf8(value: Uint8Array, token: string): boolean {
 
 /** Rejects deployment mismatches without embedding a token or payload in diagnostics. */
 export function validateSpawnProcessPluginDeployment<THandle extends IProcessHandle>(
-  deployment: ISpawnProcessPluginDeployment<THandle>
+  deployment: ISpawnProcessPluginDeployment<THandle>,
+  specField = 'supervision.spec'
 ): void {
   if (!deployment || deployment.kind !== 'spawn' || !deployment.supervision)
     invalidOption('deployment.kind')
@@ -69,15 +70,15 @@ export function validateSpawnProcessPluginDeployment<THandle extends IProcessHan
     invalidOption('deployment.token')
   const bootstrap = deployment.supervision.spec.bootstrap
   if (!bootstrap || !sameUtf8(bootstrap.payload, deployment.token))
-    invalidOption('supervision.spec.bootstrap')
+    invalidOption(`${specField}.bootstrap`)
   if (deployment.wire === ProcessPluginWire.jsonrpc && bootstrap.via !== 'fd')
-    invalidOption('supervision.spec.bootstrap.via')
+    invalidOption(`${specField}.bootstrap.via`)
   if (
     deployment.wire === ProcessPluginWire.native &&
     bootstrap.via !== 'stdin' &&
     bootstrap.via !== 'fd'
   )
-    invalidOption('supervision.spec.bootstrap.via')
+    invalidOption(`${specField}.bootstrap.via`)
 }
 
 /** The active generation alone can subscribe to stderr blocks after its channel is ready. */
