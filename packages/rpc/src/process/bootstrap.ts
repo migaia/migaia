@@ -25,6 +25,9 @@ export async function openBootstrapFrameChannel(
   let queuedError: Error | undefined
   let onFrame: ((frame: Uint8Array) => void) | undefined
   let onError: ((error: Error) => void) | undefined
+  /** Decoder failure and the awaiting caller share one physical teardown. */
+  let closing: Promise<void> | undefined
+  const close = (): Promise<void> => (closing ??= Promise.resolve().then(() => channel.close()))
   const decoder = createRpcStreamFrameDecoder({
     onFrame(frame) {
       if (!bootstrapped) {
@@ -36,14 +39,14 @@ export async function openBootstrapFrameChannel(
         /** A second pre-ready frame is a handshake violation, not another bootstrap. */
         const error = createContractError(RpcContractErrorCode.handshakeInvalid)
         queuedError = error
-        void channel.close()
+        void close()
       }
     },
     onError(error) {
       if (!bootstrapped) rejectBootstrap(error)
       else if (onError) onError(error)
       else queuedError = error
-      void channel.close()
+      void close()
     }
   })
   registerProcessFrameSource(channel, {
@@ -69,7 +72,7 @@ export async function openBootstrapFrameChannel(
   try {
     return Object.freeze({ channel, bootstrap: await payload })
   } catch (error) {
-    await channel.close()
+    await close()
     throw error
   }
 }

@@ -75,7 +75,7 @@ function obsoleteProbe(script) {
   assert.fail('obsoleteSubpaths literal probe is missing')
 }
 
-test('A11 packed consumer runs every preserved check against all 26 deep exports', () => {
+test('A11 packed consumer runs every preserved check against all 40 deep exports', () => {
   const script = readFileSync(join(root, 'packages/rpc/test/core/packed-export-smoke.mjs'), 'utf8')
   const run = spawnSync('pnpm', ['--filter', './packages/rpc', 'run', 'test:packed'], {
     cwd: root,
@@ -97,7 +97,7 @@ test('A11 packed consumer runs every preserved check against all 26 deep exports
       return match ? [[match[1], Number(match[2])]] : []
     })
   )
-  assert.equal(subpaths.size, 26)
+  assert.equal(subpaths.size, 40)
   assert.equal(subpaths.get('@migaia/rpc/core/transport-kit'), 16)
   assert.equal(subpaths.get('@migaia/rpc/core/stream'), 2)
   for (const [name, record] of Object.entries(legacy)) {

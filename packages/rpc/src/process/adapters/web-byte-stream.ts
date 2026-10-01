@@ -35,8 +35,9 @@ export function webByteStream(
       writer.abort(terminal),
       Promise.resolve().then(closePhysical)
     ]).then((results) => {
+      /** A failed reader may reject cancel with its already-reported terminal reason. */
       const errors = results.flatMap((result) =>
-        result.status === 'rejected' ? [result.reason] : []
+        result.status === 'rejected' && result.reason !== terminal ? [result.reason] : []
       )
       if (errors.length)
         throw createProcessError(
