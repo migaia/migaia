@@ -100,6 +100,60 @@ describe('shared remote retry', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 
+  it('[A8/I20-M14] settles caller abort during rebind before the obsolete send completes', async () => {
+    /** The canonical generation fixture holds replacement readiness until explicitly published. */
+    const owner = generations()
+    /** No wall-clock delay is needed to observe caller cancellation while readiness is pending. */
+    const scheduler = createManualScheduler()
+    /** Caller cancellation must settle independently of the abandoned provider request. */
+    const controller = new AbortController()
+    /** The old send deliberately stays unresolved until the assertion has observed cancellation. */
+    const first = deferred<string>()
+    /** Count physical sends so replacement readiness cannot accidentally replay cancelled work. */
+    const sendOnce = vi.fn(() => first.promise)
+    /** The shared retry owner must keep cancellation active across the rebind await. */
+    const port = createRemoteRetryPort({ events: owner.events, scheduler, report: vi.fn() })
+    /** Record settlement without awaiting the obsolete send or replacement readiness. */
+    let outcome: { value?: unknown; error?: unknown } | undefined
+    /** Attaching both handlers also observes rejection when the assertion fails. */
+    const waiting = port
+      .dispatch({
+        method: 'p.f.read',
+        mode: 'request',
+        idempotent: true,
+        key: 'same-key',
+        generation: 1,
+        signal: controller.signal,
+        events: owner.events,
+        sendOnce
+      })
+      .then(
+        (value) => {
+          outcome = { value }
+        },
+        (error) => {
+          outcome = { error }
+        }
+      )
+    owner.leave(new Error('generation left before replacement readiness'))
+    /** This exact original instance must remain reachable as the cancellation cause. */
+    const reason = new RangeError('caller cancelled during rebind')
+    controller.abort(reason)
+    for (let turn = 0; turn < 5; turn += 1) await Promise.resolve()
+    try {
+      expect(outcome).toMatchObject({ error: { name: 'AbortError' } })
+      expect((outcome!.error as Error).cause).toBe(reason)
+      owner.ready()
+      await waiting
+      expect(sendOnce).toHaveBeenCalledTimes(1)
+      expect(owner.listenerCount()).toBe(0)
+      expect(scheduler.pendingCount).toBe(0)
+    } finally {
+      first.resolve('late obsolete result')
+      owner.ready()
+    }
+  })
+
   it('[A8] never replays a sent non-idempotent request', async () => {
     const owner = generations()
     const first = deferred<string>()
