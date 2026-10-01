@@ -19,6 +19,15 @@ const contract = {
     }
   }
 }
+/** Host mode changes only the declared catalog and reserved control operations. */
+const hostMode = process.argv.includes('--host')
+/** Busy-loop acknowledgement is flushed before this real child stops servicing RPC. */
+process.on('SIGUSR2', () =>
+  process.stderr.write('busy-loop-entered', () => {
+    for (;;) {}
+  })
+)
+
 /** Required profile operations are the entire supported surface of this test peer. */
 const methods = ['migaia.hello', 'migaia.describe', 'migaia.invoke', 'migaia.cancel']
 
@@ -36,6 +45,12 @@ function serve(input, output) {
   let first
   /** Wire event snapshots prove notification/cancel order without reconstructing local intent. */
   const events = []
+  /** Connection-local Host controls retain the independently observed install state. */
+  const installed = new Set()
+  /** Host revisions advance only when this peer changes installed membership. */
+  let revision = 0
+  /** Use/inspect project the frozen remote-control result shape. */
+  const item = () => ({ name: 'p', state: 'enabled', revision, features: ['f'] })
   /** Encode each response as one canonical Content-Length write. */
   const send = (value) => {
     const body = Buffer.from(JSON.stringify(value))
@@ -79,9 +94,33 @@ function serve(input, output) {
           ).reply
         send({ jsonrpc: '2.0', id: message.id, result: { reply, methods } })
       } else if (message.method === 'migaia.describe')
-        send({ jsonrpc: '2.0', id: message.id, result: contract })
+        send({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: hostMode ? { schemaVersion: 1, catalog: { p: contract } } : contract
+        })
       else if (message.method === 'migaia.invoke' && message.id) {
         const args = message.params.args
+        if (hostMode && message.params.method === 'migaia.remote.host.use') {
+          installed.add(args[0])
+          revision++
+          send({ jsonrpc: '2.0', id: message.id, result: item() })
+          continue
+        }
+        if (hostMode && message.params.method === 'migaia.remote.host.unUse') {
+          installed.delete(args[0])
+          revision++
+          send({ jsonrpc: '2.0', id: message.id, result: { ok: true } })
+          continue
+        }
+        if (hostMode && message.params.method === 'migaia.remote.host.inspect') {
+          send({
+            jsonrpc: '2.0',
+            id: message.id,
+            result: { revision, plugins: [...installed].map(item) }
+          })
+          continue
+        }
         if (args[0] === '__wait') continue
         if (args[0] === '__stderr1') process.stderr.write(token.slice(0, token.length / 2))
         if (args[0] === '__stderr2') process.stderr.write(token.slice(token.length / 2))
@@ -93,7 +132,7 @@ function serve(input, output) {
 }
 
 /** Optional socket path changes only the carrier; fd authentication and profile stay identical. */
-const address = process.argv[2]
+const address = process.argv.slice(2).find((value) => !value.startsWith('--'))
 if (address)
   createServer((socket) => serve(socket, socket)).listen(address, () =>
     process.stdout.write('ready')

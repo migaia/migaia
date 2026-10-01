@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import { createProcessHost } from '../../src/process/host/client.js'
+import * as remoteHostModule from '../../src/remote/host.js'
 import { hostFixture } from './fixtures/host-control.js'
 import { nativeHostOptions } from './fixtures/host-native.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
@@ -20,6 +21,50 @@ async function settle(): Promise<void> {
 }
 
 describe('process Host replacement publication', () => {
+  it('[A4] rejects a candidate released between ready and publication', async () => {
+    /** Canonical remote readiness creates the precise await boundary exposed by the audit. */
+    const fixture = hostFixture()
+    /** Retain the canonical factory before observing only the second candidate. */
+    const original = remoteHostModule.createRemoteHost
+    /** The initial host and replacement each construct one remote handle. */
+    let constructions = 0
+    /** Release belongs to the same facade whose candidate is not yet published. */
+    let host!: ReturnType<typeof createProcessHost>
+    /** Join the actual release operation rather than polling facade state. */
+    let releasing: Promise<void> | undefined
+    /** The observer preserves canonical setup and readiness, injecting only the release race. */
+    const observer = vi
+      .spyOn(remoteHostModule, 'createRemoteHost')
+      .mockImplementation((options) => {
+        /** A real remote handle owns endpoint setup and description. */
+        const remote = original(options)
+        if (++constructions !== 2) return remote
+        return {
+          ...remote,
+          /** Release after readiness resolves, before the facade continuation can publish. */
+          ready() {
+            return remote.ready().then(() => {
+              queueMicrotask(() => {
+                releasing = host.release()
+              })
+            })
+          }
+        }
+      })
+    try {
+      host = createProcessHost(fixture.options)
+      await host.ready()
+      await expect(host.replace({ strategy: 'start-then-switch' })).rejects.toMatchObject({
+        code: 'PROCESS_HOST_CLOSED'
+      })
+      await releasing
+      expect(fixture.handles).toHaveLength(2)
+      expect(() => host.ready()).toThrow(expect.objectContaining({ code: 'PROCESS_HOST_CLOSED' }))
+    } finally {
+      await host?.release()
+      observer.mockRestore()
+    }
+  })
   it('[A3] never resends an old sent idempotent request into the new real child', async () => {
     /** Real I/O retains production deadlines while the injected monotonic clock advances drain. */
     const fixture = nativeHostOptions('old')
