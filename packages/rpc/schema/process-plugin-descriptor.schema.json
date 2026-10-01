@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://migaia.dev/rpc/process-plugin-descriptor.schema.json",
+  "oneOf": [
+    { "$ref": "#/$defs/plugin" },
+    { "$ref": "#/$defs/host" }
+  ],
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,39}$",
+      "maxLength": 40
+    },
+    "runtime": { "type": "string", "minLength": 1 },
+    "strategy": { "enum": ["stop-then-start", "start-then-switch"] },
+    "instanceMode": { "enum": ["shared"] },
+    "bootstrap": {
+      "type": "object",
+      "required": ["via"],
+      "additionalProperties": false,
+      "properties": {
+        "via": { "enum": ["stdin", "fd"] },
+        "fd": { "type": "integer", "minimum": 3 }
+      },
+      "if": { "properties": { "via": { "const": "fd" } } },
+      "then": { "required": ["fd"] },
+      "else": { "not": { "required": ["fd"] } }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["command", "args", "env", "stdio"],
+      "additionalProperties": false,
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "cwd": { "type": "string", "minLength": 1 },
+        "tmpDir": { "type": "string", "minLength": 1 },
+        "env": {
+          "type": "object",
+          "required": ["inherit", "set"],
+          "additionalProperties": false,
+          "properties": {
+            "inherit": { "type": "array", "items": { "type": "string" } },
+            "set": {
+              "type": "object",
+              "propertyNames": { "not": { "const": "token" } },
+              "additionalProperties": { "type": "string" }
+            }
+          }
+        },
+        "stdio": {
+          "type": "object",
+          "required": ["stdin", "stdout", "stderr"],
+          "additionalProperties": false,
+          "properties": {
+            "stdin": { "enum": ["channel", "ignore"] },
+            "stdout": { "enum": ["channel", "drain", "ignore"] },
+            "stderr": { "enum": ["drain", "ignore"] }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "memoryBytes": { "type": "number", "exclusiveMinimum": 0 },
+            "cpuTimeMs": { "type": "number", "exclusiveMinimum": 0 },
+            "callWallTimeMs": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "permissions": { "type": "array", "items": { "type": "string" } },
+        "bootstrap": { "$ref": "#/$defs/bootstrap" }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "required": ["maxUnits"],
+      "additionalProperties": false,
+      "properties": {
+        "maxUnits": { "type": "integer", "minimum": 0 },
+        "overflow": { "enum": ["queue", "reject"] },
+        "queueTimeoutMs": { "type": "number", "exclusiveMinimum": 0 },
+        "launchRate": {
+          "anyOf": [
+            { "const": false },
+            {
+              "type": "object",
+              "required": ["max", "windowMs"],
+              "additionalProperties": false,
+              "properties": {
+                "max": { "type": "integer", "minimum": 1 },
+                "windowMs": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "spawnByte": {
+      "type": "object",
+      "required": ["kind", "channelKind", "wire", "spec", "budget"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "spawn" },
+        "channelKind": { "const": "byte" },
+        "wire": { "enum": ["native", "jsonrpc"] },
+        "spec": {
+          "allOf": [
+            { "$ref": "#/$defs/spec" },
+            { "required": ["bootstrap"] }
+          ]
+        },
+        "budget": { "$ref": "#/$defs/budget" }
+      },
+      "if": { "properties": { "wire": { "const": "jsonrpc" } } },
+      "then": {
+        "properties": {
+          "spec": {
+            "properties": { "bootstrap": { "properties": { "via": { "const": "fd" } } } }
+          }
+        }
+      }
+    },
+    "spawnMessage": {
+      "type": "object",
+      "required": ["kind", "channelKind", "spec", "budget"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "spawn" },
+        "channelKind": { "const": "message" },
+        "spec": {
+          "allOf": [
+            { "$ref": "#/$defs/spec" },
+            { "not": { "required": ["bootstrap"] } }
+          ]
+        },
+        "budget": { "$ref": "#/$defs/budget" }
+      }
+    },
+    "connect": {
+      "type": "object",
+      "required": ["kind", "address"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "connect" },
+        "address": { "type": "string", "minLength": 1 }
+      }
+    },
+    "deployment": {
+      "oneOf": [
+        { "$ref": "#/$defs/spawnByte" },
+        { "$ref": "#/$defs/spawnMessage" },
+        { "$ref": "#/$defs/connect" }
+      ]
+    },
+    "plugin": {
+      "type": "object",
+      "required": ["descriptorVersion", "name", "runtime", "deployment", "contract"],
+      "additionalProperties": false,
+      "properties": {
+        "descriptorVersion": { "const": 1 },
+        "target": { "const": "plugin" },
+        "name": { "$ref": "#/$defs/name" },
+        "runtime": { "$ref": "#/$defs/runtime" },
+        "deployment": { "$ref": "#/$defs/deployment" },
+        "instanceMode": { "$ref": "#/$defs/instanceMode" },
+        "replaceStrategy": { "$ref": "#/$defs/strategy" },
+        "contract": { "$ref": "remote-contract.schema.json#/$defs/contract" }
+      },
+      "if": { "properties": { "deployment": { "properties": { "kind": { "const": "connect" } } } } },
+      "then": { "not": { "required": ["replaceStrategy"] } }
+    },
+    "host": {
+      "type": "object",
+      "required": ["descriptorVersion", "target", "name", "runtime", "deployment", "catalog"],
+      "additionalProperties": false,
+      "properties": {
+        "descriptorVersion": { "const": 1 },
+        "target": { "const": "host" },
+        "name": { "$ref": "#/$defs/name" },
+        "runtime": { "$ref": "#/$defs/runtime" },
+        "deployment": { "$ref": "#/$defs/deployment" },
+        "replaceStrategy": { "$ref": "#/$defs/strategy" },
+        "catalog": { "$ref": "remote-contract.schema.json#/$defs/catalog" }
+      },
+      "if": { "properties": { "deployment": { "properties": { "kind": { "const": "connect" } } } } },
+      "then": { "not": { "required": ["replaceStrategy"] } }
+    }
+  }
+}

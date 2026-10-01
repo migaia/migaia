@@ -202,7 +202,7 @@ contract({
 | `@migaia/rpc/core/adapters/{memory,message-port}` | transport factory | 不改变 endpoint 表面 | 内存或 MessagePort 传输 |
 | `@migaia/rpc/browser/adapters/<transport>` | transport factory | 不改变 endpoint 表面 | 浏览器与 Worker 传输 |
 | `@migaia/rpc/core/stream` | `createStreamFeature`、`createCanonicalChunkFeature` | 组合后投影 `endpoint.stream` | 按需异步多值流 |
-| `@migaia/rpc/process` | `createProcessTransport`、`createNativeProcessOffer`、`createProcessPlugin`、`createServeProcessPlugin` | 经握手后交 remote endpoint factory；服务侧逐连接持有 endpoint | 进程 byte/message 通道与 PluginHost 装配 |
+| `@migaia/rpc/process` | `createProcessTransport`、`createNativeProcessOffer`、`createProcessPlugin`、`createServeProcessPlugin`、`parseProcessPluginDescriptor` | 经握手后交 remote endpoint factory；服务侧逐连接持有 endpoint；描述只含纯数据 | 进程 byte/message 通道与 PluginHost 装配 |
 | `@migaia/rpc/contract/framing/stream` | `encodeRpcStreamFrame`、`createRpcStreamFrameDecoder` | 无端点表面 | 原生 4 字节长度前缀 |
 | `@migaia/rpc/process/adapters/*` | Node/Bun/Deno launcher、stdio 与 socket 入口 | 经 supervision 管理 | 按运行时选用的进程线材 |
 
