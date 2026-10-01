@@ -174,7 +174,8 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
                   if (closed || state === 'closed')
                     throw createProcessError(RpcProcessErrorCode.channelClosed, closeReason)
                   const verified = await options.auth.verify(auth, peer)
-                  if (!verified) throw createProcessError(RpcProcessErrorCode.authRejected)
+                  if (typeof verified !== 'string' || verified.length === 0)
+                    throw createProcessError(RpcProcessErrorCode.authRejected)
                   principalId = verified
                 }
               }
