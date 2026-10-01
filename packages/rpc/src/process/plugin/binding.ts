@@ -38,7 +38,7 @@ function reportSafely(report: (error: unknown) => void, error: unknown): void {
 }
 
 /** Rejects one invalid process option before launcher, dialer, or host work begins. */
-function invalidOption(field: string): never {
+export function invalidOption(field: string): never {
   throw createProcessError(RpcProcessErrorCode.pluginInvalidOption, undefined, { field })
 }
 
