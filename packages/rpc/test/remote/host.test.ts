@@ -2,6 +2,7 @@ import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { createComposedEndpoint } from '../../src/core/composed.js'
+import { abort } from '../../src/core/middleware/abort.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
@@ -134,7 +135,12 @@ describe('remote Host trusted control', () => {
     })
     const first = endpointHarness()
     const second = endpointHarness()
-    const options = { host: host as never, catalog, resolvePlugin: () => definition, report: vi.fn() }
+    const options = {
+      host: host as never,
+      catalog,
+      resolvePlugin: () => definition,
+      report: vi.fn()
+    }
     const a = await serveRemoteHost({ ...options, endpoint: { endpoint: first.endpoint } })
     const b = await serveRemoteHost({ ...options, endpoint: { endpoint: second.endpoint } })
     try {
@@ -409,7 +415,7 @@ describe('remote Host trusted control', () => {
       {
         id: 'server',
         transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport })]
+        middlewares: [connect({ transport: serverTransport }), abort()]
       },
       streamRoots()
     )
@@ -417,7 +423,7 @@ describe('remote Host trusted control', () => {
       {
         id: 'client',
         transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport })]
+        middlewares: [connect({ transport: clientTransport }), abort()]
       },
       streamRoots()
     )
