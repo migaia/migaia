@@ -295,6 +295,10 @@ def serve_bridge(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | No
 
 def run_business(args: Any) -> int:
     """Select existing framing over true owned stdio or borrowed reusable Unix listener."""
+    global CONTRACT
+    # A caller-owned published contract profile selects the actual describe declaration.
+    if args.contract:
+        CONTRACT = json.loads(Path(args.contract).read_text())["contracts"][0]["value"]
     import os
     import socket
     import sys
