@@ -1,0 +1,20 @@
+{
+  "p": {
+    "schemaVersion": 1,
+    "plugin": "p",
+    "features": {
+      "f": {
+        "methods": {
+          "request": {
+            "mode": "request",
+            "idempotent": true
+          },
+          "generator": {
+            "mode": "generator",
+            "idempotent": false
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import { createParentLossGuard } from '@migaia/supervision/process'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
@@ -122,7 +122,10 @@ export async function serveProcessSessions(
   onReadySession: (session: IProcessReadySession) => Promise<IRemoteServePluginHandle>,
   resilience: IProcessResilience,
   report: (error: unknown) => void,
-  fallback?: IProcessInstanceFallback
+  fallback?: IProcessInstanceFallback,
+  scheduler: IScheduler = ingress.kind === 'listener'
+    ? (ingress.scheduler ?? systemScheduler)
+    : systemScheduler
 ): Promise<Readonly<{ close(): Promise<void> }>> {
   if (ingress.kind === 'listener' && typeof ingress.verify !== 'function')
     invalidOption('ingress.verify')
@@ -134,8 +137,7 @@ export async function serveProcessSessions(
   const manager =
     borrowedManager ??
     createProcessSessionManager({
-      scheduler:
-        ingress.kind === 'listener' ? (ingress.scheduler ?? systemScheduler) : systemScheduler,
+      scheduler,
       report
     })
   const controller = new AbortController()
@@ -371,7 +373,7 @@ export async function serveProcessSessions(
         signal: controller.signal,
         role: 'responder',
         session: sessionInfo,
-        scheduler: systemScheduler,
+        scheduler,
         verify
       })
     } else {
@@ -384,7 +386,7 @@ export async function serveProcessSessions(
         signal: controller.signal,
         role: 'responder',
         session: sessionInfo,
-        scheduler: systemScheduler
+        scheduler
       })
     }
     const identity: IProcessSessionIdentity = Object.freeze({

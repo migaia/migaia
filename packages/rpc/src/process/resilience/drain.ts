@@ -19,6 +19,8 @@ type IDrainGeneration = {
 /** Process bindings share one drain owner without exporting a new public surface. */
 export type IProcessBindingDrain = Readonly<{
   wrap(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
+  /** Keep logical request settlement inside the same physical generation's drain barrier. */
+  trackCurrent<T>(operation: () => Promise<T>): Promise<T>
   drainCurrent(options?: Readonly<{ hostRemainingMs?: number }>): Promise<void>
 }>
 
@@ -76,6 +78,8 @@ export function createProcessBindingDrain(
   }
 
   return Object.freeze({
+    trackCurrent: <T>(operation: () => Promise<T>): Promise<T> =>
+      current ? track(current, operation) : operation(),
     wrap(channel, endpoint) {
       const generation: IDrainGeneration = {
         channel,

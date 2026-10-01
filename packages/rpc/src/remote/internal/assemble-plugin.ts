@@ -1,10 +1,15 @@
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import type { IFeature } from '@migaia/plugin-host'
+import { resolveAbortReason } from '../../core/internal/async-control.js'
 import { normalizeRemoteContract } from '../contract.js'
 import { RpcRemoteLayerErrorCode } from '../error-code.js'
 import { createRemoteLayerError } from '../error.js'
 import type { IRemotePluginDefinition, IRemotePluginOptions } from '../plugin.js'
-import { createRemoteGenerationHolder, createRemoteRegistration } from '../proxy.js'
+import {
+  createRemoteGenerationHolder,
+  createRemoteRegistration,
+  type IRemoteGenerationHolder
+} from '../proxy.js'
 
 /** A healthy replacement gets three bounded enable attempts before reporting. */
 const MAX_ENABLE_ATTEMPTS = 3
@@ -13,6 +18,8 @@ const ENABLE_RETRY_BASE_MS = 10
 
 /** Package-internal lifecycle observations let a facade reject stale definition commands. */
 type IRemoteAssemblyLifecycle = Readonly<{
+  /** Process reverse registration transfers one prevalidated holder instead of describing twice. */
+  preparedHolder?: IRemoteGenerationHolder
   onInstalled?(): void
   onReleased?(): void | Promise<void>
 }>
@@ -45,10 +52,14 @@ export function assembleRemotePluginDefinition<TUnit, TSpec, TMetadata extends o
     name: options.name,
     features,
     setup: async (context) => {
-      const registration = createRemoteRegistration(options)
-      const holder = createRemoteGenerationHolder(registration, options.report)
+      const registration =
+        lifecycle?.preparedHolder?.registration ?? createRemoteRegistration(options)
+      const holder =
+        lifecycle?.preparedHolder ?? createRemoteGenerationHolder(registration, options.report)
       context.onDispose(() => holder.release())
-      await holder.prepareInitial(context.operation.signal)
+      if (lifecycle?.preparedHolder) {
+        if (context.operation.signal.aborted) throw resolveAbortReason(context.operation.signal)
+      } else await holder.prepareInitial(context.operation.signal)
       /** Registered after the first description so disposal runs subscription cleanup first. */
       let subscribed = true
       let suspended = false
