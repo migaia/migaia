@@ -1,3 +1,4 @@
+import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import type { IRpcPlugin, IRpcPluginInstallResult, IRpcUuidConfig } from '../typing.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
@@ -55,4 +56,4 @@ function createUuidPlugin(config: IRpcUuidConfig): IRpcPlugin {
 
 /** Creates a UUID middleware whose generator is read only during Host installation. */
 export const uuid = (config: IRpcUuidConfig = {}): IRpcPlugin =>
-  freezePlugin(createUuidPlugin(config))
+  registerJsonObjectMiddleware(freezePlugin(createUuidPlugin(config)))

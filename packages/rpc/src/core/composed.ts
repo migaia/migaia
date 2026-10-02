@@ -1,3 +1,4 @@
+import { isJsonObjectFeature } from './internal/json-object-port.js'
 import {
   RpcConstructionError,
   RpcError,
@@ -248,6 +249,7 @@ async function createComposedEndpointRuntime<
       kernel,
       deferred: deferred as unknown as IDeferredPreparedEndpoint<string>,
       middlewareSnapshots: deferred.middlewareSnapshots,
+      privateFeaturesAllowed: Object.values(capabilityRoots).every(isJsonObjectFeature),
       hookEvents,
       ...(capabilityPlugin && capabilityAdmission
         ? {

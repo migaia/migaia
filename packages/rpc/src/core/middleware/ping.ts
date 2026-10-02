@@ -1,3 +1,4 @@
+import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import type { IRpcPingCapability, IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 import { RpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
@@ -32,4 +33,5 @@ const pingPlugin: IRpcPlugin = Object.freeze({
 export type IPingMiddleware = IRpcPlugin & { readonly pingCapability: true }
 
 /** Creates the native ping enablement role; heartbeat ownership remains with control. */
-export const ping = (): IPingMiddleware => freezePlugin({ ...pingPlugin, pingCapability: true })
+export const ping = (): IPingMiddleware =>
+  registerJsonObjectMiddleware(freezePlugin({ ...pingPlugin, pingCapability: true }))

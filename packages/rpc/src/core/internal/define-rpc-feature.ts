@@ -1,3 +1,4 @@
+import { registerJsonObjectFeature, isJsonObjectFeature } from './json-object-port.js'
 import {
   defineFeature as defineNativeFeature,
   type IFeatureFactory,
@@ -28,5 +29,10 @@ export const defineRpcFeature = <
 ): IRpcFeature<TSurface, TDependencies, TExpose> => {
   const feature = defineNativeFeature(install, dependencies)
   registerPrivateFeaturePolicy(feature, policy, policy.claims)
-  return feature as IRpcFeature<TSurface, TDependencies, TExpose>
+  // First-party factories construct these dependency records; unknown dependency tokens fail closed.
+  return (
+    Object.values(dependencies).every(isJsonObjectFeature)
+      ? registerJsonObjectFeature(feature)
+      : feature
+  ) as IRpcFeature<TSurface, TDependencies, TExpose>
 }

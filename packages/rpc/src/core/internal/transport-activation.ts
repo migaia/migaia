@@ -8,10 +8,11 @@ import type { IRpcTransport } from '../transport.js'
  */
 export function createEndpointTransportActivation(
   transport: IRpcTransport,
-  callbacks: IEndpointKernelCallbacks
+  callbacks: IEndpointKernelCallbacks,
+  subscribe: IRpcTransport['subscribe'] = (listener) => transport.subscribe(listener)
 ): IEndpointKernelActivation {
   let committed = false
-  const unsubscribe = transport.subscribe((message) => {
+  const unsubscribe = subscribe((message) => {
     if (!committed) return
     void Promise.resolve(callbacks.receive(message)).catch(callbacks.receiveError)
   })

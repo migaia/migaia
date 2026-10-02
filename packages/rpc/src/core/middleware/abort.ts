@@ -1,3 +1,4 @@
+import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import type { IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
@@ -21,4 +22,4 @@ const abortPlugin: IRpcPlugin = Object.freeze({
 })
 
 /** Creates the native abort-enable plugin used directly by the factory composer. */
-export const abort = (): IRpcPlugin => freezePlugin(abortPlugin)
+export const abort = (): IRpcPlugin => registerJsonObjectMiddleware(freezePlugin(abortPlugin))

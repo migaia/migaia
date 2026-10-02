@@ -49,6 +49,8 @@ export type IRpcNativeFeatureDefinition = Readonly<{
 /** Native composition inputs; Host remains the only identity, topology, and lifecycle owner. */
 export type IRpcNativePluginBatchOptions = {
   readonly kernel: IEndpointKernelHost
+  /** Canonical feature admission is computed from the existing own snapshot. */
+  readonly privateFeaturesAllowed?: boolean
   readonly deferred: IDeferredPreparedEndpoint<string>
   readonly middlewareSnapshots: readonly IEndpointMiddlewareSnapshot[]
   readonly hookEvents: IRpcHookEvent[]
@@ -251,7 +253,8 @@ export function buildNativePluginBatch(
           options.hookEvents,
           (operation) => Promise.resolve(operation()),
           core.getPort,
-          () => options.kernel.time.timestamp()
+          () => options.kernel.time.timestamp(),
+          options.privateFeaturesAllowed
         )
         options.onPrepared(prepared)
         return {}
