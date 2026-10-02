@@ -172,7 +172,10 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bri
     if bridge:
         if bare:
             while (body := bridge_body(reader)) is not None:
-                bridge_write_body(writer, body)
+                # A10 includes one payload parse and serialization without RPC envelope work.
+                payload = json.loads(body)
+                encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                bridge_write_body(writer, encoded)
             return
         serve_bridge(reader, writer, host, token)
         return

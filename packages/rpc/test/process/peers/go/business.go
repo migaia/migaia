@@ -221,7 +221,18 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 				if err != nil {
 					return err
 				}
-				if err = bridgeWriteBody(writer, body); err != nil {
+				// A10 charges one payload parse and serialization to the bare peer too.
+				var payload any
+				decoder := json.NewDecoder(bytes.NewReader(body))
+				decoder.UseNumber()
+				if err = decoder.Decode(&payload); err != nil {
+					return err
+				}
+				encoded, err := json.Marshal(payload)
+				if err != nil {
+					return err
+				}
+				if err = bridgeWriteBody(writer, encoded); err != nil {
 					return err
 				}
 			}
@@ -321,7 +332,7 @@ func bridgeBody(reader io.Reader) ([]byte, error) {
 	return body, nil
 }
 
-// bridgeReceive decodes JSON only for RPC; bare echoes the original physical body unchanged.
+// bridgeReceive adds RPC envelope validation to the payload parsing shared by the bare baseline.
 func bridgeReceive(reader io.Reader) (record, error) {
 	body, err := bridgeBody(reader)
 	if err != nil {
