@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { createSupervisor, createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
-import { createMemoryLauncher } from '../support/memory-launcher.js'
+import { createMemoryLauncher, deferred } from '../support/memory-launcher.js'
 import { createMemoryProfile } from '../support/memory-profile.js'
 
 /** Flushes asynchronous checks and the queued failure command. */
@@ -10,6 +10,56 @@ async function flush(): Promise<void> {
 }
 
 describe('A7 periodic health', () => {
+  it.each(['stop', 'dispose'] as const)(
+    '[K247] clears timers when %s precedes a queued health failure continuation',
+    async (operation) => {
+      /** Manual time exposes any timer armed after the synchronous close fence. */
+      const scheduler = createManualScheduler()
+      /** One real supervisor unit, with retirement paused at its asynchronous boundary. */
+      const launcher = createMemoryLauncher()
+      /** Indicates that the health failure command has entered retirement. */
+      const retiring = deferred<void>()
+      /** Releases retirement only after stop/dispose has synchronously cleared timers. */
+      const release = deferred<void>()
+      /** Keep the canonical profile except for the deterministic retirement barrier. */
+      const profile = createMemoryProfile({ autoExitOnTerminate: true })
+      /** The failed health check must use the normal retry path with a 1ms backoff. */
+      const supervisor = createSupervisor({
+        id: 'health-close-race',
+        report: () => undefined,
+        spec: 'a',
+        launcher,
+        profile: {
+          ...profile,
+          async terminate(handle, mode) {
+            retiring.resolve()
+            await release.promise
+            profile.terminate(handle, mode)
+          }
+        },
+        budget: createUnitBudget({ kind: 'memory', maxUnits: 1, launchRate: false, scheduler }),
+        scheduler,
+        restart: { mode: 'always', initialDelayMs: 1 },
+        health: {
+          intervalMs: 5,
+          timeoutMs: 2,
+          failureThreshold: 1,
+          check: () => Promise.reject(new Error('health failure fixture'))
+        }
+      })
+      await supervisor.start()
+      scheduler.advance(5)
+      await retiring.promise
+      /** Queue the close before the suspended failure command can arm its retry. */
+      const closing = supervisor[operation]()
+      release.resolve()
+      await closing
+      expect(scheduler.pendingCount).toBe(0)
+      expect(supervisor.state).toBe(operation === 'dispose' ? 'disposed' : 'stopped')
+      expect(launcher.launched).toHaveLength(1)
+      await supervisor.dispose()
+    }
+  )
   it('forces the unit after three consecutive rejected checks', async () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()
