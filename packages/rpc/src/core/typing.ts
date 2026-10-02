@@ -29,6 +29,11 @@ export type IRpcProviderLimits = {
   readonly maxGlobal?: number
   readonly maxPerPeer?: number
   /**
+   * Maximum completed inbound request tombstones retained per verified peer; defaults to 1024.
+   * Configure a known session workload without changing concurrency or the global replay ceiling.
+   */
+  readonly maxReplayEntriesPerPeer?: number
+  /**
    * Notify the local connection owner of a refused provider execution. The provider is not invoked;
    * observer failures are reported through endpoint hooks without replacing the existing OVERLOADED
    * result. No wire data is inspected.
