@@ -334,7 +334,10 @@ export const RpcCoreErrorText = {
   providerAdmissionObserverMustBeAFunction: 'Provider admission observer must be a function',
   /** Observer failures are local diagnostics; the original remains on the cause chain. */
   providerAdmissionObserverFailed: 'Provider admission observer failed',
-  /** Existing concurrency configuration text remains unchanged for legacy consumers. */
+  /**
+   * Stable core error text consumed by core/internal/provider-admission.ts; preserves its existing
+   * caller-facing wording when concurrency limits are not positive safe integers.
+   */
   providerAdmissionLimitsMustBePositiveSafeIntegers:
     'provider admission limits must be positive safe integers',
   /**
