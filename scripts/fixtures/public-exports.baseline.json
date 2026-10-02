@@ -219,6 +219,7 @@
         "disposeKey",
         "invokeCaptured",
         "isDefinedPlugin",
+        "isPluginHandleCurrent",
         "readPluginHostDisposalProvenance"
       ],
       "./composition": [
