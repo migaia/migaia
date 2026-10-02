@@ -10,7 +10,12 @@ import {
   RpcTimeoutError,
   tagRpcError
 } from '../errors.js'
-import { RpcMessageKind } from '../semantic-constants.js'
+import {
+  RpcMessageKind,
+  RpcProviderRejectionReason,
+  RpcReplayCapacityNamespace,
+  RPC_REPLAY_CAPACITY_REPORT_INTERVAL_MS
+} from '../semantic-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type {
   IRpcFanoutResult,
@@ -97,7 +102,7 @@ export type IOutboundAttachmentHost = {
     options?: { readonly transfer?: readonly unknown[] }
   ): Promise<void>
   readonly hooks: { on(listener: IRpcHook): () => void }
-  emitFailure(error: unknown, code?: string): void
+  emitFailure(error: unknown, code?: string, field?: string, detail?: IRpcHookEvent['detail']): void
   emitDiagnostic(event: Omit<IRpcHookEvent, 'at' | 'localId'>): void
   noteUnknownField(connection: string, kind: string, pointer: string, field: string): void
   readonly inboundIdentity: InboundIdentityCoordinator
@@ -145,6 +150,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   #transportFailureListener: ((error: unknown) => void) | undefined
   /** Prevents active and recently released task-id reuse. */
   readonly #replay: ReplayWindow
+  /** Last capacity report in the monotonic clock; one constant-size budget spans both namespaces. */
+  #lastCapacityReportAt: number | undefined
   /** Hook callbacks owned by the outbound runtime. */
   readonly #hooks = new HookRegistry()
   /** Per-connection warning cache for additive fields and unknown control subtypes. */
@@ -467,10 +474,12 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     const taskId = allocateRpcId(this.#uuid, 'task', this.id, targetId, (id) =>
       this.#replay.hasReservedId(id)
     )
-    if (!this.#replay.reserveId(taskId))
-      return Promise.reject(
-        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
-      )
+    if (!this.#replay.reserveId(taskId)) {
+      /** Preserve the original caller error object while exposing only numeric local capacity. */
+      const error = new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+      this.#reportReplayCapacity(error)
+      return Promise.reject(error)
+    }
     return new Promise<T>((resolve, reject) => {
       let timer: IEndpointTimer | undefined
       let settled = false
@@ -715,8 +724,12 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       operation?: IRpcStreamOpenCommand['operation']
     }>
   ): Promise<void> {
-    if (!this.#replay.reserveId(command.id))
-      throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+    if (!this.#replay.reserveId(command.id)) {
+      /** Reservation fails synchronously, before dispatch can install its asynchronous reporter. */
+      const error = new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+      this.#reportReplayCapacity(error)
+      throw error
+    }
     return Promise.resolve()
       .then(() => this.resolveReceiver(command.targetId))
       .then((receiver) => {
@@ -856,14 +869,31 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Reports one diagnostic without allowing reporter failure to re-enter runtime work. */
-  emitFailure(error: unknown, code: string = RpcCoreErrorCode.internal, field?: string): void {
+  emitFailure(
+    error: unknown,
+    code: string = RpcCoreErrorCode.internal,
+    field?: string,
+    detail?: IRpcHookEvent['detail']
+  ): void {
+    if (detail !== undefined) {
+      /** Monotonic rate limiting is local and allocates neither timers nor identity collections. */
+      const now = this.kernel.time.scheduler.now()
+      if (
+        this.#lastCapacityReportAt !== undefined &&
+        now - this.#lastCapacityReportAt < RPC_REPLAY_CAPACITY_REPORT_INTERVAL_MS
+      )
+        return
+      this.#lastCapacityReportAt = now
+    }
+    /** Capacity details are frozen numeric facts; ordinary failure hooks retain their old shape. */
     const event = {
       name: 'failure',
       at: this.kernel.time.timestamp(),
       localId: this.id,
       error,
       code,
-      ...(field === undefined ? {} : { field })
+      ...(field === undefined ? {} : { field }),
+      ...(detail === undefined ? {} : { detail })
     }
     this.#emit(event)
     try {
@@ -871,6 +901,22 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     } catch {
       // Diagnostics are observational and cannot change the terminal operation outcome.
     }
+  }
+
+  /** Reports only actual outbound capacity exhaustion, never duplicate-id admission failures. */
+  #reportReplayCapacity(error: RpcError): void {
+    if (this.#replay.size < this.#replay.maxEntries) return
+    this.emitFailure(
+      error,
+      RpcCoreErrorCode.overloaded,
+      undefined,
+      Object.freeze({
+        namespace: RpcReplayCapacityNamespace.outbound,
+        reason: RpcProviderRejectionReason.outboundReplayFull,
+        occupancy: this.#replay.size,
+        limit: this.#replay.maxEntries
+      })
+    )
   }
 
   /** Register an optional flow owner without creating another transport subscription. */
