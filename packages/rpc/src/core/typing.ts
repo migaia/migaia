@@ -1,4 +1,8 @@
 import type { IRpcProviderRejection } from './provider-admission.js'
+import type {
+  RpcProviderRejectionReason,
+  RpcReplayCapacityNamespace
+} from './semantic-constants.js'
 import type { IRpcError } from './errors.js'
 import type { IRpcTransport } from './transport.js'
 import type { IRpcFeature } from './feature.js'
@@ -54,6 +58,17 @@ export type IRpcIdempotencyConfig = Readonly<{
   store?: IRpcIdempotencyStore
   scope?: (admission: Readonly<{ token: string; senderId: string }>) => string
 }>
+/** Numeric replay exhaustion facts; contains no peer, task, method, or payload identity. */
+export type IRpcReplayCapacityDetail = Readonly<{
+  readonly namespace: RpcReplayCapacityNamespace
+  readonly reason: Extract<RpcProviderRejectionReason, 'replayLedgerFull' | 'outboundReplayFull'>
+  readonly occupancy: number
+  readonly limit: number
+  /** Present only for inbound capacity, without identifying the verified peer. */
+  readonly peerOccupancy?: number
+  readonly peerLimit?: number
+}>
+
 export type IRpcHookEvent = {
   readonly name: string
   readonly at: number
@@ -61,6 +76,8 @@ export type IRpcHookEvent = {
   readonly code?: string
   readonly error?: unknown
   readonly field?: string
+  /** Rate-limited, local-only replay capacity evidence; never serialized onto RPC frames. */
+  readonly detail?: IRpcReplayCapacityDetail
   /** Relative peer drain announced by a validated close control frame. */
   readonly durationMs?: number
   readonly contract?: unknown
