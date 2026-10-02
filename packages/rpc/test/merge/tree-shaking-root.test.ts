@@ -7,14 +7,14 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** R32 closing pins the exact retained cost of admission, controlled wire errors and handle probes. */
+/** R32 closing pins exact retained cost after C2 identity routing and local replay diagnostics. */
 const allowedIncrease = {
-  rawBytes: 71888 / legacyRoot.rawBytes,
-  gzipBytes: 17143 / legacyRoot.gzipBytes
+  rawBytes: 81809 / legacyRoot.rawBytes,
+  gzipBytes: 20045 / legacyRoot.gzipBytes
 } as const
 
-/** I12 changes no retained modules relative to the IPC-reviewed graph. */
-const expectedModuleIncrease = 5
+/** The private C2 registry adds one module to the five already retained by the reviewed graph. */
+const expectedModuleIncrease = 6
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {
