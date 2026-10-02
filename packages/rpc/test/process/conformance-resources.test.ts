@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it, beforeAll } from 'vitest'
+import { describe, expect, it, beforeAll, vi } from 'vitest'
 import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
 import { createProcessSupervisor, ProcessCapability } from '@migaia/supervision/process'
 import { createNodeProcessLauncher } from '@migaia/rpc/process/adapters/node-child-process'
@@ -19,6 +19,8 @@ const resourceTotalLaunches = 1000 + 4
 const resourceDeadlineMs =
   Math.ceil(resourceTotalLaunches / resourceLaunchRate.max) * resourceLaunchRate.windowMs +
   resourceDeadlineMarginMs
+/** Match the existing native observation budget; join the queued report before requesting dispose. */
+const resourceReportDeadlineMs = 1000
 
 beforeAll(async () => {
   const { admitConformanceToolchains } = await import(
@@ -345,19 +347,24 @@ describe('[A6] actual language process resource ownership', () => {
         const outcome = await started.unit.exited
         expect(outcome.signal).toMatch(/^SIG(?:TERM|KILL)$/)
         expect(measured).toBeGreaterThan(1)
+        /** Native exited precedes the owner's queued terminal report; disposing first cancels it. */
+        await vi.waitFor(
+          () =>
+            expect(reports).toContainEqual(
+              expect.objectContaining({
+                source: '@migaia/supervision',
+                code: 'SUPERVISION_EXHAUSTED',
+                cause: expect.objectContaining({
+                  source: '@migaia/supervision',
+                  code: 'RESOURCE_LIMIT_EXCEEDED',
+                  detail: expect.objectContaining({ maximum: 1, observed: measured })
+                })
+              })
+            ),
+          { timeout: resourceReportDeadlineMs }
+        )
         await supervisor.dispose()
         expect(budget.inUse).toBe(0)
-        expect(reports).toContainEqual(
-          expect.objectContaining({
-            source: '@migaia/supervision',
-            code: 'SUPERVISION_EXHAUSTED',
-            cause: expect.objectContaining({
-              source: '@migaia/supervision',
-              code: 'RESOURCE_LIMIT_EXCEEDED',
-              detail: expect.objectContaining({ maximum: 1, observed: measured })
-            })
-          })
-        )
         writeFileSync(
           join(evidence, `rss-${peer.language}.json`),
           JSON.stringify({ pid: started.unit.identity.pid, measured, maximum: 1, outcome })
