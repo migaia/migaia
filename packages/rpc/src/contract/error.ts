@@ -1,5 +1,5 @@
 import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
-import { createContractError } from './contract-error.js'
+import { createContractError, localErrorWireSummary } from './contract-error.js'
 import { RpcContractErrorCode } from './error-code.js'
 import { normalizePortable } from './normalize.js'
 import type {
@@ -52,22 +52,25 @@ export function createInvalidWireError(
 function snapshotError(
   input: object,
   pointer: string,
-  report: (pointer: string, field: string, error: unknown) => void
+  report: (pointer: string, field: string, error: unknown) => void,
+  summaryOnly = false
 ): IErrorSnapshot {
   const fields: Record<string, unknown> = Object.create(null) as Record<string, unknown>
   const failed = new Set<string>()
-  for (const key of [
-    'name',
-    'message',
-    'stack',
-    'source',
-    'code',
-    'data',
-    'truncated',
-    'cause',
-    'errors',
-    'cleanupErrors'
-  ]) {
+  for (const key of summaryOnly
+    ? RpcWireErrorField.slice(0, 5)
+    : [
+        'name',
+        'message',
+        'stack',
+        'source',
+        'code',
+        'data',
+        'truncated',
+        'cause',
+        'errors',
+        'cleanupErrors'
+      ]) {
     /** Keep each field's failure attached to its original pointer. */
     const read = tryReadProperty(input as Record<string, unknown>, key)
     if (read.threw) {
@@ -141,7 +144,12 @@ export function serializeRpcError(
         report(pointer, 'data', error)
       }
     }
-    const source = object && !array ? snapshotError(input, pointer, report) : undefined
+    /** Only factory-created local errors may suppress secret-bearing descendants. */
+    const localSummary = localErrorWireSummary(input)
+    const source =
+      object && !array
+        ? snapshotError(input, pointer, report, localSummary !== undefined)
+        : undefined
     let nativeError = false
     if (source) {
       try {
@@ -157,13 +165,15 @@ export function serializeRpcError(
         (typeof source.fields.name === 'string' &&
           typeof source.fields.message === 'string' &&
           typeof source.fields.stack === 'string'))
-    const message = errorLike
-      ? typeof source.fields.message === 'string'
-        ? source.fields.message
-        : ''
-      : typeof input === 'string'
-        ? input
-        : RpcWireErrorFallback.nonErrorMessage
+    const message =
+      localSummary?.message ??
+      (errorLike
+        ? typeof source.fields.message === 'string'
+          ? source.fields.message
+          : ''
+        : typeof input === 'string'
+          ? input
+          : RpcWireErrorFallback.nonErrorMessage)
     const name =
       errorLike && typeof source.fields.name === 'string' && source.fields.name.length > 0
         ? source.fields.name
@@ -174,9 +184,10 @@ export function serializeRpcError(
           ? source.fields.source
           : RpcWireErrorFallback.source,
       code:
-        errorLike && typeof source.fields.code === 'string' && source.fields.code.length > 0
+        localSummary?.code ??
+        (errorLike && typeof source.fields.code === 'string' && source.fields.code.length > 0
           ? source.fields.code
-          : RpcWireErrorFallback.code,
+          : RpcWireErrorFallback.code),
       name,
       message,
       stack:
@@ -201,7 +212,11 @@ export function serializeRpcError(
     budget.bytes += ownBytes
     budget.nodes += 1
 
-    if (errorLike) {
+    /**
+     * Stream error frames retain their required top-level shape without local secret-bearing
+     * causes.
+     */
+    if (errorLike && !localSummary) {
       projectData(source.fields.data, pointer, node, depth)
       if (source.fields.cause !== undefined) {
         const cause = visit(source.fields.cause, `${pointer}/cause`, depth + 1)
@@ -224,7 +239,7 @@ export function serializeRpcError(
         output.push(child)
       }
       if (output.length > 0) node.errors = Object.freeze(output)
-    } else if (input !== undefined && typeof input !== 'string') {
+    } else if (!localSummary && input !== undefined && typeof input !== 'string') {
       if (source) {
         let keys: string[]
         let enumerated = true

@@ -123,10 +123,9 @@ describe('remote service plugin', () => {
     let streamProviderContext: IRpcContext | undefined
     let hookCalls = 0
     let requestCalls = 0
-    const hookError = createRemoteLayerError(
-      RpcRemoteLayerErrorCode.closed,
-      new Error('hook root cause')
-    )
+    /** The original hook cause stays reachable by identity on the local owner. */
+    const hookCause = new Error('hook root cause')
+    const hookError = createRemoteLayerError(RpcRemoteLayerErrorCode.closed, hookCause)
     const target = definePlugin({
       name: 'p',
       features: {
@@ -215,12 +214,13 @@ describe('remote service plugin', () => {
       expect(streamHookContext).toBe(streamProviderContext)
       expect(requestHookContext).toBe(requestContext)
       expect(typeof streamContext?.dispatchTo).toBe('function')
-      await expect(registration.invokeRequest('p.f.request', ['reject'])).rejects.toMatchObject({
-        source: '@migaia/rpc/remote',
-        code: 'REMOTE_CLOSED',
-        stack: hookError.stack,
-        cause: { message: 'hook root cause' }
-      })
+      /** K232 keeps the exact hook failure local; the requester receives only its code/message. */
+      const rejected = await registration
+        .invokeRequest('p.f.request', ['reject'])
+        .catch((error: unknown) => error)
+      expect(rejected).toMatchObject({ code: 'REMOTE_CLOSED', message: hookError.message })
+      expect((rejected as Error).cause).toBeUndefined()
+      expect(hookError.cause).toBe(hookCause)
       expect(requestCalls).toBe(1)
       expect(await client.send('server', 'p.f.request', ['after-hook-error'])).toBe(
         'after-hook-error'
@@ -228,7 +228,7 @@ describe('remote service plugin', () => {
       await host.plugin.disable('p', { policy: 'suspend' })
       await expect(registration.invokeRequest('p.f.request', ['disabled'])).rejects.toMatchObject({
         code: 'REMOTE_CLOSED',
-        source: '@migaia/rpc/remote'
+        message: hookError.message
       })
       await host.plugin.enable('p')
       expect(await client.send('server', 'p.f.request', ['restored'])).toBe('restored')

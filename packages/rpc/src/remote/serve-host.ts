@@ -1,5 +1,6 @@
 import {
   isDefinedPlugin,
+  isPluginHandleCurrent,
   PluginHostErrorCode,
   type IDefinedPluginConstraint,
   type IHostHandle,
@@ -43,6 +44,7 @@ const installingByHost = new WeakMap<object, Map<string, IInstallingRemotePlugin
 
 /** Reads a name-addressed Host handle without trusting an older Feature output. */
 function registrationState(record: IInstalledRemotePlugin): 'enabled' | 'disabled' | 'stale' {
+  if (!isPluginHandleCurrent(record.handle)) return 'stale'
   for (const [feature, original] of record.features) {
     try {
       if (record.handle.getFeature(feature) !== original) return 'stale'
@@ -214,6 +216,10 @@ export async function serveRemoteHost(
       ) as readonly IRpcPortableValue[]
       const name = params[0] as string
       declared(catalog, name)
+      /** Only this connection's live remote adoption authorizes removal or dependency inspection. */
+      const adopted = handles.get(name)
+      if (!adopted || installed.get(name) !== adopted || registrationState(adopted) === 'stale')
+        throw createRemoteLayerError(RpcRemoteLayerErrorCode.hostNotAdopted)
       const input = (params[1] ?? {}) as {
         readonly policy?: 'reject' | 'suspend'
         readonly dryRun?: boolean

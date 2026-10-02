@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
+import {
+  definePlugin,
+  isPluginHandleCurrent,
+  PluginHost,
+  PluginHostErrorCode
+} from '../src/index.js'
 
 /** Creates an unbounded Host so lifecycle timing does not affect handle assertions. */
 const createHost = (): PluginHost<Record<string, never>> =>
@@ -34,5 +39,29 @@ describe('plugin handles', () => {
     expect(() => dCall()).toThrow(
       expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
     )
+  })
+})
+
+describe('K257 exact handle registration probe', () => {
+  it('keeps disabled registrations current and rejects replaced or disposed handles', async () => {
+    /** Registration probe must not change name-addressed extension reads. */
+    const host = createHost()
+    /** Two definitions reuse one extension value while representing distinct registrations. */
+    const first = definePlugin({ name: 'same', install: () => ({ value: 'first' }) })
+    const second = definePlugin({ name: 'same', install: () => ({ value: 'second' }) })
+    const [original] = await host.use(first)
+    expect(isPluginHandleCurrent(original)).toBe(true)
+    await host.plugin.disable('same', { policy: 'suspend' })
+    expect(isPluginHandleCurrent(original)).toBe(true)
+    await host.unUse('same')
+    expect(isPluginHandleCurrent(original)).toBe(false)
+    const [replacement] = await host.use(second)
+    expect(isPluginHandleCurrent(original)).toBe(false)
+    expect(isPluginHandleCurrent(replacement)).toBe(true)
+    expect(original.extensions.value).toBe('second')
+    await host.dispose()
+    expect(isPluginHandleCurrent(replacement)).toBe(false)
+    expect(isPluginHandleCurrent({ name: 'same' })).toBe(false)
+    expect(isPluginHandleCurrent(null)).toBe(false)
   })
 })

@@ -2,6 +2,23 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.js'
 import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.js'
 
+/** Only trusted local factories register code/message summaries; remote fields cannot opt in. */
+const summaries = new WeakMap<Error, Readonly<{ code: string; message: string }>>()
+
+/** Retain the original local cause while limiting a contract failure's outbound disclosure. */
+export function registerLocalErrorWireSummary(error: Error, code: string, message: string): void {
+  summaries.set(error, Object.freeze({ code, message }))
+}
+
+/** Read the factory-owned summary without invoking any untrusted error property getters. */
+export function localErrorWireSummary(
+  error: unknown
+): Readonly<{ code: string; message: string }> | undefined {
+  return (typeof error === 'object' && error !== null) || typeof error === 'function'
+    ? summaries.get(error as Error)
+    : undefined
+}
+
 /**
  * Canonical text per public code. Keyed by code so every throw site shares one total mapping;
  * adding a code without text fails typecheck instead of silently reusing another message.
@@ -44,5 +61,6 @@ export function createContractError(code: IRpcContractErrorCode, cause?: unknown
         code === RpcContractErrorCode.handshakeRejected
       ? new Error(TEXT_BY_CODE[code], options)
       : new TypeError(TEXT_BY_CODE[code], options)
+  registerLocalErrorWireSummary(error, code, TEXT_BY_CODE[code])
   return attachErrorIdentity(error, { source: RPC_CONTRACT_SOURCE, code })
 }

@@ -90,7 +90,8 @@
           },
           "additionalProperties": {
             "$ref": "#/$defs/method"
-          }
+          },
+          "maxProperties": 128
         }
       }
     },
@@ -121,7 +122,8 @@
           },
           "additionalProperties": {
             "$ref": "#/$defs/feature"
-          }
+          },
+          "maxProperties": 64
         }
       }
     },
@@ -135,7 +137,8 @@
       },
       "additionalProperties": {
         "$ref": "#/$defs/contract"
-      }
+      },
+      "maxProperties": 64
     },
     "describePlugin": {
       "$ref": "#/$defs/contract"
