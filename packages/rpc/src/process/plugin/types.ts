@@ -71,6 +71,8 @@ export type ISpawnProcessPluginDeployment<THandle extends IProcessHandle = IProc
 /** Connect owns a socket session while the target process and rendezvous remain borrowed. */
 export type IConnectProcessPluginDeployment = Readonly<{
   kind: 'connect'
+  /** Native is the default; JSON-RPC disables default ping while preserving custom health. */
+  wire?: ProcessPluginWire
   address: string
   token: string
   /** An optional native proposal shared with every establish call for this deployment. */

@@ -243,6 +243,7 @@ describe('JSON-RPC real process carriers', () => {
           report: () => undefined,
           deployment: {
             kind: 'connect',
+            wire: 'jsonrpc',
             address,
             token: 'wrong-credential',
             dial: async (path, signal) => {
@@ -260,8 +261,7 @@ describe('JSON-RPC real process carriers', () => {
               }
             },
             establish: establish([], [], []),
-            /** Connect wire omission remains K231; this caller supplies explicit transport health. */
-            supervision: { restart: { maxRestarts: 0 }, health: { check: async () => undefined } }
+            supervision: { restart: { maxRestarts: 0 } }
           },
           endpointFactory: async (channel) => {
             endpoints++
@@ -337,23 +337,14 @@ describe('JSON-RPC real process carriers', () => {
           report: (error) => reports.push(error),
           deployment: {
             kind: 'connect',
+            wire: 'jsonrpc',
             address,
             token,
             dial: (path, signal) =>
               dialProcessByteChannel({ address: path, signal: signal as AbortSignal }),
             establish: open,
-            /**
-             * Connect has no wire selector; this caller explicitly supplies a transport-local
-             * check.
-             */
-            supervision: {
-              restart: { maxRestarts: 0 },
-              health: {
-                check: async () => {
-                  if (second!.transport.closed) throw new Error('fixture connection closed')
-                }
-              }
-            }
+            /** JSON-RPC uses UD1 default none without a native ping workaround. */
+            supervision: { restart: { maxRestarts: 0 } }
           },
           endpointFactory: async (channel) => {
             const endpoint = await bridgeEndpoint(channel)

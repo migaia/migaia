@@ -15,7 +15,7 @@ import {
 import { createProcessHost } from '@migaia/rpc/process'
 import { createNodeProcessLauncher } from '@migaia/rpc/process/adapters/node-child-process'
 import { dialProcessByteChannel } from '@migaia/rpc/process/adapters/node-socket'
-import type { IRemoteContract, IRemoteServeEndpoint, IRemoteChannel } from '@migaia/rpc/remote'
+import type { IRemoteContract, IRemoteServeEndpoint } from '@migaia/rpc/remote'
 import { endpointFor, bridgeEndpointFor } from '../peers/ts/runtime.js'
 import { fdLauncher } from '../../bridge/fixtures/jsonrpc-process.js'
 import { createJsonRpcRemoteChannel } from '@migaia/rpc/bridge/jsonrpc'
@@ -127,8 +127,6 @@ function deployment(
   /** Exact public byte ports permit a physical EOF independent of endpoint abort/close messages. */
   const rawChannels: IProcessByteChannel[] = []
   const launcher = bridge ? fdLauncher() : createNodeProcessLauncher()
-  /** Borrowed bridge uses the existing explicit health override; default none remains K231 blocked. */
-  let established: IRemoteChannel | undefined
   /** Build with the real tool environment before the existing FD fixture's intentionally empty env. */
   const executable =
     bridge && (peer.language === 'go' || peer.language === 'rust')
@@ -167,7 +165,6 @@ function deployment(
         report: (error) => reports.push(error),
         ipc: { ...context.session, log: () => undefined }
       }).then((channel) => {
-        established = channel
         return channel
       })
     return createProcessTransport(observed, {
@@ -199,21 +196,10 @@ function deployment(
   const selected: IProcessPluginOptions['deployment'] = address
     ? {
         kind: 'connect',
+        wire: bridge ? 'jsonrpc' : 'native',
         address,
         token,
         offer: proposal,
-        ...(bridge
-          ? {
-              supervision: {
-                health: {
-                  check: async () => {
-                    if (established?.transport.closed)
-                      throw new Error('bridge fixture channel closed')
-                  }
-                }
-              }
-            }
-          : {}),
         dial: (target, signal) =>
           dialProcessByteChannel({ address: target, signal: signal as AbortSignal }),
         establish
