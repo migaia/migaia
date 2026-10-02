@@ -1,3 +1,4 @@
+import { registerJsonObjectFeature } from '../internal/json-object-port.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { defineFeature } from '../feature.js'
 import type { IRpcFeatureExpose } from '../internal/feature-contract.js'
@@ -39,5 +40,5 @@ export function createIpcLogFeature(
       return Object.freeze({})
     }
   )
-  return Object.freeze({ feature, recordStderr: publish })
+  return Object.freeze({ feature: registerJsonObjectFeature(feature), recordStderr: publish })
 }

@@ -1,3 +1,4 @@
+import { registerJsonObjectDescriptorMiddleware } from '../internal/json-object-port.js'
 import type { IRpcFrameAcceptResult, IRpcFramer } from '../../contract/index.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
@@ -23,22 +24,25 @@ export function framer<TDescriptor extends IFramerDescriptor>(
     typeof descriptor.accept !== 'function'
   )
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.framerDescriptorInvalid)
-  return Object.freeze({
-    name: 'framer',
-    framer: descriptor,
-    metadata: Object.freeze({
-      claims: Object.freeze({
-        routes: [],
-        provides: [],
-        consumes: [],
-        publicKeys: [],
-        exposedKeys: [],
-        activator: false
+  return registerJsonObjectDescriptorMiddleware(
+    Object.freeze({
+      name: 'framer',
+      framer: descriptor,
+      metadata: Object.freeze({
+        claims: Object.freeze({
+          routes: [],
+          provides: [],
+          consumes: [],
+          publicKeys: [],
+          exposedKeys: [],
+          activator: false
+        })
+      }),
+      install: (): IRpcPluginInstallResult => ({
+        extension: Object.freeze({ framer: descriptor }),
+        ports: Object.freeze({})
       })
     }),
-    install: (): IRpcPluginInstallResult => ({
-      extension: Object.freeze({ framer: descriptor }),
-      ports: Object.freeze({})
-    })
-  })
+    descriptor
+  )
 }

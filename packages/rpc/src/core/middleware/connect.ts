@@ -1,3 +1,4 @@
+import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import { RpcPlatform } from '../transport-constants.js'
 import type {
@@ -83,7 +84,15 @@ export const connect = <TMode extends IRpcDiscoveryMode = 'automatic'>(
       }
     }
   }
-  return freezePlugin(plugin) as IConnectMiddleware<TMode>
+  /** Only the default verifier may receive private data; custom selectors keep string frames. */
+  const frozen = freezePlugin(plugin)
+  return (
+    configuredIdentifier === undefined &&
+    typeof configuredUniqueTargetId !== 'function' &&
+    configuredReceiverSelector === undefined
+      ? registerJsonObjectMiddleware(frozen)
+      : frozen
+  ) as IConnectMiddleware<TMode>
 }
 
 /** Validates one frozen connect snapshot and creates its complete typed shared port. */
