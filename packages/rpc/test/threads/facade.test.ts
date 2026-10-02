@@ -1,13 +1,21 @@
 import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler, createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it } from 'vitest'
+import type { IThreadHostOptions } from '../../src/threads/types.js'
+import type { INodeThreadHandle } from '../../src/threads/adapters/node.js'
 import { createThreadHost } from '../../src/threads/host.js'
 import { createNodeThreadChannelFactory } from '../../src/threads/adapters/node.js'
 import { createServeThreadHost } from '../../src/threads/serve.js'
-import { contract, endpointFactory, nativeFixture, workerEntry } from './fixture.js'
+import {
+  contract,
+  endpointFactory,
+  nativeFixture,
+  workerEntry,
+  type IFixtureFeature
+} from './fixture.js'
 
 /** Each facade owns its own actual Worker and borrows neither another connection nor its Host. */
-function hostFixture() {
+function hostFixture(overrides: Partial<IThreadHostOptions<INodeThreadHandle>> = {}) {
   const fixture = nativeFixture({}, { hostMode: true })
   const remote = createThreadHost({
     catalog: { p: contract },
@@ -17,12 +25,53 @@ function hostFixture() {
     scheduler: systemScheduler,
     channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
     endpointFactory,
-    report: (error) => fixture.reported.push(error)
+    report: (error) => fixture.reported.push(error),
+    ...overrides
   })
   return { remote, fixture }
 }
 
 describe('thread Host facade', () => {
+  it('[A5] Host forwards callWallTimeMs as the total request deadline', async () => {
+    /** The clock is advanced only after a real Worker has received the logical call. */
+    const scheduler = createManualScheduler()
+    /** Host requests use the same remote deadline owner as Plugin requests. */
+    const host = hostFixture({
+      scheduler,
+      channelFactory: createNodeThreadChannelFactory({ scheduler }),
+      spec: { entry: workerEntry, limits: { callWallTimeMs: 100 } }
+    })
+    try {
+      /** Adoption creates the actual Worker-side plugin before its never-finishing request. */
+      const feature = await host.remote.use('p')
+      /** Caller allowance is larger, so the facade's 100 ms cap must win. */
+      const result = (feature.f as unknown as IFixtureFeature)
+        .hold([], { timeoutMs: 200 })
+        .catch((error: unknown) => error)
+      await expect
+        .poll(() => host.fixture.frames.some(({ message }) => message.method === 'p.f.hold'), {
+          timeout: 1000
+        })
+        .toBe(true)
+      scheduler.advance(100)
+      /** Allow cancellation settlement without waiting for a wall-clock timeout. */
+      let settled = false
+      void result.then(() => {
+        settled = true
+      })
+      for (let turn = 0; turn < 40; turn += 1) await Promise.resolve()
+      expect(settled).toBe(true)
+      expect(await result).toMatchObject({ code: 'DEADLINE_EXCEEDED' })
+      expect(
+        host.fixture.frames.filter(({ message }) => message.method === 'p.f.hold')
+      ).toHaveLength(1)
+    } finally {
+      await host.remote.release()
+      await host.fixture.close()
+    }
+    expect(scheduler.pendingCount).toBe(0)
+  })
+
   it('[A2] uses two independent Worker Hosts and closes only one connection', async () => {
     const first = hostFixture()
     const second = hostFixture()

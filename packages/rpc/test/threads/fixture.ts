@@ -30,8 +30,8 @@ import type { IThreadPluginOptions } from '../../src/threads/types.js'
 
 /** Capture native runtime objects only at the fixture construction boundary. */
 const nativeWorkers = vi.hoisted(() => new Map<number, import('node:worker_threads').Worker>())
-/** Echo observation attaches before the Worker can emit its only message. */
-const nativeMessages = vi.hoisted(() => new Map<number, Promise<unknown>>())
+/** Constructor checkpoint observes whether error registration occurred before asynchronous deferral. */
+const nativeErrorListeners = vi.hoisted(() => new Map<number, number>())
 vi.mock('node:worker_threads', async (original) => {
   const native = await original<typeof import('node:worker_threads')>()
   return {
@@ -40,13 +40,9 @@ vi.mock('node:worker_threads', async (original) => {
       constructor(...args: ConstructorParameters<typeof native.Worker>) {
         super(...args)
         nativeWorkers.set(this.threadId, this)
-        if (args[1]?.workerData?.data?.mode === 'echo')
-          nativeMessages.set(
-            this.threadId,
-            new Promise((resolve) => {
-              this.once('message', resolve)
-            })
-          )
+        /** This checkpoint queues before an adapter could defer listener attachment. */
+        const id = this.threadId
+        queueMicrotask(() => nativeErrorListeners.set(id, this.listenerCount('error')))
       }
     }
   }
@@ -56,9 +52,12 @@ export function nativeWorkerFor(handle: IThreadHandle): import('node:worker_thre
   return nativeWorkers.get(handle.identity.threadId!)!
 }
 
-/** Return fixture-only echo observation without exposing native diagnostics in production. */
-export function nativeWorkerMessage(handle: IThreadHandle): Promise<unknown> {
-  return nativeMessages.get(handle.identity.threadId!)!
+/**
+ * Test synchronous error-listener installation structurally rather than relying on Worker startup
+ * speed.
+ */
+export function nativeErrorListenerCount(handle: IThreadHandle): number {
+  return nativeErrorListeners.get(handle.identity.threadId!)!
 }
 
 /** Real Node fixtures load built ESM independently from Vitest's loader. */
