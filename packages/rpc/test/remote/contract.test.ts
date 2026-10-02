@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { acceptsSchema } from '../fixtures/schema-accepts.js'
 import {
+  RemoteCatalogLimit,
   normalizeRemoteContract,
   normalizeRemoteControlShape,
   normalizeRemoteHostCatalog,
@@ -10,7 +11,6 @@ import {
   REMOTE_METHOD_MODES,
   REMOTE_NAME_PATTERN
 } from '../../src/remote/contract.js'
-import { RemoteCatalogLimit } from '../../src/remote/contract-limits.js'
 import { RpcRemoteLayerErrorText } from '../../src/remote/error-text.js'
 import { RpcRemoteLayerErrorCode } from '../../src/remote/error-code.js'
 

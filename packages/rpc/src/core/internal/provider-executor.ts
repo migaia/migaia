@@ -17,6 +17,7 @@ import type { IRpcAbortSignal, IRpcContext, IRpcProviderResult } from '../typing
 import type { ProviderRegistry } from './provider.js'
 import { safeRead, safeString, tupleKey } from './safe-value.js'
 import { RpcMessageKind, RpcProviderRejectionReason } from '../semantic-constants.js'
+import { localErrorWireSummary } from '../../contract/contract-error.js'
 import { serializeRpcError } from '../../contract/error.js'
 import type {
   IRpcIdempotencyClaim,
@@ -460,6 +461,8 @@ export class ProviderExecutor<TTargetId extends string> {
     ) =>
       transfer === undefined ? this.options.send(response) : this.options.send(response, transfer)
   ): Promise<void> {
+    /** Trusted Remote/Contract failures disclose only their factory-owned code and text. */
+    const localSummary = localErrorWireSummary(error)
     const schemaError = error instanceof RpcSchemaValidationError
     await send({
       kind: RpcMessageKind.response,
@@ -470,27 +473,31 @@ export class ProviderExecutor<TTargetId extends string> {
       method: request.envelope.method,
       ok: false,
       code:
-        explicitCode ?? (schemaError ? RpcCoreErrorCode.schemaInvalid : RpcCoreErrorCode.internal),
-      message: schemaError
-        ? safeString(
-            safeRead<unknown>(error, 'message', ({ key, error: readError }) => {
-              this.options.emitFailure(
-                readError,
-                RpcCoreErrorCode.payloadInvalid,
-                typeof key === 'string' ? key : undefined
-              )
-              return undefined
-            }),
-            RpcCoreErrorText.schemaValidationFallback,
-            ({ error: conversionError }) => {
-              this.options.emitFailure(conversionError, RpcCoreErrorCode.schemaInvalid)
-              return undefined
-            }
-          )
-        : RpcCoreErrorText.providerFailed,
+        explicitCode ??
+        localSummary?.code ??
+        (schemaError ? RpcCoreErrorCode.schemaInvalid : RpcCoreErrorCode.internal),
+      message:
+        localSummary?.message ??
+        (schemaError
+          ? safeString(
+              safeRead<unknown>(error, 'message', ({ key, error: readError }) => {
+                this.options.emitFailure(
+                  readError,
+                  RpcCoreErrorCode.payloadInvalid,
+                  typeof key === 'string' ? key : undefined
+                )
+                return undefined
+              }),
+              RpcCoreErrorText.schemaValidationFallback,
+              ({ error: conversionError }) => {
+                this.options.emitFailure(conversionError, RpcCoreErrorCode.schemaInvalid)
+                return undefined
+              }
+            )
+          : RpcCoreErrorText.providerFailed),
       data: error instanceof RpcSchemaValidationError ? error.data : undefined,
       sentAt: this.options.timestamp(),
-      ...(schemaError || includeSerializedError
+      ...(!localSummary && (schemaError || includeSerializedError)
         ? {
             serializedError: serializeRpcError(error, {
               report: (failure) =>
