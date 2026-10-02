@@ -214,6 +214,10 @@ export async function serveRemoteHost(
       ) as readonly IRpcPortableValue[]
       const name = params[0] as string
       declared(catalog, name)
+      /** Only this connection's live remote adoption authorizes removal or dependency inspection. */
+      const adopted = handles.get(name)
+      if (!adopted || installed.get(name) !== adopted || registrationState(adopted) === 'stale')
+        throw createRemoteLayerError(RpcRemoteLayerErrorCode.hostNotAdopted)
       const input = (params[1] ?? {}) as {
         readonly policy?: 'reject' | 'suspend'
         readonly dryRun?: boolean
