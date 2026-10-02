@@ -893,12 +893,15 @@
       "reason": "No published process adapter exports a message IPC launcher. Node/Bun process launchers expose byte stdio only; src/process/adapters/node-child-process.ts:25,151; message IProcessMessageChannel is caller-provided static identity, not a delivered IPC launch profile."
     }
   ],
-  "blocked": [
+  "blocked": [],
+  "platform": "darwin; libproc native PID observer required",
+  "acceptanceChanges": [
     {
-      "id": "jsonrpc-typescript-responder",
-      "required": true,
-      "reason": "CF1 public-only TS peer: createJsonRpcRemoteChannel is an initiator. Mandatory TS public bridge responder business cells remain blocked; independent Python/Rust/Go bridge producers and caller FD launcher are real-supported and measured by the separate 48 required units."
+      "id": "K251",
+      "date": "2026-10-02",
+      "old": "Required public TypeScript JSON-RPC responder",
+      "new": "Python, Rust and Go responders; TypeScript remains public initiator only",
+      "reason": "User ruling: bridge publishes only initiator, no responder implementation required"
     }
-  ],
-  "platform": "darwin; libproc native PID observer required"
+  ]
 }
