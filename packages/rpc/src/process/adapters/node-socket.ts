@@ -1,4 +1,4 @@
-import { lstat, unlink } from 'node:fs/promises'
+import { lstat } from 'node:fs/promises'
 import { createConnection, createServer, type Server, type Socket } from 'node:net'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcCoreErrorCode, tagRpcError } from '../../core/errors.js'
@@ -250,6 +250,19 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
   } catch (error) {
     throw createProcessError(RpcProcessErrorCode.listenFailed, error)
   }
+  /** All Unix listeners retain their bound inode without shortening the caller's address. */
+  const unixPath =
+    address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\') ? address.path : undefined
+  /** Identity distinguishes this socket from a successor created before native close. */
+  let boundIdentity: Awaited<ReturnType<typeof lstat>> | undefined
+  if (unixPath) {
+    try {
+      boundIdentity = await lstat(unixPath)
+    } catch (error) {
+      server.close()
+      throw createProcessError(RpcProcessErrorCode.listenFailed, error)
+    }
+  }
   /** The exact inode is recorded before exposing this listener as recoverable. */
   let ownerRecord: IUnixSocketRecord | undefined
   if (managedPath) {
@@ -271,7 +284,32 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
     closed = true
     closeReason = createProcessError(RpcProcessErrorCode.channelClosed)
     closePromise = (async () => {
+      /** Node/libuv unlinks its original bind path even if a successor has replaced the inode. */
+      /** A different dev/ino marks a successor whose disappearance must be reported. */
+      let successor: Awaited<ReturnType<typeof lstat>> | undefined
+      if (unixPath && boundIdentity) {
+        try {
+          /** The last observable path identity precedes Node's non-atomic native close. */
+          const current = await lstat(unixPath)
+          if (current.dev !== boundIdentity.dev || current.ino !== boundIdentity.ino)
+            successor = current
+        } catch (error) {
+          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'))
+            reportSafely(
+              options.report,
+              createProcessError(RpcProcessErrorCode.listenFailed, error)
+            )
+        }
+      }
       server.close()
+      if (unixPath && successor) {
+        try {
+          await lstat(unixPath)
+        } catch (error) {
+          /** Report this known native limitation once; do not recreate a foreign inode. */
+          reportSafely(options.report, createProcessError(RpcProcessErrorCode.listenFailed, error))
+        }
+      }
       await Promise.all([...pendingSet].map((release) => release(closeReason)))
       /** Node owns removal of a Unix socket path created by this server. */
       if (managedPath && ownerRecord) {
@@ -279,13 +317,6 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
           await removeUnixSocketOwner(managedPath, ownerRecord)
         } catch (error) {
           reportSafely(options.report, error)
-        }
-      } else if (address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\')) {
-        try {
-          await unlink(address.path)
-        } catch (error) {
-          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'))
-            reportSafely(options.report, error)
         }
       }
       options.signal?.removeEventListener('abort', onAbort)
