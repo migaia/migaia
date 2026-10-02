@@ -116,6 +116,29 @@ describe('JSON-RPC bounded native encoding', () => {
     expect(encode).toHaveBeenCalledOnce()
   })
 
+  it('[I21-F5] accepts surrogate pairs in the middle band with frozen 44f6296 bytes', () => {
+    /** This pair-heavy body is one code unit above the safe segment and below the byte limit. */
+    const value = '🙂'.repeat(Math.floor(JsonRpcLimit.bodyBytes / 6))
+    /** Frozen 44f6296 framing.ts uses native body/header encoding followed by these two copies. */
+    const body = new TextEncoder().encode(JSON.stringify(value))
+    /** This public header literal detects a change to the old on-wire representation. */
+    const header = new TextEncoder().encode(`Content-Length: ${body.length}\r\n\r\n`)
+    /** The old valid-input algorithm is a fixed vector oracle, not the new size/counting path. */
+    const expected = new Uint8Array(header.length + body.length)
+    expected.set(header)
+    expected.set(body, header.length)
+    expect(JSON.stringify(value).length).toBeGreaterThan(Math.floor(JsonRpcLimit.bodyBytes / 3))
+    expect(JSON.stringify(value).length).toBeLessThan(JsonRpcLimit.bodyBytes)
+    expect(body.length).toBeLessThan(JsonRpcLimit.bodyBytes)
+    /** Positive interception proves this accepted pair-heavy vector enters exact counting. */
+    const count = vi.spyOn(bytes, 'utf8ByteLength')
+    /** The frozen oracle is complete before observing the current native body encoder. */
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    expect(Buffer.from(encodeJsonRpcFrame(value)).equals(Buffer.from(expected))).toBe(true)
+    expect(count).toHaveBeenCalledOnce()
+    expect(encode).toHaveBeenCalledOnce()
+  })
+
   it.each([0, 1])('[C3] preserves bytes at the safe UTF-16 segment boundary +%i', (extra) => {
     /** Three UTF-8 bytes per UTF-16 code unit establish the native-only segment ceiling. */
     const jsonLength = Math.floor(JsonRpcLimit.bodyBytes / 3) + extra
