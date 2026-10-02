@@ -5,13 +5,19 @@ import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 export class ReplayWindow {
   /** Active identifiers have no expiry and remain reserved until explicit release. */
   readonly #activeIds = new Set<string>()
-  /** Released identifiers remain as TTL-bounded tombstones to reject late reuse. */
+  /**
+   * Released identifiers remain as TTL-bounded tombstones to reject late reuse. Monotonic release
+   * times preserve insertion order, so expiration removes only the oldest prefix.
+   */
   readonly #releasedIds = new Map<string, number>()
+  /** Combined active/tombstone budget; expired entries alone may return capacity. */
   readonly #maxEntries: number
+  /** Retention after settlement; successful completion never bypasses the replay boundary. */
   readonly #ttlMs: number
   /** Endpoint clock for replay tombstone expiration. */
   readonly #now: () => number
 
+  /** Owns one bounded namespace using the endpoint's supported monotonic clock. */
   constructor(now: () => number, maxEntries = 4096, ttlMs = 310_000) {
     if (
       !Number.isSafeInteger(maxEntries) ||
@@ -70,16 +76,27 @@ export class ReplayWindow {
     return this.#maxEntries
   }
 
+  /** Reads combined active and retained occupancy without scanning or changing retention. */
+  get size(): number {
+    return this.#activeIds.size + this.#releasedIds.size
+  }
+
   /** Releases all replay state during endpoint disposal. */
   clear(): void {
     this.#activeIds.clear()
     this.#releasedIds.clear()
   }
 
-  /** Removes only released tombstones whose replay retention window elapsed. */
+  /**
+   * Removes only the expired prefix. Each removed entry is visited once over its lifetime; an
+   * access with no expiration inspects only the first live entry, regardless of retained count.
+   */
   #purgeReleasedIds(): void {
+    /** One monotonic read keeps the entire purge on the same retention boundary. */
     const now = this.#now()
-    for (const [key, releasedAt] of this.#releasedIds)
-      if (now - releasedAt >= this.#ttlMs) this.#releasedIds.delete(key)
+    for (const [key, releasedAt] of this.#releasedIds) {
+      if (now - releasedAt < this.#ttlMs) break
+      this.#releasedIds.delete(key)
+    }
   }
 }

@@ -300,11 +300,15 @@ endpoint.provide('add', (ctx) => {
 - `transport?: IRpcTransport` —— 也可以只在 `connect({ transport })` 里提供，二选一即可
 - `targetIds?: readonly string[]` —— 已知对端 id 的预声明，非必需；自动发现模式下首次 `send`/`dispatch`/`ping` 未知 `targetId` 会懒查询
 - `provider?: Readonly<Record<string, IRpcProvider>>` —— 构造时批量注册的方法集合，等价于逐个调用 `provide()`
-- `providerLimits?: { maxGlobal?: number; maxPerPeer?: number }` —— provider 并发上限，默认 `256/64`；超限立即返回 `OVERLOADED`，不排队
+- `providerLimits?: { maxGlobal?: number; maxPerPeer?: number; maxReplayEntriesPerPeer?: number; onRejected?: (rejection) => void | Promise<void> }` —— provider 并发上限默认 `256/64`；独立入站重放账本默认每个已验证 peer 1024 条、全端点 4096 条，保留 310 秒。超限不执行 provider；request 返回 `OVERLOADED`，one-way 不回复。可选 `onRejected` 观察本地拒绝，通知失败会 report，不阻断回复
 - `replay?: { maxEntries?: number; ttlMs?: number }` —— 出站请求 id 重放保护窗口，默认容量 4096、TTL 310 秒
 - `construction?: { signal?: IRpcAbortSignal; timeoutMs?: number | false }` —— 构造期本身的取消/超时；取消/超时后仍会正确回滚已安装成功的中间件
 - `scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 端点和 PluginHost 共用的单调时钟与定时器；未提供时使用 `systemScheduler`。`now()` 须返回有限非负毫秒（可含小数，不是 epoch），`schedule()` 须返回可取消任务；非法配置以 `INVALID_CONFIG` 拒绝
 - `wallClock?: IWallClock`（`@migaia/utils/scheduler`）—— 只产生 wire `sentAt` 与 hook 事件 `at` 的诊断墙钟，默认 `systemWallClock`（`Date.now()`）；`timestamp()` 须返回非负安全整数 epoch 毫秒，否则以 `INVALID_CONFIG` 拒绝。截止时间、TTL、重放窗口只按 `scheduler` 计算
+
+重放容量会限制持续吞吐。出站请求、one-way 和 stream-open 在结算后仍保留 ID 墓碑，默认持续预算约 `4096 / 310 = 13.2` 次/秒；入站每个已验证 peer 约 `1024 / 310 = 3.3` 次/秒，所有 peer 合计约 13.2 次/秒。在途请求、突发和失败结算也占出站容量，不能只按成功请求数估算。满载时拒绝新请求，不提前淘汰未过期 ID。
+
+已知负载可用现有 `replay.maxEntries` 和 `providerLimits.maxReplayEntriesPerPeer` 按「峰值持续请求率 × 310 秒 + 在途/突发余量」配置；条目数与内存随容量增长。只调每 peer 入站预算不会扩大固定全局 4096，所以这些选项不能解决超过全局约 13.2 次/秒的持续入站负载。保持默认 TTL，缩短它会改变防重放安全边界。耗尽时本端通过 `hooks` 的 `failure` / `hooks({ onHookError })` 通路以 `OVERLOADED` 限频报告 namespace、占用与上限，不带 ID 或载荷；对端回复保持原样。详见 USEGUIDE §2.4。
 
 `middlewares` 接受由 `defineMiddleware` 或首方 middleware 工厂创建的原生定义；它们与 Feature 一起作为同一个 PluginHost 批次安装，资源清理由 `core.own()` 归属。0.x 的 `IRpcMiddlewareContext`/`install(context)` 形状已移除；继续传入旧形状会在任何传输副作用前以 `INVALID_CONFIG` 拒绝。
 

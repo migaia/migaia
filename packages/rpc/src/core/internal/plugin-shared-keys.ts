@@ -137,6 +137,8 @@ export type IRpcOutboundCommand =
       readonly error: unknown
       readonly code?: string
       readonly field?: string
+      /** Local numeric replay capacity evidence forwarded to the existing hook owner. */
+      readonly detail?: IRpcHookEvent['detail']
     }
 
 /** Commands whose canonical transport operation is asynchronous. */
