@@ -148,6 +148,50 @@ describe('I21 C2 object port contracts', () => {
     expect(Object.getPrototypeOf(protoResult)).toBe(Object.prototype)
   })
 
+  it.each([false, true])('[EQ2/M08] preserves legitimate reads (Proxy=%s)', (proxy) => {
+    /** Each codec gets a fresh input so observed values depend only on its own access order. */
+    const observe = (encode: (value: unknown) => unknown) => {
+      /** Changing legal return values expose extra reads even when every value stays portable. */
+      let nextValue = 0
+      /** The original outer admission uses insertion order; portable projection sorts keys. */
+      const reads: string[] = []
+      /** User-visible access side effects must occur twice per key, never during materialization. */
+      const read = (key: string): number => {
+        reads.push(key)
+        return ++nextValue
+      }
+      /** Both supported inputs enumerate z before a and return legal numbers on every read. */
+      const input = proxy
+        ? new Proxy(
+            { z: 0, a: 0 },
+            {
+              get: (target, key, receiver) =>
+                key === 'z' || key === 'a' ? read(key) : Reflect.get(target, key, receiver)
+            }
+          )
+        : Object.defineProperties(
+            {},
+            {
+              z: { enumerable: true, get: () => read('z') },
+              a: { enumerable: true, get: () => read('a') }
+            }
+          )
+      /** Encode first, then read only the returned data snapshot while retaining input counts. */
+      const result = encode(input)
+      return { reads, nextValue, result }
+    }
+    /** This unchanged public owner supplies the pre-C2 validation/projection baseline. */
+    const baseline = observe((value) => JSON.parse(remoteProcessJsonCodec.encode(value) as string))
+    expect(baseline).toEqual({
+      reads: ['z', 'a', 'a', 'z'],
+      nextValue: 4,
+      result: { a: 3, z: 4 }
+    })
+    /** A second outer asCodecValue call changes both access order/count and retained values. */
+    const candidate = observe((value) => jsonObjectCodec.encode(value as IRpcEnvelope))
+    expect(candidate).toEqual(baseline)
+  })
+
   it('[EQ1/EQ6] materializes a raw incoming negative zero before canonical core normalization', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
