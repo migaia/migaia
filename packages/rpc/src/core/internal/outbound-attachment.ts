@@ -1,3 +1,9 @@
+import {
+  selectedJsonObjectPort,
+  releaseJsonObjectSelection,
+  JsonObjectSelectionResource
+} from './json-object-port.js'
+import { bindRpcFrameIngress } from '../../contract/framing/index.js'
 import { RpcPlatform } from '../transport-constants.js'
 import {
   RpcAbortError,
@@ -129,6 +135,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #validateData: IRpcContractCapability['validateData']
   /** Validated canonical descriptors retained for the endpoint lifetime. */
   readonly #components: import('./endpoint-options.js').IRpcSelectedComponents
+  /** Private receive components are captured once after ordinary construction admission. */
+  readonly #runtimeComponents: import('./endpoint-options.js').IRpcSelectedComponents
   /** Optional inbound/outbound protection capability. */
   readonly #authentication: IRpcAuthenticationCapability | undefined
   /** Canonical dynamic timeout capability installed by middleware. */
@@ -208,6 +216,20 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         : (method, side, data) => validateContractData(contract, method, side, data)
     this.#uuid = prepared.options.uuid ?? {}
     this.#components = prepared.options.components!
+    /** Port selection never changes the public component snapshot or semantic normalizer. */
+    const objectPort = selectedJsonObjectPort(this.#components)
+    this.#runtimeComponents = objectPort
+      ? {
+          ...this.#components,
+          codec: objectPort.codec,
+          framer: objectPort.framer,
+          ingressPrepare: bindRpcFrameIngress(objectPort.framer.accept, objectPort.framer.frame)
+        }
+      : this.#components
+    if (objectPort)
+      kernel.resources.addSync(JsonObjectSelectionResource, () =>
+        releaseJsonObjectSelection(this.#components)
+      )
     this.#authentication = prepared.options.authentication
     this.#hookErrorReporter = prepared.options.hooks?.onHookError
     this.#abortEnabled = prepared.options.features?.abort === true
@@ -307,83 +329,87 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         new TypeError(RpcCoreErrorText.ipcGateMismatch),
         RpcCoreErrorCode.invalidConfig
       )
-    const activation = createEndpointTransportActivation(this.kernel.transport, {
-      receive: async (message) => {
-        const generation = this.kernel.generation
-        if (this.kernel.state !== 'active') return
-        const physical = this.inboundIdentity.prepareSource(message)
-        if (!physical) return
-        let frame = physical.data
-        if (this.#authentication)
-          frame = await this.#authentication.unprotect(frame, {
-            direction: 'inbound',
-            endpointId: this.id,
-            platform: this.kernel.platform
+    const activation = createEndpointTransportActivation(
+      this.kernel.transport,
+      {
+        receive: async (message) => {
+          const generation = this.kernel.generation
+          if (this.kernel.state !== 'active') return
+          const physical = this.inboundIdentity.prepareSource(message)
+          if (!physical) return
+          let frame = physical.data
+          if (this.#authentication)
+            frame = await this.#authentication.unprotect(frame, {
+              direction: 'inbound',
+              endpointId: this.id,
+              platform: this.kernel.platform
+            })
+          this.kernel.assertActive(generation)
+          const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
+            source: physical.sourceToken,
+            messageId: 'whole'
           })
-        this.kernel.assertActive(generation)
-        const preparedFrame = this.#components.ingressPrepare(frame, {
-          source: physical.sourceToken,
-          messageId: 'whole'
-        })
-        const accepted = this.#components.framer.accept(preparedFrame.frame, {
-          source: physical.sourceToken,
-          messageId: preparedFrame.messageId
-        })
-        if (accepted.status === 'pending') return
-        if (accepted.status === 'rejected') {
-          this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
-          return
-        }
-        const decoded = this.#components.codec.decode(accepted.value)
-        let envelope: IRpcEnvelope
-        /** Unknown fields are reported after normalize returns its once-read kind. */
-        const ignored: Array<readonly [string, string]> = []
-        try {
-          envelope = this.#components.protocol.normalize(decoded, {
-            onUnknownField: (pointer, field) => ignored.push([pointer, field])
+          const accepted = this.#runtimeComponents.framer.accept(preparedFrame.frame, {
+            source: physical.sourceToken,
+            messageId: preparedFrame.messageId
           })
-        } catch (error) {
-          if ((error as { readonly violation?: unknown }).violation === 'unknownKind') {
-            this.#unknownFields.note(
-              physical.sourceToken,
-              'kind',
-              '',
-              String((error as { readonly unknownKindValue?: unknown }).unknownKindValue)
-            )
+          if (accepted.status === 'pending') return
+          if (accepted.status === 'rejected') {
+            this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
             return
           }
-          this.emitFailure(error, RpcCoreErrorCode.transport)
-          return
-        }
-        for (const [pointer, field] of ignored)
-          this.#unknownFields.note(physical.sourceToken, envelope.kind, pointer, field)
-        const route = envelope.data
-        const admission = await this.inboundIdentity.admitPrepared(physical, {
-          senderId: route.route.senderId,
-          targetId: route.route.targetId,
-          data: route.payload,
-          inbound: message
-        })
-        if (!admission) return
-        try {
-          this.kernel.assertActive(generation)
-          const handled = await this.kernel.dispatchRoute(
-            envelope.kind,
-            Object.freeze({ envelope, route, inbound: message, admission })
-          )
-          if (!handled && envelope.kind === RpcEnvelopeKind.stream)
-            this.emitFailure(
-              new RpcProtocolError(RpcCoreErrorText.streamRouteUnclaimed),
-              RpcCoreErrorCode.protocolInvalid
+          const decoded = this.#runtimeComponents.codec.decode(accepted.value)
+          let envelope: IRpcEnvelope
+          /** Unknown fields are reported after normalize returns its once-read kind. */
+          const ignored: Array<readonly [string, string]> = []
+          try {
+            envelope = this.#components.protocol.normalize(decoded, {
+              onUnknownField: (pointer, field) => ignored.push([pointer, field])
+            })
+          } catch (error) {
+            if ((error as { readonly violation?: unknown }).violation === 'unknownKind') {
+              this.#unknownFields.note(
+                physical.sourceToken,
+                'kind',
+                '',
+                String((error as { readonly unknownKindValue?: unknown }).unknownKindValue)
+              )
+              return
+            }
+            this.emitFailure(error, RpcCoreErrorCode.transport)
+            return
+          }
+          for (const [pointer, field] of ignored)
+            this.#unknownFields.note(physical.sourceToken, envelope.kind, pointer, field)
+          const route = envelope.data
+          const admission = await this.inboundIdentity.admitPrepared(physical, {
+            senderId: route.route.senderId,
+            targetId: route.route.targetId,
+            data: route.payload,
+            inbound: message
+          })
+          if (!admission) return
+          try {
+            this.kernel.assertActive(generation)
+            const handled = await this.kernel.dispatchRoute(
+              envelope.kind,
+              Object.freeze({ envelope, route, inbound: message, admission })
             )
-        } finally {
-          admission.release()
-        }
+            if (!handled && envelope.kind === RpcEnvelopeKind.stream)
+              this.emitFailure(
+                new RpcProtocolError(RpcCoreErrorText.streamRouteUnclaimed),
+                RpcCoreErrorCode.protocolInvalid
+              )
+          } finally {
+            admission.release()
+          }
+        },
+        transportError: (error) => this.#failAll(error),
+        listenerError: (error) => this.emitFailure(error, RpcCoreErrorCode.transport),
+        receiveError: (error) => this.emitFailure(error)
       },
-      transportError: (error) => this.#failAll(error),
-      listenerError: (error) => this.emitFailure(error, RpcCoreErrorCode.transport),
-      receiveError: (error) => this.emitFailure(error)
-    })
+      selectedJsonObjectPort(this.#components)?.subscribe
+    )
     this.kernel.activate(activation)
     this.#activated = true
   }

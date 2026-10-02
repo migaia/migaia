@@ -1,3 +1,4 @@
+import { registerJsonObjectFeature } from '../internal/json-object-port.js'
 import { RpcPluginErrorText } from './error-text.js'
 import { createEventChannel } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, hostRethrowReporter } from '@migaia/utils/promise'
@@ -217,7 +218,7 @@ export function createIpcSendQueueFeature(
       return Object.freeze({})
     }
   )
-  return Object.freeze({ feature, gate })
+  return Object.freeze({ feature: registerJsonObjectFeature(feature), gate })
 }
 
 /** Wraps one physical connection while keeping its own send receiver and close idempotent. */

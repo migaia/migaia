@@ -1,3 +1,10 @@
+import {
+  isJsonObjectMiddleware,
+  readJsonObjectPort,
+  rememberJsonObjectCandidate,
+  jsonObjectCandidate,
+  selectJsonObjectPort
+} from './json-object-port.js'
 import { RpcPortName } from './plugin-shared-keys.js'
 import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '../../contract/index.js'
 import { rpcProtocol as rpcProtocolV1 } from '../../contract/v1/protocol.js'
@@ -74,6 +81,8 @@ export type IPreparedEndpoint<TTargetId extends string> = {
 
 /** Immutable middleware metadata captured before the composed Host batch mutates state. */
 export type IEndpointLegacyMiddlewareSnapshot = {
+  /** Exact canonical token admission captured before the descriptor is copied. */
+  readonly jsonObjectCompatible: boolean
   readonly kind: 'legacy'
   readonly name: string
   readonly plugin: IRpcPlugin
@@ -81,6 +90,8 @@ export type IEndpointLegacyMiddlewareSnapshot = {
 }
 /** Native middleware retains its PluginHost definition for same-order batch installation. */
 export type IEndpointNativeMiddlewareSnapshot = {
+  /** Native user middleware has no package-owned encoded-path admission. */
+  readonly jsonObjectCompatible: boolean
   readonly kind: 'native'
   readonly name: string
   readonly plugin: IRpcPluginConstraint
@@ -113,7 +124,8 @@ export type IDeferredPreparedEndpoint<TTargetId extends string = string> = {
     hookEvents: IRpcHookEvent[],
     runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
     getPort: (key: PropertyKey) => unknown,
-    timestamp: () => number
+    timestamp: () => number,
+    privateFeaturesAllowed?: boolean
   ) => Promise<IPreparedEndpoint<TTargetId>>
 }
 
@@ -133,7 +145,8 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   installHookEvents: IRpcHookEvent[],
   runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
   getPort: (key: PropertyKey) => unknown,
-  timestamp: () => number
+  timestamp: () => number,
+  privatePathAllowed: boolean
 ): Promise<IPreparedEndpoint<TTargetId>> {
   const installedConnect = getPort(RpcPortName.connect) as IRpcConnectCapability | undefined
   if (!installedConnect)
@@ -225,6 +238,10 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.outboundFrameAndTransportEncodedTypesAreIncompatible
     )
+  /** Private selection follows all public validation, including installed authentication. */
+  const candidate = jsonObjectCandidate(components)
+  if (privatePathAllowed && authenticationCapability === undefined && candidate)
+    selectJsonObjectPort(components, candidate)
   return {
     id: factoryId,
     transport,
@@ -412,6 +429,7 @@ export async function prepareEndpoint<
         const middlewareTransport = componentPolicy?.transport
         const metadata = readDefinedMiddlewarePolicy(middleware)
         return Object.freeze({
+          jsonObjectCompatible: false,
           kind: 'native' as const,
           name,
           plugin: middleware as unknown as IRpcPluginConstraint,
@@ -453,6 +471,7 @@ export async function prepareEndpoint<
       )
         throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.middlewareMustBePlugin)
       return {
+        jsonObjectCompatible: isJsonObjectMiddleware(middleware),
         kind: 'legacy' as const,
         name: name as string,
         plugin,
@@ -502,6 +521,7 @@ export async function prepareEndpoint<
   )
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.transportDescriptorInvalid)
   const components = selectWebRpcComponents({
+    transport,
     protocol: factoryProtocol,
     codec: factoryCodec,
     framer: factoryFramer,
@@ -523,7 +543,13 @@ export async function prepareEndpoint<
     injectedScheduler,
     injectedWallClock,
     middlewareSnapshots: Object.freeze(middlewareSnapshots.map((item) => Object.freeze(item))),
-    finalize: async (installHookEvents, runConstruction, getPort, timestamp) => {
+    finalize: async (
+      installHookEvents,
+      runConstruction,
+      getPort,
+      timestamp,
+      privateFeaturesAllowed = false
+    ) => {
       const prepared = await finalizePreparedEndpoint(
         factoryId as string,
         factoryTargetIds as readonly TTargetId[] | undefined,
@@ -539,7 +565,9 @@ export async function prepareEndpoint<
         installHookEvents,
         runConstruction,
         getPort,
-        timestamp
+        timestamp,
+        privateFeaturesAllowed &&
+          middlewareSnapshots.every((snapshot) => snapshot.jsonObjectCompatible)
       )
       return {
         ...prepared,
@@ -552,6 +580,7 @@ export async function prepareEndpoint<
 /** Resolves top-level then one plugin descriptor before Host installation creates subscriptions. */
 function selectWebRpcComponents(
   input: Readonly<{
+    readonly transport: IRpcTransport
     readonly protocol?: unknown
     readonly codec?: unknown
     readonly framer?: unknown
@@ -582,6 +611,13 @@ function selectWebRpcComponents(
   const selectedProtocol = select('protocol', input.protocol, rpcProtocolV1)
   const selectedCodec = select('codec', input.codec, identityCodecV1)
   const selectedFramer = select('framer', input.framer, messageFramerV1)
+  /** Pair before snapshots copy descriptors; registry lookup performs no user getter reads. */
+  const privateCandidate = readJsonObjectPort(
+    input.transport,
+    selectedProtocol.value,
+    selectedCodec.value,
+    selectedFramer.value
+  )
   const protocol = snapshotProtocol(selectedProtocol.value)
   const codec = snapshotCodec(selectedCodec.value)
   const framer = snapshotFramer(selectedFramer.value)
@@ -612,13 +648,16 @@ function selectWebRpcComponents(
     )
   if (!isCompatible(codec, framer))
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
-  return Object.freeze({
+  /** Public snapshot remains the original string pipeline even when a private candidate exists. */
+  const components = Object.freeze({
     protocol,
     codec,
     framer,
     ingressPrepare: bindRpcFrameIngress(framer.accept, framer.frame),
     shadowed: Object.freeze(shadowed)
   })
+  if (privateCandidate) rememberJsonObjectCandidate(components, privateCandidate)
+  return components
 }
 
 /** Captures descriptor identity once for a stable deferred diagnostic. */

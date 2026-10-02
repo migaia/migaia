@@ -1,3 +1,4 @@
+import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import { validateContractData } from '../internal/contract.js'
 import type {
@@ -127,14 +128,16 @@ const contractMetadata: IRpcPluginMetadata = Object.freeze({
 
 /** Creates the admitted contract plugin and publishes only its typed shared capability. */
 export const contract = (config: IRpcContractConfig = {}): IRpcPlugin =>
-  Object.freeze({
-    name: 'contract',
-    metadata: contractMetadata,
-    install: (): IRpcPluginInstallResult => {
-      const capability = createContractCapability(config)
-      return {
-        extension: Object.freeze({}),
-        ports: Object.freeze({ [RpcPortName.contract]: capability })
+  registerJsonObjectMiddleware(
+    Object.freeze({
+      name: 'contract',
+      metadata: contractMetadata,
+      install: (): IRpcPluginInstallResult => {
+        const capability = createContractCapability(config)
+        return {
+          extension: Object.freeze({}),
+          ports: Object.freeze({ [RpcPortName.contract]: capability })
+        }
       }
-    }
-  })
+    })
+  )

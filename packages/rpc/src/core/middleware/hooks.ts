@@ -1,3 +1,4 @@
+import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import type { IRpcHooksConfig, IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
@@ -83,4 +84,4 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
 
 /** Creates a hooks middleware whose config is read only during Host installation. */
 export const hooks = (config: IRpcHooksConfig = {}): IRpcPlugin =>
-  freezePlugin(createHooksPlugin(config))
+  registerJsonObjectMiddleware(freezePlugin(createHooksPlugin(config)))
