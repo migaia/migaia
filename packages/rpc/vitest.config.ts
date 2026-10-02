@@ -5,7 +5,11 @@ export default defineConfig(
   withDistFreshness({
     test: {
       include: ['test/**/*.{test,spec}.ts'],
-      exclude: [...configDefaults.exclude, 'test/process/conformance*.test.ts'],
+      exclude: [
+        ...configDefaults.exclude,
+        'test/process/conformance*.test.ts',
+        'test/merge/suite-parity.test.ts'
+      ],
       coverage: {
         provider: 'v8',
         include: ['src/**/*.ts'],

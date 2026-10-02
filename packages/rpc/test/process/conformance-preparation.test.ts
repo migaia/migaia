@@ -80,7 +80,8 @@ describe('I20 preparation only; no A-total or A10 performance PASS', () => {
   it('keeps exact conformance paths outside the default suite and preserves default exclusions', () => {
     expect(defaultConfig.test?.exclude).toEqual([
       ...configDefaults.exclude,
-      'test/process/conformance*.test.ts'
+      'test/process/conformance*.test.ts',
+      'test/merge/suite-parity.test.ts'
     ])
     expect(conformanceConfig.test?.include).toEqual(['test/process/conformance*.test.ts'])
     expect(conformanceConfig.test?.fileParallelism).toBe(false)

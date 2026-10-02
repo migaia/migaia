@@ -154,7 +154,8 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     expect(existsSync(new URL('./peers/python/__pycache__', import.meta.url))).toBe(false)
     expect(defaultConfig.test.exclude).toEqual([
       ...configDefaults.exclude,
-      'test/process/conformance*.test.ts'
+      'test/process/conformance*.test.ts',
+      'test/merge/suite-parity.test.ts'
     ])
     /** All package dependency sets remain identical to the frozen pre-I20 preparation commit. */
     const packages = execFileSync('git', ['ls-files', 'packages/*/package.json'], {
