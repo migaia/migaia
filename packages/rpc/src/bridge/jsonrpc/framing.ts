@@ -12,22 +12,33 @@ export type IJsonRpcFrameDecoder = Readonly<{
   readonly bufferedBytes: number
 }>
 
+/**
+ * UTF-16 code units require at most three UTF-8 bytes each: BMP and isolated surrogates use up to
+ * three, while a surrogate pair uses four for two units. Bodies within this length cannot exceed
+ * the byte ceiling during native encoding.
+ */
+const nativeEncodingSafeLength = Math.floor(JsonRpcLimit.bodyBytes / 3)
+
 /** Emit exactly one normalized ASCII header and UTF-8 body in one physical write chunk. */
 export function encodeJsonRpcFrame(value: unknown): Uint8Array {
   /** Undefined JSON results retain the existing empty-body frame rejection. */
   const body = JSON.stringify(value) ?? ''
-  /** Canonical counting checks the byte budget before any encoded-body allocation. */
-  const bodyBytes = utf8ByteLength(body)
-  if (bodyBytes === 0 || bodyBytes > JsonRpcLimit.bodyBytes)
+  if (
+    body.length === 0 ||
+    body.length > JsonRpcLimit.bodyBytes ||
+    (body.length > nativeEncodingSafeLength && utf8ByteLength(body) > JsonRpcLimit.bodyBytes)
+  )
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.frameInvalid)
-  /** Header and body remain contiguous so the gate can preserve FIFO with one write. */
-  const header = `${JsonRpcHeader.prefix}${bodyBytes}${JsonRpcHeader.end}`
-  /** One exact allocation replaces temporary UTF-8 body storage and its full-frame copy. */
-  const frame = new Uint8Array(header.length + bodyBytes)
-  /** Encoding writes into caller-owned destinations without an intermediate byte array. */
+  /** Native encoding starts only after the length proof or exact allocation-free guard accepts. */
   const encoder = new TextEncoder()
+  /** Ordinary payloads avoid a JavaScript byte-counting pass over the entire body. */
+  const encodedBody = encoder.encode(body)
+  /** Header and body remain contiguous so the gate can preserve FIFO with one write. */
+  const header = `${JsonRpcHeader.prefix}${encodedBody.length}${JsonRpcHeader.end}`
+  /** The accepted native body is copied once into its contiguous wire frame. */
+  const frame = new Uint8Array(header.length + encodedBody.length)
   encoder.encodeInto(header, frame)
-  encoder.encodeInto(body, frame.subarray(header.length))
+  frame.set(encodedBody, header.length)
   return frame
 }
 

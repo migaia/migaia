@@ -8,7 +8,16 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('JSON-RPC single-allocation encoding', () => {
+describe('JSON-RPC bounded native encoding', () => {
+  it('[C3] uses native body encoding once for ordinary payloads', () => {
+    /** Ordinary bodies must avoid the generator scan that caused the A10 regression. */
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    /** Header encoding remains separate from the single body encoding operation. */
+    const encodeInto = vi.spyOn(TextEncoder.prototype, 'encodeInto')
+    encodeJsonRpcFrame({ result: '🙂'.repeat(256) })
+    expect(encode).toHaveBeenCalledOnce()
+    expect(encodeInto).toHaveBeenCalledOnce()
+  })
   it('[C3] retains the frozen UTF-8 wire vector', () => {
     expect(Buffer.from(encodeJsonRpcFrame('é'))).toEqual(
       Buffer.from('Content-Length: 4\r\n\r\n"é"', 'utf8')
@@ -87,19 +96,63 @@ describe('JSON-RPC single-allocation encoding', () => {
     expect(encodeInto).not.toHaveBeenCalled()
   })
 
-  it('[C3] accepts the exact byte ceiling without allocating a temporary encoded body', () => {
+  it('[C3] accepts the exact byte ceiling using one native body encoding and one copy', () => {
     /** Two JSON quote bytes complete the body budget without relying on string length. */
     const value = 'x'.repeat(JsonRpcLimit.bodyBytes - 2)
     /** The frozen header decimal and all body bytes are independently encoded by Buffer. */
     const expected = Buffer.from(peerFrame(value))
-    /** A temporary body from encode would reintroduce the copy this candidate removes. */
+    /** Native body encoding replaces the expensive JavaScript generator scan. */
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
-    /** Observe the eliminated public byte-copy operation before invoking the product. */
+    /** Exactly one copy places the accepted native body after its header. */
     const copy = vi.spyOn(Uint8Array.prototype, 'set')
     /** Comparing after the copy assertion keeps fixture Buffer copying outside the observation. */
     const frame = encodeJsonRpcFrame(value)
-    expect(copy).not.toHaveBeenCalled()
+    expect(copy).toHaveBeenCalledOnce()
     expect(Buffer.from(frame).equals(expected)).toBe(true)
+    expect(encode).toHaveBeenCalledOnce()
+  })
+
+  it.each([0, 1])('[C3] preserves bytes at the safe UTF-16 segment boundary +%i', (extra) => {
+    /** Three UTF-8 bytes per UTF-16 code unit establish the native-only segment ceiling. */
+    const jsonLength = Math.floor(JsonRpcLimit.bodyBytes / 3) + extra
+    /** JSON quotes occupy two code units and two bytes of the prescribed length. */
+    const value = '界'.repeat(jsonLength - 2)
+    /** The peer oracle is constructed before observing product encoding calls. */
+    const expected = Buffer.from(peerFrame(value))
+    /** Both accepted segments still encode the body exactly once. */
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    expect(Buffer.from(encodeJsonRpcFrame(value)).equals(expected)).toBe(true)
+    expect(encode).toHaveBeenCalledOnce()
+  })
+
+  it.each([0, 1])('[C3] checks the exact UTF-8 ceiling +%i before encoding', (extra) => {
+    /** BMP text exercises exact counting in the narrow interval rather than ASCII pre-rejection. */
+    const bodyBudget = JsonRpcLimit.bodyBytes - 2
+    /** The remainder ensures the serialized body has precisely the requested byte length. */
+    const value = '界'.repeat(Math.floor(bodyBudget / 3)) + 'x'.repeat((bodyBudget % 3) + extra)
+    /** The independent encoder remains outside the observed product operation. */
+    const expected = extra === 0 ? Buffer.from(peerFrame(value)) : undefined
+    /** A one-byte overflow must not allocate an encoded body. */
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    if (expected) {
+      expect(Buffer.from(encodeJsonRpcFrame(value)).equals(expected)).toBe(true)
+      expect(encode).toHaveBeenCalledOnce()
+    } else {
+      expect(() => encodeJsonRpcFrame(value)).toThrow(
+        expect.objectContaining({ code: 'JSONRPC_FRAME_INVALID' })
+      )
+      expect(encode).not.toHaveBeenCalled()
+    }
+  })
+
+  it('[C3] rejects a UTF-16 body length above the ceiling before native encoding', () => {
+    /** Including JSON quotes yields exactly the length ceiling plus one code unit and byte. */
+    const value = 'x'.repeat(JsonRpcLimit.bodyBytes - 1)
+    /** The length-only segment must reject before native encoding allocates its output. */
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    expect(() => encodeJsonRpcFrame(value)).toThrow(
+      expect.objectContaining({ code: 'JSONRPC_FRAME_INVALID' })
+    )
     expect(encode).not.toHaveBeenCalled()
   })
 
