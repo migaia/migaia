@@ -1,3 +1,4 @@
+import { utf8ByteLength } from '@migaia/utils/bytes'
 import { isExcerptFree, redactHandshake } from '../../contract/handshake.js'
 import { JsonRpcHeader, JsonRpcLimit } from './constants.js'
 import { JsonRpcBridgeErrorCode } from './error-code.js'
@@ -13,18 +14,20 @@ export type IJsonRpcFrameDecoder = Readonly<{
 
 /** Emit exactly one normalized ASCII header and UTF-8 body in one physical write chunk. */
 export function encodeJsonRpcFrame(value: unknown): Uint8Array {
-  /** UTF-8 byte count, rather than JS string length, defines Content-Length. */
-  const body = new TextEncoder().encode(JSON.stringify(value))
-  if (body.length === 0 || body.length > JsonRpcLimit.bodyBytes)
+  /** Undefined JSON results retain the existing empty-body frame rejection. */
+  const body = JSON.stringify(value) ?? ''
+  /** Canonical counting checks the byte budget before any encoded-body allocation. */
+  const bodyBytes = utf8ByteLength(body)
+  if (bodyBytes === 0 || bodyBytes > JsonRpcLimit.bodyBytes)
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.frameInvalid)
   /** Header and body remain contiguous so the gate can preserve FIFO with one write. */
-  const header = new TextEncoder().encode(
-    `${JsonRpcHeader.prefix}${body.length}${JsonRpcHeader.end}`
-  )
-  /** One allocation carries both header and body through the physical writer. */
-  const frame = new Uint8Array(header.length + body.length)
-  frame.set(header)
-  frame.set(body, header.length)
+  const header = `${JsonRpcHeader.prefix}${bodyBytes}${JsonRpcHeader.end}`
+  /** One exact allocation replaces temporary UTF-8 body storage and its full-frame copy. */
+  const frame = new Uint8Array(header.length + bodyBytes)
+  /** Encoding writes into caller-owned destinations without an intermediate byte array. */
+  const encoder = new TextEncoder()
+  encoder.encodeInto(header, frame)
+  encoder.encodeInto(body, frame.subarray(header.length))
   return frame
 }
 
