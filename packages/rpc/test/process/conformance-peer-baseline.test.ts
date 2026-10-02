@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import type { Writable } from 'node:stream'
@@ -26,8 +27,12 @@ async function echoed(command: string, args: string[], contentLength: boolean): 
   const exited = new Promise<void>((resolve, reject) => {
     child.once('error', reject)
     child.once('close', (code) => {
-      if (code === 0) resolve()
-      else reject(new Error(`Bare baseline peer exited ${code}: ${diagnostics}`))
+      try {
+        assert.equal(code, 0, diagnostics)
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
     })
   })
   /** Authentication is local fixture data and never part of the echoed business payload. */
