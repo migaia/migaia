@@ -2,12 +2,12 @@
   "revision": "I20-lane-H-2026-10-02",
   "status": "implemented",
   "supportUnitsFrozen": true,
-  "supportUnitsFreezePrerequisite": "Frozen before measurement after independent native20 and bridge48 producer preparation. Exact tracked list: packages/rpc/bench/support-units.json; required TS public JSON-RPC responder remains CF1 blocked, builtin fd unsupported differs from caller-owned proven FD launcher.",
+  "supportUnitsFreezePrerequisite": "Frozen supported native20 and bridge48; K251 user ruling removes mandatory public TypeScript JSON-RPC responder, initiator retained. No supported unit removed.",
   "acceptance": [
     {
       "id": "A1",
       "evidenceOwner": "H / E peer delivery",
-      "supportUnits": "native × python,rust,go,typescript × spawn-stdio,rendezvous-unix",
+      "supportUnits": "native \u00d7 python,rust,go,typescript \u00d7 spawn-stdio,rendezvous-unix",
       "assertions": [
         {
           "id": "A1.1",
@@ -91,7 +91,7 @@
     {
       "id": "A2",
       "evidenceOwner": "H / E peer delivery",
-      "supportUnits": "all applicable upstream cases × four languages",
+      "supportUnits": "all applicable upstream cases \u00d7 four languages",
       "assertions": [
         {
           "id": "A2.1",
@@ -161,91 +161,91 @@
     {
       "id": "A3",
       "evidenceOwner": "H / E peer delivery / bridge owner",
-      "supportUnits": "jsonrpc × four languages × both deployments",
+      "supportUnits": "jsonrpc responder: python, rust, go; both deployments, public Plugin/Host",
       "assertions": [
         {
           "id": "A3.1",
           "assertion": "Content-Length hello/describe/request/one-way/error/cancel",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.2",
           "assertion": "spawn token only dedicated proven fd; first stdin byte ASCII C",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.3",
           "assertion": "sentinel six-character substrings absent from error cause/inspect/serialized reject/report/snapshots",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.4",
           "assertion": "original string id, relative deadline, idempotency key retained",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.5",
           "assertion": "notification has no id/meta; independent receipt count/order",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.6",
           "assertion": "Host local resolver/use/inspect catalog/proxy request/unUse projection",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.7",
           "assertion": "release owned child exits / borrowed PID remains",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.8",
           "assertion": "core send trace equals meta.trace; late cancelled response reports only",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.9",
           "assertion": "missing method/capability, invalid frame, stream description/batch/reverse/NDJSON reject at specified code/time",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.10",
           "assertion": "bridge stream sends zero; other connection remains usable",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         },
         {
           "id": "A3.11",
           "assertion": "four mandatory peers handwrite profile; no existing-library PASS claim",
-          "status": "blocked",
+          "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "CF1: public TS bridge exposes initiator only, required TS public responder cannot be produced without unauthorized boundary change. Non-JS hand-written peers + caller FD launcher are proven; builtin fd is unsupported. K231 default connect health none remains separate blocked dependency; explicit custom health receipts do not close it."
+          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
         }
       ]
     },
     {
       "id": "A4",
       "evidenceOwner": "H / resilience+host owners",
-      "supportUnits": "native/jsonrpc × owned/borrowed × crash/hang",
+      "supportUnits": "native/jsonrpc \u00d7 owned/borrowed \u00d7 crash/hang",
       "assertions": [
         {
           "id": "A4.1",
@@ -406,7 +406,7 @@
     {
       "id": "A7",
       "evidenceOwner": "H / resilience+host owners",
-      "supportUnits": "shared/per-connection × two sessions + flooding/untrusted registration",
+      "supportUnits": "shared/per-connection \u00d7 two sessions + flooding/untrusted registration",
       "assertions": [
         {
           "id": "A7.1",
@@ -469,7 +469,7 @@
     {
       "id": "A8",
       "evidenceOwner": "H / IPC+bridge owners",
-      "supportUnits": "native four languages × both deployments; bridge trace route",
+      "supportUnits": "native four languages \u00d7 both deployments; bridge trace route",
       "assertions": [
         {
           "id": "A8.1",
@@ -539,7 +539,7 @@
     {
       "id": "A10",
       "evidenceOwner": "root performance owner / G measurement preparation",
-      "supportUnits": "payload 64B,1KiB,64KiB,1MiB × supported codec/carrier/runtime; bridge separately JSON/Content-Length",
+      "supportUnits": "payload 64B,1KiB,64KiB,1MiB \u00d7 supported codec/carrier/runtime; bridge separately JSON/Content-Length",
       "assertions": [
         {
           "id": "A10.1",
@@ -683,7 +683,7 @@
       "assertions": [
         {
           "id": "A12.1",
-          "assertion": "bridge §8 receives per-non-JS-language/path S4 receipts; Host A1-A8 actual verified evidence",
+          "assertion": "bridge \u00a78 receives per-non-JS-language/path S4 receipts; Host A1-A8 actual verified evidence",
           "status": "blocked",
           "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
           "note": "Required TS bridge responderCF1, K231/K232/K234/K238 and child closure dependencies remain explicit; no SHIP."
@@ -725,7 +725,7 @@
         },
         {
           "id": "A12.7",
-          "assertion": "child §8 manual audit; tracked test/bench never reads local documentation",
+          "assertion": "child \u00a78 manual audit; tracked test/bench never reads local documentation",
           "status": "pending",
           "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
           "note": "H does not run root full gates, 1000 rotations or measured benchmark; actual existing blockers remain non-SHIP."
