@@ -1229,9 +1229,13 @@ fn schema_accepts(value: &Value, rule: &Value, definitions: &Value) -> bool {
     }
     if let Value::Object(object) = value {
         if rule
-            .get("minProperties")
+            .get("maxProperties")
             .and_then(Value::as_u64)
-            .is_some_and(|min| object.len() < min as usize)
+            .is_some_and(|max| object.len() > max as usize)
+            || rule
+                .get("minProperties")
+                .and_then(Value::as_u64)
+                .is_some_and(|min| object.len() < min as usize)
             || items(field(rule, "required"))
                 .iter()
                 .any(|key| !value.has(key.as_str().unwrap()))
@@ -1280,6 +1284,21 @@ fn check_host(vectors: &Value, definitions: &Value, counts: &mut Counts) {
                 semantic &= entries
                     .iter()
                     .all(|(name, contract)| name == text(contract, "plugin"));
+                // Aggregate catalog methods share the published remote budget.
+                let method_count: usize = entries
+                    .iter()
+                    .map(|(_, contract)| match field(contract, "features") {
+                        Value::Object(features) => features
+                            .iter()
+                            .map(|(_, feature)| match field(feature, "methods") {
+                                Value::Object(methods) => methods.len(),
+                                _ => 0,
+                            })
+                            .sum(),
+                        _ => 0,
+                    })
+                    .sum();
+                semantic &= method_count <= 4096;
             }
             if semantic && definition == "hostInspectResult" {
                 let plugins = items(field(value, "plugins"));

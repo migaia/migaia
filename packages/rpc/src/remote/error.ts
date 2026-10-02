@@ -1,3 +1,4 @@
+import { registerLocalErrorWireSummary } from '../contract/contract-error.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import {
   ERROR_SOURCE,
@@ -9,6 +10,7 @@ import { RpcRemoteLayerErrorText } from './error-text.js'
 /** Single code-to-text map keeps remote error construction deterministic. */
 const TEXT_BY_CODE: Readonly<Record<IRpcRemoteLayerErrorCode, string>> = {
   [RpcRemoteLayerErrorCode.contractInvalid]: RpcRemoteLayerErrorText.contractInvalid,
+  [RpcRemoteLayerErrorCode.hostNotAdopted]: RpcRemoteLayerErrorText.hostNotAdopted,
   [RpcRemoteLayerErrorCode.startFailed]: RpcRemoteLayerErrorText.startFailed,
   [RpcRemoteLayerErrorCode.closed]: RpcRemoteLayerErrorText.closed,
   [RpcRemoteLayerErrorCode.resultUnknown]: RpcRemoteLayerErrorText.resultUnknown
@@ -25,6 +27,7 @@ export function createRemoteLayerError(
     code === RpcRemoteLayerErrorCode.contractInvalid
       ? new TypeError(TEXT_BY_CODE[code], cause === undefined ? undefined : { cause })
       : new Error(TEXT_BY_CODE[code], cause === undefined ? undefined : { cause })
+  registerLocalErrorWireSummary(error, code, TEXT_BY_CODE[code])
   attachErrorIdentity(error, { source: ERROR_SOURCE, code })
   if (detail !== undefined)
     Object.defineProperty(error, 'detail', { value: detail, enumerable: true })

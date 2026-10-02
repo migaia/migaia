@@ -1,7 +1,11 @@
 /** Stable messages exposed by the remote layer's coded errors. */
 export const RpcRemoteLayerErrorText = {
+  /** Replaces malformed untrusted keys in contract diagnostics without reflecting input. */
+  invalidPathSegment: '<invalid-key>',
   /** Used for invalid descriptions and reserved control payloads. */
   contractInvalid: 'Remote contract is invalid',
+  /** Removal admission requires a live connection-owned remote Host adoption (R4/K203). */
+  hostNotAdopted: 'Remote Host plugin is not adopted by this connection',
   /** Used when unit startup or channel acquisition cannot complete. */
   startFailed: 'Remote unit could not start',
   /** Used when a registration or generation can no longer accept work. */

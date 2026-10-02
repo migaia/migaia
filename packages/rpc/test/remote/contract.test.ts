@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { acceptsSchema } from '../fixtures/schema-accepts.js'
 import {
+  RemoteCatalogLimit,
   normalizeRemoteContract,
   normalizeRemoteControlShape,
   normalizeRemoteHostCatalog,
@@ -10,6 +11,7 @@ import {
   REMOTE_METHOD_MODES,
   REMOTE_NAME_PATTERN
 } from '../../src/remote/contract.js'
+import { RpcRemoteLayerErrorText } from '../../src/remote/error-text.js'
 import { RpcRemoteLayerErrorCode } from '../../src/remote/error-code.js'
 
 /** Narrow JSON Schema keyword set used by the checked protocol document. */
@@ -80,5 +82,69 @@ describe('A1 remote contract and Schema', () => {
     expect(normalized(() => normalizeRemoteControlShape(vector.definition, vector.value))).toBe(
       vector.semanticValid
     )
+  })
+})
+
+describe('K194 bounded catalog admission', () => {
+  it('rejects over-limit tables before invoking their entry getters', () => {
+    /** Rejected catalog entries must never reach portable normalization or resolver inputs. */
+    const read = vi.fn(() => null)
+    /** Count is one over the frozen plugin bound; enumerable getters prove traversal order. */
+    const oversized = Object.create(null) as Record<string, unknown>
+    for (let index = 0; index <= RemoteCatalogLimit.pluginsPerCatalog; index++)
+      Object.defineProperty(oversized, `p${index}`, { enumerable: true, get: read })
+    expect(() => normalizeRemoteHostCatalog(oversized)).toThrow(
+      expect.objectContaining({
+        code: RpcRemoteLayerErrorCode.contractInvalid,
+        detail: { path: '$.catalog', limit: 'pluginsPerCatalog', max: 64 }
+      })
+    )
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it.each(['catalog', 'feature', 'method', 'unknown'])(
+    'redacts a long %s key in bounded detail',
+    (location) => {
+      /** Unique input marker must never be reflected by a diagnostic path. */
+      const key = 'unsafe.' + 'x'.repeat(100000)
+      const method = { mode: 'request', idempotent: false }
+      const value = { schemaVersion: 1, plugin: 'p', features: { f: { methods: { m: method } } } }
+      const input =
+        location === 'catalog'
+          ? { [key]: value }
+          : location === 'feature'
+            ? { ...value, features: { [key]: { methods: { m: method } } } }
+            : location === 'method'
+              ? { ...value, features: { f: { methods: { [key]: method } } } }
+              : { ...value, [key]: true }
+      try {
+        if (location === 'catalog') normalizeRemoteHostCatalog(input)
+        else normalizeRemoteContract(input)
+        expect.fail('invalid key accepted')
+      } catch (error) {
+        const detail = (error as { detail: { path: string } }).detail
+        expect(detail.path).toContain(RpcRemoteLayerErrorText.invalidPathSegment)
+        expect(detail.path.length).toBeLessThanOrEqual(RemoteCatalogLimit.detailPathChars)
+        expect(detail.path).not.toContain(key)
+      }
+    }
+  )
+
+  it('reads admitted getters once and retains their original failure locally', () => {
+    const original = new Error('local getter failure')
+    const read = vi.fn(() => {
+      throw original
+    })
+    const input = {
+      schemaVersion: 1,
+      plugin: 'p',
+      get features() {
+        return read()
+      }
+    }
+    expect(() => normalizeRemoteContract(input)).toThrow(
+      expect.objectContaining({ cause: original })
+    )
+    expect(read).toHaveBeenCalledTimes(1)
   })
 })

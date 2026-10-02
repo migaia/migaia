@@ -120,3 +120,4 @@ export { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED } from './typin
 export { disposeKey, asyncDisposeKey } from './symbols.js'
 export { invokeCaptured } from './invocation.js'
 export { createRegistrationView } from './composition.js'
+export { isPluginHandleCurrent } from './plugin-handle.js'
