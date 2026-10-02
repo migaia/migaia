@@ -224,15 +224,9 @@ export function splitUtf8(value: string, maxBytes: number): readonly string[] {
 
 /** Reads one scalar at a valid UTF-16 offset, replacing lone surrogates without allocation. */
 function readUtf8CodePoint(value: string, index: number): number {
-  /** Leading UTF-16 code unit determines whether a surrogate pair can follow. */
-  const first = value.charCodeAt(index)
-  if (first >= 0xd800 && first <= 0xdbff && index + 1 < value.length) {
-    /** Trailing code unit is consumed only when it completes a valid pair. */
-    const second = value.charCodeAt(index + 1)
-    if (second >= 0xdc00 && second <= 0xdfff)
-      return 0x10000 + ((first - 0xd800) << 10) + second - 0xdc00
-  }
-  return first >= 0xd800 && first <= 0xdfff ? 0xfffd : first
+  /** Callers supply an in-range offset; the native scalar read joins only valid surrogate pairs. */
+  const codePoint = value.codePointAt(index)!
+  return codePoint >= 0xd800 && codePoint <= 0xdfff ? 0xfffd : codePoint
 }
 
 function encodingError(offset: number, cause?: unknown): TypeError {
