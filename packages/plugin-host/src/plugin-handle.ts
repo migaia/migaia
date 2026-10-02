@@ -19,6 +19,21 @@ type IPluginHandlePort<TDomainCore extends object, TValue> = Readonly<{
 /** Cached extension facade for one exact registration generation. */
 const extensionFacades = new WeakMap<object, Readonly<Record<PropertyKey, unknown>>>()
 
+/** Read-only generation probes belong to handles and disappear when the handle is collected. */
+const handleRegistrations = new WeakMap<object, () => boolean>()
+
+/**
+ * Returns whether a Host-created handle still names the exact registration present at creation.
+ * Disabled and suspended registrations remain current. Removed, replaced, disposed, and unknown
+ * handles return false. Handle members retain their existing name-addressed behavior across
+ * replacement; this probe exposes no registration object or mutation authority.
+ */
+export function isPluginHandleCurrent(handle: unknown): boolean {
+  return (typeof handle === 'object' && handle !== null) || typeof handle === 'function'
+    ? (handleRegistrations.get(handle as object)?.() ?? false)
+    : false
+}
+
 /** Throws the state-specific handle boundary error for one current registration. */
 const requireRegistration = <TDomainCore extends object, TValue>(
   port: IPluginHandlePort<TDomainCore, TValue>,
@@ -93,8 +108,11 @@ const readExtensions = <TDomainCore extends object, TValue>(
 export const createPluginHandle = <TDomainCore extends object, TValue>(
   name: string,
   port: IPluginHandlePort<TDomainCore, TValue>
-): object =>
-  Object.freeze({
+): object => {
+  /** Capture registration identity without requiring its activation or enablement. */
+  const registration = port.lookup(name)
+  /** Member reads continue to resolve the current registration by name. */
+  const handle = Object.freeze({
     name,
     get extensions() {
       const registration = requireRegistration(port, name)
@@ -120,3 +138,9 @@ export const createPluginHandle = <TDomainCore extends object, TValue>(
       }
     })
   })
+  handleRegistrations.set(
+    handle,
+    () => registration !== undefined && port.lookup(name) === registration
+  )
+  return handle
+}

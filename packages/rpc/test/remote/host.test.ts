@@ -47,6 +47,22 @@ function endpointHarness() {
   }
 }
 
+/** Give Host control mocks a canonical registration identity without mocking its owner. */
+async function currentHandleFixture(output: Record<string, unknown>) {
+  /** Identity authority lives in this actual Host registration. */
+  const owner = new PluginHost<Record<string, never>>({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  })
+  const [handle] = await owner.use(
+    definePlugin({
+      name: 'p',
+      features: { f: defineFeature(() => output) },
+      install: () => ({})
+    })
+  )
+  return { owner, handle }
+}
+
 describe('remote Host trusted control', () => {
   it('rejects a Host catalog key mismatch before resolver or Host admission', async () => {
     const endpoint = endpointHarness()
@@ -80,9 +96,10 @@ describe('remote Host trusted control', () => {
     /** Admission fails once before a valid handle is returned. */
     let fail = true
     const output = { m: () => 'live' }
+    const fixture = await currentHandleFixture(output)
     const use = vi.fn(async () => {
       if (fail) throw new Error('admission failed')
-      return [{ getFeature: () => output }]
+      return [fixture.handle]
     })
     const host = {
       use,
@@ -115,6 +132,7 @@ describe('remote Host trusted control', () => {
       })
     } finally {
       await service.close()
+      await fixture.owner.dispose()
     }
   })
 
@@ -341,8 +359,8 @@ describe('remote Host trusted control', () => {
 
   it('rejects thenables, forged definitions, wrong names and unknown names before Host.use', async () => {
     const endpoint = endpointHarness()
-    const feature = {}
-    const use = vi.fn(async () => [{ getFeature: () => feature }])
+    const fixture = await currentHandleFixture({})
+    const use = vi.fn(async () => [fixture.handle])
     const unUse = vi.fn(async () => ({ ok: true }))
     /** Resolver output changes without changing the Host or the exposed providers. */
     let candidate: unknown = definePlugin({ name: 'p', install: () => ({}) })
@@ -410,11 +428,12 @@ describe('remote Host trusted control', () => {
     await served.close()
     await served.close()
     expect(endpoint.dispose).toHaveBeenCalledTimes(1)
+    await fixture.owner.dispose()
   })
 
   it('shares inspect receipts and keeps dry runs distinct from committed removal', async () => {
-    const feature = {}
-    const use = vi.fn(async () => [{ getFeature: () => feature }])
+    const fixture = await currentHandleFixture({})
+    const use = vi.fn(async () => [fixture.handle])
     const unUse = vi.fn(async (_name: string, options: { dryRun?: boolean }) =>
       options.dryRun
         ? { policy: 'reject', order: ['p'], steps: [{ name: 'p', action: 'release' }], edges: [] }
@@ -460,6 +479,7 @@ describe('remote Host trusted control', () => {
     ).toHaveProperty('plugins.length', 0)
     await a.close()
     await b.close()
+    await fixture.owner.dispose()
   })
 
   it('uses one Host generation for describe and reserved control methods', async () => {
@@ -634,14 +654,19 @@ describe('K203 remote Host removal adoption', () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
+    /** Observe the protected Host mutation boundary, including dryRun. */
     const unUse = vi.spyOn(host, 'unUse')
+    /** Both connections resolve this exact trusted plugin definition. */
     const definition = definePlugin({
       name: 'p',
       features: { f: defineFeature(() => ({ m: () => 'live' })) },
       install: () => ({})
     })
+    /** First connection owns its independent remote adoption record. */
     const a = endpointHarness()
+    /** Second connection cannot inherit removal authority without hostUse. */
     const b = endpointHarness()
+    /** First remote service owns only its endpoint, never local Host installations. */
     const serviceA = await serveRemoteHost({
       host: host as unknown as IRemoteServeHostOptions['host'],
       catalog,
@@ -649,6 +674,7 @@ describe('K203 remote Host removal adoption', () => {
       endpoint: { endpoint: a.endpoint },
       report: vi.fn()
     })
+    /** Second service shares Host installations but retains separate adoption authority. */
     const serviceB = await serveRemoteHost({
       host: host as unknown as IRemoteServeHostOptions['host'],
       catalog,
@@ -681,6 +707,7 @@ describe('K203 remote Host removal adoption', () => {
       await expect(
         a.invoke(RemoteMethodName.hostUnUse, ['p', { dryRun: true }])
       ).resolves.toMatchObject({ dryRun: true })
+      await host.plugin.disable('p', { policy: 'suspend' })
       await expect(a.invoke(RemoteMethodName.hostUnUse, ['p'])).resolves.toEqual({ ok: true })
       expect(unUse).toHaveBeenCalledTimes(2)
       await expect(b.invoke('p.f.m', [])).rejects.toMatchObject({
@@ -697,4 +724,56 @@ describe('K203 remote Host removal adoption', () => {
       await host.dispose()
     }
   })
+})
+
+describe('K203 exact remote installation lifetime', () => {
+  it.each([false, true])(
+    'rejects local replacement with reused Feature output (disabled=%s)',
+    async (disabled) => {
+      /** Supported Feature factories may deliberately reuse one frozen output across installations. */
+      const output = { m: () => 'shared output' }
+      /** The initial installation is admitted by the remote control path. */
+      const remoteDefinition = definePlugin({
+        name: 'p',
+        features: { f: defineFeature(() => output) },
+        install: () => ({})
+      })
+      /** A different local definition proves output identity is not installation authority. */
+      const localDefinition = definePlugin({
+        name: 'p',
+        features: { f: defineFeature(() => output) },
+        install: () => ({})
+      })
+      /** The real name-addressed Host handle deliberately survives replacement generations. */
+      const host = new PluginHost<Record<string, never>>({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
+      /** Count only attempts after the legitimate local removal and replacement. */
+      const unUse = vi.spyOn(host, 'unUse')
+      const endpoint = endpointHarness()
+      const service = await serveRemoteHost({
+        host: host as unknown as IRemoteServeHostOptions['host'],
+        catalog,
+        resolvePlugin: () => remoteDefinition,
+        endpoint: { endpoint: endpoint.endpoint },
+        report: vi.fn()
+      })
+      try {
+        await endpoint.invoke(RemoteMethodName.hostUse, ['p'])
+        await host.unUse('p')
+        const [local] = await host.use(localDefinition)
+        if (disabled) await host.plugin.disable('p', { policy: 'suspend' })
+        unUse.mockClear()
+        await expect(endpoint.invoke(RemoteMethodName.hostUnUse, ['p'])).rejects.toMatchObject({
+          code: RpcRemoteLayerErrorCode.hostNotAdopted
+        })
+        expect(unUse).not.toHaveBeenCalled()
+        if (disabled) expect(host.plugin.disabled()).toContain('p')
+        else expect(local.getFeature('f')).toBe(output)
+      } finally {
+        await service.close()
+        await host.dispose()
+      }
+    }
+  )
 })
