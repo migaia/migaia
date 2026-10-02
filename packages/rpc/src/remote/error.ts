@@ -9,6 +9,7 @@ import { RpcRemoteLayerErrorText } from './error-text.js'
 /** Single code-to-text map keeps remote error construction deterministic. */
 const TEXT_BY_CODE: Readonly<Record<IRpcRemoteLayerErrorCode, string>> = {
   [RpcRemoteLayerErrorCode.contractInvalid]: RpcRemoteLayerErrorText.contractInvalid,
+  [RpcRemoteLayerErrorCode.hostNotAdopted]: RpcRemoteLayerErrorText.hostNotAdopted,
   [RpcRemoteLayerErrorCode.startFailed]: RpcRemoteLayerErrorText.startFailed,
   [RpcRemoteLayerErrorCode.closed]: RpcRemoteLayerErrorText.closed,
   [RpcRemoteLayerErrorCode.resultUnknown]: RpcRemoteLayerErrorText.resultUnknown

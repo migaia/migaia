@@ -627,3 +627,74 @@ describe('remote Host trusted control', () => {
     await remote.release()
   })
 })
+
+describe('K203 remote Host removal adoption', () => {
+  it('rejects unadopted and local installations, permits live adopters, and expires other adopters', async () => {
+    /** Real Host identity distinguishes local installation from successful remote admission. */
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const unUse = vi.spyOn(host, 'unUse')
+    const definition = definePlugin({
+      name: 'p',
+      features: { f: defineFeature(() => ({ m: () => 'live' })) },
+      install: () => ({})
+    })
+    const a = endpointHarness()
+    const b = endpointHarness()
+    const serviceA = await serveRemoteHost({
+      host: host as unknown as IRemoteServeHostOptions['host'],
+      catalog,
+      resolvePlugin: () => definition,
+      endpoint: { endpoint: a.endpoint },
+      report: vi.fn()
+    })
+    const serviceB = await serveRemoteHost({
+      host: host as unknown as IRemoteServeHostOptions['host'],
+      catalog,
+      resolvePlugin: () => definition,
+      endpoint: { endpoint: b.endpoint },
+      report: vi.fn()
+    })
+    try {
+      for (const options of [{}, { dryRun: true }])
+        await expect(b.invoke(RemoteMethodName.hostUnUse, ['p', options])).rejects.toMatchObject({
+          code: RpcRemoteLayerErrorCode.hostNotAdopted
+        })
+      expect(unUse).not.toHaveBeenCalled()
+      const [local] = await host.use(definition)
+      for (const options of [{}, { dryRun: true }])
+        await expect(b.invoke(RemoteMethodName.hostUnUse, ['p', options])).rejects.toMatchObject({
+          code: RpcRemoteLayerErrorCode.hostNotAdopted
+        })
+      expect(unUse).not.toHaveBeenCalled()
+      expect(local.getFeature('f')).toBeDefined()
+      await host.unUse('p')
+      unUse.mockClear()
+      await a.invoke(RemoteMethodName.hostUse, ['p'])
+      for (const options of [{}, { dryRun: true }])
+        await expect(b.invoke(RemoteMethodName.hostUnUse, ['p', options])).rejects.toMatchObject({
+          code: RpcRemoteLayerErrorCode.hostNotAdopted
+        })
+      expect(unUse).not.toHaveBeenCalled()
+      await b.invoke(RemoteMethodName.hostUse, ['p'])
+      await expect(
+        a.invoke(RemoteMethodName.hostUnUse, ['p', { dryRun: true }])
+      ).resolves.toMatchObject({ dryRun: true })
+      await expect(a.invoke(RemoteMethodName.hostUnUse, ['p'])).resolves.toEqual({ ok: true })
+      expect(unUse).toHaveBeenCalledTimes(2)
+      await expect(b.invoke('p.f.m', [])).rejects.toMatchObject({
+        code: RpcRemoteLayerErrorCode.closed
+      })
+      for (const options of [{}, { dryRun: true }])
+        await expect(b.invoke(RemoteMethodName.hostUnUse, ['p', options])).rejects.toMatchObject({
+          code: RpcRemoteLayerErrorCode.hostNotAdopted
+        })
+      expect(unUse).toHaveBeenCalledTimes(2)
+    } finally {
+      await serviceA.close()
+      await serviceB.close()
+      await host.dispose()
+    }
+  })
+})
