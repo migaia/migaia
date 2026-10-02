@@ -105,6 +105,21 @@ export class RequestReplayLedger {
     return this.#completed.size
   }
 
+  /** Reads numeric admission capacity after its decision without purging or exposing identities. */
+  readCapacity(peerKey: string): Readonly<{
+    occupancy: number
+    limit: number
+    peerOccupancy: number
+    peerLimit: number
+  }> {
+    return {
+      occupancy: this.#completed.size,
+      limit: this.#maxEntries,
+      peerOccupancy: this.#peerCounts.count(peerKey),
+      peerLimit: this.#maxEntriesPerPeer
+    }
+  }
+
   /** Drops only expired tombstones. */
   clear(): void {
     for (const entry of this.#completed.values()) {
