@@ -1,5 +1,6 @@
 import {
   isDefinedPlugin,
+  isPluginHandleCurrent,
   PluginHostErrorCode,
   type IDefinedPluginConstraint,
   type IHostHandle,
@@ -43,6 +44,7 @@ const installingByHost = new WeakMap<object, Map<string, IInstallingRemotePlugin
 
 /** Reads a name-addressed Host handle without trusting an older Feature output. */
 function registrationState(record: IInstalledRemotePlugin): 'enabled' | 'disabled' | 'stale' {
+  if (!isPluginHandleCurrent(record.handle)) return 'stale'
   for (const [feature, original] of record.features) {
     try {
       if (record.handle.getFeature(feature) !== original) return 'stale'
