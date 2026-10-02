@@ -1,4 +1,4 @@
-import { nativeWorkerFor, nativeWorkerMessage } from './fixture.js'
+import { nativeWorkerFor } from './fixture.js'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { createNodeThreadLauncher } from '../../src/threads/adapters/node.js'
@@ -70,18 +70,28 @@ describe('Node thread launcher', () => {
   })
   it('[A3/A9] conveys unique launcher addresses while retaining the original portable data', async () => {
     const launcher = createNodeThreadLauncher()
-    const handles = await Promise.all(
-      [1, 2].map((value) =>
-        launcher.launch(
+    const launched = await Promise.all(
+      [1, 2].map(async (value) => {
+        const handle = await launcher.launch(
           { entry, data: { mode: 'echo', value } },
           { signal: new AbortController().signal }
         )
-      )
+        /** Listener attaches in the launch continuation, before any Worker macrotask message. */
+        const message = new Promise<unknown>((resolve) => {
+          const receive = (value: unknown): void => {
+            handle.port.off('message', receive)
+            resolve(value)
+          }
+          handle.port.on('message', receive)
+        })
+        return { handle, message }
+      })
     )
+    const handles = launched.map(({ handle }) => handle)
     try {
       expect(handles[0]!.identity.fingerprint).not.toBe(handles[1]!.identity.fingerprint)
       for (const [index, handle] of handles.entries()) {
-        const bootstrap = await nativeWorkerMessage(handle)
+        const bootstrap = await launched[index]!.message
         expect(bootstrap).toEqual({
           peerId: handle.identity.fingerprint,
           data: { mode: 'echo', value: index + 1 }
