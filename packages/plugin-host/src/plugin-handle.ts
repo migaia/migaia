@@ -109,8 +109,8 @@ export const createPluginHandle = <TDomainCore extends object, TValue>(
   name: string,
   port: IPluginHandlePort<TDomainCore, TValue>
 ): object => {
-  /** Capture registration identity without requiring its activation or enablement. */
-  const registration = port.lookup(name)
+  /** Reuse the per-registration lease token without retaining the registration or its outputs. */
+  const registrationToken = port.lookup(name)?.pipelineOwnerKey
   /** Member reads continue to resolve the current registration by name. */
   const handle = Object.freeze({
     name,
@@ -140,7 +140,8 @@ export const createPluginHandle = <TDomainCore extends object, TValue>(
   })
   handleRegistrations.set(
     handle,
-    () => registration !== undefined && port.lookup(name) === registration
+    () =>
+      registrationToken !== undefined && port.lookup(name)?.pipelineOwnerKey === registrationToken
   )
   return handle
 }

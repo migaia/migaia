@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   definePlugin,
@@ -43,6 +45,21 @@ describe('plugin handles', () => {
 })
 
 describe('K257 exact handle registration probe', () => {
+  it('does not retain a removed registration while its old handle remains reachable', () => {
+    /** Run real garbage collection in an isolated process with the published runtime. */
+    const fixture = fileURLToPath(new URL('./fixtures/plugin-handle-gc.mjs', import.meta.url))
+    /** The child fails if the exact removed registration remains strongly reachable. */
+    const result = execFileSync(process.execPath, ['--expose-gc', fixture], {
+      encoding: 'utf8',
+      timeout: 15000
+    })
+    expect(JSON.parse(result)).toEqual({
+      collected: true,
+      oldCurrent: false,
+      replacementCurrent: true
+    })
+  })
+
   it('keeps disabled registrations current and rejects replaced or disposed handles', async () => {
     /** Registration probe must not change name-addressed extension reads. */
     const host = createHost()
