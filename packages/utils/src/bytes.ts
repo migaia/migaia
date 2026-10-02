@@ -108,19 +108,33 @@ export function* streamBase64Chunks(value: Uint8Array, maxChunkBytes = 32763): I
     yield bytesToBase64(value.subarray(offset, Math.min(offset + width, value.length)))
 }
 
-/** Returns the UTF-8 byte length without allocating an encoded buffer. */
+/**
+ * Counts UTF-8 bytes without allocating a buffer or iterator. Lone UTF-16 surrogates count as the
+ * three-byte U+FFFD replacement used by TextEncoder, so callers can check limits first.
+ */
 export function utf8ByteLength(value: string): number {
+  /** Accumulated encoded size; counting must not allocate the eventual output. */
   let length = 0
-  for (const codePoint of codePoints(value))
+  for (let index = 0; index < value.length;) {
+    /** Normalized scalar value shared with the fallback encoder and chunker. */
+    const codePoint = readUtf8CodePoint(value, index)
     length += codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4
+    index += codePoint > 0xffff ? 2 : 1
+  }
   return length
 }
 
-/** Encodes text as a newly allocated UTF-8 byte array. */
+/** Encodes into a new byte array using the native encoder, or an equivalent loop when absent. */
 export function encodeUtf8(value: string): Uint8Array {
+  if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(value)
+  /** Exactly sized fallback output after the allocation-free count. */
   const output = new Uint8Array(utf8ByteLength(value))
+  /** Next writable byte in the fallback output. */
   let offset = 0
-  for (const codePoint of codePoints(value)) {
+  for (let index = 0; index < value.length;) {
+    /** Normalized scalar value, including replacement of unpaired surrogates. */
+    const codePoint = readUtf8CodePoint(value, index)
+    index += codePoint > 0xffff ? 2 : 1
     if (codePoint <= 0x7f) output[offset++] = codePoint
     else if (codePoint <= 0x7ff) {
       output[offset++] = 0xc0 | (codePoint >> 6)
@@ -179,15 +193,22 @@ export function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boole
   return result
 }
 
-/** Splits UTF-8 text into encoded chunks without exceeding maxBytes. */
+/** Splits normalized UTF-8 text within maxBytes without splitting a Unicode scalar value. */
 export function splitUtf8(value: string, maxBytes: number): readonly string[] {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 4)
     throw new RangeError(UtilsErrorText.invalidArgument('maxBytes', 'a safe integer >= 4'))
   if (value.length === 0) return ['']
+  /** Completed chunks preserve input order and the existing empty-input special case. */
   const chunks: string[] = []
+  /** Current normalized text chunk; lone surrogates become U+FFFD. */
   let chunk = ''
+  /** Current chunk's encoded byte size. */
   let size = 0
-  for (const codePoint of codePoints(value)) {
+  for (let index = 0; index < value.length;) {
+    /** Next normalized scalar, read without creating a per-code-point iterator result. */
+    const codePoint = readUtf8CodePoint(value, index)
+    index += codePoint > 0xffff ? 2 : 1
+    /** Encoded width determines whether this entire scalar belongs in the next chunk. */
     const width = codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4
     if (chunk && size + width > maxBytes) {
       chunks.push(chunk)
@@ -201,19 +222,17 @@ export function splitUtf8(value: string, maxBytes: number): readonly string[] {
   return chunks
 }
 
-function* codePoints(value: string): Iterable<number> {
-  for (let index = 0; index < value.length; index++) {
-    const first = value.charCodeAt(index)
-    if (first >= 0xd800 && first <= 0xdbff && index + 1 < value.length) {
-      const second = value.charCodeAt(index + 1)
-      if (second >= 0xdc00 && second <= 0xdfff) {
-        index++
-        yield 0x10000 + ((first - 0xd800) << 10) + second - 0xdc00
-        continue
-      }
-    }
-    yield first >= 0xd800 && first <= 0xdfff ? 0xfffd : first
+/** Reads one scalar at a valid UTF-16 offset, replacing lone surrogates without allocation. */
+function readUtf8CodePoint(value: string, index: number): number {
+  /** Leading UTF-16 code unit determines whether a surrogate pair can follow. */
+  const first = value.charCodeAt(index)
+  if (first >= 0xd800 && first <= 0xdbff && index + 1 < value.length) {
+    /** Trailing code unit is consumed only when it completes a valid pair. */
+    const second = value.charCodeAt(index + 1)
+    if (second >= 0xdc00 && second <= 0xdfff)
+      return 0x10000 + ((first - 0xd800) << 10) + second - 0xdc00
   }
+  return first >= 0xd800 && first <= 0xdfff ? 0xfffd : first
 }
 
 function encodingError(offset: number, cause?: unknown): TypeError {
