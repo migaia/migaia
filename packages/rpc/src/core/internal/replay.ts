@@ -76,6 +76,11 @@ export class ReplayWindow {
     return this.#maxEntries
   }
 
+  /** Reads combined active and retained occupancy without scanning or changing retention. */
+  get size(): number {
+    return this.#activeIds.size + this.#releasedIds.size
+  }
+
   /** Releases all replay state during endpoint disposal. */
   clear(): void {
     this.#activeIds.clear()
