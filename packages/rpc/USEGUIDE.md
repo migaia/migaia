@@ -1151,6 +1151,8 @@ await processHost.release()
 await serving.close()
 ```
 
+Host 的可选 `retryPort` 包括调用方提供的外部端口：既有 generation drain 等待其逻辑请求 Promise 结算，代理保持原 Promise 身份，不重复 dispatch。成功 `use`、`unUse` 与 `inspect` 都将当前 binding 标记 ready。
+
 spawn 默认先退出旧进程再启动新进程；`replace({ spec, strategy: 'start-then-switch' })` 则要求共享预算容纳两个进程，并在新 describe 通过后切换。两种策略都兑现同一个门面。新进程从自己的 serve 启动状态开始，不重放旧 use。`restart()` 委托当前治理注册，`inspectRegistration()` 可查终态与清算原因；清算后不能用 replace 绕过。可选 `shutdownSignal.subscribe` 由调用方接平台信号，第一次排空释放，释放未完成时第二次只强制终止 owned handle；connect 只关闭本地连接。
 
 服务侧省略 resilience 时创建一个默认治理器，同一已验证主体在多连接上共享内存幂等缓存，跨进程重启要由调用方提供稳定 backing。外部治理器由调用方关闭。反向注册通过可选 registrations 提供 `verifyToken` 和 `resolveRegistration(principalId)`，后者只返回预批准的 `{ targetHost, name, contract }`；它不信任对端自报的名字或 routing peer。关闭 listener 不撤销已采用连接，EOF 以 suspend 移除代理，新连接须重新鉴权。Windows/Electron 的实机保证保持 unsupported；JSON-RPC Host 与非 JS 两种部署的实跑证据见 conformance。
