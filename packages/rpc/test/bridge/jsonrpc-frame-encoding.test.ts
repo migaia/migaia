@@ -1,3 +1,4 @@
+import * as bytes from '@migaia/utils/bytes'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { JsonRpcLimit } from '../../src/bridge/jsonrpc/constants.js'
 import { encodeJsonRpcFrame } from '../../src/bridge/jsonrpc/framing.js'
@@ -14,9 +15,12 @@ describe('JSON-RPC bounded native encoding', () => {
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
     /** Header encoding remains separate from the single body encoding operation. */
     const encodeInto = vi.spyOn(TextEncoder.prototype, 'encodeInto')
+    /** Ordinary bodies must not reintroduce an otherwise invisible full-string counting pass. */
+    const count = vi.spyOn(bytes, 'utf8ByteLength')
     encodeJsonRpcFrame({ result: '🙂'.repeat(256) })
     expect(encode).toHaveBeenCalledOnce()
     expect(encodeInto).toHaveBeenCalledOnce()
+    expect(count).not.toHaveBeenCalled()
   })
   it('[C3] retains the frozen UTF-8 wire vector', () => {
     expect(Buffer.from(encodeJsonRpcFrame('é'))).toEqual(
@@ -121,8 +125,11 @@ describe('JSON-RPC bounded native encoding', () => {
     const expected = Buffer.from(peerFrame(value))
     /** Both accepted segments still encode the body exactly once. */
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    /** Only the narrow interval needs an exact counting pass before native encoding. */
+    const count = vi.spyOn(bytes, 'utf8ByteLength')
     expect(Buffer.from(encodeJsonRpcFrame(value)).equals(expected)).toBe(true)
     expect(encode).toHaveBeenCalledOnce()
+    expect(count).toHaveBeenCalledTimes(extra)
   })
 
   it.each([0, 1])('[C3] checks the exact UTF-8 ceiling +%i before encoding', (extra) => {
@@ -134,6 +141,8 @@ describe('JSON-RPC bounded native encoding', () => {
     const expected = extra === 0 ? Buffer.from(peerFrame(value)) : undefined
     /** A one-byte overflow must not allocate an encoded body. */
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    /** The narrow interval must check the exact byte budget once before accepting or rejecting. */
+    const count = vi.spyOn(bytes, 'utf8ByteLength')
     if (expected) {
       expect(Buffer.from(encodeJsonRpcFrame(value)).equals(expected)).toBe(true)
       expect(encode).toHaveBeenCalledOnce()
@@ -143,6 +152,7 @@ describe('JSON-RPC bounded native encoding', () => {
       )
       expect(encode).not.toHaveBeenCalled()
     }
+    expect(count).toHaveBeenCalledOnce()
   })
 
   it('[C3] rejects a UTF-16 body length above the ceiling before native encoding', () => {
@@ -150,10 +160,13 @@ describe('JSON-RPC bounded native encoding', () => {
     const value = 'x'.repeat(JsonRpcLimit.bodyBytes - 1)
     /** The length-only segment must reject before native encoding allocates its output. */
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    /** Length-only rejection must avoid even the allocation-free scan. */
+    const count = vi.spyOn(bytes, 'utf8ByteLength')
     expect(() => encodeJsonRpcFrame(value)).toThrow(
       expect.objectContaining({ code: 'JSONRPC_FRAME_INVALID' })
     )
     expect(encode).not.toHaveBeenCalled()
+    expect(count).not.toHaveBeenCalled()
   })
 
   it('[C3] serializes a user value exactly once before output allocation', () => {
