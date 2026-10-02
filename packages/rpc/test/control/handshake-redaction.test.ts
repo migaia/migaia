@@ -330,9 +330,16 @@ describe('handshake redaction', () => {
     for (const omitted of ['versions', 'peer', 'codecs'])
       expect(summary).not.toHaveProperty(omitted)
     const report = vi.fn()
-    const wireCause = serializeRpcError(error, { report }).cause
-    expect(wireCause?.data).toEqual(summary)
-    expect(wireCause).not.toHaveProperty('truncated')
+    /** K232 keeps even the redacted diagnostic local to the controlled Contract factory. */
+    const wire = serializeRpcError(error, { report })
+    expect(wire).toMatchObject({
+      source: '@migaia/rpc/contract',
+      code: 'HANDSHAKE_INVALID',
+      message: error.message,
+      stack: error.stack
+    })
+    for (const field of ['cause', 'data', 'errors']) expect(wire).not.toHaveProperty(field)
+    expect(error.cause).toBe(summary)
     expect(report).not.toHaveBeenCalled()
     const empty = invalid(() => normalizeRpcHandshake('{}'), 'required')
     expect(empty.cause).toMatchObject({ fields: [], parsed: true })
