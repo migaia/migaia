@@ -1,5 +1,5 @@
 import { PeerMethod, PeerText } from './text.js'
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { openSync, closeSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs'
@@ -19,10 +19,11 @@ const executable =
     ? (process.env.RPC_PEERS_NODE ?? process.execPath)
     : (process.env.RPC_PEERS_BUN ?? 'bun')
 /** One real public peer serves Plugin and Host profiles without importing production internals. */
-const peer = join(
-  import.meta.dirname,
-  process.env.RPC_PEERS_RUNTIME === 'node' ? 'node-runner.mjs' : 'peer.mts'
-)
+const peer = execFileSync(
+  process.env.RPC_PEERS_NODE ?? process.execPath,
+  [join(import.meta.dirname, 'node-runner.mjs'), '--executable'],
+  { encoding: 'utf8' }
+).trim()
 /** Per-run evidence keeps complete peer stdout/stderr without printing any frame contents. */
 const evidence = process.env.RPC_PEERS_EVIDENCE ?? '/tmp/m2-e-evidence'
 mkdirSync(evidence, { recursive: true })

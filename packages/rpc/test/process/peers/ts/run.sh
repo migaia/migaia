@@ -1,8 +1,15 @@
 #!/bin/sh
-# Supervisor supplies installed runtime paths; wrappers never add or download packages.
+# Build once before readiness; both runtimes execute the same emitted JavaScript artifacts.
 set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-if [ "${RPC_PEERS_RUNTIME:-bun}" = node ]; then
-  exec "${RPC_PEERS_NODE:-node}" "$here/node-runner.mjs" "$@"
+compiled=$("${RPC_PEERS_NODE:-node}" "$here/node-runner.mjs" --executable)
+RPC_PEERS_VECTOR_ROOT="$here/../../../../schema/vectors"
+export RPC_PEERS_VECTOR_ROOT
+if [ "${1:-}" = "--executable" ]; then
+  printf '%s\n' "$compiled"
+  exit 0
 fi
-exec "${RPC_PEERS_BUN:-bun}" "$here/peer.mts" "$@"
+if [ "${RPC_PEERS_RUNTIME:-bun}" = node ]; then
+  exec "${RPC_PEERS_NODE:-node}" "$compiled" "$@"
+fi
+exec "${RPC_PEERS_BUN:-bun}" "$compiled" "$@"

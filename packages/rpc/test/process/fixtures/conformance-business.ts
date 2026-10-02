@@ -47,6 +47,12 @@ const bridgeContract: IRemoteContract = {
     }
   }
 }
+/** Emit the public TS fixture before launch; Node and Bun execute the same JavaScript artifact. */
+const compiledTsPeer = execFileSync(
+  process.execPath,
+  [new URL('../peers/ts/node-runner.mjs', import.meta.url).pathname, '--executable'],
+  { encoding: 'utf8' }
+).trim()
 /**
  * Four public/independent executables run directly, without language wrapping or protocol
  * forwarding.
@@ -83,13 +89,13 @@ const peers = [
   {
     language: 'node',
     command: process.execPath,
-    args: [new URL('../peers/ts/node-runner.mjs', import.meta.url).pathname],
+    args: [compiledTsPeer],
     id: 'ts-peer'
   },
   {
     language: 'bun',
     command: 'bun',
-    args: [new URL('../peers/ts/peer.mts', import.meta.url).pathname],
+    args: [compiledTsPeer],
     id: 'ts-peer'
   }
 ]
