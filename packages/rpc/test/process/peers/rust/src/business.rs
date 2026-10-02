@@ -1,6 +1,6 @@
 //! Independent native business; framing/hello/JSON remain owned by the existing peer.
 use crate::{json, negotiate, read_frame, read_json, required_str, wire_error, write_frame};
-use json::{Value, number, object, string};
+use json::{number, object, string, Value};
 use std::{
     collections::HashMap,
     io::{self, Read, Write},
@@ -332,7 +332,10 @@ pub fn serve(
     if bridge {
         if bare {
             while let Some(body) = bridge_body(input)? {
-                bridge_write_body(output, &body)?;
+                // A10 includes exactly one payload parse and serialization on both sides.
+                let payload = json::parse(&body)
+                    .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_JSON"))?;
+                bridge_write_body(output, payload.text().as_bytes())?;
             }
             return Ok(());
         }
@@ -464,7 +467,7 @@ fn bridge_body(input: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
     input.read_exact(&mut body)?;
     Ok(Some(body))
 }
-/// RPC applies the existing JSON parser; bare owns only the original physical body bytes.
+/// RPC validates its envelope after parsing; bare parses only the paired business payload.
 fn bridge_read(input: &mut impl Read) -> io::Result<Option<Value>> {
     let Some(body) = bridge_body(input)? else {
         return Ok(None);

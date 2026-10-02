@@ -135,7 +135,7 @@ export async function createMacPidObserver(pids, intervalMs = 10) {
 export async function createBareNodeSession(payload) {
   if (!payload.length || payload.length > maxFrameBytes)
     throw new RangeError('Bare frame outside carrier limit')
-  /** A bare peer owns no codec, handshake, endpoint or business protocol. */
+  /** A bare peer performs JSON business work without handshake, endpoint or business dispatch. */
   const peer = spawn(process.execPath, [fileURLToPath(import.meta.url), '--echo'], {
     stdio: ['pipe', 'pipe', 'pipe']
   })
@@ -193,7 +193,7 @@ export async function createBareNodeSession(payload) {
   }
 }
 
-/** Echo only physical frames; no JSON/codec/RPC work is added to the bare counterpart. */
+/** Echo framed payloads after one JSON parse and serialization, matching the A10 baseline. */
 async function echo() {
   process.stderr.write(readyText)
   /**
@@ -209,8 +209,12 @@ async function echo() {
       if (!length || length > maxFrameBytes)
         throw new RangeError('Bare frame outside carrier limit')
       if (bytes.length < length + 4) break
-      /** Backpressure drain is part of each physical echo's completion path. */
-      const frame = bytes.subarray(0, length + 4)
+      /** Bare JSON work matches the peer codec cost while excluding RPC envelope processing. */
+      const body = Buffer.from(JSON.stringify(JSON.parse(bytes.subarray(4, length + 4).toString())))
+      /** The physical length follows the serialized JSON body rather than the input text. */
+      const frame = Buffer.alloc(4 + body.length)
+      frame.writeUInt32BE(body.length)
+      frame.set(body, 4)
       bytes = bytes.subarray(length + 4)
       if (!process.stdout.write(frame)) await once(process.stdout, 'drain')
     }
