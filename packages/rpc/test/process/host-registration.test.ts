@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { RemoteMethodName } from '../../src/remote/constants.js'
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -17,6 +18,28 @@ import { remoteHarness, REMOTE_FIXTURE_CONTRACT } from '../remote/fixture.js'
 import { adoptHostRegistration } from '../../src/process/host/registration.js'
 import type { IProcessServeHostOptions } from '../../src/process/host/types.js'
 
+/** Cold process connection work stays within the existing 5000ms test envelope. */
+const REGISTRATION_CONNECTION_TIMEOUT_MS = 4000
+
+/** Bound fixture observation without replacing the rejection produced by the production owner. */
+async function withinRegistration<T>(operation: T): Promise<Awaited<T>> {
+  /** One timer belongs only to this observation and is always cleared after settlement. */
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(createProcessError(RpcProcessErrorCode.handshakeTimeout)),
+          REGISTRATION_CONNECTION_TIMEOUT_MS
+        )
+      })
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /** The peer initiates exactly once using the production native byte handshake. */
 function reversePeer(address: string, token = nativeHostToken, badDescription = false) {
   const child = spawn(process.execPath, [nativeHostChildPath], {
@@ -27,21 +50,35 @@ function reversePeer(address: string, token = nativeHostToken, badDescription = 
       ...(badDescription ? { RPC_BAD_DESCRIPTION: '1' } : {})
     }
   })
+  /** Successful provider installation precedes reverse description admission. */
+  let observeReady!: () => void
+  /** An early child exit must fail the current candidate instead of stranding its barrier. */
+  let rejectReady!: (reason: unknown) => void
+  const ready = new Promise<void>((resolve, reject) => {
+    observeReady = resolve
+    rejectReady = reject
+  })
+  void ready.catch(() => undefined)
   const errors: string[] = []
   child.stderr.on('data', (chunk: Buffer) => {
     errors.push(chunk.toString())
+    if (errors.join('').includes('registration-peer-ready')) observeReady()
   })
   const exited = new Promise<void>((resolve, reject) => {
-    child.once('exit', () => resolve())
+    child.once('exit', () => {
+      rejectReady(createProcessError(RpcProcessErrorCode.channelClosed))
+      resolve()
+    })
     child.once('error', reject)
   })
   return {
     child,
     errors,
     exited,
+    ready,
     async close() {
       if (child.exitCode === null) child.kill('SIGKILL')
-      await exited
+      await withinRegistration(exited)
     }
   }
 }
@@ -100,7 +137,7 @@ describe('process Host reverse native registration', () => {
           ...fixture.served.endpoint,
           async send<T>() {
             describeStarted()
-            await delayed
+            await withinRegistration(delayed)
             return REMOTE_FIXTURE_CONTRACT as T
           }
         }
@@ -126,11 +163,11 @@ describe('process Host reverse native registration', () => {
     )
     const outcome = Promise.allSettled([adopting])
     try {
-      await started
+      await withinRegistration(started)
       expect(use).not.toHaveBeenCalled()
       controller.abort(new Error('pending registration closed'))
       continueDescription()
-      expect((await outcome)[0]).toMatchObject({ status: 'rejected' })
+      expect((await withinRegistration(outcome))[0]).toMatchObject({ status: 'rejected' })
       expect(use).not.toHaveBeenCalled()
       expect(fixture.calls.filter((item) => item === 'endpoint.dispose')).toHaveLength(1)
       expect(attach).toHaveBeenCalledTimes(1)
@@ -138,12 +175,12 @@ describe('process Host reverse native registration', () => {
       expect(candidate.close).not.toHaveBeenCalled()
     } finally {
       continueDescription()
-      await governor.close()
-      await target.dispose()
+      await withinRegistration(governor.close())
+      await withinRegistration(target.dispose())
     }
   })
   it('[A7] installs only the verified principal, suspends on EOF and adopts a new connection', async () => {
-    const directory = await mkdtemp('/tmp/rpc-adopt-')
+    const directory = await withinRegistration(mkdtemp('/tmp/rpc-adopt-'))
     const address = join(directory, 'r')
     const target = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -202,50 +239,79 @@ describe('process Host reverse native registration', () => {
     })
     let listener: IProcessRegistrationListener | undefined
     const closeGovernor = vi.fn(() => governor.close())
+    /** Each spawned peer publishes its provider before the candidate starts cold discovery. */
+    let peerReady: Promise<void> = Promise.resolve()
+    /** A rejection races every success-only barrier and preserves its original cause. */
+    let rejectCandidate!: (reason: unknown) => void
+    const failedCandidate = new Promise<never>((_resolve, reject) => {
+      rejectCandidate = reject
+    })
+    void failedCandidate.catch(() => undefined)
+    /** Observe production close only; this test never calls a candidate's close capability. */
     const external = {
       ...governor,
       close: closeGovernor,
       async listenRegistrations(options: Parameters<typeof governor.listenRegistrations>[0]) {
-        listener = await governor.listenRegistrations({
-          ...options,
-          listen: (listenOptions) =>
-            options.listen({
-              ...listenOptions,
-              onConnection(pending) {
-                /** Only the first connection bypasses the authenticated candidate callback. */
-                const ordinal = ++physicalConnections
-                listenOptions.onConnection({
-                  ...pending,
-                  async close() {
-                    await pending.close()
-                    // The next event-loop turn follows the manager's synchronous finally.
-                    if (ordinal === 1) setImmediate(observeRejectedClose)
-                  }
-                })
+        listener = await withinRegistration(
+          governor.listenRegistrations({
+            ...options,
+            handshakeTimeoutMs: REGISTRATION_CONNECTION_TIMEOUT_MS,
+            listen: (listenOptions) =>
+              options.listen({
+                ...listenOptions,
+                onConnection(pending) {
+                  const ordinal = ++physicalConnections
+                  listenOptions.onConnection({
+                    ...pending,
+                    async accept(acceptOptions) {
+                      const accepted = await withinRegistration(pending.accept(acceptOptions))
+                      return {
+                        ...accepted,
+                        channel: {
+                          ...accepted.channel,
+                          async close() {
+                            await withinRegistration(accepted.channel.close())
+                            // Observe after the manager's synchronous lease-release finally.
+                            setImmediate(() => {
+                              if (ordinal === 2) observeFirstClose()
+                              if (ordinal === 3) observeBadClose()
+                              if (ordinal === 4) observeDuplicateClose()
+                            })
+                          }
+                        }
+                      }
+                    },
+                    async close() {
+                      await withinRegistration(pending.close())
+                      if (ordinal === 1) setImmediate(observeRejectedClose)
+                    }
+                  })
+                }
+              }),
+            async onCandidate(candidate) {
+              try {
+                await withinRegistration(peerReady)
+              } catch (error) {
+                rejectCandidate(error)
+                throw error
               }
-            }),
-          async onCandidate(candidate) {
-            if (candidate.identity.principalId === 'approved-principal' && !observedFirst) {
-              candidate.signal.addEventListener(
-                'abort',
-                () => {
-                  void candidate.close().then(observeFirstClose, report)
-                },
-                { once: true }
+              const [outcome] = await withinRegistration(
+                Promise.allSettled([options.onCandidate(candidate)])
               )
+              if (outcome!.status === 'rejected') {
+                rejectedCandidates += 1
+                /**
+                 * Bad description and duplicate rejection are intentional; other rejection is
+                 * fatal.
+                 */
+                if (physicalConnections !== 3 && physicalConnections !== 4)
+                  rejectCandidate(outcome!.reason)
+                throw outcome!.reason
+              }
+              return outcome!.value
             }
-            /** Observe the real close Promise, which includes the manager's lease return. */
-            const [outcome] = await Promise.allSettled([options.onCandidate(candidate)])
-            if (outcome!.status === 'rejected' || outcome!.value !== 'adopt') {
-              await candidate.close()
-              rejectedCandidates += 1
-              if (rejectedCandidates === 1) observeBadClose()
-              if (rejectedCandidates === 2) observeDuplicateClose()
-            }
-            if (outcome!.status === 'rejected') throw outcome!.reason
-            return outcome!.value
-          }
-        })
+          })
+        )
         return listener
       }
     }
@@ -292,121 +358,161 @@ describe('process Host reverse native registration', () => {
     })
     /** Later duplicate and replacement candidates must not replace the original EOF observer. */
     let observedFirst = false
-    const service = await createServeProcessHost({
-      host: target,
-      catalog: nativeHostCatalog,
-      resolvePlugin: () => blueprint,
-      scheduler: systemScheduler,
-      report,
-      resilience: external,
-      ingress: {
-        kind: 'listener',
-        address: join(directory, 's'),
-        listen: (options) =>
-          listenProcessByteChannel({ ...options, serviceId: 'host-ingress-fixture' }),
-        offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' }, stream: true }),
-        verify: () => 'principal',
-        createConnectionContext: () => ({
-          peerId: 'client',
-          ipc: {
-            connectionId: crypto.randomUUID(),
-            sessionId: crypto.randomUUID(),
-            log: () => undefined
-          }
-        })
-      },
-      endpointFactory: (channel, signal, session) => {
-        if (!observedFirst && session?.identity.principalId === 'approved-principal') {
-          observedFirst = true
-          signal.addEventListener('abort', observeFirstLoss, { once: true })
-        }
-        return nativeEndpoint(channel, 'registration-server', session)
-      },
-      registrations: {
-        listen: listenProcessByteChannel,
-        address,
-        serviceId: 'host-reverse-fixture',
-        offer: createNativeProcessOffer({
-          peer: { id: 'registration-server', runtime: 'node' },
-          stream: true
-        }),
-        createConnectionContext: () => ({
-          peerId: 'registration-peer',
-          ipc: {
-            connectionId: crypto.randomUUID(),
-            sessionId: crypto.randomUUID(),
-            log: () => undefined
-          }
-        }),
-        verifyToken: (token) => {
-          if (token !== nativeHostToken && token !== 'second-reverse-fixture')
-            throw createProcessError(RpcProcessErrorCode.authRejected)
-          if (token === 'second-reverse-fixture') return 'approved-second'
-          return 'approved-principal'
+    const service = await withinRegistration(
+      createServeProcessHost({
+        host: target,
+        catalog: nativeHostCatalog,
+        resolvePlugin: () => blueprint,
+        scheduler: systemScheduler,
+        report,
+        resilience: external,
+        ingress: {
+          kind: 'listener',
+          address: join(directory, 's'),
+          listen: (options) =>
+            listenProcessByteChannel({ ...options, serviceId: 'host-ingress-fixture' }),
+          offer: createNativeProcessOffer({
+            peer: { id: 'server', runtime: 'node' },
+            stream: true
+          }),
+          verify: () => 'principal',
+          createConnectionContext: () => ({
+            peerId: 'client',
+            ipc: {
+              connectionId: crypto.randomUUID(),
+              sessionId: crypto.randomUUID(),
+              log: () => undefined
+            }
+          })
         },
-        resolveRegistration
-      }
-    })
+        endpointFactory: async (channel, signal, session) => {
+          if (!observedFirst && session?.identity.principalId === 'approved-principal') {
+            observedFirst = true
+            signal.addEventListener('abort', observeFirstLoss, { once: true })
+          }
+          const served = await withinRegistration(
+            nativeEndpoint(channel, 'registration-server', session)
+          )
+          return {
+            ...served,
+            endpoint: {
+              ...served.endpoint,
+              send<T>(...input: Parameters<typeof served.endpoint.send>) {
+                return served.endpoint.send<T>(
+                  input[0],
+                  input[1],
+                  input[2],
+                  input[1] === RemoteMethodName.describe
+                    ? { ...input[3], timeoutMs: REGISTRATION_CONNECTION_TIMEOUT_MS }
+                    : input[3]
+                )
+              }
+            }
+          }
+        },
+        registrations: {
+          listen: listenProcessByteChannel,
+          address,
+          serviceId: 'host-reverse-fixture',
+          offer: createNativeProcessOffer({
+            peer: { id: 'registration-server', runtime: 'node' },
+            stream: true
+          }),
+          createConnectionContext: () => ({
+            peerId: 'registration-peer',
+            ipc: {
+              connectionId: crypto.randomUUID(),
+              sessionId: crypto.randomUUID(),
+              log: () => undefined
+            }
+          }),
+          verifyToken: (token) => {
+            if (token !== nativeHostToken && token !== 'second-reverse-fixture')
+              throw createProcessError(RpcProcessErrorCode.authRejected)
+            if (token === 'second-reverse-fixture') return 'approved-second'
+            return 'approved-principal'
+          },
+          resolveRegistration
+        }
+      })
+    )
     const rejected = reversePeer(address, 'wrong-fixture-token')
-    await rejected.exited
-    await rejectedClosed
+    await withinRegistration(rejected.exited)
+    await withinRegistration(rejectedClosed)
     const first = reversePeer(address)
+    peerReady = first.ready
     let replacement: ReturnType<typeof reversePeer> | undefined
     let independent: ReturnType<typeof reversePeer> | undefined
     try {
-      await rejected.exited
-      await firstInstalling
+      await withinRegistration(rejected.exited)
+      await withinRegistration(Promise.race([firstInstalling, failedCandidate]))
       expect(use).toHaveBeenCalledTimes(1)
-      const [proxy] = await use.mock.results[0]!.value
+      const [proxy] = await withinRegistration(
+        use.mock.results[0]!.value as ReturnType<typeof target.use>
+      )
       expect(resolveRegistration.mock.calls).toEqual([['approved-principal']])
       const bad = reversePeer(address, nativeHostToken, true)
-      await bad.exited
-      await badClosed
+      peerReady = bad.ready
+      await withinRegistration(bad.exited)
+      await withinRegistration(badClosed)
       expect(use).toHaveBeenCalledTimes(1)
       const duplicate = reversePeer(address)
-      await duplicate.exited
-      await duplicateClosed
+      peerReady = duplicate.ready
+      await withinRegistration(duplicate.exited)
+      await withinRegistration(duplicateClosed)
       expect(use).toHaveBeenCalledTimes(2)
       expect(unUse).not.toHaveBeenCalled()
       independent = reversePeer(address, 'second-reverse-fixture')
-      await secondInstalling
+      peerReady = independent.ready
+      await withinRegistration(Promise.race([secondInstalling, failedCandidate]))
       expect(secondUse).toHaveBeenCalledTimes(1)
-      const [independentProxy] = await secondUse.mock.results[0]!.value
+      const [independentProxy] = await withinRegistration(
+        secondUse.mock.results[0]!.value as ReturnType<typeof target.use>
+      )
       const independentFeature = independentProxy.getFeature('f') as Record<
         string,
         (...args: unknown[]) => unknown
       >
       const feature = proxy.getFeature('f') as Record<string, (...args: unknown[]) => unknown>
-      expect(await feature.request!(['reverse'])).toMatchObject({ pid: first.child.pid })
-      const [dependent] = await target.use(
-        definePlugin({
-          name: 'dependent',
-          features: {
-            f: defineFeature(
-              (_core, dependencies) => ({ read: () => dependencies.p.request(['dependent']) }),
-              { p: blueprint.getFeature('f') }
-            )
-          },
-          install: () => ({})
-        })
+      expect(await withinRegistration(feature.request!(['reverse']))).toMatchObject({
+        pid: first.child.pid
+      })
+      const [dependent] = await withinRegistration(
+        target.use(
+          definePlugin({
+            name: 'dependent',
+            features: {
+              f: defineFeature(
+                (_core, dependencies) => ({ read: () => dependencies.p.request(['dependent']) }),
+                { p: blueprint.getFeature('f') }
+              )
+            },
+            install: () => ({})
+          })
+        )
       )
-      await first.close()
-      await firstLost
+      await withinRegistration(first.close())
+      await withinRegistration(firstLost)
       expect(unUse).toHaveBeenCalledTimes(1)
-      await unUse.mock.results[0]!.value
-      await firstClosed
+      await withinRegistration(unUse.mock.results[0]!.value)
+      await withinRegistration(firstClosed)
       expect(unUse.mock.calls[0]).toEqual(['p', { policy: 'suspend' }])
-      expect(await independentFeature.request!(['unaffected'])).toMatchObject({
+      expect(await withinRegistration(independentFeature.request!(['unaffected']))).toMatchObject({
         pid: independent.child.pid
       })
       expect(() => dependent.getFeature('f')).toThrow(
         expect.objectContaining({ code: 'PLUGIN_SUSPENDED' })
       )
       replacement = reversePeer(address)
-      await replacementInstalling
+      peerReady = replacement.ready
+      await withinRegistration(Promise.race([replacementInstalling, failedCandidate]))
       expect(use).toHaveBeenCalledTimes(4)
-      const [newProxy] = await use.mock.results[3]!.value
-      expect(await (newProxy.getFeature('f') as typeof feature).request!(['new'])).toMatchObject({
+      const [newProxy] = await withinRegistration(
+        use.mock.results[3]!.value as ReturnType<typeof target.use>
+      )
+      expect(
+        await withinRegistration((newProxy.getFeature('f') as typeof feature).request!(['new']))
+      ).toMatchObject({
         pid: replacement.child.pid
       })
       expect(resolveRegistration.mock.calls).toEqual([
@@ -417,30 +523,35 @@ describe('process Host reverse native registration', () => {
         ['approved-principal']
       ])
       expect(() => dependent.getFeature('f')).not.toThrow()
-      await listener!.close()
+      await withinRegistration(listener!.close())
       expect(
-        await (newProxy.getFeature('f') as typeof feature).request!(['listener-closed'])
+        await withinRegistration(
+          (newProxy.getFeature('f') as typeof feature).request!(['listener-closed'])
+        )
       ).toMatchObject({ pid: replacement.child.pid })
       const closing = service.close()
       expect(service.close()).toBe(closing)
-      await closing
-      await replacement.exited
-      await independent.exited
+      await withinRegistration(closing)
+      await withinRegistration(replacement.exited)
+      await withinRegistration(independent.exited)
       expect(closeGovernor).not.toHaveBeenCalled()
       expect(first.errors.join('')).not.toContain(nativeHostToken)
       expect(replacement.errors.join('')).not.toContain(nativeHostToken)
+      expect(rejectedCandidates).toBe(2)
     } finally {
-      await service.close()
-      await Promise.allSettled([
-        first.close(),
-        rejected.close(),
-        replacement?.close(),
-        independent?.close()
-      ])
-      await target.dispose()
-      await secondTarget.dispose()
-      await governor.close()
-      await rm(directory, { recursive: true, force: true })
+      await withinRegistration(service.close())
+      await withinRegistration(
+        Promise.allSettled([
+          first.close(),
+          rejected.close(),
+          replacement?.close(),
+          independent?.close()
+        ])
+      )
+      await withinRegistration(target.dispose())
+      await withinRegistration(secondTarget.dispose())
+      await withinRegistration(governor.close())
+      await withinRegistration(rm(directory, { recursive: true, force: true }))
     }
   })
 })

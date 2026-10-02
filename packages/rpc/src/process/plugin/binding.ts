@@ -463,10 +463,16 @@ export function createConnectProcessBinding(
     invalidOption('deployment.address')
   if (typeof deployment.token !== 'string' || deployment.token.length === 0)
     invalidOption('deployment.token')
+  if (deployment.wire !== undefined && !Object.values(ProcessPluginWire).includes(deployment.wire))
+    invalidOption('deployment.wire')
   /** A borrowed session keeps one stable proposal across reconnect generations. */
   const offer = deployment.offer ?? defaultProcessOffer(deployment.token)
-  /** Explicit health overrides native ping, including a proposal without ping@1. */
-  const health = deployment.supervision?.health ? 'custom' : 'ping'
+  /** Explicit health overrides the wire default; JSON-RPC has no native ping contract. */
+  const health = deployment.supervision?.health
+    ? 'custom'
+    : deployment.wire === ProcessPluginWire.jsonrpc
+      ? 'none'
+      : 'ping'
   if (health === 'ping') requirePingCapabilities(offer.capabilities)
   const channels = new WeakMap<IRemoteChannel, IProcessConnectionHandle>()
   const readyEndpoints = new WeakMap<
