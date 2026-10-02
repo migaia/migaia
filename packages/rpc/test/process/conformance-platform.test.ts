@@ -123,7 +123,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
   it('[A11] preserves offline builds, standard-library peers and default conformance exclusion', () => {
     /** Rust builds through the maintained runner into a system temporary target directory. */
     const rust = readFileSync(new URL('./peers/rust/run.sh', import.meta.url), 'utf8')
-    expect(rust).toContain('cargo build --offline --locked')
+    expect(rust).toContain('cargo build --release --offline --locked')
     expect(rust).toContain('TMPDIR')
     /** Empty dependency tables are allowed; dependency entries are not. */
     const manifest = readFileSync(new URL('./peers/rust/Cargo.toml', import.meta.url), 'utf8')
