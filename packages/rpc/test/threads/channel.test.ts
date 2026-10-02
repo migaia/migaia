@@ -61,11 +61,15 @@ describe('thread channel ownership and portable boundary', () => {
           cause: { source: '@migaia/rpc/contract' }
         })
       expect(fixture.frames).toHaveLength(before)
-      await expect(feature.bad([])).rejects.toMatchObject({
-        source: '@migaia/rpc/contract',
+      /** A controlled Contract failure crosses the boundary as code/text without local causes. */
+      const remoteError = await feature.bad([]).catch((error: unknown) => error)
+      expect(remoteError).toMatchObject({
+        source: '@migaia/rpc/core',
         code: 'INVALID_ENVELOPE',
+        message: 'rpc envelope is invalid',
         stack: expect.any(String)
       })
+      expect((remoteError as Error).cause).toBeUndefined()
       expect(fixture.frames.every(({ transfer }) => transfer === undefined)).toBe(true)
     } finally {
       ports.port1.close()
