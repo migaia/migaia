@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createBrowserThreadLauncher } from '../../src/threads/adapters/browser.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import {
+  createBrowserThreadLauncher,
+  createBrowserThreadChannelFactory
+} from '../../src/threads/adapters/browser.js'
+import { ThreadBootstrap } from '../../src/threads/constants.js'
 
 /** A real launcher owns acknowledgement and failure handling on this controllable Worker port. */
 function webFixture() {
@@ -27,6 +32,36 @@ function webFixture() {
 }
 
 describe('Web thread bootstrap failure', () => {
+  it('[A9] production channel open remains pending until the Worker acknowledges bootstrap', async () => {
+    /** No test-created prepared Promise can stand in for the production launcher barrier. */
+    const fixture = webFixture()
+    /** Bootstrap receives no acknowledgement until the explicit fixture event below. */
+    const handle = await createBrowserThreadLauncher(fixture).launch(
+      { entry: 'file:///worker.mjs' },
+      { signal: new AbortController().signal }
+    )
+    /** Publishing the channel before acknowledgement would permit premature transport installation. */
+    let published = false
+    /** The real channel factory must wait on the launcher's own preparation. */
+    const opening = createBrowserThreadChannelFactory({ scheduler: systemScheduler })
+      .open(handle, new AbortController().signal)
+      .then((channel) => {
+        published = true
+        return channel
+      })
+    for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
+    expect(published).toBe(false)
+    expect(fixture.subscriptions.filter((type) => type === 'message')).toHaveLength(1)
+    fixture.events.dispatchEvent(
+      new MessageEvent('message', { data: { kind: ThreadBootstrap.acknowledged } })
+    )
+    /** Only acknowledged candidates can expose a live transport to remote assembly. */
+    const channel = await opening
+    expect(published).toBe(true)
+    await channel.close()
+    handle.terminate()
+  })
+
   it('[A6/A9] rejects preparation with the original Worker error before acknowledgement', async () => {
     /** This failure is independent from the launch signal, which remains live. */
     const original = new Error('worker bootstrap original failure')
