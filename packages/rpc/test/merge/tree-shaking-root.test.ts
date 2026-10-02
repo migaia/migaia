@@ -7,10 +7,10 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** K215 keeps the module graph and pins the compressed local admission observer cost. */
+/** R32 closing pins the exact retained cost of admission, controlled wire errors and handle probes. */
 const allowedIncrease = {
-  rawBytes: 70167 / legacyRoot.rawBytes,
-  gzipBytes: 16673 / legacyRoot.gzipBytes
+  rawBytes: 71888 / legacyRoot.rawBytes,
+  gzipBytes: 17143 / legacyRoot.gzipBytes
 } as const
 
 /** I12 changes no retained modules relative to the IPC-reviewed graph. */
