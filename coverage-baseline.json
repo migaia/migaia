@@ -114,24 +114,24 @@
     },
     "plugin-host": {
       "lines": {
-        "covered": 2083,
-        "total": 2284,
-        "pct": 91.19
+        "covered": 2089,
+        "total": 2290,
+        "pct": 91.22
       },
       "statements": {
-        "covered": 2212,
-        "total": 2465,
-        "pct": 89.73
+        "covered": 2218,
+        "total": 2471,
+        "pct": 89.76
       },
       "functions": {
-        "covered": 571,
-        "total": 651,
-        "pct": 87.71
+        "covered": 573,
+        "total": 653,
+        "pct": 87.74
       },
       "branches": {
-        "covered": 1014,
-        "total": 1224,
-        "pct": 82.84
+        "covered": 1023,
+        "total": 1233,
+        "pct": 82.96
       }
     },
     "reactive": {
@@ -180,24 +180,24 @@
     },
     "rpc": {
       "lines": {
-        "covered": 8694,
-        "total": 9633,
-        "pct": 90.25
+        "covered": 9531,
+        "total": 10523,
+        "pct": 90.57
       },
       "statements": {
-        "covered": 9482,
-        "total": 10768,
-        "pct": 88.05
+        "covered": 10385,
+        "total": 11772,
+        "pct": 88.21
       },
       "functions": {
-        "covered": 2068,
-        "total": 2295,
-        "pct": 90.1
+        "covered": 2266,
+        "total": 2502,
+        "pct": 90.56
       },
       "branches": {
-        "covered": 5592,
-        "total": 6597,
-        "pct": 84.76
+        "covered": 6169,
+        "total": 7228,
+        "pct": 85.34
       }
     },
     "serialize": {
@@ -510,14 +510,14 @@
     },
     "supervision": {
       "lines": {
-        "covered": 1102,
-        "total": 1212,
-        "pct": 90.92
+        "covered": 1107,
+        "total": 1217,
+        "pct": 90.96
       },
       "statements": {
-        "covered": 1199,
-        "total": 1380,
-        "pct": 86.88
+        "covered": 1205,
+        "total": 1388,
+        "pct": 86.81
       },
       "functions": {
         "covered": 221,
@@ -525,9 +525,9 @@
         "pct": 92.85
       },
       "branches": {
-        "covered": 745,
-        "total": 910,
-        "pct": 81.86
+        "covered": 751,
+        "total": 918,
+        "pct": 81.8
       }
     },
     "tray": {
@@ -3218,24 +3218,24 @@
     },
     "packages/plugin-host/src/plugin-handle.ts": {
       "lines": {
-        "covered": 40,
-        "total": 43,
-        "pct": 93.02
+        "covered": 46,
+        "total": 49,
+        "pct": 93.87
       },
       "statements": {
-        "covered": 41,
-        "total": 44,
-        "pct": 93.18
+        "covered": 47,
+        "total": 50,
+        "pct": 94
       },
       "functions": {
-        "covered": 7,
-        "total": 8,
-        "pct": 87.5
+        "covered": 9,
+        "total": 10,
+        "pct": 90
       },
       "branches": {
-        "covered": 21,
-        "total": 22,
-        "pct": 95.45
+        "covered": 30,
+        "total": 31,
+        "pct": 96.77
       }
     },
     "packages/plugin-host/src/publication.ts": {
@@ -4206,6 +4206,182 @@
         "pct": 100
       }
     },
+    "packages/rpc/src/bridge/jsonrpc/constants.ts": {
+      "lines": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/bridge/jsonrpc/error-code.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/bridge/jsonrpc/error-text.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/bridge/jsonrpc/error.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/bridge/jsonrpc/framing.ts": {
+      "lines": {
+        "covered": 68,
+        "total": 70,
+        "pct": 97.14
+      },
+      "statements": {
+        "covered": 70,
+        "total": 74,
+        "pct": 94.59
+      },
+      "functions": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 57,
+        "total": 61,
+        "pct": 93.44
+      }
+    },
+    "packages/rpc/src/bridge/jsonrpc/handshake.ts": {
+      "lines": {
+        "covered": 23,
+        "total": 24,
+        "pct": 95.83
+      },
+      "statements": {
+        "covered": 23,
+        "total": 24,
+        "pct": 95.83
+      },
+      "functions": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 51,
+        "total": 55,
+        "pct": 92.72
+      }
+    },
+    "packages/rpc/src/bridge/jsonrpc/index.ts": {
+      "lines": {
+        "covered": 24,
+        "total": 26,
+        "pct": 92.3
+      },
+      "statements": {
+        "covered": 26,
+        "total": 28,
+        "pct": 92.85
+      },
+      "functions": {
+        "covered": 4,
+        "total": 5,
+        "pct": 80
+      },
+      "branches": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/bridge/jsonrpc/transport.ts": {
+      "lines": {
+        "covered": 158,
+        "total": 163,
+        "pct": 96.93
+      },
+      "statements": {
+        "covered": 173,
+        "total": 188,
+        "pct": 92.02
+      },
+      "functions": {
+        "covered": 31,
+        "total": 33,
+        "pct": 93.93
+      },
+      "branches": {
+        "covered": 125,
+        "total": 141,
+        "pct": 88.65
+      }
+    },
     "packages/rpc/src/browser/adapters/broadcast-channel.ts": {
       "lines": {
         "covered": 38,
@@ -4384,23 +4560,23 @@
     },
     "packages/rpc/src/contract/contract-error.ts": {
       "lines": {
-        "covered": 5,
-        "total": 5,
+        "covered": 9,
+        "total": 9,
         "pct": 100
       },
       "statements": {
-        "covered": 5,
-        "total": 5,
+        "covered": 9,
+        "total": 9,
         "pct": 100
       },
       "functions": {
-        "covered": 1,
-        "total": 1,
+        "covered": 3,
+        "total": 3,
         "pct": 100
       },
       "branches": {
-        "covered": 8,
-        "total": 8,
+        "covered": 13,
+        "total": 13,
         "pct": 100
       }
     },
@@ -4472,14 +4648,14 @@
     },
     "packages/rpc/src/contract/error.ts": {
       "lines": {
-        "covered": 329,
-        "total": 352,
-        "pct": 93.46
+        "covered": 330,
+        "total": 353,
+        "pct": 93.48
       },
       "statements": {
-        "covered": 369,
-        "total": 401,
-        "pct": 92.01
+        "covered": 370,
+        "total": 402,
+        "pct": 92.03
       },
       "functions": {
         "covered": 28,
@@ -4487,9 +4663,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 292,
-        "total": 311,
-        "pct": 93.89
+        "covered": 302,
+        "total": 321,
+        "pct": 94.08
       }
     },
     "packages/rpc/src/contract/framing/index.ts": {
@@ -5653,9 +5829,9 @@
         "pct": 94.11
       },
       "branches": {
-        "covered": 82,
+        "covered": 83,
         "total": 102,
-        "pct": 80.39
+        "pct": 81.37
       }
     },
     "packages/rpc/src/core/internal/define-rpc-feature.ts": {
@@ -6083,9 +6259,9 @@
         "pct": 93.67
       },
       "statements": {
-        "covered": 338,
+        "covered": 339,
         "total": 380,
-        "pct": 88.94
+        "pct": 89.21
       },
       "functions": {
         "covered": 80,
@@ -6335,21 +6511,21 @@
         "pct": 90.32
       },
       "branches": {
-        "covered": 67,
-        "total": 81,
-        "pct": 82.71
+        "covered": 69,
+        "total": 83,
+        "pct": 83.13
       }
     },
     "packages/rpc/src/core/internal/provider-executor.ts": {
       "lines": {
-        "covered": 158,
-        "total": 170,
-        "pct": 92.94
+        "covered": 159,
+        "total": 171,
+        "pct": 92.98
       },
       "statements": {
-        "covered": 176,
-        "total": 196,
-        "pct": 89.79
+        "covered": 177,
+        "total": 197,
+        "pct": 89.84
       },
       "functions": {
         "covered": 22,
@@ -6357,9 +6533,9 @@
         "pct": 88
       },
       "branches": {
-        "covered": 165,
-        "total": 196,
-        "pct": 84.18
+        "covered": 169,
+        "total": 200,
+        "pct": 84.5
       }
     },
     "packages/rpc/src/core/internal/provider-first-party-roots.ts": {
@@ -7491,9 +7667,9 @@
         "pct": 100
       },
       "statements": {
-        "covered": 43,
+        "covered": 44,
         "total": 47,
-        "pct": 91.48
+        "pct": 93.61
       },
       "functions": {
         "covered": 13,
@@ -7501,9 +7677,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 11,
+        "covered": 12,
         "total": 16,
-        "pct": 68.75
+        "pct": 75
       }
     },
     "packages/rpc/src/process/adapters/node-child-process.ts": {
@@ -7530,24 +7706,24 @@
     },
     "packages/rpc/src/process/adapters/node-socket.ts": {
       "lines": {
-        "covered": 107,
-        "total": 131,
-        "pct": 81.67
+        "covered": 118,
+        "total": 143,
+        "pct": 82.51
       },
       "statements": {
-        "covered": 115,
-        "total": 143,
-        "pct": 80.41
+        "covered": 126,
+        "total": 155,
+        "pct": 81.29
       },
       "functions": {
-        "covered": 23,
+        "covered": 24,
         "total": 29,
-        "pct": 79.31
+        "pct": 82.75
       },
       "branches": {
-        "covered": 95,
-        "total": 111,
-        "pct": 85.58
+        "covered": 104,
+        "total": 125,
+        "pct": 83.2
       }
     },
     "packages/rpc/src/process/adapters/unix-socket-ownership.ts": {
@@ -7645,9 +7821,9 @@
         "pct": 93.03
       },
       "statements": {
-        "covered": 193,
+        "covered": 194,
         "total": 225,
-        "pct": 85.77
+        "pct": 86.22
       },
       "functions": {
         "covered": 40,
@@ -7655,9 +7831,9 @@
         "pct": 83.33
       },
       "branches": {
-        "covered": 75,
+        "covered": 76,
         "total": 98,
-        "pct": 76.53
+        "pct": 77.55
       }
     },
     "packages/rpc/src/process/constants.ts": {
@@ -7743,8 +7919,8 @@
         "pct": 100
       },
       "branches": {
-        "covered": 9,
-        "total": 9,
+        "covered": 10,
+        "total": 10,
         "pct": 100
       }
     },
@@ -7765,9 +7941,163 @@
         "pct": 76.92
       },
       "branches": {
-        "covered": 47,
+        "covered": 49,
         "total": 55,
-        "pct": 85.45
+        "pct": 89.09
+      }
+    },
+    "packages/rpc/src/process/host/adopted-binding.ts": {
+      "lines": {
+        "covered": 35,
+        "total": 39,
+        "pct": 89.74
+      },
+      "statements": {
+        "covered": 37,
+        "total": 46,
+        "pct": 80.43
+      },
+      "functions": {
+        "covered": 9,
+        "total": 12,
+        "pct": 75
+      },
+      "branches": {
+        "covered": 19,
+        "total": 27,
+        "pct": 70.37
+      }
+    },
+    "packages/rpc/src/process/host/client.ts": {
+      "lines": {
+        "covered": 145,
+        "total": 157,
+        "pct": 92.35
+      },
+      "statements": {
+        "covered": 155,
+        "total": 178,
+        "pct": 87.07
+      },
+      "functions": {
+        "covered": 36,
+        "total": 38,
+        "pct": 94.73
+      },
+      "branches": {
+        "covered": 64,
+        "total": 76,
+        "pct": 84.21
+      }
+    },
+    "packages/rpc/src/process/host/error.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "statements": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "functions": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/process/host/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/process/host/registration.ts": {
+      "lines": {
+        "covered": 49,
+        "total": 66,
+        "pct": 74.24
+      },
+      "statements": {
+        "covered": 50,
+        "total": 76,
+        "pct": 65.78
+      },
+      "functions": {
+        "covered": 6,
+        "total": 9,
+        "pct": 66.66
+      },
+      "branches": {
+        "covered": 12,
+        "total": 24,
+        "pct": 50
+      }
+    },
+    "packages/rpc/src/process/host/serve.ts": {
+      "lines": {
+        "covered": 30,
+        "total": 49,
+        "pct": 61.22
+      },
+      "statements": {
+        "covered": 31,
+        "total": 57,
+        "pct": 54.38
+      },
+      "functions": {
+        "covered": 6,
+        "total": 7,
+        "pct": 85.71
+      },
+      "branches": {
+        "covered": 18,
+        "total": 35,
+        "pct": 51.42
+      }
+    },
+    "packages/rpc/src/process/host/types.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
       }
     },
     "packages/rpc/src/process/index.ts": {
@@ -7860,46 +8190,46 @@
     },
     "packages/rpc/src/process/plugin/binding.ts": {
       "lines": {
-        "covered": 115,
-        "total": 146,
-        "pct": 78.76
+        "covered": 139,
+        "total": 167,
+        "pct": 83.23
       },
       "statements": {
-        "covered": 123,
-        "total": 167,
-        "pct": 73.65
+        "covered": 153,
+        "total": 193,
+        "pct": 79.27
       },
       "functions": {
-        "covered": 32,
-        "total": 41,
-        "pct": 78.04
+        "covered": 45,
+        "total": 53,
+        "pct": 84.9
       },
       "branches": {
-        "covered": 94,
-        "total": 123,
-        "pct": 76.42
+        "covered": 117,
+        "total": 143,
+        "pct": 81.81
       }
     },
     "packages/rpc/src/process/plugin/client.ts": {
       "lines": {
-        "covered": 52,
-        "total": 59,
-        "pct": 88.13
+        "covered": 56,
+        "total": 61,
+        "pct": 91.8
       },
       "statements": {
-        "covered": 58,
-        "total": 66,
-        "pct": 87.87
+        "covered": 61,
+        "total": 67,
+        "pct": 91.04
       },
       "functions": {
         "covered": 18,
-        "total": 20,
-        "pct": 90
+        "total": 18,
+        "pct": 100
       },
       "branches": {
-        "covered": 36,
-        "total": 39,
-        "pct": 92.3
+        "covered": 39,
+        "total": 41,
+        "pct": 95.12
       }
     },
     "packages/rpc/src/process/plugin/constants.ts": {
@@ -7926,14 +8256,14 @@
     },
     "packages/rpc/src/process/plugin/descriptor.ts": {
       "lines": {
-        "covered": 128,
+        "covered": 129,
         "total": 132,
-        "pct": 96.96
+        "pct": 97.72
       },
       "statements": {
-        "covered": 145,
+        "covered": 146,
         "total": 153,
-        "pct": 94.77
+        "pct": 95.42
       },
       "functions": {
         "covered": 12,
@@ -7941,9 +8271,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 135,
+        "covered": 138,
         "total": 148,
-        "pct": 91.21
+        "pct": 93.24
       }
     },
     "packages/rpc/src/process/plugin/index.ts": {
@@ -7970,14 +8300,14 @@
     },
     "packages/rpc/src/process/plugin/serve.ts": {
       "lines": {
-        "covered": 207,
+        "covered": 211,
         "total": 259,
-        "pct": 79.92
+        "pct": 81.46
       },
       "statements": {
-        "covered": 216,
+        "covered": 221,
         "total": 278,
-        "pct": 77.69
+        "pct": 79.49
       },
       "functions": {
         "covered": 23,
@@ -7985,9 +8315,9 @@
         "pct": 71.87
       },
       "branches": {
-        "covered": 84,
-        "total": 122,
-        "pct": 68.85
+        "covered": 93,
+        "total": 123,
+        "pct": 75.6
       }
     },
     "packages/rpc/src/process/plugin/types.ts": {
@@ -8036,24 +8366,24 @@
     },
     "packages/rpc/src/process/resilience/drain.ts": {
       "lines": {
-        "covered": 75,
-        "total": 78,
-        "pct": 96.15
+        "covered": 76,
+        "total": 79,
+        "pct": 96.2
       },
       "statements": {
-        "covered": 80,
-        "total": 84,
-        "pct": 95.23
+        "covered": 81,
+        "total": 85,
+        "pct": 95.29
       },
       "functions": {
-        "covered": 20,
-        "total": 20,
+        "covered": 21,
+        "total": 21,
         "pct": 100
       },
       "branches": {
-        "covered": 25,
-        "total": 27,
-        "pct": 92.59
+        "covered": 26,
+        "total": 29,
+        "pct": 89.65
       }
     },
     "packages/rpc/src/process/resilience/fallback.ts": {
@@ -8080,24 +8410,24 @@
     },
     "packages/rpc/src/process/resilience/index.ts": {
       "lines": {
-        "covered": 88,
-        "total": 115,
-        "pct": 76.52
+        "covered": 97,
+        "total": 116,
+        "pct": 83.62
       },
       "statements": {
-        "covered": 97,
-        "total": 129,
-        "pct": 75.19
+        "covered": 108,
+        "total": 131,
+        "pct": 82.44
       },
       "functions": {
-        "covered": 20,
+        "covered": 24,
         "total": 27,
-        "pct": 74.07
+        "pct": 88.88
       },
       "branches": {
-        "covered": 49,
-        "total": 72,
-        "pct": 68.05
+        "covered": 55,
+        "total": 74,
+        "pct": 74.32
       }
     },
     "packages/rpc/src/process/resilience/liquidation.ts": {
@@ -8124,24 +8454,24 @@
     },
     "packages/rpc/src/process/resilience/provider-admission.ts": {
       "lines": {
-        "covered": 77,
-        "total": 86,
-        "pct": 89.53
+        "covered": 95,
+        "total": 101,
+        "pct": 94.05
       },
       "statements": {
-        "covered": 82,
-        "total": 94,
-        "pct": 87.23
+        "covered": 103,
+        "total": 115,
+        "pct": 89.56
       },
       "functions": {
-        "covered": 19,
-        "total": 20,
-        "pct": 95
+        "covered": 22,
+        "total": 23,
+        "pct": 95.65
       },
       "branches": {
-        "covered": 26,
-        "total": 38,
-        "pct": 68.42
+        "covered": 34,
+        "total": 43,
+        "pct": 79.06
       }
     },
     "packages/rpc/src/process/resilience/rendezvous.ts": {
@@ -8161,9 +8491,9 @@
         "pct": 66.66
       },
       "branches": {
-        "covered": 25,
+        "covered": 27,
         "total": 36,
-        "pct": 69.44
+        "pct": 75
       }
     },
     "packages/rpc/src/process/resilience/session.ts": {
@@ -8190,14 +8520,14 @@
     },
     "packages/rpc/src/process/resilience/terminal.ts": {
       "lines": {
-        "covered": 67,
-        "total": 69,
-        "pct": 97.1
+        "covered": 69,
+        "total": 71,
+        "pct": 97.18
       },
       "statements": {
-        "covered": 72,
-        "total": 83,
-        "pct": 86.74
+        "covered": 74,
+        "total": 85,
+        "pct": 87.05
       },
       "functions": {
         "covered": 12,
@@ -8205,9 +8535,9 @@
         "pct": 85.71
       },
       "branches": {
-        "covered": 38,
+        "covered": 39,
         "total": 47,
-        "pct": 80.85
+        "pct": 82.97
       }
     },
     "packages/rpc/src/process/resilience/types.ts": {
@@ -8322,24 +8652,24 @@
     },
     "packages/rpc/src/remote/contract.ts": {
       "lines": {
-        "covered": 117,
-        "total": 128,
-        "pct": 91.4
+        "covered": 163,
+        "total": 172,
+        "pct": 94.76
       },
       "statements": {
-        "covered": 133,
-        "total": 156,
-        "pct": 85.25
+        "covered": 180,
+        "total": 202,
+        "pct": 89.1
       },
       "functions": {
-        "covered": 11,
-        "total": 11,
+        "covered": 15,
+        "total": 15,
         "pct": 100
       },
       "branches": {
-        "covered": 94,
-        "total": 116,
-        "pct": 81.03
+        "covered": 113,
+        "total": 136,
+        "pct": 83.08
       }
     },
     "packages/rpc/src/remote/coroutine.ts": {
@@ -8410,13 +8740,13 @@
     },
     "packages/rpc/src/remote/error.ts": {
       "lines": {
-        "covered": 6,
-        "total": 6,
+        "covered": 7,
+        "total": 7,
         "pct": 100
       },
       "statements": {
-        "covered": 6,
-        "total": 6,
+        "covered": 7,
+        "total": 7,
         "pct": 100
       },
       "functions": {
@@ -8447,9 +8777,9 @@
         "pct": 92.85
       },
       "branches": {
-        "covered": 34,
+        "covered": 35,
         "total": 40,
-        "pct": 85
+        "pct": 87.5
       }
     },
     "packages/rpc/src/remote/index.ts": {
@@ -8476,24 +8806,24 @@
     },
     "packages/rpc/src/remote/internal/assemble-plugin.ts": {
       "lines": {
-        "covered": 77,
-        "total": 78,
-        "pct": 98.71
+        "covered": 79,
+        "total": 80,
+        "pct": 98.75
       },
       "statements": {
-        "covered": 84,
-        "total": 90,
-        "pct": 93.33
+        "covered": 88,
+        "total": 94,
+        "pct": 93.61
       },
       "functions": {
-        "covered": 15,
-        "total": 15,
+        "covered": 16,
+        "total": 16,
         "pct": 100
       },
       "branches": {
-        "covered": 36,
-        "total": 42,
-        "pct": 85.71
+        "covered": 46,
+        "total": 52,
+        "pct": 88.46
       }
     },
     "packages/rpc/src/remote/plugin.ts": {
@@ -8520,24 +8850,24 @@
     },
     "packages/rpc/src/remote/proxy.ts": {
       "lines": {
-        "covered": 278,
-        "total": 308,
-        "pct": 90.25
+        "covered": 289,
+        "total": 311,
+        "pct": 92.92
       },
       "statements": {
-        "covered": 301,
-        "total": 342,
-        "pct": 88.01
+        "covered": 315,
+        "total": 348,
+        "pct": 90.51
       },
       "functions": {
-        "covered": 57,
-        "total": 61,
-        "pct": 93.44
+        "covered": 60,
+        "total": 63,
+        "pct": 95.23
       },
       "branches": {
-        "covered": 207,
-        "total": 250,
-        "pct": 82.8
+        "covered": 220,
+        "total": 255,
+        "pct": 86.27
       }
     },
     "packages/rpc/src/remote/retry.ts": {
@@ -8547,9 +8877,9 @@
         "pct": 88.4
       },
       "statements": {
-        "covered": 69,
+        "covered": 70,
         "total": 81,
-        "pct": 85.18
+        "pct": 86.41
       },
       "functions": {
         "covered": 15,
@@ -8557,21 +8887,21 @@
         "pct": 100
       },
       "branches": {
-        "covered": 35,
+        "covered": 38,
         "total": 46,
-        "pct": 76.08
+        "pct": 82.6
       }
     },
     "packages/rpc/src/remote/serve-host.ts": {
       "lines": {
-        "covered": 90,
-        "total": 108,
-        "pct": 83.33
+        "covered": 96,
+        "total": 112,
+        "pct": 85.71
       },
       "statements": {
-        "covered": 96,
-        "total": 118,
-        "pct": 81.35
+        "covered": 102,
+        "total": 123,
+        "pct": 82.92
       },
       "functions": {
         "covered": 17,
@@ -8579,9 +8909,9 @@
         "pct": 89.47
       },
       "branches": {
-        "covered": 48,
-        "total": 63,
-        "pct": 76.19
+        "covered": 57,
+        "total": 70,
+        "pct": 81.42
       }
     },
     "packages/rpc/src/remote/serve-methods.ts": {
@@ -8629,6 +8959,402 @@
       }
     },
     "packages/rpc/src/remote/types.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/adapters/browser.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/adapters/bun.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "statements": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "functions": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/adapters/deno.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "statements": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "functions": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/adapters/electron-main.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "statements": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "functions": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/adapters/electron-renderer.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "statements": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "functions": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/adapters/node.ts": {
+      "lines": {
+        "covered": 29,
+        "total": 29,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 31,
+        "total": 33,
+        "pct": 93.93
+      },
+      "functions": {
+        "covered": 11,
+        "total": 11,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 22,
+        "total": 24,
+        "pct": 91.66
+      }
+    },
+    "packages/rpc/src/threads/adapters/web.ts": {
+      "lines": {
+        "covered": 41,
+        "total": 43,
+        "pct": 95.34
+      },
+      "statements": {
+        "covered": 44,
+        "total": 47,
+        "pct": 93.61
+      },
+      "functions": {
+        "covered": 11,
+        "total": 11,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 15,
+        "total": 20,
+        "pct": 75
+      }
+    },
+    "packages/rpc/src/threads/binding.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/bootstrap.ts": {
+      "lines": {
+        "covered": 12,
+        "total": 14,
+        "pct": 85.71
+      },
+      "statements": {
+        "covered": 12,
+        "total": 14,
+        "pct": 85.71
+      },
+      "functions": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 16,
+        "total": 19,
+        "pct": 84.21
+      }
+    },
+    "packages/rpc/src/threads/channel.ts": {
+      "lines": {
+        "covered": 15,
+        "total": 16,
+        "pct": 93.75
+      },
+      "statements": {
+        "covered": 18,
+        "total": 20,
+        "pct": 90
+      },
+      "functions": {
+        "covered": 13,
+        "total": 14,
+        "pct": 92.85
+      },
+      "branches": {
+        "covered": 4,
+        "total": 6,
+        "pct": 66.66
+      }
+    },
+    "packages/rpc/src/threads/constants.ts": {
+      "lines": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/error-text.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/error.ts": {
+      "lines": {
+        "covered": 12,
+        "total": 13,
+        "pct": 92.3
+      },
+      "statements": {
+        "covered": 15,
+        "total": 16,
+        "pct": 93.75
+      },
+      "functions": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 9,
+        "total": 10,
+        "pct": 90
+      }
+    },
+    "packages/rpc/src/threads/host.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      }
+    },
+    "packages/rpc/src/threads/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/plugin.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      }
+    },
+    "packages/rpc/src/threads/serve.ts": {
+      "lines": {
+        "covered": 17,
+        "total": 29,
+        "pct": 58.62
+      },
+      "statements": {
+        "covered": 18,
+        "total": 32,
+        "pct": 56.25
+      },
+      "functions": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 2,
+        "total": 6,
+        "pct": 33.33
+      }
+    },
+    "packages/rpc/src/threads/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -14438,14 +15164,14 @@
     },
     "packages/supervision/src/supervisor.ts": {
       "lines": {
-        "covered": 349,
-        "total": 379,
-        "pct": 92.08
+        "covered": 354,
+        "total": 384,
+        "pct": 92.18
       },
       "statements": {
-        "covered": 383,
-        "total": 439,
-        "pct": 87.24
+        "covered": 389,
+        "total": 447,
+        "pct": 87.02
       },
       "functions": {
         "covered": 65,
@@ -14453,9 +15179,9 @@
         "pct": 92.85
       },
       "branches": {
-        "covered": 234,
-        "total": 284,
-        "pct": 82.39
+        "covered": 240,
+        "total": 292,
+        "pct": 82.19
       }
     },
     "packages/supervision/src/threads/constants.ts": {
@@ -15452,20 +16178,6 @@
   "exclusions": {
     "wasm": "Rust and wasm-bindgen coverage is owned by the package wasm runner"
   },
-  "changedRuntimeFiles": [
-    "packages/rpc/src/core/error-text.ts",
-    "packages/rpc/src/core/index.ts",
-    "packages/rpc/src/core/internal/provider-attachment.ts",
-    "packages/rpc/src/core/internal/provider-executor.ts",
-    "packages/rpc/src/core/provider-admission.ts",
-    "packages/rpc/src/core/semantic-constants.ts",
-    "packages/rpc/src/core/typing.ts",
-    "packages/rpc/src/process/index.ts",
-    "packages/rpc/src/process/plugin/client.ts",
-    "packages/rpc/src/process/plugin/serve.ts",
-    "packages/rpc/src/process/resilience/index.ts",
-    "packages/rpc/src/process/resilience/provider-admission.ts",
-    "packages/rpc/src/remote/internal/assemble-plugin.ts"
-  ],
+  "changedRuntimeFiles": [],
   "deletedRuntimeFiles": []
 }
