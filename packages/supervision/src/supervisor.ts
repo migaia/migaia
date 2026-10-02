@@ -174,6 +174,7 @@ export function createSupervisor<
   }
   /** Terminates after the allowed failure window and optionally arms one cooldown. */
   const enterTerminal = (lastError: unknown, lastRejection?: BudgetRejection): void => {
+    if (terminal.lifecycle !== 'open') return
     clearTimers()
     const error = createSupervisionError(
       Error,
@@ -195,7 +196,7 @@ export function createSupervisor<
     transition(SupervisorState.terminal)
     emit({ type: 'terminal', error, entry: terminalEntries })
     options.report(error)
-    if (options.terminalPolicy?.mode === 'cooldown') {
+    if (terminal.lifecycle === 'open' && options.terminalPolicy?.mode === 'cooldown') {
       cooldownTimer = scheduler.schedule(() => {
         cooldownTimer = undefined
         if (terminal.lifecycle !== 'open' || state !== SupervisorState.terminal) return
@@ -209,6 +210,7 @@ export function createSupervisor<
   }
   /** Schedules another attempt using a bounded exponential delay. */
   const scheduleBackoff = (delayMs: number): void => {
+    if (terminal.lifecycle !== 'open') return
     transition(SupervisorState.backoff)
     backoffTimer = scheduler.schedule(() => {
       backoffTimer = undefined
@@ -220,6 +222,7 @@ export function createSupervisor<
   }
   /** Applies the restart policy to a failed active or attempted unit. */
   const onFailure = (error: unknown, lastRejection?: BudgetRejection): void => {
+    if (terminal.lifecycle !== 'open') return
     trimFailures()
     failures.push(scheduler.now())
     if (restartMode === RestartMode.never || failures.length > maxRestarts) {
@@ -585,6 +588,7 @@ export function createSupervisor<
     pendingStop = commands
       .enqueue(async () => {
         if (state === SupervisorState.disposed) return
+        clearTimers()
         transition(SupervisorState.stopping)
         if (candidate) {
           await retire(candidate, 'stop')
@@ -704,6 +708,7 @@ export function createSupervisor<
     attempts.dispose()
     clearTimers()
     pendingDispose = commands.enqueue(async () => {
+      clearTimers()
       transition(SupervisorState.stopping)
       if (candidate) {
         await retire(candidate, 'stop')
