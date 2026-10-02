@@ -9,6 +9,17 @@ import { createProcessSupervisor, ProcessCapability } from '@migaia/supervision/
 import { createNodeProcessLauncher } from '@migaia/rpc/process/adapters/node-child-process'
 import { client, peers, evidence } from './fixtures/conformance-business.js'
 
+/** Match the production default rate (budget.ts); resource acceptance never disables admission. */
+const resourceLaunchRate = { max: 8, windowMs: 1000 }
+/** Existing 30s preparation budget covers native observation and final cleanup beyond rate waiting. */
+const resourceDeadlineMarginMs = 30_000
+/** Four runtime warmups plus all 1000 required launches share the same rate limiter. */
+const resourceTotalLaunches = 1000 + 4
+/** K252 user ruling derives acceptance time from the unchanged production launch rate. */
+const resourceDeadlineMs =
+  Math.ceil(resourceTotalLaunches / resourceLaunchRate.max) * resourceLaunchRate.windowMs +
+  resourceDeadlineMarginMs
+
 beforeAll(async () => {
   const { admitConformanceToolchains } = await import(
     new URL('./fixtures/conformance-toolchains.mjs', import.meta.url).href
@@ -50,7 +61,7 @@ async function rotations(perLanguage: number) {
     new URL('../../bench/bare-node.mjs', import.meta.url).href
   )
   const observer: IResourceObserver = await createMacPidObserver([process.pid])
-  const budget = createUnitBudget({ kind: 'process', maxUnits: 2 })
+  const budget = createUnitBudget({ kind: 'process', maxUnits: 2, launchRate: resourceLaunchRate })
   const languages = peers.slice(0, 4)
   const counts = Object.fromEntries(languages.map((peer) => [peer.language, 0]))
   const rows: Array<{
@@ -363,10 +374,14 @@ describe('[A6] actual language process resource ownership', () => {
     expect(receipt.counts).toEqual({ python: 1, go: 1, rust: 1, node: 1 })
     expect(receipt.rows).toHaveLength(4)
   }, 30000)
-  it('performs 1000 actual round-robin launch/exits, 250 for each language, without FD or lease growth', async () => {
-    const receipt = await rotations(250)
-    expect(receipt.type).toBe('resource-conformance')
-    expect(receipt.counts).toEqual({ python: 250, go: 250, rust: 250, node: 250 })
-    expect(receipt.rows).toHaveLength(1000)
-  }, 120000)
+  it(
+    'performs 1000 actual round-robin launch/exits, 250 for each language, without FD or lease growth',
+    async () => {
+      const receipt = await rotations(250)
+      expect(receipt.type).toBe('resource-conformance')
+      expect(receipt.counts).toEqual({ python: 250, go: 250, rust: 250, node: 250 })
+      expect(receipt.rows).toHaveLength(1000)
+    },
+    resourceDeadlineMs
+  )
 })
