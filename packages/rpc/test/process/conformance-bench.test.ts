@@ -55,6 +55,40 @@ function receipt(unit: object, factor = 1) {
 }
 
 describe('[A10] IPC pairing contract', () => {
+  it('[I21 A9] rejects either high-load boundary as environment ERROR and preserves exact admission', async () => {
+    /** Run the actual guard in a process so its ERROR exit cannot masquerade as ratio FAIL. */
+    const source = `import { judgeWindowLoad } from ${JSON.stringify(driverUrl)};
+      const verdict = judgeWindowLoad(...JSON.parse(process.argv[1]));
+      console.log(JSON.stringify(verdict)); process.exitCode = verdict.exitCode;`
+    for (const loads of [
+      [5.01, 1, 10],
+      [1, 5.01, 10]
+    ]) {
+      /** A rejected process retains its structured environmental verdict and distinct exit. */
+      const result = await execute(process.execPath, [
+        '--input-type=module',
+        '-e',
+        source,
+        JSON.stringify(loads)
+      ]).catch((error: { code: number; stdout: string; stderr: string }) => error)
+      expect(result).toMatchObject({ code: 2 })
+      expect(JSON.parse(result.stdout)).toEqual({
+        status: 'error',
+        exitCode: 2,
+        code: 'A10_BENCH_ENVIRONMENT'
+      })
+      expect(result.stdout + result.stderr).not.toContain('A10_BENCH_RATIO_ASSERTION')
+    }
+    /** Equality at half the logical cores remains admitted without a relaxed threshold. */
+    const admitted = await execute(process.execPath, [
+      '--input-type=module',
+      '-e',
+      source,
+      '[5,5,10]'
+    ])
+    expect(JSON.parse(admitted.stdout)).toEqual({ status: 'pass', exitCode: 0 })
+  })
+
   it('uses medians of alternating complete pairs and preserves immutable targets', async () => {
     const { judgePairs, IpcBenchThreshold } = await import(/* @vite-ignore */ driverUrl)
     const unit = { codec: 'json', carrier: 'stdio-framed', payloadBytes: 64 }
