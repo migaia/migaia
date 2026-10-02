@@ -23,8 +23,10 @@ packages/rpc/test/process/peers/ts/run.sh --listen-unix /tmp/peer.sock --auth-fd
 listeners require an inherited readable secret descriptor. Credentials never
 enter argv, environment, status markers or saved diagnostics. `--host` serves
 real Host catalog/use/unUse/inspect methods; the default serves one installed
-Plugin. Node 24 strips the fixture sources into a worktree-specific temporary
-directory and loads them in the same PID, retaining inherited descriptors.
+Plugin. Node 24 emits type-erased JavaScript into a stable worktree-specific
+temporary directory before launching the peer. Both Node and Bun execute that
+compiled `peer.mjs`, retaining inherited descriptors. `ts/run.sh --executable`
+prints the compiled entry path without starting the peer.
 `RPC_PEERS_BUN` and `RPC_PEERS_NODE` select installed executables.
 
 The real native focused test covers stdio/socket × Plugin/Host, request,
@@ -47,7 +49,9 @@ packages/rpc/test/process/peers/ts-reference/run.sh --stdio --role responder
 
 The original `--role initiator`, `--listen-unix PATH` and `--connect-unix PATH`
 paths exchange length-prefixed native hello/echo/close frames. Rust and Go
-compile offline into system temporary directories. `ts-reference` uses the
+compile offline into stable worktree-specific system temporary directories.
+Rust uses `cargo build --release` with explicit `opt-level = 3`; Go uses the
+default optimized `go build`. Python runs unchanged. `ts-reference` uses the
 installed Node/TypeScript tools. Their current request shapes lack production
 core discovery/receiver identities, Host dispatch, stream execution and bridge
 support. The legacy interop matrix therefore does not establish production A1.
@@ -77,3 +81,14 @@ stream owners and frame codecs; control actions execute public endpoints.
 Missing vector files fail explicitly. The original 12 ordered interop pairs
 prove only their real native hello/echo/close exchange; `ts` is separately
 verified through the real public production client above.
+
+## A10 bare baseline
+
+The 2026-10-02 baseline includes one JSON parse and one JSON serialization of
+the business payload before each bare reply. Python, Rust and Go perform that
+work in `--bare-jsonrpc`; Node/Bun perform it in the native bare benchmark
+peer, including the Worker carrier. Bare peers still omit RPC envelopes,
+discovery, handshake, routing and business dispatch. The paired valid JSON
+payload and physical carrier stay identical. The focused
+`conformance-peer-baseline.test.ts` uses whitespace-bearing JSON to prove
+that a raw byte echo cannot satisfy this definition.

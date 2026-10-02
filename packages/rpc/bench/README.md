@@ -7,10 +7,14 @@ then sums those peaks. A shared thread PID counts once. No startup baseline is
 subtracted. A missing sample fails the side, and no ratio assertion is emitted
 before complete paired measurements.
 
-`bare-node.mjs` starts an isolated Node parent with a separate raw stdio echo
+`bare-node.mjs` starts an isolated Node parent with a separate JSON stdio echo
 peer using the same Node executable. The echo port accepts caller-provided
 codec-produced bytes, so a paired driver can use exactly the same encoded
-payload. The CLI currently prepares one JSON/stdio-framed unit at concurrency
+payload. Before replying, the bare peer parses and serializes the payload once,
+as required by the 2026-10-02 A10 baseline. Foreign peers use the same JSON work
+in their bare Content-Length mode; Rust uses release `opt-level = 3`, Go uses
+its default optimized build, and public TS peers execute emitted JavaScript.
+The CLI currently prepares one JSON/stdio-framed unit at concurrency
 one; it does not freeze or exclude other supported units.
 
 ```bash

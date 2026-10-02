@@ -57,7 +57,7 @@ function waitReady(child) {
 }
 
 /**
- * Serve bare socket/stdio physical bytes with the paired JSON codec and carrier prefix.
+ * Serve bare socket/stdio frames with one JSON parse and serialization per payload.
  *
  * @param {import('@migaia/rpc/process').IProcessByteChannel} raw Owned physical channel.
  * @returns {Promise<void>} Resolves at physical close.
@@ -74,7 +74,14 @@ async function serveBare(raw) {
       const size = buffered.readUInt32BE(0)
       if (!size || size > 16_777_216) throw new RangeError('Bare frame outside carrier limit')
       if (buffered.length < size + 4) break
-      const frame = buffered.subarray(0, size + 4)
+      /** The bare baseline includes business JSON work without endpoint or protocol dispatch. */
+      const body = Buffer.from(
+        JSON.stringify(JSON.parse(buffered.subarray(4, size + 4).toString()))
+      )
+      /** Regenerate the physical prefix from the serialized body, including noncanonical input. */
+      const frame = Buffer.alloc(body.length + 4)
+      frame.writeUInt32BE(body.length)
+      frame.set(body, 4)
       buffered = buffered.subarray(size + 4)
       writing = writing.then(() => raw.write(frame))
     }
@@ -416,7 +423,7 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
       runtime = await bridgeEndpointFor(channel, 'parent')
       cleanup.push(() => runtime.endpoint.dispose())
     }
-    /** The bare endpoint returns these exact codec-produced bytes without JSON or business dispatch. */
+    /** The bare peer parses and serializes this JSON payload once without RPC business dispatch. */
     const body = Buffer.from(JSON.stringify(payload)),
       frame = Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body])
     let buffered = Buffer.alloc(0),
@@ -488,7 +495,9 @@ async function childMain(side, carrier, address) {
   const api = side === 'rpc' ? await rpcApi() : undefined
   if (carrier === 'worker') {
     if (side === 'bare')
-      parentPort.on('message', (value) => parentPort.postMessage(value, undefined))
+      parentPort.on('message', (value) =>
+        parentPort.postMessage(JSON.parse(JSON.stringify(value)), undefined)
+      )
     else
       await serveRpc(
         api.createNodeThreadChannel(parentPort, 'parent', { scheduler: systemScheduler })
@@ -500,7 +509,13 @@ async function childMain(side, carrier, address) {
     /** Bare listener borrows native socket only; RPC listener authenticates through public adapter. */
     if (side === 'bare') {
       const { createServer } = await import('node:net')
-      const server = createServer((socket) => socket.on('data', (chunk) => socket.write(chunk)))
+      const { nodeByteStream } = await import('../dist/process/adapters/node-byte-stream.js')
+      const server = createServer((socket) => {
+        void serveBare(nodeByteStream(socket, socket, () => socket.destroy())).catch((error) => {
+          process.stderr.write(String(error))
+          socket.destroy(error)
+        })
+      })
       await new Promise((resolve, reject) => {
         server.once('error', reject)
         server.listen(address, resolve)
