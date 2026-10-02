@@ -30,7 +30,8 @@ export function streamRoots(capability?: IRpcStreamCapabilityPort) {
 /** Compose the negotiated channel without recreating a codec, framer or control protocol. */
 export async function endpointFor(
   channel: IRemoteChannel,
-  id: string
+  id: string,
+  providerLimits?: import('@migaia/rpc/core').IRpcProviderLimits
 ): Promise<IRemoteServeEndpoint> {
   /** Core stream and request paths share the same token graph. */
   const roots = streamRoots({ supports: () => channel.agreement.capabilities.includes('stream@1') })
@@ -43,6 +44,7 @@ export async function endpointFor(
       scheduler: channel.scheduler,
       transport: channel.transport,
       targetIds: [channel.peerId],
+      ...(providerLimits === undefined ? {} : { providerLimits }),
       middlewares: [
         codec(channel.pipeline.codec),
         framer(channel.pipeline.framer),

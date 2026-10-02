@@ -111,7 +111,11 @@ export class RpcProviderAttachment {
         RpcCoreErrorCode.invalidConfig
       )
     this.#transaction = kernel
-    this.#replay = new RequestReplayLedger(4096, 1024, 310_000)
+    this.#replay = new RequestReplayLedger(
+      4096,
+      prepared.options.providerLimits?.maxReplayEntriesPerPeer ?? 1024,
+      310_000
+    )
     this.#executor = new ProviderExecutor({
       timestamp: () => kernel.time.timestamp(),
       now: () => kernel.time.now(),

@@ -33,6 +33,8 @@ async function rpcApi() {
 }
 /** Fixed benchmark method has no side effect besides returning its portable input. */
 const echoMethod = 'bench.echo'
+/** Ready (1), warmup (100) and measured requests (1000) all retain provider tombstones (K255). */
+const nativeProviderLimits = { maxReplayEntriesPerPeer: 1101 }
 
 /**
  * Wait for a separately started peer, retaining startup failures as preparation errors.
@@ -90,7 +92,7 @@ async function serveBare(raw) {
  */
 async function serveRpc(channel) {
   const { endpointFor } = await rpcApi()
-  const runtime = await endpointFor(channel, 'peer')
+  const runtime = await endpointFor(channel, 'peer', nativeProviderLimits)
   runtime.endpoint.provide(echoMethod, (context) => context.success(context.data))
   channel.transport.onTransportError?.(() => {
     void runtime.endpoint.dispose().catch((error) => process.stderr.write(String(error)))
