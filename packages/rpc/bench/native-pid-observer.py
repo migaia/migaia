@@ -22,6 +22,11 @@ class IBsdShort(ctypes.Structure):
     ]
 
 
+class IMachTimebase(ctypes.Structure):
+    """SDK mach_timebase_info_data_t converts CPU Mach ticks to nanoseconds."""
+    _fields_ = [("numer", ctypes.c_uint32), ("denom", ctypes.c_uint32)]
+
+
 def resource_row(libproc, pid):
     """Read actual open descriptors and child states for resource regression, outside bench windows."""
     size = libproc.proc_pidinfo(pid, 1, 0, None, 0)
@@ -54,6 +59,14 @@ def main():
     """Read PID arrays, return complete CPU nanoseconds and absolute resident bytes."""
     if sys.platform != "darwin":
         raise RuntimeError("Native PID observer requires macOS")
+    # Resolve the host's tick ratio once before readiness, outside every sample.
+    libsystem = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+    libsystem.mach_timebase_info.argtypes = [ctypes.POINTER(IMachTimebase)]
+    libsystem.mach_timebase_info.restype = ctypes.c_int
+    # The native ratio is architecture-specific, not a hard-coded Apple Silicon scale.
+    timebase = IMachTimebase()
+    if libsystem.mach_timebase_info(ctypes.byref(timebase)) != 0 or timebase.denom == 0:
+        raise RuntimeError("mach_timebase_info failed")
     libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
     libproc.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
     libproc.proc_pid_rusage.restype = ctypes.c_int
@@ -73,7 +86,9 @@ def main():
                 usage = IRusage()
                 if libproc.proc_pid_rusage(pid, 0, ctypes.byref(usage)) != 0:
                     raise OSError(ctypes.get_errno(), "proc_pid_rusage failed")
-                rows.append({"pid": pid, "cpuNs": usage.user_time + usage.system_time,
+                # Integer arithmetic retains precision for long-lived PID totals.
+                cpu_ns = ((usage.user_time + usage.system_time) * timebase.numer) // timebase.denom
+                rows.append({"pid": pid, "cpuNs": cpu_ns,
                              "rssBytes": usage.resident_size})
             print(json.dumps({"rows": rows}), flush=True)
         except Exception as error:
