@@ -3,8 +3,45 @@ import { createManualScheduler } from '@migaia/utils/scheduler'
 import { createProcessHost } from '../../src/process/host/client.js'
 import { hostFixture } from './fixtures/host-control.js'
 import { nativeHostOptions } from './fixtures/host-native.js'
+import type { IRemoteRetryPort } from '../../src/remote/types.js'
 
 describe('process Host facade admission and ownership', () => {
+  it('[K221/A1] drains an external retry port without changing its call count or Promise', async () => {
+    /** No endpoint send owns this logical operation; the caller-supplied retry port does. */
+    const fixture = hostFixture()
+    /** Preserve the exact settlement object and Promise produced by the external owner. */
+    const value = Object.freeze({ completed: true })
+    /** The external owner decides when its request settles. */
+    let settle!: (result: typeof value) => void
+    const pending = new Promise<typeof value>((resolve) => {
+      settle = resolve
+    })
+    /** Count forwarding at the external boundary instead of inspecting internal drain counters. */
+    const dispatch = vi.fn(() => pending)
+    const external: IRemoteRetryPort = { dispatch: dispatch as IRemoteRetryPort['dispatch'] }
+    const host = createProcessHost({ ...fixture.options, retryPort: external })
+    try {
+      const feature = await host.use('p')
+      const request = feature.f!.m!([])
+      expect(request).toBe(pending)
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(fixture.send.mock.calls.filter((call) => call[1] === 'p.f.m')).toHaveLength(0)
+      const closing = host.release()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(fixture.terminate).not.toHaveBeenCalled()
+      settle(value)
+      expect(await request).toBe(value)
+      await closing
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(fixture.terminate).toHaveBeenCalledTimes(1)
+      expect(fixture.scheduler.pendingCount).toBe(0)
+    } finally {
+      settle(value)
+      await host.release()
+    }
+  })
+
   it('[A1] forwards the process call wall cap through the existing remote dispatcher', async () => {
     /** The neutral endpoint records the effective deadline rather than waiting on real time. */
     const fixture = hostFixture()
