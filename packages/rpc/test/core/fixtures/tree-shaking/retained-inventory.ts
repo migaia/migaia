@@ -5,7 +5,7 @@ export type IRetainedConsumer = 'core' | 'client' | 'provider' | 'full' | 'custo
 const reviewed = (...modules: readonly string[]): readonly string[] =>
   Object.freeze([...modules].sort())
 
-/** Exact normalized module sets for every retained consumer. */
+/** Exact consumer sets include the I21 private identity registry, measured by the canonical graph. */
 export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, readonly string[]>> =
   Object.freeze({
     core: reviewed(
@@ -36,6 +36,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/endpoint-projection.ts',
       'src/core/internal/feature-policy.ts',
       'src/core/internal/first-party-roots.ts',
+      'src/core/internal/json-object-port.ts',
       'src/core/internal/plugin-contract.ts',
       'src/core/internal/plugin-descriptor.ts',
       'src/core/internal/plugin-inventory.ts',
@@ -170,6 +171,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/endpoint-projection.ts',
       'src/core/internal/feature-policy.ts',
       'src/core/internal/first-party-roots.ts',
+      'src/core/internal/json-object-port.ts',
       'src/core/internal/hooks.ts',
       'src/core/internal/id.ts',
       'src/core/internal/identity.ts',
@@ -323,6 +325,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/endpoint-projection.ts',
       'src/core/internal/feature-policy.ts',
       'src/core/internal/first-party-roots.ts',
+      'src/core/internal/json-object-port.ts',
       'src/core/internal/hooks.ts',
       'src/core/internal/id.ts',
       'src/core/internal/identity.ts',
@@ -490,6 +493,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/endpoint-projection.ts',
       'src/core/internal/feature-policy.ts',
       'src/core/internal/first-party-roots.ts',
+      'src/core/internal/json-object-port.ts',
       'src/core/internal/hooks.ts',
       'src/core/internal/id.ts',
       'src/core/internal/identity.ts',
@@ -653,6 +657,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/endpoint-projection.ts',
       'src/core/internal/feature-policy.ts',
       'src/core/internal/first-party-roots.ts',
+      'src/core/internal/json-object-port.ts',
       'src/core/internal/hooks.ts',
       'src/core/internal/id.ts',
       'src/core/internal/identity.ts',
