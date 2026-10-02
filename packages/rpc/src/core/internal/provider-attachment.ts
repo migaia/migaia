@@ -1,6 +1,10 @@
 import { RpcPlatform } from '../transport-constants.js'
 import { RpcConfigurationError, RpcError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
-import { RpcMessageKind } from '../semantic-constants.js'
+import {
+  RpcMessageKind,
+  RpcProviderRejectionReason,
+  RpcReplayCapacityNamespace
+} from '../semantic-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcAbortSignal, IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
@@ -127,7 +131,28 @@ export class RpcProviderAttachment {
       registry: this.#registry,
       controllers: this.#controllers,
       admission: this.#admission,
-      onRejected: prepared.options.providerLimits?.onRejected,
+      /** Observe numeric capacity locally, then preserve the original callback result and cause. */
+      onRejected: (rejection) => {
+        if (rejection.reason === RpcProviderRejectionReason.replayLedgerFull) {
+          /** Admission has already purged expired entries; this O(1) snapshot cannot change it. */
+          const capacity = this.#replay.readCapacity(rejection.verifiedPeerKey)
+          if (capacity.occupancy >= capacity.limit || capacity.peerOccupancy >= capacity.peerLimit)
+            this.#outbound.send({
+              kind: 'report',
+              error: new RpcError(
+                RpcCoreErrorCode.overloaded,
+                RpcCoreErrorText.requestReplayLedgerIsFull
+              ),
+              code: RpcCoreErrorCode.overloaded,
+              detail: Object.freeze({
+                namespace: RpcReplayCapacityNamespace.inbound,
+                reason: RpcProviderRejectionReason.replayLedgerFull,
+                ...capacity
+              })
+            })
+        }
+        return prepared.options.providerLimits?.onRejected?.(rejection)
+      },
       peers: this.#targetIds,
       dispatch: (targetId, method, data) => {
         this.#outbound.send({ kind: 'dispatch', targetId, method, data })

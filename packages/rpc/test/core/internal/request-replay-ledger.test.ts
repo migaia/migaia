@@ -1,7 +1,91 @@
 import { describe, expect, it } from 'vitest'
 import { RequestReplayLedger } from '../../../src/core/internal/request-replay-ledger.js'
+import { countReplayEntryVisits } from './replay-iteration-observer.js'
 
 describe('RequestReplayLedger', () => {
+  it('C4 visits one accepted tombstone per access with 1101 entries and releases each once at TTL', () => {
+    /** Original binding release order remains visible across bulk expiration and later access. */
+    const released: string[] = []
+    /** Explicit fixture per-peer budget fits A10's 1101 entries; default global and TTL remain. */
+    const ledger = new RequestReplayLedger(4096, 1101, 310000, {
+      retain: () => true,
+      release: (peer) => released.push(peer)
+    })
+    for (let index = 0; index < 1101; index++)
+      expect(ledger.admit(`inbound-retained:${index}`, 'peer', 0)).toBe(true)
+    /** Per-peer fullness does not justify scanning every retained request. */
+    const liveVisits = countReplayEntryVisits('inbound-retained:', () => {
+      expect(ledger.has('inbound-retained:1100', 309999)).toBe(true)
+      expect(ledger.canAdmit('candidate', 'peer', 309999)).toBe(false)
+    })
+    expect(liveVisits).toBe(2)
+    expect(released).toEqual([])
+    /** Exact 310-second expiration restores per-peer leases without evicting fresh suffixes. */
+    const expiredVisits = countReplayEntryVisits('inbound-retained:', () => {
+      expect(ledger.canAdmit('candidate', 'peer', 310000)).toBe(true)
+      expect(ledger.size).toBe(0)
+      ledger.purge(310000)
+    })
+    expect(expiredVisits).toBe(1101)
+    expect(released).toHaveLength(1101)
+  })
+
+  it('C4 expires only the accepted prefix at the default TTL and retains later peer leases', () => {
+    /** Binding releases identify exactly which prefix entries expired, in original order. */
+    const released: string[] = []
+    /** Independently labelled peer leases prove no live suffix is prematurely released. */
+    const ledger = new RequestReplayLedger(3, 1, 310000, {
+      retain: () => true,
+      release: (peer) => released.push(peer)
+    })
+    expect(ledger.admit('first', 'peer-first', 0)).toBe(true)
+    expect(ledger.admit('second', 'peer-second', 1)).toBe(true)
+    expect(ledger.admit('third', 'peer-third', 2)).toBe(true)
+    ledger.purge(309999)
+    expect(released).toEqual([])
+    ledger.purge(310000)
+    expect(released).toEqual(['peer-first'])
+    expect(ledger.has('second', 310000)).toBe(true)
+    expect(ledger.has('third', 310000)).toBe(true)
+    ledger.purge(310001)
+    expect(released).toEqual(['peer-first', 'peer-second'])
+    expect(ledger.has('third', 310001)).toBe(true)
+    ledger.clear()
+    expect(released).toEqual(['peer-first', 'peer-second', 'peer-third'])
+  })
+
+  it('C4 visits one live rejection with 1101 rejected keys and purges each once at fixed expiry', () => {
+    /** One peer's retained accepted request fills only its own per-peer budget. */
+    const ledger = new RequestReplayLedger(4096, 1, 310000)
+    expect(ledger.admit('accepted', 'full-peer', 0)).toBe(true)
+    for (let index = 0; index < 1101; index++)
+      expect(ledger.admit(`inbound-rejected:${index}`, 'full-peer', 0)).toBe(false)
+    /** A fresh global peer still cannot bypass a live rejected-key tombstone. */
+    const liveVisits = countReplayEntryVisits('inbound-rejected:', () => {
+      expect(ledger.canAdmit('inbound-rejected:0', 'fresh-peer', 999)).toBe(false)
+    })
+    expect(liveVisits).toBe(1)
+    /** The fixed short retention restores rejected keys exactly at 1000ms, not earlier. */
+    const expiredVisits = countReplayEntryVisits('inbound-rejected:', () => {
+      expect(ledger.admit('inbound-rejected:0', 'fresh-peer', 1000)).toBe(true)
+    })
+    expect(expiredVisits).toBe(1101)
+    expect(ledger.has('accepted', 1000)).toBe(true)
+  })
+
+  it('C4 duplicate rejection does not refresh expiry or reorder the live suffix', () => {
+    /** Distinct rejected timestamps expose any accidental refresh without private inspection. */
+    const ledger = new RequestReplayLedger(4, 1, 310000)
+    expect(ledger.admit('accepted', 'full-peer', 0)).toBe(true)
+    expect(ledger.admit('rejected-first', 'full-peer', 0)).toBe(false)
+    expect(ledger.admit('rejected-second', 'full-peer', 1)).toBe(false)
+    expect(ledger.admit('rejected-first', 'full-peer', 500)).toBe(false)
+    expect(ledger.admit('rejected-first', 'first-peer', 1000)).toBe(true)
+    expect(ledger.admit('rejected-second', 'second-peer', 1000)).toBe(false)
+    expect(ledger.admit('rejected-second', 'second-peer', 1001)).toBe(true)
+    expect(ledger.has('accepted', 1001)).toBe(true)
+  })
+
   it('rejects non-positive limits with a coded TypeError (bare-throw gate)', () => {
     expect(() => new RequestReplayLedger(0, 2, 100)).toThrow(
       expect.objectContaining({
