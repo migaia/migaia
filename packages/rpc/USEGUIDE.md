@@ -326,11 +326,26 @@ type IRpcFactoryConfig<TTargetId extends string = string> = {
 - **`transport`**：可以在工厂配置或 `connect({ transport })` 中提供；两处都提供时必须是同一个对象。没有可解析出的 transport、或出现冲突，会在订阅消息前以 `INVALID_CONFIG` 失败。
 - **中间件迁移**：`middlewares` 接受 `defineMiddleware` 或首方工厂返回的原生定义，并在同一个 PluginHost 批次中安装。旧版 `IRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义定义在第三个参数声明 Feature 引用，通过 `core.features` 读取依赖，并用 `core.own()` 归属清理。
 - **`provider`**：等价于在 `createEndpoint` 返回前，对每一项调用一次 `endpoint.provide(method, fn)`；纯粹是"少写几行"的便利写法。
-- **`replay`**：出站请求/消息 id 会在一个有界窗口内保留，防止重放攻击复用同一个 id 让已完成的请求再跑一次 provider。普通请求的 id 在整个 TTL 内都不释放（哪怕响应已经收到）——这是有意为之，防止晚到的重复响应复活一个"看起来还在等"的旧请求；dispatch-only（单向通知）的 id 在发送结算后立即释放，因为它天生不会有响应需要防重放。默认容量 4096、TTL 310 秒；高频单向通知场景一般不需要调大，持续的双向请求量很大时可以按需调整。
+- **`replay`**：出站 request、dispatch-only（单向通知）与 stream-open 共用 ID 保留窗口。发送或请求结算只清除 active 状态，仍转为 TTL 墓碑；收到失败响应同样保留。默认容量 4096、结算后 TTL 310 秒，持续预算约 13.2 次/秒，突发与在途会提前占满。满载拒绝新操作，不淘汰未过期 ID，防止旧响应误结算新请求。
+- **`providerLimits` 的重放预算**：与并发 `maxGlobal/maxPerPeer` 分开。入站默认每 verified peer 1024、全端点 4096 个 request 身份，准入时开始保留 310 秒；单 peer 持续约 3.3 次/秒，全局约 13.2 次/秒。request 超限返回原 `OVERLOADED`，不执行 provider；one-way 同样准入但不回复。`maxReplayEntriesPerPeer` 可按已知工作量设置，全局 4096 不随它改变。
 - **`construction.signal` / `construction.timeoutMs`**：构造 `createEndpoint()` 本身也是异步的（要跑完全部中间件的 `install()`），可以用这两个字段取消或限时。取消会 reject 构造过程，并且仍然会清理已经安装成功的中间件（不会留下半初始化的资源）。中间件的 `install(context)` 会收到同一个 `signal`，如果中间件自己的初始化工作是可取消的，应该监听它。
 - **`scheduler`**：可注入 `@migaia/utils/scheduler` 的 `IScheduler`，同一对象供 endpoint 与 PluginHost 使用；未注入时使用 `systemScheduler`（`performance.now()`）。`now()` 是单调时钟，只须返回有限非负毫秒（可含小数，不解释为 epoch），`schedule(callback, delayMs)` 必须返回含 `cancel()` 的任务；不合法的 scheduler 会在构造期以 `INVALID_CONFIG` 拒绝。注入手动调度器时，构造超时、请求 deadline、TTL、过期与重放窗口均受同一时钟控制。
 - **`wallClock`**：可注入 `IWallClock`，只用于产生 wire `sentAt` 与 hook 事件 `at` 等诊断时间戳；未注入时使用 `systemWallClock`（`Date.now()`）。构造期读取一次并调用一次 `timestamp()`，返回值必须是非负安全整数 epoch 毫秒，否则以 `INVALID_CONFIG` 拒绝（抛出的原错误位于 `cause`）。墙钟回拨不影响任何截止时间。
 - **服务器元数据时间**：`getServerList()` 与 `receiverSelector(serverList)` 中的 `registeredAt`/`lastSeenAt` 是端点单调时间（`scheduler.now()`），只能相互比较或与同一端点的 `IRpcTimePort.now()` 比较；不要当作日历时间显示或跨进程比较，需要日历时间时在回调中读取自己的墙钟。
+
+容量估算使用准入请求率，包含之后失败或取消的请求；出站还要为在途与突发留余量。例如单 peer 每秒 10 笔，需要约 3100 个入站条目，以下是端点配置片段：
+
+```ts
+/** 每秒 10 笔的已知负载配置，合入实际端点的其他必填配置。 */
+const replayCapacity = {
+  replay: { maxEntries: 4096 },
+  providerLimits: { maxReplayEntriesPerPeer: 3100 }
+}
+```
+
+这只解决默认每 peer 1024 的较低预算，不消除全局 4096 的上限。每秒 20 笔持续入站需要约 6200 条，现有每 peer 选项不能扩大全局预算；不要把调整选项当成吞吐限制已根治。条目内存与容量近似线性增长，ID 长度及 registry 开销影响实际字节。TTL 310 秒覆盖现有 freshness 安全边界，本次扫描与诊断改动保留它。
+
+容量耗尽会在本地 `hooks` failure / `onHookError` 通路以已登记的 `OVERLOADED` 码报告，`event.detail` 只含 namespace（outbound/inbound）、拒绝原因及数值占用/上限，可含 per-peer 数值；不含 ID、身份或载荷。每 endpoint 最多每秒一条容量报告，普通错误报告不受此限频影响。可选 `providerLimits.onRejected` 仍收到原本地拒绝快照，通知抛错或异步拒绝会 report 且不阻断原回复。出站调用者仍得到原错误，对端仍得到原错误码、文本与 one-way 无回复行为。
 
 #### 2.5 PluginHost 的边界
 
