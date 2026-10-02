@@ -29,6 +29,21 @@
 export const IpcBenchThreshold = Object.freeze({ p99: 3, throughput: 0.5, cpu: 3, rss: 2 })
 
 /**
+ * Judge the user's D5 exclusive window using its two one-minute load observations. Raw measurements
+ * remain available when environmental admission fails; no ratio verdict is inferred.
+ *
+ * @param {number} startLoad One-minute load at window admission.
+ * @param {number} endLoad One-minute load after the complete window.
+ * @param {number} logicalCores Host logical CPU count.
+ * @returns {{ status: 'pass' | 'error'; exitCode: 0 | 2; code?: string }} Window disposition.
+ */
+export function judgeWindowLoad(startLoad, endLoad, logicalCores) {
+  if (startLoad > logicalCores * 0.5 || endLoad > logicalCores * 0.5)
+    return { status: 'error', exitCode: 2, code: 'A10_BENCH_ENVIRONMENT' }
+  return { status: 'pass', exitCode: 0 }
+}
+
+/**
  * Return the nearest-rank latency without interpolating or losing the last sample.
  *
  * @param {number[]} values Positive measured latencies in nanoseconds.
