@@ -1,6 +1,6 @@
-import { nativeWorkerFor } from './fixture.js'
+import { nativeWorkerFor, nativeErrorListenerCount } from './fixture.js'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createNodeThreadLauncher } from '../../src/threads/adapters/node.js'
 
 /** Native exit fixture has no RPC protocol or Vitest runtime in the Worker. */
@@ -10,6 +10,15 @@ describe('Node thread launcher', () => {
   it('[A3] captures threadId once and resolves only after native exit', async () => {
     const launcher = createNodeThreadLauncher()
     const handle = await launcher.launch({ entry }, { signal: new AbortController().signal })
+    /** Observe the actual native Worker beneath the production messaging shim. */
+    const worker = nativeWorkerFor(handle)
+    expect(nativeErrorListenerCount(handle)).toBe(1)
+    expect(worker.listenerCount('error')).toBe(1)
+    /** Native method spies prove arguments and lifecycle calls after shim adaptation. */
+    const postMessage = vi.spyOn(worker, 'postMessage')
+    const terminate = vi.spyOn(worker, 'terminate')
+    handle.port.postMessage({ fixture: 'portable probe' }, undefined)
+    expect(postMessage).toHaveBeenCalledExactlyOnceWith({ fixture: 'portable probe' }, undefined)
     await new Promise((resolve) => {
       const receive = (message: unknown): void => {
         handle.port.off('message', receive)
@@ -24,12 +33,15 @@ describe('Node thread launcher', () => {
     })
     handle.terminate()
     handle.terminate()
+    expect(terminate).toHaveBeenCalledTimes(1)
     expect(exited).toBe(false)
     await handle.exited
     expect(nativeWorkerFor(handle).threadId).toBe(-1)
     expect(handle.identity.threadId).toBe(id)
     expect(id).toBeGreaterThan(0)
     expect(nativeWorkerFor(handle).listenerCount('error')).toBe(0)
+    postMessage.mockRestore()
+    terminate.mockRestore()
   })
   it.each(['natural', 'error'] as const)(
     '[A3/A7] keeps host alive on %s exit and retains original failure',

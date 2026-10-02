@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import * as remotePlugin from '../../src/remote/plugin.js'
+import * as threadSupervision from '@migaia/supervision/threads'
 import { createNodeThreadChannelFactory } from '../../src/threads/adapters/node.js'
 import { nativeFixture } from './fixture.js'
 
@@ -38,6 +39,8 @@ describe('thread Plugin facade', () => {
   it('[A1] prepares a dependent install and preserves scheduler identity at every boundary', async () => {
     const scheduler = createManualScheduler()
     const assembly = vi.spyOn(remotePlugin, 'createRemotePlugin')
+    /** The supervisor receives the exact same clock as binding and channel construction. */
+    const supervision = vi.spyOn(threadSupervision, 'createThreadSupervisor')
     const fixture = nativeFixture({ scheduler })
     let firstCall: Promise<unknown> | undefined
     const dependent = definePlugin({
@@ -62,6 +65,7 @@ describe('thread Plugin facade', () => {
       const options = assembly.mock.calls.at(-1)![0]
       expect(Object.hasOwn(options, 'retryPort')).toBe(false)
       expect(options.binding.scheduler).toBe(scheduler)
+      expect(supervision.mock.calls[0]![0].scheduler).toBe(scheduler)
       const controller = new AbortController()
       const channel = await options.binding.openChannel(fixture.handles[0]!, controller.signal)
       expect(channel.scheduler).toBe(scheduler)
@@ -70,6 +74,7 @@ describe('thread Plugin facade', () => {
     } finally {
       await fixture.close()
       assembly.mockRestore()
+      supervision.mockRestore()
     }
     expect(scheduler.pendingCount).toBe(0)
   })
