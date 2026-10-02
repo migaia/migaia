@@ -16,14 +16,12 @@ export type IRpcJsonObjectPort = Readonly<{
 
 /** Final transport identities retain no business payload and are revoked by bridge close. */
 const ports = new WeakMap<object, IRpcJsonObjectPort>()
-/** Canonical middleware tokens are signed by their package-owned factories only. */
-const middlewares = new WeakSet<object>()
+/** Canonical tokens optionally retain their paired descriptor; has() distinguishes unknown tokens. */
+const middlewares = new WeakMap<object, object | undefined>()
 /** Canonical Feature tokens are signed by their package-owned factories only. */
 const features = new WeakSet<object>()
 /** Only descriptors published by a paired bridge factory may contribute encoded domains. */
 const descriptors = new WeakSet<object>()
-/** Descriptor middleware may be constructed before its canonical channel completes hello. */
-const middlewareDescriptors = new WeakMap<object, object>()
 /** Candidates retain original identity through the public descriptor snapshot phase. */
 const candidates = new WeakMap<IRpcSelectedComponents, IRpcJsonObjectPort>()
 /** Endpoint snapshots retain their chosen runtime port without changing public metadata. */
@@ -58,13 +56,13 @@ export function readJsonObjectPort(
 
 /** Signs one canonical middleware after its existing configuration reads have finished. */
 export function registerJsonObjectMiddleware<T extends object>(middleware: T): T {
-  middlewares.add(middleware)
+  middlewares.set(middleware, undefined)
   return middleware
 }
 
 /** Unknown middleware descriptors retain the complete public string path. */
 export function isJsonObjectMiddleware(middleware: object): boolean {
-  const descriptor = middlewareDescriptors.get(middleware)
+  const descriptor = middlewares.get(middleware)
   return middlewares.has(middleware) && (descriptor === undefined || descriptors.has(descriptor))
 }
 
@@ -105,8 +103,8 @@ export function registerJsonObjectDescriptorMiddleware<T extends object>(
   middleware: T,
   descriptor: object
 ): T {
-  middlewareDescriptors.set(middleware, descriptor)
-  return registerJsonObjectMiddleware(middleware)
+  middlewares.set(middleware, descriptor)
+  return middleware
 }
 
 /** Retains a pre-snapshot candidate without enabling any runtime bypass. */
