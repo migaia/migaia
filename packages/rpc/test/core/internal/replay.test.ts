@@ -1,7 +1,60 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ReplayWindow } from '../../../src/core/internal/replay.js'
+import { countReplayEntryVisits } from './replay-iteration-observer.js'
 
 describe('ReplayWindow', () => {
+  it('C4 visits one live tombstone per access with 1101 retained ids and each expired id once', () => {
+    /** Supported monotonic clock crosses the exact default 310-second boundary without sleeping. */
+    let now = 0
+    /** The user A10 workload retains 1101 request ids; the product TTL remains its default. */
+    const window = new ReplayWindow(() => now, 1101)
+    for (let index = 0; index < 1101; index++) {
+      window.reserveId(`outbound-retained:${index}`)
+      window.releaseId(`outbound-retained:${index}`)
+    }
+    /** Two live accesses must not traverse 1101 entries each. */
+    const liveVisits = countReplayEntryVisits('outbound-retained:', () => {
+      expect(window.hasReservedId('outbound-retained:1100')).toBe(true)
+      expect(window.reserveId('candidate')).toBe(false)
+    })
+    expect(liveVisits).toBe(2)
+    now = 310000
+    /** Expiring the full prefix accounts for work once instead of hiding a linear clear. */
+    const expiredVisits = countReplayEntryVisits('outbound-retained:', () => {
+      expect(window.reserveId('candidate')).toBe(true)
+      expect(window.hasReservedId('candidate')).toBe(true)
+    })
+    expect(expiredVisits).toBe(1101)
+  })
+
+  it('C4 expires only the ordered prefix at 310 seconds and preserves later live and active ids', () => {
+    /** Release times stay monotonic while different entries reach their individual TTL. */
+    let now = 0
+    /** Active reservation remains independent from the ordered released prefix. */
+    const window = new ReplayWindow(() => now, 4)
+    window.reserveId('active')
+    for (let index = 0; index < 3; index++) {
+      now = index
+      window.reserveId(`boundary:${index}`)
+      window.releaseId(`boundary:${index}`)
+    }
+    now = 309999
+    expect(window.hasReservedId('boundary:0')).toBe(true)
+    expect(window.reserveId('candidate')).toBe(false)
+    now = 310000
+    expect(window.hasReservedId('boundary:0')).toBe(false)
+    expect(window.hasReservedId('boundary:1')).toBe(true)
+    expect(window.hasReservedId('boundary:2')).toBe(true)
+    expect(window.hasReservedId('active')).toBe(true)
+    now = 310001
+    expect(window.hasReservedId('boundary:1')).toBe(false)
+    expect(window.hasReservedId('boundary:2')).toBe(true)
+    now = 310002
+    expect(window.hasReservedId('boundary:2')).toBe(false)
+    expect(window.hasReservedId('active')).toBe(true)
+    expect(window.reserveId('candidate')).toBe(true)
+  })
+
   it('rejects non-positive or unsafe replay limits', () => {
     expect(() => new ReplayWindow(() => Date.now(), 0, 1)).toThrow()
     expect(() => new ReplayWindow(() => Date.now(), 1, Number.POSITIVE_INFINITY)).toThrow()

@@ -4,6 +4,7 @@ import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
 /** Non-evicting replay ledger for business requests. */
 export class RequestReplayLedger {
+  /** Accepted requests retain monotonic admission times in insertion order until TTL expiry. */
   readonly #completed = new Map<
     string,
     {
@@ -13,11 +14,20 @@ export class RequestReplayLedger {
       readonly releaseCount: () => void
     }
   >()
+  /**
+   * Rejected keys use the same fixed short TTL, so monotonic admission preserves expiry order. An
+   * existing rejected key is never refreshed or moved by duplicate admission.
+   */
   readonly #rejected = new Map<string, number>()
+  /** Global tombstone budget remains non-evicting before retention expiry. */
   readonly #maxEntries: number
+  /** Independently bounded per-peer lease count prevents one peer consuming global capacity. */
   readonly #maxEntriesPerPeer: number
+  /** Accepted request retention also bounds the fixed rejected-key TTL. */
   readonly #ttlMs: number
+  /** Optional binding retain hook keeps accepted request identity alive until expiry. */
   readonly #retain?: (peerKey: string) => boolean
+  /** Paired binding release hook runs only on expiration or owner disposal. */
   readonly #release?: (peerKey: string) => void
   /**
    * Per-peer completed-tombstone counts, owned by `@migaia/lifecycle`'s `LeaseRegistry` so
@@ -110,14 +120,21 @@ export class RequestReplayLedger {
     this.#purge(now)
   }
 
+  /**
+   * Purges expired prefixes using the canonical endpoint's monotonic admission clock. Accepted and
+   * rejected maps have independently fixed retention, so their insertion order is expiry order;
+   * live suffixes are never scanned, evicted, or refreshed.
+   */
   #purge(now: number): void {
     for (const [key, entry] of this.#completed) {
-      if (now - entry.at >= this.#ttlMs) {
-        this.#completed.delete(key)
-        entry.releaseCount()
-        this.#release?.(entry.peerKey)
-      }
+      if (now - entry.at < this.#ttlMs) break
+      this.#completed.delete(key)
+      entry.releaseCount()
+      this.#release?.(entry.peerKey)
     }
-    for (const [key, expiresAt] of this.#rejected) if (expiresAt <= now) this.#rejected.delete(key)
+    for (const [key, expiresAt] of this.#rejected) {
+      if (expiresAt > now) break
+      this.#rejected.delete(key)
+    }
   }
 }
