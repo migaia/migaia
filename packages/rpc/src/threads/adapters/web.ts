@@ -3,6 +3,8 @@ import { awaitThreadPreparation, createWebThreadChannel } from '../channel.js'
 import { THREAD_FINGERPRINT_PREFIX, ThreadBootstrap, ThreadEvent } from '../constants.js'
 import { absoluteThreadEntry, portableThreadSpec } from '../error.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
+import { RpcTransportError } from '../../core/errors.js'
+import { ThreadErrorText } from '../error-text.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } from '../types.js'
@@ -68,6 +70,11 @@ export function createWebThreadLauncher(
         ThreadEvent.error,
         (event: { preventDefault(): void; error?: unknown }) => {
           event.preventDefault()
+          // Preparation owns this failure even when no launch cancellation has occurred.
+          rejectPrepared?.(
+            new RpcTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
+          )
+          rejectPrepared = undefined
           try {
             options.report(event.error ?? event)
           } catch (reporterError) {

@@ -1,6 +1,6 @@
-import { nativeWorkerFor, nativeWorkerMessage } from './fixture.js'
+import { nativeWorkerFor, nativeErrorListenerCount } from './fixture.js'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createNodeThreadLauncher } from '../../src/threads/adapters/node.js'
 
 /** Native exit fixture has no RPC protocol or Vitest runtime in the Worker. */
@@ -10,6 +10,15 @@ describe('Node thread launcher', () => {
   it('[A3] captures threadId once and resolves only after native exit', async () => {
     const launcher = createNodeThreadLauncher()
     const handle = await launcher.launch({ entry }, { signal: new AbortController().signal })
+    /** Observe the actual native Worker beneath the production messaging shim. */
+    const worker = nativeWorkerFor(handle)
+    expect(nativeErrorListenerCount(handle)).toBe(1)
+    expect(worker.listenerCount('error')).toBe(1)
+    /** Native method spies prove arguments and lifecycle calls after shim adaptation. */
+    const postMessage = vi.spyOn(worker, 'postMessage')
+    const terminate = vi.spyOn(worker, 'terminate')
+    handle.port.postMessage({ fixture: 'portable probe' }, undefined)
+    expect(postMessage).toHaveBeenCalledExactlyOnceWith({ fixture: 'portable probe' }, undefined)
     await new Promise((resolve) => {
       const receive = (message: unknown): void => {
         handle.port.off('message', receive)
@@ -24,12 +33,15 @@ describe('Node thread launcher', () => {
     })
     handle.terminate()
     handle.terminate()
+    expect(terminate).toHaveBeenCalledTimes(1)
     expect(exited).toBe(false)
     await handle.exited
     expect(nativeWorkerFor(handle).threadId).toBe(-1)
     expect(handle.identity.threadId).toBe(id)
     expect(id).toBeGreaterThan(0)
     expect(nativeWorkerFor(handle).listenerCount('error')).toBe(0)
+    postMessage.mockRestore()
+    terminate.mockRestore()
   })
   it.each(['natural', 'error'] as const)(
     '[A3/A7] keeps host alive on %s exit and retains original failure',
@@ -70,18 +82,28 @@ describe('Node thread launcher', () => {
   })
   it('[A3/A9] conveys unique launcher addresses while retaining the original portable data', async () => {
     const launcher = createNodeThreadLauncher()
-    const handles = await Promise.all(
-      [1, 2].map((value) =>
-        launcher.launch(
+    const launched = await Promise.all(
+      [1, 2].map(async (value) => {
+        const handle = await launcher.launch(
           { entry, data: { mode: 'echo', value } },
           { signal: new AbortController().signal }
         )
-      )
+        /** Listener attaches in the launch continuation, before any Worker macrotask message. */
+        const message = new Promise<unknown>((resolve) => {
+          const receive = (value: unknown): void => {
+            handle.port.off('message', receive)
+            resolve(value)
+          }
+          handle.port.on('message', receive)
+        })
+        return { handle, message }
+      })
     )
+    const handles = launched.map(({ handle }) => handle)
     try {
       expect(handles[0]!.identity.fingerprint).not.toBe(handles[1]!.identity.fingerprint)
       for (const [index, handle] of handles.entries()) {
-        const bootstrap = await nativeWorkerMessage(handle)
+        const bootstrap = await launched[index]!.message
         expect(bootstrap).toEqual({
           peerId: handle.identity.fingerprint,
           data: { mode: 'echo', value: index + 1 }
