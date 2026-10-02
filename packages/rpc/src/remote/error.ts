@@ -1,3 +1,4 @@
+import { registerLocalErrorWireSummary } from '../contract/contract-error.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import {
   ERROR_SOURCE,
@@ -26,6 +27,7 @@ export function createRemoteLayerError(
     code === RpcRemoteLayerErrorCode.contractInvalid
       ? new TypeError(TEXT_BY_CODE[code], cause === undefined ? undefined : { cause })
       : new Error(TEXT_BY_CODE[code], cause === undefined ? undefined : { cause })
+  registerLocalErrorWireSummary(error, code, TEXT_BY_CODE[code])
   attachErrorIdentity(error, { source: ERROR_SOURCE, code })
   if (detail !== undefined)
     Object.defineProperty(error, 'detail', { value: detail, enumerable: true })
