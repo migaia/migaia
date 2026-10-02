@@ -1,3 +1,4 @@
+import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import type {
   IRpcPlugin,
@@ -86,4 +87,4 @@ function createTimeoutPlugin(config: IRpcTimeoutConfig): IRpcPlugin {
 
 /** Creates the native timeout plugin and retains its legacy middleware call shape. */
 export const timeout = (config: IRpcTimeoutConfig = {}): IRpcPlugin =>
-  freezePlugin(createTimeoutPlugin(config))
+  registerJsonObjectMiddleware(freezePlugin(createTimeoutPlugin(config)))

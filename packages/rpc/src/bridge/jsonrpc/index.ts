@@ -1,3 +1,6 @@
+import { registerJsonObjectPort } from '../../core/internal/json-object-port.js'
+import { rpcProtocolV1 } from '../../contract/index.js'
+import { jsonObjectCodec, jsonObjectFramer } from './object-pipeline.js'
 import type { IScheduledTask } from '@migaia/utils/scheduler'
 import {
   collectListenerCleanupFailures,
@@ -58,6 +61,20 @@ export async function createJsonRpcRemoteChannel(
     drainListenerFailures(collectListenerCleanupFailures([cancelTimer]))
     /** Adopt exactly one canonical gate, log Feature and stderr subscription. */
     const ipc = attachIpcConnection(wire.transport, options.ipc, options.report)
+    wire.registerObjectPortRelease(
+      registerJsonObjectPort(
+        ipc.transport,
+        Object.freeze({
+          protocol: rpcProtocolV1,
+          publicCodec: byteProcessPipeline.codec,
+          publicFramer: byteProcessPipeline.framer,
+          codec: jsonObjectCodec,
+          framer: jsonObjectFramer,
+          send: wire.sendObject,
+          subscribe: wire.subscribeObject
+        })
+      )
+    )
     return Object.freeze({
       transport: ipc.transport,
       peerId: options.peerId,

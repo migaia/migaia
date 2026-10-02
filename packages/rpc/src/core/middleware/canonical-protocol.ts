@@ -1,3 +1,4 @@
+import { registerJsonObjectDescriptorMiddleware } from '../internal/json-object-port.js'
 import { rpcProtocolV1, type IRpcEnvelope, type IRpcProtocol } from '../../contract/index.js'
 import type {
   IRpcPlugin,
@@ -39,17 +40,20 @@ export function canonicalProtocol(
     typeof readProtocolNormalize(descriptor) !== 'function'
   )
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
-  return Object.freeze({
-    name: 'protocol',
-    protocol: descriptor,
-    metadata: protocolMetadata,
-    install: (): IRpcPluginInstallResult => {
-      return {
-        extension: Object.freeze({}),
-        ports: Object.freeze({ [RpcPortName.protocol]: descriptor })
+  return registerJsonObjectDescriptorMiddleware(
+    Object.freeze({
+      name: 'protocol',
+      protocol: descriptor,
+      metadata: protocolMetadata,
+      install: (): IRpcPluginInstallResult => {
+        return {
+          extension: Object.freeze({}),
+          ports: Object.freeze({ [RpcPortName.protocol]: descriptor })
+        }
       }
-    }
-  })
+    }),
+    descriptor
+  )
 }
 
 /** Reads the terminal normalizer once and preserves hostile descriptor failures as coded causes. */

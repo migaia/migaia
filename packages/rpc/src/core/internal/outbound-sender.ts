@@ -1,3 +1,4 @@
+import { selectedJsonObjectPort, type IRpcJsonObjectPort } from './json-object-port.js'
 import {
   RpcAuthenticationError,
   RpcLifecycleError,
@@ -42,6 +43,8 @@ export class RpcOutboundSender {
   readonly #lifecycle: IRpcOutboundLifecycle | undefined
   /** Optional whole-envelope admission keeps plugin capacity outside the core codec pipeline. */
   readonly #gate: IRpcOutboundGate | undefined
+  /** Once-selected private data port; public transport and descriptor snapshots remain unchanged. */
+  readonly #objectPort: IRpcJsonObjectPort | undefined
 
   constructor(
     transport: IRpcOutboundTransport,
@@ -54,6 +57,7 @@ export class RpcOutboundSender {
     this.transport = transport
     this.id = id
     this.components = components
+    this.#objectPort = selectedJsonObjectPort(components)
     this.authentication = authentication
     this.#transportEncodedType = transport.encodedType
     this.#gate = gate
@@ -103,14 +107,14 @@ export class RpcOutboundSender {
     const hasTransfer = transfer !== undefined && transfer.length > 0
     let encoded: unknown
     try {
-      encoded = this.components.codec.encode(message)
-      this.assertProtocolEncodedType(encoded)
+      encoded = (this.#objectPort?.codec ?? this.components.codec).encode(message)
+      if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
     } catch (cause) {
       throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     let frames: readonly unknown[]
     try {
-      frames = this.components.framer.frame(encoded, {
+      frames = (this.#objectPort?.framer ?? this.components.framer).frame(encoded, {
         source: this.id,
         messageId: message.id
       })
@@ -275,7 +279,7 @@ export class RpcOutboundSender {
       return Promise.resolve().then(() => {
         try {
           this.#lifecycle?.assertActive(generation)
-          this.assertTransportEncodedType(value)
+          if (!this.#objectPort) this.assertTransportEncodedType(value)
           return value
         } catch (cause) {
           if (cause instanceof RpcLifecycleError) throw cause
@@ -326,7 +330,9 @@ export class RpcOutboundSender {
           admissionFailure = error
           throw error
         }
-        return this.transport.send(value, { transfer })
+        return this.#objectPort
+          ? this.#objectPort.send(value, { transfer })
+          : this.transport.send(value, { transfer })
       })
       .then(() => {
         this.#lifecycle?.assertActive(generation)

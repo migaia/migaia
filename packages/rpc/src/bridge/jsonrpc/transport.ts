@@ -1,3 +1,4 @@
+import { materializeJsonSnapshot } from './object-pipeline.js'
 import { deferred } from '@migaia/utils/promise'
 import { deserializeRpcError, serializeRpcError } from '../../contract/error.js'
 import { fromJsonRpcError } from '../../contract/error-jsonrpc.js'
@@ -38,6 +39,10 @@ import { validateJsonRpcDescription, type IJsonRpcBridgeOptions } from './handsh
 /** The factory owns one pre-ready hello and one exclusive logical transport. */
 export type IJsonRpcWire = Readonly<{
   transport: IRpcTransport
+  /** Package-private data ports share the public sender, subscribers and terminal owner. */
+  readonly sendObject: IRpcTransport['send']
+  readonly subscribeObject: IRpcTransport['subscribe']
+  readonly registerObjectPortRelease: (release: () => void) => void
   exchangeHello(hello: string): Promise<unknown>
   close(reason?: unknown): Promise<void>
   assertOpen(): void
@@ -56,6 +61,10 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   const failures = createListenerFailureState()
   /** Only this logical connection owns inbound response subscribers. */
   const listeners = new Set<(message: IRpcInboundMessage) => void>()
+  /** Distinguishes private subscribers without changing Set identity or traversal semantics. */
+  const objectListeners = new WeakSet<(message: IRpcInboundMessage) => void>()
+  /** Final wrapper's capability disposer is set only after successful IPC adoption. */
+  let releaseObjectPort: (() => void) | undefined
   /** Transport failure subscribers settle core pending requests on termination. */
   const errorListeners = new Set<(error: unknown) => void>()
   /** All physical writes can settle promptly on close even if drain never arrives. */
@@ -80,6 +89,8 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   const close = (reason?: unknown): Promise<void> => {
     if (closing) return closing
     closed = true
+    releaseObjectPort?.()
+    releaseObjectPort = undefined
     terminal = reason ?? createProcessError(RpcProcessErrorCode.channelClosed)
     decoder.close()
     pending.clear()
@@ -211,7 +222,12 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     )
     for (const listener of listeners)
       reportListenerFailure(
-        { data: JSON.stringify(envelope), peerId: options.peerId },
+        {
+          data: objectListeners.has(listener)
+            ? materializeJsonSnapshot(envelope)
+            : JSON.stringify(envelope),
+          peerId: options.peerId
+        },
         [(value) => listener(value as IRpcInboundMessage)],
         failures
       )
@@ -348,6 +364,68 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     throw error
   }
 
+  /** Both package-private and public input paths use this one correlation/write owner. */
+  const send = async (
+    value: unknown,
+    sendOptions?: import('../../core/transport.js').IRpcSendOptions,
+    objectInput = false
+  ): Promise<void> => {
+    if (closed) throw terminal
+    if (sendOptions?.transfer?.length || (!objectInput && typeof value !== 'string'))
+      throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
+    /** Core already encodes portable envelopes; the bridge validates before translating. */
+    const envelope = normalizeRpcEnvelope(
+      objectInput ? value : (JSON.parse(value as string) as unknown)
+    )
+    if (
+      envelope.kind === RpcEnvelopeKind.variation &&
+      envelope.data.route.variation === RpcControl.abort
+    ) {
+      if (!pending.has(envelope.id)) return
+      pending.delete(envelope.id)
+      await write({
+        jsonrpc: JsonRpcProfile.version,
+        method: JsonRpcProfile.cancel,
+        params: {
+          id: envelope.id,
+          ...(envelope.data.payload === undefined ? {} : { reason: envelope.data.payload })
+        }
+      })
+      return
+    }
+    if (envelope.kind !== RpcEnvelopeKind.request || !Array.isArray(envelope.data.payload ?? []))
+      throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
+    /** Metadata projection reads only the normalized request routing contract. */
+    const route = envelope.data.route
+    /** Remote describe is the only reserved method translated to a distinct extension. */
+    const describe = envelope.method === RemoteMethodName.describe
+    /** Dispatch ownership, rather than contract lookup, decides whether an id is emitted. */
+    const oneWay = route.dispatchOnly === true
+    if (!oneWay && pending.has(envelope.id))
+      throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
+    /** Preserve exactly the three contract metadata keys that are present at gate dispatch. */
+    const meta = Object.fromEntries(
+      [RpcRouteField.timeoutMs, RpcRouteField.idempotencyKey, RpcRouteField.trace]
+        .filter((key) => Object.hasOwn(route, key))
+        .map((key) => [key, route[key as keyof typeof route]])
+    )
+    /** Describe and invoke preserve positional payloads without a second method resolver. */
+    const params = describe
+      ? { args: envelope.data.payload ?? [] }
+      : {
+          method: envelope.method,
+          args: envelope.data.payload ?? [],
+          ...(!oneWay && Object.keys(meta).length > 0 ? { meta } : {})
+        }
+    if (!oneWay) pending.set(envelope.id, envelope)
+    await write({
+      jsonrpc: JsonRpcProfile.version,
+      ...(!oneWay ? { id: envelope.id } : {}),
+      method: describe ? JsonRpcProfile.describe : JsonRpcProfile.invoke,
+      params
+    })
+  }
+
   /** Metadata and ownership describe the logical single-peer connection rather than its process. */
   const transport: IRpcTransport = {
     platform: RpcPlatform.process,
@@ -355,59 +433,8 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     ownership: RpcTransportOwnership.owned,
     encodedType: RpcTransportEncoding.string,
     peerId: options.peerId,
-    async send(value, sendOptions) {
-      if (closed) throw terminal
-      if (sendOptions?.transfer?.length || typeof value !== 'string')
-        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
-      /** Core already encodes portable envelopes; the bridge validates before translating. */
-      const envelope = normalizeRpcEnvelope(JSON.parse(value) as unknown)
-      if (
-        envelope.kind === RpcEnvelopeKind.variation &&
-        envelope.data.route.variation === RpcControl.abort
-      ) {
-        if (!pending.has(envelope.id)) return
-        pending.delete(envelope.id)
-        await write({
-          jsonrpc: JsonRpcProfile.version,
-          method: JsonRpcProfile.cancel,
-          params: {
-            id: envelope.id,
-            ...(envelope.data.payload === undefined ? {} : { reason: envelope.data.payload })
-          }
-        })
-        return
-      }
-      if (envelope.kind !== RpcEnvelopeKind.request || !Array.isArray(envelope.data.payload ?? []))
-        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
-      /** Metadata projection reads only the normalized request routing contract. */
-      const route = envelope.data.route
-      /** Remote describe is the only reserved method translated to a distinct extension. */
-      const describe = envelope.method === RemoteMethodName.describe
-      /** Dispatch ownership, rather than contract lookup, decides whether an id is emitted. */
-      const oneWay = route.dispatchOnly === true
-      if (!oneWay && pending.has(envelope.id))
-        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
-      /** Preserve exactly the three contract metadata keys that are present at gate dispatch. */
-      const meta = Object.fromEntries(
-        [RpcRouteField.timeoutMs, RpcRouteField.idempotencyKey, RpcRouteField.trace]
-          .filter((key) => Object.hasOwn(route, key))
-          .map((key) => [key, route[key as keyof typeof route]])
-      )
-      /** Describe and invoke preserve positional payloads without a second method resolver. */
-      const params = describe
-        ? { args: envelope.data.payload ?? [] }
-        : {
-            method: envelope.method,
-            args: envelope.data.payload ?? [],
-            ...(!oneWay && Object.keys(meta).length > 0 ? { meta } : {})
-          }
-      if (!oneWay) pending.set(envelope.id, envelope)
-      await write({
-        jsonrpc: JsonRpcProfile.version,
-        ...(!oneWay ? { id: envelope.id } : {}),
-        method: describe ? JsonRpcProfile.describe : JsonRpcProfile.invoke,
-        params
-      })
+    send(value, sendOptions) {
+      return send(value, sendOptions)
     },
     subscribe(listener) {
       listeners.add(listener)
@@ -429,6 +456,19 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   }
   return {
     transport,
+    sendObject: (value, sendOptions) => send(value, sendOptions, true),
+    subscribeObject: (listener) => {
+      objectListeners.add(listener)
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+        objectListeners.delete(listener)
+      }
+    },
+    registerObjectPortRelease: (release) => {
+      if (closed) release()
+      else releaseObjectPort = release
+    },
     async exchangeHello(hello) {
       await write({
         jsonrpc: JsonRpcProfile.version,
