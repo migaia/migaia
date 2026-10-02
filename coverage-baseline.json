@@ -180,13 +180,13 @@
     },
     "rpc": {
       "lines": {
-        "covered": 9634,
-        "total": 10625,
+        "covered": 9635,
+        "total": 10626,
         "pct": 90.67
       },
       "statements": {
-        "covered": 10499,
-        "total": 11887,
+        "covered": 10500,
+        "total": 11888,
         "pct": 88.32
       },
       "functions": {
@@ -195,9 +195,9 @@
         "pct": 90.64
       },
       "branches": {
-        "covered": 6248,
-        "total": 7307,
-        "pct": 85.5
+        "covered": 6250,
+        "total": 7309,
+        "pct": 85.51
       }
     },
     "serialize": {
@@ -554,14 +554,14 @@
     },
     "utils": {
       "lines": {
-        "covered": 1686,
+        "covered": 1688,
         "total": 1892,
-        "pct": 89.11
+        "pct": 89.21
       },
       "statements": {
-        "covered": 1839,
-        "total": 2140,
-        "pct": 85.93
+        "covered": 1845,
+        "total": 2143,
+        "pct": 86.09
       },
       "functions": {
         "covered": 273,
@@ -569,9 +569,9 @@
         "pct": 86.66
       },
       "branches": {
-        "covered": 1358,
-        "total": 1642,
-        "pct": 82.7
+        "covered": 1362,
+        "total": 1641,
+        "pct": 82.99
       }
     }
   },
@@ -4296,14 +4296,14 @@
     },
     "packages/rpc/src/bridge/jsonrpc/framing.ts": {
       "lines": {
-        "covered": 71,
-        "total": 72,
-        "pct": 98.61
+        "covered": 72,
+        "total": 73,
+        "pct": 98.63
       },
       "statements": {
-        "covered": 73,
-        "total": 76,
-        "pct": 96.05
+        "covered": 74,
+        "total": 77,
+        "pct": 96.1
       },
       "functions": {
         "covered": 8,
@@ -4311,9 +4311,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 60,
-        "total": 63,
-        "pct": 95.23
+        "covered": 62,
+        "total": 65,
+        "pct": 95.38
       }
     },
     "packages/rpc/src/bridge/jsonrpc/handshake.ts": {
@@ -15846,14 +15846,14 @@
     },
     "packages/utils/src/bytes.ts": {
       "lines": {
-        "covered": 126,
+        "covered": 128,
         "total": 134,
-        "pct": 94.02
+        "pct": 95.52
       },
       "statements": {
-        "covered": 138,
-        "total": 152,
-        "pct": 90.78
+        "covered": 144,
+        "total": 155,
+        "pct": 92.9
       },
       "functions": {
         "covered": 12,
@@ -15861,9 +15861,9 @@
         "pct": 100
       },
       "branches": {
-        "covered": 103,
-        "total": 127,
-        "pct": 81.1
+        "covered": 107,
+        "total": 126,
+        "pct": 84.92
       }
     },
     "packages/utils/src/collector.ts": {
