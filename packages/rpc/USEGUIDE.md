@@ -1153,7 +1153,7 @@ await serving.close()
 
 spawn 默认先退出旧进程再启动新进程；`replace({ spec, strategy: 'start-then-switch' })` 则要求共享预算容纳两个进程，并在新 describe 通过后切换。两种策略都兑现同一个门面。新进程从自己的 serve 启动状态开始，不重放旧 use。`restart()` 委托当前治理注册，`inspectRegistration()` 可查终态与清算原因；清算后不能用 replace 绕过。可选 `shutdownSignal.subscribe` 由调用方接平台信号，第一次排空释放，释放未完成时第二次只强制终止 owned handle；connect 只关闭本地连接。
 
-服务侧省略 resilience 时创建一个默认治理器，同一已验证主体在多连接上共享内存幂等缓存，跨进程重启要由调用方提供稳定 backing。外部治理器由调用方关闭。反向注册通过可选 registrations 提供 `verifyToken` 和 `resolveRegistration(principalId)`，后者只返回预批准的 `{ targetHost, name, contract }`；它不信任对端自报的名字或 routing peer。关闭 listener 不撤销已采用连接，EOF 以 suspend 移除代理，新连接须重新鉴权。Windows/Electron 实机保证与 JSON-RPC bridge 的 Host 接线属 M2，目前没有 PASS 声明。
+服务侧省略 resilience 时创建一个默认治理器，同一已验证主体在多连接上共享内存幂等缓存，跨进程重启要由调用方提供稳定 backing。外部治理器由调用方关闭。反向注册通过可选 registrations 提供 `verifyToken` 和 `resolveRegistration(principalId)`，后者只返回预批准的 `{ targetHost, name, contract }`；它不信任对端自报的名字或 routing peer。关闭 listener 不撤销已采用连接，EOF 以 suspend 移除代理，新连接须重新鉴权。Windows/Electron 的实机保证保持 unsupported；JSON-RPC Host 与非 JS 两种部署的实跑证据见 conformance。
 
 ### JSON-RPC bridge
 
@@ -1229,10 +1229,28 @@ callback forwards the generation's token, scheduler, signal and IPC session
 into the bridge; optional `ipc.stderr` uses the provided stderr subscription.
 Each stderr block logs only `CHILD_STDERR_REDACTED`. Current built-in launchers
 cannot supply the fd carrier; the focused Node path uses a caller-owned fd
-launcher. Connect owns just its socket. Its current process facade defaults
-to native ping and has no wire selector, so JSON-RPC connect must explicitly
-supply caller health; a default `health: none` connect path remains an upstream
-API gap. The bridge itself adds no health check.
+launcher. Connect owns just its socket. Set its optional deployment `wire` to
+`'jsonrpc'` when establish uses the bridge. Without `supervision.health`, the
+registration reports `health: 'none'` and sends no default ping. An explicit
+health port takes priority and reports `health: 'custom'`. Omitted wire and
+`'native'` keep the native ping behavior. The bridge itself adds no health check.
+
+For a borrowed JSON-RPC socket, keep the caller-provided dial and establish
+ports and declare the wire explicitly:
+
+```ts
+// The deployment borrows one socket and selects the bridge health policy.
+const borrowedJsonRpcDeployment = {
+  kind: 'connect' as const,
+  wire: 'jsonrpc' as const,
+  address,
+  token,
+  dial,
+  establish
+}
+// Pass it as deployment to createProcessPlugin or createProcessHost.
+// establish must pass the received token, scheduler and signal to the bridge.
+```
 
 Peer handlers follow this exact profile:
 
