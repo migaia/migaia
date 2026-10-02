@@ -632,7 +632,7 @@ def schema_accepts(value: Any, rule: dict[str, Any], definitions: dict[str, Any]
             if not schema_accepts(item, child, definitions):
                 return False
     if isinstance(value, dict):
-        if len(value) < rule.get("minProperties", 0) or any(key not in value for key in rule.get("required", [])):
+        if len(value) > rule.get("maxProperties", len(value)) or len(value) < rule.get("minProperties", 0) or any(key not in value for key in rule.get("required", [])):
             return False
         for key, item in value.items():
             if not schema_accepts(key, rule.get("propertyNames", {}), definitions):
@@ -655,7 +655,7 @@ def check_host_control(results: Results, data: dict[str, Any]) -> None:
                 semantic = valid
                 catalog = value if definition == "catalog" else value.get("catalog") if definition == "describeHost" else None
                 if semantic and catalog is not None:
-                    semantic = all(name == contract["plugin"] for name, contract in catalog.items())
+                    semantic = all(name == contract["plugin"] for name, contract in catalog.items()) and sum(len(feature["methods"]) for contract in catalog.values() for feature in contract["features"].values()) <= 4096
                 if semantic and definition == "hostInspectResult":
                     names = [item["name"] for item in value["plugins"]]
                     semantic = names == sorted(set(names)) and all(item["features"] == sorted(set(item["features"])) for item in value["plugins"])

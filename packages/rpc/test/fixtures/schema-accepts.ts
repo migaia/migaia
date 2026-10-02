@@ -78,6 +78,7 @@ export function acceptsSchema(
   if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
     const object = value as Record<string, unknown>
     const keys = Object.keys(object)
+    if (typeof rule.maxProperties === 'number' && keys.length > rule.maxProperties) return false
     if (typeof rule.minProperties === 'number' && keys.length < rule.minProperties) return false
     if (Array.isArray(rule.required) && rule.required.some((key) => !Object.hasOwn(object, key)))
       return false

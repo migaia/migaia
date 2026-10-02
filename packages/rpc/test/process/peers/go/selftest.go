@@ -747,6 +747,12 @@ func schemaAccepts(value any, rule record, definitions record) bool {
 				return false
 			}
 		}
+		if maximum, exists := rule["maxProperties"]; exists {
+			n, _ := asInt(maximum)
+			if len(object) > n {
+				return false
+			}
+		}
 		for _, key := range stringSlice(rule["required"]) {
 			if _, exists := object[key]; !exists {
 				return false
@@ -790,9 +796,15 @@ func hostVectors(suite *vectorSuite, vector record, definitions record) {
 				catalog = field(field(value)["catalog"])
 			}
 			if semantic && catalog != nil {
+				// Catalog aggregate cap mirrors the published remote semantic budget.
+				methodCount := 0
 				for name, child := range catalog {
 					semantic = semantic && name == stringField(field(child), "plugin")
+					for _, feature := range field(field(child)["features"]) {
+						methodCount += len(field(field(feature)["methods"]))
+					}
 				}
+				semantic = semantic && methodCount <= 4096
 			}
 			if semantic && definition == "hostInspectResult" {
 				previous := ""

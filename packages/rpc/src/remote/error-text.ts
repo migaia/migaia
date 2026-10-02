@@ -1,5 +1,7 @@
 /** Stable messages exposed by the remote layer's coded errors. */
 export const RpcRemoteLayerErrorText = {
+  /** Replaces malformed untrusted keys in contract diagnostics without reflecting input. */
+  invalidPathSegment: '<invalid-key>',
   /** Used for invalid descriptions and reserved control payloads. */
   contractInvalid: 'Remote contract is invalid',
   /** Used when unit startup or channel acquisition cannot complete. */
