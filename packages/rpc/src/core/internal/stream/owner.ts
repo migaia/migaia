@@ -1,7 +1,7 @@
+import { createOutboundEnvelope } from '../outbound-envelope.js'
 import {
   deserializeRpcError,
   invalidRpcStream,
-  normalizeRpcEnvelope,
   normalizeStreamPayload,
   RpcEnvelopeKind,
   RpcRouteProfile,
@@ -442,7 +442,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     admission?: IRpcFrameAdmission
   ): Promise<void> {
     const normalized = normalizeStreamPayload(payload)
-    const message = normalizeRpcEnvelope({
+    const message = createOutboundEnvelope({
       kind: 'stream',
       id,
       data: {

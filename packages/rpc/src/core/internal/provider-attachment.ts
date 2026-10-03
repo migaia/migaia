@@ -1,3 +1,4 @@
+import { createOutboundEnvelope } from './outbound-envelope.js'
 import { RpcPlatform } from '../transport-constants.js'
 import { RpcConfigurationError, RpcError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import {
@@ -9,7 +10,6 @@ import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcAbortSignal, IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
   deserializeRpcError,
-  normalizeRpcEnvelope,
   RpcControl,
   RpcRouteProfile,
   type IRpcEnvelope,
@@ -492,7 +492,7 @@ function toCanonicalResponse(response: unknown): IRpcEnvelope {
     ...(current.message === undefined ? {} : { message: current.message })
   }
   if (current.ok)
-    return normalizeRpcEnvelope({
+    return createOutboundEnvelope({
       kind: 'response',
       ok: true,
       id: current.taskId,
@@ -501,7 +501,7 @@ function toCanonicalResponse(response: unknown): IRpcEnvelope {
         ...(current.data === undefined ? {} : { payload: current.data })
       } as never
     })
-  return normalizeRpcEnvelope({
+  return createOutboundEnvelope({
     kind: 'response',
     ok: false,
     id: current.taskId,

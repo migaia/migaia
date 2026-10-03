@@ -1,3 +1,4 @@
+import { createOutboundEnvelope } from './outbound-envelope.js'
 import {
   selectedJsonObjectPort,
   releaseJsonObjectSelection,
@@ -36,7 +37,6 @@ import type {
 import { assertContractMethod as assertMethod, validateContractData } from './contract.js'
 import {
   normalizePortable,
-  normalizeRpcEnvelope,
   RpcControl,
   RpcEnvelopeKind,
   RpcRouteProfile,
@@ -645,7 +645,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                     this.emitFailure(failure.error, RpcCoreErrorCode.payloadInvalid)
                   )
             return this.#pipeline.send(
-              normalizeRpcEnvelope({
+              createOutboundEnvelope({
                 kind: 'variation',
                 id: taskId,
                 data: {
@@ -738,7 +738,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             this.kernel.assertActive()
           }
           return this.#pipeline.send(
-            normalizeRpcEnvelope(request),
+            createOutboundEnvelope(request),
             options,
             this.#outboundGate
               ? {
@@ -755,7 +755,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                   request.data.route.sentAt = this.kernel.time.timestamp()
                   if (typeof remaining === 'number')
                     (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(remaining)
-                  return normalizeRpcEnvelope(request)
+                  return createOutboundEnvelope(request)
                 }
               : undefined,
             () => {
@@ -877,7 +877,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           if (command.operation?.remaining() === 0) throw new RpcTimeoutError()
         }
         return this.#pipeline.send(
-          normalizeRpcEnvelope(request),
+          createOutboundEnvelope(request),
           command.transfer === undefined ? undefined : { transfer: command.transfer },
           this.#outboundGate && command.operation
             ? {
@@ -893,7 +893,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 request.data.route.sentAt = this.kernel.time.timestamp()
                 if (typeof updated === 'number')
                   (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(updated)
-                return normalizeRpcEnvelope(request)
+                return createOutboundEnvelope(request)
               }
             : undefined
         )

@@ -1,4 +1,11 @@
-import { asCodecValue, type ICodec } from '@migaia/serialize/codec'
+import { isOutboundEnvelope, materializeOutboundJson } from '../core/internal/outbound-envelope.js'
+import { SerializeErrorCode } from '@migaia/serialize/core'
+import {
+  asCodecValue,
+  normalizeCodecFailure,
+  CodecErrorText,
+  type ICodec
+} from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { messageFramerV1 } from '../contract/framing/message-framer.js'
@@ -13,7 +20,19 @@ export const remoteProcessJsonCodec: ICodec<unknown, unknown> = Object.freeze({
   id: jsonCodec.id,
   version: jsonCodec.version,
   encodedType: jsonCodec.encodedType,
-  encode: (value) => jsonCodec.encode(asCodecValue(value)),
+  encode: (value) => {
+    if (!isOutboundEnvelope(value)) return jsonCodec.encode(asCodecValue(value))
+    try {
+      return JSON.stringify(materializeOutboundJson(value))
+    } catch (error) {
+      // Retain the source JSON codec's native failure/cause boundary even on owned snapshots.
+      throw normalizeCodecFailure(
+        error,
+        SerializeErrorCode.encodeFailed,
+        CodecErrorText.encodeFailed
+      )
+    }
+  },
   decode: (value) => jsonCodec.decode(asProcessString(value))
 })
 
