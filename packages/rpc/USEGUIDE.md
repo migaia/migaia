@@ -1292,8 +1292,11 @@ in TS peers, or its wire schema in other languages. Missing business extensions
 fail only that call (`JSONRPC_EXTENSION_MISSING`); malformed embedded graphs
 fail only that call (`JSONRPC_PROFILE_INVALID`). Ordinary standard JSON-RPC
 errors keep foreign `jsonrpc-2.0/<number>` identity. Unknown/late/number ids are
-reported and discarded. Batch, reverse messages, malformed response shapes,
-`id: null`, framing/UTF-8/JSON faults terminate that connection. Streams reject
+reported and discarded. Physical arrays require mutual `batch@1`; each member retains
+its own correlation and validation; an invalid member is reported without suppressing
+valid siblings. Outside negotiated arrays, reverse messages, malformed response
+shapes and `id: null` terminate that connection. Framing/UTF-8/JSON faults also
+terminate the connection. Streams reject
 before business publication (`JSONRPC_UNSUPPORTED_MODE`); transfer rejects its
 send Promise as a native TypeError before bytes. Hello timeout uses
 `JSONRPC_HANDSHAKE_TIMEOUT`. All five bridge codes have source
@@ -1454,3 +1457,6 @@ termination and exit observation therefore remain unsupported; close is not an e
 Electron and browser actual-runtime fixtures remain INFERRED/unverified. Provide explicit health
 and select `supervisor.isolation: 'best-effort'` only when that degradation suits the deployment.
 Without a proven actual exit, supervision keeps the lease occupied on abandonment.
+
+
+内建载体协商 `batch@1` 后，core 在物理写空闲时立即发送单帧，在写进行中合并就绪的请求与响应；未协商的载体保持单帧。等待对端处理完成用现有请求方法（worker contract 为 `request`）；只等待发出用现有单向发送方法（worker contract 为 `notify`）。独立调用请用 `Promise.all`；有依赖的串行 `await` 无法自动合并。

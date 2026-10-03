@@ -188,7 +188,7 @@ function createConnectCapability(
     discoveryMode,
     receiverSelector,
     transport,
-    verify: async (context, reportRead) => {
+    verify: (context, reportRead) => {
       const peerId = context.peerId ?? (transportPeerId as string | undefined)
       const peerIdentity = Boolean(peerId) && context.senderId === peerId
       const originIdentity = transportOrigin !== undefined && context.origin === transportOrigin
@@ -217,7 +217,11 @@ function createConnectCapability(
           anonymousBroadcast)
       if (!baseVerified) return false
       if (useBaseIdVerifyOnly !== false) return true
-      return Boolean(await identifier?.(context))
+      /** Built-in identity is synchronous; only a genuinely asynchronous custom verifier yields. */
+      const verified = identifier?.(context)
+      return verified === undefined || typeof verified === 'boolean'
+        ? Boolean(verified)
+        : Promise.resolve(verified).then(Boolean)
     }
   }
   return Object.freeze(capability)

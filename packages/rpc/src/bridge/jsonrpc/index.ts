@@ -1,4 +1,5 @@
 import { registerJsonObjectPort } from '../../core/internal/json-object-port.js'
+import { registerBatchAgreement } from '../../core/internal/batch-frame.js'
 import { rpcProtocolV1 } from '../../contract/index.js'
 import { jsonObjectCodec, jsonObjectFramer } from './object-pipeline.js'
 import type { IScheduledTask } from '@migaia/utils/scheduler'
@@ -56,11 +57,13 @@ export async function createJsonRpcRemoteChannel(
     const result = await wire.exchangeHello(prepared.hello)
     /** Only the control owner authenticates the negotiated reply grammar. */
     const agreement = completeJsonRpcHello(prepared.offer, result)
+    wire.setCapabilities(agreement.capabilities)
     wire.assertOpen()
     // Timer cleanup must finish before the physical connection can be published.
     drainListenerFailures(collectListenerCleanupFailures([cancelTimer]))
     /** Adopt exactly one canonical gate, log Feature and stderr subscription. */
     const ipc = attachIpcConnection(wire.transport, options.ipc, options.report)
+    registerBatchAgreement(ipc.transport, agreement.capabilities)
     wire.registerObjectPortRelease(
       registerJsonObjectPort(
         ipc.transport,

@@ -1,8 +1,32 @@
 import { describe, expect, it } from 'vitest'
+import { runInNewContext } from 'node:vm'
 import { connect } from '../../../src/core/middleware/connect.js'
 import { installPlugin } from './helpers.js'
 
 describe('connect middleware', () => {
+  it('[A28] awaits a foreign-realm identifier rejection instead of trusting the Promise object', async () => {
+    /** A native Promise from a different realm is supported by the public async identifier. */
+    const rejectedIdentity = runInNewContext('Promise.resolve(false)') as Promise<boolean>
+    expect(rejectedIdentity instanceof Promise).toBe(false)
+    /** A supplied source allows the custom verifier to decide identity independently. */
+    const transport = { platform: 'Memory' as const, send() {}, subscribe: () => () => undefined }
+    /** Installation exercises the canonical connect port, rather than a replacement verifier. */
+    const values = installPlugin(
+      connect({ transport, useBaseIdVerifyOnly: false, identifier: () => rejectedIdentity }),
+      transport
+    )
+    /** Verification must preserve the asynchronous false result at the package boundary. */
+    const capability = values.get('connectCapability') as {
+      verify(context: {
+        senderId: string
+        targetId: string
+        source: object
+      }): boolean | Promise<boolean>
+    }
+    await expect(
+      Promise.resolve(capability.verify({ senderId: 'peer', targetId: 'a', source: {} }))
+    ).resolves.toBe(false)
+  })
   it('installs peer verification capability', async () => {
     const transport = {
       platform: 'Memory' as const,
@@ -14,9 +38,9 @@ describe('connect middleware', () => {
     const capability = values.get('connectCapability') as {
       verify(context: { senderId: string; targetId: string }): boolean | Promise<boolean>
     }
-    await expect(capability.verify({ senderId: 'trusted', targetId: 'a' })).resolves.toBe(true)
-    await expect(capability.verify({ senderId: 'other', targetId: 'a' })).resolves.toBe(false)
-    await expect(capability.verify({ senderId: 'trusted', targetId: 'other' })).resolves.toBe(false)
+    expect(await capability.verify({ senderId: 'trusted', targetId: 'a' })).toBe(true)
+    expect(await capability.verify({ senderId: 'other', targetId: 'a' })).toBe(false)
+    expect(await capability.verify({ senderId: 'trusted', targetId: 'other' })).toBe(false)
   })
   it('uses base verification by default and only invokes identifier when explicitly enabled', async () => {
     const transport = {
@@ -39,7 +63,7 @@ describe('connect middleware', () => {
     const capability = values.get('connectCapability') as {
       verify(context: { senderId: string; targetId: string }): boolean | Promise<boolean>
     }
-    await expect(capability.verify({ senderId: 'trusted', targetId: 'a' })).resolves.toBe(true)
+    expect(await capability.verify({ senderId: 'trusted', targetId: 'a' })).toBe(true)
     expect(calls).toBe(0)
     expect(() =>
       installPlugin(connect({ transport, useBaseIdVerifyOnly: false }), transport)
@@ -55,9 +79,7 @@ describe('connect middleware', () => {
         source?: unknown
       }): boolean | Promise<boolean>
     }
-    await expect(capability.verify({ senderId: 'peer', targetId: 'a', source: {} })).resolves.toBe(
-      false
-    )
+    expect(await capability.verify({ senderId: 'peer', targetId: 'a', source: {} })).toBe(false)
   })
   it('accepts source-less identity on an explicitly exclusive Worker transport', async () => {
     const transport = {
@@ -75,14 +97,14 @@ describe('connect middleware', () => {
         topology: 'exclusive'
       }): boolean | Promise<boolean>
     }
-    await expect(
-      capability.verify({
+    expect(
+      await capability.verify({
         senderId: 'peer',
         targetId: 'a',
         platform: 'Worker',
         topology: 'exclusive'
       })
-    ).resolves.toBe(true)
+    ).toBe(true)
   })
   it('rejects a non-boolean base verification option during installation', () => {
     const transport = { platform: 'Memory' as const, send() {}, subscribe: () => () => undefined }
@@ -120,7 +142,7 @@ describe('connect middleware', () => {
     const capability = values.get('connectCapability') as {
       verify(context: { senderId: string; targetId: string }): boolean | Promise<boolean>
     }
-    await expect(capability.verify({ senderId: 'trusted', targetId: 'a' })).resolves.toBe(true)
+    expect(await capability.verify({ senderId: 'trusted', targetId: 'a' })).toBe(true)
   })
   it('snapshots discovery mode before installation', () => {
     const transport = { platform: 'Memory' as const, send() {}, subscribe: () => () => undefined }

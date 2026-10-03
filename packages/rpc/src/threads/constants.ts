@@ -5,7 +5,7 @@ import { RpcCapability } from '../contract/wire-constants.js'
 /** Both ends share this static identity pipeline; no hello is sent on message channels. */
 export const THREAD_CHANNEL_PROFILE = Object.freeze({
   codec: identityCodecV1.id,
-  capabilities: Object.freeze([RpcCapability.stream]),
+  capabilities: Object.freeze([RpcCapability.stream, RpcCapability.batch]),
   pipeline: Object.freeze({ codec: identityCodecV1, framer: messageFramerV1 })
 })
 

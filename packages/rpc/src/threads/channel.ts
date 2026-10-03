@@ -6,6 +6,7 @@ import {
   type INodeMessagePortLike
 } from '../core/adapters/message-port.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
+import { registerBatchAgreement } from '../core/internal/batch-frame.js'
 import type { IRpcTransport } from '../core/transport.js'
 import type { IRemoteChannel } from '../remote/types.js'
 import { THREAD_CHANNEL_PROFILE } from './constants.js'
@@ -30,6 +31,7 @@ function threadChannel(
 ): IRemoteChannel {
   /** Concurrent teardown shares the exact same Promise, including cleanup rejection. */
   let closing: Promise<void> | undefined
+  registerBatchAgreement(transport, options.capabilities ?? THREAD_CHANNEL_PROFILE.capabilities)
   return Object.freeze({
     transport,
     peerId,

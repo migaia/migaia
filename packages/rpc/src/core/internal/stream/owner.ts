@@ -845,6 +845,14 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const admission = new AbortController()
     state.itemAdmission = admission
     const seq = state.seq
+    /** Legacy transports without a gate commit after completion; batch writers commit at invocation. */
+    let started = false
+    /** Commits this credit once without awaiting physical completion before peer reentry. */
+    const commit = () => {
+      started = true
+      state.seq = seq + 1
+      state.busy = false
+    }
     try {
       await this.#yieldDataTurn(state)
       await this.#sendFrame(senderId, id, outboundPayload, {
@@ -852,9 +860,10 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         assertCanSend: () => {
           this.#kernel.assertActive()
           if (state.terminal || state.seq !== seq) throw new RpcAbortError()
-        }
+        },
+        onStarted: commit
       })
-      state.seq += 1
+      if (!started) commit()
     } catch (error) {
       if (state.terminal) return
       const failure = this.#sendFailureReason(error)
@@ -864,11 +873,14 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       } catch (cleanupError) {
         this.#report(cleanupError)
       }
-      await this.#sendFailure(senderId, id, state.seq, failure)
+      await this.#sendFailure(senderId, id, seq, failure)
     }
     admission.abort()
-    state.itemAdmission = undefined
-    state.busy = false
+    /** Earlier physical completion must not clear a subsequent credit's active admission. */
+    if (state.itemAdmission === admission) {
+      state.itemAdmission = undefined
+      state.busy = false
+    }
   }
 
   /** Release one producer state before any terminal notification can reenter it. */

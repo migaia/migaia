@@ -11,7 +11,7 @@ export function createNativeProcessOffer(
   }>
 ): IRpcHandshakeOffer {
   /** Default control capabilities are available to native process endpoints. */
-  const capabilities: string[] = [RpcCapability.ping, RpcCapability.close]
+  const capabilities: string[] = [RpcCapability.ping, RpcCapability.close, RpcCapability.batch]
   if (options.stream) capabilities.push(RpcCapability.stream)
   capabilities.push(...(options.capabilities ?? []))
   /** Set preserves first occurrence and makes caller-added duplicates harmless. */

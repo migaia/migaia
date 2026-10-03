@@ -31,7 +31,16 @@ export const RpcCapability = {
   deadline: 'deadline@1',
   idempotency: 'idempotency@1',
   trace: 'trace@1',
-  stream: 'stream@1'
+  stream: 'stream@1',
+  /** Optional physical grouping; it never introduces a semantic envelope kind. */
+  batch: 'batch@1'
+} as const
+
+/** Physical wrapper fields are shared by native carriers and the negotiated JSON-RPC bridge. */
+export const RpcBatchPhysical = {
+  kind: 'batch',
+  members: 'envelopes',
+  maxBytes: 16 * 1024 * 1024
 } as const
 
 /** JSON is the mandatory codec available to every protocol 1.0 peer. */

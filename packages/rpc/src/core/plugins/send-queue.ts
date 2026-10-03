@@ -1,5 +1,10 @@
 import { registerJsonObjectFeature } from '../internal/json-object-port.js'
 import { carryNativeReplayTransport } from '../internal/native-replay.js'
+import {
+  carryBatchAgreement,
+  isBatchWriter,
+  type IBatchWriteGuard
+} from '../internal/batch-frame.js'
 import { RpcPluginErrorText } from './error-text.js'
 import { createEventChannel } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, hostRethrowReporter } from '@migaia/utils/promise'
@@ -99,6 +104,8 @@ export function createIpcSendQueueFeature(
   let controlHigh = false
   /** Makes gate close idempotent and rejects later admissions. */
   let closed = false
+  /** Original close reason rejects accepted queued members without replacing its identity. */
+  let closeReason: unknown
   /** Shares one event source between endpoint hooks and the optional logger. */
   const events = createEventChannel<IIpcBacklogEvent>({
     report: ({ error }) => hostRethrowReporter(error, IpcReporterContext)
@@ -149,6 +156,15 @@ export function createIpcSendQueueFeature(
     concurrency: 1,
     report: (error) => emit(snapshot(IpcLogEventName['ipc.send.failed'], undefined, error))
   })
+  /** Canonical sender groups physically; this set retains only existing logical capacity lifetimes. */
+  const coalesced = new Set<Promise<void>>()
+  /**
+   * Only the sender's already queued members register cancellation until physical preparation
+   * starts.
+   */
+  const queuedCancellations = new Set<(reason: unknown) => void>()
+  /** Idle observers wait for all accepted logical settlements, including admissions during drain. */
+  const idle = new Set<() => void>()
   /** Gate owns the whole-envelope capacity and settlement lifetime. */
   const gate: IIpcSendGate = Object.freeze({
     run(
@@ -171,8 +187,27 @@ export function createIpcSendQueueFeature(
       if (sendClass === IpcSendClass.data) pendingData += 1
       else pendingControl += 1
       observeWatermark(sendClass)
-      return limiter
-        .run(
+      /** Only the private sender callback bypasses the legacy physical concurrency-one lane. */
+      const coalescing = isBatchWriter(sendNow)
+      let send: Promise<void>
+      if (coalescing) {
+        try {
+          send = Promise.resolve(
+            (sendNow as (guard: IBatchWriteGuard) => void | Promise<void>)((cancelQueued) => {
+              if (closed) throw closeReason
+              if (cancelQueued) {
+                queuedCancellations.add(cancelQueued)
+                return () => {
+                  queuedCancellations.delete(cancelQueued)
+                }
+              }
+            })
+          )
+        } catch (error) {
+          send = Promise.reject(error)
+        }
+      } else
+        send = limiter.run(
           async () => {
             admission?.assertCanSend()
             active = sendClass
@@ -184,6 +219,8 @@ export function createIpcSendQueueFeature(
           },
           admission?.queueSignal === undefined ? undefined : { signal: admission.queueSignal }
         )
+      /** Capacity and reporting retain their original per-envelope settlement boundary. */
+      const settled = send
         .catch((error: unknown) => {
           emit(snapshot(IpcLogEventName['ipc.send.failed'], envelope, error))
           throw error
@@ -192,7 +229,14 @@ export function createIpcSendQueueFeature(
           if (sendClass === IpcSendClass.data) pendingData -= 1
           else pendingControl -= 1
           observeWatermark(sendClass)
+          if (coalescing) coalesced.delete(settled)
+          if (coalescing && coalesced.size === 0) {
+            for (const resolve of idle) resolve()
+            idle.clear()
+          }
         })
+      if (coalescing) coalesced.add(settled)
+      return settled
     },
     onEvent(listener: (event: IIpcBacklogEvent) => void): () => void {
       return events.subscribe((context) => listener(context.value))
@@ -200,11 +244,18 @@ export function createIpcSendQueueFeature(
     close(reason?: unknown): void {
       if (closed) return
       closed = true
-      limiter.close(reason ?? new RpcLifecycleError(RpcCoreErrorText.endpointDisposed))
+      closeReason = reason ?? new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+      limiter.close(closeReason)
+      for (const cancel of queuedCancellations) cancel(closeReason)
+      queuedCancellations.clear()
       events.clear()
     },
     whenIdle(): Promise<void> {
-      return limiter.whenIdle()
+      if (coalesced.size === 0) return limiter.whenIdle()
+      return Promise.all([
+        limiter.whenIdle(),
+        coalesced.size === 0 ? Promise.resolve() : new Promise<void>((resolve) => idle.add(resolve))
+      ]).then(() => undefined)
     }
   })
   /** Native Feature installs the same gate identity selected by the wrapper. */
@@ -299,5 +350,6 @@ export function createIpcSendQueueTransport(
     }
   })
   carryNativeReplayTransport(transport, wrapper)
+  carryBatchAgreement(transport, wrapper)
   return wrapper
 }

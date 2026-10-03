@@ -1,5 +1,9 @@
 import { createOutboundEnvelope } from './outbound-envelope.js'
-import { hasFastEndpoint } from './fast-path.js'
+import { hasFastEndpoint, hasFastComponents } from './fast-path.js'
+import { hasBatchAgreement, batchPayloadLimit } from './batch-frame.js'
+import { readRpcBatchMembers, assertRpcPhysicalFrameSize } from '../../contract/batch-frame.js'
+import type { IInboundIdentityPreparedSource } from './inbound-identity.js'
+import { RpcSerializationError } from '../errors.js'
 import { enableFastTimePort } from './time-port.js'
 import {
   selectedJsonObjectPort,
@@ -178,6 +182,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #pipeline: RpcOutboundSender
   /** Once-finalized private proof selects only the canonical request/response optimization. */
   readonly #fast: boolean
+  /** Immutable carrier/component agreement permits physical batch parsing and sending. */
+  readonly #batch: boolean
+  /** Factory-owned framing overhead is shared by ingress and the existing sender. */
+  readonly #physicalLimit: number
   /** Optional wrapper-owned whole-envelope gate selected before the sender is constructed. */
   readonly #outboundGate: IRpcOutboundGate | undefined
   /** Active request settlements keyed by wire task id. */
@@ -291,6 +299,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           ? (timeout.resolveTimeout as IRpcTimeoutCapability['resolveTimeout'])
           : (override) => (override === undefined ? timeoutDefault : override)
     }
+    this.#batch = hasBatchAgreement(kernel.transport) && hasFastComponents(this.#components)
+    this.#physicalLimit = batchPayloadLimit(kernel.transport)
     this.#fast = hasFastEndpoint(prepared.options)
     if (this.#fast) enableFastTimePort(kernel.time)
     this.#outboundGate = readOutboundGate(kernel.transport)
@@ -302,7 +312,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       kernel.platform,
       this.#outboundGate,
       (error) => this.emitFailure(error, RpcCoreErrorCode.invalidConfig),
-      this.#fast
+      this.#fast,
+      this.#batch,
+      this.#physicalLimit
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
       native: this.#native,
@@ -403,6 +415,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           const physical = this.inboundIdentity.prepareSource(message)
           if (!physical) return
           let frame = physical.data
+          if (this.#batch && (this.#authentication || typeof frame === 'string'))
+            assertRpcPhysicalFrameSize(frame, this.#physicalLimit)
           /** Private physical binding follows this exact context through async transforms. */
           const authenticationContext = {
             direction: 'inbound' as const,
@@ -461,51 +475,44 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             }
             decoded = this.#runtimeComponents.codec.decode(accepted.value)
           }
-          let envelope: IRpcEnvelope
-          /** Unknown fields are reported after normalize returns its once-read kind. */
-          const ignored: Array<readonly [string, string]> = []
-          try {
-            envelope = this.#components.protocol.normalize(decoded, {
-              onUnknownField: (pointer, field) => ignored.push([pointer, field])
-            })
-          } catch (error) {
-            if ((error as { readonly violation?: unknown }).violation === 'unknownKind') {
-              this.#unknownFields.note(
-                physical.sourceToken,
-                'kind',
-                '',
-                String((error as { readonly unknownKindValue?: unknown }).unknownKindValue)
-              )
-              return
+          /**
+           * Unknown/no-capability carriers keep their original normalize path without batch
+           * probing.
+           */
+          let members: readonly unknown[] | undefined
+          if (this.#batch) {
+            try {
+              members = readRpcBatchMembers(decoded)
+            } catch (cause) {
+              throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
             }
-            this.emitFailure(error, RpcCoreErrorCode.transport)
-            return
           }
-          for (const [pointer, field] of ignored)
-            this.#unknownFields.note(physical.sourceToken, envelope.kind, pointer, field)
-          markAuthenticationReplayEnvelope(authenticationContext, envelope)
-          const route = envelope.data
-          const admission = await this.inboundIdentity.admitPrepared(physical, {
-            senderId: route.route.senderId,
-            targetId: route.route.targetId,
-            data: route.payload,
-            inbound: message
-          })
-          if (!admission) return
-          try {
-            this.kernel.assertActive(generation)
-            const handled = await this.kernel.dispatchRoute(
-              envelope.kind,
-              Object.freeze({ envelope, route, inbound: message, admission })
+          if (!members)
+            return this.#receiveEnvelope(
+              decoded,
+              physical,
+              message,
+              generation,
+              authenticationContext
             )
-            if (!handled && envelope.kind === RpcEnvelopeKind.stream)
-              this.emitFailure(
-                new RpcProtocolError(RpcCoreErrorText.streamRouteUnclaimed),
-                RpcCoreErrorCode.protocolInvalid
-              )
-          } finally {
-            admission.release()
-          }
+          /**
+           * Each sibling owns its own identity lease and dispatch completion; no member awaits
+           * another.
+           */
+          const proofs = this.inboundIdentity.splitPrepared(physical, members.length)
+          await Promise.all(
+            members.map((member, index) =>
+              this.#receiveEnvelope(
+                member,
+                proofs[index]!,
+                message,
+                generation,
+                authenticationContext
+              ).catch((error: unknown) => {
+                this.emitFailure(error)
+              })
+            )
+          )
         },
         transportError: (error) => {
           /** Settle with the original transport error before retirement can emit a lifecycle abort. */
@@ -519,6 +526,73 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     )
     this.kernel.activate(activation)
     this.#activated = true
+  }
+
+  /**
+   * Normalizes and admits one semantic member through the existing owner, independently of
+   * siblings.
+   */
+  async #receiveEnvelope(
+    decoded: unknown,
+    physical: IInboundIdentityPreparedSource,
+    message: IRpcInboundMessage,
+    generation: number,
+    authenticationContext: import('../typing.js').IRpcAuthenticationContext
+  ): Promise<void> {
+    let envelope: IRpcEnvelope
+    /** Unknown fields are reported after normalize returns its once-read kind. */
+    const ignored: Array<readonly [string, string]> = []
+    try {
+      envelope = this.#components.protocol.normalize(decoded, {
+        onUnknownField: (pointer, field) => ignored.push([pointer, field])
+      })
+    } catch (error) {
+      if ((error as { readonly violation?: unknown }).violation === 'unknownKind') {
+        this.#unknownFields.note(
+          physical.sourceToken,
+          'kind',
+          '',
+          String((error as { readonly unknownKindValue?: unknown }).unknownKindValue)
+        )
+        return
+      }
+      this.emitFailure(error, RpcCoreErrorCode.transport)
+      return
+    }
+    for (const [pointer, field] of ignored)
+      this.#unknownFields.note(physical.sourceToken, envelope.kind, pointer, field)
+    markAuthenticationReplayEnvelope(authenticationContext, envelope)
+    const route = envelope.data
+    const pendingAdmission = this.inboundIdentity.admitPrepared(
+      physical,
+      {
+        senderId: route.route.senderId,
+        targetId: route.route.targetId,
+        data: route.payload,
+        inbound: message
+      },
+      this.#batch && envelope.kind !== RpcEnvelopeKind.stream
+    )
+    /** Established identity is synchronous; only genuine asynchronous verification yields. */
+    const admission =
+      this.#batch && !(pendingAdmission instanceof Promise)
+        ? pendingAdmission
+        : await pendingAdmission
+    if (!admission) return
+    try {
+      this.kernel.assertActive(generation)
+      const handled = await this.kernel.dispatchRoute(
+        envelope.kind,
+        Object.freeze({ envelope, route, inbound: message, admission })
+      )
+      if (!handled && envelope.kind === RpcEnvelopeKind.stream)
+        this.emitFailure(
+          new RpcProtocolError(RpcCoreErrorText.streamRouteUnclaimed),
+          RpcCoreErrorCode.protocolInvalid
+        )
+    } finally {
+      admission.release()
+    }
   }
 
   /** Sends one request through the canonical single-attempt deadline and cancellation closure. */
@@ -953,7 +1027,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               signals: admission.queueSignal ? [admission.queueSignal] : [],
               assertCanSend: admission.assertCanSend
             }
-          : undefined
+          : undefined,
+        undefined,
+        admission?.onStarted
       )
     })
   }

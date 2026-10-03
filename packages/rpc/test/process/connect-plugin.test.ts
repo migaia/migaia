@@ -148,7 +148,7 @@ describe('process plugin connect binding', () => {
           expect(options.token).toBe('signed-token')
           expect(options.offer).toMatchObject({
             auth: 'signed-token',
-            capabilities: ['ping@1', 'close@1']
+            capabilities: ['ping@1', 'close@1', 'batch@1']
           })
           return {
             ...fixture.channel,

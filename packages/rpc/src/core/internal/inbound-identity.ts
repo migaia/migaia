@@ -122,10 +122,26 @@ export class InboundIdentityCoordinator {
   }
 
   /** Consumes one prepared physical proof before establishing or retaining a logical lease. */
-  async admitPrepared(
+  admitPrepared(
     prepared: IInboundIdentityPreparedSource,
-    request: IInboundIdentityRequest
-  ): Promise<IInboundIdentityAdmission | undefined> {
+    request: IInboundIdentityRequest,
+    synchronous = false
+  ): IInboundIdentityAdmission | undefined | Promise<IInboundIdentityAdmission | undefined> {
+    try {
+      const admission = this.#consumePrepared(prepared, request, synchronous)
+      return synchronous ? admission : Promise.resolve(admission)
+    } catch (error) {
+      if (synchronous) throw error
+      return Promise.reject(error)
+    }
+  }
+
+  /** Qualified batch ingress omits only the legacy async handoff, using the same proof owner. */
+  #consumePrepared(
+    prepared: IInboundIdentityPreparedSource,
+    request: IInboundIdentityRequest,
+    synchronous: boolean
+  ): IInboundIdentityAdmission | undefined | Promise<IInboundIdentityAdmission | undefined> {
     this.#native?.observeOwner()
     if (this.#native && !this.#native.active) return undefined
     if (this.#closed || !this.#prepared.delete(prepared)) return undefined
@@ -152,7 +168,7 @@ export class InboundIdentityCoordinator {
       return undefined
     }
     if (this.#connect?.verify) {
-      const verified = await this.#connect.verify(
+      const verified = this.#connect.verify(
         {
           senderId: request.senderId,
           targetId: request.targetId,
@@ -165,9 +181,37 @@ export class InboundIdentityCoordinator {
         },
         this.#reportRead
       )
-      this.#native?.observeOwner()
-      if (!verified || this.#closed || (this.#native && !this.#native.active)) return undefined
+      if (!synchronous || typeof verified !== 'boolean')
+        return Promise.resolve(verified).then((accepted) =>
+          accepted ? this.#establish(prepared, request, establishedKey) : undefined
+        )
+      if (!verified) return undefined
     }
+    return this.#establish(prepared, request, establishedKey)
+  }
+
+  /** Consumes one physical proof and issues one single-use member proof per logical admission. */
+  splitPrepared(
+    prepared: IInboundIdentityPreparedSource,
+    count: number
+  ): readonly IInboundIdentityPreparedSource[] {
+    if (this.#closed || !this.#prepared.delete(prepared)) return []
+    /** No inbound getter or source-proof callback is reread while issuing member receipts. */
+    return Array.from({ length: count }, () => {
+      const member = Object.freeze({ ...prepared })
+      this.#prepared.add(member)
+      return member
+    })
+  }
+
+  /** Finalizes both synchronous and genuinely asynchronous verification through one binding owner. */
+  #establish(
+    prepared: IInboundIdentityPreparedSource,
+    request: IInboundIdentityRequest,
+    establishedKey: string
+  ): IInboundIdentityAdmission | undefined {
+    this.#native?.observeOwner()
+    if (this.#closed || (this.#native && !this.#native.active)) return undefined
     const token = this.#peers.register(
       request.senderId,
       prepared.peerId,

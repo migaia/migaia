@@ -1,5 +1,6 @@
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { bindNativeReplayTransport } from '../core/internal/native-replay.js'
+import { registerBatchAgreement } from '../core/internal/batch-frame.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
 import { serializeRpcError } from '../contract/error.js'
 import {
@@ -169,6 +170,7 @@ export async function createProcessTransport(
     )
       throw invalidOption(RpcProcessErrorText.staticAgreementMismatch)
     const transport = bindProcessMessageTransport(channel, messageOptions)
+    registerBatchAgreement(transport, local.capabilities)
     return Object.freeze({
       transport,
       peerId: messageOptions.peerId,
@@ -214,9 +216,11 @@ export async function createProcessTransport(
     if (wire.closed) throw createProcessError(RpcProcessErrorCode.channelClosed)
     if (agreement.codec !== RpcCodecId.json)
       throw invalidOption(RpcProcessErrorText.negotiatedCodecUnsupported)
-    wire.activate()
+    wire.activate(agreement.capabilities)
     const ipc = attachIpcConnection(wire.transport, byteOptions.ipc, byteOptions.report)
     bindNativeReplayTransport(channel, ipc.transport)
+    /** Four network-order prefix bytes count toward the complete native physical frame. */
+    registerBatchAgreement(ipc.transport, agreement.capabilities, 4)
     return Object.freeze({
       transport: ipc.transport,
       peerId: byteOptions.peerId,

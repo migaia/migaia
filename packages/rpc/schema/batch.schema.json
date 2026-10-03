@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "migaia.rpc.batch/1",
+  "title": "Physical batch@1 wrapper; semantic envelope version remains 1.1",
+  "type": "object",
+  "required": [
+    "kind",
+    "envelopes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "const": "batch"
+    },
+    "envelopes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "envelope.schema.json"
+      }
+    }
+  },
+  "x-migaia-max-physical-bytes": 16777216
+}

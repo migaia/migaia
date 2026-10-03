@@ -58,7 +58,8 @@ export const RpcCoreErrorCode = {
 
   /**
    * Codec 的 payload 不符合其输入规则，或发送端错误序列化的读取、data 投影降级；作为 `RpcSerializationError` / `RpcChunkError`
-   * 的基础码。
+   * 的基础码。 Physical batch shape/encoding failures preserve the contract cause; malformed semantic
+   * members are reported individually without discarding valid siblings.
    *
    * 调用方检查 data、codec 或抛出值；载荷已照常发送或取消已生效时不应重试同一 payload。
    */
