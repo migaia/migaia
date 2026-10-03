@@ -53,6 +53,12 @@ export type IGenerationController = {
   begin(options?: { readonly timeoutMs?: number }): IGenerationRequest
   isCurrent(token: IGenerationToken): boolean
   /**
+   * Releases the matching current token's timer and parent subscription without aborting its
+   * signal. Returns false for stale/disposed tokens; cleanup failures retain cancellation codes and
+   * causes after invalidating the token.
+   */
+  complete(token: IGenerationToken): boolean
+  /**
    * Invalidates the current generation without disposing the controller — a later `begin()` still
    * works.
    */
@@ -142,7 +148,8 @@ export function createGenerationController(
   let currentTimer: IScheduledTask | undefined
   let disposed = false
 
-  const abortCurrent = (reason?: unknown): void => {
+  /** Invalidates current ownership before shared timer/parent cleanup, optionally aborting signal. */
+  const releaseCurrent = (reason?: unknown, shouldAbort = true): void => {
     const errors: unknown[] = []
     const runCleanup = (cleanup: () => void): void => {
       try {
@@ -179,7 +186,7 @@ export function createGenerationController(
           )
         }
       })
-    if (controller) runCleanup(() => controller.abort(reason))
+    if (controller && shouldAbort) runCleanup(() => controller.abort(reason))
     if (errors.length === 1) {
       throw createLifecycleFailure(
         LifecycleErrorCode.generationCancellationFailed,
@@ -196,7 +203,7 @@ export function createGenerationController(
   }
 
   /** Invalidates a parent-driven generation using the reason captured by the subscription. */
-  const abortFromParent = (reason: unknown): void => abortCurrent(reason)
+  const abortFromParent = (reason: unknown): void => releaseCurrent(reason)
 
   /** Rolls back a partially admitted generation and throws the original admission failure. */
   const rollbackAdmission = (
@@ -213,7 +220,7 @@ export function createGenerationController(
       }
     }
     try {
-      abortCurrent(primary)
+      releaseCurrent(primary)
     } catch (error) {
       appendCleanupErrors(cleanupErrors, error)
     }
@@ -275,7 +282,7 @@ export function createGenerationController(
         )
       }
       if (timeoutMs !== undefined) validateSchedulerDelay(timeoutMs, 'timeoutMs')
-      abortCurrent('superseded by a new generation')
+      releaseCurrent('superseded by a new generation')
       generation++
       const token: IGenerationToken = {}
       const controller = createController()
@@ -289,7 +296,7 @@ export function createGenerationController(
           if (parentSignal.aborted) {
             // 已 abort 的 parent：本次 generation 立即失效，不建 timer、不建 listener。
             const reason = parentSignal.reason
-            abortCurrent(reason)
+            releaseCurrent(reason)
             invalidatedByParent = true
           } else {
             const registrationErrors: unknown[] = []
@@ -322,7 +329,7 @@ export function createGenerationController(
             scheduled = scheduler.schedule(() => {
               firedSynchronously = scheduling
               try {
-                abortCurrent('generation timed out')
+                releaseCurrent('generation timed out')
               } catch (error) {
                 callbackFailed = true
                 callbackFailure = error
@@ -361,10 +368,16 @@ export function createGenerationController(
     isCurrent(token) {
       return !disposed && currentToken === token
     },
+    /** Completes only the admitted current token; successful release never aborts its signal. */
+    complete(token) {
+      if (disposed || currentToken !== token) return false
+      releaseCurrent(undefined, false)
+      return true
+    },
     supersede(reason) {
       if (disposed) return
       generation++
-      abortCurrent(reason)
+      releaseCurrent(reason)
     },
     adopt(token, value, release, onReleaseError) {
       if (!disposed && currentToken === token) return true
@@ -394,7 +407,7 @@ export function createGenerationController(
       if (disposed) return
       disposed = true
       generation++
-      abortCurrent(reason)
+      releaseCurrent(reason)
     }
   }
 }

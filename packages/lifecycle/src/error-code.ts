@@ -68,8 +68,9 @@ export const LifecycleErrorCode = {
   generationSuperseded: 'GENERATION_SUPERSEDED',
 
   /**
-   * Generation 取消期间的 timer、parent listener 或 signal cleanup 失败。 generation 作废必须先完成状态收敛并按登记顺序保留所有
-   * cleanup 失败，落实 lifecycle-extraction.sdd.md §4.10.2；调用方应处理该错误并依赖新 generation，不得复活旧 generation。
+   * Generation 取消或 complete 成功释放期间的 timer、parent listener 或 signal cleanup 失败。 generation
+   * 作废必须先完成状态收敛并按登记顺序保留所有 cleanup 失败，落实 lifecycle-extraction.sdd.md §4.10.2；调用方应处理该错误并依赖新
+   * generation，不得复活旧 generation。
    */
   generationCancellationFailed: 'GENERATION_CANCELLATION_FAILED',
 

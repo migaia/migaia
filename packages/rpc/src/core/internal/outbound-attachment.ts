@@ -573,7 +573,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       { ...options, timeoutMs: remaining },
       [operation.signal, ...(options.signal ? [options.signal] : [])],
       operation
-    ).finally(() => operation.abort())
+    ).finally(() => operation.finish())
   }
 
   /** Owns one request's task id, pending settlement, timeout, and abort listeners. */
@@ -626,6 +626,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         if (settled) return
         settled = true
         cleanup()
+        operation.markSuccess()
         resolve(value as T)
       }
       // Matches legacy `notifyRemoteAbort()`: told the remote provider to cancel its active
