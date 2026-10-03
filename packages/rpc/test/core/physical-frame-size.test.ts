@@ -8,6 +8,7 @@ import {
   createOutboundEnvelope,
   outboundJsonByteUpperBound
 } from '../../src/core/internal/outbound-envelope.js'
+import { RpcSerializationError } from '../../src/core/errors.js'
 import { RpcOutboundSender } from '../../src/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../src/core/internal/endpoint-options.js'
 
@@ -144,4 +145,71 @@ it('[A27-FIX3] the owned upper bound includes JSON null slots preserved by porta
     outboundJsonByteUpperBound(message)! >= measureRpcPhysicalFrame(message),
     '[A27-FIX3] an admitted sparse array cannot bypass exact physical sizing with an unsafe bound'
   )
+})
+
+it('[A27-FIX5] queued opaque sizing failures keep the serialization category and native cause', async () => {
+  /** The supported variation contract preserves opaque payload identity, including cycles. */
+  const payload: { cycle?: unknown } = {}
+  payload.cycle = payload
+  /** Normalization keeps the opaque value outside the owned portable size proof. */
+  const message = createOutboundEnvelope({
+    kind: 'variation',
+    id: 'opaque-size-failure',
+    data: {
+      route: {
+        profile: 'migaia.rpc.route',
+        type: 'variation',
+        variation: 'ping',
+        applicationVersion: '1',
+        senderId: 'a',
+        targetId: 'b',
+        receiverId: 'b',
+        sentAt: 0
+      },
+      payload
+    }
+  })
+  /** Keep one real write pending so the opaque singleton is prepared by the FIFO drain. */
+  let releaseWrite!: () => void
+  /** Only the first transport write is held; failed serialization must never write a frame. */
+  const pending = new Promise<void>((resolve) => {
+    releaseWrite = resolve
+  })
+  /** Delivered frame count observes rollback at the existing physical boundary. */
+  const frames: unknown[] = []
+  /** Identity codec admits the variation before exact JSON sizing discovers its native cycle. */
+  const sender = new RpcOutboundSender(
+    {
+      platform: 'Memory',
+      send: (value) => {
+        frames.push(value)
+        return pending
+      }
+    },
+    'a',
+    {
+      protocol: rpcProtocolV1,
+      codec: identityCodecV1 as unknown as IRpcSelectedComponents['codec'],
+      framer: messageFramerV1,
+      ingressPrepare: (frame) => ({ frame, messageId: 'whole' }),
+      shadowed: []
+    },
+    undefined,
+    'Memory',
+    undefined,
+    undefined,
+    true,
+    true
+  )
+  /** The queued failure is observed before releasing the transport to avoid a late rejection. */
+  const first = sender.send(sizeRequest('held'))
+  /** The pre-existing category distinguishes encoding failure from physical oversize. */
+  const rejected = assert.rejects(Promise.resolve(sender.send(message)), (error: unknown) => {
+    assert.ok(error instanceof RpcSerializationError)
+    assert.ok(error.cause instanceof TypeError)
+    return true
+  })
+  releaseWrite()
+  await Promise.all([first, rejected])
+  assert.equal(frames.length, 1)
 })

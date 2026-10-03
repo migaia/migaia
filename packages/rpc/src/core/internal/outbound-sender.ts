@@ -335,12 +335,13 @@ export class RpcOutboundSender {
         })
         value = frames[0]
       }
-      if (entries.length === 1) {
-        /** Queued singletons reuse the same admitted size proof as idle physical writes. */
-        this.#assertPhysicalSize(value)
-      } else if (measureRpcPhysicalFrame(value) > this.#physicalLimit) {
+      /** Singleton proofs skip byte scans; exact sizing retains this queue's original error policy. */
+      const bound = entries.length === 1 ? outboundJsonByteUpperBound(value) : undefined
+      if (
+        (bound === undefined || bound > this.#physicalLimit) &&
+        measureRpcPhysicalFrame(value) > this.#physicalLimit
+      )
         return this.#splitBatch(entries)
-      }
       return [{ entries, value }]
     } catch (cause) {
       /** Existing native contract/authentication errors retain their original instances and causes. */
