@@ -8,12 +8,12 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * X14 r32 pins I26 after reusing the single sender and canonical physical-size owner. The measured
- * two private batch modules add no unmeasured headroom.
+ * X14 r32 pins the regression repair after compressing its proven-size bound. The exact measured
+ * increase preserves the 16 MiB guard without adding any module or unmeasured headroom.
  */
 const allowedIncrease = {
-  rawBytes: 128600 / legacyRoot.rawBytes,
-  gzipBytes: 32779 / legacyRoot.gzipBytes
+  rawBytes: 130243 / legacyRoot.rawBytes,
+  gzipBytes: 33314 / legacyRoot.gzipBytes
 } as const
 
 /** I22–I26 ownership includes the two canonical physical batch modules. */

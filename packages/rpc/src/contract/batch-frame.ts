@@ -36,6 +36,8 @@ export function measureRpcPhysicalFrame(value: unknown): number {
 
 /** Enforces the whole physical byte limit with the contract owner's native coded error. */
 export function assertRpcPhysicalFrameSize(value: unknown, limit: number): void {
+  /** UTF-8 needs at most three bytes per UTF-16 unit, including unpaired-surrogate replacement. */
+  if (typeof value === 'string' && value.length <= Math.floor(limit / 3)) return
   if (measureRpcPhysicalFrame(value) > limit) rejectRpcPhysicalFrameSize()
 }
 

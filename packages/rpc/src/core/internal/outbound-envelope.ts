@@ -20,6 +20,31 @@ export function isOutboundEnvelope(value: unknown): value is IRpcEnvelope {
 }
 
 /**
+ * Bounds JSON bytes only for the existing immutable portable snapshot proof. Six bytes per UTF-16
+ * unit cover JSON escapes; an inconclusive bound falls back to exact physical sizing at the
+ * caller.
+ */
+export function outboundJsonByteUpperBound(value: unknown): number | undefined {
+  if (!isOutboundEnvelope(value)) return undefined
+  return portableJsonByteUpperBound(value)
+}
+
+/** Counts snapshot structure without encoding or visiting characters of string payloads. */
+function portableJsonByteUpperBound(value: unknown): number {
+  if (typeof value === 'string') return value.length * 6 + 2
+  /** Finite numbers, booleans, null and omitted undefined fields need at most 32 JSON bytes. */
+  if (value === null || typeof value !== 'object') return 32
+  /** The normalizer already proved an acyclic own-data tree; no validation is duplicated here. */
+  let bytes = 2
+  for (const key of Object.keys(value)) {
+    /** Array indices are omitted by JSON; including their names still provides a safe upper bound. */
+    bytes +=
+      key.length * 6 + 4 + portableJsonByteUpperBound((value as Record<string, unknown>)[key])
+  }
+  return bytes
+}
+
+/**
  * Copies validated snapshots once, sorting owned JSON output or retaining legacy snapshot key
  * order.
  */

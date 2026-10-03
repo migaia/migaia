@@ -26,6 +26,7 @@ import {
   rejectRpcPhysicalFrameSize
 } from '../../contract/batch-frame.js'
 import { resolveAbortReason } from './async-control.js'
+import { outboundJsonByteUpperBound } from './outbound-envelope.js'
 
 /** One logical settlement remains owned until its actual physical write completes. */
 type IQueuedEnvelope = {
@@ -552,6 +553,9 @@ export class RpcOutboundSender {
   /** Physical admission retains the existing transport error and original native cause. */
   #assertPhysicalSize(value: unknown): void {
     try {
+      /** Existing owned-envelope proof avoids JSON encoding solely to size an identity frame. */
+      const bound = outboundJsonByteUpperBound(value)
+      if (bound !== undefined && bound <= this.#physicalLimit) return
       assertRpcPhysicalFrameSize(value, this.#physicalLimit)
     } catch (cause) {
       throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
