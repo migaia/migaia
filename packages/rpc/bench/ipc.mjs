@@ -43,10 +43,11 @@ export const Da1BenchThreshold = Object.freeze({
  * @param {{ order: string[]; bare: object; rpc: object }[]} rounds Complete original receipts.
  * @param {'small' | 'large' | 'concurrency'} scenario Registered budget domain.
  * @param {number} floor Frozen throughput floor for concurrency only.
+ * @param {{ baseline: object; noiseBand: number }} [guard] Frozen W3 p50 and same-window A/A noise.
  * @returns {object} Median ratios, every round and exact threshold disposition.
  * @throws {Error} Incomplete measurements or absent PID denominators.
  */
-export function judgeDa1Pairs(rounds, scenario, floor) {
+export function judgeDa1Pairs(rounds, scenario, floor, guard) {
   /** Existing oracle preserves configuration, sample, attribution and alternating-order guards. */
   const original = judgePairs(rounds)
   /** Role matching compares equivalent processes, never unrelated numeric PID identities. */
@@ -121,6 +122,9 @@ export function judgeDa1Pairs(rounds, scenario, floor) {
     if (thresholds[key] !== undefined)
       for (const [role, ratio] of Object.entries(ratios[key]))
         if (ratio > thresholds[key]) failedMetrics.push(key + '.' + role)
+  /** Relative p50 regression is judged separately from the unchanged absolute DA1 budgets. */
+  const regression = guard ? judgeW3Regression(rounds, guard.baseline, guard.noiseBand) : undefined
+  if (regression?.status === 'fail') failedMetrics.push('w3.p50')
   return {
     type: 'da1-ratio',
     status: failedMetrics.length ? 'fail' : 'pass',
@@ -130,7 +134,43 @@ export function judgeDa1Pairs(rounds, scenario, floor) {
     failedMetrics,
     ratiosByRound: original.ratiosByRound,
     endpointRatiosByRound: byRound,
-    samples: original.samples
+    samples: original.samples,
+    ...(regression ? { regression } : {})
+  }
+}
+
+/**
+ * Compare every retained pair's RPC/bare p50 with the frozen pre-program implementation.
+ *
+ * @param {object[]} rounds Three complete alternating bare/RPC pairs.
+ * @param {object} baseline Frozen W3 ratio and original raw-data provenance.
+ * @param {number} noiseBand Maximum measured A/A change of the same normalized metric.
+ * @returns {object} Original pair ratios, median and independent no-regression verdict.
+ * @throws {Error} Missing baseline, noise or nonpositive latency denominator.
+ */
+export function judgeW3Regression(rounds, baseline, noiseBand) {
+  if (!(baseline?.p50Ratio > 0) || !Number.isFinite(noiseBand) || noiseBand < 0)
+    throw new Error(IpcBenchErrorText.paired)
+  /** Nearest rank is recomputed from full samples, including original browser clock observations. */
+  const ratiosByRound = rounds.map(({ bare, rpc }) => {
+    /** Browser clock resolution can produce genuine zero samples; no sample is clamped or removed. */
+    const options = { allowClockResolutionZero: bare.unit.carrier === 'browser-worker' }
+    const denominator = nearestRank(bare.latenciesNs, 0.5, options)
+    if (!(denominator > 0)) throw new Error(IpcBenchErrorText.paired)
+    return nearestRank(rpc.latenciesNs, 0.5, options) / denominator
+  })
+  /** Three original pairs determine the median without selecting a favorable launch. */
+  const candidateRatio = [...ratiosByRound].sort((a, b) => a - b)[1]
+  /** A positive change means worse normalized RPC latency than the original frozen W3 data. */
+  const relativeChange = candidateRatio / baseline.p50Ratio - 1
+  return {
+    status: relativeChange > noiseBand ? 'fail' : 'pass',
+    metric: 'median of three paired RPC/bare p50 ratios',
+    baseline,
+    candidateRatio,
+    relativeChange,
+    noiseBand,
+    ratiosByRound
   }
 }
 
@@ -452,6 +492,8 @@ async function pairedMain() {
   let selectedId
   /** Complete raw sides are saved before their summaries, never discarded after failure. */
   let output
+  /** The serial window supplies its own W3/W3 calibration; historical noise is never substituted. */
+  let noisePath
   /** Preparation checks capabilities before freezing the formal inventory. */
   let prepare = false
   /** Listing never starts a measured side. */
@@ -460,6 +502,7 @@ async function pairedMain() {
     if (args[index] === '--scenario') scenario = args[++index]
     else if (args[index] === '--unit') selectedId = args[++index]
     else if (args[index] === '--output') output = args[++index]
+    else if (args[index] === '--noise') noisePath = args[++index]
     else if (args[index] === '--prepare') prepare = true
     else if (args[index] === '--list') list = true
     else throw new Error(IpcBenchErrorText.inventory)
@@ -491,6 +534,17 @@ async function pairedMain() {
     )
     return
   }
+  /** Frozen ratios ship with the benchmark only; this adds no production endpoint API. */
+  const baseline = prepare
+    ? undefined
+    : JSON.parse(await readFile(new URL('./w3-baseline.json', import.meta.url)))
+  /** A missing current-window calibration cannot yield a no-regression claim. */
+  const noise = prepare ? undefined : noisePath ? JSON.parse(await readFile(noisePath)) : undefined
+  if (
+    !prepare &&
+    (!noise || noise.sourceCommit !== baseline.sourceCommit || noise.representatives?.length !== 4)
+  )
+    throw new Error(IpcBenchErrorText.paired)
   if (
     !prepare &&
     (!inventory.frozen || units.some((unit) => unit.status !== 'supported' || !unit.evidence))
@@ -577,7 +631,11 @@ async function pairedMain() {
               : unit.payloadBytes <= 1024
                 ? 'small'
                 : 'large',
-            unit.throughputFloor
+            unit.throughputFloor,
+            {
+              baseline: { ...baseline.cells[unit.id], sourceCommit: baseline.sourceCommit },
+              noiseBand: noise.p50RatioNoiseBand
+            }
           )
       const result = {
         ...judged,
