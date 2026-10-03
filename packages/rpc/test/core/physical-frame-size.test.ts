@@ -4,13 +4,16 @@ import { identityCodecV1 } from '@migaia/serialize/codec'
 import { rpcProtocolV1 } from '../../src/contract/index.js'
 import { messageFramerV1 } from '../../src/contract/framing/message-framer.js'
 import { measureRpcPhysicalFrame } from '../../src/contract/batch-frame.js'
-import { createOutboundEnvelope } from '../../src/core/internal/outbound-envelope.js'
+import {
+  createOutboundEnvelope,
+  outboundJsonByteUpperBound
+} from '../../src/core/internal/outbound-envelope.js'
 import { RpcOutboundSender } from '../../src/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../src/core/internal/endpoint-options.js'
 
-it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or serializing its payload', async () => {
-  /** Same portable envelope and canonical identity codec used by the native Worker sender. */
-  const message = createOutboundEnvelope({
+/** Build the same portable envelope used by the native Worker sender and sizing boundary. */
+function sizeRequest(payload: unknown) {
+  return createOutboundEnvelope({
     kind: 'request',
     id: 'size-positive-control',
     method: 'echo',
@@ -24,9 +27,14 @@ it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or se
         receiverId: 'b',
         sentAt: 0
       },
-      payload: 'x'.repeat(1_048_576)
+      payload
     }
   })
+}
+
+it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or serializing its payload', async () => {
+  /** The actual canonical snapshot carries the private sender sizing proof. */
+  const message = sizeRequest('x'.repeat(1_048_576))
   /** The actual sender owns idle/busy admission and the delivered frame identity. */
   const frames: unknown[] = []
   /** No receiver or host timing is simulated in this execution-count discriminator. */
@@ -100,4 +108,16 @@ it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or se
     Object.defineProperty(String.prototype, 'codePointAt', characterDescriptor)
     Object.defineProperty(JSON, 'stringify', jsonDescriptor)
   }
+})
+
+it('[A27-FIX3] the owned upper bound includes JSON null slots preserved by portable normalization', () => {
+  /** Array.map retains holes; JSON represents every absent slot as null. */
+  const payload: unknown[] = []
+  payload.length = 4096
+  /** The admitted array keeps its absent own indices. */
+  const message = sizeRequest(payload)
+  assert.ok(
+    outboundJsonByteUpperBound(message)! >= measureRpcPhysicalFrame(message),
+    '[A27-FIX3] an admitted sparse array cannot bypass exact physical sizing with an unsafe bound'
+  )
 })
