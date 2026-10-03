@@ -10,7 +10,7 @@ export const LifecycleErrorText = {
   disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed',
   /** Fallback message for a queue timeout wrapper around a non-Error primary. */
   mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out',
-  /** Explains that generation cancellation had multiple cleanup failures. */
+  /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */
   generationCancellationFailed: '[lifecycle] generation cancellation failed',
   /** Explains that a disposal ledger no longer accepts new item callbacks. */
   disposalLedgerClosed: '[lifecycle] disposal ledger is sealed',

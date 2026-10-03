@@ -401,6 +401,7 @@ type IGenerationController = {
   readonly disposed: boolean
   begin(options?: { readonly timeoutMs?: number }): IGenerationRequest
   isCurrent(token: IGenerationToken): boolean
+  complete(token: IGenerationToken): boolean
   supersede(reason?: unknown): void
   adopt<T>(
     token: IGenerationToken,
@@ -429,6 +430,7 @@ if (generations.adopt(request.token, result, (v) => v.close())) {
 - `begin(options?)`：使当前活跃代（若存在）立即失效（触发其 `signal` 中止），`generation` 自增，返回新的 `{ generation, token, signal }`。`options.timeoutMs?` 非法（非有限/负数）抛 `INVALID_OPTION`；超过该毫秒数后当前代的 `signal` 自动中止。控制器已 `dispose()` 后调用抛 `GENERATION_DISPOSED`。
 - `isCurrent(token)`：`token` 是否仍是当前代；`dispose()` 之后恒为 `false`。
 - `supersede(reason?)`：作废当前代（其 `signal` 中止）但控制器本身仍可用，之后 `begin()` 仍能开新代；对已 `dispose()` 的控制器调用是空操作。
+- `complete(token)`：只释放匹配的当前代，返回 true 并使 token 不再 current；先清 timer、再移除 parent listener，保持 signal 未中止。stale/disposed token 返回 false，不影响当前代。cleanup 失败仍以原 `GENERATION_CANCELLATION_FAILED` 保留原 cause，失败后 token 已作废；后续 `begin()` 仍可用。真正取消继续使用 `supersede`/parent/timeout/dispose，保持原 signal 与 reason。
 - `adopt(token, value, release, onReleaseError?)`：`token` 仍是当前代时返回 `true`，`value` 留给调用方；否则调用 `release(value)` 回收并返回 `false`——`release` 本身抛出/reject 只会经 `onReleaseError` 上报，绝不反过来污染"当前是哪一代"这一状态（不会抛出、不会重新计入错误策略）。若提供了 `onSuperseded`，在过期路径上先额外触发一次携带 `GENERATION_SUPERSEDED` 码的诊断信息（非失败信号）。
 - `dispose(reason?)`：终态；之后 `begin()` 恒抛 `GENERATION_DISPOSED`，`isCurrent()` 恒 `false`。
 - `parentSignal` 中止时，当前活跃代同步中止（清理 timer、移除 parent listener、abort 自身 controller）；清理过程中任一步失败会聚合为 `GENERATION_CANCELLATION_FAILED`。

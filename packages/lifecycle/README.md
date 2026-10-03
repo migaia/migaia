@@ -217,7 +217,7 @@ if (generations.adopt(request.token, result, (v) => v.close())) {
 - `onSuperseded?: (info: ILifecycleError) => void` —— `adopt()` 发现 token 已过期时的诊断钩子（`GENERATION_SUPERSEDED`），不是失败信号
 - `scheduler?: IScheduler` —— 默认 `systemScheduler`；驱动 `begin({ timeoutMs })` 的计时
 
-返回方法：`generation`（只读当前代号）、`disposed`（只读）、`begin(options?)` → `{ generation, token, signal }`（`options.timeoutMs?: number`，超时/父中止/新 `begin()` 都会使这个 token 的 `signal` 中止）、`isCurrent(token)`、`supersede(reason?)`（作废当前代但控制器仍可用）、`adopt(token, value, release, onReleaseError?)`、`dispose(reason?)`（终态，之后 `begin()` 抛 `GENERATION_DISPOSED`）。
+返回方法：`generation`（只读当前代号）、`disposed`（只读）、`begin(options?)` → `{ generation, token, signal }`（`options.timeoutMs?: number`，超时/父中止/新 `begin()` 都会使这个 token 的 `signal` 中止）、`isCurrent(token)`、`complete(token)`（仅匹配当前代时返回 true，作废 token 并释放 timer/parent listener，不中止其 signal；旧 token/已 dispose 返回 false）、`supersede(reason?)`（作废当前代但控制器仍可用）、`adopt(token, value, release, onReleaseError?)`、`dispose(reason?)`（终态，之后 `begin()` 抛 `GENERATION_DISPOSED`）。
 
 ---
 

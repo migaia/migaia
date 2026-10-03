@@ -1,9 +1,134 @@
+import assert from 'node:assert/strict'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createGenerationController,
   type IGenerationControllerOptions
 } from '../src/generation-controller.js'
 import { LifecycleErrorCode } from '../src/error-code.js'
+
+/** Optional pre-implementation seam makes missing complete an assertion, never a TypeError. */
+type ICompletionController = ReturnType<typeof createGenerationController> & {
+  readonly complete?: (token: object) => boolean
+}
+
+describe('P2-A generation completion', () => {
+  it('[A16] completes only the current token and cleans timer before parent without abort', () => {
+    /** Parent cleanup is a real native subscription and is observed independently of timer cleanup. */
+    const parent = new AbortController()
+    /** Records canonical cleanup order without adding a second lifecycle implementation. */
+    const order: string[] = []
+    /** Native parent removal remains the owner action after observation. */
+    const originalRemove = parent.signal.removeEventListener
+    /** Observation preserves the native built-in receiver semantics. */
+    const remove = vi.spyOn(parent.signal, 'removeEventListener').mockImplementation((...args) => {
+      order.push('parent')
+      Reflect.apply(originalRemove, parent.signal, args)
+    })
+    /** Test scheduler exposes exactly the currently acquired timer's cancellation. */
+    const controller: ICompletionController = createGenerationController({
+      parentSignal: parent.signal,
+      scheduler: {
+        now: () => 0,
+        schedule: () => ({
+          cancel: () => {
+            order.push('timer')
+          }
+        })
+      }
+    })
+    try {
+      assert.equal(typeof controller.complete, 'function', '[A16] lifecycle complete must exist')
+      assert.ok(controller.complete)
+      /** First token becomes stale through the original begin cancellation path. */
+      const first = controller.begin({ timeoutMs: 10 })
+      /** Current token owns one parent registration and one timer. */
+      const current = controller.begin({ timeoutMs: 10 })
+      order.length = 0
+      assert.equal(controller.complete(first.token), false)
+      assert.equal(controller.isCurrent(current.token), true)
+      assert.deepEqual(order, [])
+      assert.equal(controller.complete(current.token), true)
+      assert.deepEqual(order, ['timer', 'parent'])
+      assert.equal(current.signal.aborted, false)
+      assert.equal(controller.isCurrent(current.token), false)
+      assert.equal(controller.complete(current.token), false)
+      parent.abort()
+      assert.equal(current.signal.aborted, false)
+      controller.dispose()
+      assert.equal(controller.complete(current.token), false)
+    } finally {
+      remove.mockRestore()
+      controller.dispose()
+    }
+  })
+
+  it('[A16] completion cleanup failures preserve the native primary and still remove parent', () => {
+    /** Native parent subscription is still released after timer cancellation fails. */
+    const parent = new AbortController()
+    /** Original supported scheduler failure must stay reachable from the package error. */
+    const primary = new RangeError('fixture completion timer failure')
+    /** Counts the original subscription cleanup rather than a fixture-owned cancellation. */
+    const remove = vi.spyOn(parent.signal, 'removeEventListener')
+    /** Scheduler failure is the same reachable cleanup branch as supersede/dispose. */
+    const controller: ICompletionController = createGenerationController({
+      parentSignal: parent.signal,
+      scheduler: {
+        now: () => 0,
+        schedule: () => ({
+          cancel: () => {
+            throw primary
+          }
+        })
+      }
+    })
+    try {
+      assert.equal(typeof controller.complete, 'function', '[A16] lifecycle complete must exist')
+      assert.ok(controller.complete)
+      /** Current generation must be invalidated before any fallible cleanup. */
+      const current = controller.begin({ timeoutMs: 10 })
+      assert.throws(
+        () => controller.complete!(current.token),
+        (error: unknown) => {
+          assert.equal(
+            (error as { code: unknown }).code,
+            LifecycleErrorCode.generationCancellationFailed
+          )
+          assert.equal(error, primary)
+          assert.ok(error instanceof RangeError)
+          assert.ok(primary.stack)
+          return true
+        }
+      )
+      assert.equal(remove.mock.calls.length, 1)
+      assert.equal(controller.isCurrent(current.token), false)
+      assert.equal(controller.complete(current.token), false)
+      assert.equal(current.signal.aborted, false)
+    } finally {
+      remove.mockRestore()
+      controller.dispose()
+    }
+  })
+
+  it('[A16] later real cancellation retains the exact native reason after successful completion', () => {
+    /** Completion must leave the controller reusable for a later supported generation. */
+    const controller: ICompletionController = createGenerationController()
+    assert.equal(typeof controller.complete, 'function', '[A16] lifecycle complete must exist')
+    assert.ok(controller.complete)
+    /** First generation is genuinely completed while its signal remains live. */
+    const completed = controller.begin()
+    assert.equal(controller.complete(completed.token), true)
+    /** Next generation uses the original cancellation path and signal. */
+    const current = controller.begin()
+    /** Native reason identity, type and stack are part of the unchanged cancellation contract. */
+    const reason = new DOMException('fixture actual cancellation', 'AbortError')
+    controller.supersede(reason)
+    assert.equal(current.signal.reason, reason)
+    assert.equal(current.signal.aborted, true)
+    assert.ok(reason instanceof DOMException && reason.stack)
+    assert.equal(completed.signal.aborted, false)
+    controller.dispose()
+  })
+})
 
 describe('L-T6 GenerationController: new generation, late arrival, disposed', () => {
   it('Round24 L-T60: invalid timeout preserves current generation state exactly', () => {

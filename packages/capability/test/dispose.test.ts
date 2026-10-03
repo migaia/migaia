@@ -28,6 +28,10 @@ vi.mock('@migaia/lifecycle', async () => {
         isCurrent(token: IGenerationToken): boolean {
           return controller.isCurrent(token)
         },
+        /** Forward the public completion increment without altering this cleanup-failure fixture. */
+        complete(token: IGenerationToken): boolean {
+          return controller.complete(token)
+        },
         supersede(reason?: unknown): void {
           controller.supersede(reason)
         },

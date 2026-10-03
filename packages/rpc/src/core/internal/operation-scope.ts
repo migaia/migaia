@@ -1,5 +1,9 @@
 import { RpcCoreErrorText } from '../error-text.js'
-import { createGenerationController, type IGenerationController } from '@migaia/lifecycle'
+import {
+  createGenerationController,
+  type IGenerationController,
+  type IGenerationToken
+} from '@migaia/lifecycle'
 import { RpcLifecycleError, RpcTimeoutError } from '../errors.js'
 import type { IAbortSignal } from './async-control.js'
 
@@ -17,12 +21,20 @@ export class OperationScope {
   readonly signal: IAbortSignal
   /** Owns the operation's AbortSignal and parent closing-signal linkage. */
   readonly #controller: IGenerationController
+  /** Matches completion to this scope's admission, never a later generation. */
+  readonly #token: IGenerationToken
+  /** Endpoint receive generation whose work this scope can still commit. */
   readonly #generation: number
+  /** Absolute deadline used to preserve the caller's single total timeout budget. */
   readonly #deadlineAt: number | undefined
   /** Endpoint clock shared with the operation timer. */
   readonly #now: () => number
+  /** Prevents repeated cancellation/completion and rejects later work on this scope. */
   #closed = false
+  /** Set only after pending success cleanup; actual scope release stays in the original finally. */
+  #succeeded = false
 
+  /** Admits one operation through lifecycle's canonical generation owner and closing signal. */
   constructor(
     generation: number,
     timeoutMs: number | false | undefined,
@@ -34,7 +46,10 @@ export class OperationScope {
     this.#deadlineAt =
       timeoutMs === undefined || timeoutMs === false ? undefined : now() + timeoutMs
     this.#controller = createGenerationController({ parentSignal: closingSignal })
-    this.signal = this.#controller.begin().signal
+    /** Keep the token and signal from the same canonical admission. */
+    const request = this.#controller.begin()
+    this.#token = request.token
+    this.signal = request.signal
   }
 
   /** Returns the remaining operation budget, preserving false as unlimited. */
@@ -56,5 +71,21 @@ export class OperationScope {
     if (this.#closed) return
     this.#closed = true
     this.#controller.supersede(reason)
+  }
+
+  /** Marks ordinary success after pending cleanup and before resolving the existing promise. */
+  markSuccess(): void {
+    this.#succeeded = true
+  }
+
+  /** Runs in the existing finally reaction, choosing success release or original cancellation. */
+  finish(): void {
+    if (!this.#succeeded) {
+      this.abort()
+      return
+    }
+    if (this.#closed) return
+    this.#closed = true
+    this.#controller.complete(this.#token)
   }
 }
