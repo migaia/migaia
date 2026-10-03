@@ -219,6 +219,7 @@ function createOutboundSharedPorts(
       admit
     } satisfies IRpcVariationCoordinatorPort),
     [RpcPortName.outboundOperations]: Object.freeze({
+      ...(owner.defaultGenerate === undefined ? {} : { defaultGenerate: owner.defaultGenerate }),
       send: send as IRpcOutboundSend,
       onTransportFailure: (listener: (error: unknown) => void) =>
         owner.onTransportFailure(listener),

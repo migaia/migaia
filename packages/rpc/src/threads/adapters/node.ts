@@ -1,4 +1,9 @@
 import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
+import { parentPort } from 'node:worker_threads'
+import {
+  registerLazyNativeReplayOwner,
+  registerNativeReplayOwner
+} from '../../core/internal/native-replay.js'
 import { ThreadLimit } from '@migaia/supervision/threads'
 import type { INodeMessagePortLike } from '../../core/adapters/message-port.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
@@ -16,6 +21,20 @@ import type { IThreadChannelFactory, IThreadChannelOptions } from '../types.js'
 export type INodeThreadHandle = IThreadHandle & Readonly<{ port: INodeMessagePortLike }>
 /** Native IDs may recycle; this sequence gives each handle a permanent adapter identity. */
 let sequence = 0
+
+/** Only opening a canonical child channel installs the native lifetime observer. */
+if (parentPort) {
+  /** Native object identity grants provenance; bootstrap fields never do. */
+  const port = parentPort
+  registerLazyNativeReplayOwner(port, () => {
+    /** Remains live until the exact port's physical close event. */
+    let alive = true
+    port.once('close', () => {
+      alive = false
+    })
+    return { alive: () => alive, exclusive: () => port.listenerCount('message') <= 1 }
+  })
+}
 
 /** Launch Node Workers with immediate error/exit listeners and true two-phase termination. */
 export function createNodeThreadLauncher(): IThreadLauncher<INodeThreadHandle> {
@@ -82,16 +101,20 @@ export function createNodeThreadLauncher(): IThreadLauncher<INodeThreadHandle> {
       })
       /** Concurrent supervisor teardown requests terminate at most once. */
       let terminating = false
+      /** Launcher provenance belongs to this exact borrowed surface, independent of public shape. */
+      const port: INodeMessagePortLike = {
+        postMessage: (message) => worker.postMessage(message, undefined),
+        on: (event, listener) => worker.on(event === 'close' ? ThreadEvent.exit : event, listener),
+        off: (event, listener) => worker.off(event === 'close' ? ThreadEvent.exit : event, listener)
+      }
+      registerNativeReplayOwner(port, {
+        alive: () => !terminating && worker.threadId !== -1,
+        exclusive: () => worker.listenerCount('message') <= 1
+      })
       return {
         identity,
         /** Worker emits exit, whereas core's borrowed MessagePort transport observes close. */
-        port: {
-          postMessage: (message) => worker.postMessage(message, undefined),
-          on: (event, listener) =>
-            worker.on(event === 'close' ? ThreadEvent.exit : event, listener),
-          off: (event, listener) =>
-            worker.off(event === 'close' ? ThreadEvent.exit : event, listener)
-        },
+        port,
         exited,
         terminate() {
           if (terminating) return

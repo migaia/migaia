@@ -1,6 +1,7 @@
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcConfigurationError, RpcContractError, RpcError, RpcCoreErrorCode } from '../errors.js'
 import type { IRpcUuidConfig, IRpcUuidContext } from '../typing.js'
+import { isNativeDefaultCounterExhaustion } from './native-default-id.js'
 
 /** Stable diagnostic for a UUID descriptor whose generator property cannot be read. */
 const UUID_GENERATOR_UNREADABLE = 'UUID generator configuration is unreadable'
@@ -38,6 +39,7 @@ export function allocateRpcId(
       // Keep the cached callable invocation unchanged: the generator contract is receiver-free.
       generated = generate({ variation, senderId, targetId })
     } catch (error) {
+      if (isNativeDefaultCounterExhaustion(error)) throw error
       throw new RpcConfigurationError(UUID_GENERATOR_FAILED, error)
     }
   }

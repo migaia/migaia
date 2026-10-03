@@ -22,6 +22,7 @@ import {
 import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 import { RpcPlatform, RpcTransportOwnership } from '../transport-constants.js'
 import { RpcMessagePortErrorText } from './message-port-text.js'
+import { bindNativeReplayTransport } from '../internal/native-replay.js'
 
 /**
  * Structural shape of Node's `worker_threads.MessagePort` (and close enough to `EventEmitter`
@@ -300,7 +301,8 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
     emitTransportError(terminalError)
   }
 
-  return {
+  /** Only a previously registered native resource grants the final adapter private provenance. */
+  const transport: IRpcTransport = {
     platform: RpcPlatform.messagePort,
     topology: 'exclusive',
     ownership: RpcTransportOwnership.borrowed,
@@ -383,4 +385,6 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
       }
     }
   }
+  bindNativeReplayTransport(port, transport)
+  return transport
 }

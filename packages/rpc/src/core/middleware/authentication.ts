@@ -1,5 +1,22 @@
 import { RpcMiddlewareErrorText } from './error-text.js'
-import { RpcAuthenticationError, RpcError, RpcCoreErrorCode } from '../errors.js'
+import {
+  RpcAuthenticationError,
+  RpcConfigurationError,
+  RpcError,
+  RpcCoreErrorCode
+} from '../errors.js'
+import {
+  authenticationReplaySession,
+  authenticationCounterExhaustion,
+  recordAuthenticationReplayBinding,
+  registerAuthenticationCounterSetter
+} from '../internal/authentication-replay.js'
+import {
+  createAuthenticationNonce,
+  readAuthenticationEnvelope,
+  RpcAuthenticationEnvelope,
+  wrapAuthenticationEnvelope
+} from './authentication-envelope.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 import type {
@@ -71,6 +88,11 @@ function createAuthenticationCapability(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationSignVerifyMustBeConfiguredTogether
     )
+  if (encrypt && !sign)
+    throw new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcMiddlewareErrorText.authenticationEncryptionRequiresSigning
+    )
   if (!encrypt && !sign)
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
@@ -82,24 +104,68 @@ function createAuthenticationCapability(
       RpcMiddlewareErrorText.authenticationEncodedTypeIsInvalid
     )
 
-  /** Runs outbound encryption before signing. */
+  /** Each installed endpoint owns a nonce, independent of shared plugin configuration identity. */
+  let nonce: string | undefined
+  /** Sequence allocation happens before async transforms and is never rolled back or reused. */
+  let counter = 0n
+  /** Exactly one nonce and uint64 bitmap are retained per receiver-owned physical session. */
+  const sessions = new WeakMap<object, { nonce: string; high: bigint; bits: BigUint64Array }>()
+  /** Signs the replay binding inside encryption while preserving transform value categories. */
   const protect: IRpcAuthenticationTransform = async (value, context) => {
     try {
-      const encrypted = encrypt ? await encrypt(value, context) : value
-      return sign ? await sign(encrypted, context) : encrypted
+      if (counter === RpcAuthenticationEnvelope.maximumCounter)
+        throw authenticationCounterExhaustion()
+      nonce ??= createAuthenticationNonce()
+      /** Synchronous allocation prevents concurrent protection from selecting the same counter. */
+      const bound = wrapAuthenticationEnvelope(value, nonce, ++counter)
+      /** Existing encrypt-before-sign order now covers the binding and original payload together. */
+      const encrypted = encrypt ? await encrypt(bound, context) : bound
+      return await sign!(encrypted, context)
     } catch (error) {
-      if (error instanceof RpcAuthenticationError) throw error
+      if (error instanceof RpcAuthenticationError || error instanceof RpcConfigurationError)
+        throw error
       throw new RpcAuthenticationError(
         RpcMiddlewareErrorText.outboundFrameAuthenticationFailed,
         error
       )
     }
   }
-  /** Runs inbound verification before decryption. */
+  /** Verifies/decrypts once, then admits unseen counters within a fixed 64-slot completion window. */
   const unprotect: IRpcAuthenticationTransform = async (value, context) => {
     try {
       const verified = verify ? await verify(value, context) : value
-      return decrypt ? await decrypt(verified, context) : verified
+      /** Parse only after decryption, so no unsigned outer field can influence replay state. */
+      const decrypted = decrypt ? await decrypt(verified, context) : verified
+      /** Old format, malformed binding and missing physical proof all fail before dispatch. */
+      const envelope = readAuthenticationEnvelope(decrypted)
+      /** Async verification cannot commit against a retired receiver generation. */
+      const session = authenticationReplaySession(context)
+      if (!session)
+        throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+      /** Pin the first verified nonce; a new nonce never allocates another window on this session. */
+      let state = sessions.get(session)
+      if (!state) {
+        state = { nonce: envelope.nonce, high: 0n, bits: new BigUint64Array(1) }
+        sessions.set(session, state)
+      }
+      if (state.nonce !== envelope.nonce)
+        throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+      /** Counter grammar is validated before bounded uint64 arithmetic. */
+      const sequence = BigInt(envelope.counter)
+      if (sequence > state.high) {
+        /** Advancing by at least 64 drops the old window rather than growing or waiting. */
+        const advance = sequence - state.high
+        state.bits[0] = (advance >= 64n ? 0n : state.bits[0]! << advance) | 1n
+        state.high = sequence
+      } else {
+        /** Out-of-order verification accepts only a still-unseen bit in the fixed bitmap. */
+        const distance = state.high - sequence
+        if (distance >= 64n || (state.bits[0]! & (1n << distance)) !== 0n)
+          throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationFrameReplayed)
+        state.bits[0] = state.bits[0]! | (1n << distance)
+      }
+      recordAuthenticationReplayBinding(context)
+      return envelope.payload
     } catch (error) {
       if (error instanceof RpcAuthenticationError) throw error
       throw new RpcAuthenticationError(
@@ -108,10 +174,15 @@ function createAuthenticationCapability(
       )
     }
   }
-  return Object.freeze({
-    enabled: true,
+  /** Test counter access stays private to this exact capability and never enters public exports. */
+  const capability: IRpcAuthenticationCapability = Object.freeze({
+    enabled: true as const,
     encodedType: encodedType ?? 'any',
     protect,
     unprotect
   })
+  registerAuthenticationCounterSetter(capability, (value) => {
+    counter = value
+  })
+  return capability
 }

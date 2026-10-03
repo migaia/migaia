@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import assert from 'node:assert/strict'
+import { createHmac } from 'node:crypto'
 import { bridgeFixture, flush, request, peerFrame } from './fixture.js'
 import { objectFixtureEndpoint, objectDeepValue } from './json-object-fixture.js'
 import {
@@ -10,6 +12,10 @@ import { readJsonObjectPort } from '../../src/core/internal/json-object-port.js'
 import { rpcProtocolV1, type IRpcEnvelope } from '../../src/contract/index.js'
 import { defineFeature } from '../../src/core/feature.js'
 import { authentication } from '../../src/core/middleware/authentication.js'
+import { readAuthenticationEnvelope } from '../../src/core/middleware/authentication-envelope.js'
+import { normalizeRpcEnvelope } from '../../src/contract/v1/normalize.js'
+import type { IRpcAuthenticationCapability } from '../../src/core/typing.js'
+import { installPlugin } from '../core/middleware/helpers.js'
 
 /** Capture the thrown instance without replacing its native type or cause graph. */
 function thrown(operation: () => unknown): unknown {
@@ -217,6 +223,23 @@ describe('I21 C2 object port contracts', () => {
       const fixture = bridgeFixture()
       const channel = await fixture.open()
       const observed: unknown[] = []
+      /** The foreign peer carries the full signed inner frame in its existing positional payload. */
+      let originalRequest: IRpcEnvelope | undefined
+      /** A public fixture key checks coverage of nonce, counter and original RPC routing together. */
+      const signed = (value: unknown) => ({
+        value,
+        mac: createHmac('sha256', 'bridge-authentication-fixture')
+          .update(JSON.stringify(value))
+          .digest('hex')
+      })
+      /** The independently installed peer allocates its own canonical response binding. */
+      const peerAuthentication = installPlugin(
+        authentication({
+          encodedType: 'string',
+          sign: signed,
+          verify: (value) => value
+        })
+      ).get('authenticationCapability') as IRpcAuthenticationCapability
       const endpoint = await objectFixtureEndpoint(channel, {
         ...(mode === 'connect'
           ? {
@@ -234,6 +257,26 @@ describe('I21 C2 object port contracts', () => {
               middlewares: [
                 authentication({
                   encodedType: 'string',
+                  sign: (value) => {
+                    /** Preserve the existing foreign method while authenticating the original frame. */
+                    const payload = readAuthenticationEnvelope(value).payload as string
+                    originalRequest = JSON.parse(payload) as IRpcEnvelope
+                    assert.equal(originalRequest.kind, 'request')
+                    assert.ok(payload.includes('"payload":[]'))
+                    return payload.replace(
+                      '"payload":[]',
+                      `"payload":${JSON.stringify([signed(value)])}`
+                    )
+                  },
+                  verify: (value) => {
+                    /** Only the verified inner value reaches canonical replay and route admission. */
+                    const carrier = JSON.parse(value as string) as {
+                      data: { payload: ReturnType<typeof signed> }
+                    }
+                    const box = carrier.data.payload
+                    assert.equal(box.mac, signed(box.value).mac)
+                    return box.value
+                  },
                   encrypt: (value) => {
                     observed.push(value)
                     return value
@@ -251,7 +294,40 @@ describe('I21 C2 object port contracts', () => {
       try {
         const pending = endpoint.send('peer', 'p.f.request', [], { timeoutMs: 100 })
         await flush()
-        fixture.deliver({ jsonrpc: '2.0', id: fixture.messages.at(-1)!.id, result: 'ok' })
+        /** Existing foreign arguments/results are opaque carriers; the signed route remains intact. */
+        let result: unknown = 'ok'
+        if (mode === 'authentication') {
+          assert.ok(originalRequest?.kind === 'request')
+          /** Verify that the actual outgoing foreign payload contains the full authenticated frame. */
+          const box = (fixture.messages.at(-1)!.params as { args: ReturnType<typeof signed>[] })
+            .args[0]!
+          assert.equal(box.mac, signed(box.value).mac)
+          const route = originalRequest.data.route
+          const response = normalizeRpcEnvelope({
+            kind: 'response',
+            ok: true,
+            id: originalRequest.id,
+            data: {
+              route: {
+                profile: route.profile,
+                type: 'response',
+                applicationVersion: route.applicationVersion,
+                senderId: route.targetId,
+                targetId: route.senderId,
+                receiverId: route.senderId,
+                method: originalRequest.method,
+                sentAt: 123
+              },
+              payload: 'ok'
+            }
+          })
+          result = await peerAuthentication.protect(JSON.stringify(response), {
+            direction: 'outbound',
+            endpointId: 'peer',
+            platform: 'Process'
+          })
+        }
+        fixture.deliver({ jsonrpc: '2.0', id: fixture.messages.at(-1)!.id, result })
         await expect(pending).resolves.toBe('ok')
         expect(spy.mock.calls.filter(([value]) => value?.kind === 'request')).toHaveLength(1)
         if (mode === 'authentication')

@@ -13,6 +13,7 @@ import {
   type IRpcStreamPayload
 } from '../../../contract/index.js'
 import { RpcCoreErrorCode, RpcError, RpcAbortError, RpcTimeoutError } from '../../errors.js'
+import { RpcCoreErrorText } from '../../error-text.js'
 import { RpcStreamErrorText } from './error-text.js'
 import type { IEndpointKernelHost } from '../../endpoint-kernel.js'
 import type {
@@ -66,6 +67,15 @@ type IPendingCancel = {
 
 /** Producer state is keyed by admitted sender and id, never by method alone. */
 type IProducerState = {
+  /** Protected stream admission waits until all next/return/write work actually finishes. */
+  readonly lifetime?: {
+    /** Counts only operations already started for this exact producer, independent of Map deletion. */
+    pending: number
+    /** Completes at terminal with no remaining operation, retaining the stream-open replay entry. */
+    readonly settled: Promise<void>
+    /** Promise resolution is idempotent and never aborts or recreates the stream. */
+    readonly resolve: () => void
+  }
   readonly id: string
   readonly senderId: string
   readonly iterator: AsyncIterator<IRpcPortableValue> | Iterator<IRpcPortableValue>
@@ -221,11 +231,15 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     for (const state of this.#consumers.values())
       this.#finishConsumer(state, { error: new RpcAbortError() })
     for (const state of this.#producers.values()) {
+      if (state.lifetime) state.lifetime.pending += 1
       this.#finishProducer(state, new RpcAbortError())
       try {
         await state.iterator.return?.()
       } catch (error) {
         this.#report(error)
+      } finally {
+        if (state.lifetime) state.lifetime.pending -= 1
+        this.#settleProducer(state)
       }
     }
     this.#producers.clear()
@@ -245,7 +259,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcStreamErrorText.capabilityMissing)
     if (options?.signal?.aborted) throw readStreamAbortReason(options.signal)
     const id = allocateRpcId(
-      this.#prepared.options.uuid ?? {},
+      this.#outbound.defaultGenerate
+        ? { ...this.#prepared.options.uuid, generate: this.#outbound.defaultGenerate }
+        : (this.#prepared.options.uuid ?? {}),
       'task',
       this.#prepared.id,
       targetId,
@@ -564,6 +580,15 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const request = (message as { envelope?: IRpcEnvelope }).envelope
     if (request?.kind !== 'request') return
     const senderId = request.data.route.senderId
+    if ((message as { replayRejected?: boolean }).replayRejected) {
+      await this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull)
+      )
+      return
+    }
     if (this.#capability && !this.#capability.supports(senderId)) {
       this.#report(
         new RpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
@@ -626,7 +651,19 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         typeof source[Symbol.asyncIterator] === 'function'
           ? source[Symbol.asyncIterator]!()
           : source[Symbol.iterator]!()
+      /** Legacy streams allocate no added lifetime state or Promise. */
+      let lifetime: IProducerState['lifetime']
+      if ((message as { activeLifetime?: boolean }).activeLifetime) {
+        /** Resolving this producer's settlement cannot release any later same-ID admission. */
+        let resolve!: () => void
+        /** Open-frame work counts before a timer or cancel can mark the producer terminal. */
+        const settled = new Promise<void>((done) => {
+          resolve = done
+        })
+        lifetime = { pending: 1, settled, resolve }
+      }
       state = {
+        lifetime,
         id: request.id,
         senderId,
         iterator,
@@ -639,10 +676,15 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       if (request.data.route.timeoutMs !== undefined)
         state.timer = this.#kernel.time.setTimeout(() => {
           if (state.terminal) return
+          if (state.lifetime) state.lifetime.pending += 1
           this.#finishProducer(state, new RpcTimeoutError())
           void Promise.resolve()
             .then(() => state.iterator.return?.())
             .catch((error) => this.#report(error))
+            .finally(() => {
+              if (state.lifetime) state.lifetime.pending -= 1
+              this.#settleProducer(state)
+            })
         }, request.data.route.timeoutMs)
     } catch (error) {
       scope.abort()
@@ -660,11 +702,36 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         this.#report(cleanupError)
       }
       await this.#sendFailure(senderId, request.id, 0, failure)
+    } finally {
+      if (state.lifetime) state.lifetime.pending -= 1
+      this.#settleProducer(state)
     }
+    if (state.lifetime) await state.lifetime.settled
   }
 
   /** Grant one producer credit and send exactly its result, never prefetching. */
   async #receiveProducer(senderId: string, id: string, payload: IRpcStreamPayload): Promise<void> {
+    /** Keep cleanup ownership even after a terminal step removes the publicly indexed state. */
+    const state = this.#producers.get(tupleKey(senderId, id))
+    if (!state?.lifetime) return this.#receiveProducerStep(senderId, id, payload)
+    state.lifetime.pending += 1
+    try {
+      await this.#receiveProducerStep(senderId, id, payload)
+    } finally {
+      state.lifetime.pending -= 1
+      this.#settleProducer(state)
+    }
+  }
+
+  /**
+   * Executes one original producer step; final lifetime tracking never serializes independent
+   * credits.
+   */
+  async #receiveProducerStep(
+    senderId: string,
+    id: string,
+    payload: IRpcStreamPayload
+  ): Promise<void> {
     const key = tupleKey(senderId, id)
     const state = this.#producers.get(key)
     if (!state) {
@@ -811,6 +878,12 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     if (state.timer) this.#kernel.time.clearTimeout(state.timer)
     state.itemAdmission?.abort()
     state.scope.abort(reason)
+    this.#settleProducer(state)
+  }
+
+  /** Resolves the admitted stream lifetime only when terminal cleanup and sends have all settled. */
+  #settleProducer(state: IProducerState): void {
+    if (state.terminal && state.lifetime?.pending === 0) state.lifetime.resolve()
   }
 
   /** Yield the endpoint scheduler once without leaving a pull suspended on disposal. */
@@ -861,9 +934,21 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     for (const state of this.#consumers.values()) this.#finishConsumer(state, { error })
     for (const key of this.#pendingCancels.keys()) this.#resolveCancel(key, error)
     for (const state of this.#producers.values()) {
-      state.terminal = true
-      state.scope.abort(error)
-      void Promise.resolve(state.iterator.return?.()).catch((failure) => this.#report(failure))
+      if (state.lifetime) {
+        state.lifetime.pending += 1
+        this.#finishProducer(state, error)
+        void Promise.resolve()
+          .then(() => state.iterator.return?.())
+          .catch((failure) => this.#report(failure))
+          .finally(() => {
+            state.lifetime!.pending -= 1
+            this.#settleProducer(state)
+          })
+      } else {
+        state.terminal = true
+        state.scope.abort(error)
+        void Promise.resolve(state.iterator.return?.()).catch((failure) => this.#report(failure))
+      }
     }
     this.#producers.clear()
     this.#earlyCancels.clear()

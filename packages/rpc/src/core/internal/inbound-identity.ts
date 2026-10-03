@@ -5,6 +5,7 @@ import { recordInboundIdentityRelease } from './test-observer.js'
 import type { IRpcConnectCapability } from '../typing.js'
 import type { IRpcInboundMessage, IRpcTransportTopology } from '../transport.js'
 import type { IRpcPlatform } from '../typing.js'
+import type { INativeReplayReceipt } from './native-replay.js'
 
 /** Result of shared inbound identity admission; token is leased until release. */
 export type IInboundIdentityAdmission = {
@@ -61,9 +62,12 @@ export class InboundIdentityCoordinator {
   readonly #prepared = new WeakSet<object>()
   /** Terminal clear prevents a stale asynchronous verification from reviving identity state. */
   #closed = false
+  /** Physical qualification is shared with core; this identity owner never claims another consumer. */
+  readonly #native: INativeReplayReceipt | undefined
 
   /** Creates one endpoint-local identity owner without subscribing or allocating feature state. */
   constructor(options: {
+    readonly native?: INativeReplayReceipt
     /** Endpoint clock forwarded to the verified binding registry. */
     readonly now: () => number
     readonly connect?: IRpcConnectCapability
@@ -79,6 +83,7 @@ export class InboundIdentityCoordinator {
     this.#platform = options.platform
     this.#topology = options.topology
     this.#peers = options.peers ?? new VerifiedPeerRegistry(options.now)
+    this.#native = options.native
   }
 
   /** Reports whether a stable peer token is a valid identity value without creating a lease. */
@@ -96,6 +101,8 @@ export class InboundIdentityCoordinator {
   prepareSource(
     inbound: IInboundIdentityRequest['inbound']
   ): IInboundIdentityPreparedSource | undefined {
+    this.#native?.observeOwner()
+    if (this.#native && !this.#native.active) return undefined
     if (this.#closed) return undefined
     const data = inbound?.data
     const source = inbound?.source
@@ -119,6 +126,8 @@ export class InboundIdentityCoordinator {
     prepared: IInboundIdentityPreparedSource,
     request: IInboundIdentityRequest
   ): Promise<IInboundIdentityAdmission | undefined> {
+    this.#native?.observeOwner()
+    if (this.#native && !this.#native.active) return undefined
     if (this.#closed || !this.#prepared.delete(prepared)) return undefined
     const establishedKey = tupleKey(
       request.senderId,
@@ -137,6 +146,11 @@ export class InboundIdentityCoordinator {
           recordInboundIdentityRelease(this)
         }
       }
+    /** A spent native binding cannot issue another token on the same still-live physical resource. */
+    if (establishedToken !== undefined && this.#native) {
+      this.#native.retire()
+      return undefined
+    }
     if (this.#connect?.verify) {
       const verified = await this.#connect.verify(
         {
@@ -151,7 +165,8 @@ export class InboundIdentityCoordinator {
         },
         this.#reportRead
       )
-      if (!verified || this.#closed) return undefined
+      this.#native?.observeOwner()
+      if (!verified || this.#closed || (this.#native && !this.#native.active)) return undefined
     }
     const token = this.#peers.register(
       request.senderId,
@@ -178,7 +193,11 @@ export class InboundIdentityCoordinator {
 
   /** Retains a previously admitted identity for replay/operation ownership. */
   retain(token: string): boolean {
-    return this.#peers.retain(token)
+    /** Replay admission may cross hard expiry after logical admission retained this exact binding. */
+    const retained = this.#peers.retain(token)
+    if (!retained && this.#native && [...this.#established.values()].includes(token))
+      this.#native.retire()
+    return retained
   }
 
   /** Releases one replay/operation identity lease. */

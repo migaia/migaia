@@ -27,7 +27,8 @@ export const RpcCoreErrorCode = {
   middlewareMissing: 'MIDDLEWARE_MISSING',
 
   /**
-   * Factory / middleware / transport 描述符非法或配置字段取值不合法。
+   * Factory / middleware / transport 描述符非法或配置字段取值不合法。 Replay r12 also rejects encrypt-only
+   * configuration, unavailable entropy and exhausted counters.
    *
    * 这是参数/配置类错误的统一出口；调用方应按 `detail` 修正配置后重试，不要对同一份配置重试。
    */
@@ -135,6 +136,8 @@ export const RpcCoreErrorCode = {
 
   /**
    * Authentication 的逐 frame transform（encrypt/sign/verify/decrypt）失败（`RpcAuthenticationError`）。
+   * Replay r12 rejects missing/invalid binding, duplicate counters and untrusted physical
+   * sessions.
    *
    * 调用方检查密钥/算法配置；失败不向远端回传细节。
    */

@@ -2,6 +2,15 @@ import type { Readable, Writable } from 'node:stream'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import type { IProcessByteChannel } from '../types.js'
+import type { INativeReplayOwner } from '../../core/internal/native-replay.js'
+
+/** Stream construction alone is not authority; only canonical launch/stdio owners register it. */
+const nativeOwners = new WeakMap<object, INativeReplayOwner>()
+
+/** Returns the original stream observations for a canonical caller's private registration. */
+export function nativeNodeByteOwner(channel: object): INativeReplayOwner | undefined {
+  return nativeOwners.get(channel)
+}
 
 /** Own one Node readable and writable pair without adding another framing layer. */
 export function nodeByteStream(
@@ -37,7 +46,8 @@ export function nodeByteStream(
   writable.once('error', end)
   writable.once('close', () => end())
 
-  return {
+  /** Exact channel identity owns its stream lifetime and single data subscriber observation. */
+  const channel: IProcessByteChannel = {
     kind: 'byte',
     write(chunk) {
       if (closed) return Promise.reject(terminal)
@@ -68,4 +78,9 @@ export function nodeByteStream(
       end()
     }
   }
+  nativeOwners.set(channel, {
+    alive: () => !closed && !readable.destroyed && !writable.destroyed,
+    exclusive: () => dataListeners.size <= 1 && readable.listenerCount('data') === 1
+  })
+  return channel
 }
