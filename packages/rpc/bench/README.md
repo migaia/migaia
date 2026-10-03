@@ -20,8 +20,8 @@ pnpm --filter @migaia/rpc run bench:ipc --list
 pnpm --filter @migaia/rpc run bench:ipc --prepare --unit node:stdio-framed:64
 
 # Three alternating pairs: 100 warmup and 1000 settled echoes on every side.
-pnpm --filter @migaia/rpc run bench:ipc --scenario sequential --unit node:stdio-framed:64 --output /absolute/raw-directory
-pnpm --filter @migaia/rpc run bench:ipc --scenario concurrency --unit node:stdio-framed:64:c16 --output /absolute/raw-directory
+pnpm --filter @migaia/rpc run bench:ipc --scenario sequential --unit node:stdio-framed:64 --noise /absolute/window-noise.json --output /absolute/raw-directory
+pnpm --filter @migaia/rpc run bench:ipc --scenario concurrency --unit node:stdio-framed:64:c16 --noise /absolute/window-noise.json --output /absolute/raw-directory
 ```
 
 The macOS observer starts before warmup and uses Python's standard-library
@@ -47,6 +47,16 @@ cannot hide a failing endpoint. Concurrency 16/64 uses the exact six
 `judgePairs` remain available for historical oracle checks; their aggregate
 budgets are not DA1.
 
+Formal runs also report `regression`: the median of three paired RPC/bare p50
+ratios compared with `w3-baseline.json`. Its 68 historical values come from the
+original W3 raw data; the eight later DA1 cells use supplementary measurements
+of the same W3 production commit with the common measurement fixture. The
+unchanged DA1 budgets and this relative guard must both pass. `--noise` supplies
+the current exclusive window's W3/W3 A/A calibration: three baseline pairs for
+each of four representatives, with both RPC and bare observations retained.
+Its `p50RatioNoiseBand` is the largest observed absolute change of the normalized
+ratio. A missing calibration is an error, never a no-regression verdict.
+
 Chromium uses the canonical browser Worker adapter and static batch agreement.
 Bare uses a separate pure postMessage echo graph. All 1000 round trips are timed
 inside one page evaluation; Node driver CPU and control round trips are excluded.
@@ -66,7 +76,7 @@ SHA from disk SHA; formal timing has no counter overlay. Diagnostics remain
 separate. Foreign peers retain optimized executable and source identities;
 their JavaScript heap/thread fields are explicitly unavailable.
 
-The six sustained >=400-second cells reuse the replay implementation's original
-full records and classifications. They are not another benchmark run. B0 is
-historical wall-budget tracking only. Summed isolated gains cannot replace an
-actual complete-stack reference pair.
+The six sustained >=400-second cells run separately with the replay fixture's
+full records and classifications. A native send/receive change requires fresh
+records from that code version. B0 is historical wall-budget tracking only.
+Summed isolated gains cannot replace an actual complete-stack reference pair.

@@ -1,0 +1,541 @@
+{
+  "sourceCommit": "db5441cc586100802f00216d66aa8700a47def2d",
+  "metric": "median of three paired RPC/bare p50 ratios",
+  "historicalRawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+  "historicalCells": 68,
+  "supplementaryCells": 8,
+  "cells": {
+    "node:stdio-framed:64": {
+      "p50Ratio": 4.701612903225806,
+      "rpcP50Ns": 72791,
+      "bareP50Ns": 15500,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:stdio-framed:1024": {
+      "p50Ratio": 4.25880743358796,
+      "rpcP50Ns": 73958,
+      "bareP50Ns": 17500,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:stdio-framed:65536": {
+      "p50Ratio": 2.493792942325868,
+      "rpcP50Ns": 234833,
+      "bareP50Ns": 93750,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:stdio-framed:1048576": {
+      "p50Ratio": 1.7159319434377818,
+      "rpcP50Ns": 2803375,
+      "bareP50Ns": 1637542,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:socket-framed:64": {
+      "p50Ratio": 5.032376126126126,
+      "rpcP50Ns": 72125,
+      "bareP50Ns": 14208,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:socket-framed:1024": {
+      "p50Ratio": 4.701451278507256,
+      "rpcP50Ns": 74833,
+      "bareP50Ns": 15917,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:socket-framed:65536": {
+      "p50Ratio": 1.919540301019903,
+      "rpcP50Ns": 306459,
+      "bareP50Ns": 161584,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:socket-framed:1048576": {
+      "p50Ratio": 0.6030540285294587,
+      "rpcP50Ns": 3964125,
+      "bareP50Ns": 6599750,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:worker:64": {
+      "p50Ratio": 5.091369440774989,
+      "rpcP50Ns": 46375,
+      "bareP50Ns": 9167,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:worker:1024": {
+      "p50Ratio": 4.600645038892051,
+      "rpcP50Ns": 47375,
+      "bareP50Ns": 10459,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:worker:65536": {
+      "p50Ratio": 0.9654855784811494,
+      "rpcP50Ns": 53625,
+      "bareP50Ns": 55708,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:worker:1048576": {
+      "p50Ratio": 0.28214673473496305,
+      "rpcP50Ns": 242458,
+      "bareP50Ns": 865500,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:stdio-framed:64": {
+      "p50Ratio": 4.158333333333333,
+      "rpcP50Ns": 62375,
+      "bareP50Ns": 15000,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:stdio-framed:1024": {
+      "p50Ratio": 3.7737226277372264,
+      "rpcP50Ns": 64792,
+      "bareP50Ns": 17125,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:stdio-framed:65536": {
+      "p50Ratio": 2.1384927536231886,
+      "rpcP50Ns": 110959,
+      "bareP50Ns": 51750,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:stdio-framed:1048576": {
+      "p50Ratio": 0.5996770327114517,
+      "rpcP50Ns": 789500,
+      "bareP50Ns": 1316542,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:socket-framed:64": {
+      "p50Ratio": 4.765631270567461,
+      "rpcP50Ns": 59375,
+      "bareP50Ns": 12333,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:socket-framed:1024": {
+      "p50Ratio": 4.345924453280318,
+      "rpcP50Ns": 61209,
+      "bareP50Ns": 14084,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:socket-framed:65536": {
+      "p50Ratio": 1.5274027631185116,
+      "rpcP50Ns": 195125,
+      "bareP50Ns": 128750,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:socket-framed:1048576": {
+      "p50Ratio": 0.4238725685785536,
+      "rpcP50Ns": 3390042,
+      "bareP50Ns": 8001292,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:python:stdio-content-length:64": {
+      "p50Ratio": 3.717307034545662,
+      "rpcP50Ns": 65667,
+      "bareP50Ns": 17791,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:python:stdio-content-length:1024": {
+      "p50Ratio": 2.6194716981132076,
+      "rpcP50Ns": 69291,
+      "bareP50Ns": 26292,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:python:stdio-content-length:65536": {
+      "p50Ratio": 1.7238900211305468,
+      "rpcP50Ns": 275750,
+      "bareP50Ns": 159958,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:python:stdio-content-length:1048576": {
+      "p50Ratio": 1.420593811929511,
+      "rpcP50Ns": 3534584,
+      "bareP50Ns": 2474083,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:python:socket-content-length:64": {
+      "p50Ratio": 3.419190113874279,
+      "rpcP50Ns": 66958,
+      "bareP50Ns": 19583,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:python:socket-content-length:1024": {
+      "p50Ratio": 2.5663930822218965,
+      "rpcP50Ns": 70042,
+      "bareP50Ns": 27250,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:python:socket-content-length:65536": {
+      "p50Ratio": 1.5216268479298163,
+      "rpcP50Ns": 363750,
+      "bareP50Ns": 240250,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:python:socket-content-length:1048576": {
+      "p50Ratio": 0.8277734980928887,
+      "rpcP50Ns": 4751542,
+      "bareP50Ns": 5773791,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:rust:stdio-content-length:64": {
+      "p50Ratio": 4.529685681024447,
+      "rpcP50Ns": 50583,
+      "bareP50Ns": 11167,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:rust:stdio-content-length:1024": {
+      "p50Ratio": 4.220590557397758,
+      "rpcP50Ns": 53459,
+      "bareP50Ns": 12666,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:rust:stdio-content-length:65536": {
+      "p50Ratio": 1.5333999834360692,
+      "rpcP50Ns": 261208,
+      "bareP50Ns": 169042,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:rust:stdio-content-length:1048576": {
+      "p50Ratio": 1.5739611620638418,
+      "rpcP50Ns": 3503750,
+      "bareP50Ns": 2355875,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:rust:socket-content-length:64": {
+      "p50Ratio": 3.3959772951628824,
+      "rpcP50Ns": 54459,
+      "bareP50Ns": 16041,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:rust:socket-content-length:1024": {
+      "p50Ratio": 3.2148063306955437,
+      "rpcP50Ns": 62042,
+      "bareP50Ns": 19333,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:rust:socket-content-length:65536": {
+      "p50Ratio": 1.4976675580712084,
+      "rpcP50Ns": 356084,
+      "bareP50Ns": 241875,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:rust:socket-content-length:1048576": {
+      "p50Ratio": 0.8208350043894099,
+      "rpcP50Ns": 4478666,
+      "bareP50Ns": 5410750,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:go:stdio-content-length:64": {
+      "p50Ratio": 3.6124916459080136,
+      "rpcP50Ns": 59458,
+      "bareP50Ns": 16458,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:go:stdio-content-length:1024": {
+      "p50Ratio": 2.503962085308057,
+      "rpcP50Ns": 66083,
+      "bareP50Ns": 26375,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:go:stdio-content-length:65536": {
+      "p50Ratio": 1.4542834008097165,
+      "rpcP50Ns": 360875,
+      "bareP50Ns": 247000,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:go:stdio-content-length:1048576": {
+      "p50Ratio": 1.3153839450641782,
+      "rpcP50Ns": 5163583,
+      "bareP50Ns": 3842750,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:go:socket-content-length:64": {
+      "p50Ratio": 3.505687074829932,
+      "rpcP50Ns": 64417,
+      "bareP50Ns": 18375,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:go:socket-content-length:1024": {
+      "p50Ratio": 3.255976566191061,
+      "rpcP50Ns": 69167,
+      "bareP50Ns": 21166,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:go:socket-content-length:65536": {
+      "p50Ratio": 1.3416827821492772,
+      "rpcP50Ns": 454417,
+      "bareP50Ns": 337667,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:go:socket-content-length:1048576": {
+      "p50Ratio": 0.9242397365752564,
+      "rpcP50Ns": 6413916,
+      "bareP50Ns": 7124250,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:python:stdio-content-length:64": {
+      "p50Ratio": 3.1195725190839694,
+      "rpcP50Ns": 51083,
+      "bareP50Ns": 16125,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:python:stdio-content-length:1024": {
+      "p50Ratio": 2.729552943490877,
+      "rpcP50Ns": 55500,
+      "bareP50Ns": 20333,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:python:stdio-content-length:65536": {
+      "p50Ratio": 1.4112587959343237,
+      "rpcP50Ns": 226375,
+      "bareP50Ns": 159875,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:python:stdio-content-length:1048576": {
+      "p50Ratio": 1.116885159937074,
+      "rpcP50Ns": 2687541,
+      "bareP50Ns": 2383750,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:python:socket-content-length:64": {
+      "p50Ratio": 3.3176875,
+      "rpcP50Ns": 53708,
+      "bareP50Ns": 16125,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:python:socket-content-length:1024": {
+      "p50Ratio": 2.9461863354037265,
+      "rpcP50Ns": 58875,
+      "bareP50Ns": 20125,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:python:socket-content-length:65536": {
+      "p50Ratio": 1.2738701677363138,
+      "rpcP50Ns": 304083,
+      "bareP50Ns": 239000,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:python:socket-content-length:1048576": {
+      "p50Ratio": 0.7269360563955076,
+      "rpcP50Ns": 4785125,
+      "bareP50Ns": 6537542,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:rust:stdio-content-length:64": {
+      "p50Ratio": 3.2211538461538463,
+      "rpcP50Ns": 41875,
+      "bareP50Ns": 13000,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:rust:stdio-content-length:1024": {
+      "p50Ratio": 3.0825688073394497,
+      "rpcP50Ns": 42416,
+      "bareP50Ns": 13625,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:rust:stdio-content-length:65536": {
+      "p50Ratio": 1.4462440344218557,
+      "rpcP50Ns": 209458,
+      "bareP50Ns": 148792,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:rust:stdio-content-length:1048576": {
+      "p50Ratio": 1.1391441307923444,
+      "rpcP50Ns": 2352000,
+      "bareP50Ns": 2336167,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:rust:socket-content-length:64": {
+      "p50Ratio": 3.2669847600056974,
+      "rpcP50Ns": 45875,
+      "bareP50Ns": 14209,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:rust:socket-content-length:1024": {
+      "p50Ratio": 2.9828823529411763,
+      "rpcP50Ns": 50875,
+      "bareP50Ns": 17042,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:rust:socket-content-length:65536": {
+      "p50Ratio": 1.3426785698687096,
+      "rpcP50Ns": 307417,
+      "bareP50Ns": 227500,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:rust:socket-content-length:1048576": {
+      "p50Ratio": 0.7288882425469877,
+      "rpcP50Ns": 4641166,
+      "bareP50Ns": 6434166,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:go:stdio-content-length:64": {
+      "p50Ratio": 3.056690666147759,
+      "rpcP50Ns": 47125,
+      "bareP50Ns": 15542,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:go:stdio-content-length:1024": {
+      "p50Ratio": 2.6123675923275123,
+      "rpcP50Ns": 54750,
+      "bareP50Ns": 20958,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:go:stdio-content-length:65536": {
+      "p50Ratio": 1.3413542249580301,
+      "rpcP50Ns": 299625,
+      "bareP50Ns": 229542,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:go:stdio-content-length:1048576": {
+      "p50Ratio": 1.0308444897935831,
+      "rpcP50Ns": 4144167,
+      "bareP50Ns": 4020167,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:go:socket-content-length:64": {
+      "p50Ratio": 3.1840975116837185,
+      "rpcP50Ns": 50417,
+      "bareP50Ns": 15834,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:go:socket-content-length:1024": {
+      "p50Ratio": 2.565714285714286,
+      "rpcP50Ns": 56208,
+      "bareP50Ns": 21875,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:go:socket-content-length:65536": {
+      "p50Ratio": 1.1464497041420119,
+      "rpcP50Ns": 387500,
+      "bareP50Ns": 338000,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "bun:go:socket-content-length:1048576": {
+      "p50Ratio": 0.7955530353827218,
+      "rpcP50Ns": 6619333,
+      "bareP50Ns": 8334875,
+      "rawSHA256": "47db17ff5dbe960d98fc018bc7eb7e42ae78fa4af5e0462f120e370ed13ce8f0",
+      "provenance": "historical W3 full raw"
+    },
+    "node:stdio-framed:64:c16": {
+      "p50Ratio": 10.650568181818182,
+      "rpcP50Ns": 469000,
+      "bareP50Ns": 44000,
+      "rawSHA256": "4c4dcdfaac69747a6675a691a13ffdfb5e01dc963c5fda30803bacc078d5e9e9",
+      "provenance": "W3 production plus common I27 measurement fixture; new DA1 cell"
+    },
+    "node:rust:socket-content-length:1024:c64": {
+      "p50Ratio": 3.4748150116240453,
+      "rpcP50Ns": 2723708,
+      "bareP50Ns": 800500,
+      "rawSHA256": "ff38dd45df9995f7699964c284f33c716a5bab3da5f48c1d775e08e40128bada",
+      "provenance": "W3 production plus common I27 measurement fixture; new DA1 cell"
+    },
+    "chromium:browser-worker:1024": {
+      "p50Ratio": 3.4999994412065467,
+      "rpcP50Ns": 35000.00014901161,
+      "bareP50Ns": 10000.001639127731,
+      "rawSHA256": "be83777cdb29a1afd5da31f141538d9edfdb74005f2124b1d7027b9613f3763d",
+      "provenance": "W3 production plus common I27 measurement fixture; new DA1 cell"
+    },
+    "node:worker:64:c16": {
+      "p50Ratio": 9.752376801329374,
+      "rpcP50Ns": 358000,
+      "bareP50Ns": 36709,
+      "rawSHA256": "e2a82faf67dbb5ec4d9be2ddbf22acdfe47cda31bf67cfa164674922320160de",
+      "provenance": "W3 production plus common I27 measurement fixture; new DA1 cell"
+    },
+    "chromium:browser-worker:64": {
+      "p50Ratio": 3.4999994412065467,
+      "rpcP50Ns": 35000.00014901161,
+      "bareP50Ns": 10000.001639127731,
+      "rawSHA256": "1b6ac1ccba354228d0a004b69fff69b9bb16e35d4d459a94172bb5f2edc15db3",
+      "provenance": "W3 production plus common I27 measurement fixture; new DA1 cell"
+    },
+    "node:worker:64:c64": {
+      "p50Ratio": 11.58286162035098,
+      "rpcP50Ns": 1632083,
+      "bareP50Ns": 148042,
+      "rawSHA256": "2e7c8d674724b500b7a445b53cc86a5efd80acf6f520e750eefd4e3d437d34c5",
+      "provenance": "W3 production plus common I27 measurement fixture; new DA1 cell"
+    },
+    "node:stdio-framed:64:c64": {
+      "p50Ratio": 12.985636815805835,
+      "rpcP50Ns": 2156667,
+      "bareP50Ns": 171084,
+      "rawSHA256": "0271a5081a51f32ec1311a8db04bbe75fe41e05e4215ea8a5b8ac7bcc40e88ca",
+      "provenance": "W3 production plus common I27 measurement fixture; new DA1 cell"
+    },
+    "node:rust:socket-content-length:1024:c16": {
+      "p50Ratio": 3.33981461138487,
+      "rpcP50Ns": 638459,
+      "bareP50Ns": 191166,
+      "rawSHA256": "5bb23efba60afeae18fc8394ca799d2a054909b0a4b9b33cdb75160e116b9165",
+      "provenance": "W3 production plus common I27 measurement fixture; new DA1 cell"
+    }
+  }
+}
