@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { performance } from 'node:perf_hooks'
 
@@ -87,7 +87,10 @@ export function snapshot() {
 if (parentPort) {
   workerData?.benchPort?.on('message', () => workerData.benchPort.postMessage(snapshot()))
 } else if (process.argv.includes('--child')) {
-  process.on('SIGUSR2', () =>
-    writeFileSync(stem + '.snapshot-' + sequence++ + '.json', JSON.stringify(snapshot()))
-  )
+  process.on('SIGUSR2', () => {
+    /** Publish only a complete boundary snapshot; existence is the parent's ready signal. */
+    const path = stem + '.snapshot-' + sequence++ + '.json'
+    writeFileSync(path + '.tmp', JSON.stringify(snapshot()))
+    renameSync(path + '.tmp', path)
+  })
 }
