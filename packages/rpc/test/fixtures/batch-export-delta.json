@@ -1,0 +1,6 @@
+{
+  "added": {
+    "@migaia/rpc/contract": ["RpcBatchPhysical"]
+  },
+  "removed": {}
+}

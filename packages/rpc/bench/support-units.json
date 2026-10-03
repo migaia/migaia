@@ -1,7 +1,7 @@
 {
-  "revision": "I20-H-2026-10-02-native20-bridge48",
+  "revision": "I27-DA1-2026-10-03-native68-browser2-concurrency6",
   "frozen": true,
-  "baseline": "be19788",
+  "baseline": "d5786de464bdbca3b656724189c42a019b36c101",
   "units": [
     {
       "id": "node:stdio-framed:64",
@@ -12,7 +12,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-stdio-framed-64-result.json SHA256 fb6d389234548359189737399603e52e27e2585d651b387b3d447555fac5e060; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:stdio-framed:1024",
@@ -23,7 +23,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-stdio-framed-1024-result.json SHA256 f8108c23af9dc9e11d1657f13b79da2e7460dd79245a5344de703904191c074e; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:stdio-framed:65536",
@@ -34,7 +34,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-stdio-framed-65536-result.json SHA256 dd48fff645f2193a8179dd0ccbfb95677142a5f5c429bcdd0386768d60574403; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:stdio-framed:1048576",
@@ -45,7 +45,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-stdio-framed-1048576-result.json SHA256 71c9b255e0af1ae9e1d956dcc18bd03257bf96a71ca499a859daa434b344d139; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:socket-framed:64",
@@ -56,7 +56,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-socket-framed-64-result.json SHA256 5cd59248e95701519852c1b45c8a2648527de26abf21936d2eaa29d2a7e277b3; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:socket-framed:1024",
@@ -67,7 +67,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-socket-framed-1024-result.json SHA256 ba155bbd0b2d9f5b667adb79dbde50d50d30f64c31afd2df14c4179ce6496230; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:socket-framed:65536",
@@ -78,7 +78,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-socket-framed-65536-result.json SHA256 dbbc7366f42348b1231b8348a04e8e04b07c98e5525479a3f503f64b582041c8; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:socket-framed:1048576",
@@ -89,7 +89,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-socket-framed-1048576-result.json SHA256 47206d73ac1b2ec3efe24f7dab095c3cac17460a5b5e0f254020bea2305d0ac6; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:worker:64",
@@ -100,7 +100,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-worker-64-result.json SHA256 613539bb0250671591eea6611812b1af85be4fa7eaa11df88df9085201c93837; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:worker:1024",
@@ -111,7 +111,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-worker-1024-result.json SHA256 b21820d69299f29a994b7569f10c7fa8ab4dd7c0fdcdd9c5a32fa5b213a1584a; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:worker:65536",
@@ -122,7 +122,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-worker-65536-result.json SHA256 6d42710b5c8f7e4fe471e33b31062279ccdc5d01b0f6f20049621b153528d5df; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:worker:1048576",
@@ -133,7 +133,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-worker-1048576-result.json SHA256 d930bc691fc8e4e57f649d9d2b083f82b0596098fce0b21b504bf801728cf751; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:stdio-framed:64",
@@ -144,7 +144,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-stdio-framed-64-result.json SHA256 b460a44b648839d1a431a181ca1e7e4ad86231f34d3faafcdfe8a987ada67203; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:stdio-framed:1024",
@@ -155,7 +155,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-stdio-framed-1024-result.json SHA256 4acfb2476e14fa18dbbc4b46dc9eeceedcedfbfba2af4594421e4e34ef0612c3; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:stdio-framed:65536",
@@ -166,7 +166,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-stdio-framed-65536-result.json SHA256 c8fecc1a33dc0815e8890dcec94f526faec5e004b6be5e945ffedcbeddd25a27; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:stdio-framed:1048576",
@@ -177,7 +177,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-stdio-framed-1048576-result.json SHA256 da3612b8dc21b18a4a4a7da434a53119e27967c50b13e0c7ac5b1b7c61deb394; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:socket-framed:64",
@@ -188,7 +188,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-socket-framed-64-result.json SHA256 d9f5c7e11ff342ef5ffef1dd929c7991eea03a233c6df55ec0cf69015a2de3b6; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:socket-framed:1024",
@@ -199,7 +199,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-socket-framed-1024-result.json SHA256 f2b321bbd3985cd59835fae35988922cf16343cdb13ca661d942d8014b1e258a; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:socket-framed:65536",
@@ -210,7 +210,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-socket-framed-65536-result.json SHA256 8d2440a087e0671f66aaae034f78234a1edb08dd7847b4c77b634f48b78b3382; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:socket-framed:1048576",
@@ -221,7 +221,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "conformance-bench.test.ts: actual isolated bare/RPC startup, 3 settled echoes, native endpoint PID readings; 2026-10-02 baseline be19788"
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-socket-framed-1048576-result.json SHA256 c0fcdbdfeb247f54ef3b86d0db2f2edf3061dbcca88509bf6e4899219add4d98; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:python:stdio-content-length:64",
@@ -234,7 +234,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-python-stdio-content-length-64-result.json SHA256 5a750ade3354360419b7540971c53a839214ae9a4ce419b812f169229f93de31; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:python:stdio-content-length:1024",
@@ -247,7 +247,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-python-stdio-content-length-1024-result.json SHA256 fc435eebae058b417bbafffd21b5d47c6e3a41dd5d2f96716cc4a9a7663c52de; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:python:stdio-content-length:65536",
@@ -260,7 +260,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-python-stdio-content-length-65536-result.json SHA256 8c9d67edacea1fbd567d176a8511337423620c62413e25e16dc4f8317871dfbb; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:python:stdio-content-length:1048576",
@@ -273,7 +273,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-python-stdio-content-length-1048576-result.json SHA256 7bbb8f79cb10f7e11f1f249898352f9e9e897c38c5b9f7d9f3f6d365f92b1084; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:python:socket-content-length:64",
@@ -286,7 +286,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-python-socket-content-length-64-result.json SHA256 4225e41d0075c159d7ecb38ff482c96e8032a53960a9e8aa135855d545946ea3; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:python:socket-content-length:1024",
@@ -299,7 +299,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-python-socket-content-length-1024-result.json SHA256 d99bed40b39a56690086d4deaa8537e76e664cc947995efb2c38aad5ada19658; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:python:socket-content-length:65536",
@@ -312,7 +312,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-python-socket-content-length-65536-result.json SHA256 ecd3020832582e3d37265feac3012a53080b6afe83627985cd178493bb7109ae; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:python:socket-content-length:1048576",
@@ -325,7 +325,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-python-socket-content-length-1048576-result.json SHA256 ed8d26d82a7506648e94765da74affc982215e6f8bc45056f90d6a1d55fe96de; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:rust:stdio-content-length:64",
@@ -338,7 +338,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-rust-stdio-content-length-64-result.json SHA256 8aeb19cb66125d90e1dbabcfc77d7689cb464e08c0e7c2c9cd73d065e8d4007e; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:rust:stdio-content-length:1024",
@@ -351,7 +351,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-rust-stdio-content-length-1024-result.json SHA256 2d775d6b308d00cc88927c9f4ead9f7832d80aa2f482b3ad9f7691d556793e8c; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:rust:stdio-content-length:65536",
@@ -364,7 +364,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-rust-stdio-content-length-65536-result.json SHA256 05881d076c0b62cbad41b304db774d5a6d3eaae75de61ab19836f1fd1c018960; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:rust:stdio-content-length:1048576",
@@ -377,7 +377,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-rust-stdio-content-length-1048576-result.json SHA256 da5c6a5d61302e6d484c0dc6eec4286ca652448bdc30c794257678d55cf4b47c; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:rust:socket-content-length:64",
@@ -390,7 +390,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-rust-socket-content-length-64-result.json SHA256 625e603d1e78559f04c4d581cc10edc5aed50c46552da5320cbfe4d338871330; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:rust:socket-content-length:1024",
@@ -403,7 +403,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-rust-socket-content-length-1024-result.json SHA256 7664a8d9e3d5a69c1883b31364a6d41b9e4e260ebb8f5237f2b9e2286f5184b5; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:rust:socket-content-length:65536",
@@ -416,7 +416,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-rust-socket-content-length-65536-result.json SHA256 e423160b24bebfb29acd816b7affdcaffdb3f0d1fe0b53f69f82b751db314d6a; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:rust:socket-content-length:1048576",
@@ -429,7 +429,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-rust-socket-content-length-1048576-result.json SHA256 25a50740e2a841f5d9439e6916b5ee1a2c845d6b9c6ced6bcadcb5c82da44ede; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:go:stdio-content-length:64",
@@ -442,7 +442,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-go-stdio-content-length-64-result.json SHA256 71a94a5d8da2d63e4628f85bbd6547ac74170088f0440e9943739ca6a2856fa9; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:go:stdio-content-length:1024",
@@ -455,7 +455,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-go-stdio-content-length-1024-result.json SHA256 7efe95e9ea9cda6ea134ca127b52076de0de0c9dba87a7758ab81df9b361189b; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:go:stdio-content-length:65536",
@@ -468,7 +468,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-go-stdio-content-length-65536-result.json SHA256 add7d25b42e8a8934b4ac8c4cce12e3ff11d9ba6969f67cca56e0b265342796a; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:go:stdio-content-length:1048576",
@@ -481,7 +481,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-go-stdio-content-length-1048576-result.json SHA256 cbde9aa936476f27357799c8e6ac60cfe5afc6c9e9f5d2b0499629189f993364; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:go:socket-content-length:64",
@@ -494,7 +494,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-go-socket-content-length-64-result.json SHA256 77cb93ce7b24b34755bc3bfaad495fec02474a7d489ae2333b0d75c030e97aca; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:go:socket-content-length:1024",
@@ -507,7 +507,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-go-socket-content-length-1024-result.json SHA256 3e56b5effc4ac8414e0deac6096174f0802e92fda932485ab9820d11acb914c7; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:go:socket-content-length:65536",
@@ -520,7 +520,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-go-socket-content-length-65536-result.json SHA256 df5a1d7a0459fd5b9c7005f18b48390dd6bc9e1ab252f9d7f3182d08f6a7b985; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "node:go:socket-content-length:1048576",
@@ -533,7 +533,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/node-go-socket-content-length-1048576-result.json SHA256 298a3ca848c476dcb9ad35cdddd81425f2ea64f4d42ed1464e43304d1386a830; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:python:stdio-content-length:64",
@@ -546,7 +546,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-python-stdio-content-length-64-result.json SHA256 4d7e2857ff702a4f2fb45a9facde37d0b02092261a2ee28d812a19ea48d614b6; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:python:stdio-content-length:1024",
@@ -559,7 +559,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-python-stdio-content-length-1024-result.json SHA256 77e96545cee2eacbf3e0736e4845a18bc9e70e97e573f356e240ce6c230a70fc; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:python:stdio-content-length:65536",
@@ -572,7 +572,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-python-stdio-content-length-65536-result.json SHA256 d6c472b9d9d71875cb2d091706ba876d6bc9bc88fd1385b668cfb1a7eec47d59; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:python:stdio-content-length:1048576",
@@ -585,7 +585,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-python-stdio-content-length-1048576-result.json SHA256 f846d61b51c1f53ea71c282aeeafa535d482270102e374336ed39c23659e342c; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:python:socket-content-length:64",
@@ -598,7 +598,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-python-socket-content-length-64-result.json SHA256 540409bbb9182604ba654cb5ce85a992e045b11a2126ab229413d1940fef511a; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:python:socket-content-length:1024",
@@ -611,7 +611,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-python-socket-content-length-1024-result.json SHA256 43c012a140e26aecc4e55519a535ed650532e0930642b0bf192badeb46009b21; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:python:socket-content-length:65536",
@@ -624,7 +624,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-python-socket-content-length-65536-result.json SHA256 585006aeb5a6a7eb84e064777f62a7304d61fff0fc17d1c090f3e96a67949490; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:python:socket-content-length:1048576",
@@ -637,7 +637,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-python-socket-content-length-1048576-result.json SHA256 79caa864a8e5e6376df85f247873df1b325b3c1d1e3dc2868afbdebccce62132; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:rust:stdio-content-length:64",
@@ -650,7 +650,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-rust-stdio-content-length-64-result.json SHA256 e76d01801095eaa3bcbe2ffec43fb095a29c3ca940023f85844132c2b881ab07; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:rust:stdio-content-length:1024",
@@ -663,7 +663,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-rust-stdio-content-length-1024-result.json SHA256 28b9ad9770c134597b872b1cb6f689964175eff0424325f6c9fba5a41732e250; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:rust:stdio-content-length:65536",
@@ -676,7 +676,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-rust-stdio-content-length-65536-result.json SHA256 44e1f7bd4ea3f05f126374220c71e9b0ecd3e12cf7fb71eb37f0a6db8fc28a15; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:rust:stdio-content-length:1048576",
@@ -689,7 +689,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-rust-stdio-content-length-1048576-result.json SHA256 d615e7afd6d34801d66309d3259c13c0c000964a6c84cff5d7d456a00b75e984; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:rust:socket-content-length:64",
@@ -702,7 +702,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-rust-socket-content-length-64-result.json SHA256 dd941310cdbea60bd33d1cdd2b6fc0eea4749c5733891f2e8632caec2fa9641a; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:rust:socket-content-length:1024",
@@ -715,7 +715,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-rust-socket-content-length-1024-result.json SHA256 ab71b3238feb8136d5d52343078cd6505aa9a8979ede08d691fc9e4e60d28d40; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:rust:socket-content-length:65536",
@@ -728,7 +728,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-rust-socket-content-length-65536-result.json SHA256 a05c7f2d0a08fe2fe6024f81e6bd398e7c202ff5127acb5579c7783fdbd17fd2; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:rust:socket-content-length:1048576",
@@ -741,7 +741,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-rust-socket-content-length-1048576-result.json SHA256 0eb8d4e0b6b0543d6c55cc09d712d509a027a555c3a789fb56efe086dba7d9fb; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:go:stdio-content-length:64",
@@ -754,7 +754,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-go-stdio-content-length-64-result.json SHA256 da65c0286fd7c358e2fb9ff072caf22c07f165c7b7ba0c889e790c33951bf07c; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:go:stdio-content-length:1024",
@@ -767,7 +767,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-go-stdio-content-length-1024-result.json SHA256 6ca7c800194fdabf5dd33e60e10619df99758f161aa6e887127c6ce93edcdb23; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:go:stdio-content-length:65536",
@@ -780,7 +780,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-go-stdio-content-length-65536-result.json SHA256 75da95b1e68af84913fb6b772f0cf8e4b09983556a961fefcff01d68fd0eaae6; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:go:stdio-content-length:1048576",
@@ -793,7 +793,7 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-go-stdio-content-length-1048576-result.json SHA256 b7f079b4ca5ef8a70d88e8727b062804437faf8b59d975a54f9e4a7790236a48; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:go:socket-content-length:64",
@@ -806,7 +806,7 @@
       "payloadBytes": 64,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-go-socket-content-length-64-result.json SHA256 c77471f99ebe0e9d77a4621e329cf8ea32a7ff9c81750b01a5a7b9d2aabd50f0; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:go:socket-content-length:1024",
@@ -819,7 +819,7 @@
       "payloadBytes": 1024,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-go-socket-content-length-1024-result.json SHA256 10420b95368a5bb74454c35a08cba992c70020a0d8b31d8158ee8c226ad6f73f; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:go:socket-content-length:65536",
@@ -832,7 +832,7 @@
       "payloadBytes": 65536,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-go-socket-content-length-65536-result.json SHA256 ce2dbe99f5bca62a827c55e878d9eb7b369ec42e5007343f5df83ee06a22be46; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     },
     {
       "id": "bun:go:socket-content-length:1048576",
@@ -845,7 +845,29 @@
       "payloadBytes": 1048576,
       "concurrency": 1,
       "status": "supported",
-      "evidence": "2026-10-02 h-bridge-bench-preparation.log: actual isolated bare/RPC cold start, 3 exact echoes each and native parent/peer PID readings; stdio reuses unchanged caller fdLauncher via K249/D-b offline erasure; peer pure Content-Length echo/business share one framing owner. No measured window yet."
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/bun-go-socket-content-length-1048576-result.json SHA256 e28ade4c5e0c97e68e8749d3d0037743e96abb9423085e5aaf0ebb68558eeeb1; actual separate bare/RPC 3 echoes and native PID observation, not timing"
+    },
+    {
+      "id": "chromium:browser-worker:64",
+      "executable": "node",
+      "runtime": "chromium",
+      "carrier": "browser-worker",
+      "codec": "identity",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/chromium-browser-worker-64-result.json SHA256 4b8ad3e7aeb1f553af812828781c033a209dc6527e84ac88a849e4084f6c152b; actual separate bare/RPC 3 echoes and native PID observation, not timing"
+    },
+    {
+      "id": "chromium:browser-worker:1024",
+      "executable": "node",
+      "runtime": "chromium",
+      "carrier": "browser-worker",
+      "codec": "identity",
+      "payloadBytes": 1024,
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-sequential/chromium-browser-worker-1024-result.json SHA256 97b3d5c455d592476c39d53fe66ce0ddde735d2e85abad5f9efa32441830b643; actual separate bare/RPC 3 echoes and native PID observation, not timing"
     }
   ],
   "unsupported": [
@@ -902,6 +924,84 @@
       "old": "Required public TypeScript JSON-RPC responder",
       "new": "Python, Rust and Go responders; TypeScript remains public initiator only",
       "reason": "User ruling: bridge publishes only initiator, no responder implementation required"
+    }
+  ],
+  "concurrentUnits": [
+    {
+      "id": "node:stdio-framed:64:c16",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 64,
+      "concurrency": 16,
+      "status": "supported",
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-concurrency/node-stdio-framed-64-c16-result.json SHA256 4018aad1a66dbe6fd8ef6920b765569469398d5016db72298e2ac1115055c87e; actual separate bare/RPC 3 echoes and native PID observation, not timing",
+      "throughputFloor": 0.5523228073775753
+    },
+    {
+      "id": "node:stdio-framed:64:c64",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 64,
+      "concurrency": 64,
+      "status": "supported",
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-concurrency/node-stdio-framed-64-c64-result.json SHA256 b1da53ea7cd2774249c80e9988ea62b4d6ae223e8bba5b438e090d31d3cc3ca7; actual separate bare/RPC 3 echoes and native PID observation, not timing",
+      "throughputFloor": 0.5266468219547931
+    },
+    {
+      "id": "node:worker:64:c16",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 64,
+      "concurrency": 16,
+      "status": "supported",
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-concurrency/node-worker-64-c16-result.json SHA256 52c0ce8e24b023644c36831f4cd960300b4fe20d281bba416a2b4109b739b74b; actual separate bare/RPC 3 echoes and native PID observation, not timing",
+      "throughputFloor": 0.4233305716652842
+    },
+    {
+      "id": "node:worker:64:c64",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 64,
+      "concurrency": 64,
+      "status": "supported",
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-concurrency/node-worker-64-c64-result.json SHA256 047afe4583b2e15a3664f9491554a2358cf4f3d41d832dc28a2e98f6e7760e32; actual separate bare/RPC 3 echoes and native PID observation, not timing",
+      "throughputFloor": 0.4088632727058323
+    },
+    {
+      "id": "node:rust:socket-content-length:1024:c16",
+      "executable": "node",
+      "runtime": "node",
+      "peerRuntime": "rust",
+      "wire": "jsonrpc",
+      "carrier": "socket-content-length",
+      "codec": "json",
+      "payloadBytes": 1024,
+      "concurrency": 16,
+      "status": "supported",
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-concurrency/node-rust-socket-content-length-1024-c16-result.json SHA256 b9b7f568b5966c2b06f7e3ad84d869068dc8cd03ffc3ff77a04592b74505a54f; actual separate bare/RPC 3 echoes and native PID observation, not timing",
+      "throughputFloor": 0.7980208193039089
+    },
+    {
+      "id": "node:rust:socket-content-length:1024:c64",
+      "executable": "node",
+      "runtime": "node",
+      "peerRuntime": "rust",
+      "wire": "jsonrpc",
+      "carrier": "socket-content-length",
+      "codec": "json",
+      "payloadBytes": 1024,
+      "concurrency": 64,
+      "status": "supported",
+      "evidence": "2026-10-03 I27 docs/rpc/scratch/rpc-impl-2026-10-03/i27-prepare-concurrency/node-rust-socket-content-length-1024-c64-result.json SHA256 c7878ce616ad2c7bfd69b1885b9bfa749dc5fd5d84a96c7ae1a6d6a79d370cc9; actual separate bare/RPC 3 echoes and native PID observation, not timing",
+      "throughputFloor": 0.788115756975116
     }
   ]
 }

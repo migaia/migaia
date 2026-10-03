@@ -378,6 +378,7 @@
         "serveRemotePlugin"
       ],
       "./contract": [
+        "RpcBatchPhysical",
         "RpcCapability",
         "RpcCodecId",
         "RpcContractErrorCode",
