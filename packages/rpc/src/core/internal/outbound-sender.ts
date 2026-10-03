@@ -88,6 +88,15 @@ export class RpcOutboundSender {
   #writing = false
   /** FIFO contains semantic settlements, never serialized per-member size estimates. */
   #queued: IQueuedEnvelope[] = []
+  /** One owner callback releases an idle physical write before its caller continuation. */
+  #idleWriteCompleted = (): void => {
+    this.#finishWriting()
+  }
+  /** Reuse the failure reaction while preserving the exact transport error and release order. */
+  #idleWriteFailed = (error: unknown): never => {
+    this.#finishWriting()
+    throw error
+  }
 
   constructor(
     transport: IRpcOutboundTransport,
@@ -156,15 +165,7 @@ export class RpcOutboundSender {
           } catch (error) {
             sent = Promise.reject(error)
           }
-          return Promise.resolve(sent).then(
-            () => {
-              this.#finishWriting()
-            },
-            (error: unknown) => {
-              this.#finishWriting()
-              throw error
-            }
-          )
+          return Promise.resolve(sent).then(this.#idleWriteCompleted, this.#idleWriteFailed)
         }
         return new Promise<void>((resolve, reject) => {
           /** A record preserves independent admission, cancellation and completion ownership. */
