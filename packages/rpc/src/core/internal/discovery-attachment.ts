@@ -1,3 +1,4 @@
+import { createOutboundEnvelope } from './outbound-envelope.js'
 import { RpcPlatform } from '../transport-constants.js'
 import {
   RpcAbortError,
@@ -21,7 +22,6 @@ import type {
   IRpcUuidConfig
 } from '../typing.js'
 import {
-  normalizeRpcEnvelope,
   RpcRouteProfile,
   RpcRouteType,
   type IRpcEnvelope,
@@ -1700,7 +1700,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   #sendFrame(id: string, route: IRpcEnvelopeData): Promise<void> {
     return this.#ports.outboundOperations.send({
       kind: 'frame',
-      message: normalizeRpcEnvelope({
+      message: createOutboundEnvelope({
         kind: 'discovery',
         id,
         version: this.#applicationVersion,

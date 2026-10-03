@@ -7,14 +7,14 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** X14 r32 pins replay and P2-A after canonical cleanup reuse and removing the extra wrapper. */
+/** X14 r32 pins I24 after sharing the existing recursive materializer; no duplicate copier remains. */
 const allowedIncrease = {
-  rawBytes: 98954 / legacyRoot.rawBytes,
-  gzipBytes: 24848 / legacyRoot.gzipBytes
+  rawBytes: 99571 / legacyRoot.rawBytes,
+  gzipBytes: 25046 / legacyRoot.gzipBytes
 } as const
 
-/** The six existing additions plus four private authentication/native modules remain exact. */
-const expectedModuleIncrease = 10
+/** The ten previous additions plus the I24 private snapshot owner remain exact. */
+const expectedModuleIncrease = 11
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {
