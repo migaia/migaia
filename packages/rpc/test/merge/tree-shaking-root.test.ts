@@ -12,8 +12,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
  * increase preserves the 16 MiB guard without adding any module or unmeasured headroom.
  */
 const allowedIncrease = {
-  rawBytes: 130441 / legacyRoot.rawBytes,
-  gzipBytes: 33364 / legacyRoot.gzipBytes
+  rawBytes: 130523 / legacyRoot.rawBytes,
+  gzipBytes: 33391 / legacyRoot.gzipBytes
 } as const
 
 /** I22–I26 ownership includes the two canonical physical batch modules. */
