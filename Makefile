@@ -18,13 +18,71 @@ CHECK_TARGETS := $(addsuffix -check,$(PUBLISHABLE_PACKAGES))
 PATCH_TARGETS := $(addsuffix -patch,$(PUBLISHABLE_PACKAGES))
 PUBLISH_TARGETS := $(addsuffix -publish,$(PUBLISHABLE_PACKAGES))
 
+# Foreign peers reuse the installed conformance toolchains; CI never installs them.
+CONFORMANCE_TOOLCHAINS := python3 rustc cargo go
+CI_ALLOW_MISSING_TOOLCHAINS ?= 0
+# Indirection keeps `make -n ci` from executing a whole multi-command recipe
+# merely because it contains a recursive make invocation.
+CI_MAKE = $(MAKE) --no-print-directory
+
+# Manual measurements use the existing package fixtures and their own budgets.
+PERF_SCENARIO ?= sequential
+PERF_UNIT ?=
+PERF_NOISE ?=
+PERF_OUTPUT ?=
+LONG_MODE ?= process
+LONG_RATE ?= 50
+LONG_SECONDS ?= 400
+LONG_OUTPUT ?=
+
+# Keep every gate's real exit code and elapsed seconds, then fail only required
+# gates. One POSIX shell owns the summary; this works with GNU Make 3.81.
+define CI_REPORT
+failed=0; passed=0; warnings=0; summary=''; \
+record_gate() { \
+	state=$$1; label=$$2; code=$$3; seconds=$$4; \
+	summary="$${summary}$${state} | $${label} | exit=$${code} | $${seconds}s\n"; \
+	case "$$state" in \
+		PASS) passed=$$((passed + 1)) ;; \
+		FAIL|SKIP-BLOCKING) failed=$$((failed + 1)) ;; \
+		*) warnings=$$((warnings + 1)) ;; \
+	esac; \
+}; \
+run_gate() { \
+	policy=$$1; label=$$2; shift 2; \
+	printf '\n==> %s\n' "$$label"; \
+	started=$$(date +%s); \
+	if "$$@"; then code=0; else code=$$?; fi; \
+	seconds=$$(($$(date +%s) - started)); \
+	if [ "$$code" -eq 0 ]; then state=PASS; \
+	elif [ "$$policy" = warning ]; then state=WARN; \
+	else state=FAIL; fi; \
+	record_gate "$$state" "$$label" "$$code" "$$seconds"; \
+}; \
+finish_ci() { \
+	printf '\n==> CI summary\n'; \
+	printf '%b' "$$summary"; \
+	printf '==> passed=%s blocking=%s non-blocking=%s\n' "$$passed" "$$failed" "$$warnings"; \
+	[ "$$failed" -eq 0 ]; \
+};
+endef
+
+# The dependency check and conformance gate use the same executable inventory.
+define FIND_MISSING_TOOLCHAINS
+missing_tools=''; \
+for tool in $(CONFORMANCE_TOOLCHAINS); do \
+	command -v "$$tool" >/dev/null 2>&1 || missing_tools="$${missing_tools} $$tool"; \
+done;
+endef
+
 .PHONY: $(PUBLISHABLE_PACKAGES) $(CHECK_TARGETS) $(PATCH_TARGETS) $(PUBLISH_TARGETS) \
 	ship ship-dry-run ship-preflight ship-check ship-pack-check ship-release release-plan-check \
 	ship-ci ship-cd \
 	store-ship store-ship-dry-run store-ship-preflight store-ship-ci store-ship-pack-check \
 	store-ship-cd store-release-plan-check \
 	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish \
-	coverage-custody-report
+	coverage-custody-report ci ci-fast ci-conformance ci-website-test ci-website-check fmt-check \
+	perf-guard long-test
 
 # Ship has one visible direction: prove the whole plan, prove every package,
 # then enter the irreversible release loop. No package is versioned before all
@@ -45,6 +103,101 @@ ship-dry-run:
 	@$(MAKE) ship-pack-check
 	@echo "==> ship dry-run passed; no release mutations performed"
 
+# Full local CI preserves release-package ownership and adds repository gates
+# serially. Website tests are the owner's known existing failures; every other
+# gate remains blocking. No release mutation or registry authentication runs.
+ci:
+	@$(CI_REPORT) \
+	run_gate required dependencies-check $(CI_MAKE) dependencies-check; \
+	run_gate required release-plan-check $(CI_MAKE) release-plan-check; \
+	run_gate required ship-ci $(CI_MAKE) ship-ci; \
+	run_gate required store-ship-ci $(CI_MAKE) store-ship-ci; \
+	run_gate required registry:check pnpm run registry:check; \
+	run_gate required typecheck:consumers pnpm run typecheck:consumers; \
+	run_gate required check-docs-independence node scripts/check-docs-independence.mjs; \
+	for gate in test:coverage-custody test:dist-stamp test:tree-shaking; do \
+		run_gate required "$$gate" pnpm run "$$gate"; \
+	done; \
+	run_gate required coverage-custody-report $(CI_MAKE) coverage-custody-report; \
+	$(FIND_MISSING_TOOLCHAINS) \
+	if [ -n "$$missing_tools" ]; then \
+		printf '\n==> rpc/test:conformance 跳过：缺少工具链%s\n' "$$missing_tools"; \
+		if [ "$(CI_ALLOW_MISSING_TOOLCHAINS)" = 1 ]; then \
+			record_gate SKIP-WARN "rpc/test:conformance (missing:$$missing_tools)" 0 0; \
+		else record_gate SKIP-BLOCKING "rpc/test:conformance (missing:$$missing_tools)" 1 0; fi; \
+	else run_gate required rpc/test:conformance $(CI_MAKE) ci-conformance; fi; \
+	for gate in fmt lint typecheck; do \
+		run_gate required "website/$$gate" $(CI_MAKE) ci-website-check GATE="$$gate"; \
+	done; \
+	run_gate warning website/test $(CI_MAKE) ci-website-test; \
+	finish_ci
+
+# Daily checks run format before lint and types, without tests or builds.
+# wasm has no typecheck:test script; its native tests stay in full CI.
+ci-fast:
+	@$(CI_REPORT) \
+	for gate in fmt lint typecheck typecheck:test; do \
+		for package in $(PUBLISHABLE_PACKAGES); do \
+			if [ "$$gate" = fmt ]; then \
+				run_gate required "$$package/$$gate" $(CI_MAKE) fmt-check DIRECTORY="packages/$$package"; \
+			elif node -e 'const p=require("./packages/"+process.argv[1]+"/package.json"); process.exit(p.scripts?.[process.argv[2]] ? 0 : 1)' "$$package" "$$gate"; then \
+				run_gate required "$$package/$$gate" pnpm --filter "./packages/$$package" run "$$gate"; \
+			else \
+				printf '\n==> %s/%s skipped: no package script\n' "$$package" "$$gate"; \
+				if [ "$$gate" = typecheck:test ]; then record_gate SKIP-WARN "$$package/$$gate (no script)" 0 0; \
+				else record_gate SKIP-BLOCKING "$$package/$$gate (no script)" 1 0; fi; \
+			fi; \
+		done; \
+		run_gate required "website/$$gate" $(CI_MAKE) ci-website-check GATE="$$gate"; \
+	done; \
+	finish_ci
+
+# A standalone invocation retains the website exit code; only ci downgrades it.
+ci-website-test:
+	@echo "==> website/test"
+	@code=0; (cd website && bun run test) || code=$$?; \
+	if [ "$$code" -ne 0 ]; then \
+		echo "==> WARN website/test: 已知既有失败，见 website owner (exit=$$code; non-blocking in ci)"; \
+	else echo "==> PASS website/test (exit=0)"; fi; \
+	exit "$$code"
+
+ci-website-check:
+	@if [ "$(GATE)" = fmt ]; then \
+		$(CI_MAKE) fmt-check DIRECTORY=website; \
+	else (cd website && bun run "$(GATE)"); fi
+
+ci-conformance:
+	@echo "==> rpc/test:conformance"
+	@$(FIND_MISSING_TOOLCHAINS) \
+	if [ -n "$$missing_tools" ]; then \
+		echo "==> 跳过：缺少工具链$$missing_tools"; \
+		if [ "$(CI_ALLOW_MISSING_TOOLCHAINS)" = 1 ]; then echo "==> WARN CI_ALLOW_MISSING_TOOLCHAINS=1"; exit 0; fi; \
+		exit 1; \
+	fi; \
+	pnpm --filter ./packages/rpc run test:conformance
+
+# Performance matrices and W3 guards are reference-machine ratios, need an
+# exclusive calibrated measurement window, and take too long for ordinary CI.
+# Supply that window's noise receipt; budgets stay owned by the RPC benchmark.
+# Example: make perf-guard PERF_NOISE=raw/noise.json PERF_UNIT=node:stdio-framed:64 PERF_OUTPUT=raw/perf
+perf-guard:
+	@echo "==> manual RPC performance matrix / W3 guard ($(PERF_SCENARIO))"
+	@test -n "$(PERF_NOISE)" || { echo "Set PERF_NOISE to the current exclusive window calibration" >&2; exit 2; }
+	@pnpm --filter ./packages/rpc run bench:ipc --scenario "$(PERF_SCENARIO)" \
+		$(if $(PERF_UNIT),--unit "$(PERF_UNIT)") --noise "$(PERF_NOISE)" \
+		$(if $(PERF_OUTPUT),--output "$(PERF_OUTPUT)")
+
+# The six sustained cells (process/worker x 50/500/5000 RPS) each need >=400s
+# and an exclusive window. Run one cell per invocation, outside ci and ci-fast,
+# so callers can bound their window and retain the fixture's complete raw data.
+# Example: make long-test LONG_MODE=worker LONG_RATE=500 LONG_OUTPUT=raw/worker-500
+long-test:
+	@echo "==> manual sustained RPC cell ($(LONG_MODE), $(LONG_RATE) RPS, $(LONG_SECONDS)s)"
+	@test -n "$(LONG_OUTPUT)" || { echo "Set LONG_OUTPUT to a fresh raw directory" >&2; exit 2; }
+	@test "$(LONG_SECONDS)" -ge 400 || { echo "LONG_SECONDS must be at least 400" >&2; exit 2; }
+	@node packages/rpc/test/replay-window-r12/native-long.mjs \
+		"$(LONG_MODE)" "$(LONG_RATE)" "$(LONG_SECONDS)" "$(LONG_OUTPUT)"
+
 ship-preflight:
 	@$(MAKE) release-plan-check
 	@$(MAKE) dependencies-check
@@ -52,21 +205,28 @@ ship-preflight:
 	@$(MAKE) auth-check
 
 dependencies-check:
+	@echo "==> workspace dependencies / conformance toolchains"
 	@test -x node_modules/.bin/oxfmt || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 	@test -x node_modules/.bin/oxlint || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 	@test -x node_modules/.bin/tsc || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 	@test -x node_modules/.bin/vitest || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
+	@$(FIND_MISSING_TOOLCHAINS) \
+	if [ -n "$$missing_tools" ]; then \
+		echo "==> rpc/test:conformance 跳过：缺少工具链$$missing_tools"; \
+		if [ "$(CI_ALLOW_MISSING_TOOLCHAINS)" = 1 ]; then echo "==> WARN CI_ALLOW_MISSING_TOOLCHAINS=1"; \
+		else exit 1; fi; \
+	fi
 
 # Reports current custody against its installed baseline; baseline replacement stays an explicit command.
 coverage-custody-report:
 	@node scripts/coverage-custody.mjs
 
 ship-ci:
-	@set -eu; \
+	@$(CI_REPORT) \
 	for package in $(RELEASE_PACKAGES); do \
-		echo "==> CI validating $$package"; \
-		$(MAKE) "$$package-check"; \
-	done
+		run_gate required "$$package/release-check" $(CI_MAKE) "$$package-check"; \
+	done; \
+	finish_ci
 
 # Backward-compatible name for callers that used the pre-phase terminology.
 ship-check:
@@ -121,11 +281,11 @@ store-ship-preflight:
 	@$(MAKE) auth-check
 
 store-ship-ci:
-	@set -eu; \
+	@$(CI_REPORT) \
 	for package in $(STORE_RELEASE_PACKAGES); do \
-		echo "==> Store CI validating $$package"; \
-		$(MAKE) "$$package-check"; \
-	done
+		run_gate required "$$package/release-check" $(CI_MAKE) "$$package-check"; \
+	done; \
+	finish_ci
 
 store-ship-pack-check:
 	@set -eu; \
@@ -168,19 +328,30 @@ release-check: check-package
 	directory="./packages/$$package"; \
 	manifest="packages/$$package/package.json"; \
 	echo "==> checking @migaia/$$package"; \
-	format_paths=$$(node -e 'const p=require("./"+process.argv[1]); const command=p.scripts?.fmt??""; if (!command.startsWith("oxfmt ")) process.exit(2); console.log(command.slice(6))' "$$manifest"); \
-	(cd "$$directory" && ../../node_modules/.bin/oxfmt --check $$format_paths); \
-	pnpm --filter "$$directory" run lint; \
-	pnpm --filter "$$directory" run typecheck; \
+	$(CI_REPORT) \
+	run_gate required "$$package/fmt" $(CI_MAKE) fmt-check DIRECTORY="$$directory"; \
+	run_gate required "$$package/lint" pnpm --filter "$$directory" run lint; \
+	run_gate required "$$package/typecheck" pnpm --filter "$$directory" run typecheck; \
 	optional_typechecks=$$(node -e 'const p=require("./"+process.argv[1]); console.log(Object.keys(p.scripts||{}).filter((name)=>name.startsWith("typecheck:")).sort().join(" "))' "$$manifest"); \
-	for gate in $$optional_typechecks; do pnpm --filter "$$directory" run "$$gate"; done; \
-	pnpm --filter "$$directory" run test; \
+	for gate in $$optional_typechecks; do run_gate required "$$package/$$gate" pnpm --filter "$$directory" run "$$gate"; done; \
+	run_gate required "$$package/test" pnpm --filter "$$directory" run test; \
 	for gate in test:packed test:e2e; do \
 		if node -e 'const p=require("./"+process.argv[1]); process.exit(p.scripts?.[process.argv[2]] ? 0 : 1)' "$$manifest" "$$gate"; then \
-			pnpm --filter "$$directory" run "$$gate"; \
+			run_gate required "$$package/$$gate" pnpm --filter "$$directory" run "$$gate"; \
 		fi; \
 	done; \
-	pnpm --filter "$$directory" run build
+	run_gate required "$$package/build" pnpm --filter "$$directory" run build; \
+	finish_ci
+
+# Reuse each owner's configured format paths, always in non-mutating check mode.
+# Website keeps its own installed formatter, while packages use the root tool.
+fmt-check:
+	@set -eu; \
+	directory="$(DIRECTORY)"; \
+	format_paths=$$(node -e 'const p=require("./"+process.argv[1]+"/package.json"); const command=p.scripts?.fmt??""; if (!command.startsWith("oxfmt ")) process.exit(2); console.log(command.slice(6))' "$$directory"); \
+	if [ "$$directory" = website ]; then formatter=./node_modules/.bin/oxfmt; \
+	else formatter=../../node_modules/.bin/oxfmt; fi; \
+	(cd "$$directory" && "$$formatter" --check $$format_paths)
 
 # A full ship starts only from a clean, synchronized release branch. This is
 # intentionally stricter than package-publish, which runs after a local patch
