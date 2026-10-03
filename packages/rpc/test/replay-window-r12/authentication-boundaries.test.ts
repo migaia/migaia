@@ -8,6 +8,9 @@ import type {
 } from '../../src/core/typing.js'
 import {
   bindAuthenticationReplayContext,
+  hasAuthenticationReplayBinding,
+  markAuthenticationReplayEnvelope,
+  recordAuthenticationReplayBinding,
   setAuthenticationReplayCounter
 } from '../../src/core/internal/authentication-replay.js'
 import { RpcMiddlewareErrorText } from '../../src/core/middleware/error-text.js'
@@ -46,6 +49,26 @@ function context(session?: object, active: () => boolean = () => true): IRpcAuth
 }
 
 describe('r12 authentication boundary ownership', () => {
+  it('[A18/A25] transfers verified binding only to the exact semantic envelope identity', () => {
+    /** Public context fields alone cannot claim completed physical verification. */
+    const context: IRpcAuthenticationContext = {
+      direction: 'inbound',
+      endpointId: 'bound',
+      platform: 'Memory'
+    }
+    /** Equal-shaped envelope copies must not inherit another member's private proof. */
+    const envelope = { id: 'bound-member' }
+    markAuthenticationReplayEnvelope(context, envelope)
+    assert.equal(hasAuthenticationReplayBinding(envelope), false)
+    recordAuthenticationReplayBinding(context)
+    markAuthenticationReplayEnvelope(context, envelope)
+    assert.equal(hasAuthenticationReplayBinding(envelope), true)
+    assert.equal(hasAuthenticationReplayBinding({ ...envelope }), false)
+    /** A different receiver context cannot transfer a verified physical fact. */
+    const sibling = { id: 'other-member' }
+    markAuthenticationReplayEnvelope({ ...context }, sibling)
+    assert.equal(hasAuthenticationReplayBinding(sibling), false)
+  })
   it('[A20] fails closed for absent or throwing secure nonce entropy without losing cause', async () => {
     /** Crypto is restored before the fixture observes the separately throwing native entropy path. */
     vi.stubGlobal('crypto', undefined)
