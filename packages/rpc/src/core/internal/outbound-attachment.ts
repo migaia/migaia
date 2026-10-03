@@ -1,4 +1,6 @@
 import { createOutboundEnvelope } from './outbound-envelope.js'
+import { hasFastEndpoint } from './fast-path.js'
+import { enableFastTimePort } from './time-port.js'
 import {
   selectedJsonObjectPort,
   releaseJsonObjectSelection,
@@ -174,6 +176,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #abortEnabled: boolean
   /** Outbound transport/protocol pipeline. */
   readonly #pipeline: RpcOutboundSender
+  /** Once-finalized private proof selects only the canonical request/response optimization. */
+  readonly #fast: boolean
   /** Optional wrapper-owned whole-envelope gate selected before the sender is constructed. */
   readonly #outboundGate: IRpcOutboundGate | undefined
   /** Active request settlements keyed by wire task id. */
@@ -287,6 +291,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           ? (timeout.resolveTimeout as IRpcTimeoutCapability['resolveTimeout'])
           : (override) => (override === undefined ? timeoutDefault : override)
     }
+    this.#fast = hasFastEndpoint(prepared.options)
+    if (this.#fast) enableFastTimePort(kernel.time)
     this.#outboundGate = readOutboundGate(kernel.transport)
     this.#pipeline = new RpcOutboundSender(
       kernel,
@@ -295,7 +301,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       prepared.options.authentication,
       kernel.platform,
       this.#outboundGate,
-      (error) => this.emitFailure(error, RpcCoreErrorCode.invalidConfig)
+      (error) => this.emitFailure(error, RpcCoreErrorCode.invalidConfig),
+      this.#fast
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
       native: this.#native,
@@ -435,20 +442,25 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           this.#native?.observeOwner()
           this.kernel.assertActive(generation)
           if (this.#native && !this.#native.active) return
-          const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
-            source: physical.sourceToken,
-            messageId: 'whole'
-          })
-          const accepted = this.#runtimeComponents.framer.accept(preparedFrame.frame, {
-            source: physical.sourceToken,
-            messageId: preparedFrame.messageId
-          })
-          if (accepted.status === 'pending') return
-          if (accepted.status === 'rejected') {
-            this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
-            return
+          /** Private component proof omits generic whole-frame fanout, never semantic admission. */
+          let decoded: unknown
+          if (this.#fast) decoded = this.#runtimeComponents.codec.decode(frame)
+          else {
+            const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
+              source: physical.sourceToken,
+              messageId: 'whole'
+            })
+            const accepted = this.#runtimeComponents.framer.accept(preparedFrame.frame, {
+              source: physical.sourceToken,
+              messageId: preparedFrame.messageId
+            })
+            if (accepted.status === 'pending') return
+            if (accepted.status === 'rejected') {
+              this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
+              return
+            }
+            decoded = this.#runtimeComponents.codec.decode(accepted.value)
           }
-          const decoded = this.#runtimeComponents.codec.decode(accepted.value)
           let envelope: IRpcEnvelope
           /** Unknown fields are reported after normalize returns its once-read kind. */
           const ignored: Array<readonly [string, string]> = []
@@ -560,8 +572,12 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     }
     const timeoutMs = this.#timeout.resolveTimeout(options.timeoutMs)
     assertTimeout(timeoutMs)
-    const operation = new OperationScope(generation, timeoutMs, this.kernel.closingSignal, () =>
-      this.kernel.time.scheduler.now()
+    const operation = new OperationScope(
+      generation,
+      timeoutMs,
+      this.kernel.closingSignal,
+      () => this.kernel.time.scheduler.now(),
+      this.#fast
     )
     const remaining = operation.remaining(timeoutMs)
     operation.assertActive(this.kernel.generation)
@@ -571,7 +587,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       method,
       data,
       { ...options, timeoutMs: remaining },
-      [operation.signal, ...(options.signal ? [options.signal] : [])],
+      this.#fast
+        ? options.signal
+          ? [options.signal]
+          : []
+        : [operation.signal, ...(options.signal ? [options.signal] : [])],
       operation
     ).finally(() => operation.finish())
   }
@@ -742,7 +762,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             options,
             this.#outboundGate
               ? {
-                  queueSignal: operation.signal,
+                  get queueSignal() {
+                    return operation.signal
+                  },
                   signals,
                   assertCanSend
                 }

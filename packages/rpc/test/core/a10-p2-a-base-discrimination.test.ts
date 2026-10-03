@@ -3,15 +3,19 @@ import { describe, it, vi } from 'vitest'
 import { createEndpoint } from '../../src/core/index.js'
 import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
 import { connect } from '../../src/core/middleware/connect.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
 
 describe('P2-A successful request completion', () => {
   it('[A16] both real initiators release success without aborting native signals', async () => {
     /** Canonical endpoints exercise the actual caller and provider owners in both directions. */
     const [leftTransport, rightTransport] = createMemoryTransportPair()
+    /** A supported custom scheduler keeps the original eager P2-A control independent of P2-F. */
+    const scheduler = { ...systemScheduler }
     /** Left endpoint remains unchanged while the host constructor is observed during calls. */
     const left = await createEndpoint({
       id: 'p2-a-left',
       transport: leftTransport,
+      scheduler,
       middlewares: [connect()],
       provider: { echo: (context) => context.success(context.data) }
     })
@@ -19,6 +23,7 @@ describe('P2-A successful request completion', () => {
     const right = await createEndpoint({
       id: 'p2-a-right',
       transport: rightTransport,
+      scheduler,
       middlewares: [connect()],
       provider: { echo: (context) => context.success(context.data) }
     })

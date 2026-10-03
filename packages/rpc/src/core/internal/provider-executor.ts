@@ -1,5 +1,11 @@
 import type { IRpcProviderRejection } from '../provider-admission.js'
 import {
+  createGenerationController,
+  type IGenerationController,
+  type IGenerationRequest
+} from '@migaia/lifecycle'
+import type { IRpcProviderController } from './plugin-shared-keys.js'
+import {
   RpcError,
   RpcContractError,
   RpcCoreErrorCode,
@@ -37,11 +43,13 @@ type IProviderAdmission = {
 }
 type IControllerRegistry = {
   has(key: string): boolean
-  set(key: string, controller: AbortController): void
+  set(key: string, controller: IRpcProviderController): void
   delete(key: string): void
 }
 
 type IProviderExecutorOptions<TTargetId extends string> = {
+  /** Only finalized canonical ordinary requests may defer their unread native signal. */
+  readonly fast?: boolean
   /** Endpoint wall clock for response wire `sentAt` diagnostics; never used for deadlines. */
   readonly timestamp: () => number
   /** Monotonic endpoint time and timer lifecycle used for incoming relative deadlines. */
@@ -107,7 +115,7 @@ export class ProviderExecutor<TTargetId extends string> {
   /** Creates the core-owned context once for an admitted request or stream open. */
   createContext(
     request: IProviderRequestInput,
-    signal: IRpcAbortSignal,
+    signal: IRpcAbortSignal | (() => IRpcAbortSignal),
     isExpired: () => boolean,
     taskToken: object = {}
   ): IRpcContext {
@@ -120,7 +128,9 @@ export class ProviderExecutor<TTargetId extends string> {
     })
     return {
       data: request.route.payload,
-      signal,
+      get signal() {
+        return typeof signal === 'function' ? signal() : signal
+      },
       trace: request.route.route.trace,
       success: (
         data?: unknown,
@@ -358,29 +368,73 @@ export class ProviderExecutor<TTargetId extends string> {
       this.options.markCompleted?.(request, verifiedPeerKey)
       return
     }
-    const controller = new AbortController()
+    /** Only ordinary request/response execution can defer a native provider signal. */
+    const fast = this.options.fast === true && request.route.route.dispatchOnly !== true
+    /** Existing context settlement invalidation stays independent of native cancellation. */
+    let expired = false
+    /** Canonical lifecycle owns the real native signal whenever it is materialized. */
+    let lifecycle: IGenerationController | undefined
+    /** Token and signal remain paired through completion and late reads. */
+    let generation: IGenerationRequest | undefined
+    /** Unread cancellation invalidates work without constructing a substitute signal. */
+    let canceled = false
+    /** Exactly the first routed reason survives materialization after cancellation. */
+    let cancellationReason: unknown
+    /** Timer ownership is unchanged; unread cancellation must still release it immediately. */
+    let deadlineTimer: IEndpointTimer | undefined
+    /** First read delegates native identity and original abort semantics to lifecycle. */
+    const readSignal = (): IRpcAbortSignal => {
+      if (generation === undefined) {
+        lifecycle = createGenerationController()
+        generation = lifecycle.begin()
+        if (canceled) lifecycle.supersede(cancellationReason)
+        else if (expired) lifecycle.complete(generation.token)
+      }
+      return generation.signal as IRpcAbortSignal
+    }
+    /** The private command defers allocation; the full provider remains its original native owner. */
+    const controller: IRpcProviderController = fast
+      ? {
+          get signal() {
+            return readSignal()
+          },
+          abort: (reason?: unknown) => {
+            if (canceled) return
+            canceled = true
+            cancellationReason = reason
+            lifecycle?.supersede(reason)
+            if (deadlineTimer) this.options.clearTimeout(deadlineTimer)
+            if (claim?.status === 'claimed') claim.release()
+          }
+        }
+      : new AbortController()
     this.options.controllers.set(controllerKey, controller)
     const pendingAbort = this.options.consumePendingAbort?.(controllerKey)
     const timeoutMs = request.route.route.timeoutMs
     /** A provider deadline uses only endpoint monotonic timers, never wire sentAt. */
-    const deadlineTimer =
+    deadlineTimer =
       timeoutMs === undefined || timeoutMs === 0
         ? undefined
         : this.options.setTimeout(() => controller.abort(new RpcTimeoutError()), timeoutMs)
-    controller.signal.addEventListener(
-      'abort',
-      () => {
-        if (deadlineTimer) this.options.clearTimeout(deadlineTimer)
-        if (claim?.status === 'claimed') claim.release()
-      },
-      { once: true }
-    )
+    if (!fast)
+      controller.signal.addEventListener(
+        'abort',
+        () => {
+          if (deadlineTimer) this.options.clearTimeout(deadlineTimer)
+          if (claim?.status === 'claimed') claim.release()
+        },
+        { once: true }
+      )
     if (pendingAbort?.found) controller.abort(pendingAbort.reason)
     if (timeoutMs === 0) controller.abort(new RpcTimeoutError())
-    let expired = false
     const taskToken = {}
-    const isExpired = (): boolean => expired || controller.signal.aborted
-    const context = this.createContext(request, controller.signal, isExpired, taskToken)
+    const isExpired = (): boolean => expired || (fast ? canceled : controller.signal.aborted)
+    const context = this.createContext(
+      request,
+      fast ? () => controller.signal : controller.signal,
+      isExpired,
+      taskToken
+    )
     try {
       if (
         request.route.route.dispatchOnly &&
@@ -457,6 +511,8 @@ export class ProviderExecutor<TTargetId extends string> {
       if (deadlineTimer) this.options.clearTimeout(deadlineTimer)
       if (claim?.status === 'claimed') claim.release()
       expired = true
+      // Complete preserves the original provider's un-aborted signal after normal settlement.
+      if (lifecycle && generation) lifecycle.complete(generation.token)
     }
   }
 

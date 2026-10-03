@@ -1,5 +1,6 @@
 import type {
   IRpcAuthenticationCapability,
+  IRpcAbortSignal,
   IRpcConnectCapability,
   IRpcContractCapability,
   IRpcDiscoveryCandidate,
@@ -43,6 +44,27 @@ export const RpcPortName = Object.freeze({
 } as const)
 
 export type IRpcPortName = (typeof RpcPortName)[keyof typeof RpcPortName]
+
+/** Native or lazily materialized provider signal; variation owns only its cancellation command. */
+export type IRpcProviderController = {
+  readonly signal: IRpcAbortSignal
+  abort(reason?: unknown): void
+}
+
+/** Stable factory roles that introduce no business interceptor; private identity is still required. */
+export const RpcFastMiddlewareNames: ReadonlySet<string> = new Set([
+  RpcPortName.connect,
+  'middleware:connect',
+  RpcPortName.uuid,
+  'middleware:uuid',
+  RpcPortName.timeout,
+  'middleware:timeout',
+  RpcPortName.abort,
+  'middleware:abort',
+  'codec',
+  'framer',
+  RpcPortName.protocol
+])
 
 /** Stable protocol commands shared by protocol providers and frame consumers. */
 export type IRpcProtocolPort = IRpcProtocolCapability
@@ -182,7 +204,7 @@ export type IRpcVariationAdmissionRequest =
   | {
       readonly operation: 'abort'
       readonly key: string
-      readonly controller: AbortController | undefined
+      readonly controller: Pick<IRpcProviderController, 'abort'> | undefined
       readonly expiresAt: number
       readonly reason: unknown
     }

@@ -130,6 +130,129 @@ function addVirtualTime(base: number, delta: number, field: string): number {
   return target
 }
 
+/** Endpoint-derived receiver identities retain one canonical scheduler strategy per endpoint. */
+const sharedSchedulers = new WeakMap<object, IScheduler>()
+/** Native re-reference stays private; the public scheduled-task contract remains unchanged. */
+const referenceNativeTask = new WeakMap<IScheduledTask, () => void>()
+
+/** One logical deadline owns its callback and independent native-liveness request. */
+type ISharedDeadline = {
+  readonly due: number
+  callback: (() => void) | undefined
+  unreferenced: boolean
+}
+
+/** Shares exact absolute deadlines through the existing native timer owner, without quantization. */
+function sharedScheduler(receiver: object): IScheduler {
+  /** Each derived receiver belongs to one endpoint and never shares tasks across endpoints. */
+  const existing = sharedSchedulers.get(receiver)
+  if (existing) return existing
+  /** Set insertion order is the FIFO tie breaker for exactly equal deadlines. */
+  const deadlines = new Set<ISharedDeadline>()
+  /** Sole active host registration for all pending deadlines of this endpoint. */
+  let armed: IScheduledTask | undefined
+  /** Absolute wakeup time of the current native task, including retained earlier idle ticks. */
+  let armedDue = Number.POSITIVE_INFINITY
+  /** Avoids duplicate native ref/unref while mirroring every logical task's liveness. */
+  let armedUnreferenced = false
+  /** Selects the earliest live task; strict comparison preserves insertion order for exact ties. */
+  const first = (): ISharedDeadline | undefined => {
+    /** Earliest task observed while walking the endpoint's bounded live task set. */
+    let next: ISharedDeadline | undefined
+    for (const entry of deadlines) if (next === undefined || entry.due < next.due) next = entry
+    return next
+  }
+  /** The native task may be unreferenced only when every remaining logical task is unreferenced. */
+  const syncReference = (): void => {
+    if (!armed || deadlines.size === 0) return
+    /** Any referenced logical deadline must keep the same host liveness as its own native timer. */
+    let unreferenced = true
+    for (const entry of deadlines)
+      if (!entry.unreferenced) {
+        unreferenced = false
+        break
+      }
+    if (unreferenced === armedUnreferenced) return
+    armedUnreferenced = unreferenced
+    if (unreferenced) armed.unref?.()
+    else referenceNativeTask.get(armed)?.()
+  }
+  /** Reuses an earlier armed wakeup; native flush will re-check exact due time before execution. */
+  const arm = (): void => {
+    /** An earlier native tick is retained even if its original logical deadline was cancelled. */
+    const next = first()
+    if (!next) return
+    if (armed && armedDue <= next.due) {
+      syncReference()
+      return
+    }
+    armed?.cancel()
+    armed = undefined
+    armedDue = next.due
+    armed = systemScheduler.schedule(flush, Math.max(0, next.due - systemScheduler.now()))
+    armedUnreferenced = false
+    syncReference()
+  }
+  /** Executes one callback per native task, preserving Promise reactions before the next callback. */
+  const flush = (): void => {
+    armed = undefined
+    armedDue = Number.POSITIVE_INFINITY
+    armedUnreferenced = false
+    /** A retained earlier tick never authorizes firing another deadline early. */
+    const next = first()
+    if (!next) return
+    if (next.due > systemScheduler.now()) {
+      arm()
+      return
+    }
+    deadlines.delete(next)
+    /** Clear callback ownership before reentrant cancellation or new registrations. */
+    const callback = next.callback
+    next.callback = undefined
+    try {
+      callback?.()
+    } finally {
+      arm()
+    }
+  }
+  /** Receiver-local strategy delegates clocks and actual host registration to the canonical owner. */
+  const scheduler: IScheduler = {
+    now: () => systemScheduler.now(),
+    schedule(callback, delayMs) {
+      assertDelay(delayMs, 'delayMs')
+      /** Shared deadlines use the existing finite absolute-clock admission and error identity. */
+      const due = addVirtualTime(systemScheduler.now(), delayMs, 'delayMs')
+      /** A handle cancels exactly its own callback, not its siblings. */
+      const entry: ISharedDeadline = { due, callback, unreferenced: false }
+      deadlines.add(entry)
+      try {
+        arm()
+      } catch (error) {
+        deadlines.delete(entry)
+        throw error
+      }
+      return {
+        cancel: () => {
+          entry.callback = undefined
+          deadlines.delete(entry)
+          if (deadlines.size === 0) {
+            armed?.cancel()
+            armed = undefined
+            armedDue = Number.POSITIVE_INFINITY
+            armedUnreferenced = false
+          } else syncReference()
+        },
+        unref: () => {
+          entry.unreferenced = true
+          syncReference()
+        }
+      }
+    }
+  }
+  sharedSchedulers.set(receiver, scheduler)
+  return scheduler
+}
+
 /**
  * Default scheduler: `performance.now()` as the monotonic clock and host `setTimeout` /
  * `clearTimeout` for timers. Host capabilities are checked lazily on each call and a missing or
@@ -163,6 +286,12 @@ export const systemScheduler: IScheduler = {
     return value
   },
   schedule(callback, delayMs) {
+    if (
+      this !== systemScheduler &&
+      this !== undefined &&
+      Object.getPrototypeOf(this) === systemScheduler
+    )
+      return sharedScheduler(this).schedule(callback, delayMs)
     assertDelay(delayMs, 'delayMs')
     /** One host snapshot so the registering and cancelling functions always pair up. */
     const host = hostGlobals()
@@ -211,7 +340,8 @@ export const systemScheduler: IScheduler = {
       if (unrefRequested) applyUnref()
     }
     arm()
-    return {
+    /** The existing public handle also anchors a private reference-restoration capability. */
+    const task: IScheduledTask = {
       cancel() {
         if (settled) return
         settled = true
@@ -222,6 +352,13 @@ export const systemScheduler: IScheduler = {
         applyUnref()
       }
     }
+    referenceNativeTask.set(task, () => {
+      unrefRequested = false
+      /** Node/Bun timer handles have ref; browsers retain their original numeric handle behavior. */
+      const timer = handle as { readonly ref?: unknown } | null | undefined
+      if (typeof timer?.ref === 'function') Reflect.apply(timer.ref, timer, [])
+    })
+    return task
   }
 }
 

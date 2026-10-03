@@ -83,6 +83,8 @@ authenticated connections. A cancelled execution releases its key for a waiting 
 
 ## Core
 
+内建普通 request/response 在配置已验证后自动选择私有快速路径；自定义 scheduler、认证与自定义组件仍使用完整路径。provider 的 `context.signal` 首次读取时才分配原生 signal，同一请求重复读取保持 identity，取消仍保留原 reason；成功不会 abort。默认调度器可在端点内部共享精确 deadline，同截止时间保持 FIFO 与回调间微任务机会，不改变公开 scheduler identity。
+
 **传输无关的双向 RPC 框架**——同一套 API，同时支持 `Window.postMessage`、Web Worker、SharedWorker、ServiceWorker、BroadcastChannel、WebRTC DataChannel、WebTransport，以及自定义传输通道。
 
 ### 1. 这是什么

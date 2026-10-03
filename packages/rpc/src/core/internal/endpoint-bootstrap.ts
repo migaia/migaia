@@ -19,6 +19,13 @@ import {
   RpcTimeoutError
 } from '../errors.js'
 import type { IScheduler, IWallClock } from '@migaia/utils/scheduler'
+import { isEndpointSystemScheduler } from '../endpoint-kernel.js'
+import { proveFastComponents, proveFastEndpoint } from './fast-path.js'
+import {
+  readCanonicalMiddlewareProof,
+  registerJsonObjectMiddleware,
+  registerJsonObjectDescriptorMiddleware
+} from './json-object-port.js'
 import { safeRead } from './safe-value.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type {
@@ -470,6 +477,10 @@ export async function prepareEndpoint<
           (!middlewareTransport || typeof middlewareTransport !== 'object'))
       )
         throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.middlewareMustBePlugin)
+      /** Carry factory identity through the already validated immutable descriptor copy. */
+      const proof = readCanonicalMiddlewareProof(middleware)
+      if (proof === true) registerJsonObjectMiddleware(plugin)
+      else if (typeof proof === 'object') registerJsonObjectDescriptorMiddleware(plugin, proof)
       return {
         jsonObjectCompatible: isJsonObjectMiddleware(middleware),
         kind: 'legacy' as const,
@@ -569,10 +580,16 @@ export async function prepareEndpoint<
         privateFeaturesAllowed &&
           middlewareSnapshots.every((snapshot) => snapshot.jsonObjectCompatible)
       )
-      return {
-        ...prepared,
-        options: { ...prepared.options, components }
-      }
+      /** Qualification uses the completed snapshot and the once-read scheduler identity. */
+      const options = { ...prepared.options, components }
+      proveFastEndpoint(
+        options,
+        components,
+        middlewareSnapshots,
+        privateFeaturesAllowed,
+        !isEndpointSystemScheduler(injectedScheduler)
+      )
+      return { ...prepared, options }
     }
   }
 }
@@ -656,6 +673,7 @@ function selectWebRpcComponents(
     ingressPrepare: bindRpcFrameIngress(framer.accept, framer.frame),
     shadowed: Object.freeze(shadowed)
   })
+  proveFastComponents(components, selectedProtocol.value, selectedCodec.value, selectedFramer.value)
   if (privateCandidate) rememberJsonObjectCandidate(components, privateCandidate)
   return components
 }

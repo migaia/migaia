@@ -1,4 +1,6 @@
 import { createOutboundEnvelope } from './outbound-envelope.js'
+import { hasFastEndpoint } from './fast-path.js'
+import type { IRpcProviderController } from './plugin-shared-keys.js'
 import { RpcPlatform } from '../transport-constants.js'
 import { RpcConfigurationError, RpcError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import {
@@ -66,7 +68,7 @@ export class RpcProviderAttachment {
   /** Per-task provider execution quotas. */
   readonly #admission: ProviderAdmissionRegistry
   /** Active provider abort controllers. */
-  readonly #controllers = new Map<string, AbortController>()
+  readonly #controllers = new Map<string, IRpcProviderController>()
   /** Provider execution owner. */
   readonly #executor: ProviderExecutor<string>
   /** Narrow outbound facts and operations owned by the outbound feature. */
@@ -134,6 +136,7 @@ export class RpcProviderAttachment {
       }
     )
     this.#executor = new ProviderExecutor({
+      fast: hasFastEndpoint(prepared.options),
       timestamp: () => kernel.time.timestamp(),
       now: () => kernel.time.now(),
       setTimeout: (task, delayMs) => kernel.time.setTimeout(task, delayMs),
