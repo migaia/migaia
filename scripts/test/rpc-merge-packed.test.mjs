@@ -23,6 +23,10 @@ const controlDelta = JSON.parse(
 const streamingDelta = JSON.parse(
   readFileSync(join(root, 'packages/rpc/test/fixtures/streaming-export-delta.json'), 'utf8')
 )
+/** I26's registered batch limit is an exact addition; the merge baseline remains frozen. */
+const batchDelta = JSON.parse(
+  readFileSync(join(root, 'packages/rpc/test/fixtures/batch-export-delta.json'), 'utf8')
+)
 /** I18's additive subpath extends the frozen forty entries without changing their counts. */
 const bridgeDelta = JSON.parse(
   readFileSync(join(root, 'packages/rpc/test/fixtures/jsonrpc-bridge-export-delta.json'), 'utf8')
@@ -123,6 +127,7 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
       ...(errorFormatDelta.added[name] ?? []),
       ...(controlDelta.added[name] ?? []),
       ...(streamingDelta.added[name] ?? []),
+      ...(batchDelta.added[name] ?? []),
       // K215 admits exactly one core runtime export; every other packed count stays frozen.
       ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : [])
     ]

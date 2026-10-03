@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { mkdtemp, readFile } from 'node:fs/promises'
-import { resolve, join } from 'node:path'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createNodeThreadLauncher } from '../../dist/threads/adapters/node.js'
 import { createNodeThreadChannel } from '../../dist/threads/channel.js'
@@ -20,7 +21,8 @@ import { nativeEndpoint } from './native-runtime.mjs'
  */
 export async function nativeSession(mode, options = {}) {
   const entry = options.entry ?? fileURLToPath(new URL('./native-peer.mjs', import.meta.url))
-  const directory = await mkdtemp(resolve('docs/rpc/scratch/rpc-impl-2026-10-03/native-ready-'))
+  /** Fixture readiness belongs to an isolated host temporary directory, independent of docs. */
+  const directory = await mkdtemp(join(tmpdir(), 'rpc-native-ready-'))
   const config = {
     required: options.required === true,
     ready: join(directory, 'peer.json'),

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile } from 'node:fs/promises'
-import { resolve, join } from 'node:path'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createNodeThreadLauncher } from '../../dist/threads/adapters/node.js'
@@ -23,7 +24,8 @@ if (process.env.RPC_REPLAY_ENTROPY_MUTANT === 'skip-retirement') {
 }
 const results = []
 for (const mode of ['process', 'worker']) {
-  const directory = await mkdtemp(resolve('docs/rpc/scratch/rpc-impl-2026-10-03/entropy-ready-'))
+  /** Fixture readiness belongs to an isolated host temporary directory, independent of docs. */
+  const directory = await mkdtemp(join(tmpdir(), 'rpc-entropy-ready-'))
   const config = { ready: join(directory, 'peer.json') }
   const entry = fileURLToPath(new URL('./native-peer.mjs', import.meta.url))
   const signal = new AbortController().signal
