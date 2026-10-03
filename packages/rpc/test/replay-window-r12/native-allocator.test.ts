@@ -6,6 +6,15 @@ import { NativeReplayReceipt } from '../../src/core/internal/native-replay.js'
 import { allocateRpcId } from '../../src/core/internal/id.js'
 
 describe('r12 native default allocation and pure receipt state', () => {
+  it('[A20] rejects exhaustion with the default reporter without allocating another ID', () => {
+    /** An internal boundary seed reaches exhaustion without changing endpoint defaults. */
+    const generate = createNativeDefaultAllocator({}, 0xffffffffffffffffn)!
+    assert.throws(generate, (error: unknown) => {
+      assert.equal((error as { code: string }).code, 'INVALID_CONFIG')
+      assert.equal((error as Error).message, NativeDefaultIdText.counterExhausted)
+      return true
+    })
+  })
   it('[A4/A20] preserves genuine exhaustion through the canonical RPC ID allocation owner', () => {
     /** Native code alone owns this generator and its genuine exhaustion error identity. */
     const reported: unknown[] = []
