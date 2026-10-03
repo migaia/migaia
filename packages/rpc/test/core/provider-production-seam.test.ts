@@ -60,6 +60,9 @@ import { buildNativePluginBatch } from '../../src/core/internal/plugin-inventory
 import type { IRpcOutboundCommandObservation } from '../../src/core/internal/feature-contract.js'
 import { RpcError, RpcLifecycleError, RpcSchemaValidationError } from '../../src/core/errors.js'
 import { authentication } from '../../src/core/middleware/authentication.js'
+import { bindAuthenticationReplayContext } from '../../src/core/internal/authentication-replay.js'
+import { installPlugin } from './middleware/helpers.js'
+import type { IRpcAuthenticationCapability } from '../../src/core/typing.js'
 import { abort } from '../../src/core/middleware/abort.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { contract } from '../../src/core/middleware/contract.js'
@@ -250,7 +253,41 @@ async function createActualAdmissionFixture(
   options: IAdmissionFixtureOptions = {}
 ): Promise<IActualAdmissionFixture> {
   const endpointId = options.endpointId ?? 'provider-admission-fixture'
-  const [clientTransport, transport] = createMemoryTransportPair()
+  const [rawClientTransport, transport] = createMemoryTransportPair()
+  /** The hand-written peer now sends signed bindings instead of the removed identity-auth format. */
+  const peerAuthentication = installPlugin(
+    authentication({
+      sign: (value) => value,
+      verify: (value) => value
+    })
+  ).get('authenticationCapability') as IRpcAuthenticationCapability
+  /** One receiver session preserves counter isolation across all response callbacks. */
+  const peerSession = {}
+  /** Raw business fixtures retain their original values at the peer boundary. */
+  const clientTransport: IRpcTransport = {
+    ...rawClientTransport,
+    async send(message, options) {
+      const frame = await peerAuthentication.protect(message, {
+        direction: 'outbound',
+        endpointId: 'provider-fixture-peer',
+        platform: 'Memory'
+      })
+      return rawClientTransport.send(frame, options)
+    },
+    subscribe(listener) {
+      return rawClientTransport.subscribe((message) => {
+        const context = {
+          direction: 'inbound' as const,
+          endpointId: 'provider-fixture-peer',
+          platform: 'Memory' as const
+        }
+        bindAuthenticationReplayContext(context, peerSession)
+        void Promise.resolve(peerAuthentication.unprotect(message.data, context)).then((data) => {
+          listener({ ...message, data })
+        })
+      })
+    }
+  }
   const stats = { activeSubscriptions: 0, subscribeCalls: 0, dispatches: 0 }
   const baseTransport = transport
   const composedTransport = {
@@ -285,7 +322,9 @@ async function createActualAdmissionFixture(
       protocol(),
       authentication({
         encrypt: (value) => value,
-        decrypt: (value) => value
+        decrypt: (value) => value,
+        sign: (value) => value,
+        verify: (value) => value
       }),
       contract(options.contractConfig),
       connect({ ...options.connectConfig, transport: composedTransport }),

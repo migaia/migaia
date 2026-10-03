@@ -1,5 +1,18 @@
 /** Stable middleware error text stays with its owner outside the root endpoint graph. */
 export const RpcMiddlewareErrorText = {
+  /** R12 requires a signed replay binding inside encryption; encrypt-only callers must add signing. */
+  authenticationEncryptionRequiresSigning:
+    'authentication encryption requires sign/verify replay binding',
+  /** Binding parse/session failure is sanitized before provider admission (r12 A25/A29). */
+  authenticationReplayBindingInvalid: 'Authentication replay binding is invalid',
+  /** A verified counter already seen or outside the fixed 64-slot window cannot execute again. */
+  authenticationFrameReplayed: 'Authentication frame was replayed',
+  /** Uint64 protection counters never wrap; callers must establish a new endpoint/session. */
+  authenticationCounterExhausted: 'Authentication replay counter is exhausted',
+  /** Signed replay nonces require 128 bits of secure entropy; weak randomness is never substituted. */
+  authenticationNonceUnavailable: 'Authentication replay nonce is unavailable',
+  /** Entropy failure keeps the original cause on a coded configuration error. */
+  authenticationNonceFailed: 'Authentication replay nonce generation failed',
   /**
    * Stable core error text consumed by core/middleware/authentication.ts; preserves its existing
    * caller-facing wording.

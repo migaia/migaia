@@ -12,6 +12,8 @@ import { createEndpoint } from '../../src/core/index.js'
 import { defineMiddleware } from '../../src/core/middleware.js'
 import { abort } from '../../src/core/middleware/abort.js'
 import { authentication } from '../../src/core/middleware/authentication.js'
+import { bindAuthenticationReplayContext } from '../../src/core/internal/authentication-replay.js'
+import { RpcAuthenticationEnvelope } from '../../src/core/middleware/authentication-envelope.js'
 import { codec } from '../../src/core/middleware/codec.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { contract } from '../../src/core/middleware/contract.js'
@@ -264,7 +266,9 @@ function productionMiddleware(
   contractMiddleware: IRpcPlugin | null | undefined = contract(),
   authenticationMiddleware: IRpcPlugin | null | undefined = authentication({
     encrypt: (value) => value,
-    decrypt: (value) => value
+    decrypt: (value) => value,
+    sign: (value) => value,
+    verify: (value) => value
   }),
   connectMiddleware: IRpcPlugin | null | undefined = connect({ transport }),
   abortMiddleware: IRpcPlugin | null | undefined = abort(),
@@ -2029,12 +2033,14 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('B12b02 RED: publishes authentication and connect through typed Host shared ports', async () => {
     const encrypted = (value: unknown): unknown => `encrypted:${String(value)}`
-    const decrypted = (value: unknown): unknown => `decrypted:${String(value)}`
+    const decrypted = (value: unknown): unknown => String(value).slice('encrypted:'.length)
     const identified = async (): Promise<boolean> => true
     const batch = await createProductionBatch({
       authenticationMiddleware: authentication({
         encrypt: encrypted,
         decrypt: decrypted,
+        sign: (value) => value,
+        verify: (value) => value,
         encodedType: 'string'
       }),
       connectMiddleware: connect({ identifier: identified })
@@ -2057,20 +2063,22 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(authenticationPort).toBeDefined()
       expect(connectPort).toBeDefined()
       expect(authenticationPort?.encodedType).toBe('string')
+      const protectedFrame = await authenticationPort?.protect('frame', {
+        direction: 'outbound',
+        endpointId: 'id',
+        platform: 'Memory'
+      })
       expect(
-        await authenticationPort?.protect('frame', {
-          direction: 'outbound',
-          endpointId: 'id',
-          platform: 'Memory'
-        })
-      ).toBe('encrypted:frame')
-      expect(
-        await authenticationPort?.unprotect('frame', {
-          direction: 'inbound',
-          endpointId: 'id',
-          platform: 'Memory'
-        })
-      ).toBe('decrypted:frame')
+        String(protectedFrame).startsWith('encrypted:' + RpcAuthenticationEnvelope.prefix)
+      ).toBe(true)
+      /** Direct capability probes use the same private session binding as the receiver owner. */
+      const inboundContext = {
+        direction: 'inbound' as const,
+        endpointId: 'id',
+        platform: 'Memory' as const
+      }
+      bindAuthenticationReplayContext(inboundContext, batch)
+      expect(await authenticationPort?.unprotect(protectedFrame, inboundContext)).toBe('frame')
       expect(
         await connectPort?.verify({
           senderId: 'id',
@@ -2172,7 +2180,9 @@ describe('B12a atomic middleware and claim contracts', () => {
     let closeCalls = 0
     const authenticationMiddleware = authentication({
       encrypt: (value) => value,
-      decrypt: (value) => value
+      decrypt: (value) => value,
+      sign: (value) => value,
+      verify: (value) => value
     })
     const [endpointTransport] = createMemoryTransportPair()
     const ownedTransport = {
@@ -2206,10 +2216,15 @@ describe('B12a atomic middleware and claim contracts', () => {
       platform: 'Memory' as const
     }
     const inboundContext = { ...outboundContext, direction: 'inbound' as const }
+    /** Exact receiver session is required before the verified binding can return payload. */
+    bindAuthenticationReplayContext(inboundContext, inboundContext)
+    /** Decryption restores the actual input to encryption, including its replay binding. */
+    let boundFrame: unknown
     const encrypted = Object.freeze({ stage: 'encrypted', value: 'frame' })
     const signed = Object.freeze({ stage: 'signed', value: encrypted })
     const authenticationMiddleware = authentication({
       encrypt: (value, context) => {
+        boundFrame = value
         calls.push({ name: 'encrypt', value, context })
         return encrypted
       },
@@ -2223,7 +2238,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       },
       decrypt: (value, context) => {
         calls.push({ name: 'decrypt', value, context })
-        return 'frame'
+        return boundFrame
       },
       encodedType: 'string'
     })
@@ -2237,7 +2252,8 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(await publishedCapability?.protect('frame', outboundContext)).toBe(signed)
       expect(await publishedCapability?.unprotect(signed, inboundContext)).toBe('frame')
       expect(calls.map(({ name }) => name)).toEqual(['encrypt', 'sign', 'verify', 'decrypt'])
-      expect(calls[0]).toEqual({ name: 'encrypt', value: 'frame', context: outboundContext })
+      expect(calls[0]).toEqual({ name: 'encrypt', value: boundFrame, context: outboundContext })
+      expect(String(boundFrame).startsWith(RpcAuthenticationEnvelope.prefix)).toBe(true)
       expect(calls[1]).toEqual({ name: 'sign', value: encrypted, context: outboundContext })
       expect(calls[2]).toEqual({ name: 'verify', value: signed, context: inboundContext })
       expect(calls[3]).toEqual({ name: 'decrypt', value: encrypted, context: inboundContext })
@@ -2573,7 +2589,12 @@ describe('B12a atomic middleware and claim contracts', () => {
       id: 'b12b02-round4-endpoint',
       transport,
       middlewares: [
-        authentication({ encrypt: (value) => value, decrypt: (value) => value }),
+        authentication({
+          encrypt: (value) => value,
+          decrypt: (value) => value,
+          sign: (value) => value,
+          verify: (value) => value
+        }),
         connect({ transport })
       ]
     })
@@ -2589,6 +2610,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     let encrypt = (value: unknown): unknown => `auth:${String(value)}`
     let decrypt = (value: unknown): unknown => `plain:${String(value)}`
     const authenticationConfig = {
+      sign: (value: unknown) => value,
+      verify: (value: unknown) => value,
       get encrypt() {
         authenticationReads.push('encrypt')
         return encrypt
@@ -2646,12 +2669,14 @@ describe('B12a atomic middleware and claim contracts', () => {
       | IRpcConnectCapability
       | undefined
     expect(
-      await authenticationCapability?.protect('x', {
-        direction: 'outbound',
-        endpointId: 'b12a-production-1',
-        platform: 'Memory'
-      })
-    ).toBe('auth:x')
+      String(
+        await authenticationCapability?.protect('x', {
+          direction: 'outbound',
+          endpointId: 'b12a-production-1',
+          platform: 'Memory'
+        })
+      ).startsWith('auth:' + RpcAuthenticationEnvelope.prefix)
+    ).toBe(true)
     const capturedIdentifier = connectCapability?.identifier
     expect(await capturedIdentifier?.({} as never)).toBe(true)
     expect(connectReads).toContain('identifier.undefined')
@@ -2810,6 +2835,8 @@ describe('B12a atomic middleware and claim contracts', () => {
       const hostile = new Error(`authentication ${operation} hostile transform`)
       const batch = await createProductionBatch({
         authenticationMiddleware: authentication({
+          sign: (value) => value,
+          verify: (value) => value,
           encrypt:
             operation === 'protect'
               ? () => {
@@ -5124,7 +5151,12 @@ describe('B12a atomic middleware and claim contracts', () => {
       const transport = { ...baseTransport, ownership: 'borrowed' as const }
       const middleware: IRpcPlugin[] = [
         protocol(),
-        authentication({ encrypt: (value) => value, decrypt: (value) => value }),
+        authentication({
+          encrypt: (value) => value,
+          decrypt: (value) => value,
+          sign: (value) => value,
+          verify: (value) => value
+        }),
         contract(),
         connect({ transport }),
         nativePlugin,
@@ -5525,6 +5557,8 @@ describe('B12c01 outbound feature production-seam matrix', () => {
         authentication({
           encrypt: (value) => String(value),
           decrypt: (value) => value,
+          sign: (value) => value,
+          verify: (value) => value,
           encodedType: 'string'
         })
       ]
@@ -5578,6 +5612,8 @@ describe('B12c01 outbound feature production-seam matrix', () => {
           authentication({
             encrypt: (value) => value,
             decrypt: (value) => value,
+            sign: (value) => value,
+            verify: (value) => value,
             encodedType: 'any'
           })
         ]
@@ -6344,7 +6380,9 @@ describe('B12c01 outbound feature production-seam matrix', () => {
           encrypt: () => {
             throw hostile
           },
-          decrypt: (value) => value
+          decrypt: (value) => value,
+          sign: (value) => value,
+          verify: (value) => value
         }),
         connect({ transport })
       ]

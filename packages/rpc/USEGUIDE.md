@@ -326,14 +326,14 @@ type IRpcFactoryConfig<TTargetId extends string = string> = {
 - **`transport`**：可以在工厂配置或 `connect({ transport })` 中提供；两处都提供时必须是同一个对象。没有可解析出的 transport、或出现冲突，会在订阅消息前以 `INVALID_CONFIG` 失败。
 - **中间件迁移**：`middlewares` 接受 `defineMiddleware` 或首方工厂返回的原生定义，并在同一个 PluginHost 批次中安装。旧版 `IRpcMiddlewareContext`/`install(context)` 描述符不再兼容，并会在订阅传输前以 `INVALID_CONFIG` 拒绝；自定义定义在第三个参数声明 Feature 引用，通过 `core.features` 读取依赖，并用 `core.own()` 归属清理。
 - **`provider`**：等价于在 `createEndpoint` 返回前，对每一项调用一次 `endpoint.provide(method, fn)`；纯粹是"少写几行"的便利写法。
-- **`replay`**：出站 request、dispatch-only（单向通知）与 stream-open 共用 ID 保留窗口。发送或请求结算只清除 active 状态，仍转为 TTL 墓碑；收到失败响应同样保留。默认容量 4096、结算后 TTL 310 秒，持续预算约 13.2 次/秒，突发与在途会提前占满。满载拒绝新操作，不淘汰未过期 ID，防止旧响应误结算新请求。
-- **`providerLimits` 的重放预算**：与并发 `maxGlobal/maxPerPeer` 分开。入站默认每 verified peer 1024、全端点 4096 个 request 身份，准入时开始保留 310 秒；单 peer 持续约 3.3 次/秒，全局约 13.2 次/秒。request 超限返回原 `OVERLOADED`，不执行 provider；one-way 同样准入但不回复。`maxReplayEntriesPerPeer` 可按已知工作量设置，全局 4096 不随它改变。
+- **`replay`**：出站 request、dispatch-only（单向通知）与 stream-open 共用 ID 保留窗口。canonical Node child-process stdio 与 Node Worker/parentPort 的独占物理通道使用端点独立的安全 128-bit nonce + uint64 计数器默认 ID（固定 36 字符），结算后释放活动 ID。自定义生成器及其他通道仍转为 TTL 墓碑，失败响应同样保留；默认容量 4096、结算后 TTL 310 秒，legacy 持续预算约 13.2 次/秒。满载拒绝新操作，不淘汰未过期 ID。安全随机源不可用时默认生成器保留原 legacy 路径；原生 nonce 初始化抛错会回滚构造并保留 cause，计数器耗尽按 `INVALID_CONFIG` 报告并拒绝，不回绕。
+- **`providerLimits` 的重放预算**：与并发 `maxGlobal/maxPerPeer` 分开。入站默认每 verified peer 1024、全端点 4096 个 request 身份；上述独占原生通道只保留在飞条目，provider 与回复尝试全部结算才释放，stream-open 还等待 next/return cleanup 与终态写尝试。活动重复只执行一次；结算后同业务 ID 可重新准入，跨会话幂等须显式配置共享 store/key。追加读者、第二 wrapper/endpoint 会永久降级，在飞工作结算后开始 legacy TTL；物理 close/exit/dispose/hard expiry 退休后不恢复。其他路径仍从准入保留 310 秒墓碑，单 peer legacy 持续约 3.3 次/秒，全局约 13.2 次/秒。request 超限返回原 `OVERLOADED`，不执行 provider；one-way 同样准入但不回复。`maxReplayEntriesPerPeer` 可按已知工作量设置，全局 4096 不随它改变。
 - **`construction.signal` / `construction.timeoutMs`**：构造 `createEndpoint()` 本身也是异步的（要跑完全部中间件的 `install()`），可以用这两个字段取消或限时。取消会 reject 构造过程，并且仍然会清理已经安装成功的中间件（不会留下半初始化的资源）。中间件的 `install(context)` 会收到同一个 `signal`，如果中间件自己的初始化工作是可取消的，应该监听它。
 - **`scheduler`**：可注入 `@migaia/utils/scheduler` 的 `IScheduler`，同一对象供 endpoint 与 PluginHost 使用；未注入时使用 `systemScheduler`（`performance.now()`）。`now()` 是单调时钟，只须返回有限非负毫秒（可含小数，不解释为 epoch），`schedule(callback, delayMs)` 必须返回含 `cancel()` 的任务；不合法的 scheduler 会在构造期以 `INVALID_CONFIG` 拒绝。注入手动调度器时，构造超时、请求 deadline、TTL、过期与重放窗口均受同一时钟控制。
 - **`wallClock`**：可注入 `IWallClock`，只用于产生 wire `sentAt` 与 hook 事件 `at` 等诊断时间戳；未注入时使用 `systemWallClock`（`Date.now()`）。构造期读取一次并调用一次 `timestamp()`，返回值必须是非负安全整数 epoch 毫秒，否则以 `INVALID_CONFIG` 拒绝（抛出的原错误位于 `cause`）。墙钟回拨不影响任何截止时间。
 - **服务器元数据时间**：`getServerList()` 与 `receiverSelector(serverList)` 中的 `registeredAt`/`lastSeenAt` 是端点单调时间（`scheduler.now()`），只能相互比较或与同一端点的 `IRpcTimePort.now()` 比较；不要当作日历时间显示或跨进程比较，需要日历时间时在回调中读取自己的墙钟。
 
-容量估算使用准入请求率，包含之后失败或取消的请求；出站还要为在途与突发留余量。例如单 peer 每秒 10 笔，需要约 3100 个入站条目，以下是端点配置片段：
+legacy 路径的容量估算使用准入请求率，包含之后失败或取消的请求；出站还要为在途与突发留余量。例如 legacy 单 peer 每秒 10 笔，需要约 3100 个入站条目，以下是端点配置片段：
 
 ```ts
 /** 每秒 10 笔的已知负载配置，合入实际端点的其他必填配置。 */
@@ -416,7 +416,9 @@ authentication({
 
 对**每一帧**（包括分片帧和 ping/pong/abort 这类控制帧）做保护，不是只保护业务请求/响应。`context` 里的 `direction: 'outbound' | 'inbound'` 告诉你当前是在处理发送还是接收方向。通道本身不可信（比如匿名 BroadcastChannel、未加密的 WebRTC 通道）时应当配置这个中间件；启用后，`Transfer` 列表（如 `ArrayBuffer` 的零拷贝转移）不再受支持，因为加密/签名要求先拿到序列化后的字节。
 
-**成对校验规则（构造期强制，均抛 `INVALID_CONFIG`）**：`encrypt`/`decrypt` 必须同时提供或同时不提供，只给一个会被拒绝；`sign`/`verify` 同理。两对里至少要配置一对（`encrypt`+`decrypt`，或 `sign`+`verify`，或两对都配），完全不给任何一个函数同样会被拒绝——`authentication()` 存在的意义就是至少做一种保护，空配置没有意义。出站顺序固定是先 `encrypt` 后 `sign`（`protect`），入站顺序固定是先 `verify` 后 `decrypt`（`unprotect`），与配置的字段顺序无关。任一 transform 在执行期抛出的异常都会被统一包装成 `RpcAuthenticationError`（`code: 'AUTHENTICATION_FAILED'`）。
+**成对校验规则（构造期强制，均抛 `INVALID_CONFIG`）**：`sign`/`verify` 必须同时提供；配置加密时 `encrypt`/`decrypt` 也必须成对，只有加密而没有签名会被拒绝。出站先包入版本、安全 128-bit nonce、uint64 计数器与载荷，再 `encrypt`、`sign`；入站先 `verify`、`decrypt`，再检查绑定及所属物理会话，与配置字段顺序无关。transform 的输入类别仍为原 string/Uint8Array/object，但其内容已包含绑定，必须完整保护及还原，不能仅签原业务载荷。旧格式、无绑定、畸形绑定及无可信会话来源均为 `AUTHENTICATION_FAILED`，不退回旧认证路径。
+
+每个接收会话固定首个通过验证的 nonce，并用 64 槽窗口接受乱序的未见计数器；同计数器、窗口外计数器及同会话换 nonce 均拒绝。不同物理会话互相隔离，退休会话晚返回的 verify 不进入 provider；这种隔离不声明新会话首帧的密码学 freshness。签名计数器耗尽按 `INVALID_CONFIG`、稳定文本 `Authentication replay counter is exhausted` 报告并拒绝，不回绕；安全随机源不可用或抛错时不降级弱随机，原错误保留在 cause。其他 transform 异常保持 `RpcAuthenticationError`（`AUTHENTICATION_FAILED`）包装。
 
 #### 3.5 `framer(descriptor?)`
 

@@ -60,11 +60,22 @@ import { RpcOutboundSender } from './outbound-sender.js'
 import { outboundGateMatchesFeature, readOutboundGate } from './outbound-gate.js'
 import type { IRpcOutboundGate } from './outbound-gate.js'
 import { ReplayWindow } from './replay.js'
+import { claimNativeReplayTransport, type INativeReplayReceipt } from './native-replay.js'
+import { createNativeDefaultAllocator } from './native-default-id.js'
+import { NativeDefaultIdText } from './native-default-id-text.js'
+import {
+  bindAuthenticationReplayContext,
+  markAuthenticationReplayEnvelope
+} from './authentication-replay.js'
 import { OperationScope } from './operation-scope.js'
 import { InboundIdentityCoordinator, type IInboundIdentityAdmission } from './inbound-identity.js'
 import { RpcVariationCoordinator } from './variation-coordinator.js'
 import { createSafeRecord, fanoutDeliveryKey } from './safe-value.js'
-import { readSelectedFramerChunks, type IRpcEndpointDebugSnapshot } from './test-observer.js'
+import {
+  readSelectedFramerChunks,
+  RpcDebugProperty,
+  type IRpcEndpointDebugSnapshot
+} from './test-observer.js'
 import type { IRpcDiscoveryResolverPort } from './plugin-shared-keys.js'
 import type { IRpcFrameAdmission, IRpcStreamOpenCommand } from './plugin-shared-keys.js'
 import type { IEndpointTimer } from './time-port.js'
@@ -144,6 +155,19 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #runtimeComponents: import('./endpoint-options.js').IRpcSelectedComponents
   /** Optional inbound/outbound protection capability. */
   readonly #authentication: IRpcAuthenticationCapability | undefined
+  /** Source-less physical channels share the endpoint's authentication partition. */
+  readonly #authenticationPhysicalSession = {}
+  /** Actual object sources partition authentication weakly; primitive token text grants no proof. */
+  readonly #authenticationSessions = new WeakMap<object, object>()
+  /** One native claim is shared by provider and stream owners, never reconstructed from metadata. */
+  readonly #native: INativeReplayReceipt | undefined
+  /** Secure canonical initialization alone grants the default allocator non-reuse exemption. */
+  readonly #defaultGenerate: (() => string) | undefined
+
+  /** Optional stream allocation uses this same endpoint counter without claiming another owner. */
+  get defaultGenerate(): (() => string) | undefined {
+    return this.#defaultGenerate
+  }
   /** Canonical dynamic timeout capability installed by middleware. */
   readonly #timeout: IRpcTimeoutCapability
   /** Enables caller abort semantics only when the abort capability is selected. */
@@ -205,10 +229,22 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     this.#discoveryResolver = discoveryResolver
     this.id = prepared.id
     this.targetIds = Object.freeze([...(prepared.options.targetIds ?? [])])
+    this.#native = claimNativeReplayTransport(kernel.transport)
+    try {
+      this.#defaultGenerate = this.#native
+        ? createNativeDefaultAllocator(prepared.options.uuid ?? {}, 0n, (error) =>
+            this.emitFailure(error)
+          )
+        : undefined
+    } catch (error) {
+      this.#native?.retire()
+      throw error
+    }
     this.#replay = new ReplayWindow(
       () => kernel.time.scheduler.now(),
       prepared.options.replay?.maxEntries,
-      prepared.options.replay?.ttlMs
+      prepared.options.replay?.ttlMs,
+      () => this.#defaultGenerate !== undefined && this.#native?.active === true
     )
     const contract = prepared.options.contract ?? {}
     this.#version = contract.version ?? '1.0'
@@ -221,7 +257,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       'validateData' in contract && contract.validateData
         ? (contract.validateData as IRpcContractCapability['validateData'])
         : (method, side, data) => validateContractData(contract, method, side, data)
-    this.#uuid = prepared.options.uuid ?? {}
+    this.#uuid = this.#defaultGenerate
+      ? { ...prepared.options.uuid, generate: this.#defaultGenerate }
+      : (prepared.options.uuid ?? {})
     this.#components = prepared.options.components!
     /** Port selection never changes the public component snapshot or semantic normalizer. */
     const objectPort = selectedJsonObjectPort(this.#components)
@@ -256,9 +294,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#components,
       prepared.options.authentication,
       kernel.platform,
-      this.#outboundGate
+      this.#outboundGate,
+      (error) => this.emitFailure(error, RpcCoreErrorCode.invalidConfig)
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
+      native: this.#native,
       now: () => kernel.time.scheduler.now(),
       connect:
         prepared.options.connect && 'verify' in prepared.options.connect
@@ -276,6 +316,15 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       platform: kernel.platform,
       topology: kernel.topology
     })
+    if (this.#native)
+      kernel.resources.addSync(
+        NativeDefaultIdText.terminalSubscription,
+        this.#native.onRetire(() => {
+          kernel.beginClose()
+          this.#failAll(new RpcAbortError())
+          this.#replay.clear()
+        })
+      )
     kernel.registerOwner('outbound-pipeline', this.#pipeline)
     kernel.registerOwner('pending-registry', this.#pending)
     kernel.registerOwner('replay-window', this.#replay)
@@ -342,16 +391,50 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         receive: async (message) => {
           const generation = this.kernel.generation
           if (this.kernel.state !== 'active') return
+          this.#native?.observeOwner()
+          if (this.#native && !this.#native.active) return
           const physical = this.inboundIdentity.prepareSource(message)
           if (!physical) return
           let frame = physical.data
-          if (this.#authentication)
-            frame = await this.#authentication.unprotect(frame, {
-              direction: 'inbound',
-              endpointId: this.id,
-              platform: this.kernel.platform
-            })
+          /** Private physical binding follows this exact context through async transforms. */
+          const authenticationContext = {
+            direction: 'inbound' as const,
+            endpointId: this.id,
+            platform: this.kernel.platform
+          }
+          if (this.#authentication) {
+            /** Native and source-less channels identify one physical endpoint partition. */
+            let session =
+              this.#native || physical.source === undefined
+                ? this.#authenticationPhysicalSession
+                : undefined
+            if (
+              !session &&
+              physical.source !== null &&
+              (typeof physical.source === 'object' || typeof physical.source === 'function')
+            ) {
+              /** Actual source object is weakly owned; token text cannot create trusted sessions. */
+              const source = physical.source as object
+              session = this.#authenticationSessions.get(source)
+              if (!session) {
+                session = {}
+                this.#authenticationSessions.set(source, session)
+              }
+            }
+            if (session)
+              bindAuthenticationReplayContext(
+                authenticationContext,
+                session,
+                () =>
+                  this.kernel.state === 'active' &&
+                  this.kernel.generation === generation &&
+                  (this.#native?.active ?? true)
+              )
+            frame = await this.#authentication.unprotect(frame, authenticationContext)
+          }
+          this.#native?.observeOwner()
           this.kernel.assertActive(generation)
+          if (this.#native && !this.#native.active) return
           const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
             source: physical.sourceToken,
             messageId: 'whole'
@@ -388,6 +471,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           }
           for (const [pointer, field] of ignored)
             this.#unknownFields.note(physical.sourceToken, envelope.kind, pointer, field)
+          markAuthenticationReplayEnvelope(authenticationContext, envelope)
           const route = envelope.data
           const admission = await this.inboundIdentity.admitPrepared(physical, {
             senderId: route.route.senderId,
@@ -411,7 +495,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             admission.release()
           }
         },
-        transportError: (error) => this.#failAll(error),
+        transportError: (error) => {
+          /** Settle with the original transport error before retirement can emit a lifecycle abort. */
+          this.#failAll(error)
+          this.#native?.observeOwner()
+        },
         listenerError: (error) => this.emitFailure(error, RpcCoreErrorCode.transport),
         receiveError: (error) => this.emitFailure(error)
       },
@@ -965,7 +1053,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
 
   /** Reads live package-private owner counts for hostile lifecycle verification. */
   debugSnapshot(): IRpcEndpointDebugSnapshot {
-    return {
+    /** Existing enumerable shape stays stable; replay counts are an explicit passive read. */
+    const snapshot: IRpcEndpointDebugSnapshot = {
       phase: this.kernel.state === 'disposed' ? 'disposed' : 'active',
       pending: this.#pending.size,
       pingPending: 0,
@@ -987,12 +1076,20 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         inboundTimers: 0
       }
     }
+    Object.defineProperty(snapshot, RpcDebugProperty.replayState, {
+      value: Object.freeze({
+        active: this.#replay.activeSize,
+        completed: this.#replay.size - this.#replay.activeSize
+      })
+    })
+    return snapshot
   }
 
   /** Releases outbound-owned state once; the composed kernel plugin closes root resources later. */
   dispose(): Promise<void> {
     if (this.#featureDisposePromise) return this.#featureDisposePromise
     this.#featureDisposePromise = Promise.resolve().then(() => {
+      this.#native?.retire()
       this.kernel.beginClose()
       this.#failAll(new RpcAbortError())
       this.#responseBindings.clear()

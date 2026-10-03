@@ -16,7 +16,8 @@ import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
-import { nodeByteStream } from './node-byte-stream.js'
+import { nodeByteStream, nativeNodeByteOwner } from './node-byte-stream.js'
+import { registerNativeReplayOwner } from '../../core/internal/native-replay.js'
 
 /** A Node handle exposes stdout/stdin only when the specification chose byte channels. */
 export type INodeProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel }>
@@ -146,6 +147,7 @@ export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle
                 child.stdin?.destroy()
               })
             : undefined
+        if (channel) registerNativeReplayOwner(channel, nativeNodeByteOwner(channel)!)
         child.stdin?.removeListener('error', onStdinError)
         return Object.freeze({
           identity: Object.freeze({ fingerprint: randomUUID(), pid: child.pid }),
@@ -179,5 +181,6 @@ export async function openProcessStdioChannel(
     process.stdin.pause()
     process.stdout.end()
   })
+  registerNativeReplayOwner(channel, nativeNodeByteOwner(channel)!)
   return openBootstrapFrameChannel(channel, options.bootstrap)
 }

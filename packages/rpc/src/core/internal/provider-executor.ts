@@ -189,6 +189,16 @@ export class ProviderExecutor<TTargetId extends string> {
     }
   }
 
+  /** Shared streams report replay capacity through this executor's existing rejection observer. */
+  notifyReplayCapacityRejection(request: IProviderRequestInput, verifiedPeerKey: string): void {
+    this.#notifyRejection(
+      request,
+      verifiedPeerKey,
+      tupleKey(verifiedPeerKey, request.route.route.senderId, request.envelope.id),
+      RpcProviderRejectionReason.replayLedgerFull
+    )
+  }
+
   /** Validates, executes, and settles one inbound request. */
   async execute(request: IProviderRequestInput, verifiedPeerKey = ''): Promise<void> {
     const controllerKey = tupleKey(

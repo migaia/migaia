@@ -16,9 +16,16 @@ export class ReplayWindow {
   readonly #ttlMs: number
   /** Endpoint clock for replay tombstone expiration. */
   readonly #now: () => number
+  /** Canonical non-reusing allocator proof alone permits release without a completion tombstone. */
+  readonly #activeOnly: () => boolean
 
   /** Owns one bounded namespace using the endpoint's supported monotonic clock. */
-  constructor(now: () => number, maxEntries = 4096, ttlMs = 310_000) {
+  constructor(
+    now: () => number,
+    maxEntries = 4096,
+    ttlMs = 310_000,
+    activeOnly: () => boolean = () => false
+  ) {
     if (
       !Number.isSafeInteger(maxEntries) ||
       maxEntries < 1 ||
@@ -32,6 +39,7 @@ export class ReplayWindow {
     this.#maxEntries = maxEntries
     this.#ttlMs = ttlMs
     this.#now = now
+    this.#activeOnly = activeOnly
   }
 
   /** Tests whether an outbound identifier remains reserved. */
@@ -52,7 +60,7 @@ export class ReplayWindow {
   /** Moves an active identifier to a TTL-bounded tombstone after settlement. */
   releaseId(id: string): void {
     if (!this.#activeIds.delete(id)) return
-    this.#releasedIds.set(id, this.#now())
+    if (!this.#activeOnly()) this.#releasedIds.set(id, this.#now())
   }
 
   /**
@@ -79,6 +87,11 @@ export class ReplayWindow {
   /** Reads combined active and retained occupancy without scanning or changing retention. */
   get size(): number {
     return this.#activeIds.size + this.#releasedIds.size
+  }
+
+  /** Reads live reservations through the existing package-only lifecycle snapshot boundary. */
+  get activeSize(): number {
+    return this.#activeIds.size
   }
 
   /** Releases all replay state during endpoint disposal. */

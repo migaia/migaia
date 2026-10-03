@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { authentication } from '../../../src/core/middleware/authentication.js'
+import { bindAuthenticationReplayContext } from '../../../src/core/internal/authentication-replay.js'
+import type { IRpcAuthenticationContext } from '../../../src/core/typing.js'
 import { installPlugin } from './helpers.js'
 
 /** Installs a native authentication plugin into an isolated capability projection. */
@@ -36,9 +38,14 @@ describe('authentication middleware', () => {
     }
     const context = { direction: 'outbound', endpointId: 'endpoint', platform: 'Memory' }
     const protectedValue = await capability.protect('data', context)
-    await expect(
-      capability.unprotect(protectedValue, { ...context, direction: 'inbound' })
-    ).resolves.toBe('data')
+    /** Direct capability tests supply the same private physical binding as the real receiver owner. */
+    const inbound: IRpcAuthenticationContext = {
+      direction: 'inbound',
+      endpointId: 'endpoint',
+      platform: 'Memory'
+    }
+    bindAuthenticationReplayContext(inbound, {})
+    await expect(capability.unprotect(protectedValue, inbound)).resolves.toBe('data')
     expect(calls).toEqual(['encrypt', 'sign', 'verify', 'decrypt'])
   })
 

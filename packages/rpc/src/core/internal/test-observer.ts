@@ -13,6 +13,11 @@ export type IRpcEndpointDebugSnapshot = {
     readonly admission: number
     readonly replay: number
   }
+  /** Non-enumerable replay occupancy is read only through the existing package-test boundary. */
+  readonly replayState?: {
+    readonly active: number
+    readonly completed: number
+  }
   readonly chunks: number | undefined
   readonly providers: number
   readonly events: number
@@ -31,6 +36,9 @@ export type IRpcEndpointDebugSnapshot = {
     readonly inboundTimers: number
   }
 }
+
+/** Stable private snapshot property shared by the two canonical replay owners and fixtures. */
+export const RpcDebugProperty = { replayState: 'replayState' } as const
 
 /** Projects only the proven stateless native message framer; custom framing state remains opaque. */
 export function readSelectedFramerChunks(components: IRpcSelectedComponents): number | undefined {

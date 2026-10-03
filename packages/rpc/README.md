@@ -300,13 +300,15 @@ endpoint.provide('add', (ctx) => {
 - `transport?: IRpcTransport` —— 也可以只在 `connect({ transport })` 里提供，二选一即可
 - `targetIds?: readonly string[]` —— 已知对端 id 的预声明，非必需；自动发现模式下首次 `send`/`dispatch`/`ping` 未知 `targetId` 会懒查询
 - `provider?: Readonly<Record<string, IRpcProvider>>` —— 构造时批量注册的方法集合，等价于逐个调用 `provide()`
-- `providerLimits?: { maxGlobal?: number; maxPerPeer?: number; maxReplayEntriesPerPeer?: number; onRejected?: (rejection) => void | Promise<void> }` —— provider 并发上限默认 `256/64`；独立入站重放账本默认每个已验证 peer 1024 条、全端点 4096 条，保留 310 秒。超限不执行 provider；request 返回 `OVERLOADED`，one-way 不回复。可选 `onRejected` 观察本地拒绝，通知失败会 report，不阻断回复
+- `providerLimits?: { maxGlobal?: number; maxPerPeer?: number; maxReplayEntriesPerPeer?: number; onRejected?: (rejection) => void | Promise<void> }` —— provider 并发上限默认 `256/64`；独立入站重放账本默认每个已验证 peer 1024 条、全端点 4096 条。下述原生独占通道只保留在飞条目，其他通道保留 310 秒墓碑。超限不执行 provider；request 返回 `OVERLOADED`，one-way 不回复。可选 `onRejected` 观察本地拒绝，通知失败会 report，不阻断回复
 - `replay?: { maxEntries?: number; ttlMs?: number }` —— 出站请求 id 重放保护窗口，默认容量 4096、TTL 310 秒
 - `construction?: { signal?: IRpcAbortSignal; timeoutMs?: number | false }` —— 构造期本身的取消/超时；取消/超时后仍会正确回滚已安装成功的中间件
 - `scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 端点和 PluginHost 共用的单调时钟与定时器；未提供时使用 `systemScheduler`。`now()` 须返回有限非负毫秒（可含小数，不是 epoch），`schedule()` 须返回可取消任务；非法配置以 `INVALID_CONFIG` 拒绝
 - `wallClock?: IWallClock`（`@migaia/utils/scheduler`）—— 只产生 wire `sentAt` 与 hook 事件 `at` 的诊断墙钟，默认 `systemWallClock`（`Date.now()`）；`timestamp()` 须返回非负安全整数 epoch 毫秒，否则以 `INVALID_CONFIG` 拒绝。截止时间、TTL、重放窗口只按 `scheduler` 计算
 
-重放容量会限制持续吞吐。出站请求、one-way 和 stream-open 在结算后仍保留 ID 墓碑，默认持续预算约 `4096 / 310 = 13.2` 次/秒；入站每个已验证 peer 约 `1024 / 310 = 3.3` 次/秒，所有 peer 合计约 13.2 次/秒。在途请求、突发和失败结算也占出站容量，不能只按成功请求数估算。满载时拒绝新请求，不提前淘汰未过期 ID。
+canonical Node child-process stdio 与 Node Worker/parentPort 的单物理资源、单 transport、单 endpoint 独占通道使用活动重放账本。默认 ID 由端点独立的安全 128-bit nonce 与 uint64 计数器组成，固定 36 字符；出站结算后释放 ID，入站 provider、stream next/return cleanup 与终态发送尝试全部结算后释放活动条目。活动重复仍只执行一次；结算后再次送达同一业务 ID 可重新执行，跨会话逻辑幂等请使用显式 `idempotencyKey` 与共享 store。追加物理读者或第二 wrapper/endpoint 会永久降级，在飞工作继续、结算后转 legacy 墓碑；物理退休不能重新恢复资格。公共字段或任意 MessagePort 不授予该资格。
+
+其他通道及自定义 ID 生成器的出站路径仍保留 TTL 墓碑。其默认持续预算约 `4096 / 310 = 13.2` 次/秒；legacy 入站每个已验证 peer 约 `1024 / 310 = 3.3` 次/秒，所有 peer 合计约 13.2 次/秒。在途请求、突发和失败结算也占出站容量，不能只按成功请求数估算。满载时拒绝新请求，不提前淘汰未过期 ID。
 
 已知负载可用现有 `replay.maxEntries` 和 `providerLimits.maxReplayEntriesPerPeer` 按「峰值持续请求率 × 310 秒 + 在途/突发余量」配置；条目数与内存随容量增长。只调每 peer 入站预算不会扩大固定全局 4096，所以这些选项不能解决超过全局约 13.2 次/秒的持续入站负载。保持默认 TTL，缩短它会改变防重放安全边界。耗尽时本端通过 `hooks` 的 `failure` / `hooks({ onHookError })` 通路以 `OVERLOADED` 限频报告 namespace、占用与上限，不带 ID 或载荷；对端回复保持原样。详见 USEGUIDE §2.4。
 
@@ -462,7 +464,7 @@ authentication({
 })
 ```
 
-全部选项：`encrypt?`/`decrypt?`/`sign?`/`verify?: (value, context) => unknown | Promise<unknown>`（`context.direction` 为 `'outbound' | 'inbound'`；`encrypt`/`decrypt` 必须成对提供，`sign`/`verify`同理，且至少要配置一对，否则构造期抛 `INVALID_CONFIG`）、`encodedType?: 'any' | 'string' | 'uint8array'`（默认 `'any'`）。启用后 `Transfer` 零拷贝列表不再受支持。通道本身不可信（如匿名 BroadcastChannel）时必须加。
+全部选项：`encrypt?`/`decrypt?`/`sign?`/`verify?: (value, context) => unknown | Promise<unknown>`（`context.direction` 为 `'outbound' | 'inbound'`；`sign`/`verify` 必须成对提供，使用加密时还须同时提供 `encrypt`/`decrypt`，否则构造期抛 `INVALID_CONFIG`）、`encodedType?: 'any' | 'string' | 'uint8array'`（默认 `'any'`）。签名覆盖每个物理帧的版本、128-bit nonce、uint64 计数器与载荷；加密输入已经包含该绑定。接收端按真实会话使用 64 槽窗口处理异步验签乱序与重放，拒绝旧格式或无绑定签名（`AUTHENTICATION_FAILED`），不提供旧格式兼容。启用后 `Transfer` 零拷贝列表不再受支持。通道本身不可信（如匿名 BroadcastChannel）时必须加。
 
 **`framer(descriptor?)`｜10 秒上手** —— 大消息自动分片与重组：
 

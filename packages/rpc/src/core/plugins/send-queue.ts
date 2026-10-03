@@ -1,4 +1,5 @@
 import { registerJsonObjectFeature } from '../internal/json-object-port.js'
+import { carryNativeReplayTransport } from '../internal/native-replay.js'
 import { RpcPluginErrorText } from './error-text.js'
 import { createEventChannel } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, hostRethrowReporter } from '@migaia/utils/promise'
@@ -297,5 +298,6 @@ export function createIpcSendQueueTransport(
       claimed = false
     }
   })
+  carryNativeReplayTransport(transport, wrapper)
   return wrapper
 }

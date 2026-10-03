@@ -7,14 +7,14 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 /** New package root used to run the same tree-shaking measurement script. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** R32 closing pins the lower exact retained cost after the UTF-8 regression repair. */
+/** X14 r32 pins canonical reuse, retirement/error fixes and passive existing-owner replay reads. */
 const allowedIncrease = {
-  rawBytes: 81633 / legacyRoot.rawBytes,
-  gzipBytes: 19986 / legacyRoot.gzipBytes
+  rawBytes: 97750 / legacyRoot.rawBytes,
+  gzipBytes: 24491 / legacyRoot.gzipBytes
 } as const
 
-/** The private C2 registry adds one module to the five already retained by the reviewed graph. */
-const expectedModuleIncrease = 6
+/** The six existing additions plus four private authentication/native modules remain exact. */
+const expectedModuleIncrease = 10
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {

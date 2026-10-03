@@ -1,4 +1,5 @@
 import { selectedJsonObjectPort, type IRpcJsonObjectPort } from './json-object-port.js'
+import { isAuthenticationCounterExhaustion } from './authentication-replay.js'
 import {
   RpcAuthenticationError,
   RpcLifecycleError,
@@ -45,6 +46,8 @@ export class RpcOutboundSender {
   readonly #gate: IRpcOutboundGate | undefined
   /** Once-selected private data port; public transport and descriptor snapshots remain unchanged. */
   readonly #objectPort: IRpcJsonObjectPort | undefined
+  /** Existing endpoint diagnostics observe genuine local counter exhaustion before rejection. */
+  readonly #reportConfiguration: ((error: unknown) => void) | undefined
 
   constructor(
     transport: IRpcOutboundTransport,
@@ -52,7 +55,8 @@ export class RpcOutboundSender {
     components: IRpcSelectedComponents,
     authentication?: IRpcAuthenticationCapability,
     platform: IRpcPlatform = transport.platform,
-    gate?: IRpcOutboundGate
+    gate?: IRpcOutboundGate,
+    reportConfiguration?: (error: unknown) => void
   ) {
     this.transport = transport
     this.id = id
@@ -61,6 +65,7 @@ export class RpcOutboundSender {
     this.authentication = authentication
     this.#transportEncodedType = transport.encodedType
     this.#gate = gate
+    this.#reportConfiguration = reportConfiguration
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
       typeof lifecycle.assertActive === 'function' && typeof lifecycle.generation === 'number'
@@ -293,6 +298,10 @@ export class RpcOutboundSender {
         return authentication.protect(value, this.#authenticationContext)
       })
       .catch((cause) => {
+        if (isAuthenticationCounterExhaustion(cause)) {
+          this.#reportConfiguration?.(cause)
+          throw cause
+        }
         if (cause instanceof RpcAuthenticationError) throw cause
         if (cause instanceof RpcLifecycleError) throw cause
         throw new RpcAuthenticationError(RpcCoreErrorText.authenticationFailed, cause)

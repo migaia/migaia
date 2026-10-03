@@ -1,4 +1,5 @@
 import { hostRethrowReporter } from '@migaia/utils/promise'
+import { bindNativeReplayTransport } from '../core/internal/native-replay.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
 import { serializeRpcError } from '../contract/error.js'
 import {
@@ -215,6 +216,7 @@ export async function createProcessTransport(
       throw invalidOption(RpcProcessErrorText.negotiatedCodecUnsupported)
     wire.activate()
     const ipc = attachIpcConnection(wire.transport, byteOptions.ipc, byteOptions.report)
+    bindNativeReplayTransport(channel, ipc.transport)
     return Object.freeze({
       transport: ipc.transport,
       peerId: byteOptions.peerId,

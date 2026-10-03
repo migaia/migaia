@@ -29,10 +29,14 @@ import { assertContractMethod } from './contract.js'
 import { ProviderExecutor } from './provider-executor.js'
 import { ProviderRegistry } from './provider.js'
 import { RequestReplayLedger } from './request-replay-ledger.js'
+import { nativeReplayReceipt } from './native-replay.js'
+import { hasAuthenticationReplayBinding } from './authentication-replay.js'
+import { NativeDefaultIdText } from './native-default-id-text.js'
 import { tupleKey } from './safe-value.js'
 import { createRpcIdempotencyStore } from '../idempotency-store.js'
 import {
   readSelectedFramerChunks,
+  RpcDebugProperty,
   recordProviderRegistration,
   type IRpcEndpointDebugSnapshot
 } from './test-observer.js'
@@ -57,6 +61,8 @@ export class RpcProviderAttachment {
   readonly #registry = new ProviderRegistry()
   /** Completed request replay ownership. */
   readonly #replay: RequestReplayLedger
+  /** Per-frame authentication brings protected streams into the shared budget even on legacy media. */
+  readonly #authenticated: boolean
   /** Per-task provider execution quotas. */
   readonly #admission: ProviderAdmissionRegistry
   /** Active provider abort controllers. */
@@ -115,10 +121,17 @@ export class RpcProviderAttachment {
         RpcCoreErrorCode.invalidConfig
       )
     this.#transaction = kernel
+    this.#authenticated = prepared.options.authentication !== undefined
     this.#replay = new RequestReplayLedger(
       4096,
       prepared.options.providerLimits?.maxReplayEntriesPerPeer ?? 1024,
-      310_000
+      310_000,
+      undefined,
+      () => {
+        /** This is a pure mode read; owner observations precede admission/settlement. */
+        const receipt = nativeReplayReceipt(kernel.transport)
+        return receipt && !receipt.active ? undefined : receipt?.qualified === true
+      }
     )
     this.#executor = new ProviderExecutor({
       timestamp: () => kernel.time.timestamp(),
@@ -177,7 +190,9 @@ export class RpcProviderAttachment {
         this.#replay.admit(
           tupleKey(peerKey, request.route.route.senderId, request.envelope.id),
           peerKey,
-          kernel.time.scheduler.now()
+          kernel.time.scheduler.now(),
+          nativeReplayReceipt(kernel.transport)?.qualified === true &&
+            (!this.#authenticated || hasAuthenticationReplayBinding(request.envelope))
         ),
       consumePendingAbort: (key) =>
         this.#variations.admit({ operation: 'consumeAbort', key }) as {
@@ -186,6 +201,13 @@ export class RpcProviderAttachment {
         },
       responseReceiverId: (request) => request.route.route.senderId
     })
+    /** Physical retirement drops only this provider's ledger before any late cleanup can return. */
+    const native = nativeReplayReceipt(kernel.transport)
+    if (native)
+      kernel.resources.addSync(
+        NativeDefaultIdText.providerTerminalSubscription,
+        native.onRetire(() => this.#replay.clear())
+      )
     kernel.registerOwner('provider-registry', this.#registry)
     kernel.registerOwner('request-replay', this.#replay)
     kernel.registerOwner('provider-admission', this.#admission)
@@ -298,6 +320,12 @@ export class RpcProviderAttachment {
       value: Object.freeze({ admission: this.#admission.size, replay: this.#replay.size }),
       writable: false
     })
+    Object.defineProperty(snapshot, RpcDebugProperty.replayState, {
+      value: Object.freeze({
+        active: this.#replay.activeSize,
+        completed: this.#replay.size - this.#replay.activeSize
+      })
+    })
     return snapshot
   }
 
@@ -362,12 +390,62 @@ export class RpcProviderAttachment {
     if (!record.admission) return
     const stream = this.#registry.streamProviders.get(request.method)
     if (stream) {
-      await stream(record, (signal) =>
-        this.#executor.createContext({ envelope: request, route }, signal, () => signal.aborted)
-      )
+      /** Unauthenticated unsupported streams retain their original stream-only budget behavior. */
+      const native = nativeReplayReceipt(this.#kernel.transport)
+      if (!native && !this.#authenticated) {
+        await stream(record, (signal) =>
+          this.#executor.createContext({ envelope: request, route }, signal, () => signal.aborted)
+        )
+        return
+      }
+      /** One shared business identity protects open, next, return and terminal send settlement. */
+      const key = tupleKey(record.admission.token, route.route.senderId, request.id)
+      if (this.#replay.has(key, this.#kernel.time.scheduler.now())) return
+      if (
+        !this.#replay.admit(
+          key,
+          record.admission.token,
+          this.#kernel.time.scheduler.now(),
+          native?.qualified === true &&
+            (!this.#authenticated || hasAuthenticationReplayBinding(request)),
+          true
+        )
+      ) {
+        this.#executor.notifyReplayCapacityRejection(
+          { envelope: request, route },
+          record.admission.token
+        )
+        await stream({ ...record, replayRejected: true }, (signal) =>
+          this.#executor.createContext({ envelope: request, route }, signal, () => signal.aborted)
+        )
+        return
+      }
+      /** Capture exact admission ownership before any asynchronous stream construction or cleanup. */
+      const release = this.#replay.captureRelease(key)
+      try {
+        await stream({ ...record, activeLifetime: true }, (signal) =>
+          this.#executor.createContext({ envelope: request, route }, signal, () => signal.aborted)
+        )
+      } finally {
+        native?.observeOwner()
+        release(this.#kernel.time.scheduler.now())
+      }
       return
     }
-    await this.#executor.execute({ envelope: request, route }, record.admission.token)
+    /** Executor admission happens synchronously before its first await; duplicates own no new lease. */
+    const key = tupleKey(record.admission.token, route.route.senderId, request.id)
+    /** A duplicate must never capture the original operation's release closure. */
+    const duplicate = this.#replay.has(key, this.#kernel.time.scheduler.now())
+    /** Start the canonical executor before capturing its actual admitted entry identity. */
+    const executing = this.#executor.execute({ envelope: request, route }, record.admission.token)
+    /** A captured closure compares exact entry identity after asynchronous completion. */
+    const release = duplicate ? undefined : this.#replay.captureRelease(key)
+    try {
+      await executing
+    } finally {
+      nativeReplayReceipt(this.#kernel.transport)?.observeOwner()
+      release?.(this.#kernel.time.scheduler.now())
+    }
   }
 }
 

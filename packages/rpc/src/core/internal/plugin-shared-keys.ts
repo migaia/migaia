@@ -196,6 +196,8 @@ export type IRpcVariationCoordinatorPort = {
 
 /** Exact D87 outbound operation; provider dispatch uses the existing send owner. */
 export type IRpcOutboundOperationsPort = {
+  /** Package-private allocator shared with stream; no new public generator configuration. */
+  readonly defaultGenerate?: () => string
   readonly send: IRpcOutboundSend
   /** Notify optional flow owners when the canonical outbound attachment loses its transport. */
   readonly onTransportFailure?: (listener: (error: unknown) => void) => () => void
