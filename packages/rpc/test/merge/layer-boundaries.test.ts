@@ -47,7 +47,14 @@ function layerViolations(file: string, source: string): string[] {
       invalid ||=
         outside ||
         (!isRelative && specifier !== '@migaia/utils/bytes') ||
-        (target.startsWith('core/') && !browserCoreAllowlist.has(target))
+        (target.startsWith('core/') &&
+          !browserCoreAllowlist.has(target) &&
+          !(
+            relative(sourceRoot, file).split(sep).join('/') === 'browser/adapters/web-worker.ts' &&
+            target === 'core/internal/batch-frame.ts' &&
+            ts.isImportDeclaration(statement) &&
+            statement.importClause?.namedBindings?.getText(parsed) === '{ registerBatchAgreement }'
+          ))
     }
     if (owner === 'bridge')
       invalid ||=

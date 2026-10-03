@@ -1,3 +1,5 @@
+import { registerBatchAgreement } from '../../core/internal/batch-frame.js'
+import { RpcCapability } from '../../contract/wire-constants.js'
 import { BrowserRpcErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
 import {
@@ -36,6 +38,8 @@ export type IWebWorkerLikePort = {
 
 /** Static metadata for a dedicated worker channel whose peer is known by construction. */
 export type IWebWorkerTransportOptions = {
+  /** Explicit static agreement; both deployment endpoints must use the same capabilities. */
+  readonly capabilities?: readonly string[]
   readonly peerId?: string
   readonly origin?: string
 }
@@ -133,7 +137,8 @@ export function createWebWorkerTransport(
   const onError = onFailure(BrowserRpcErrorText.workerFailedReason)
   const onMessageError = onFailure(BrowserRpcErrorText.workerMessageErrorReason)
 
-  return {
+  /** The canonical factory is the sole owner of this static deployment agreement. */
+  const transport: IRpcTransport<unknown, Transferable> = {
     platform: RpcPlatform.worker,
     topology: 'exclusive',
     ownership: RpcTransportOwnership.borrowed,
@@ -208,4 +213,5 @@ export function createWebWorkerTransport(
       }
     }
   }
+  return registerBatchAgreement(transport, options.capabilities ?? [RpcCapability.batch])
 }

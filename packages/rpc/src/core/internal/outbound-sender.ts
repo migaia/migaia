@@ -18,6 +18,35 @@ import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcSelectedComponents } from './endpoint-options.js'
 import { RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
 import type { IRpcOutboundAdmission, IRpcOutboundGate } from './outbound-gate.js'
+import { registerBatchWriter, type IBatchWriteGuard } from './batch-frame.js'
+import { RpcBatchPhysical } from '../../contract/wire-constants.js'
+import {
+  measureRpcPhysicalFrame,
+  assertRpcPhysicalFrameSize,
+  rejectRpcPhysicalFrameSize
+} from '../../contract/batch-frame.js'
+import { resolveAbortReason } from './async-control.js'
+
+/** One logical settlement remains owned until its actual physical write completes. */
+type IQueuedEnvelope = {
+  message: IRpcEnvelope
+  transfer: readonly unknown[] | undefined
+  readonly options: ISendOptions | undefined
+  readonly admission: IRpcOutboundAdmission | undefined
+  readonly beforeWrite: (() => IRpcEnvelope) | undefined
+  readonly onStarted: (() => void) | undefined
+  readonly guard: IBatchWriteGuard | undefined
+  /** Only waiting entries retain a queued cancellation listener. */
+  cancelQueued?: () => void
+  readonly resolve: () => void
+  readonly reject: (error: unknown) => void
+}
+
+/** One complete encoded/protected physical value retains its exact logical settlements. */
+type IPreparedBatch = Readonly<{ entries: IQueuedEnvelope[]; value: unknown }>
+
+/** The sender becomes idle in the same reaction as its final actual host-write settlement. */
+type IPhysicalDrain = { pending: number; preparing: boolean; finish(): void }
 
 /** Minimal canonical send port consumed by the outbound owner. */
 export type IRpcOutboundTransport = {
@@ -50,6 +79,14 @@ export class RpcOutboundSender {
   readonly #reportConfiguration: ((error: unknown) => void) | undefined
   /** Exact endpoint proof bypasses generic fanout only for ordinary request/response envelopes. */
   readonly #fast: boolean
+  /** Completed carrier agreement and canonical components permit physical grouping only. */
+  readonly #batch: boolean
+  /** Exact negotiated adapter overhead is included without estimating any semantic member. */
+  readonly #physicalLimit: number
+  /** Busy physical writes accumulate ready requests and responses in this single owner. */
+  #writing = false
+  /** FIFO contains semantic settlements, never serialized per-member size estimates. */
+  #queued: IQueuedEnvelope[] = []
 
   constructor(
     transport: IRpcOutboundTransport,
@@ -59,7 +96,9 @@ export class RpcOutboundSender {
     platform: IRpcPlatform = transport.platform,
     gate?: IRpcOutboundGate,
     reportConfiguration?: (error: unknown) => void,
-    fast = false
+    fast = false,
+    batch = false,
+    physicalLimit = RpcBatchPhysical.maxBytes
   ) {
     this.transport = transport
     this.id = id
@@ -70,6 +109,8 @@ export class RpcOutboundSender {
     this.#gate = gate
     this.#reportConfiguration = reportConfiguration
     this.#fast = fast && authentication === undefined
+    this.#batch = batch
+    this.#physicalLimit = physicalLimit
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
       typeof lifecycle.assertActive === 'function' && typeof lifecycle.generation === 'number'
@@ -93,6 +134,90 @@ export class RpcOutboundSender {
     beforeWrite?: () => IRpcEnvelope,
     onStarted?: () => void
   ): void | Promise<void> {
+    if (this.#batch) {
+      /** The existing gate owns capacity; its closed check accompanies each queued member. */
+      const write = registerBatchWriter((guard?: IBatchWriteGuard) => {
+        if (!this.#writing) {
+          guard?.()
+          admission?.assertCanSend()
+          const envelope = beforeWrite?.() ?? message
+          this.#writing = true
+          /** Idle traffic reuses the original single-frame owner without allocating a queued entry. */
+          let sent: void | Promise<void>
+          try {
+            sent =
+              this.#fast &&
+              ((envelope.kind === RpcEnvelopeKind.request &&
+                envelope.data.route.dispatchOnly !== true) ||
+                envelope.kind === RpcEnvelopeKind.response)
+                ? this.#sendFast(envelope, options, admission, onStarted, true)
+                : this.#sendEnvelope(envelope, options, false, admission, onStarted, true)
+          } catch (error) {
+            sent = Promise.reject(error)
+          }
+          return Promise.resolve(sent).then(
+            () => {
+              this.#finishWriting()
+            },
+            (error: unknown) => {
+              this.#finishWriting()
+              throw error
+            }
+          )
+        }
+        return new Promise<void>((resolve, reject) => {
+          /** A record preserves independent admission, cancellation and completion ownership. */
+          const entry: IQueuedEnvelope = {
+            message,
+            transfer: undefined,
+            options,
+            admission,
+            beforeWrite,
+            onStarted,
+            guard,
+            resolve,
+            reject
+          }
+          if (this.#writing) {
+            /** Reuse the existing operation signal only when real writability queues this member. */
+            const signal = admission?.queueSignal
+            if (signal?.aborted) {
+              reject(resolveAbortReason(signal))
+              return
+            }
+            if (signal) {
+              /** Cancellation releases the existing gate's capacity before the held writer drains. */
+              const cancel = () => {
+                const index = this.#queued.indexOf(entry)
+                if (index < 0) return
+                this.#queued.splice(index, 1)
+                entry.cancelQueued?.()
+                reject(resolveAbortReason(signal))
+              }
+              signal.addEventListener('abort', cancel, { once: true })
+              entry.cancelQueued = () => signal.removeEventListener('abort', cancel)
+            }
+            this.#queued.push(entry)
+            /** Gate closure releases only this not-yet-started member through the same queue owner. */
+            const releaseGate = guard?.((reason) => {
+              const index = this.#queued.indexOf(entry)
+              if (index < 0) return
+              this.#queued.splice(index, 1)
+              entry.cancelQueued?.()
+              reject(reason)
+            })
+            if (releaseGate) {
+              const releaseSignal = entry.cancelQueued
+              entry.cancelQueued = () => {
+                releaseSignal?.()
+                releaseGate()
+              }
+            }
+          }
+        })
+      })
+      return this.#gate ? this.#gate.run(message, write, admission) : write()
+    }
     if (
       this.#fast &&
       ((message.kind === RpcEnvelopeKind.request && message.data.route.dispatchOnly !== true) ||
@@ -115,12 +240,208 @@ export class RpcOutboundSender {
     return this.#sendEnvelope(message, options, false)
   }
 
+  /** Starts an idle singleton synchronously; only an existing physical write creates a queue. */
+  #flush(entries: readonly IQueuedEnvelope[]): void {
+    this.#writing = true
+    /** Cancellation/close failures remove only their own logical member before preparation. */
+    const admitted = this.#admitBatch(entries, true)
+    /** Transfer and opaque variation frames are boundaries, preserving their original ownership. */
+    const groups: IQueuedEnvelope[][] = []
+    /** The current portable run can share one encoded/protected representation. */
+    let group: IQueuedEnvelope[] = []
+    for (const entry of admitted) {
+      if (entry.transfer?.length || entry.message.kind === RpcEnvelopeKind.variation) {
+        if (group.length) groups.push(group)
+        groups.push([entry])
+        group = []
+      } else group.push(entry)
+    }
+    if (group.length) groups.push(group)
+    /** Encode whole groups; authentication below follows the actual physical invocation order. */
+    const prepared = groups.flatMap((members) => this.#prepareBatch(members))
+    /** Final write settlement releases busy ownership before any awaiting caller can send again. */
+    const drain: IPhysicalDrain = {
+      pending: 0,
+      preparing: true,
+      finish: () => {
+        this.#finishWriting()
+      }
+    }
+    this.#writeBatch(prepared, drain)
+  }
+
+  /** Releases physical ownership before caller continuation and drains exactly one ready snapshot. */
+  #finishWriting(): void {
+    this.#writing = false
+    const queued = this.#queued
+    this.#queued = []
+    if (queued.length) this.#flush(queued)
+  }
+
+  /** Every supported cancellation/close is checked through the original operation/gate owners. */
+  #admitBatch(entries: readonly IQueuedEnvelope[], refresh: boolean): IQueuedEnvelope[] {
+    /** Rejected members cannot abort or reorder the survivors. */
+    const admitted: IQueuedEnvelope[] = []
+    for (const entry of entries) {
+      if (refresh) entry.cancelQueued?.()
+      try {
+        this.#lifecycle?.assertActive()
+        if (refresh) entry.guard?.()
+        entry.admission?.assertCanSend()
+        if (refresh) {
+          entry.transfer = this.#snapshotTransfer(entry.options)
+          if (entry.beforeWrite) entry.message = entry.beforeWrite()
+        }
+        admitted.push(entry)
+      } catch (error) {
+        entry.reject(error)
+      }
+    }
+    return admitted
+  }
+
+  /** Encodes the entire physical value once; only actual oversize results trigger member splitting. */
+  #prepareBatch(entries: IQueuedEnvelope[]): IPreparedBatch[] {
+    if (!entries.length) return []
+    try {
+      /** A singleton retains the ordinary wire shape, including transfer and opaque variations. */
+      const physical =
+        entries.length === 1
+          ? entries[0]!.message
+          : {
+              kind: RpcBatchPhysical.kind,
+              [RpcBatchPhysical.members]: entries.map((entry) => entry.message)
+            }
+      /** Canonical codec owns portability; byte carriers reuse the resulting encoded bytes. */
+      let value = (this.#objectPort?.codec ?? this.components.codec).encode(
+        physical as IRpcEnvelope
+      )
+      if (!this.#objectPort) this.assertProtocolEncodedType(value)
+      if (
+        !this.#fast ||
+        this.authentication ||
+        entries.length !== 1 ||
+        !(
+          (entries[0]!.message.kind === RpcEnvelopeKind.request &&
+            entries[0]!.message.data.route.dispatchOnly !== true) ||
+          entries[0]!.message.kind === RpcEnvelopeKind.response
+        )
+      ) {
+        /** Qualified whole-frame framers cannot chunk; retain their existing full-path invocation. */
+        const frames = (this.#objectPort?.framer ?? this.components.framer).frame(value, {
+          source: this.id,
+          messageId: entries[0]!.message.id
+        })
+        value = frames[0]
+      }
+      if (measureRpcPhysicalFrame(value) > this.#physicalLimit) return this.#splitBatch(entries)
+      return [{ entries, value }]
+    } catch (cause) {
+      /** Existing native contract/authentication errors retain their original instances and causes. */
+      const error =
+        cause instanceof RpcAuthenticationError ||
+        cause instanceof RpcLifecycleError ||
+        cause instanceof RpcTransportError
+          ? cause
+          : new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+      for (const entry of entries) entry.reject(error)
+      return []
+    }
+  }
+
+  /** Count bisection uses only envelope boundaries, never per-member JSON size estimates. */
+  #splitBatch(entries: IQueuedEnvelope[]): IPreparedBatch[] {
+    if (entries.length === 1) {
+      try {
+        rejectRpcPhysicalFrameSize()
+      } catch (cause) {
+        throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
+      }
+    }
+    /** Oversize frames recurse only until individually bounded semantic members remain. */
+    const middle = Math.ceil(entries.length / 2)
+    return [
+      ...this.#prepareBatch(entries.slice(0, middle)),
+      ...this.#prepareBatch(entries.slice(middle))
+    ]
+  }
+
+  /** Sequential preparation/invocation supplies FIFO; no physical completion is awaited here. */
+  #writeBatch(frames: readonly IPreparedBatch[], drain: IPhysicalDrain): void {
+    for (let index = 0; index < frames.length; index += 1) {
+      /** Remove only members whose existing operation has actually cancelled or closed. */
+      const frame = frames[index]!
+      const admitted = this.#admitBatch(frame.entries, false)
+      if (!admitted.length) continue
+      if (admitted.length !== frame.entries.length) {
+        this.#writeBatch([...this.#prepareBatch(admitted), ...frames.slice(index + 1)], drain)
+        return
+      }
+      if (this.authentication) {
+        /** Protection and any membership rebuild finish before the next frame consumes a counter. */
+        void this.#prepareTransportValue(frame.value, frame.entries[0]!.transfer)
+          .then((value) => {
+            const current = this.#admitBatch(frame.entries, false)
+            if (current.length !== frame.entries.length) {
+              this.#writeBatch([...this.#prepareBatch(current), ...frames.slice(index + 1)], drain)
+              return
+            }
+            if (measureRpcPhysicalFrame(value) > this.#physicalLimit) {
+              this.#writeBatch([...this.#splitBatch(current), ...frames.slice(index + 1)], drain)
+              return
+            }
+            this.#invokeBatch(frame.entries, value, drain)
+            this.#writeBatch(frames.slice(index + 1), drain)
+          })
+          .catch((error: unknown) => {
+            for (const entry of frame.entries) entry.reject(error)
+            this.#writeBatch(frames.slice(index + 1), drain)
+          })
+        return
+      }
+      this.#invokeBatch(frame.entries, frame.value, drain)
+    }
+    drain.preparing = false
+    if (drain.pending === 0) drain.finish()
+  }
+
+  /** One synchronous host invocation settles every member of precisely this physical frame. */
+  #invokeBatch(entries: IQueuedEnvelope[], value: unknown, drain: IPhysicalDrain): void {
+    drain.pending += 1
+    /** Existing error and started owners stay immediately adjacent to the real host writer. */
+    const sent = this.#sendPreparedTransport(
+      value,
+      entries[0]!.transfer,
+      this.#lifecycle?.generation,
+      () => {
+        for (const entry of entries) entry.onStarted?.()
+      },
+      true
+    )
+    /** Both outcomes release busy identity before the logical member Promises settle. */
+    const complete = () => {
+      drain.pending -= 1
+      if (!drain.preparing && drain.pending === 0) drain.finish()
+    }
+    void sent.then(
+      () => {
+        complete()
+        for (const entry of entries) entry.resolve()
+      },
+      (error: unknown) => {
+        complete()
+        for (const entry of entries) entry.reject(error)
+      }
+    )
+  }
+
   /** Reuses canonical codec/write owners while omitting only proven whole-frame collectors. */
   #sendFast(
     message: IRpcEnvelope,
     options?: ISendOptions,
     admission?: IRpcOutboundAdmission,
-    onStarted?: () => void
+    onStarted?: () => void,
+    immediate = false
   ): Promise<void> {
     /** Async handoff must still reject a frame captured before this lifecycle generation closes. */
     const generation = this.#lifecycle?.generation
@@ -136,7 +457,9 @@ export class RpcOutboundSender {
       throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     this.#lifecycle?.assertActive(generation)
-    return Promise.resolve().then(() => {
+    if (immediate) this.#assertPhysicalSize(encoded)
+    /** Only qualified idle writes remove the old deferred handoff; foreign paths retain it. */
+    const write = () => {
       this.#lifecycle?.assertActive(generation)
       if (!this.#objectPort) this.assertTransportEncodedType(encoded)
       return this.#sendPreparedTransport(
@@ -148,9 +471,11 @@ export class RpcOutboundSender {
               admission.assertCanSend()
               onStarted?.()
             }
-          : undefined
+          : undefined,
+        immediate
       )
-    })
+    }
+    return immediate ? write() : Promise.resolve().then(write)
   }
 
   /** Retains the original synchronous encode/framing path when no IPC gate was selected. */
@@ -159,7 +484,8 @@ export class RpcOutboundSender {
     options?: ISendOptions,
     gated = false,
     admission?: IRpcOutboundAdmission,
-    onStarted?: () => void
+    onStarted?: () => void,
+    immediate = false
   ): void | Promise<void> {
     const generation = this.#lifecycle?.generation
     this.#lifecycle?.assertActive(generation)
@@ -184,12 +510,52 @@ export class RpcOutboundSender {
     this.#lifecycle?.assertActive(generation)
     if (hasTransfer && frames.length !== 1)
       throw new RpcSerializationError(RpcCoreErrorText.transferUnsupportedForChunking)
+    if (immediate) {
+      this.#assertPhysicalSize(frames[0])
+      /** Canonical whole-frame components retain their original encode/framing/protection owners. */
+      const write = (value: unknown) => {
+        this.#assertPhysicalSize(value)
+        return this.#sendPreparedTransport(
+          value,
+          transfer,
+          generation,
+          () => {
+            admission?.assertCanSend()
+            onStarted?.()
+          },
+          true
+        )
+      }
+      if (!this.authentication) {
+        if (!this.#objectPort) this.assertTransportEncodedType(frames[0])
+        return this.#sendPreparedTransport(
+          frames[0],
+          transfer,
+          generation,
+          () => {
+            admission?.assertCanSend()
+            onStarted?.()
+          },
+          true
+        )
+      }
+      return this.#prepareTransportValue(frames[0], transfer, hasTransfer, generation).then(write)
+    }
     return this.#prepareFrames(frames, transfer, hasTransfer, generation).then((preparedFrames) => {
       this.#lifecycle?.assertActive(generation)
       return gated
         ? this.#sendPreparedFramesGated(preparedFrames, transfer, generation, admission, onStarted)
         : this.#sendPreparedFrames(preparedFrames, transfer, generation)
     })
+  }
+
+  /** Physical admission retains the existing transport error and original native cause. */
+  #assertPhysicalSize(value: unknown): void {
+    try {
+      assertRpcPhysicalFrameSize(value, this.#physicalLimit)
+    } catch (cause) {
+      throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
+    }
   }
 
   /** Validates codec output before it reaches a typed transport boundary. */
@@ -382,22 +748,33 @@ export class RpcOutboundSender {
     value: unknown,
     transfer: readonly unknown[] | undefined,
     generation: number | undefined,
-    beforeSend?: () => void
+    beforeSend?: () => void,
+    immediate = false
   ): Promise<void> {
     let admissionFailure: unknown
-    return Promise.resolve()
-      .then(() => {
-        this.#lifecycle?.assertActive(generation)
-        try {
-          beforeSend?.()
-        } catch (error) {
-          admissionFailure = error
-          throw error
-        }
-        return this.#objectPort
-          ? this.#objectPort.send(value, { transfer })
-          : this.transport.send(value, { transfer })
-      })
+    /** Batch FIFO is the synchronous invocation sequence, never chained physical completions. */
+    const write = () => {
+      this.#lifecycle?.assertActive(generation)
+      try {
+        beforeSend?.()
+      } catch (error) {
+        admissionFailure = error
+        throw error
+      }
+      return this.#objectPort
+        ? this.#objectPort.send(value, { transfer })
+        : this.transport.send(value, { transfer })
+    }
+    /** Synchronous host exceptions still use the same asynchronous boundary classification. */
+    let result: void | Promise<void>
+    if (immediate) {
+      try {
+        result = write()
+      } catch (error) {
+        result = Promise.reject(error)
+      }
+    } else result = Promise.resolve().then(write)
+    return Promise.resolve(result)
       .then(() => {
         this.#lifecycle?.assertActive(generation)
       })

@@ -104,6 +104,8 @@ export type IRpcUuidPort = { readonly generate?: IRpcUuidConfig['generate'] }
 export type IRpcFrameAdmission = Readonly<{
   readonly queueSignal?: IAbortSignal
   readonly assertCanSend: () => void
+  /** Commits protocol state immediately before the physical transport can reenter its peer. */
+  readonly onStarted?: () => void
 }>
 
 /** Initial stream request carries the sole stream operation's cancellation and remaining budget. */

@@ -22,7 +22,8 @@ export const JSONRPC_ALLOWED_CAPABILITIES: readonly string[] = [
   ...JSONRPC_REQUIRED_CAPABILITIES,
   RpcCapability.deadline,
   RpcCapability.idempotency,
-  RpcCapability.trace
+  RpcCapability.trace,
+  RpcCapability.batch
 ]
 /** The responder must register all four extension methods before it can become usable. */
 export const JSONRPC_REQUIRED_METHODS = [

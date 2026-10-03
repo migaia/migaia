@@ -1,9 +1,10 @@
 import { isUint8Array } from '@migaia/utils/bytes'
 import { createContractError } from '../contract-error.js'
 import { RpcContractErrorCode } from '../error-code.js'
+import { RpcBatchPhysical } from '../wire-constants.js'
 
 /** Maximum payload carried by one native process frame. */
-export const RPC_STREAM_MAX_FRAME_BYTES = 16 * 1024 * 1024
+export const RPC_STREAM_MAX_FRAME_BYTES = RpcBatchPhysical.maxBytes
 
 /** A decoder owns one bounded frame buffer and reports the first malformed frame. */
 export type IRpcStreamFrameDecoder = Readonly<{

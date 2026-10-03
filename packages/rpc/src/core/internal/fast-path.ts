@@ -85,3 +85,8 @@ export function proveFastEndpoint(
 export function hasFastEndpoint(options: object): boolean {
   return endpoints.has(options)
 }
+
+/** Batch grouping reuses component provenance even when authentication requires the full path. */
+export function hasFastComponents(snapshot: object): boolean {
+  return components.has(snapshot)
+}

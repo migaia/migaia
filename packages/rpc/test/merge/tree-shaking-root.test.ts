@@ -8,16 +8,16 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * X14 r32 pins I25 after sharing canonical cancellation/scheduler owners and removing duplicate
- * task ordering.
+ * X14 r32 pins I26 after reusing the single sender and canonical physical-size owner. The measured
+ * two private batch modules add no unmeasured headroom.
  */
 const allowedIncrease = {
-  rawBytes: 111192 / legacyRoot.rawBytes,
-  gzipBytes: 28317 / legacyRoot.gzipBytes
+  rawBytes: 128600 / legacyRoot.rawBytes,
+  gzipBytes: 32779 / legacyRoot.gzipBytes
 } as const
 
-/** I22/I24 ownership plus the I25 private qualification module remain exact. */
-const expectedModuleIncrease = 12
+/** I22–I26 ownership includes the two canonical physical batch modules. */
+const expectedModuleIncrease = 14
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {

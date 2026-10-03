@@ -2,6 +2,7 @@ export { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.j
 export { createDescriptor } from './protocol.js'
 export { fromJsonRpcError, toJsonRpcError } from './error-jsonrpc.js'
 export { normalizePortable } from './normalize.js'
+export type { IRpcBatchFrame } from './batch-frame.js'
 export { normalizeRpcEnvelope, rpcProtocol as rpcProtocolV1 } from './v1/index.js'
 export { invalidRpcStream, normalizeStreamPayload } from './v1/stream.js'
 export {
@@ -19,6 +20,7 @@ export {
 } from './handshake.js'
 export {
   RpcCapability,
+  RpcBatchPhysical,
   RpcCodecId,
   RpcControl,
   RpcEnvelopeKind,

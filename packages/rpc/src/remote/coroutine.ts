@@ -8,6 +8,8 @@ import type { IUnitBudget } from '@migaia/supervision'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { messageFramerV1 } from '../contract/framing/index.js'
+import { RpcCapability } from '../contract/wire-constants.js'
+import { registerBatchAgreement } from '../core/internal/batch-frame.js'
 import { createMemoryTransportPair, type IMemoryTransport } from '../core/adapters/memory.js'
 import { createComposedEndpoint } from '../core/composed.js'
 import { createCanonicalChunkFeature } from '../core/features/canonical-chunk.js'
@@ -141,6 +143,8 @@ export function coroutinePorts(
             throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
           serving = (async () => {
             const [clientTransport, serverTransport] = createMemoryTransportPair()
+            registerBatchAgreement(clientTransport, [RpcCapability.stream, RpcCapability.batch])
+            registerBatchAgreement(serverTransport, [RpcCapability.stream, RpcCapability.batch])
             try {
               const server = await composed('server', serverTransport, idempotency)
               const service =
@@ -196,7 +200,11 @@ export function coroutinePorts(
         transport,
         peerId: 'server',
         scheduler: systemScheduler,
-        agreement: { source: 'static', codec: identityCodecV1.id, capabilities: ['stream@1'] },
+        agreement: {
+          source: 'static',
+          codec: identityCodecV1.id,
+          capabilities: [RpcCapability.stream, RpcCapability.batch]
+        },
         pipeline: { codec: identityCodecV1, framer: messageFramerV1 },
         features: [],
         close: async () => {

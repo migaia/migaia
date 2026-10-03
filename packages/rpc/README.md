@@ -889,8 +889,9 @@ that description before exposing any method. Request metadata forwards only
 sends a `migaia.cancel` notification. Business errors carry
 `error.data.migaiaWireError`, preserving source/code/stack/cause/errors.
 
-The first profile supports request/one-way only. Batch, reverse calls,
-streaming, transfer lists, native ping/close/discovery and NDJSON are excluded.
+The first profile supports request/one-way only. Physical JSON-RPC arrays are used
+only after both peers negotiate `batch@1`; peers without it retain single messages.
+Reverse calls, streaming, transfer lists, native ping/close/discovery and NDJSON are excluded.
 Spawn JSON-RPC requires a caller-supplied dedicated-fd bootstrap launcher;
 the built-in Node launcher currently advertises fd bootstrap as unsupported.
 For endpoint assembly, use the client outbound/one-way roots and install the
@@ -911,3 +912,6 @@ Node termination uses the real `exit` event. Bun, Deno, browser and Electron ada
 retain unsupported termination/exit capability declarations until their own actual-exit evidence
 is available. Unsupported exit observation requires explicit health; unsupported termination
 rejects default required isolation before Worker creation. See [USEGUIDE](./USEGUIDE.md#threads).
+
+
+内建载体协商 `batch@1` 后，core 在物理写空闲时立即发送单帧，在写进行中合并就绪的请求与响应；未协商的载体保持单帧。等待对端处理完成用现有请求方法（worker contract 为 `request`）；只等待发出用现有单向发送方法（worker contract 为 `notify`）。独立调用请用 `Promise.all`；有依赖的串行 `await` 无法自动合并。

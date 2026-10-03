@@ -2,7 +2,7 @@ import { createContractError } from '../contract/contract-error.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { resolveAbortReason } from '../core/internal/async-control.js'
 import { RpcContractErrorCode } from '../contract/error-code.js'
-import { RpcHandshakeStep, RpcReservedKind } from '../contract/wire-constants.js'
+import { RpcHandshakeStep, RpcReservedKind, RpcCapability } from '../contract/wire-constants.js'
 import {
   createRpcStreamFrameDecoderWithLimit,
   encodeRpcStreamFrame,
@@ -61,7 +61,7 @@ type IPendingWrite = {
 export type IProcessByteWire = Readonly<{
   transport: IRpcTransport
   readHandshakeFrame(): Promise<string>
-  activate(): void
+  activate(capabilities?: readonly string[]): void
   writeText(value: string): Promise<void>
   close(reason?: unknown): Promise<void>
   readonly closed: boolean
@@ -126,6 +126,8 @@ export function bindProcessByteWire(
   let acceptReceived = false
   /** Business messages may be delivered only after explicit activation. */
   let ready = false
+  /** Completed negotiation alone permits synchronous invocation of the physical byte writer. */
+  let batch = false
   /** Closed is monotonic and its reason is replayed to late core subscribers. */
   let closed = false
   let terminalError: unknown
@@ -309,28 +311,36 @@ export function bindProcessByteWire(
       /** The record lets close reject even if a physical writer never drains. */
       const pending: IPendingWrite = { settled: false, reject }
       pendingWrites.add(pending)
-      void Promise.resolve()
-        .then(() => {
-          if (closed) throw terminalError
-          return channel.write(bytes)
-        })
-        .then(
-          () => {
-            pendingWrites.delete(pending)
-            if (pending.settled) return
-            pending.settled = true
-            resolve()
-          },
-          (error: unknown) => {
-            pendingWrites.delete(pending)
-            if (pending.settled) {
-              report(error)
-              return
-            }
-            pending.settled = true
-            reject(error)
+      /** Negotiated grouping preserves FIFO by the actual synchronous writer invocation. */
+      const invoke = () => {
+        if (closed) throw terminalError
+        return channel.write(bytes)
+      }
+      let result: void | Promise<void>
+      if (batch) {
+        try {
+          result = invoke()
+        } catch (error) {
+          result = Promise.reject(error)
+        }
+      } else result = Promise.resolve().then(invoke)
+      void Promise.resolve(result).then(
+        () => {
+          pendingWrites.delete(pending)
+          if (pending.settled) return
+          pending.settled = true
+          resolve()
+        },
+        (error: unknown) => {
+          pendingWrites.delete(pending)
+          if (pending.settled) {
+            report(error)
+            return
           }
-        )
+          pending.settled = true
+          reject(error)
+        }
+      )
     })
   }
 
@@ -378,10 +388,11 @@ export function bindProcessByteWire(
         handshakeWaiter = { resolve, reject }
       })
     },
-    activate() {
+    activate(capabilities) {
       if (closed) throw terminalError
       if (!handshakeReceived) throw createContractError(RpcContractErrorCode.handshakeInvalid)
       ready = true
+      batch = capabilities?.includes(RpcCapability.batch) === true
       frameSource?.activate?.()
       flushBusiness()
     },

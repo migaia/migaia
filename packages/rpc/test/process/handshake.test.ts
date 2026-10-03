@@ -174,7 +174,11 @@ describe('native process handshake', () => {
     const basic = createNativeProcessOffer({ peer })
     expect(basic.versions).toEqual([{ major: RpcProtocol.major, minor: RpcProtocol.minor }])
     expect(basic.codecs).toEqual([RpcCodecId.json])
-    expect(basic.capabilities).toEqual([RpcCapability.ping, RpcCapability.close])
+    expect(basic.capabilities).toEqual([
+      RpcCapability.ping,
+      RpcCapability.close,
+      RpcCapability.batch
+    ])
     expect(Object.isFrozen(basic)).toBe(true)
     expect(Object.isFrozen(basic.capabilities)).toBe(true)
     expect(
@@ -183,7 +187,7 @@ describe('native process handshake', () => {
         stream: true,
         capabilities: [RpcCapability.ping, RpcCapability.stream]
       }).capabilities
-    ).toEqual([RpcCapability.ping, RpcCapability.close, RpcCapability.stream])
+    ).toEqual([RpcCapability.ping, RpcCapability.close, RpcCapability.batch, RpcCapability.stream])
   })
 
   it('[A5] completes byte hello/accept on one injected scheduler', async () => {
@@ -214,7 +218,11 @@ describe('native process handshake', () => {
     expect(left.scheduler).toBe(scheduler)
     expect(right.scheduler).toBe(scheduler)
     expect(left.agreement).toMatchObject({ source: 'negotiated', codec: RpcCodecId.json })
-    expect(left.agreement.capabilities).toEqual([RpcCapability.ping, RpcCapability.close])
+    expect(left.agreement.capabilities).toEqual([
+      RpcCapability.ping,
+      RpcCapability.close,
+      RpcCapability.batch
+    ])
     expect(left.pipeline.codec.id).toBe(RpcCodecId.json)
     expect(left.pipeline.framer.outputEncodedType).toBe('string')
     expect(left.features).toHaveLength(2)

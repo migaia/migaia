@@ -140,6 +140,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts'
     ),
     client: reviewed(
+      'src/contract/batch-frame.ts',
+      'src/core/internal/batch-frame.ts',
       'src/core/internal/fast-path.ts',
       'src/core/internal/outbound-envelope.ts',
       'src/core/internal/authentication-replay.ts',
@@ -301,6 +303,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/protocol-constants.ts'
     ),
     provider: reviewed(
+      'src/contract/batch-frame.ts',
+      'src/core/internal/batch-frame.ts',
       'src/core/internal/fast-path.ts',
       'src/core/internal/outbound-envelope.ts',
       'src/core/internal/authentication-replay.ts',
@@ -468,6 +472,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/idempotency-store.ts'
     ),
     full: reviewed(
+      'src/contract/batch-frame.ts',
+      'src/core/internal/batch-frame.ts',
       'src/core/internal/fast-path.ts',
       'src/core/internal/outbound-envelope.ts',
       'src/core/internal/authentication-replay.ts',
@@ -640,6 +646,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/idempotency-store.ts'
     ),
     custom: reviewed(
+      'src/contract/batch-frame.ts',
+      'src/core/internal/batch-frame.ts',
       'src/core/internal/fast-path.ts',
       'src/core/internal/outbound-envelope.ts',
       'src/core/internal/authentication-replay.ts',

@@ -12,9 +12,9 @@ export const RpcContractErrorCode = {
    * frame and terminate only its stream.
    */
   invalidStream: 'INVALID_STREAM',
-  /** Invalid frame grammar; caller must discard the frame sequence. */
+  /** Invalid frame grammar or empty/malformed physical batch; discard the physical frame. */
   invalidFrame: 'INVALID_FRAME',
-  /** Reassembly exceeded a declared message/source/global budget. */
+  /** Reassembly or encoded physical batch exceeded its byte budget; split at member boundaries. */
   frameLimitExceeded: 'FRAME_LIMIT_EXCEEDED',
   /** Reassembly expired before all fragments arrived. */
   frameAssemblyExpired: 'FRAME_ASSEMBLY_EXPIRED',

@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "capability": "batch@1",
+  "valid": [
+    {
+      "id": "B-V1",
+      "value": {
+        "kind": "batch",
+        "envelopes": [
+          {
+            "kind": "request",
+            "id": "req-1",
+            "method": "count",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "applicationVersion": "1",
+                "senderId": "caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "type": "request"
+              }
+            }
+          },
+          {
+            "kind": "response",
+            "id": "req-1",
+            "ok": true,
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "applicationVersion": "1",
+                "senderId": "caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "type": "response",
+                "method": "count"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "B-E1",
+      "value": {
+        "kind": "batch",
+        "envelopes": []
+      }
+    },
+    {
+      "id": "B-E2",
+      "value": {
+        "kind": "batch"
+      }
+    },
+    {
+      "id": "B-E3",
+      "value": {
+        "kind": "batch",
+        "envelopes": {}
+      }
+    },
+    {
+      "id": "B-E4",
+      "value": {
+        "kind": "batch",
+        "envelopes": [
+          {
+            "kind": "request",
+            "id": "req-1",
+            "method": "count",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "applicationVersion": "1",
+                "senderId": "caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "type": "request"
+              }
+            }
+          },
+          {
+            "kind": "response",
+            "id": "req-1",
+            "ok": true,
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "applicationVersion": "1",
+                "senderId": "caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "type": "response",
+                "method": "count"
+              }
+            }
+          }
+        ],
+        "extra": true
+      }
+    }
+  ],
+  "isolated": [
+    {
+      "id": "B-I1",
+      "value": {
+        "kind": "batch",
+        "envelopes": [
+          {
+            "kind": "request",
+            "id": "req-1",
+            "method": "count",
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "applicationVersion": "1",
+                "senderId": "caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "type": "request"
+              }
+            }
+          },
+          {
+            "kind": "request",
+            "id": "invalid"
+          },
+          {
+            "kind": "response",
+            "id": "req-1",
+            "ok": true,
+            "data": {
+              "route": {
+                "profile": "migaia.rpc.route",
+                "applicationVersion": "1",
+                "senderId": "caller",
+                "targetId": "provider",
+                "sentAt": 0,
+                "type": "response",
+                "method": "count"
+              }
+            }
+          }
+        ]
+      },
+      "validMembers": [
+        0,
+        2
+      ]
+    }
+  ]
+}

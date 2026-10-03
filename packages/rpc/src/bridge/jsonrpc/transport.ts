@@ -7,6 +7,7 @@ import type { IRpcRequestEnvelope } from '../../contract/v1/types.js'
 import type { IRpcSerializedError } from '../../contract/types.js'
 import {
   RpcControl,
+  RpcCapability,
   RpcEnvelopeKind,
   RpcRouteField,
   RpcRouteType
@@ -31,6 +32,7 @@ import { createProcessError } from '../../process/error.js'
 import { RemoteMethodName } from '../../remote/constants.js'
 import { RpcRemoteLayerErrorCode } from '../../remote/error-code.js'
 import { JsonRpcProfile, JsonRpcErrorNumber } from './constants.js'
+import { readRpcBatchMembers } from '../../contract/batch-frame.js'
 import { JsonRpcBridgeErrorCode } from './error-code.js'
 import { createJsonRpcBridgeError } from './error.js'
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from './framing.js'
@@ -43,6 +45,8 @@ export type IJsonRpcWire = Readonly<{
   readonly sendObject: IRpcTransport['send']
   readonly subscribeObject: IRpcTransport['subscribe']
   readonly registerObjectPortRelease: (release: () => void) => void
+  /** Completed hello intersection alone enables JSON-RPC arrays after negotiation. */
+  setCapabilities(capabilities: readonly string[]): void
   exchangeHello(hello: string): Promise<unknown>
   close(reason?: unknown): Promise<void>
   assertOpen(): void
@@ -81,6 +85,8 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   let closing: Promise<void> | undefined
   /** Before hello settlement, any response must belong to its fixed correlation id. */
   let helloPending = true
+  /** False before hello and when the peer did not explicitly negotiate physical batch support. */
+  let batch = false
 
   /** Observe report failures without replacing the primary protocol failure. */
   const report = (error: unknown): void => reportListenerFailure(error, [options.report], failures)
@@ -136,27 +142,35 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
       /** The terminal callback stays registered until the physical Promise has settled. */
       const abortWrite = (error: unknown): void => reject(error)
       writes.add(abortWrite)
-      void Promise.resolve()
-        .then(() => {
-          if (closed) throw terminal
-          return options.byte.write(frame)
-        })
-        .then(
-          () => {
-            writes.delete(abortWrite)
-            resolve()
-          },
-          (cause: unknown) => {
-            /** Late physical rejection is secondary once another event committed closure. */
-            const alreadyClosed = closed
-            writes.delete(abortWrite)
-            /** IO failure keeps its original instance reachable through the process error cause. */
-            const error = createProcessError(RpcProcessErrorCode.channelClosed, cause)
-            reject(error)
-            if (alreadyClosed) report(error)
-            else fail(error)
-          }
-        )
+      /** Only negotiated whole-frame writes remove the legacy deferred physical handoff. */
+      const invoke = () => {
+        if (closed) throw terminal
+        return options.byte.write(frame)
+      }
+      let result: void | Promise<void>
+      if (batch) {
+        try {
+          result = invoke()
+        } catch (error) {
+          result = Promise.reject(error)
+        }
+      } else result = Promise.resolve().then(invoke)
+      void Promise.resolve(result).then(
+        () => {
+          writes.delete(abortWrite)
+          resolve()
+        },
+        (cause: unknown) => {
+          /** Late physical rejection is secondary once another event committed closure. */
+          const alreadyClosed = closed
+          writes.delete(abortWrite)
+          /** IO failure keeps its original instance reachable through the process error cause. */
+          const error = createProcessError(RpcProcessErrorCode.channelClosed, cause)
+          reject(error)
+          if (alreadyClosed) report(error)
+          else fail(error)
+        }
+      )
     })
   }
 
@@ -234,7 +248,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   }
 
   /** Apply IB1–IB7 in order before allowing any response to settle one pending request. */
-  const receive = (value: unknown): void => {
+  const receiveOne = (value: unknown): void => {
     if (closed) return
     if (!value || typeof value !== 'object' || Array.isArray(value))
       throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
@@ -320,6 +334,20 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     }
   }
 
+  /** Negotiated arrays preserve each original IB1–IB7 admission and isolate malformed siblings. */
+  const receive = (value: unknown): void => {
+    if (!Array.isArray(value)) return receiveOne(value)
+    if (!batch || helloPending || value.length === 0)
+      throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
+    for (const member of value) {
+      try {
+        receiveOne(member)
+      } catch (error) {
+        report(error)
+      }
+    }
+  }
+
   try {
     removals.push(
       options.byte.onData((chunk) => {
@@ -364,34 +392,24 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     throw error
   }
 
-  /** Both package-private and public input paths use this one correlation/write owner. */
-  const send = async (
-    value: unknown,
-    sendOptions?: import('../../core/transport.js').IRpcSendOptions,
-    objectInput = false
-  ): Promise<void> => {
-    if (closed) throw terminal
-    if (sendOptions?.transfer?.length || (!objectInput && typeof value !== 'string'))
-      throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
-    /** Core already encodes portable envelopes; the bridge validates before translating. */
-    const envelope = normalizeRpcEnvelope(
-      objectInput ? value : (JSON.parse(value as string) as unknown)
-    )
+  /** One translation owner retains correlation and metadata semantics for single or batch requests. */
+  const translate = (value: unknown): Record<string, unknown> | undefined => {
+    /** Each semantic member receives the original portable contract admission. */
+    const envelope = normalizeRpcEnvelope(value)
     if (
       envelope.kind === RpcEnvelopeKind.variation &&
       envelope.data.route.variation === RpcControl.abort
     ) {
       if (!pending.has(envelope.id)) return
       pending.delete(envelope.id)
-      await write({
+      return {
         jsonrpc: JsonRpcProfile.version,
         method: JsonRpcProfile.cancel,
         params: {
           id: envelope.id,
           ...(envelope.data.payload === undefined ? {} : { reason: envelope.data.payload })
         }
-      })
-      return
+      }
     }
     if (envelope.kind !== RpcEnvelopeKind.request || !Array.isArray(envelope.data.payload ?? []))
       throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
@@ -418,12 +436,34 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
           ...(!oneWay && Object.keys(meta).length > 0 ? { meta } : {})
         }
     if (!oneWay) pending.set(envelope.id, envelope)
-    await write({
+    return {
       jsonrpc: JsonRpcProfile.version,
       ...(!oneWay ? { id: envelope.id } : {}),
       method: describe ? JsonRpcProfile.describe : JsonRpcProfile.invoke,
       params
-    })
+    }
+  }
+
+  /** Both public and private inputs share one whole physical write and one correlation owner. */
+  const send = async (
+    value: unknown,
+    sendOptions?: import('../../core/transport.js').IRpcSendOptions,
+    objectInput = false
+  ): Promise<void> => {
+    if (closed) throw terminal
+    if (sendOptions?.transfer?.length || (!objectInput && typeof value !== 'string'))
+      throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
+    /** Public strings are parsed once; only negotiated internal wrappers become JSON-RPC arrays. */
+    const decoded = objectInput ? value : (JSON.parse(value as string) as unknown)
+    const members = batch ? readRpcBatchMembers(decoded) : undefined
+    if (!members) {
+      const message = translate(decoded)
+      if (message) await write(message)
+      return
+    }
+    /** Outbound semantic members have already been admitted by core; translate in FIFO order. */
+    const messages = members.map(translate).filter((message) => message !== undefined)
+    if (messages.length) await write(messages)
   }
 
   /** Metadata and ownership describe the logical single-peer connection rather than its process. */
@@ -468,6 +508,9 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     registerObjectPortRelease: (release) => {
       if (closed) release()
       else releaseObjectPort = release
+    },
+    setCapabilities(capabilities) {
+      batch = capabilities.includes(RpcCapability.batch)
     },
     async exchangeHello(hello) {
       await write({
