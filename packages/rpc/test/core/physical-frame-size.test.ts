@@ -32,17 +32,27 @@ function sizeRequest(payload: unknown) {
   })
 }
 
-it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or serializing its payload', async () => {
+/** Exercise idle or queued singletons through the same canonical sender and observable counters. */
+async function verifyOwnedSingleton(queued: boolean) {
   /** The actual canonical snapshot carries the private sender sizing proof. */
   const message = sizeRequest('x'.repeat(1_048_576))
   /** The actual sender owns idle/busy admission and the delivered frame identity. */
   const frames: unknown[] = []
+  /** Hold the first write only when exercising the reachable busy-sender singleton path. */
+  let releaseWrite: (() => void) | undefined
+  /** Native Promise settlement drives the canonical queue, without simulating its internals. */
+  const pendingWrite = queued
+    ? new Promise<void>((resolve) => {
+        releaseWrite = resolve
+      })
+    : undefined
   /** No receiver or host timing is simulated in this execution-count discriminator. */
   const sender = new RpcOutboundSender(
     {
       platform: 'Memory',
       send: (value) => {
         frames.push(value)
+        if (frames.length === 1) return pendingWrite
       }
     },
     'a',
@@ -91,9 +101,17 @@ it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or se
     assert.equal(serializations, 1)
     characterReads = 0
     serializations = 0
-    await sender.send(message)
-    assert.equal(frames.length, 1)
-    assert.equal(frames[0], message)
+    /** The first envelope stays in flight while exactly one large envelope enters the FIFO. */
+    const first = queued ? sender.send(sizeRequest('held')) : undefined
+    /** The queued operation keeps its own settlement until the transport write completes. */
+    const sent = sender.send(message)
+    if (queued) {
+      assert.equal(frames.length, 1)
+      releaseWrite!()
+    }
+    await Promise.all([first, sent])
+    assert.equal(frames.length, queued ? 2 : 1)
+    assert.equal(frames[queued ? 1 : 0], message)
     assert.equal(
       characterReads,
       0,
@@ -108,7 +126,13 @@ it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or se
     Object.defineProperty(String.prototype, 'codePointAt', characterDescriptor)
     Object.defineProperty(JSON, 'stringify', jsonDescriptor)
   }
-})
+}
+
+it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or serializing its payload', () =>
+  verifyOwnedSingleton(false))
+
+it('[A27-FIX4] queued owned 1 MiB singleton keeps FIFO and its size guard without a payload scan', () =>
+  verifyOwnedSingleton(true))
 
 it('[A27-FIX3] the owned upper bound includes JSON null slots preserved by portable normalization', () => {
   /** Array.map retains holes; JSON represents every absent slot as null. */
