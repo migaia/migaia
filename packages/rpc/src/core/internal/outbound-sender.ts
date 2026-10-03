@@ -16,7 +16,7 @@ import type { IRpcSendOptions, IRpcTransport } from '../transport.js'
 import { isUint8Array } from './safe-value.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcSelectedComponents } from './endpoint-options.js'
-import type { IRpcEnvelope } from '../../contract/index.js'
+import { RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
 import type { IRpcOutboundAdmission, IRpcOutboundGate } from './outbound-gate.js'
 
 /** Minimal canonical send port consumed by the outbound owner. */
@@ -48,6 +48,8 @@ export class RpcOutboundSender {
   readonly #objectPort: IRpcJsonObjectPort | undefined
   /** Existing endpoint diagnostics observe genuine local counter exhaustion before rejection. */
   readonly #reportConfiguration: ((error: unknown) => void) | undefined
+  /** Exact endpoint proof bypasses generic fanout only for ordinary request/response envelopes. */
+  readonly #fast: boolean
 
   constructor(
     transport: IRpcOutboundTransport,
@@ -56,7 +58,8 @@ export class RpcOutboundSender {
     authentication?: IRpcAuthenticationCapability,
     platform: IRpcPlatform = transport.platform,
     gate?: IRpcOutboundGate,
-    reportConfiguration?: (error: unknown) => void
+    reportConfiguration?: (error: unknown) => void,
+    fast = false
   ) {
     this.transport = transport
     this.id = id
@@ -66,6 +69,7 @@ export class RpcOutboundSender {
     this.#transportEncodedType = transport.encodedType
     this.#gate = gate
     this.#reportConfiguration = reportConfiguration
+    this.#fast = fast && authentication === undefined
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
       typeof lifecycle.assertActive === 'function' && typeof lifecycle.generation === 'number'
@@ -89,6 +93,19 @@ export class RpcOutboundSender {
     beforeWrite?: () => IRpcEnvelope,
     onStarted?: () => void
   ): void | Promise<void> {
+    if (
+      this.#fast &&
+      ((message.kind === RpcEnvelopeKind.request && message.data.route.dispatchOnly !== true) ||
+        message.kind === RpcEnvelopeKind.response)
+    ) {
+      return this.#gate
+        ? this.#gate.run(
+            message,
+            () => this.#sendFast(beforeWrite?.() ?? message, options, admission, onStarted),
+            admission
+          )
+        : this.#sendFast(message, options)
+    }
     if (this.#gate)
       return this.#gate.run(
         message,
@@ -96,6 +113,44 @@ export class RpcOutboundSender {
         admission
       )
     return this.#sendEnvelope(message, options, false)
+  }
+
+  /** Reuses canonical codec/write owners while omitting only proven whole-frame collectors. */
+  #sendFast(
+    message: IRpcEnvelope,
+    options?: ISendOptions,
+    admission?: IRpcOutboundAdmission,
+    onStarted?: () => void
+  ): Promise<void> {
+    /** Async handoff must still reject a frame captured before this lifecycle generation closes. */
+    const generation = this.#lifecycle?.generation
+    this.#lifecycle?.assertActive(generation)
+    /** The original transfer owner retains once-read getter and immutable snapshot semantics. */
+    const transfer = this.#snapshotTransfer(options)
+    /** The canonical codec keeps first-user portability and existing source/code/cause boundaries. */
+    let encoded: unknown
+    try {
+      encoded = (this.#objectPort?.codec ?? this.components.codec).encode(message)
+      if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
+    } catch (cause) {
+      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+    }
+    this.#lifecycle?.assertActive(generation)
+    return Promise.resolve().then(() => {
+      this.#lifecycle?.assertActive(generation)
+      if (!this.#objectPort) this.assertTransportEncodedType(encoded)
+      return this.#sendPreparedTransport(
+        encoded,
+        transfer,
+        generation,
+        admission
+          ? () => {
+              admission.assertCanSend()
+              onStarted?.()
+            }
+          : undefined
+      )
+    })
   }
 
   /** Retains the original synchronous encode/framing path when no IPC gate was selected. */

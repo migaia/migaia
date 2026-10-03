@@ -15,6 +15,11 @@ import type { IRpcPlatform } from './typing.js'
 import { RpcPlatform } from './transport-constants.js'
 import { systemScheduler, type IScheduler, type IWallClock } from '@migaia/utils/scheduler'
 
+/** The kernel alone owns default scheduler identity; bootstrap and the time port reuse its decision. */
+export function isEndpointSystemScheduler(scheduler: IScheduler | undefined): boolean {
+  return scheduler === undefined || scheduler === systemScheduler
+}
+
 /** Canonical lifecycle states owned by one endpoint kernel. */
 export const EndpointKernelState = {
   constructing: 'constructing',
@@ -125,7 +130,7 @@ class EndpointKernel implements IEndpointKernelHost {
     scheduler: IScheduler,
     wallClock: IWallClock | undefined
   ) {
-    this.#time = createEndpointTimePort(scheduler, wallClock)
+    this.#time = createEndpointTimePort(scheduler, wallClock, isEndpointSystemScheduler(scheduler))
     const transportSnapshot = snapshot ?? readTransportSnapshot(transport)
     const {
       send: transportSend,

@@ -1,4 +1,5 @@
 import { isOutboundEnvelope, materializeOutboundJson } from '../core/internal/outbound-envelope.js'
+import { registerFastCodec, registerFastFramer } from '../core/internal/fast-path.js'
 import { SerializeErrorCode } from '@migaia/serialize/core'
 import {
   asCodecValue,
@@ -35,6 +36,10 @@ export const remoteProcessJsonCodec: ICodec<unknown, unknown> = Object.freeze({
   },
   decode: (value) => jsonCodec.decode(asProcessString(value))
 })
+
+// Registration keeps the public frozen descriptors intact and signs only their exact identities.
+registerFastCodec(remoteProcessJsonCodec)
+registerFastFramer(remoteProcessStringFramer)
 
 /** The byte pipeline keeps negotiated codec and exact string framing paired. */
 export const byteProcessPipeline: Readonly<{

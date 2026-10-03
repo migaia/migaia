@@ -23,6 +23,14 @@ export type IEndpointTimePort = {
   readonly dispose: () => void
 }
 
+/** Endpoint-local enablement owns only the private scheduler receiver, never caller configuration. */
+const fastSchedulers = new WeakMap<IEndpointTimePort, () => void>()
+
+/** Turns on canonical aggregation only after bootstrap's exact private proof has succeeded. */
+export function enableFastTimePort(port: IEndpointTimePort): void {
+  fastSchedulers.get(port)?.()
+}
+
 /**
  * Creates one endpoint-local time port and tracks every timer until clear or disposal. `scheduler`
  * drives every duration and timer; `wallClock` only produces diagnostic timestamps and defaults to
@@ -30,9 +38,14 @@ export type IEndpointTimePort = {
  */
 export function createEndpointTimePort(
   scheduler: IScheduler,
-  wallClock: IWallClock = systemWallClock
+  wallClock: IWallClock = systemWallClock,
+  canonicalScheduler = false
 ): IEndpointTimePort {
+  /** Timer strategy may change internally while the original scheduler stays publicly observable. */
+  let runtimeScheduler = scheduler
+  /** All logical task handles remain owned by this port until clear or endpoint disposal. */
   const timers = new Set<IScheduledTask>()
+  /** Prevents timers from being admitted after endpoint disposal. */
   let disposed = false
 
   const port: IEndpointTimePort = {
@@ -55,7 +68,7 @@ export function createEndpointTimePort(
           handle.cancel()
         }
       }
-      handle = scheduler.schedule(() => {
+      handle = runtimeScheduler.schedule(() => {
         if (cleared) return
         cleared = true
         timers.delete(handle!)
@@ -76,7 +89,12 @@ export function createEndpointTimePort(
       disposed = true
       for (const handle of timers) handle.cancel()
       timers.clear()
+      fastSchedulers.delete(port)
     }
   }
+  fastSchedulers.set(port, () => {
+    if (canonicalScheduler && runtimeScheduler === scheduler && !disposed)
+      runtimeScheduler = Object.create(scheduler) as IScheduler
+  })
   return Object.freeze(port)
 }

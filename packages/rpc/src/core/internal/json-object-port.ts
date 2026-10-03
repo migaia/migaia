@@ -124,3 +124,8 @@ export function jsonObjectCandidate(
 
 /** Stable label used by the existing endpoint resource scope to release private selection. */
 export const JsonObjectSelectionResource = 'JSON object selection'
+
+/** Reads exact factory proof without re-reading any caller-owned descriptor properties. */
+export function readCanonicalMiddlewareProof(value: object): true | object | false {
+  return middlewares.has(value) ? (middlewares.get(value) ?? true) : false
+}

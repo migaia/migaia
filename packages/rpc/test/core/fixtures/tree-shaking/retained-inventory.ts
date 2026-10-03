@@ -6,12 +6,13 @@ const reviewed = (...modules: readonly string[]): readonly string[] =>
   Object.freeze([...modules].sort())
 
 /**
- * Exact consumer sets include I22 and the I24 private snapshot owner, measured by the canonical
- * graph.
+ * Exact consumer sets include I22, I24 and the I25 private qualification owner, measured by the
+ * canonical graph.
  */
 export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, readonly string[]>> =
   Object.freeze({
     core: reviewed(
+      'src/core/internal/fast-path.ts',
       '\u0000rolldown/runtime.js',
       'src/contract/contract-error.ts',
       'src/contract/error-code.ts',
@@ -139,6 +140,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts'
     ),
     client: reviewed(
+      'src/core/internal/fast-path.ts',
       'src/core/internal/outbound-envelope.ts',
       'src/core/internal/authentication-replay.ts',
       'src/core/internal/native-default-id-text.ts',
@@ -299,6 +301,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/protocol-constants.ts'
     ),
     provider: reviewed(
+      'src/core/internal/fast-path.ts',
       'src/core/internal/outbound-envelope.ts',
       'src/core/internal/authentication-replay.ts',
       'src/core/internal/native-default-id-text.ts',
@@ -465,6 +468,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/idempotency-store.ts'
     ),
     full: reviewed(
+      'src/core/internal/fast-path.ts',
       'src/core/internal/outbound-envelope.ts',
       'src/core/internal/authentication-replay.ts',
       'src/core/internal/native-default-id-text.ts',
@@ -636,6 +640,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/idempotency-store.ts'
     ),
     custom: reviewed(
+      'src/core/internal/fast-path.ts',
       'src/core/internal/outbound-envelope.ts',
       'src/core/internal/authentication-replay.ts',
       'src/core/internal/native-default-id-text.ts',

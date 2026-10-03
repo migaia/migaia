@@ -5,7 +5,7 @@ import {
   type IGenerationToken
 } from '@migaia/lifecycle'
 import { RpcLifecycleError, RpcTimeoutError } from '../errors.js'
-import type { IAbortSignal } from './async-control.js'
+import { resolveAbortReason, type IAbortSignal } from './async-control.js'
 
 /**
  * Owns one public operation's deadline and cancellation signal.
@@ -18,11 +18,16 @@ import type { IAbortSignal } from './async-control.js'
  * not the endpoint's monotonic receive generation).
  */
 export class OperationScope {
-  readonly signal: IAbortSignal
   /** Owns the operation's AbortSignal and parent closing-signal linkage. */
-  readonly #controller: IGenerationController
+  #controller: IGenerationController | undefined
   /** Matches completion to this scope's admission, never a later generation. */
-  readonly #token: IGenerationToken
+  #token: IGenerationToken | undefined
+  /** Canonical closing state is readable without allocating a child native signal. */
+  readonly #closingSignal: IAbortSignal
+  /** Materialized native signal retains one stable identity even after the scope settles. */
+  #signal: IAbortSignal | undefined
+  /** The first cancellation reason remains available when nobody read the signal before closure. */
+  #closeReason: unknown
   /** Endpoint receive generation whose work this scope can still commit. */
   readonly #generation: number
   /** Absolute deadline used to preserve the caller's single total timeout budget. */
@@ -39,17 +44,33 @@ export class OperationScope {
     generation: number,
     timeoutMs: number | false | undefined,
     closingSignal: IAbortSignal,
-    now: () => number
+    now: () => number,
+    lazy = false
   ) {
     this.#generation = generation
     this.#now = now
     this.#deadlineAt =
       timeoutMs === undefined || timeoutMs === false ? undefined : now() + timeoutMs
-    this.#controller = createGenerationController({ parentSignal: closingSignal })
-    /** Keep the token and signal from the same canonical admission. */
-    const request = this.#controller.begin()
-    this.#token = request.token
-    this.signal = request.signal
+    this.#closingSignal = closingSignal
+    if (!lazy) void this.signal
+  }
+
+  /** Materializes the original lifecycle-owned native signal only when a consumer actually reads it. */
+  get signal(): IAbortSignal {
+    if (this.#signal === undefined) {
+      this.#controller = createGenerationController(
+        this.#closed ? {} : { parentSignal: this.#closingSignal }
+      )
+      /** Token and signal always originate from the same canonical admission. */
+      const request = this.#controller.begin()
+      this.#token = request.token
+      this.#signal = request.signal
+      if (this.#closed) {
+        if (this.#succeeded) this.#controller.complete(request.token)
+        else this.#controller.supersede(this.#closeReason)
+      }
+    }
+    return this.#signal
   }
 
   /** Returns the remaining operation budget, preserving false as unlimited. */
@@ -60,7 +81,12 @@ export class OperationScope {
 
   /** Rejects work that crossed disposal or operation cancellation. */
   assertActive(currentGeneration: number): void {
-    if (this.#closed || this.signal.aborted || currentGeneration !== this.#generation)
+    if (
+      this.#closed ||
+      this.#closingSignal.aborted ||
+      this.#signal?.aborted ||
+      currentGeneration !== this.#generation
+    )
       throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (this.#deadlineAt !== undefined && this.#deadlineAt <= this.#now())
       throw new RpcTimeoutError()
@@ -70,7 +96,11 @@ export class OperationScope {
   abort(reason?: unknown): void {
     if (this.#closed) return
     this.#closed = true
-    this.#controller.supersede(reason)
+    this.#closeReason =
+      this.#signal === undefined && this.#closingSignal.aborted
+        ? resolveAbortReason(this.#closingSignal)
+        : reason
+    this.#controller?.supersede(reason)
   }
 
   /** Marks ordinary success after pending cleanup and before resolving the existing promise. */
@@ -86,6 +116,6 @@ export class OperationScope {
     }
     if (this.#closed) return
     this.#closed = true
-    this.#controller.complete(this.#token)
+    if (this.#controller && this.#token) this.#controller.complete(this.#token)
   }
 }

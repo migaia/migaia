@@ -1,5 +1,6 @@
 import { RpcCoreErrorText } from '../error-text.js'
 import { VariationAdmissionRegistry } from './variation-admission.js'
+import type { IRpcProviderController } from './plugin-shared-keys.js'
 
 /** Private handler port for one verified variation subkind. */
 export type IVariationHandler = (message: unknown, peerKey: string) => void | Promise<void>
@@ -70,7 +71,7 @@ export class RpcVariationCoordinator {
   /** Aborts an active provider task or records a bounded early-abort tombstone. */
   abort(
     key: string,
-    controller: AbortController | undefined,
+    controller: Pick<IRpcProviderController, 'abort'> | undefined,
     expiresAt: number,
     reason: unknown
   ): boolean {
