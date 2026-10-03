@@ -34,8 +34,8 @@ function portableJsonByteUpperBound(value: unknown): number {
   if (typeof value === 'string') return value.length * 6 + 2
   /** Finite numbers, booleans, null and omitted undefined fields need at most 32 JSON bytes. */
   if (value === null || typeof value !== 'object') return 32
-  /** The normalizer already proved an acyclic own-data tree; no validation is duplicated here. */
-  let bytes = 2
+  /** Five bytes per array slot cover its JSON null/comma, including holes retained by map. */
+  let bytes = Array.isArray(value) ? 2 + value.length * 5 : 2
   for (const key of Object.keys(value)) {
     /** Array indices are omitted by JSON; including their names still provides a safe upper bound. */
     bytes +=
