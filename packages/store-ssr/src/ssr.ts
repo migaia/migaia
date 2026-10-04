@@ -338,19 +338,11 @@ export class SSRRequestScope {
   }
 
   /**
-   * Best-effort, NOT atomic. `assertSSRState()` already rejected anything that isn't well-formed
-   * JSON before this runs, but an individual store's or resource's own `$hydrate()`/`hydrate()` can
-   * still throw for reasons outside this method's control (its own validation, a computed
-   * constraint, whatever). Doing true all-or-nothing commit across an arbitrary set of stores would
-   * need each one to support a stage/commit/ rollback protocol — `ISSRStore`/`ISSRResource` don't
-   * have one, and adding one is a real interface change, not a local fix.
-   *
-   * So instead: every entry is attempted regardless of an earlier one failing (same pattern as
-   * `dispose()` below), so "hydrate() threw" always means "every entry that _could_ apply, did —
-   * here's what couldn't," never "stopped partway through for reasons that depend on object-key
-   * iteration order." Pending-hydration bookkeeping is always updated to reflect what was actually
-   * consumed, never left stale from before this call just because something later in the same call
-   * failed.
+   * Applies validated JSON state best-effort rather than atomically. A store or resource can reject
+   * its own hydration; every other entry is still attempted and failures are collected. The
+   * contracts provide no stage/commit/rollback protocol, so successful changes remain applied.
+   * Pending hydration records always reflect the entries actually consumed, including when a later
+   * entry fails. Callers must handle partial application rather than assume rollback.
    */
   hydrate(state: ISSRState): void {
     this.#assertActive()
@@ -426,19 +418,11 @@ export class SSRRequestScope {
   }
 
   /**
-   * Internal fast path — NOT a snapshot. Every value in the returned state (`store.$plain()`'s
-   * object, each resource's `dehydrate()` result) is whatever live reference those calls happen to
-   * return; this method does not copy, freeze deeply, or validate it. If the store mutates between
-   * this call and whenever the caller actually serializes the result (an await, a later tick, a
-   * queued write), the payload can change out from under the caller without warning — there is no
-   * point-in-time guarantee here the way there is with `dehydrate()`.
-   *
-   * Only correct when every value is already known-safe, already-JSON,
-   * already-immutable-for-the-duration-of-the-call data — e.g. this library's own bundled
-   * documentation/demo content, never anything derived from request input or a store that might
-   * mutate concurrently. `dehydrate()` is almost certainly the method you want; reach for this one
-   * only when the validation/copy cost of `dehydrate()` is the thing you're specifically trying to
-   * avoid, and you can actually justify why skipping it is safe here.
+   * Returns live dehydration references without copying, freezing or validation. Later mutations
+   * can change the payload before serialization, including across an await; this is not a snapshot.
+   * Use only for known-safe JSON data that stays immutable through serialization, such as owned
+   * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate()
+   * instead. Select this fast path only when skipping validation and copying is justified.
    */
   dehydrateTrusted(): ITrustedSSRState {
     this.#assertActive()
@@ -465,19 +449,9 @@ export class SSRRequestScope {
   }
 
   /**
-   * 等待所有已注册的异步派生，返回失败清单。
-   *
-   * 之前是一趟 `Promise.all`，两个后果：
-   *
-   * - 任何一个 resource reject，整个 await 就 reject，页面拿不到**任何** payload——一份可选的预取数据挂掉，把其余全部预取一起赔进去；
-   * - 瀑布式的 resource（A resolve 之后才注册 B）根本不在那一趟里， dehydrate 时 B 还没好，SSR 缓存白做。
-   *
-   * 现在逐轮 settle：每轮只等**这一轮新出现的 promise**，直到不再有新的。 按 promise 身份去重，不按 key——同一个 key 在首次 settle 后又发起
-   * retry/refetch 换了一个新 promise，仍然要被等到，而不是因为 key 已经 "见过"就永久跳过。失败不抛出，而是作为清单返回——调用方决定是整页
-   * 失败，还是发出去让客户端重取。
-   *
-   * 三种失败旁路都要收进清单，不能让任何一种绕过 try/catch 直接终止整个 等待：`.promise` getter 同步抛错、真正超时、以及等待期间 scope 被
-   * dispose（这一种直接返回已有结果，不算这一轮里剩下 resource 的错）。
+   * 逐轮等待已注册的异步派生，返回失败清单，允许调用方选择整页失败或客户端重取。 新注册的瀑布式 resource 也参与后续轮次；按 Promise 身份去重，同一个 key 的
+   * retry/refetch 新 Promise 仍会被等待。单个 resource 失败不会阻断其他预取。 Promise getter 抛错与超时均计入清单。等待期间 scope 被
+   * dispose 时返回已有结果， 不把剩余 resource 算作失败。
    */
   async awaitResources(
     options: IAwaitResourcesOptions = {}
