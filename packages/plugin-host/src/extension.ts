@@ -3,6 +3,14 @@ import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-
 import { asyncDisposeKey, disposeKey } from './disposal.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginHostErrorCode } from './typing.js'
+import type { IExtensionOwner, ISharedExtensionSlot } from './registry.js'
+
+/** Family discrimination belongs to the canonical extension owner, leaving registry types erased. */
+export function isSharedExtensionSlot<TDomainCore extends object, TValue>(
+  owner: IExtensionOwner<TDomainCore, TValue>
+): owner is ISharedExtensionSlot<TDomainCore, TValue> {
+  return 'family' in owner
+}
 
 /** Object prototype names can never become plugin-host extension surface. */
 const objectPrototypeKeys = new Set(Reflect.ownKeys(Object.prototype))
@@ -22,6 +30,20 @@ const hostReservedKeys = new Set<PropertyKey>([
   'host',
   'extensions'
 ])
+
+/** Shared slots and ordinary extensions use one canonical Host/prototype reserved-key policy. */
+export function assertPluginExtensionKey(pluginName: string, key: PropertyKey): void {
+  if (objectPrototypeKeys.has(typeof key === 'number' ? String(key) : key))
+    throw new PluginHostError(
+      PluginHostErrorCode.extensionObjectPrototype,
+      ERROR_TEXT.EXTENSION_OBJECT_PROTOTYPE(pluginName, key)
+    )
+  if (hostReservedKeys.has(key))
+    throw new PluginHostError(
+      PluginHostErrorCode.extensionReserved,
+      ERROR_TEXT.EXTENSION_RESERVED(pluginName, key)
+    )
+}
 
 type IExtensionRegistration = {
   readonly name: string
@@ -72,16 +94,7 @@ export const mountPluginExtensions = <TRegistration extends IExtensionRegistrati
       )
       continue
     }
-    if (objectPrototypeKeys.has(key))
-      throw new PluginHostError(
-        PluginHostErrorCode.extensionObjectPrototype,
-        ERROR_TEXT.EXTENSION_OBJECT_PROTOTYPE(registration.name, key)
-      )
-    if (hostReservedKeys.has(key))
-      throw new PluginHostError(
-        PluginHostErrorCode.extensionReserved,
-        ERROR_TEXT.EXTENSION_RESERVED(registration.name, key)
-      )
+    assertPluginExtensionKey(registration.name, key)
     if (extensionOwners.has(key))
       throw new PluginHostError(
         PluginHostErrorCode.extensionDuplicate,

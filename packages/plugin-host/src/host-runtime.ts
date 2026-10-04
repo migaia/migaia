@@ -13,7 +13,12 @@ import {
 } from './admission-runtime.js'
 import { PluginHostInstallRuntime, type IInstallBatchContext } from './install-runtime.js'
 import { PluginHostErrorCode } from './error-code.js'
-import { buildManagedPort, registerManagedHost } from './composition-entry.js'
+import {
+  buildManagedPort,
+  registerManagedHost,
+  isManagedHost,
+  openComposition
+} from './composition-entry.js'
 import { PluginHostState } from './host-state.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 import { reportQueueWait, translateQueueRejection } from './host-queue.js'
@@ -359,6 +364,7 @@ export class PluginHost<
       snapshotBatch: () => ({
         registrations: new Map(),
         extensionOwners: new Map(),
+        sharedContributions: [],
         releasedOwners: new Set(),
         committed: false
       }),
@@ -385,7 +391,6 @@ export class PluginHost<
     this.#removalRuntime = new PluginHostRemovalRuntime({
       registrations: this.#state.registrations,
       removeRegistration: (registration) => this.#state.closeRegistration(registration),
-      extensionOwners: this.#state.extensionOwners,
       pipelineLeases: this.#pipelineLeases,
       retireLeaseOwner: (registration) =>
         this.#state.lanes.retireLeaseOwner(registration, this.#pipelineLeases),
@@ -456,7 +461,115 @@ export class PluginHost<
         ),
       executionSignal: this.#executionController.signal,
       registerStage: (stage, registration, kind) => this.#registerStage(stage, registration, kind),
-      cleanupRuntime: this.#cleanupRuntime
+      cleanupRuntime: this.#cleanupRuntime,
+      runtimeIntegration: (registration, batch) => {
+        /** Mutation authority belongs only to this original current install batch. */
+        const assertInstall = (): void => {
+          this.#state.assertRegistrationValid(registration, (current) =>
+            this.#operationRuntime.assertCurrent(current)
+          )
+          if (
+            !batch ||
+            batch.committed ||
+            registration.lifecycle !== PluginHostRegistrationLifecycle.install
+          )
+            throw new PluginHostError(
+              PluginHostErrorCode.resourceOutsideInstall,
+              ERROR_TEXT.RESOURCE_OUTSIDE_INSTALL
+            )
+        }
+        /** Existing handle access keeps connection enabled/suspended/activated admission canonical. */
+        const connectionHandle = this.#createHandle(registration.name) as unknown as {
+          readonly extensions: object
+        }
+        /** Exact registration is checked before a name-addressed handle can select any successor. */
+        const assertCurrent = (): void => {
+          this.#assertActive()
+          if (this.#state.registrations.get(registration.name) !== registration)
+            throw new PluginHostError(
+              PluginHostErrorCode.registrationRevoked,
+              ERROR_TEXT.REGISTRATION_REVOKED
+            )
+          void connectionHandle.extensions
+        }
+        return Object.freeze({
+          identity: this.identity,
+          matchesHost: (host: object) =>
+            isManagedHost(host) && openComposition(host) === openComposition(this),
+          assertCurrent,
+          acquireSharedSlot: (key, family, create) => {
+            assertInstall()
+            /** Normalize numeric PropertyKey once before entering the canonical ownership map. */
+            const slotKey = typeof key === 'number' ? String(key) : key
+            if (
+              Reflect.has(this, slotKey) &&
+              this.#state.readSharedExtension(slotKey) === undefined
+            )
+              throw new PluginHostError(
+                PluginHostErrorCode.extensionReserved,
+                ERROR_TEXT.EXTENSION_RESERVED(registration.name, slotKey)
+              )
+            return this.#state.acquireSharedSlot(
+              registration,
+              batch!,
+              slotKey,
+              family,
+              create,
+              assertInstall
+            )
+          },
+          readFeatureOutputs: (name: string) => {
+            assertInstall()
+            /** A name is resolved only once to the exact registered Feature owner. */
+            const target = batch?.registrations.get(name) ?? this.#state.registrations.get(name)
+            /** Original getFeature access enforces activation and output identity. */
+            const handle = this.#createHandle(name, batch) as unknown as {
+              readonly extensions: object
+              getFeature(feature: string): object
+            }
+            if (!target) {
+              void handle.extensions
+              throw new PluginHostError(
+                PluginHostErrorCode.pluginNotInstalled,
+                ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
+              )
+            }
+            /** Feature names come from trusted definition metadata, never arbitrary Host fields. */
+            const outputs: Record<string, object> = Object.create(null)
+            for (const feature of Object.keys(target.plugin.features))
+              outputs[feature] = handle.getFeature(feature)
+            if (Object.keys(outputs).length === 0) void handle.extensions
+            return Object.freeze({
+              outputs: Object.freeze(outputs),
+              assertCurrent: (feature: string): void => {
+                assertCurrent()
+                if (
+                  this.#state.registrations.get(name) !== target ||
+                  handle.getFeature(feature) !== outputs[feature]
+                )
+                  throw new PluginHostError(
+                    PluginHostErrorCode.registrationRevoked,
+                    ERROR_TEXT.REGISTRATION_REVOKED
+                  )
+              }
+            })
+          }
+        })
+      }
+    })
+    this.#state.configureSharedPublication({
+      assertActive: () => this.#assertActive(),
+      publish: (key) => {
+        /** The concrete descriptor reads canonical state, never a facade-maintained registry. */
+        Object.defineProperty(this, key, {
+          enumerable: true,
+          configurable: true,
+          get: () => this.#state.readSharedExtension(key)
+        })
+      },
+      revoke: (key) => {
+        Reflect.deleteProperty(this, key)
+      }
     })
     this.#configRuntime = new PluginHostConfigRuntime({
       registrations: this.#state.registrations,
@@ -590,6 +703,11 @@ export class PluginHost<
   /** Current committed Host mutation receipt; it changes only at publication boundaries. */
   get revision(): number {
     return this.#state.revision
+  }
+
+  /** Frozen handles receive only this read port for the same committed shared publication. */
+  protected readRuntimeSharedExtension(key: PropertyKey): object | undefined {
+    return this.#state.readSharedExtension(key)
   }
 
   #assertActive(): void {
@@ -941,12 +1059,17 @@ export class PluginHost<
     })
   }
 
-  /** Creates a live name-addressed handle over the current registration generation. */
-  #createHandle<TPlugin extends IPluginConstraint<any>>(name: string): IPluginHandle<TPlugin> {
+  /** Preparing Feature reads may see their original batch; committed handles resolve live state. */
+  #createHandle<TPlugin extends IPluginConstraint<any>>(
+    name: string,
+    batch?: IInstallBatchContext<TDomainCore, TValue>
+  ): IPluginHandle<TPlugin> {
     return createPluginHandle(name, {
       host: this,
       assertActive: () => this.#assertActive(),
-      lookup: (pluginName) => this.#state.registrations.get(pluginName),
+      lookup: (pluginName) =>
+        (batch && !batch.committed ? batch.registrations.get(pluginName) : undefined) ??
+        this.#state.registrations.get(pluginName),
       readConfig: (pluginName) => this.config.get(pluginName),
       updateConfig: (pluginName, recipe) => this.config.update(pluginName, recipe)
     }) as IPluginHandle<TPlugin>
@@ -1012,7 +1135,17 @@ export class PluginHost<
       host: this,
       assertLive: (captured) => this.#assertViewLive(captured),
       readConfig: (path) => this.config.get(path),
-      updateConfig: (name, recipe) => this.config.update(name, recipe)
+      updateConfig: (name, recipe) => this.config.update(name, recipe),
+      readSharedExtensions: () => {
+        /** Existing publication reads one committed facade per shared key, never one per member. */
+        const shared = new Map<PropertyKey, object>()
+        for (const key of this.#state.extensionOwners.keys()) {
+          /** Ordinary exclusive extensions retain their original exact-registration publication. */
+          const facade = this.#state.readSharedExtension(key)
+          if (facade) shared.set(key, facade)
+        }
+        return shared
+      }
     })
   }
 

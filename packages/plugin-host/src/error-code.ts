@@ -91,8 +91,9 @@ export const PluginHostErrorCode = {
   dependentRestartFailed: 'DEPENDENT_RESTART_FAILED',
   /**
    * A plugin definition carries a retired or unsupported field (for example `shared`), or its
-   * dependency data is structurally invalid. Rejected at definition admission (R14); migrate the
-   * definition to Feature dependencies.
+   * dependency data is structurally invalid, or runtime integration is requested from an object
+   * that is not a canonical package-minted core. Definition admission and the D9 integration port
+   * reject these inputs; migrate to Feature dependencies or use the original install core.
    */
   pluginDefinitionInvalid: 'PLUGIN_DEFINITION_INVALID',
 
@@ -120,9 +121,9 @@ export const PluginHostErrorCode = {
   pluginDisposeFailed: 'PLUGIN_DISPOSE_FAILED',
 
   /**
-   * 插件 `install()` 返回的扩展属性名与 Host 上已存在的属性冲突。
+   * 插件 `install()` 返回的扩展属性名与 Host 上已存在的属性冲突；shared slot 只允许同 family 的确切注册贡献，不接受普通扩展或其它 family 占用同键。
    *
-   * 扩展挂载是独占的；调用方需改扩展名或调整插件安装顺序。冲突在挂载前检测，不会产生半挂载状态。
+   * 普通扩展挂载仍独占；调用方需改扩展名或使用 canonical 同族贡献。冲突在挂载前检测， 不会发布半挂载状态。
    */
   extensionDuplicate: 'EXTENSION_DUPLICATE',
 

@@ -13,7 +13,6 @@ type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   /** Removes an exact committed registration and its dependency node atomically. */
   readonly removeRegistration: (registration: IRegistration<TDomainCore, TValue>) => void
-  readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
   readonly pipelineLeases: IQuiescenceTracker<object>
   readonly retireLeaseOwner: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly host: object
@@ -84,7 +83,6 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
       }
     }
     registration.pipelineDisposers = []
-    this.#port.removeRegistration(registration)
     this.#removeOwnedPublication(registration)
     // The name-keyed slot retains its ordinal across a same-name reinstall. Composition-issued
     // tokens remain under their holder's explicit retireDataOrderSlot authority.
@@ -197,9 +195,6 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
 
   /** Removes extension capabilities still owned by the exact registration. */
   #removeOwnedPublication(registration: IRegistration<TDomainCore, TValue>): void {
-    for (const { key } of [...registration.extensions].reverse())
-      if (this.#port.extensionOwners.get(key) === registration)
-        this.#port.extensionOwners.delete(key)
     this.#port.removeRegistration(registration)
   }
 }

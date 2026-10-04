@@ -55,6 +55,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   readonly plugin: IPluginDefinition<TDomainCore & IPluginHostCore<TValue>>
   config: IPluginConfig
   extensions: IExtensionOwnership[]
+  /** Candidate and committed shared receipts belong to this exact registration generation. */
+  sharedContributions?: ISharedExtensionContribution<TDomainCore, TValue>[]
   pipelineDisposers: IPluginDisposer[]
   /** Stages registered by this exact generation, not keyed by function identity. */
   stageEntries: IStageEntry<TValue>[]
@@ -106,6 +108,34 @@ type IExtensionOwnership = {
   readonly key: PropertyKey
   readonly descriptor: PropertyDescriptor
 }
+
+/** Shared publication extends the existing extension owner rather than creating another registry. */
+export type ISharedExtensionSlot<TDomainCore extends object, TValue> = {
+  readonly key: PropertyKey
+  readonly family: object
+  facade: object
+  /** Final contribution removal retires this facade permanently. */
+  retired: boolean
+  readonly contributions: Map<
+    IRegistration<TDomainCore, TValue>,
+    ISharedExtensionContribution<TDomainCore, TValue>
+  >
+  readonly names: Map<string, ISharedExtensionContribution<TDomainCore, TValue>>
+  readonly instanceIds: Map<string, Set<ISharedExtensionContribution<TDomainCore, TValue>>>
+}
+
+/** Revocation compares the receipt itself so late cleanup cannot touch a successor registration. */
+export type ISharedExtensionContribution<TDomainCore extends object, TValue> = Readonly<{
+  slot: ISharedExtensionSlot<TDomainCore, TValue>
+  registration: IRegistration<TDomainCore, TValue>
+  instanceId: string
+  value: object
+}>
+
+/** Ordinary exclusive slots retain their original registration owner. */
+export type IExtensionOwner<TDomainCore extends object, TValue> =
+  | IRegistration<TDomainCore, TValue>
+  | ISharedExtensionSlot<TDomainCore, TValue>
 
 export type IInstallEntry<TDomainCore extends object, TValue> = {
   readonly plugin: IPluginDefinition<TDomainCore & IPluginHostCore<TValue>>

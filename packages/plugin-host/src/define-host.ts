@@ -22,7 +22,8 @@ import type {
   IPluginHostDisposalResult,
   IPluginHostConfigFor,
   IPluginEnablement,
-  IPluginHostOptions
+  IPluginHostOptions,
+  IPluginHostRuntimeExtensions
 } from './typing.js'
 
 /**
@@ -121,7 +122,8 @@ export type IHostHandle<
   /** Replaces the `protected runPipeline`; only the handle's holder can reach it. */
   runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
   dispose(): Promise<IPluginHostDisposalResult>
-}>
+}> &
+  IPluginHostRuntimeExtensions
 
 /**
  * A host as a value instead of a base class.
@@ -161,6 +163,10 @@ export function defineHost<TDomainCore extends object = Record<string, never>, T
     }
     runPipelinePublic(value: TValue, done: (value: TValue) => void) {
       return this.runPipeline(value, done)
+    }
+    /** Only the package-owned frozen surface receives this committed-publication read capability. */
+    readRuntimeSharedExtensionPublic(key: PropertyKey): object | undefined {
+      return this.readRuntimeSharedExtension(key)
     }
   }
   const runtime = new Runtime(options.host, readDefinedPluginDefinition)
@@ -223,14 +229,22 @@ export function defineHost<TDomainCore extends object = Record<string, never>, T
     dispose: (): Promise<IPluginHostDisposalResult> =>
       (disposal ??= options.dispose ? options.dispose(() => runtime.dispose()) : runtime.dispose())
   }
-  const identity = issueHostIdentity(handleSurface, options.host.identity?.name)
+  /** Shared outlets are read through original state while the existing public protocol stays frozen. */
+  const handle = new Proxy(handleSurface, {
+    get: (target, key, receiver) =>
+      Reflect.has(target, key)
+        ? Reflect.get(target, key, receiver)
+        : runtime.readRuntimeSharedExtensionPublic(key)
+  })
+  /** Identity and managed-host provenance belong to the exact public proxy rather than its target. */
+  const identity = issueHostIdentity(handle, options.host.identity?.name)
   Object.defineProperty(handleSurface, 'identity', {
     value: identity,
     enumerable: true,
     configurable: false,
     writable: false
   })
-  const handle = Object.freeze(handleSurface)
+  Object.freeze(handleSurface)
   registerManagedHost(handle, openComposition(runtime))
   if (options.receiver) registerManagedHost(options.receiver, openComposition(runtime))
   return handle as unknown as IHostHandle<TDomainCore, TValue, readonly []>

@@ -21,6 +21,9 @@ export type IPluginResource =
 /** Generic structured detail carried by a PluginHost boundary error. */
 export type IPluginHostErrorDetail = Readonly<Record<string, unknown>>
 
+/** Interface semantics are required only for adapter-owned module augmentation of Host outlets. */
+export interface IPluginHostRuntimeExtensions {}
+
 /**
  * Structured install-failure detail. Synchronous installation publishes an immutable snapshot; its
  * completion resolves to the final immutable rollback detail without mutating the published error,

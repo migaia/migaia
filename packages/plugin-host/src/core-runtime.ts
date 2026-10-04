@@ -1,7 +1,7 @@
 import type { IAbortSignal, ILifecycleScope, IProvisionalScope } from '@migaia/lifecycle'
 import type { IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
-import { createPluginCore } from './core.js'
+import { createPluginCore, type IPluginRuntimeIntegration } from './core.js'
 import { resolveDisposer } from './disposal.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -28,6 +28,11 @@ type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
     kind: IMiddlewarePipelineMode
   ) => void
   readonly cleanupRuntime: PluginHostCleanupRuntime
+  /** The original Host constructs install-scoped authority without exposing its mutable runtime. */
+  readonly runtimeIntegration: (
+    registration: IRegistration<TDomainCore, TValue>,
+    batch?: IInstallBatchContext<TDomainCore, TValue>
+  ) => IPluginRuntimeIntegration
 }>
 
 /** Owns the plugin-facing core facade and resource/stage admission boundaries. */
@@ -65,7 +70,8 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
         signal: registration.lifecycleController?.signal ?? this.#port.executionSignal
       }),
       registerResource: (resource) => this.#registerResource(registration, resource),
-      registerStage: (stage, kind) => this.#port.registerStage(stage, registration, kind)
+      registerStage: (stage, kind) => this.#port.registerStage(stage, registration, kind),
+      runtimeIntegration: () => this.#port.runtimeIntegration(registration, batch)
     })
     return registration.core
   }

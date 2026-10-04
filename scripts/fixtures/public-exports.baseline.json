@@ -217,6 +217,7 @@
         "defineHost",
         "definePlugin",
         "disposeKey",
+        "getPluginRuntimeIntegration",
         "invokeCaptured",
         "isDefinedPlugin",
         "isPluginHandleCurrent",
