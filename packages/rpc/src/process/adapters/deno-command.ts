@@ -7,12 +7,21 @@ import {
 } from '@migaia/supervision/process'
 import { encodeRpcStreamFrame } from '../../contract/framing/stream.js'
 import { RpcCoreErrorCode, tagRpcError } from '../../core/errors.js'
+import { resolveAbortReason } from '../../core/internal/async-control.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { openBootstrapFrameChannel } from '../bootstrap.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
+import type { IRuntimePeerIdentity } from '../../remote/runtime-api/description.js'
+import {
+  prepareProcessRuntimeBootstrap,
+  invalidProcessRuntimeBootstrap,
+  type IProcessRuntimeBootstrapOptions
+} from '../runtime-bootstrap.js'
+import { deferProcessByteReceive } from '../channel.js'
+import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
 import { webByteStream } from './web-byte-stream.js'
 
 /** Only the Deno APIs used by this deep adapter are typed here. */
@@ -88,13 +97,30 @@ async function drain(
 }
 
 /** One Deno child exposes its byte port only when both directions were piped. */
-export type IDenoProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel }>
+export type IDenoProcessHandle = IProcessHandle &
+  Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity }>
 
 /** Spawn a Deno.Command with an explicit environment allowlist and early stderr drain. */
-export function createDenoProcessLauncher(): IProcessLauncher<IDenoProcessHandle> {
+export function createDenoProcessLauncher(
+  options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions }> = {}
+): IProcessLauncher<IDenoProcessHandle> {
   return Object.freeze({
     capabilities: DENO_CAPABILITIES,
     async launch(spec, context) {
+      if (options.runtimeApiBootstrap && context.signal.aborted)
+        throw resolveAbortReason(context.signal)
+      /** Opt-in metadata is admitted before native spawn or any secret-bearing write. */
+      if (
+        options.runtimeApiBootstrap &&
+        (spec.bootstrap?.via !== 'stdin' ||
+          spec.stdio.stdin !== 'channel' ||
+          spec.stdio.stdout !== 'channel')
+      )
+        invalidProcessRuntimeBootstrap()
+      /** The original launcher uses one prepared identity for bootstrap and its returned handle. */
+      const runtimeBootstrap = options.runtimeApiBootstrap
+        ? prepareProcessRuntimeBootstrap(options.runtimeApiBootstrap, spec.bootstrap?.payload)
+        : undefined
       const runtime = denoRuntime()
       /** Clearing the ambient environment precedes the caller's selected keys. */
       const env: Record<string, string> = {}
@@ -103,6 +129,7 @@ export function createDenoProcessLauncher(): IProcessLauncher<IDenoProcessHandle
         if (value !== undefined) env[key] = value
       }
       Object.assign(env, spec.env.set)
+      if (runtimeBootstrap) env[PROCESS_RUNTIME_API_ENV] = PROCESS_RUNTIME_API_ENV_VERSION
       /** Deno has no supported dedicated bootstrap fd in this adapter. */
       if (spec.bootstrap?.via === 'fd')
         throw tagRpcError(
@@ -153,7 +180,9 @@ export function createDenoProcessLauncher(): IProcessLauncher<IDenoProcessHandle
         if (spec.bootstrap?.via === 'stdin') {
           const writer = child.stdin.getWriter()
           try {
-            await writer.write(encodeRpcStreamFrame(spec.bootstrap.payload))
+            await writer.write(
+              encodeRpcStreamFrame(runtimeBootstrap?.payload ?? spec.bootstrap.payload)
+            )
           } finally {
             writer.releaseLock()
           }
@@ -163,10 +192,15 @@ export function createDenoProcessLauncher(): IProcessLauncher<IDenoProcessHandle
           spec.stdio.stdin === 'channel' && spec.stdio.stdout === 'channel'
             ? webByteStream(child.stdout, child.stdin, () => undefined)
             : undefined
+        if (channel && runtimeBootstrap) deferProcessByteReceive(channel)
         return Object.freeze({
-          identity: Object.freeze({ fingerprint: crypto.randomUUID(), pid: child.pid }),
+          identity: Object.freeze({
+            fingerprint: runtimeBootstrap?.self.instanceId ?? crypto.randomUUID(),
+            pid: child.pid
+          }),
           exited,
           channel,
+          ...(runtimeBootstrap ? { runtimeApiIdentity: runtimeBootstrap.self } : {}),
           terminate
         })
       } catch (error) {
@@ -183,6 +217,7 @@ export function openProcessStdioChannel(
   options: Readonly<{
     bootstrap: 'stdin' | 'fd' | 'none'
     fd?: number
+    bootstrapTimeoutMs?: number
   }>
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {
   if (options.bootstrap === 'fd')
@@ -192,5 +227,5 @@ export function openProcessStdioChannel(
     )
   const runtime = denoRuntime()
   const channel = webByteStream(runtime.stdin.readable, runtime.stdout.writable, () => undefined)
-  return openBootstrapFrameChannel(channel, options.bootstrap)
+  return openBootstrapFrameChannel(channel, options.bootstrap, options)
 }

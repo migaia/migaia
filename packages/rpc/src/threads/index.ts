@@ -1,4 +1,5 @@
 export { createThreadPlugin } from './plugin.js'
+export { createThreadPeer } from './peer.js'
 export { createThreadHost } from './host.js'
 export { createServeThreadPlugin, createServeThreadHost } from './serve.js'
 export { createNodeThreadChannel, createWebThreadChannel } from './channel.js'

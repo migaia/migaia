@@ -43,6 +43,14 @@ export type IProcessFrameSource = Readonly<{
 /** Registration is internal to the process package and never changes the byte-port contract. */
 const frameSources = new WeakMap<IProcessByteChannel, IProcessFrameSource>()
 
+/** Opt-in runtime bootstrap defers business subscriptions while preserving the original byte queue. */
+const deferredReceivers = new WeakSet<IProcessByteChannel>()
+
+/** Register a cold handoff before the canonical wire claims the physical channel. */
+export function deferProcessByteReceive(channel: IProcessByteChannel): void {
+  deferredReceivers.add(channel)
+}
+
 /** Transfer one bootstrap decoder to the ordinary handshake without replaying raw bytes. */
 export function registerProcessFrameSource(
   channel: IProcessByteChannel,
@@ -61,6 +69,8 @@ type IPendingWrite = {
 export type IProcessByteWire = Readonly<{
   transport: IRpcTransport
   readHandshakeFrame(): Promise<string>
+  beginAccept?(): void
+  activateReceive?(): void
   activate(capabilities?: readonly string[]): void
   writeText(value: string): Promise<void>
   close(reason?: unknown): Promise<void>
@@ -106,6 +116,12 @@ export function bindProcessByteWire(
   const textEncoder = new TextEncoder()
   /** Business listeners become active only after the control handshake completes. */
   const listeners = new Set<(message: { data: unknown; peerId: string }) => void>()
+  /** Default byte wires never enter this additional cold subscription phase. */
+  const deferred = deferredReceivers.delete(channel)
+  /** One temporary set holds original endpoint callbacks until its provider/stream commit. */
+  const pendingListeners = deferred
+    ? new Set<(message: { data: unknown; peerId: string }) => void>()
+    : undefined
   /** Frames received after activation wait for the first endpoint subscriber. */
   const earlyBusiness: string[] = []
   /** The queue's byte total is released with its frames on delivery or close. */
@@ -158,6 +174,7 @@ export function bindProcessByteWire(
     handshakeFrame = undefined
     earlyBusiness.length = 0
     earlyBusinessBytes = 0
+    pendingListeners?.clear()
     for (const write of pendingWrites) {
       write.settled = true
       write.reject(terminalError)
@@ -233,7 +250,11 @@ export function bindProcessByteWire(
     }
     if (!ready) {
       if (handshakeReceived) {
-        if (options.role === 'initiator' && acceptReceived && !isHandshakeControl(text)) {
+        if (
+          (options.role === 'initiator' || deferred) &&
+          acceptReceived &&
+          !isHandshakeControl(text)
+        ) {
           queueBusiness(text, frame.byteLength)
           return
         }
@@ -372,8 +393,39 @@ export function bindProcessByteWire(
     }
   }
 
+  /** Activation restores the exact existing subscribe function, leaving no hot receive wrapper. */
+  let activateReceive: (() => void) | undefined
+  if (pendingListeners) {
+    /** Preserve the canonical transport subscription rather than permanently wrapping dispatch. */
+    const subscribe = transport.subscribe
+    transport.subscribe = (listener) => {
+      pendingListeners.add(listener)
+      return () => {
+        pendingListeners.delete(listener)
+        listeners.delete(listener)
+      }
+    }
+    activateReceive = () => {
+      if (closed) throw terminalError
+      transport.subscribe = subscribe
+      for (const listener of pendingListeners) listeners.add(listener)
+      pendingListeners.clear()
+      flushBusiness()
+    }
+  }
+
   return Object.freeze({
     transport,
+    ...(activateReceive
+      ? {
+          activateReceive,
+          /** Called only after authentication, immediately before writing the responder accept. */
+          beginAccept() {
+            if (closed) throw terminalError
+            acceptReceived = true
+          }
+        }
+      : {}),
     readHandshakeFrame() {
       if (closed) return Promise.reject(terminalError)
       if (handshakeFrame !== undefined) {

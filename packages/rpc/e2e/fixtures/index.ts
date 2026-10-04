@@ -5,6 +5,7 @@ if (!scenario) throw new Error('missing e2e scenario')
 const scenarios: Record<string, () => Promise<unknown>> = {
   'broadcast-channel': () => import('./broadcast-channel.js'),
   'dedicated-worker': () => import('./dedicated-worker.js'),
+  'automatic-thread': () => import('../../test/runtime-api/browser-peer.js'),
   'message-port': () => import('./message-port.js'),
   'manual-discovery': () => import('./manual-discovery.js'),
   'rtc-data-channel': () => import('./rtc-data-channel.js'),

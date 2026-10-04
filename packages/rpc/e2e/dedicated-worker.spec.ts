@@ -56,3 +56,31 @@ test('DedicatedWorker supports concurrent RPC and terminal convergence', async (
   expect(pageErrors).toEqual([])
   expect(consoleErrors).toEqual([])
 })
+
+// Existing dedicated-worker.spec.ts receives this required C3 case; no new test infrastructure.
+test('[A2][A17] actual Web Worker adopts library bootstrap and executes a reverse request', async ({
+  page
+}) => {
+  /** A real browser context independently observes script exceptions. */
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.goto('/e2e/fixtures/index.html?scenario=automatic-thread')
+  await page.evaluate(() => globalThis.e2eReady)
+  const receipt = (await page.evaluate(() => globalThis.runAutomaticThreadScenario())) as {
+    result: { value: string; self: { name: string; instanceId: string }; parent: string }
+    reverseCalls: number
+    fingerprint: string
+    failures: string[]
+    exited: boolean
+  }
+  expect(receipt.result.value, '[A2] actual child business').toBe('browser-ready')
+  expect(receipt.result.self.name, '[A17] actual launcher name').toBe('browser-automatic-child')
+  expect(receipt.result.self.instanceId, '[A17] exact launcher fingerprint').toBe(
+    receipt.fingerprint
+  )
+  expect(receipt.result.parent, '[A2] genuine reverse business').toBe('browser-automatic-parent')
+  expect(receipt.reverseCalls, '[A2] exact parent dispatch count').toBe(1)
+  expect(receipt.exited, '[A3] unsupported actual exit is never fabricated').toBe(false)
+  expect(receipt.failures).toEqual([])
+  expect(pageErrors).toEqual([])
+})

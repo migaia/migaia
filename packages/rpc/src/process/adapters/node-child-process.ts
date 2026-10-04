@@ -16,11 +16,20 @@ import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
+import type { IRuntimePeerIdentity } from '../../remote/runtime-api/description.js'
+import {
+  prepareProcessRuntimeBootstrap,
+  invalidProcessRuntimeBootstrap,
+  type IProcessRuntimeBootstrapOptions
+} from '../runtime-bootstrap.js'
+import { deferProcessByteReceive } from '../channel.js'
+import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
 import { nodeByteStream, nativeNodeByteOwner } from './node-byte-stream.js'
 import { registerNativeReplayOwner } from '../../core/internal/native-replay.js'
 
 /** A Node handle exposes stdout/stdin only when the specification chose byte channels. */
-export type INodeProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel }>
+export type INodeProcessHandle = IProcessHandle &
+  Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity }>
 
 /** Node does not claim tree termination until the POSIX grandchild fixture proves it. */
 const NODE_CAPABILITIES = Object.freeze({
@@ -66,10 +75,26 @@ function terminateChild(child: ChildProcess, mode: TerminationMode): void {
 }
 
 /** Spawn without a shell and drain diagnostics before writing a secret bootstrap frame. */
-export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle> {
+export function createNodeProcessLauncher(
+  options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions }> = {}
+): IProcessLauncher<INodeProcessHandle> {
   return Object.freeze({
     capabilities: NODE_CAPABILITIES,
     async launch(spec, context) {
+      if (options.runtimeApiBootstrap && context.signal.aborted)
+        throw resolveAbortReason(context.signal)
+      /** Opt-in metadata is admitted before native spawn or any secret-bearing write. */
+      if (
+        options.runtimeApiBootstrap &&
+        (spec.bootstrap?.via !== 'stdin' ||
+          spec.stdio.stdin !== 'channel' ||
+          spec.stdio.stdout !== 'channel')
+      )
+        invalidProcessRuntimeBootstrap()
+      /** The original launcher uses one prepared identity for bootstrap and its returned handle. */
+      const runtimeBootstrap = options.runtimeApiBootstrap
+        ? prepareProcessRuntimeBootstrap(options.runtimeApiBootstrap, spec.bootstrap?.payload)
+        : undefined
       /** Only explicitly inherited environment keys pass to the child. */
       const env: Record<string, string> = {}
       for (const key of spec.env.inherit) {
@@ -77,6 +102,7 @@ export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle
         if (value !== undefined) env[key] = value
       }
       Object.assign(env, spec.env.set)
+      if (runtimeBootstrap) env[PROCESS_RUNTIME_API_ENV] = PROCESS_RUNTIME_API_ENV_VERSION
       /** Only the selected channel/drain streams are opened as pipes. */
       const child = spawn(spec.command, [...spec.args], {
         cwd: spec.cwd,
@@ -123,10 +149,13 @@ export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle
           if (stdinFailure) throw stdinFailure
           await new Promise<void>((resolve, reject) => {
             rejectBootstrap = reject
-            child.stdin!.write(encodeRpcStreamFrame(spec.bootstrap!.payload), (error) => {
-              if (error) reject(error)
-              else resolve()
-            })
+            child.stdin!.write(
+              encodeRpcStreamFrame(runtimeBootstrap?.payload ?? spec.bootstrap!.payload),
+              (error) => {
+                if (error) reject(error)
+                else resolve()
+              }
+            )
           })
           rejectBootstrap = undefined
         }
@@ -148,11 +177,16 @@ export function createNodeProcessLauncher(): IProcessLauncher<INodeProcessHandle
               })
             : undefined
         if (channel) registerNativeReplayOwner(channel, nativeNodeByteOwner(channel)!)
+        if (channel && runtimeBootstrap) deferProcessByteReceive(channel)
         child.stdin?.removeListener('error', onStdinError)
         return Object.freeze({
-          identity: Object.freeze({ fingerprint: randomUUID(), pid: child.pid }),
+          identity: Object.freeze({
+            fingerprint: runtimeBootstrap?.self.instanceId ?? randomUUID(),
+            pid: child.pid
+          }),
           exited,
           channel,
+          ...(runtimeBootstrap ? { runtimeApiIdentity: runtimeBootstrap.self } : {}),
           terminate: (mode: TerminationMode) => terminateChild(child, mode)
         })
       } catch (error) {
@@ -170,6 +204,7 @@ export async function openProcessStdioChannel(
   options: Readonly<{
     bootstrap: 'stdin' | 'fd' | 'none'
     fd?: number
+    bootstrapTimeoutMs?: number
   }>
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {
   if (options.bootstrap === 'fd')
@@ -182,5 +217,5 @@ export async function openProcessStdioChannel(
     process.stdout.end()
   })
   registerNativeReplayOwner(channel, nativeNodeByteOwner(channel)!)
-  return openBootstrapFrameChannel(channel, options.bootstrap)
+  return openBootstrapFrameChannel(channel, options.bootstrap, options)
 }

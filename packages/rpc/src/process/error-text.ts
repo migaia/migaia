@@ -1,5 +1,7 @@
 /** Canonical process diagnostics never contain token, frame, or stderr payload bytes. */
 export const RpcProcessErrorText = {
+  /** Invalid discovery or bootstrap rejects before authentication and provider publication. */
+  runtimeBootstrapInvalid: 'process runtime API bootstrap is invalid',
   /** Host admission rejects invalid deployment or replacement options before side effects. */
   hostInvalidOption: 'process host options are invalid',
   /** Facade release permanently rejects new and queued Host commands. */

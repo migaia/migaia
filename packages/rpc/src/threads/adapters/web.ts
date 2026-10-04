@@ -1,5 +1,13 @@
 import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
 import { awaitThreadPreparation, createWebThreadChannel } from '../channel.js'
+import {
+  createThreadRuntimeBootstrap,
+  readThreadRuntimeAcknowledgement,
+  intersectThreadCapabilities
+} from '../bootstrap.js'
+import { createWebThreadBootstrapHandoff } from '../receive-handoff.js'
+import type { IRuntimePeerSourceContext } from '../../remote/runtime-api/peer.js'
+import { invalidThreadConfig } from '../error.js'
 import { THREAD_FINGERPRINT_PREFIX, ThreadBootstrap, ThreadEvent } from '../constants.js'
 import { absoluteThreadEntry, portableThreadSpec } from '../error.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
@@ -11,13 +19,18 @@ import type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } fro
 
 /** Web handles expose preparation but never counterfeit an unsupported actual-exit receipt. */
 export type IWebThreadHandle = IThreadHandle &
-  Readonly<{ port: IThreadWebPort; prepared: Promise<void> }>
+  Readonly<{
+    port: IThreadWebPort
+    prepared: Promise<void | readonly string[]>
+    runtimeApi?: ReturnType<typeof createWebThreadBootstrapHandoff>
+  }>
 /** Structural constructors admit actual runtime Workers and controlled adapter fixtures. */
 export type IWebThreadWorker = IThreadWebPort & { terminate(): void }
 /** Platform runtime injection does not strengthen unsupported lifecycle capabilities. */
 export type IWebThreadLauncherOptions = Readonly<{
   Worker?: new (entry: string | URL, options: { type: 'module'; name?: string }) => IWebThreadWorker
   report(error: unknown): void
+  runtimeApi?: IRuntimePeerSourceContext
 }>
 /** Local fingerprint distinguishes Web workers without a numeric runtime identifier. */
 let sequence = 0
@@ -44,10 +57,16 @@ export function createWebThreadLauncher(
         (globalThis.Worker as unknown as NonNullable<IWebThreadLauncherOptions['Worker']>)
       /** The service receives the exact peerId used by the client channel factory. */
       const fingerprint = `${THREAD_FINGERPRINT_PREFIX}web-${++sequence}`
+      /** The shared bootstrap owner admits safe metadata before native Worker construction. */
+      const bootstrap = options.runtimeApi
+        ? createThreadRuntimeBootstrap(spec.name || fingerprint, fingerprint, options.runtimeApi)
+        : undefined
       /** Worker lifecycle hooks attach synchronously before the host can deliver events. */
       const worker = new Constructor(entry, { type: 'module', name: spec.name })
       /** A terminate request has no effect on the independently unsupported exited Promise. */
       let terminating = false
+      /** Only the opt-in protocol transfers a bounded cold receive owner to core. */
+      let handoff: IWebThreadHandle['runtimeApi']
       /** Bootstrap listener is released on acknowledgement or explicit termination. */
       let receive: ((event: { data: unknown }) => void) | undefined
       /** Pending bootstrap rejects when cancellation reclaims its candidate Worker. */
@@ -62,6 +81,7 @@ export function createWebThreadLauncher(
         if (terminating) return
         terminating = true
         removeBootstrap()
+        handoff?.close()
         rejectPrepared?.(resolveAbortReason(context.signal))
         rejectPrepared = undefined
         worker.terminate()
@@ -71,6 +91,7 @@ export function createWebThreadLauncher(
         (event: { preventDefault(): void; error?: unknown }) => {
           event.preventDefault()
           // Preparation owns this failure even when no launch cancellation has occurred.
+          handoff?.fail(event.error ?? event)
           rejectPrepared?.(
             new RpcTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
           )
@@ -84,8 +105,45 @@ export function createWebThreadLauncher(
         }
       )
       /** Even absent business data requires the private address before channel open. */
-      const prepared = new Promise<void>((resolve, reject) => {
+      const prepared = new Promise<void | readonly string[]>((resolve, reject) => {
         rejectPrepared = reject
+        if (bootstrap) {
+          /** Child capability ACK is independent of parent claims and application readiness. */
+          let acknowledged = false
+          handoff = createWebThreadBootstrapHandoff(worker, {
+            consume(message) {
+              if (
+                !message ||
+                typeof message !== 'object' ||
+                !('kind' in message) ||
+                message.kind !== ThreadBootstrap.runtimeAcknowledged
+              )
+                return false
+              if (acknowledged)
+                invalidThreadConfig('runtimeApi.ack', ThreadErrorText.bootstrapFailed)
+              /** The private bootstrap reader owns ACK version, field and offer bounds. */
+              const peer = readThreadRuntimeAcknowledgement(message)
+              acknowledged = true
+              rejectPrepared = undefined
+              resolve(intersectThreadCapabilities(bootstrap.capabilities, peer))
+              return true
+            },
+            onFailure: (error) => {
+              reject(error)
+              terminate()
+            }
+          })
+          worker.postMessage(
+            {
+              kind: ThreadBootstrap.data,
+              peerId: fingerprint,
+              runtimeApi: bootstrap,
+              ...(spec.data === undefined ? {} : { data: spec.data })
+            },
+            undefined
+          )
+          return
+        }
         receive = (event) => {
           if (
             event.data === null ||
@@ -112,7 +170,8 @@ export function createWebThreadLauncher(
       void prepared.catch(() => undefined)
       return {
         identity: Object.freeze({ fingerprint }),
-        port: worker,
+        port: handoff?.port ?? worker,
+        ...(handoff ? { runtimeApi: handoff } : {}),
         prepared,
         exited: new Promise(() => undefined),
         terminate
@@ -127,8 +186,21 @@ export function createWebThreadChannelFactory(
 ): IThreadChannelFactory<IWebThreadHandle> {
   return {
     open: async (handle, signal) => {
-      await awaitThreadPreparation(handle.prepared, signal)
-      return createWebThreadChannel(handle.port, handle.identity.fingerprint, options)
+      try {
+        /** Only an actual child offer can replace the legacy static capability profile. */
+        const capabilities = await awaitThreadPreparation(handle.prepared, signal)
+        if (handle.runtimeApi)
+          return createWebThreadChannel(
+            handle.port,
+            handle.identity.fingerprint,
+            { ...options, capabilities: capabilities as readonly string[] },
+            handle.runtimeApi
+          )
+        return createWebThreadChannel(handle.port, handle.identity.fingerprint, options)
+      } catch (error) {
+        handle.runtimeApi?.close()
+        throw error
+      }
     }
   }
 }

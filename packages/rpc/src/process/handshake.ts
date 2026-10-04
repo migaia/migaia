@@ -19,6 +19,7 @@ import {
 import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import type { IRemoteChannel } from '../remote/types.js'
+import type { IRuntimePeerSourceResult } from '../remote/runtime-api/peer.js'
 import {
   bindProcessByteWire,
   bindProcessMessageTransport,
@@ -135,6 +136,8 @@ async function exchangeByteHandshake(
       throw rejected
     }
   }
+  /** Opt-in early receive opens only after successful auth, before physical accept drain. */
+  wire.beginAccept?.()
   await wire.writeText(negotiated.reply)
   return negotiated.agreement
 }
@@ -143,7 +146,7 @@ async function exchangeByteHandshake(
 export function createProcessTransport(
   channel: IProcessByteChannel,
   options: IProcessByteOptions
-): Promise<IRemoteChannel>
+): Promise<IRuntimePeerSourceResult>
 /** Message overload projects an explicit shared static agreement without a wire handshake. */
 export function createProcessTransport(
   channel: IProcessMessageChannel,
@@ -153,7 +156,7 @@ export function createProcessTransport(
 export async function createProcessTransport(
   channel: IProcessByteChannel | IProcessMessageChannel,
   options: IProcessByteOptions | IProcessMessageOptions
-): Promise<IRemoteChannel> {
+): Promise<IRuntimePeerSourceResult> {
   if (channel.kind === 'message') {
     if (!('staticAgreement' in options)) throw invalidOption(RpcProcessErrorText.optionsInvalid)
     const messageOptions = options
@@ -228,6 +231,7 @@ export async function createProcessTransport(
       agreement: publicAgreement(agreement),
       pipeline: byteProcessPipeline,
       features: ipc.features,
+      ...(wire.activateReceive ? { activateReceive: wire.activateReceive } : {}),
       close: ipc.close
     })
   } catch (error) {

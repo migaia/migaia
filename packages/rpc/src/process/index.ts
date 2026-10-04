@@ -1,4 +1,5 @@
 export { createProcessTransport } from './handshake.js'
+export { createProcessPeer } from './peer.js'
 export { createNativeProcessOffer } from './offer.js'
 export { createProcessHost, createServeProcessHost } from './host/index.js'
 export type {
