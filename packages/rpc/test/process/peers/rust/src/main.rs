@@ -3,7 +3,7 @@ mod business;
 mod json;
 mod selftest;
 
-use json::{Value, number, object, string};
+use json::{number, object, string, Value};
 use std::env;
 use std::io::{self, Read, Write};
 use std::os::fd::FromRawFd;
@@ -12,7 +12,120 @@ use std::path::PathBuf;
 
 const MAX_FRAME: usize = 16_777_216;
 const MAX_HANDSHAKE: usize = 65_536;
-const CAPABILITIES: [&str; 4] = ["abort@1", "ping@1", "close@1", "wire-error@1"];
+/// Every real session uses the U36 directory and native physical batch baseline.
+const CAPABILITIES: [&str; 6] = [
+    "abort@1",
+    "ping@1",
+    "close@1",
+    "wire-error@1",
+    "runtime-api@1",
+    "batch@1",
+];
+/// The only application directory method belongs to the schemaVersion 2 baseline.
+const RUNTIME_DESCRIBE: &str = "migaia.remote.runtime.describe";
+/// Logical stream methods use the actual production registered route prefix.
+const RUNTIME_STREAM_PREFIX: &str = "migaia.remote.runtime.stream.";
+/// Whitelist refusal keeps the production core source/code/text contract.
+const METHOD_UNAVAILABLE: &str = "Runtime method is not provided by this peer";
+
+/// Require the new baseline at the real session boundary without altering pure negotiation vectors.
+fn baseline_agreed(agreement: &Value) -> bool {
+    agreement.get("major").and_then(Value::as_u64) == Some(1)
+        && agreement.get("minor").and_then(Value::as_u64) == Some(1)
+        && negotiated(agreement, "runtime-api@1")
+        && negotiated(agreement, "batch@1")
+}
+
+/// Describe only explicitly installed routes and safe identity, never source or bootstrap secrets.
+fn runtime_description(methods: &[(&str, &[&str])]) -> Value {
+    object(&[
+        ("schemaVersion", number(2)),
+        (
+            "self",
+            object(&[
+                ("name", string("rust-peer")),
+                ("instanceId", string("rust-peer")),
+            ]),
+        ),
+        (
+            "methods",
+            Value::Array(
+                methods
+                    .iter()
+                    .map(|(name, modes)| {
+                        object(&[
+                            ("name", string(name)),
+                            (
+                                "supportedModes",
+                                Value::Array(modes.iter().map(|mode| string(mode)).collect()),
+                            ),
+                            ("modeSource", string("declared")),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+    ])
+}
+
+/// Decode the native physical batch without changing individual member admission or correlation.
+fn physical_envelopes(message: Value) -> io::Result<Vec<Value>> {
+    if message.get("kind").and_then(Value::as_str) != Some("batch") {
+        return Ok(vec![message]);
+    }
+    if !matches!(&message, Value::Object(fields) if fields.len() == 2) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "INVALID_ENVELOPE",
+        ));
+    }
+    match message.get("envelopes").and_then(Value::as_array) {
+        Some(members) if !members.is_empty() => Ok(members.to_vec()),
+        _ => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "INVALID_ENVELOPE",
+        )),
+    }
+}
+
+/// Admit only current native envelopes; unsupported profile/options never enter business dispatch.
+fn native_envelope_valid(message: &Value) -> bool {
+    let Some(kind) = message.get("kind").and_then(Value::as_str) else {
+        return false;
+    };
+    if !matches!(
+        kind,
+        "request" | "response" | "variation" | "discovery" | "stream"
+    ) || message
+        .get("id")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty)
+        || message.has("options")
+        || message.has("task")
+        || message.has("profile")
+    {
+        return false;
+    }
+    let route = message.get("data").and_then(|data| data.get("route"));
+    if route
+        .and_then(|route| route.get("profile"))
+        .and_then(Value::as_str)
+        != Some("migaia.rpc.route")
+    {
+        return false;
+    }
+    if kind == "request" {
+        return message
+            .get("method")
+            .and_then(Value::as_str)
+            .is_some_and(|method| !method.is_empty())
+            && route
+                .and_then(|route| route.get("type"))
+                .and_then(Value::as_str)
+                == Some("request");
+    }
+    true
+}
 
 /// Reject a framing header before allocating attacker-controlled payload length.
 fn read_frame(input: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
@@ -351,7 +464,8 @@ fn serve(
     let agreement = match negotiate(&first) {
         Ok(value)
             if required_auth
-                .is_none_or(|auth| first.get("auth").and_then(Value::as_str) == Some(auth)) =>
+                .is_none_or(|auth| first.get("auth").and_then(Value::as_str) == Some(auth))
+                && baseline_agreed(&value) =>
         {
             value
         }
@@ -369,140 +483,178 @@ fn serve(
     let mut waiting: Option<Value> = None;
     let mut one_way_receipts = 0u64;
     let mut draining = false;
-    while let Some(message) = read_json(input)? {
-        match message.get("kind").and_then(Value::as_str) {
-            Some("request") => {
-                if draining && message.get("method").and_then(Value::as_str) != Some("peer.finish")
-                {
-                    continue;
-                }
-                let route = message.get("data").and_then(|data| data.get("route"));
-                if route
-                    .and_then(|route| route.get("profile"))
-                    .and_then(Value::as_str)
-                    != Some("migaia.rpc.route")
-                    || route
-                        .and_then(|route| route.get("type"))
-                        .and_then(Value::as_str)
-                        != Some("request")
-                {
-                    continue;
-                }
-                let one_way =
-                    route.and_then(|route| route.get("dispatchOnly")) == Some(&Value::Bool(true));
-                if one_way {
-                    one_way_receipts += 1;
-                }
-                match message.get("method").and_then(Value::as_str) {
-                    Some("peer.wait") => {
-                        if !one_way {
-                            waiting = Some(message);
-                        }
-                    }
-                    Some("peer.finish") => {
-                        if let Some(pending) = waiting.take() {
-                            write_frame(output, &response(&pending, Value::Null, None))?;
-                        }
-                        if !one_way {
-                            write_frame(output, &response(&message, Value::Null, None))?;
-                        }
-                        if draining {
-                            break;
-                        }
-                    }
-                    Some("peer.error") => {
-                        if !one_way {
-                            write_frame(
-                                output,
-                                &response(
-                                    &message,
-                                    Value::Null,
-                                    Some((
-                                        "@migaia/rpc/core",
-                                        "INTERNAL",
-                                        "Peer requested failure",
-                                    )),
-                                ),
-                            )?;
-                        }
-                    }
-                    Some("peer.receipts") => {
-                        if !one_way {
-                            write_frame(
-                                output,
-                                &response(&message, number(one_way_receipts), None),
-                            )?;
-                        }
-                    }
-                    Some("echo") | Some("peer.echo") => {
-                        if !one_way {
-                            write_frame(
-                                output,
-                                &response(
-                                    &message,
-                                    message
-                                        .get("data")
-                                        .and_then(|data| data.get("payload"))
-                                        .cloned()
-                                        .unwrap_or(Value::Null),
-                                    None,
-                                ),
-                            )?;
-                        }
-                    }
-                    _ => {
-                        if !one_way {
-                            write_frame(
-                                output,
-                                &response(
-                                    &message,
-                                    Value::Null,
-                                    Some(("rust-peer", "METHOD_NOT_FOUND", "Method not found")),
-                                ),
-                            )?;
-                        }
-                    }
-                }
+    'session: while let Some(physical) = read_json(input)? {
+        for message in physical_envelopes(physical)? {
+            // Unknown wire kinds are diagnostic-only and cannot retire later baseline calls.
+            if message
+                .get("kind")
+                .and_then(Value::as_str)
+                .is_some_and(|kind| {
+                    !matches!(
+                        kind,
+                        "request" | "response" | "variation" | "discovery" | "stream"
+                    )
+                })
+            {
+                eprintln!("PEER_WARN UNKNOWN_KIND");
+                continue;
             }
-            Some("variation") => match subtype(&message) {
-                Some("ping") if negotiated(&agreement, "ping@1") => {
-                    write_frame(output, &variation(&message, "pong"))?
-                }
-                Some("abort") if negotiated(&agreement, "abort@1") => {
-                    if draining {
-                        eprintln!("PEER_EVENT ABORT_DURING_DRAIN");
-                    }
-                    if let Some(pending) = waiting.take() {
-                        if pending.get("id") == message.get("id") {
-                            if draining {
-                                break;
-                            }
-                        } else {
-                            waiting = Some(pending);
-                        }
-                    }
-                }
-                Some("close") if negotiated(&agreement, "close@1") => {
-                    if !valid_close(&message) {
-                        eprintln!("PEER_ERROR PROTOCOL_INVALID");
+            if !native_envelope_valid(&message) {
+                eprintln!("PEER_ERROR PROTOCOL_INVALID");
+                continue;
+            }
+            match message.get("kind").and_then(Value::as_str) {
+                Some("request") => {
+                    if draining
+                        && message.get("method").and_then(Value::as_str) != Some("peer.finish")
+                    {
                         continue;
                     }
-                    if waiting.is_some() {
-                        draining = true;
-                    } else {
-                        break;
+                    let route = message.get("data").and_then(|data| data.get("route"));
+                    if route
+                        .and_then(|route| route.get("profile"))
+                        .and_then(Value::as_str)
+                        != Some("migaia.rpc.route")
+                        || route
+                            .and_then(|route| route.get("type"))
+                            .and_then(Value::as_str)
+                            != Some("request")
+                    {
+                        continue;
+                    }
+                    let one_way = route.and_then(|route| route.get("dispatchOnly"))
+                        == Some(&Value::Bool(true));
+                    if one_way {
+                        one_way_receipts += 1;
+                    }
+                    match message.get("method").and_then(Value::as_str) {
+                        Some(RUNTIME_DESCRIBE) => {
+                            if !one_way {
+                                let directory = runtime_description(&[
+                                    ("echo", &["request", "notify"]),
+                                    ("peer.echo", &["request", "notify"]),
+                                    ("peer.wait", &["request", "notify"]),
+                                    ("peer.finish", &["request", "notify"]),
+                                    ("peer.error", &["request", "notify"]),
+                                    ("peer.receipts", &["request", "notify"]),
+                                ]);
+                                write_frame(output, &response(&message, directory, None))?;
+                            }
+                        }
+                        Some("peer.wait") => {
+                            if !one_way {
+                                waiting = Some(message);
+                            }
+                        }
+                        Some("peer.finish") => {
+                            if let Some(pending) = waiting.take() {
+                                write_frame(output, &response(&pending, Value::Null, None))?;
+                            }
+                            if !one_way {
+                                write_frame(output, &response(&message, Value::Null, None))?;
+                            }
+                            if draining {
+                                break 'session;
+                            }
+                        }
+                        Some("peer.error") => {
+                            if !one_way {
+                                write_frame(
+                                    output,
+                                    &response(
+                                        &message,
+                                        Value::Null,
+                                        Some((
+                                            "@migaia/rpc/core",
+                                            "INTERNAL",
+                                            "Peer requested failure",
+                                        )),
+                                    ),
+                                )?;
+                            }
+                        }
+                        Some("peer.receipts") => {
+                            if !one_way {
+                                write_frame(
+                                    output,
+                                    &response(&message, number(one_way_receipts), None),
+                                )?;
+                            }
+                        }
+                        Some("echo") | Some("peer.echo") => {
+                            if !one_way {
+                                write_frame(
+                                    output,
+                                    &response(
+                                        &message,
+                                        message
+                                            .get("data")
+                                            .and_then(|data| data.get("payload"))
+                                            .cloned()
+                                            .unwrap_or(Value::Null),
+                                        None,
+                                    ),
+                                )?;
+                            }
+                        }
+                        _ => {
+                            if !one_way {
+                                write_frame(
+                                    output,
+                                    &response(
+                                        &message,
+                                        Value::Null,
+                                        Some((
+                                            "@migaia/rpc/core",
+                                            "PROVIDER_NOT_FOUND",
+                                            METHOD_UNAVAILABLE,
+                                        )),
+                                    ),
+                                )?;
+                            }
+                        }
                     }
                 }
-                _ => {}
-            },
-            Some("response") | Some("discovery") | Some("stream") => {}
-            _ => eprintln!("PEER_WARN UNKNOWN_KIND"),
+                Some("variation") => match subtype(&message) {
+                    Some("ping") if negotiated(&agreement, "ping@1") => {
+                        write_frame(output, &variation(&message, "pong"))?
+                    }
+                    Some("abort") if negotiated(&agreement, "abort@1") => {
+                        if draining {
+                            eprintln!("PEER_EVENT ABORT_DURING_DRAIN");
+                        }
+                        if let Some(pending) = waiting.take() {
+                            if pending.get("id") == message.get("id") {
+                                if draining {
+                                    break 'session;
+                                }
+                            } else {
+                                waiting = Some(pending);
+                            }
+                        }
+                    }
+                    Some("close") if negotiated(&agreement, "close@1") => {
+                        if !valid_close(&message) {
+                            eprintln!("PEER_ERROR PROTOCOL_INVALID");
+                            continue;
+                        }
+                        if waiting.is_some() {
+                            draining = true;
+                        } else {
+                            break 'session;
+                        }
+                    }
+                    _ => {}
+                },
+                Some("response") | Some("discovery") | Some("stream") => {}
+                _ => eprintln!("PEER_WARN UNKNOWN_KIND"),
+            }
         }
     }
     Ok(())
 }
 
-fn request() -> Value {
+fn request(remote_id: &str) -> Value {
     object(&[
         ("kind", string("request")),
         ("id", string("rust-echo-1")),
@@ -517,7 +669,7 @@ fn request() -> Value {
                         ("type", string("request")),
                         ("applicationVersion", string("1")),
                         ("senderId", string("rust-peer")),
-                        ("targetId", string("peer")),
+                        ("targetId", string(remote_id)),
                         ("sentAt", number(0)),
                     ]),
                 ),
@@ -527,7 +679,7 @@ fn request() -> Value {
     ])
 }
 
-/// Cross-language initiator exercise: handshake, one echo, and close.
+/// Cross-language initiator proves the new directory and native batch before closing.
 fn initiate(input: &mut impl Read, output: &mut impl Write, auth: Option<&str>) -> io::Result<()> {
     write_frame(output, &hello(auth))?;
     let accepted = read_json(input)?
@@ -537,10 +689,7 @@ fn initiate(input: &mut impl Read, output: &mut impl Write, auth: Option<&str>) 
         || accepted.get("protocol").and_then(Value::as_str) != Some("migaia.rpc")
         || accepted.get("codec").and_then(Value::as_str) != Some("json")
         || accepted.get("major").and_then(Value::as_u64) != Some(1)
-        || accepted
-            .get("minor")
-            .and_then(Value::as_u64)
-            .is_none_or(|minor| minor > 1)
+        || accepted.get("minor").and_then(Value::as_u64) != Some(1)
         || accepted
             .get("capabilities")
             .and_then(Value::as_array)
@@ -554,8 +703,52 @@ fn initiate(input: &mut impl Read, output: &mut impl Write, auth: Option<&str>) 
     {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid accept"));
     }
-    let outgoing = request();
-    write_frame(output, &outgoing)?;
+    if !baseline_agreed(&accepted) {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid accept"));
+    }
+    let remote_id = accepted
+        .get("peer")
+        .and_then(|peer| peer.get("id"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid accept"))?;
+    let mut describe = request(remote_id);
+    if let Value::Object(fields) = &mut describe {
+        fields.iter_mut().find(|(name, _)| name == "id").unwrap().1 = string("rust-describe-1");
+        fields
+            .iter_mut()
+            .find(|(name, _)| name == "method")
+            .unwrap()
+            .1 = string(RUNTIME_DESCRIBE);
+    }
+    write_frame(output, &describe)?;
+    let description = read_json(input)?
+        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "missing description"))?;
+    let directory = description.get("data").and_then(|data| data.get("payload"));
+    if description.get("kind").and_then(Value::as_str) != Some("response")
+        || description.get("id") != describe.get("id")
+        || description.get("ok") != Some(&Value::Bool(true))
+        || directory
+            .and_then(|value| value.get("schemaVersion"))
+            .and_then(Value::as_u64)
+            != Some(2)
+        || directory
+            .and_then(|value| value.get("self"))
+            .and_then(|value| value.get("instanceId"))
+            != accepted.get("peer").and_then(|peer| peer.get("id"))
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "invalid description",
+        ));
+    }
+    let outgoing = request(remote_id);
+    write_frame(
+        output,
+        &object(&[
+            ("kind", string("batch")),
+            ("envelopes", Value::Array(vec![outgoing.clone()])),
+        ]),
+    )?;
     let incoming = read_json(input)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "missing response"))?;
     if incoming.get("kind").and_then(Value::as_str) != Some("response")
@@ -579,7 +772,7 @@ fn initiate(input: &mut impl Read, output: &mut impl Write, auth: Option<&str>) 
                         ("type", string("variation")),
                         ("applicationVersion", string("1")),
                         ("senderId", string("rust-peer")),
-                        ("targetId", string("peer")),
+                        ("targetId", string(remote_id)),
                         ("sentAt", number(0)),
                         ("variation", string("close")),
                     ]),
@@ -606,7 +799,6 @@ fn run() -> io::Result<()> {
     let mut bare_profile = false;
     let mut host_profile = false;
     let mut bootstrap_stdin = false;
-    let mut contract_path = None;
     let mut arguments = env::args().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -629,7 +821,10 @@ fn run() -> io::Result<()> {
             "--bare-jsonrpc" => bare_profile = true,
             "--host" => host_profile = true,
             "--bootstrap" => bootstrap_stdin = arguments.next().as_deref() == Some("stdin"),
-            "--contract" => contract_path = arguments.next().map(PathBuf::from),
+            // Deployment callers may still supply this path; U36 never reads a v1 contract.
+            "--contract" => {
+                arguments.next();
+            }
             "--stdio" => {}
             "--listen-unix" => listener_path = arguments.next().map(PathBuf::from),
             "--connect-unix" => connect_path = arguments.next().map(PathBuf::from),
@@ -685,13 +880,6 @@ fn run() -> io::Result<()> {
     } else {
         None
     };
-    let business_contract = if business_profile {
-        Some(business::contract(&contract_path.ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidInput, "missing contract")
-        })?)?)
-    } else {
-        None
-    };
     if listener_path.is_some() && connect_path.is_some() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -705,13 +893,12 @@ fn run() -> io::Result<()> {
             let (stream, _) = listener.accept()?;
             let mut input = stream.try_clone()?;
             let mut output = stream;
-            let result = if let Some(contract) = &business_contract {
+            let result = if business_profile {
                 business::serve(
                     &mut input,
                     &mut output,
                     host_profile,
                     auth.as_deref(),
-                    contract,
                     bridge_profile,
                     bare_profile,
                 )
@@ -734,7 +921,16 @@ fn run() -> io::Result<()> {
         eprintln!("READY pid={}", std::process::id());
         let mut input = stream.try_clone()?;
         let mut output = stream;
-        return if role == "initiator" {
+        return if business_profile {
+            business::serve(
+                &mut input,
+                &mut output,
+                host_profile,
+                auth.as_deref(),
+                bridge_profile,
+                bare_profile,
+            )
+        } else if role == "initiator" {
             initiate(&mut input, &mut output, auth.as_deref())
         } else {
             serve(&mut input, &mut output, auth.as_deref())
@@ -746,7 +942,7 @@ fn run() -> io::Result<()> {
     if business_profile && bootstrap_stdin {
         auth = Some(business::bootstrap(&mut input)?);
     }
-    if let Some(contract) = &business_contract {
+    if business_profile {
         // This real child is owned through EOF and reaped before the peer returns.
         let mut child = if descendant {
             Some(
@@ -762,7 +958,6 @@ fn run() -> io::Result<()> {
             &mut output,
             host_profile,
             auth.as_deref(),
-            contract,
             bridge_profile,
             bare_profile,
         );
