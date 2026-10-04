@@ -19,6 +19,7 @@ COMMANDS = {
     "go": [str(PEERS / "go" / "run.sh")],
     "ts-reference": [str(PEERS / "ts-reference" / "run.sh")],
 }
+PEER_IDS = {"python": "python-peer", "rust": "rust-peer", "go": "go-peer", "ts-reference": "ts-peer"}
 
 
 def frame(value):
@@ -65,7 +66,7 @@ def matches(actual, expected):
     return actual == expected
 
 
-def run_case(command, base_hello, case):
+def run_case(command, base_hello, case, target="provider"):
     """Exercise one complete connection and return a bounded fixed verdict."""
     process = subprocess.Popen(
         command + ["--stdio", "--role", "responder"],
@@ -87,7 +88,13 @@ def run_case(command, base_hello, case):
         for step in case["steps"]:
             if step.get("pauseMs"):
                 time.sleep(step["pauseMs"] / 1000)
-            process.stdin.write(bytes.fromhex(step["rawHex"]) if "rawHex" in step else frame(step["frame"]))
+            # Vector routes use a symbolic provider; bind it to the real fixture identity.
+            def resolve(value):
+                if isinstance(value, dict):
+                    return {key: target if key in ("targetId", "receiverId") and item == "provider" else resolve(item)
+                            for key, item in value.items()}
+                return [resolve(item) for item in value] if isinstance(value, list) else value
+            process.stdin.write(bytes.fromhex(step["rawHex"]) if "rawHex" in step else frame(resolve(step["frame"])))
             process.stdin.flush()
     except BrokenPipeError:
         pass
@@ -124,7 +131,7 @@ def main():
         raise SystemExit("BEHAVIOR_SCHEMA_INVALID")
     failures = []
     for case in vectors["cases"]:
-        if not run_case(COMMANDS[args.language], vectors["hello"], case):
+        if not run_case(COMMANDS[args.language], vectors["hello"], case, PEER_IDS[args.language]):
             failures.append(case["id"])
     print(json.dumps({"language": args.language, "passed": len(vectors["cases"]) - len(failures),
                       "failed": len(failures), "failures": failures}))

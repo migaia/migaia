@@ -4,10 +4,18 @@
     "kind": "handshake",
     "step": "hello",
     "protocol": "migaia.rpc",
-    "versions": [{ "major": 1, "minor": 1 }],
+    "versions": [
+      {
+        "major": 1,
+        "minor": 1
+      }
+    ],
     "codecs": ["json"],
-    "capabilities": ["ping@1", "abort@1", "close@1", "wire-error@1"],
-    "peer": { "id": "behavior-caller", "runtime": "python" }
+    "capabilities": ["ping@1", "abort@1", "close@1", "wire-error@1", "runtime-api@1", "batch@1"],
+    "peer": {
+      "id": "behavior-caller",
+      "runtime": "python"
+    }
   },
   "cases": [
     {
@@ -61,7 +69,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 0 }
+              "payload": {
+                "drainMs": 0
+              }
             }
           }
         }
@@ -69,15 +79,27 @@
       "expect": {
         "exit": 0,
         "frames": [
-          { "kind": "handshake", "step": "accept" },
-          { "kind": "response", "id": "echo-1", "ok": true, "data": { "payload": "still-open" } }
+          {
+            "kind": "handshake",
+            "step": "accept"
+          },
+          {
+            "kind": "response",
+            "id": "echo-1",
+            "ok": true,
+            "data": {
+              "payload": "still-open"
+            }
+          }
         ],
-        "stderr": { "PEER_WARN UNKNOWN_KIND": 1 }
+        "stderr": {
+          "PEER_WARN UNKNOWN_KIND": 1
+        }
       }
     },
     {
       "id": "ping-not-negotiated",
-      "capabilities": ["close@1"],
+      "capabilities": ["close@1", "runtime-api@1", "batch@1"],
       "steps": [
         {
           "frame": {
@@ -128,7 +150,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 0 }
+              "payload": {
+                "drainMs": 0
+              }
             }
           }
         }
@@ -136,14 +160,24 @@
       "expect": {
         "exit": 0,
         "frames": [
-          { "kind": "handshake", "step": "accept" },
-          { "kind": "response", "id": "echo-2", "ok": true, "data": { "payload": 2 } }
+          {
+            "kind": "handshake",
+            "step": "accept"
+          },
+          {
+            "kind": "response",
+            "id": "echo-2",
+            "ok": true,
+            "data": {
+              "payload": 2
+            }
+          }
         ]
       }
     },
     {
       "id": "abort-not-negotiated",
-      "capabilities": ["close@1"],
+      "capabilities": ["close@1", "runtime-api@1", "batch@1"],
       "steps": [
         {
           "frame": {
@@ -210,7 +244,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 0 }
+              "payload": {
+                "drainMs": 0
+              }
             }
           }
         }
@@ -218,15 +254,26 @@
       "expect": {
         "exit": 0,
         "frames": [
-          { "kind": "handshake", "step": "accept" },
-          { "kind": "response", "id": "wait-1", "ok": true },
-          { "kind": "response", "id": "finish-1", "ok": true }
+          {
+            "kind": "handshake",
+            "step": "accept"
+          },
+          {
+            "kind": "response",
+            "id": "wait-1",
+            "ok": true
+          },
+          {
+            "kind": "response",
+            "id": "finish-1",
+            "ok": true
+          }
         ]
       }
     },
     {
       "id": "close-not-negotiated",
-      "capabilities": [],
+      "capabilities": ["runtime-api@1", "batch@1"],
       "steps": [
         {
           "frame": {
@@ -242,7 +289,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 0 }
+              "payload": {
+                "drainMs": 0
+              }
             }
           }
         },
@@ -268,8 +317,18 @@
       "expect": {
         "exit": 0,
         "frames": [
-          { "kind": "handshake", "step": "accept" },
-          { "kind": "response", "id": "echo-4", "ok": true, "data": { "payload": "open" } }
+          {
+            "kind": "handshake",
+            "step": "accept"
+          },
+          {
+            "kind": "response",
+            "id": "echo-4",
+            "ok": true,
+            "data": {
+              "payload": "open"
+            }
+          }
         ]
       }
     },
@@ -290,7 +349,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": "1" }
+              "payload": {
+                "drainMs": "1"
+              }
             }
           }
         },
@@ -308,7 +369,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": -1 }
+              "payload": {
+                "drainMs": -1
+              }
             }
           }
         },
@@ -326,7 +389,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 2147483648 }
+              "payload": {
+                "drainMs": 2147483648
+              }
             }
           }
         },
@@ -362,7 +427,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 0 }
+              "payload": {
+                "drainMs": 0
+              }
             }
           }
         }
@@ -370,10 +437,22 @@
       "expect": {
         "exit": 0,
         "frames": [
-          { "kind": "handshake", "step": "accept" },
-          { "kind": "response", "id": "echo-5", "ok": true, "data": { "payload": "continued" } }
+          {
+            "kind": "handshake",
+            "step": "accept"
+          },
+          {
+            "kind": "response",
+            "id": "echo-5",
+            "ok": true,
+            "data": {
+              "payload": "continued"
+            }
+          }
         ],
-        "stderr": { "PEER_ERROR PROTOCOL_INVALID": 3 }
+        "stderr": {
+          "PEER_ERROR PROTOCOL_INVALID": 3
+        }
       }
     },
     {
@@ -410,7 +489,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 1000 }
+              "payload": {
+                "drainMs": 1000
+              }
             }
           }
         },
@@ -435,8 +516,15 @@
       ],
       "expect": {
         "exit": 0,
-        "frames": [{ "kind": "handshake", "step": "accept" }],
-        "stderr": { "PEER_EVENT ABORT_DURING_DRAIN": 1 }
+        "frames": [
+          {
+            "kind": "handshake",
+            "step": "accept"
+          }
+        ],
+        "stderr": {
+          "PEER_EVENT ABORT_DURING_DRAIN": 1
+        }
       }
     },
     {
@@ -448,16 +536,31 @@
         "versions": [],
         "codecs": ["json"],
         "capabilities": [],
-        "peer": { "id": "behavior-caller", "runtime": "python" }
+        "peer": {
+          "id": "behavior-caller",
+          "runtime": "python"
+        }
       },
       "steps": [],
-      "expect": { "exit": 1, "frames": [], "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 } }
+      "expect": {
+        "exit": 1,
+        "frames": [],
+        "stderr": {
+          "PEER_FAIL HANDSHAKE_INVALID": 1
+        }
+      }
     },
     {
       "id": "nonobject-hello",
       "hello": null,
       "steps": [],
-      "expect": { "exit": 1, "frames": [], "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 } }
+      "expect": {
+        "exit": 1,
+        "frames": [],
+        "stderr": {
+          "PEER_FAIL HANDSHAKE_INVALID": 1
+        }
+      }
     },
     {
       "id": "request-before-hello",
@@ -478,13 +581,25 @@
         }
       },
       "steps": [],
-      "expect": { "exit": 1, "frames": [], "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 } }
+      "expect": {
+        "exit": 1,
+        "frames": [],
+        "stderr": {
+          "PEER_FAIL HANDSHAKE_INVALID": 1
+        }
+      }
     },
     {
       "id": "eof-before-hello",
       "sendHello": false,
       "steps": [],
-      "expect": { "exit": 1, "frames": [], "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 } }
+      "expect": {
+        "exit": 1,
+        "frames": [],
+        "stderr": {
+          "PEER_FAIL HANDSHAKE_INVALID": 1
+        }
+      }
     },
     {
       "id": "unknown-method",
@@ -520,7 +635,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 0 }
+              "payload": {
+                "drainMs": 0
+              }
             }
           }
         }
@@ -528,13 +645,18 @@
       "expect": {
         "exit": 0,
         "frames": [
-          { "kind": "handshake", "step": "accept" },
+          {
+            "kind": "handshake",
+            "step": "accept"
+          },
           {
             "kind": "response",
             "id": "method-1",
             "ok": false,
-            "code": "METHOD_NOT_FOUND",
-            "error": { "code": "METHOD_NOT_FOUND" }
+            "code": "PROVIDER_NOT_FOUND",
+            "error": {
+              "code": "PROVIDER_NOT_FOUND"
+            }
           }
         ]
       }
@@ -591,7 +713,9 @@
                 "sentAt": 0,
                 "variation": "close"
               },
-              "payload": { "drainMs": 0 }
+              "payload": {
+                "drainMs": 0
+              }
             }
           }
         }
@@ -599,8 +723,18 @@
       "expect": {
         "exit": 0,
         "frames": [
-          { "kind": "handshake", "step": "accept" },
-          { "kind": "response", "id": "reuse-1", "ok": true, "data": { "payload": "reused" } }
+          {
+            "kind": "handshake",
+            "step": "accept"
+          },
+          {
+            "kind": "response",
+            "id": "reuse-1",
+            "ok": true,
+            "data": {
+              "payload": "reused"
+            }
+          }
         ]
       }
     },
@@ -610,32 +744,62 @@
       "steps": [],
       "expect": {
         "exit": 1,
-        "frames": [{ "kind": "handshake", "step": "accept" }],
+        "frames": [
+          {
+            "kind": "handshake",
+            "step": "accept"
+          }
+        ],
         "stderrNot": ["PEER_FAIL HANDSHAKE_INVALID"]
       }
     },
     {
       "id": "reject-incompatible-protocol",
-      "helloFields": { "protocol": "other.rpc" },
+      "helloFields": {
+        "protocol": "other.rpc"
+      },
       "steps": [],
       "expect": {
         "exit": 1,
         "frames": [
-          { "kind": "handshake", "step": "reject", "error": { "code": "HANDSHAKE_INCOMPATIBLE" } }
+          {
+            "kind": "handshake",
+            "step": "reject",
+            "error": {
+              "code": "HANDSHAKE_INCOMPATIBLE"
+            }
+          }
         ],
-        "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 }
+        "stderr": {
+          "PEER_FAIL HANDSHAKE_INVALID": 1
+        }
       }
     },
     {
       "id": "reject-incompatible-version",
-      "helloFields": { "versions": [{ "major": 2, "minor": 0 }] },
+      "helloFields": {
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ]
+      },
       "steps": [],
       "expect": {
         "exit": 1,
         "frames": [
-          { "kind": "handshake", "step": "reject", "error": { "code": "HANDSHAKE_INCOMPATIBLE" } }
+          {
+            "kind": "handshake",
+            "step": "reject",
+            "error": {
+              "code": "HANDSHAKE_INCOMPATIBLE"
+            }
+          }
         ],
-        "stderr": { "PEER_FAIL HANDSHAKE_INVALID": 1 }
+        "stderr": {
+          "PEER_FAIL HANDSHAKE_INVALID": 1
+        }
       }
     },
     {
@@ -697,22 +861,36 @@
       "expect": {
         "exit": 0,
         "frames": [
-          { "kind": "handshake", "step": "accept" },
+          {
+            "kind": "handshake",
+            "step": "accept"
+          },
           {
             "kind": "response",
             "id": "echo-after-abort",
             "ok": true,
-            "data": { "payload": "alive" }
+            "data": {
+              "payload": "alive"
+            }
           }
         ]
       }
     },
     {
       "id": "post-handshake-error-marker",
-      "steps": [{ "rawHex": "000000017b" }],
+      "steps": [
+        {
+          "rawHex": "000000017b"
+        }
+      ],
       "expect": {
         "exit": 1,
-        "frames": [{ "kind": "handshake", "step": "accept" }],
+        "frames": [
+          {
+            "kind": "handshake",
+            "step": "accept"
+          }
+        ],
         "stderrContains": ["PEER_FAIL "],
         "stderrNot": ["ERROR peer session failed"]
       }

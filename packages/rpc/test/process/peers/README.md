@@ -1,8 +1,8 @@
 # Process peer fixtures
 
-Python, Rust and Go are independent native protocol fixtures. `ts-reference`
-remains an independent oracle, unchanged by the public peer delivery; it does
-not count toward CF1/S2 or A1. `ts` consumes only published `@migaia/rpc`
+Python, Rust, Go and `ts-reference` are independent native protocol fixtures.
+Their U36 baseline requires protocol 1.1, `runtime-api@1` and `batch@1`.
+`ts-reference` remains a handwritten oracle and is distinct from the public TS fixture. `ts` consumes only published `@migaia/rpc`
 package exports and executes production process, core and remote modules.
 These fixtures are not language SDKs and install no dependencies.
 
@@ -47,40 +47,58 @@ packages/rpc/test/process/peers/go/run.sh --stdio --role responder
 packages/rpc/test/process/peers/ts-reference/run.sh --stdio --role responder
 ```
 
-The original `--role initiator`, `--listen-unix PATH` and `--connect-unix PATH`
-paths exchange length-prefixed native hello/echo/close frames. Rust and Go
-compile offline into stable worktree-specific system temporary directories.
-Rust uses `cargo build --release` with explicit `opt-level = 3`; Go uses the
-default optimized `go build`. Python runs unchanged. `ts-reference` uses the
-installed Node/TypeScript tools. Their current request shapes lack production
-core discovery/receiver identities, Host dispatch, stream execution and bridge
-support. The legacy interop matrix therefore does not establish production A1.
+The initiator paths exchange a real v2 directory, send echo in a native batch,
+then close. Rust and Go compile offline into worktree-specific temporary
+directories. The TS reference selftest cache is also scoped to its worktree.
+All four fixtures return the closed directory
+`{schemaVersion:2,self:{name,instanceId},methods:[{name,supportedModes,modeSource}]}`
+from `migaia.remote.runtime.describe`; methods declare only installed modes.
+The v1 describe and RPC bridge paths are removed. Non-bare `--jsonrpc` is
+unsupported; the existing bare physical carrier is separate from RPC.
+
+A native batch is `{kind:'batch',envelopes:[...]}`. Members enter in array order;
+a malformed member or provider failure does not discard valid siblings.
+Ordinary single envelopes remain part of the new protocol for handshake,
+control and single calls. There is no capability/version downgrade path.
+Python, Rust and Go `--business` provide their installed business routes;
+stream methods use `migaia.remote.runtime.stream.<logical-name>` only after
+actual stream agreement. The TS reference implements discovery and addressed
+responses so a standard production Runtime Peer request can settle.
+
+Only Python registers `peer.reverse`, a request provider accepting
+`{method,payload}`. It fetches the authenticated caller's v2 directory, admits
+only its request providers, and correlates responses on the same reader while
+regular requests continue. At most two long-lived provider operations are
+admitted; abort and close retire pending work. The other fixtures reject this
+method. None declares order/group/generation/binary capabilities.
 
 ## Focused checks
 
+Run these within the program's exclusive measurement window (start/end load
+at most 5, at most 45 minutes, release only the owned lock).
+
 ```sh
-python3 packages/rpc/test/process/peers/python/selftest.py packages/rpc/schema/vectors
+python3 -B packages/rpc/test/process/peers/python/runtime_baseline_test.py
+python3 -B packages/rpc/test/process/peers/python/peer.py --selftest
+python3 -B packages/rpc/test/process/peers/python/reverse-check.py
 packages/rpc/test/process/peers/rust/selftest.sh
 packages/rpc/test/process/peers/go/selftest.sh
-packages/rpc/test/process/peers/ts/selftest.sh
-python3 packages/rpc/test/process/peers/interop.py
-cd packages/rpc
-pnpm exec vitest run test/process/peers/ts/native-public.test.ts --coverage.enabled=false
-RPC_PEERS_RUNTIME=node pnpm exec vitest run test/process/peers/ts/native-public.test.ts --coverage.enabled=false
+packages/rpc/test/process/peers/ts-reference/selftest.sh
+python3 -B packages/rpc/test/process/peers/baseline_check.py
+python3 -B packages/rpc/test/process/peers/interop.py
+pnpm -r --filter @migaia/rpc... build
+pnpm --filter @migaia/rpc exec vitest run test/process/peers/runtime-interop.test.ts --coverage.enabled=false --maxWorkers=1
 ```
 
-The available `remote-contract.json`, `remote-host-control.json` and
-`stream-framing.json` cases now have individual semantic oracles. Non-JS Host
-and contract checks execute selftest-only schema/semantic interpreters, not
-live Host dispatch. Frame decoding invokes each language peer's real reader
-and compares every byte or the first mapped normative failure. Python and Go
-also invoke their real writer; Rust's binary encoding prefix check remains an
-independent oracle because its runtime writer accepts JSON values only.
-The TS vector checks use public canonical normalizers, error graph functions,
-stream owners and frame codecs; control actions execute public endpoints.
-Missing vector files fail explicitly. The original 12 ordered interop pairs
-prove only their real native hello/echo/close exchange; `ts` is separately
-verified through the real public production client above.
+Language selftests exercise their own unit/vector rules and the real-process
+control cases. They no longer consume frozen 1.0 or v1 remote-contract/Host
+schema vectors. Current framing/control/error vectors remain in use pending
+I28's final baseline vectors; missing required files fail explicitly. The
+12 ordered pairs prove v2 negotiation and batch echo between independent
+fixtures. The production TS test uses the canonical Runtime Peer request path
+without receiver overrides, covering all four fixtures and an actual Python
+reverse call into a TS provider. Its remote directory assertion reads the
+accepted connection receipt; `Peer.describe()` describes the local peer.
 
 ## A10 bare baseline
 
