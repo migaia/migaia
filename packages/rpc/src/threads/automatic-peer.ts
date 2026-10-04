@@ -26,7 +26,7 @@ export async function createAutomaticWebThreadPeer(
 ) {
   if (options.spawn !== undefined || options.connect !== undefined || options.listen !== undefined)
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
-  compileRuntimeMethods(options.provide)
+  compileRuntimeMethods(options.provide, options.contract)
   /** A real library bootstrap must arrive before any automatic endpoint is constructed. */
   let resolveBootstrap!: (value: IThreadRuntimeBootstrap) => void
   /** Invalid bootstrap, deserialization and cold overflow share one startup failure. */

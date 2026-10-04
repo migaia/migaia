@@ -9,7 +9,10 @@ import {
   type IRuntimePeerOptions,
   type IRuntimePeerSource
 } from '../remote/runtime-api/peer.js'
-import { withRuntimeLaunchContext } from '../remote/runtime-api/launch-context.js'
+import {
+  withRuntimeLaunchContext,
+  readRuntimePreparationContext
+} from '../remote/runtime-api/launch-context.js'
 import {
   createSpawnProcessBinding,
   createConnectProcessBinding,
@@ -80,10 +83,15 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
         self,
         provide: options.provide,
         providerLimits: options.providerLimits,
+        contract: options.contract,
+        keyFactory: options.keyFactory,
+        retryPort: options.retryPort,
+        callDeadlineCapMs: spawn?.supervision.spec.limits?.callWallTimeMs,
         report: options.report
       },
       binding,
-      (endpoint, peer) => binding.bindEndpoint(readRuntimePeerConnection(peer).channel, endpoint)
+      (endpoint, peer) => binding.bindEndpoint(readRuntimePeerConnection(peer).channel, endpoint),
+      readRuntimePreparationContext(options)
     )
   /** The canonical binding's native health and drain are kept, rather than disabled for v2. */
   return spawn

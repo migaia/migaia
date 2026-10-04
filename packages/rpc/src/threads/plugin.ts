@@ -21,8 +21,7 @@ export function createThreadPlugin(
 export function createThreadPlugin<THandle extends IThreadHandle>(
   options: IThreadPluginOptions<THandle> | IRuntimeThreadPluginOptions
 ): IRemotePluginDefinition | ReturnType<typeof createRuntimePlugin> {
-  if (options.contract === undefined)
-    return createRuntimePlugin(options, 'thread', createThreadPeer)
+  if (!('spec' in options)) return createRuntimePlugin(options, 'thread', createThreadPeer)
   return createRemotePlugin({
     name: options.name,
     contract: options.contract,

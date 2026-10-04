@@ -57,6 +57,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   extensions: IExtensionOwnership[]
   /** Candidate and committed shared receipts belong to this exact registration generation. */
   sharedContributions?: ISharedExtensionContribution<TDomainCore, TValue>[]
+  /** Original registration reservations retain a facade while native generations rebind. */
+  sharedSlots?: ISharedExtensionSlot<TDomainCore, TValue>[]
   pipelineDisposers: IPluginDisposer[]
   /** Stages registered by this exact generation, not keyed by function identity. */
   stageEntries: IStageEntry<TValue>[]
@@ -116,11 +118,10 @@ export type ISharedExtensionSlot<TDomainCore extends object, TValue> = {
   facade: object
   /** Final contribution removal retires this facade permanently. */
   retired: boolean
-  readonly contributions: Map<
-    IRegistration<TDomainCore, TValue>,
-    ISharedExtensionContribution<TDomainCore, TValue>
-  >
-  readonly names: Map<string, ISharedExtensionContribution<TDomainCore, TValue>>
+  /** Ready physical sessions and live registrations remain separate canonical membership facts. */
+  readonly contributions: Set<ISharedExtensionContribution<TDomainCore, TValue>>
+  readonly registrations: Set<IRegistration<TDomainCore, TValue>>
+  readonly names: Map<string, Set<ISharedExtensionContribution<TDomainCore, TValue>>>
   readonly instanceIds: Map<string, Set<ISharedExtensionContribution<TDomainCore, TValue>>>
 }
 

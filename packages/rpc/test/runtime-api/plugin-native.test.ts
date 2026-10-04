@@ -199,6 +199,22 @@ for (const kind of ['process', 'thread'] as const) {
                 ? threadDeployment
                 : processDeployment,
           expose: ['parent'],
+          ...(source === 'deployment'
+            ? {
+                contract: {
+                  schemaVersion: 1 as const,
+                  plugin: 'parent',
+                  features: {
+                    data: {
+                      methods: {
+                        read: { mode: 'request' as const, idempotent: false },
+                        ready: { mode: 'request' as const, idempotent: false }
+                      }
+                    }
+                  }
+                }
+              }
+            : {}),
           report: () => undefined
         }
         /**

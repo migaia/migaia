@@ -24,7 +24,8 @@ import type {
   IRpcAbortSignal
 } from '../../core/typing.js'
 import { RemoteMethodName } from '../constants.js'
-import type { IRemoteCallOptions, IRemoteChannel } from '../types.js'
+import type { IRemoteContract } from '../contract.js'
+import type { IRemoteCallOptions, IRemoteChannel, IRemoteProxyOptions } from '../types.js'
 import { compileRuntimeMethods, type IRuntimePeerProvide } from './catalog.js'
 import {
   normalizeRuntimeDescription,
@@ -57,15 +58,24 @@ export type IRuntimePeerSource = (
 ) => Promise<IRuntimePeerSourceResult>
 
 /** This internal assembly input is reused by the four platform factories. */
-export type IRuntimePeerOptions = Readonly<{
-  self?: IRuntimePeerIdentity
-  provide?: IRuntimePeerProvide
-  spawn?: IRuntimePeerSource
-  connect?: IRuntimePeerSource
-  listen?: IRuntimePeerSource
-  providerLimits?: IRpcProviderLimits
-  report(error: unknown): void
-}>
+export type IRuntimePeerOptions = Pick<
+  IRemoteProxyOptions<object, unknown>,
+  'keyFactory' | 'retryPort'
+> &
+  Readonly<{
+    self?: IRuntimePeerIdentity
+    provide?: IRuntimePeerProvide
+    spawn?: IRuntimePeerSource
+    connect?: IRuntimePeerSource
+    listen?: IRuntimePeerSource
+    providerLimits?: IRpcProviderLimits
+    /** Explicit advanced schema, modes and idempotency retain their original contract owner. */
+    contract?: IRemoteContract
+    report(error: unknown): void
+  }>
+
+/** Accepted routes are compiled once for both the direct Peer and canonical managed dispatch. */
+type IRuntimePeerRoute = IRuntimePeerDescription['methods'][number] & Readonly<{ stream: string }>
 
 /** Hot calls return the original operation result; only local description queries are asynchronous. */
 export type IRuntimePeer = Readonly<{
@@ -92,17 +102,21 @@ type IRuntimePeerConnection = Readonly<{
   endpoint: IRuntimeApiEndpoint
   channel: IRemoteChannel
   report(error: unknown): void
+  routes: ReadonlyMap<string, IRuntimePeerRoute>
 }>
 
 /** Only this callable assembly mints metadata for its own prepared facade; no lifecycle lives here. */
-const runtimePeerConnections = new WeakMap<IRuntimePeer, IRuntimePeerConnection>()
+const runtimePeerConnections = new WeakMap<
+  IRuntimePeer,
+  IRuntimePeerConnection | (() => IRuntimePeer)
+>()
 
 /** Read the canonical accepted receipt for Plugin publication without another handshake or registry. */
 export function readRuntimePeerConnection(peer: IRuntimePeer): IRuntimePeerConnection {
   /** An application-shaped Peer cannot inject identity or directory authority into a Host slot. */
   const connection = runtimePeerConnections.get(peer)
   if (!connection) invalid(RuntimeApiErrorText.peerInvalid)
-  return connection
+  return typeof connection === 'function' ? readRuntimePeerConnection(connection()) : connection
 }
 
 /** Configuration rejection keeps its canonical code and does not reflect source secrets. */
@@ -151,7 +165,7 @@ export async function createRuntimePeer(
   }>
 ): Promise<IRuntimePeer> {
   /** Method descriptors are compiled once; no dispatch searches the application object. */
-  const methods = compileRuntimeMethods(options.provide)
+  const methods = compileRuntimeMethods(options.provide, options.contract)
   /** A platform automatic source and an explicit source can never compete for one Peer. */
   const sources = [options.spawn, options.connect, options.listen].filter(
     (source) => source !== undefined
@@ -197,6 +211,7 @@ export async function createRuntimePeer(
   if (supportsRuntime) {
     providers[RemoteMethodName.runtimeDescribe] = (context) => context.success(localDescription)
     for (const entry of methods) {
+      if (entry.supportedModes?.every((mode) => mode === RuntimeApiMode.stream)) continue
       providers[entry.name] = async (context) => {
         /** Handler failure stays outside the scalar result validation error boundary. */
         const result = await Reflect.apply(entry.method, entry.receiver, [context.data, context])
@@ -269,7 +284,8 @@ export async function createRuntimePeer(
             ],
             modeSource: entry.supportedModes
               ? RuntimeApiModeSource.declared
-              : RuntimeApiModeSource.generatedRoutes
+              : RuntimeApiModeSource.generatedRoutes,
+            ...(entry.declaration ? { idempotent: entry.declaration.idempotent } : {})
           }))
         : []
     })
@@ -356,7 +372,8 @@ export async function createRuntimePeer(
         description: remote,
         endpoint: ready,
         channel,
-        report
+        report,
+        routes
       })
     )
     return peer
@@ -390,6 +407,12 @@ export function readRuntimePeerEndpoint(peer: IRuntimePeer) {
 }
 
 /** A managed facade retains accepted metadata from its exact genuine first-generation Peer. */
-export function retainRuntimePeerConnection(facade: IRuntimePeer, prepared: IRuntimePeer): void {
-  runtimePeerConnections.set(facade, readRuntimePeerConnection(prepared))
+export function retainRuntimePeerConnection(
+  facade: IRuntimePeer,
+  prepared: IRuntimePeer | (() => IRuntimePeer)
+): void {
+  runtimePeerConnections.set(
+    facade,
+    typeof prepared === 'function' ? prepared : readRuntimePeerConnection(prepared)
+  )
 }

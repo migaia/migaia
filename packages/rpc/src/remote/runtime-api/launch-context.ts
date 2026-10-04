@@ -1,4 +1,38 @@
-import type { IRuntimePeerSourceContext } from './peer.js'
+import type { IRuntimePeerSourceContext, IRuntimePeerProvide } from './peer.js'
+import type { IAbortSignal } from '@migaia/lifecycle'
+
+/** Original Host operation and resource ownership travel only through exact internal options. */
+export type IRuntimePreparationContext = Readonly<{
+  initialSignal: IAbortSignal
+  lifecycleSignal: IAbortSignal
+  own(dispose: () => Promise<void>): void
+  /** New native generations compile current Feature snapshots from the original integration port. */
+  readProvide?(): IRuntimePeerProvide
+}>
+
+/** This table transfers original scope provenance; it owns no lifecycle state or policy. */
+const runtimePreparationContexts = new WeakMap<object, IRuntimePreparationContext>()
+
+/** Platform factories read the exact context passed by the genuine Plugin install. */
+export function readRuntimePreparationContext(
+  options: object
+): IRuntimePreparationContext | undefined {
+  return runtimePreparationContexts.get(options)
+}
+
+/** Keep Host startup cancellation and early resource ownership on the original managed scope. */
+export async function withRuntimePreparationContext<T>(
+  options: object,
+  context: IRuntimePreparationContext,
+  prepare: () => Promise<T>
+): Promise<T> {
+  runtimePreparationContexts.set(options, context)
+  try {
+    return await prepare()
+  } finally {
+    runtimePreparationContexts.delete(options)
+  }
+}
 
 /** A supervised process has its existing local unit label in addition to the parent's safe offer. */
 type IRuntimeLaunchContext = IRuntimePeerSourceContext & Readonly<{ childName?: string }>

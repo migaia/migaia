@@ -1,6 +1,14 @@
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
-import type { IRemoteBinding, IRemoteServeEndpoint } from '../types.js'
-import { createRemoteRuntimeRegistration, createRemoteGenerationHolder } from '../proxy.js'
+import { hostRethrowReporter } from '@migaia/utils/promise'
+import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
+import type { IRemoteBinding, IRemoteServeEndpoint, IRemoteProxyOptions } from '../types.js'
+import {
+  createRemoteRuntimeRegistration,
+  createRemoteGenerationHolder,
+  type IRemoteRuntimeRegistration
+} from '../proxy.js'
+import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
+import type { IRuntimePreparationContext } from './launch-context.js'
 import { compileRuntimeMethods } from './catalog.js'
 import {
   createRuntimePeer,
@@ -11,29 +19,44 @@ import {
   type IRuntimePeer
 } from './peer.js'
 
+/** Exact facade provenance points to the original generation owner and duplicates no state. */
+const managedRegistrations = new WeakMap<IRuntimePeer, IRemoteRuntimeRegistration>()
+
+/** Plugin publication subscribes to the genuine canonical owner, never a structural Peer. */
+export function readManagedRuntimeRegistration(
+  peer: IRuntimePeer
+): IRemoteRuntimeRegistration | undefined {
+  return managedRegistrations.get(peer)
+}
+
 /**
  * Original remote generation and resource owners prepare one platform binding without a v1
  * contract.
  */
 export async function createManagedRuntimePeer<TUnit, TSpec>(
-  options: IRuntimePeerOptions,
+  options: IRuntimePeerOptions &
+    Pick<IRemoteProxyOptions<TUnit, TSpec>, 'keyFactory' | 'retryPort' | 'callDeadlineCapMs'>,
   binding: IRemoteBinding<TUnit, TSpec>,
   bindEndpoint?: (endpoint: IRemoteServeEndpoint, peer: IRuntimePeer) => IRemoteServeEndpoint,
-  signal: IAbortSignal = createAbortController().signal
+  preparation?: IRuntimePreparationContext
 ): Promise<IRuntimePeer> {
-  compileRuntimeMethods(options.provide)
+  compileRuntimeMethods(options.provide, options.contract)
   /** Safe configuration admission precedes supervisor.start and any native launcher side effect. */
   const context = prepareRuntimePeerSourceContext(options.self)
   /** This is the original canonical current/leave/ready owner, shared with existing remote facades. */
   const registration = createRemoteRuntimeRegistration({
     binding,
     report: options.report,
+    keyFactory: options.keyFactory,
+    retryPort: options.retryPort,
+    callDeadlineCapMs: options.callDeadlineCapMs,
     prepareRuntime: (channel, preparationSignal) =>
       createRuntimePeer(
         {
           self: context.self,
-          provide: options.provide,
+          provide: preparation?.readProvide?.() ?? options.provide,
           providerLimits: options.providerLimits,
+          contract: options.contract,
           report: options.report
         },
         {
@@ -51,30 +74,51 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   })
   /** Every startup/rebind disposer joins the original holder's exact generation resource group. */
   const holder = createRemoteGenerationHolder(registration, options.report)
+  /** A standalone Peer uses the original lifecycle signal domain without Host mutation metadata. */
+  const signal: IAbortSignal = preparation?.initialSignal ?? createAbortController().signal
+  /** The original observer is canceled before the canonical holder releases its generation. */
+  let stopObserving: (() => void) | undefined
+  /** Early ownership covers acquired native execution while channel or endpoint preparation waits. */
+  const close = (): Promise<void> => {
+    stopObserving?.()
+    return holder.release()
+  }
   try {
+    preparation?.own(close)
     await holder.prepareInitial(signal, true)
+    stopObserving = observeRemoteGenerations(
+      holder,
+      binding,
+      preparation?.lifecycleSignal ?? signal,
+      options.report
+    )
   } catch (primary) {
     try {
       await holder.release()
     } catch (cleanup) {
-      options.report(cleanup)
+      try {
+        options.report(cleanup)
+      } catch (reporterError) {
+        hostRethrowReporter(reporterError, IpcReporterContext)
+      }
     }
     throw primary
   }
   /** Only the true accepted generation supplies identity and directory metadata for publication. */
-  const prepared = registration.currentPeer()
+  registration.currentPeer()
   /** Calls preserve the original current-generation operation Promise and stream iterator. */
   const peer: IRuntimePeer = Object.freeze({
     self: context.self,
     request: (method, payload, callOptions) =>
-      registration.currentPeer().request(method, payload, callOptions),
+      registration.invokeRequest(method, payload, callOptions),
     notify: (method, payload, callOptions) =>
       registration.currentPeer().notify(method, payload, callOptions),
     stream: (method, payload, callOptions) =>
       registration.currentPeer().stream(method, payload, callOptions),
-    describe: () => prepared.describe(),
-    close: () => holder.release()
+    describe: () => registration.currentPeer().describe(),
+    close
   })
-  retainRuntimePeerConnection(peer, prepared)
+  managedRegistrations.set(peer, registration)
+  retainRuntimePeerConnection(peer, () => registration.currentPeer())
   return peer
 }

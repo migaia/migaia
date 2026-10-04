@@ -3,8 +3,11 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizePortable } from '../contract/normalize.js'
 import type { IRpcPortableValue } from '../contract/types.js'
 import type { IRuntimePeer } from './runtime-api/peer.js'
+import { readRuntimePeerConnection } from './runtime-api/peer.js'
+import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
-import { RpcCoreErrorCode, RpcError, RpcRemoteError } from '../core/errors.js'
+import { RpcAbortError, RpcCoreErrorCode, RpcError, RpcRemoteError } from '../core/errors.js'
+import { nativeReplayReceipt } from '../core/internal/native-replay.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
 import { assertRpcIdempotencyKey, defaultRpcId } from '../core/internal/id.js'
 import { RemoteMethodName } from './constants.js'
@@ -82,6 +85,14 @@ export type IRemoteRuntimeRegistration = Pick<
 > &
   Readonly<{
     currentPeer(): IRuntimePeer
+    /** Logical runtime calls reuse the original retry/key/deadline dispatch below. */
+    invokeRequest(
+      method: string,
+      payload: unknown,
+      options?: IRemoteCallOptions
+    ): Promise<IRpcPortableValue>
+    /** Observe only a genuinely prepared canonical generation, after current pointer publication. */
+    onReady(listener: (peer: IRuntimePeer, generation: number) => void): () => void
   }>
 
 /** Runtime preparation stays inside the original binding/channel/generation rollback boundary. */
@@ -167,6 +178,8 @@ class RemoteRegistration<TUnit, TSpec> {
   readonly #leaveListeners = new Map<number, Set<(reason: unknown) => void>>()
   /** Waiters are resolved only after description and pointer switch. */
   readonly #readyWaiters = new Set<IReadyWaiter>()
+  /** Runtime publications observe the same prepared pointer; no adapter readiness state is copied. */
+  readonly #runtimeReadyListeners = new Set<(peer: IRuntimePeer, generation: number) => void>()
   /** Supervisor subscription is owned by the registration. */
   readonly #unsubscribe: () => void
   /** Release remains idempotent and returns the same Promise. */
@@ -393,6 +406,13 @@ class RemoteRegistration<TUnit, TSpec> {
       if (channel.transport.closed === true) this.#leave(outcome.generation, reason)
     })
     if (removeTransportError) own(async () => removeTransportError())
+    if (this.#options.prepareRuntime) {
+      /** Native L can retire during a core checkpoint before the adapter's exit event arrives. */
+      const removeRetirement = nativeReplayReceipt(channel.transport)?.onRetire(() =>
+        this.#leave(outcome.generation, new RpcAbortError())
+      )
+      if (removeRetirement) own(async () => removeRetirement())
+    }
     /** Runtime directory preparation and v1 describe share the same exact departure/resource owner. */
     const runtime = this.#options.prepareRuntime
       ? await this.#options.prepareRuntime(channel, signal)
@@ -459,6 +479,14 @@ class RemoteRegistration<TUnit, TSpec> {
       throw error
     }
     this.#current = generation
+    if (runtime)
+      for (const listener of this.#runtimeReadyListeners) {
+        try {
+          listener(runtime, generation.number)
+        } catch (error) {
+          this.#options.report(error)
+        }
+      }
     for (const waiter of this.#readyWaiters)
       if (generation.number > waiter.after) this.#settleWaiter(waiter, generation.number, true)
     return generation.number
@@ -478,6 +506,14 @@ class RemoteRegistration<TUnit, TSpec> {
     const active = this.#active()
     if (!active.runtime) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     return active.runtime
+  }
+
+  /** Subscribe to actual prepared replacements without launching or querying a second lifecycle. */
+  onReady(listener: (peer: IRuntimePeer, generation: number) => void): () => void {
+    this.#runtimeReadyListeners.add(listener)
+    return () => {
+      this.#runtimeReadyListeners.delete(listener)
+    }
   }
 
   /** Portable method arguments are checked before guard, retry, or frame emission. */
@@ -514,24 +550,31 @@ class RemoteRegistration<TUnit, TSpec> {
     params: unknown,
     options: IRemoteCallOptions = {}
   ): Promise<IRpcPortableValue> {
+    /** Direct runtime admission keeps its existing synchronous failure boundary. */
+    const runtime = this.#options.prepareRuntime !== undefined
+    /** The portable runtime payload is normalized once before dispatch allocates any work. */
+    const runtimeData = runtime && params !== undefined ? normalizePortable(params) : undefined
+    /** The original accepted route index supplies the declaration without a directory query. */
+    const runtimeDeclaration = runtime ? this.#runtimeRequestMethod(method) : undefined
     try {
-      const data = this.#params(params)
-      const declaration = this.#method(method)
-      if (declaration.mode !== RemoteMethodMode.request)
+      const data = runtime ? runtimeData : this.#params(params)
+      /** Runtime routes share the accepted cold index, while frozen v1 retains its original lookup. */
+      const declaration = runtime ? runtimeDeclaration : this.#method(method)
+      if (declaration && 'mode' in declaration && declaration.mode !== RemoteMethodMode.request)
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
       this.#callOptions(options, true)
       const observedGeneration =
         this.#current?.number ?? this.#options.binding.supervisor.generation
       this.#options.callGuard?.beforeDispatch({
         method,
-        mode: declaration.mode,
+        mode: RemoteMethodMode.request,
         generation: observedGeneration
       })
       const active = this.#active()
       /** Explicit caller key takes precedence and suppresses factory invocation. */
       const key =
         options.idempotencyKey ??
-        (declaration.idempotent ? (this.#options.keyFactory?.() ?? defaultRpcId()) : undefined)
+        (declaration?.idempotent ? (this.#options.keyFactory?.() ?? defaultRpcId()) : undefined)
       if (key !== undefined) assertRpcIdempotencyKey(key)
       const timeoutMs = this.#timeout(options.timeoutMs)
       const deadlineAt =
@@ -540,7 +583,7 @@ class RemoteRegistration<TUnit, TSpec> {
       const dispatch = {
         method,
         mode: 'request' as const,
-        idempotent: declaration.idempotent,
+        idempotent: declaration?.idempotent ?? false,
         key,
         generation: active.number,
         signal: options.signal,
@@ -584,6 +627,21 @@ class RemoteRegistration<TUnit, TSpec> {
     } catch (error) {
       return Promise.reject(error)
     }
+  }
+
+  /** Admit an actual runtime request from the same precompiled index used by direct Peer calls. */
+  #runtimeRequestMethod(method: string) {
+    const connection = readRuntimePeerConnection(this.currentPeer())
+    if (!connection.description) return undefined
+    const declaration = connection.routes.get(method)
+    if (!declaration)
+      throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+    if (!declaration.supportedModes.includes(RuntimeApiMode.request))
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    return declaration
   }
 
   /** One-way only settles local sending and has no invocation control options. */
@@ -775,6 +833,7 @@ class RemoteRegistration<TUnit, TSpec> {
         await Promise.allSettled(this.#closing.values())
         this.#departed.clear()
         this.#leaveListeners.clear()
+        this.#runtimeReadyListeners.clear()
       }
     })()
     return this.#releasePromise

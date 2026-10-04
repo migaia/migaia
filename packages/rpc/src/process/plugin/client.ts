@@ -73,8 +73,7 @@ export function createProcessPlugin(
 export function createProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle> | IRuntimeProcessPluginOptions
 ): IProcessPlugin | ReturnType<typeof createRuntimePlugin> {
-  if (options.contract === undefined)
-    return createRuntimePlugin(options, 'process', createProcessPeer)
+  if (!('deployment' in options)) return createRuntimePlugin(options, 'process', createProcessPeer)
   return assembleProcessPlugin(options)
 }
 

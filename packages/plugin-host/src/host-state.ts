@@ -6,7 +6,12 @@ import { PluginHostErrorCode } from './error-code.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IInstallBatchContext } from './install-runtime.js'
-import type { IExtensionOwner, IRegistration, ISharedExtensionSlot } from './registry.js'
+import type {
+  IExtensionOwner,
+  IRegistration,
+  ISharedExtensionSlot,
+  ISharedExtensionContribution
+} from './registry.js'
 import type { IPluginRuntimeSharedSlot } from './core.js'
 import { assertPluginExtensionKey, isSharedExtensionSlot } from './extension.js'
 import { createPluginHostTypeError } from './error-text.js'
@@ -97,7 +102,8 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     key: PropertyKey,
     family: object,
     create: (view: IPluginRuntimeSharedSlot<TFacade>) => TFacade,
-    assertInstall: () => void
+    assertInstall: () => void,
+    assertContribution: () => void
   ): IPluginRuntimeSharedSlot<TFacade> {
     assertInstall()
     assertPluginExtensionKey(registration.name, key)
@@ -127,7 +133,8 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       family,
       facade: {},
       retired: false,
-      contributions: new Map(),
+      contributions: new Set(),
+      registrations: new Set(),
       names: new Map(),
       instanceIds: new Map()
     }
@@ -140,10 +147,10 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         this.#sharedPublication?.assertActive()
         if (slot.retired || this.extensionOwners.get(key) !== slot) return undefined
         /** Instance identity takes precedence over an equal human name. */
-        const instances = slot.instanceIds.get(target)
+        const instances = slot.instanceIds.get(target) ?? slot.names.get(target)
         if (instances && instances.size !== 1) return null
         /** Both indexes select one receipt before the original registration's availability check. */
-        const receipt = instances?.values().next().value ?? slot.names.get(target)
+        const receipt = instances?.values().next().value
         return receipt &&
           this.isLive(receipt.registration) &&
           receipt.registration.activated &&
@@ -155,8 +162,8 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         this.extensionOwners.get(key) === slot
           ? [...slot.contributions.values()].map((receipt) => receipt.value)
           : [],
-      contribute: (value: object, instanceId: string): void => {
-        assertInstall()
+      contribute: (value: object, instanceId: string): (() => void) => {
+        assertContribution()
         if (
           typeof value !== 'object' ||
           value === null ||
@@ -164,27 +171,33 @@ export class PluginHostState<TDomainCore extends object, TValue> {
           !instanceId
         )
           throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
-        if (
-          batch.sharedContributions.some(
-            (receipt) => receipt.slot === slot && receipt.registration === registration
-          )
-        )
+        if (slot.retired)
           throw new PluginHostError(
-            PluginHostErrorCode.extensionDuplicate,
-            ERROR_TEXT.EXTENSION_DUPLICATE(registration.name, key)
+            PluginHostErrorCode.registrationRevoked,
+            ERROR_TEXT.REGISTRATION_REVOKED
           )
         /** Candidate rollback cannot erase any committed or successor receipt. */
         const receipt = Object.freeze({ slot, registration, instanceId, value })
-        batch.sharedContributions.push(receipt)
+        if (!batch.committed) batch.sharedContributions.push(receipt)
         ;(registration.sharedContributions ??= []).push(receipt)
+        if (batch.committed) this.#updateSharedContribution(receipt, true)
+        return () => {
+          /** Candidate withdrawal never publishes and late cleanup cannot affect a successor. */
+          const candidate = batch.sharedContributions.indexOf(receipt)
+          if (candidate !== -1) batch.sharedContributions.splice(candidate, 1)
+          this.#updateSharedContribution(receipt, false)
+          const owned = registration.sharedContributions?.indexOf(receipt) ?? -1
+          if (owned !== -1) registration.sharedContributions!.splice(owned, 1)
+        }
       }
     })
     if (!owner) {
       slot.facade = create(view)
       if (typeof slot.facade !== 'object' || slot.facade === null)
         throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
-      batch.extensionOwners.set(key, slot)
     }
+    batch.extensionOwners.set(key, slot)
+    if (!registration.sharedSlots?.includes(slot)) (registration.sharedSlots ??= []).push(slot)
     return view
   }
 
@@ -244,7 +257,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
           ERROR_TEXT.REGISTRATION_REVOKED
         )
     /** Replacement's old and new exact receipts may retain one slot in this same commit. */
-    const retainedSlots = new Set(batch.sharedContributions.map((receipt) => receipt.slot))
+    const retainedSlots = new Set([...batch.extensionOwners.values()].filter(isSharedExtensionSlot))
     for (const registration of installed) {
       /** Registration currently owning this name before candidate publication, if any. */
       const previous = this.registrations.get(registration.name)
@@ -266,20 +279,16 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     for (const [key, owner] of batch.extensionOwners)
       if (
         !isSharedExtensionSlot(owner) ||
-        batch.sharedContributions.some((receipt) => receipt.slot === owner)
+        installed.some((registration) => registration.sharedSlots?.includes(owner))
       )
         this.extensionOwners.set(key, owner)
+    for (const registration of installed)
+      for (const slot of registration.sharedSlots ?? []) {
+        slot.registrations.add(registration)
+        this.#sharedPublication?.publish(slot.key)
+      }
     for (const receipt of batch.sharedContributions) {
-      /** All target indexes become visible at the original synchronous commit point. */
-      const slot = receipt.slot
-      this.extensionOwners.set(slot.key, slot)
-      slot.contributions.set(receipt.registration, receipt)
-      slot.names.set(receipt.registration.name, receipt)
-      /** Duplicate instance identities preserve ambiguity rather than overwriting a connection. */
-      const instances = slot.instanceIds.get(receipt.instanceId) ?? new Set()
-      instances.add(receipt)
-      slot.instanceIds.set(receipt.instanceId, instances)
-      this.#sharedPublication?.publish(slot.key)
+      this.#updateSharedContribution(receipt, true)
     }
     for (const registration of installed) this.lanes.bindOwner(registration)
     batch.committed = true
@@ -309,18 +318,12 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     registration: IRegistration<TDomainCore, TValue>,
     retainedSlots?: ReadonlySet<ISharedExtensionSlot<TDomainCore, TValue>>
   ): void {
-    for (const receipt of registration.sharedContributions ?? []) {
-      /** Only a committed receipt owns any canonical indexes. */
-      const slot = receipt.slot
-      if (slot.contributions.get(registration) !== receipt) continue
-      slot.contributions.delete(registration)
-      if (slot.names.get(registration.name) === receipt) slot.names.delete(registration.name)
-      /** Address ambiguity shrinks by this exact membership only. */
-      const instances = slot.instanceIds.get(receipt.instanceId)
-      instances?.delete(receipt)
-      if (instances?.size === 0) slot.instanceIds.delete(receipt.instanceId)
+    for (const receipt of registration.sharedContributions ?? [])
+      this.#updateSharedContribution(receipt, false)
+    for (const slot of registration.sharedSlots ?? []) {
+      slot.registrations.delete(registration)
       if (
-        slot.contributions.size === 0 &&
+        slot.registrations.size === 0 &&
         !retainedSlots?.has(slot) &&
         this.extensionOwners.get(slot.key) === slot
       ) {
@@ -330,6 +333,35 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       }
     }
     registration.sharedContributions = []
+    registration.sharedSlots = []
+  }
+
+  /** Update exact ready membership and both canonical indexes through one publication owner. */
+  #updateSharedContribution(
+    receipt: ISharedExtensionContribution<TDomainCore, TValue>,
+    publish: boolean
+  ): void {
+    /** The original registration retains its slot while physical generations rebind. */
+    const slot = receipt.slot
+    if (publish) {
+      this.extensionOwners.set(slot.key, slot)
+      slot.contributions.add(receipt)
+    } else if (!slot.contributions.delete(receipt)) return
+    for (const [index, key] of [
+      [slot.names, receipt.registration.name],
+      [slot.instanceIds, receipt.instanceId]
+    ] as const) {
+      /** One exact bucket is updated; stale cleanup never removes a successor receipt. */
+      const members = index.get(key) ?? new Set<ISharedExtensionContribution<TDomainCore, TValue>>()
+      if (publish) {
+        members.add(receipt)
+        index.set(key, members)
+      } else {
+        members.delete(receipt)
+        if (members.size === 0) index.delete(key)
+      }
+    }
+    if (publish) this.#sharedPublication?.publish(slot.key)
   }
 
   /**

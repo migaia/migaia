@@ -10,11 +10,11 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 /**
  * X14 permits exact measured pins after compression. C4 shares the canonical extension owner and
  * removes duplicate receipt lookup; registry declarations remain erased. The module count stays
- * exact, and both byte caps equal c4-a9-compressed-r2, without headroom.
+ * exact, and both byte caps equal c4-final-a9-compressed-r1, without headroom.
  */
 const allowedIncrease = {
-  rawBytes: 140543 / legacyRoot.rawBytes,
-  gzipBytes: 35746 / legacyRoot.gzipBytes
+  rawBytes: 141213 / legacyRoot.rawBytes,
+  gzipBytes: 35932 / legacyRoot.gzipBytes
 } as const
 
 /** I22–I26 ownership includes the two canonical physical batch modules. */

@@ -34,6 +34,8 @@ import { RpcRemoteLayerErrorCode } from '../error-code.js'
 import { RemoteMethodName } from '../constants.js'
 import { registerRuntimeControlMethods, type IRuntimeMethodEntry } from './catalog.js'
 import { RuntimeApiMode } from './constants.js'
+import { withRuntimePreparationContext } from './launch-context.js'
+import { readManagedRuntimeRegistration } from './managed-peer.js'
 
 /** Platform factories share this application contract while retaining their original source owner. */
 export type IRuntimePluginOptions<
@@ -45,11 +47,6 @@ export type IRuntimePluginOptions<
     spawn?: TSpawn
     connect?: TConnect
     listen?: TListen
-    /**
-     * Disjoint migration input prevents legacy contract callers from selecting an empty Feature
-     * type.
-     */
-    contract?: never
     name: string
     expose?: readonly string[]
     /** Existing Host-control configuration is used only when host is explicitly exposed. */
@@ -141,6 +138,9 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
     connect: options.connect as IRuntimePeerSource | undefined,
     listen: options.listen as IRuntimePeerSource | undefined,
     providerLimits: options.providerLimits,
+    contract: options.contract,
+    keyFactory: options.keyFactory,
+    retryPort: options.retryPort,
     report: options.report
   })
   return definePlugin({
@@ -153,6 +153,11 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         expose.filter((target) => target !== RuntimePluginExpose.host),
         (target) => integration.readFeatureOutputs(target)
       )
+      /**
+       * One original Host-control owner remains shared across this registration's native
+       * generations.
+       */
+      let controls: readonly IRuntimeMethodEntry[] | undefined
       if (expose.includes(RuntimePluginExpose.host)) {
         if (!options.host || !options.catalog || typeof options.resolvePlugin !== 'function')
           throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.hostControlInvalid)
@@ -172,7 +177,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
          * Reserved scalar routes preserve original request/one-way registration, without stream
          * aliases.
          */
-        const controls: readonly IRuntimeMethodEntry[] = [
+        controls = [
           [RemoteMethodName.hostUse, control.use],
           [RemoteMethodName.hostUnUse, control.unUse],
           [RemoteMethodName.hostInspect, control.inspect]
@@ -199,7 +204,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
        * Automatic bootstrap retains its trusted identity; explicit sources use the original id
        * owner.
        */
-      const peer = await createPeer({
+      const preparationOptions = {
         ...peerOptions,
         self:
           peerOptions.self ??
@@ -207,9 +212,30 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
             ? Object.freeze({ name, instanceId: defaultRpcId() })
             : undefined),
         provide
-      })
+      }
+      /** Original scope owns native cleanup before any launcher or cold channel preparation. */
+      const peer = await withRuntimePreparationContext(
+        preparationOptions,
+        {
+          initialSignal: core.operation.signal,
+          lifecycleSignal: core.lifecycle.signal,
+          own: (dispose) => core.onDispose(dispose),
+          readProvide: () => {
+            /** Each generation captures exact current outputs; old providers keep their old guards. */
+            const current = exposedProvide(
+              expose.filter((target) => target !== RuntimePluginExpose.host),
+              (target) => integration.readFeatureOutputs(target)
+            )
+            if (controls) registerRuntimeControlMethods(current, controls)
+            return current
+          }
+        },
+        () => createPeer(preparationOptions)
+      )
+      /** Managed native resources were already registered before startup; callbacks transfer here. */
+      const registration = readManagedRuntimeRegistration(peer)
       try {
-        core.onDispose(() => peer.close())
+        if (!registration) core.onDispose(() => peer.close())
       } catch (error) {
         // A late prepared Peer belongs to this attempt even after the original Host scope closed.
         try {
@@ -224,17 +250,23 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         throw error
       }
       /** Accepted remote metadata is read from the genuine Peer, without reflecting local describe. */
-      const accepted = readRuntimePeerConnection(peer)
-      /** One exact registration receipt enters the canonical Host indexes at batch commit. */
-      const connection: IRuntimePluginConnection = Object.freeze({
-        name,
-        instanceId: accepted.peerId,
-        identity: accepted.description?.self,
-        description: accepted.description,
-        peer,
-        report: accepted.report
-      })
-      slot.contribute(connection, connection.instanceId)
+      /** Each actual prepared generation publishes an exact receipt through the canonical slot. */
+      const publish = (prepared: IRuntimePeer, generation?: number): void => {
+        const accepted = readRuntimePeerConnection(prepared)
+        const connection: IRuntimePluginConnection = Object.freeze({
+          name,
+          instanceId: accepted.peerId,
+          identity: accepted.description?.self,
+          description: accepted.description,
+          peer,
+          report: accepted.report
+        })
+        const withdraw = slot.contribute(connection, connection.instanceId)
+        if (registration && generation !== undefined)
+          registration.events.onLeave(generation, withdraw)
+      }
+      publish(peer, registration?.events.current().generation)
+      if (registration) core.onDispose(registration.onReady(publish))
       return {}
     }
   })
