@@ -153,7 +153,7 @@ test('SITE-T-STORAGE-WEB-NAV groups APIs by caller task instead of export module
     '实体、Schema 与序列化',
     '宿主创建与运行',
     'Feature 定义与拓扑',
-    '插件与 Backend Kind 定义',
+    '插件定义与命名',
     'Backend 插件',
     '响应式适配插件',
     '错误与基础契约'
@@ -581,11 +581,11 @@ test('SITE-T-CAPABILITY-ENTRYPOINTS render distinct ownership and mutation paths
     'utf8'
   )
   const dynamicHtml = readFileSync(
-    join(buildRoot, 'zh/docs/capability/graph-dynamic/createDynamicCapabilityGraph/index.html'),
+    join(buildRoot, 'zh/docs/capability/graph/dynamic/createDynamicCapabilityGraph/index.html'),
     'utf8'
   )
   const topologyHtml = readFileSync(
-    join(buildRoot, 'zh/docs/capability/graph-topology/buildCapabilityTopology/index.html'),
+    join(buildRoot, 'zh/docs/capability/graph/topology/buildCapabilityTopology/index.html'),
     'utf8'
   )
   assert.match(hostHtml, /只有 activate 内执行动态 import/)
@@ -602,15 +602,17 @@ test('SITE-T-MIDDLEWARE-ENTRYPOINTS render each control algebra and supported ad
   /** Reads one maintained middleware API page. */
   const readMiddleware = (symbol: string): string =>
     readFileSync(join(buildRoot, `zh/docs/middleware-pipeline/${symbol}/index.html`), 'utf8')
-  assert.match(readMiddleware('runSyncMiddleware'), /扁平同步 middleware chain/)
-  assert.match(readMiddleware('runAsyncMiddleware'), /洋葱模型/)
-  assert.match(readMiddleware('runAsyncMiddleware'), /--option-combineStageAndDownstreamError"/)
-  assert.match(readMiddleware('runGeneratorMiddleware'), /yield 只属于当前 stage/)
-  assert.match(readMiddleware('runAsyncGeneratorMiddleware'), /严格串行运行 async generator/)
-  assert.match(readMiddleware('adaptSyncStageToAsync'), /adapter 的 violation reporter/)
-  assert.match(readMiddleware('adaptSyncStageToGenerator'), /violation reporter 必填/)
-  assert.match(readMiddleware('adaptGeneratorStageToAsyncGenerator'), /thrown error identity/)
-  assert.match(readMiddleware('adaptSyncStageToAsyncGenerator'), /halt\/continue 映射/)
+  /** Four execution algebras and stage lifting belong to the single public constructor. */
+  const text = renderedText(readMiddleware('createPipeline'))
+  for (const mode of ['sync', 'async', 'generator', 'async-generator']) {
+    assert.ok(text.includes(mode), `createPipeline must explain ${mode}`)
+  }
+  for (const operation of ['lift', 'run()', 'onViolation', 'combineStageAndDownstreamError']) {
+    assert.ok(text.includes(operation), `createPipeline must explain ${operation}`)
+  }
+  assert.match(text, /创建时固定.*代数/)
+  assert.match(text, /lift 只适配支持的 stage 方向/)
+  assert.match(text, /取消/)
 })
 
 test('SITE-T-WASM-API-ENTRYPOINTS render exact memory and conversion ownership', () => {
@@ -1194,8 +1196,14 @@ test('SITE-T-CODE-EXPLANATION-REPETITION rejects site-wide fallback commentary',
     }
   }
 
-  for (const [explanation, count] of occurrences)
+  /** Required repository-only scheduler warning is shared by every relevant example. */
+  const requiredWarnings = new Set([
+    '这是本仓测试与适配器验证专用的确定性时钟，不适合外部业务代码。外部项目应优先使用测试框架的 fake timers，生产代码使用默认的 systemScheduler。'
+  ])
+  for (const [explanation, count] of occurrences) {
+    if (requiredWarnings.has(explanation)) continue
     assert.ok(count <= 10, `commentary repeated ${count} times: ${explanation}`)
+  }
 })
 
 test('SITE-T-API-EXAMPLE-COMMENTARY requires concrete guidance on every primary API example', () => {
@@ -1331,8 +1339,14 @@ test('SITE-T-API-EXAMPLES import the primary API from its public owner', () => {
     'utf8'
   )
 
-  assert.match(renderedText(host), /import \{ createCapabilityHost \} from '@migaia\/capability'/)
-  assert.match(renderedText(timeout), /import \{ withTimeout \} from '@migaia\/utils\/promise'/)
+  assert.match(
+    renderedText(host),
+    /import\s+\{[^}]*\bcreateCapabilityHost\b[^}]*\}\s+from\s+['"]@migaia\/capability['"]/
+  )
+  assert.match(
+    renderedText(timeout),
+    /import\s+\{[^}]*\bwithTimeout\b[^}]*\}\s+from\s+['"]@migaia\/utils\/promise['"]/
+  )
 })
 
 test('SITE-T-FUNCTION-EXAMPLE-COVERAGE gives every function detail page a copyable example', () => {
@@ -1401,10 +1415,11 @@ test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date
   const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /返回的都是 Unix 时间戳，数值与精度没有区别/)
-  assert.match(text, /now\(\).*schedule\(\).*同一个 IUtilsScheduler/s)
-  assert.match(text, /绕过注入的调度器/)
-  assert.match(text, /真实时间和虚拟定时器/)
+  assert.match(text, /systemScheduler.*performance\.now\(\).*单调时钟/s)
+  assert.match(text, /now\(\).*单调不递减.*不是 Unix 时间戳/s)
+  assert.match(text, /systemWallClock\.timestamp\(\).*Date\.now\(\)/s)
+  assert.match(text, /scheduler\.now\(\).*scheduler\.schedule\(\)/s)
+  assert.match(text, /不要把它与 now\(\) 混用或参与截止时间比较/)
 })
 
 test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () => {
