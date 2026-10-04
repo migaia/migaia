@@ -61,11 +61,23 @@ export type IMiddlewarePipelineLiftSource<TMode extends IMiddlewarePipelineMode>
 
 /** Shared construction options for every middleware mode. */
 export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{
+  /**
+   * Selects the execution algebra for every run; stages must match this mode or be lifted
+   * explicitly.
+   */
   readonly mode: TMode
+  /** Reports duplicate or late next calls without starting a second downstream traversal. */
   readonly onViolation?: IMiddlewarePipelineViolationHandler
+  /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */
   readonly assertActive?: () => void
+  /** Default cooperative abort signal; a run-level signal overrides it. */
   readonly signal?: IMiddlewarePipelineAbortSignal
+  /** Optional generator sentinel set; all three sentinel identities must be distinct. */
   readonly signals?: IGeneratorMiddlewareSignals
+  /**
+   * Combines simultaneous asynchronous stage and downstream failures while retaining both
+   * originals.
+   */
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown
 }>
 

@@ -146,7 +146,7 @@ await pipeline.run(
 
 sentinel 语义与 generator 相同，但 stage 是 `AsyncGenerator`，`done` 可以异步，`run()` 返回 Promise。
 
-## 3. `lift()` 复用低阶 stage
+## 3. 高阶用法：`lift()` 复用低阶 stage
 
 提升复用包内既有适配语义，不改变 stage 调用次数、错误或 Promise 身份。
 
