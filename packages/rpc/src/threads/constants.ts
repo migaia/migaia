@@ -35,3 +35,6 @@ export const THREAD_HEAP_ERROR_CODE = 'ERR_WORKER_OUT_OF_MEMORY'
 
 /** Private runtime bootstrap and capability ACK use the same independently validated version. */
 export const THREAD_RUNTIME_API_VERSION = 1
+
+/** A dedicated Worker without the launcher's private bootstrap must not retain capture forever. */
+export const THREAD_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS = 10_000

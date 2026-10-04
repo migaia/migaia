@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { PROCESS_RUNTIME_API_ENV } from '../../../dist/process/constants.js'
 import * as processApi from '../../../dist/process/index.js'
 import { openProcessStdioChannel } from '../../../dist/process/adapters/node-child-process.js'
 import { createComposedEndpoint } from '../../../dist/core/composed.js'
@@ -14,6 +16,24 @@ let initialized
 if (typeof processApi.createProcessPeer === 'function') {
   initialized = processApi.createProcessPeer({
     provide: {
+      /** A real nested launch inherits the current environment without a fixture marker override. */
+      auditSource: async () => {
+        const script = `import { createProcessPeer } from ${JSON.stringify(new URL('../../../dist/process/index.js', import.meta.url).href)};
+const before = process.stdin.listenerCount('data');
+try { await createProcessPeer({report: () => undefined}); }
+catch (error) { console.log(JSON.stringify({code: error.code, before, after: process.stdin.listenerCount('data')})); }`
+        const grandchild = await new Promise((resolve) => {
+          execFile(
+            process.execPath,
+            ['--input-type=module', '-e', script],
+            { timeout: 2000 },
+            (error, output) => {
+              resolve(error ? { code: 'NATIVE_CHILD_TIMEOUT' } : JSON.parse(output))
+            }
+          )
+        })
+        return { consumed: process.env[PROCESS_RUNTIME_API_ENV] === undefined, grandchild }
+      },
       /** The actual factory result owns identity; fixture metadata never fabricates one. */
       probe: async (value) => {
         const peer = await initialized

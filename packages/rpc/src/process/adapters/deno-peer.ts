@@ -4,14 +4,29 @@ import { createProcessSourcePeer, type IRuntimeProcessPeerOptions } from '../run
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
 import { openProcessStdioChannel } from './deno-command.js'
 
+/** Only this process retains consumed discovery; grandchildren inherit no automatic authority. */
+let automaticMarker: string | undefined
+
 /** Deno discovery borrows its native environment and stream owner, never a Node stdin shim. */
 export function createProcessPeer(options: IRuntimeProcessPeerOptions) {
   /** This deep adapter is selected only in a native Deno runtime. */
   const runtime = Reflect.get(globalThis, 'Deno') as {
-    env: { get(key: string): string | undefined }
+    env: { get(key: string): string | undefined; delete(key: string): void }
+    permissions: {
+      querySync(descriptor: { name: 'env'; variable: string }): { state: string }
+    }
   }
-  /** Genuine automatic context keeps precedence over explicit source effects. */
-  const marker = runtime.env.get(PROCESS_RUNTIME_API_ENV)
+  /** Discovery never asks for permission or reads a denied environment variable. */
+  const permitted =
+    runtime.permissions.querySync({ name: 'env', variable: PROCESS_RUNTIME_API_ENV }).state ===
+    'granted'
+  /** Genuine consumed context retains precedence over explicit source effects. */
+  const marker =
+    automaticMarker ?? (permitted ? runtime.env.get(PROCESS_RUNTIME_API_ENV) : undefined)
+  if (marker !== undefined && permitted) {
+    automaticMarker = marker
+    runtime.env.delete(PROCESS_RUNTIME_API_ENV)
+  }
   if (!marker && (typeof options.spawn === 'object' || typeof options.connect === 'object'))
     return createProcessSourcePeer(options, 'deno')
   return createAutomaticProcessPeer(options as IRuntimePeerOptions, {
