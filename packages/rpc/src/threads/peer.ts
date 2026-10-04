@@ -9,14 +9,21 @@ import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtim
 
 /** Platform-owned context plus validated library bootstrap grants automatic discovery. */
 export function createThreadPeer(options: IRuntimeThreadPeerOptions): Promise<IRuntimePeer> {
-  /** Browser/Deno worker globals have independent native type identity. */
-  const Scope = Reflect.get(globalThis, 'WorkerGlobalScope') as
+  /** Browser automatic discovery is limited to genuine dedicated Worker globals. */
+  const Scope = Reflect.get(globalThis, 'DedicatedWorkerGlobalScope') as
     | (new (...args: never[]) => object)
     | undefined
+  /** Deno supports dedicated module Workers through its own WorkerGlobalScope identity. */
+  const DenoScope = Reflect.get(globalThis, 'Deno')
+    ? (Reflect.get(globalThis, 'WorkerGlobalScope') as
+        | (new (...args: never[]) => object)
+        | undefined)
+    : undefined
   /** Bun supplies an independent worker-context flag even without WorkerGlobalScope. */
   const bun = Reflect.get(globalThis, 'Bun') as { isMainThread?: boolean } | undefined
   if (
     (typeof Scope === 'function' && globalThis instanceof Scope) ||
+    (typeof DenoScope === 'function' && globalThis instanceof DenoScope) ||
     (bun?.isMainThread === false && typeof Reflect.get(globalThis, 'postMessage') === 'function')
   )
     return createAutomaticWebThreadPeer(

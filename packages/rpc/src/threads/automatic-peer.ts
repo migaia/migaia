@@ -12,7 +12,11 @@ import {
 } from './bootstrap.js'
 import { createWebThreadBootstrapHandoff } from './receive-handoff.js'
 import { createWebThreadChannel } from './channel.js'
-import { ThreadBootstrap, THREAD_RUNTIME_API_VERSION } from './constants.js'
+import {
+  ThreadBootstrap,
+  THREAD_RUNTIME_API_VERSION,
+  THREAD_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS
+} from './constants.js'
 import type { IThreadWebPort } from './types.js'
 
 /** Attach the original EventTarget bootstrap listener synchronously, before any asynchronous import. */
@@ -46,9 +50,18 @@ export async function createAutomaticWebThreadPeer(
     },
     onFailure: (error) => rejectBootstrap(error)
   })
+  /**
+   * The existing scheduler fails the original cold handoff; no second capture or timer owner
+   * exists.
+   */
+  const deadline = systemScheduler.schedule(
+    () => handoff.fail(),
+    THREAD_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS
+  )
   try {
     /** No top-level asynchronous boundary precedes physical bootstrap subscription. */
     const bootstrap = await prepared
+    deadline.cancel()
     return await createRuntimePeer(options, {
       self: bootstrap.self,
       async source(context) {
@@ -82,5 +95,7 @@ export async function createAutomaticWebThreadPeer(
       }
     }
     throw primary
+  } finally {
+    deadline.cancel()
   }
 }
