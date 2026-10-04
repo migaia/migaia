@@ -105,11 +105,7 @@ for (const mode of ['peer', 'plugin'] as const) {
           })
         )
         assert.equal(replacement.getFeature('data').echo(), 84)
-        await assert.rejects(
-          request('retired-output'),
-          (error: Error & { cause?: { code?: string } }) =>
-            error.cause?.code === 'REGISTRATION_REVOKED'
-        )
+        assert.equal(((await request('current-output')) as { parent: number }).parent, 84)
       }
       /** Genuine native departure is the sole authorization for the original supervisor restart. */
       handles[0]!.terminate()

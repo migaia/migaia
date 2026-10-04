@@ -16,6 +16,8 @@ export function isSharedExtensionSlot<TDomainCore extends object, TValue>(
 const objectPrototypeKeys = new Set(Reflect.ownKeys(Object.prototype))
 /** Host protocol names cannot be claimed by an extension view. */
 const hostReservedKeys = new Set<PropertyKey>([
+  // A thenable Host would let Promise assimilation invoke application-owned facade code.
+  'then',
   'config',
   'pipelineMode',
   'usePipeline',

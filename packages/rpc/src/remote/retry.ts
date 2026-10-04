@@ -18,8 +18,8 @@ export function createRemoteRetryPort(
   return Object.freeze({
     dispatch(input: IRemoteRetryDispatch): Promise<IRpcPortableValue> {
       return new Promise<IRpcPortableValue>((resolve, reject) => {
-        /** The readiness waiter is canceled when this logical call finishes. */
-        const controller = createAbortController()
+        /** Only actual replay needs a readiness waiter, canceled when this logical call finishes. */
+        let controller: ReturnType<typeof createAbortController> | undefined
         /** Each send observes its own generation until a result or departure wins. */
         let unsubscribe: () => void = () => undefined
         /** One timer enforces the original logical deadline, including rebind wait. */
@@ -37,7 +37,7 @@ export function createRemoteRetryPort(
           unsubscribe()
           timer?.cancel()
           input.signal?.removeEventListener('abort', onAbort)
-          controller.abort()
+          controller?.abort()
           if (success) resolve(result as IRpcPortableValue)
           else reject(result)
         }
@@ -89,6 +89,7 @@ export function createRemoteRetryPort(
               return
             }
             replayed = true
+            controller = createAbortController()
             void options.events.whenReady(generation, controller.signal).then(
               (next) => {
                 if (!settled) send(next)

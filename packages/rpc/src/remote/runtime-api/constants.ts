@@ -67,6 +67,7 @@ import { RpcCapability } from '../../contract/wire-constants.js'
 export const RUNTIME_API_CAPABILITIES = Object.freeze([
   RpcCapability.ping,
   RpcCapability.close,
+  RpcCapability.abort,
   RpcCapability.stream,
   RpcCapability.batch,
   RpcCapability.runtimeApi

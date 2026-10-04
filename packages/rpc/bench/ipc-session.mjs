@@ -76,7 +76,8 @@ let offer
 /** Load the production endpoint graph only on RPC sides; bare RSS must not include it. */
 async function rpcApi() {
   const processApi = await import('@migaia/rpc/process')
-  const { endpointFor } = await import('../test/core/a10-p2-f-runtime.ts')
+  const { loadEndpointFixture } = await import('./fd-fixture-loader.mjs')
+  const { endpointFor } = await loadEndpointFixture()
   const { createNodeThreadChannel } = await import('@migaia/rpc/threads')
   offer = (id) => processApi.createNativeProcessOffer({ peer: { id, runtime: 'node' } })
   return { ...processApi, endpointFor, createNodeThreadChannel }
@@ -486,7 +487,8 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
     cleanup.push(() => raw.close())
     if (side === 'rpc') {
       const { createJsonRpcRemoteChannel } = await import('@migaia/rpc/bridge/jsonrpc')
-      const { bridgeEndpointFor } = await import('../test/core/a10-p2-f-runtime.ts')
+      const { loadEndpointFixture } = await import('./fd-fixture-loader.mjs')
+      const { bridgeEndpointFor } = await loadEndpointFixture()
       /** Contract describes the same request echo already proved by the conformance facade cases. */
       const contract = {
         schemaVersion: 1,

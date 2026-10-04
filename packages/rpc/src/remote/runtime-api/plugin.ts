@@ -56,16 +56,24 @@ export type IRuntimePluginOptions<
     resolvePlugin?: IRemoteHostControlOptions['resolvePlugin']
   }>
 
-/** A guarded cold closure retains the actual output and never substitutes a later same-name Feature. */
+/** A cold method whitelist resolves current Feature availability through the original Host owner. */
 function exposedMethod(
   snapshot: IPluginRuntimeFeatureSnapshot,
   feature: string,
-  receiver: object,
-  method: (...args: unknown[]) => unknown
+  key: string
 ): IRuntimePeerMethod {
   return (payload, context) => {
-    snapshot.assertCurrent(feature)
-    return Reflect.apply(method, receiver, [payload, context])
+    /** Replacement may change output identity; no physical generation preparation reads it. */
+    const receiver = snapshot.readCurrent(feature)
+    /** Only a current enumerable data method can satisfy the already compiled whitelist. */
+    const descriptor = Object.getOwnPropertyDescriptor(receiver, key)
+    if (
+      !descriptor?.enumerable ||
+      !('value' in descriptor) ||
+      typeof descriptor.value !== 'function'
+    )
+      throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+    return Reflect.apply(descriptor.value, receiver, [payload, context])
   }
 }
 
@@ -100,7 +108,7 @@ function exposedProvide(
             RpcCoreErrorCode.capabilityConflict,
             RuntimeApiErrorText.featureConflict
           )
-        group[key] = exposedMethod(snapshot, feature, output, descriptor.value)
+        group[key] = exposedMethod(snapshot, feature, key)
       }
     }
     provide[name] = Object.freeze(group)
@@ -155,11 +163,6 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         expose.filter((target) => target !== RuntimePluginExpose.host),
         (target) => integration.readFeatureOutputs(target)
       )
-      /**
-       * One original Host-control owner remains shared across this registration's native
-       * generations.
-       */
-      let controls: readonly IRuntimeMethodEntry[] | undefined
       if (expose.includes(RuntimePluginExpose.host)) {
         if (!options.host || !options.catalog || typeof options.resolvePlugin !== 'function')
           throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.hostControlInvalid)
@@ -179,7 +182,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
          * Reserved scalar routes preserve original request/one-way registration, without stream
          * aliases.
          */
-        controls = [
+        const controls: readonly IRuntimeMethodEntry[] = [
           [RemoteMethodName.hostUse, control.use],
           [RemoteMethodName.hostUnUse, control.unUse],
           [RemoteMethodName.hostInspect, control.inspect]
@@ -239,15 +242,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
           initialSignal: core.operation.signal,
           lifecycleSignal: core.lifecycle.signal,
           own: (dispose) => core.onDispose(dispose),
-          readProvide: () => {
-            /** Each generation captures exact current outputs; old providers keep their old guards. */
-            const current = exposedProvide(
-              expose.filter((target) => target !== RuntimePluginExpose.host),
-              (target) => integration.readFeatureOutputs(target)
-            )
-            if (controls) registerRuntimeControlMethods(current, controls)
-            return current
-          },
+          // Native preparation owns the frozen whitelist; business availability is checked on calls.
+          readProvide: () => provide,
           publishPeer
         },
         () => createPeer(preparationOptions)

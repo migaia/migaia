@@ -166,13 +166,11 @@ it('[A12][A13][A34] genuine connections revoke inbound modes and exact target re
     assert.equal(await first.request('service.read'), 43)
     await owner.replace('service', service('replacement', 45))
     calls.length = 0
-    await assert.rejects(remote[0].thread!.request('connection-0', 'service.read'), (error) =>
-      permission(error, 'REGISTRATION_REVOKED')
-    )
+    assert.equal(await remote[0].thread!.request('connection-0', 'service.read'), 45)
     assert.equal(
       calls.length,
-      0,
-      '[A34] captured Feature permission cannot revive a successor output'
+      1,
+      '[A34] the original Host guard selects the current same-name Feature'
     )
     await owner.unUse('connection-0')
     assert.equal(owner.thread, outlet, '[A34] first removal retains the shared facade')
