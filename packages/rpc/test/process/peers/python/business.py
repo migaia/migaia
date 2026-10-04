@@ -12,7 +12,17 @@ from typing import Any, BinaryIO
 import peer
 
 
-CONTRACT = json.loads((Path(__file__).resolve().parents[4] / "schema/vectors/remote-contract.json").read_text())["contracts"][0]["value"]
+# The static registry names actual fixture routes; no frozen v1 contract is loaded.
+DESCRIBE = "migaia.remote.runtime.describe"
+STREAM_PREFIX = "migaia.remote.runtime.stream."
+METHODS = {
+    "echo": ["request", "notify"], "peer.echo": ["request", "notify"],
+    "peer.received": ["request"], "peer.aborts": ["request"], "peer.stats": ["request"],
+    "peer.trace": ["request"], "peer.error": ["request"], "peer.wait": ["request"],
+    "peer.finish": ["request"], "p.f.request": ["request"], "p.f.oneWay": ["notify"],
+    "p.f.generator": ["stream"], "p.f.asyncGenerator": ["stream"]
+}
+HOST_METHODS = ["migaia.remote.host.use", "migaia.remote.host.unUse", "migaia.remote.host.inspect"]
 ERROR_SOURCE = "@migaia/rpc/core"
 
 
@@ -26,8 +36,7 @@ def reply_route(message: dict[str, Any], kind: str) -> dict[str, Any]:
     """Reply to this exact sender/session while preserving receiver and trace correlation."""
     incoming = message["data"]["route"]
     route = peer.route(kind, incoming["targetId"], incoming["senderId"])
-    if "receiverId" in incoming:
-        route["receiverId"] = incoming["senderId"]
+    route["receiverId"] = incoming["senderId"]
     if "trace" in incoming:
         route["trace"] = incoming["trace"]
     if kind == "response":
@@ -67,6 +76,24 @@ class Business:
         self.pongs = 0
         self.closes = 0
         self.closing = False
+        self.capabilities = set(peer.CAPABILITIES)
+        self.remote_id = ""
+        # Registered providers alone can be invoked; the directory derives from this same whitelist.
+        self.providers = {name: (lambda payload, trace, method=name: self.invoke(method, payload, trace))
+                          for name in [DESCRIBE, *METHODS, *(HOST_METHODS if host else [])]}
+
+
+
+    def description(self) -> dict[str, Any]:
+        """Expose only the safe identity and modes installed in this exact session."""
+        methods = {**METHODS}
+        if "stream@1" not in self.capabilities:
+            methods = {name: modes for name, modes in methods.items() if "stream" not in modes}
+        if self.host:
+            methods.update({name: ["request"] for name in HOST_METHODS})
+        return {"schemaVersion": 2, "self": {"name": "python-peer", "instanceId": "python-peer"},
+                "methods": [{"name": name, "supportedModes": modes, "modeSource": "declared"}
+                            for name, modes in methods.items()]}
 
     def item(self) -> dict[str, Any]:
         """Project the actual local installed record, never executable definitions."""
@@ -74,8 +101,8 @@ class Business:
 
     def invoke(self, method: str, payload: Any, trace: Any = None) -> tuple[Any, Any]:
         """Execute portable Host controls or local business methods without a TS intermediary."""
-        if method == "migaia.remote.describe":
-            return ({"schemaVersion": 1, "catalog": {"p": CONTRACT}} if self.host else CONTRACT), None
+        if method == DESCRIBE:
+            return self.description(), None
         if method == "migaia.remote.host.use" and self.host:
             if not isinstance(payload, list) or not 1 <= len(payload) <= 2 or payload[0] != "p":
                 return None, peer.wire_error("REMOTE_CONTRACT_INVALID", "invalid Host use")
@@ -109,7 +136,7 @@ class Business:
         if method == "p.f.oneWay":
             self.received.append(payload[0])
             return None, None
-        return None, peer.wire_error("METHOD_NOT_FOUND", "native peer method unavailable")
+        return None, {**peer.wire_error("PROVIDER_NOT_FOUND", "Runtime method is not provided by this peer"), "source": ERROR_SOURCE}
 
     def native(self, message: dict[str, Any]) -> list[dict[str, Any]]:
         """Dispatch one validated native frame; streams require one pull credit per item."""
@@ -124,17 +151,25 @@ class Business:
             return [{"kind": "discovery", "id": identifier, "version": message["version"], "acceptVersions": message["acceptVersions"], "data": {"route": header}}]
         if kind == "variation":
             control = route.get("variation")
-            if control == "ping":
+            if control == "ping" and "ping@1" in self.capabilities:
                 self.pongs += 1
                 result = {"kind": "variation", "id": identifier, "data": {"route": {**reply_route(message, "variation"), "variation": "pong"}}}
                 return [result]
-            if control == "abort":
+            if control == "abort" and "abort@1" in self.capabilities:
+                if self.closing:
+                    print("PEER_EVENT ABORT_DURING_DRAIN", file=peer.sys.stderr, flush=True)
                 if self.waiting.pop(identifier, None) is not None:
                     reason = payload.get("reason") if isinstance(payload, dict) and "reason" in payload else payload
                     self.aborts.append(reason)
-            if control == "close":
+            if control == "close" and "close@1" in self.capabilities:
+                if not isinstance(payload, dict) or type(payload.get("drainMs")) is not int or not 0 <= payload["drainMs"] <= 2_147_483_647:
+                    print("PEER_ERROR PROTOCOL_INVALID", file=peer.sys.stderr, flush=True)
+                    return []
                 self.closes += 1
                 self.closing = True
+                if payload["drainMs"] == 0:
+                    self.waiting.clear()
+                    self.streams.clear()
             return []
         if kind == "stream":
             state = self.streams.get(identifier)
@@ -154,14 +189,26 @@ class Business:
         if kind != "request" or self.closing:
             return []
         method = message["method"]
+        modes = ["request"] if method == DESCRIBE or method in HOST_METHODS else METHODS.get(method)
+        if modes is not None and ("notify" if route.get("dispatchOnly") is True else "request") not in modes:
+            error = {**peer.wire_error("CAPABILITY_UNSUPPORTED", "Runtime operation capability is unavailable"), "source": ERROR_SOURCE}
+            return [] if route.get("dispatchOnly") else [native_response(message, None, error)]
         if method == "peer.wait":
             self.waiting[identifier] = message
             return []
-        if method in ("p.f.generator", "p.f.asyncGenerator"):
+        if method in (STREAM_PREFIX + "p.f.generator", STREAM_PREFIX + "p.f.asyncGenerator") and "stream@1" in self.capabilities:
             items = payload[0] if isinstance(payload[0], list) else [payload[0]] * 3
             self.streams[identifier] = message, items, 0
             return [stream_frame(message, "open", 0)]
-        result, error = self.invoke(method, payload, route.get("trace"))
+        if method == "peer.finish":
+            replies = [native_response(wait, None) for wait in self.waiting.values()]
+            self.waiting.clear()
+            if route.get("dispatchOnly") is not True:
+                replies.append(native_response(message, None))
+            return replies
+        provider = self.providers.get(method)
+        result, error = provider(payload, route.get("trace")) if provider else (None, {
+            **peer.wire_error("PROVIDER_NOT_FOUND", "Runtime method is not provided by this peer"), "source": ERROR_SOURCE})
         if route.get("dispatchOnly") is True:
             return []
         return [native_response(message, result, error)]
@@ -177,43 +224,66 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bri
                 encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
                 bridge_write_body(writer, encoded)
             return
-        serve_bridge(reader, writer, host, token)
-        return
+        raise peer.PeerFailure("CAPABILITY_UNSUPPORTED")
     raw = peer.read_frame(reader, peer.MAX_HANDSHAKE)
     if raw is None:
         raise peer.PeerFailure("HANDSHAKE_INVALID")
     hello = peer.decode_frame(raw)
     local = peer.own_offer("python-peer")
     agreed = peer.negotiate(hello, local)
-    if agreed is None or (token is not None and hello.get("auth") != token):
+    if agreed is None or agreed["major"] != 1 or agreed["minor"] != 1 or not {"runtime-api@1", "batch@1"} <= set(agreed["capabilities"]):
+        reason = "protocol" if hello.get("protocol") != peer.PROTOCOL else "version"
+        peer.write_json(writer, {"kind": "handshake", "step": "reject", "protocol": peer.PROTOCOL, "error": peer.wire_error("HANDSHAKE_INCOMPATIBLE", "rpc handshake incompatible: " + reason)})
+        raise peer.PeerFailure("HANDSHAKE_INVALID")
+    if token is not None and hello.get("auth") != token:
         peer.write_json(writer, {"kind": "handshake", "step": "reject", "protocol": peer.PROTOCOL, "error": peer.wire_error("AUTH_REJECTED", "authentication rejected")})
         return
     peer.write_json(writer, {"kind": "handshake", "step": "accept", "protocol": peer.PROTOCOL, **agreed, "peer": local["peer"]})
     business = Business(host)
+    business.capabilities = set(agreed["capabilities"])
+    business.remote_id = hello["peer"]["id"]
     while True:
         raw = peer.read_frame(reader)
         if raw is None:
+            business.waiting.clear()
+            business.streams.clear()
             return
-        message = peer.decode_frame(raw)
-        method = message.get("method")
-        if method in ("peer.busy", "peer.pause", "peer.crash"):
-            peer.write_json(writer, native_response(message, "ACK"))
-            import os
-            import signal
-            if method == "peer.crash":
-                os._exit(17)
-            if method == "peer.pause":
-                os.kill(os.getpid(), signal.SIGSTOP)
-            else:
-                while True:
-                    pass
-            continue
-        for reply in business.native(message):
-            peer.write_json(writer, reply)
+        physical = peer.decode_frame(raw)
+        if not isinstance(physical, dict):
+            raise peer.PeerFailure("INVALID_ENVELOPE")
+        batched = physical.get("kind") == "batch"
+        if batched:
+            members = physical.get("envelopes")
+            if set(physical) != {"kind", "envelopes"} or not isinstance(members, list) or not members:
+                raise peer.PeerFailure("INVALID_ENVELOPE")
+        else:
+            members = [physical]
+        for message in members:
+            try:
+                if not isinstance(message, dict):
+                    raise peer.PeerFailure("INVALID_ENVELOPE")
+                kind = message.get("kind")
+                if kind not in ("request", "response", "discovery", "variation", "stream"):
+                    print("PEER_WARN UNKNOWN_KIND", file=peer.sys.stderr, flush=True)
+                    continue
+                route = message.get("data", {}).get("route") if isinstance(message.get("data"), dict) else None
+                if not isinstance(message.get("id"), str) or not isinstance(route, dict) or route.get("profile") != peer.ROUTE_PROFILE:
+                    raise peer.PeerFailure("INVALID_ENVELOPE")
+                if route.get("senderId") != business.remote_id or route.get("targetId") != "python-peer":
+                    raise peer.PeerFailure("INVALID_ENVELOPE")
+                if kind == "request" and (route.get("type") != "request" or not isinstance(message.get("method"), str)):
+                    raise peer.PeerFailure("INVALID_ENVELOPE")
+                for reply in business.native(message):
+                    peer.write_json(writer, reply)
+                if business.closing and not business.waiting:
+                    business.streams.clear()
+                    return
+            except (peer.PeerFailure, KeyError, TypeError, IndexError):
+                if not batched:
+                    raise peer.PeerFailure("INVALID_ENVELOPE")
+                print("PEER_ERROR PROTOCOL_INVALID", file=peer.sys.stderr, flush=True)
 
 
-BRIDGE_METHODS = ["migaia.hello", "migaia.describe", "migaia.invoke", "migaia.cancel"]
-BRIDGE_CAPABILITIES = ["abort@1", "jsonrpc-bridge@1", "wire-error@1", "deadline@1", "trace@1", "idempotency@1"]
 
 
 def bridge_body(reader: BinaryIO) -> bytes | None:
@@ -251,57 +321,9 @@ def bridge_write(writer: BinaryIO, message: Any) -> None:
     bridge_write_body(writer, body)
 
 
-def serve_bridge(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None) -> None:
-    """Serve the four negotiated extensions using the same independent local business owner."""
-    business = Business(host)
-    business.contract = json.loads(json.dumps(CONTRACT))
-    for method in ["generator", "asyncGenerator"]:
-        del business.contract["features"]["f"]["methods"][method]
-    authenticated = False
-    while (message := bridge_read(reader)) is not None:
-        if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or isinstance(message, list):
-            raise peer.PeerFailure("INVALID_ENVELOPE")
-        method, params, identifier = message.get("method"), message.get("params", {}), message.get("id")
-        if method == "migaia.hello":
-            hello = peer.decode_frame(params["hello"].encode("utf-8"))
-            local = {**peer.own_offer(), "capabilities": BRIDGE_CAPABILITIES}
-            agreed = peer.negotiate(hello, local)
-            authenticated = agreed is not None and token is not None and hello.get("auth") == token
-            reply = {"kind": "handshake", "step": "accept", "protocol": peer.PROTOCOL, **agreed, "peer": local["peer"]} if authenticated else {"kind": "handshake", "step": "reject", "protocol": peer.PROTOCOL, "error": peer.wire_error("AUTH_REJECTED", "authentication rejected")}
-            result, error = {"reply": json.dumps(reply, separators=(",", ":")), "methods": BRIDGE_METHODS}, None
-        elif not authenticated:
-            raise peer.PeerFailure("AUTH_REQUIRED")
-        elif method == "migaia.cancel":
-            if business.waiting.pop(params.get("id"), None) is not None:
-                business.aborts.append(params.get("reason"))
-                bridge_write(writer, {"jsonrpc": "2.0", "id": params["id"], "result": "late-after-cancel"})
-            continue
-        elif method == "migaia.describe":
-            result = {"schemaVersion": 1, "catalog": {"p": business.contract}} if host else business.contract
-            error = None
-        elif method == "migaia.invoke":
-            called, args = params["method"], params["args"]
-            if called == "peer.wait" or called == "p.f.request" and args == ["__wait"]:
-                business.waiting[identifier] = message
-                continue
-            result, error = business.invoke(called, args, params.get("meta", {}).get("trace"))
-        else:
-            result, error = None, peer.wire_error("METHOD_NOT_FOUND", "bridge peer method unavailable")
-        if identifier is not None:
-            reply = {"jsonrpc": "2.0", "id": identifier}
-            if error is None:
-                reply["result"] = result
-            else:
-                reply["error"] = {"code": -32000, "message": error["message"], "data": {"migaiaWireError": error}}
-            bridge_write(writer, reply)
-
 
 def run_business(args: Any) -> int:
     """Select existing framing over true owned stdio or borrowed reusable Unix listener."""
-    global CONTRACT
-    # A caller-owned published contract profile selects the actual describe declaration.
-    if args.contract:
-        CONTRACT = json.loads(Path(args.contract).read_text())["contracts"][0]["value"]
     import os
     import socket
     import sys
