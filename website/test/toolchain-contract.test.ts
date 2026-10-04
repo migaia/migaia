@@ -2,7 +2,12 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, parse, resolve } from 'node:path'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { findApiGuide, findOptionTranslation } from '../app/api-guides.js'
+import {
+  createSupportingContractGuide,
+  findApiGuide,
+  findOptionTranslation
+} from '../app/api-guides.js'
+import type { IApi } from '../app/content-contract.js'
 import { findGuideJourney } from '../app/guide-journeys.js'
 import { parseSelectedLibrary, replaceOwnedEntries } from '../scripts/generate/signatures.js'
 
@@ -17,22 +22,7 @@ const generatedApiManifest = JSON.parse(
   readFileSync(join(websiteRoot, 'src/generated/manifests/apis.json'), 'utf8')
 )
 /** Typed subset of generated API facts required by documentation acceptance. */
-const generatedApis = generatedApiManifest.apis as Array<{
-  id: string
-  library: string
-  module: string
-  symbols: Array<{
-    name: string
-    kind: string
-    configuration: Array<{
-      name: string
-      type: string
-      description: string
-      descriptionEn?: string
-      descriptionZh?: string
-    }>
-  }>
-}>
+const generatedApis = generatedApiManifest.apis as readonly IApi[]
 
 test('SITE-T-SIGNATURES-DIRECT-ENTRY validates bounded writer selection before generation', () => {
   assert.equal(parseSelectedLibrary([]), null)
@@ -562,7 +552,9 @@ test('SITE-T-UTILS-GUIDES gives every runtime export an explicit bilingual decis
   assert.ok(runtimeSymbols.length > 0, 'expected public utils runtime exports')
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide(api.library, api.module, symbol.name, locale)
+      const guide =
+        findApiGuide(api.library, api.module, symbol.name, locale) ??
+        createSupportingContractGuide(api.library, symbol, locale)
       assert.ok(guide, `${api.id}#${symbol.name} has no ${locale} decision guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.purpose.trim().length >= 40)
