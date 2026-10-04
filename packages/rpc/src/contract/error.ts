@@ -146,10 +146,9 @@ export function serializeRpcError(
     }
     /** Only factory-created local errors may suppress secret-bearing descendants. */
     const localSummary = localErrorWireSummary(input)
-    const source =
-      object && !array
-        ? snapshotError(input, pointer, report, localSummary !== undefined)
-        : undefined
+    /** Opt-in applies to this exact local node; each descendant makes its own secrecy decision. */
+    const summaryOnly = localSummary !== undefined && localSummary.preserveSerializedError !== true
+    const source = object && !array ? snapshotError(input, pointer, report, summaryOnly) : undefined
     let nativeError = false
     if (source) {
       try {
@@ -216,7 +215,7 @@ export function serializeRpcError(
      * Stream error frames retain their required top-level shape without local secret-bearing
      * causes.
      */
-    if (errorLike && !localSummary) {
+    if (errorLike && !summaryOnly) {
       projectData(source.fields.data, pointer, node, depth)
       if (source.fields.cause !== undefined) {
         const cause = visit(source.fields.cause, `${pointer}/cause`, depth + 1)
@@ -239,7 +238,7 @@ export function serializeRpcError(
         output.push(child)
       }
       if (output.length > 0) node.errors = Object.freeze(output)
-    } else if (!localSummary && input !== undefined && typeof input !== 'string') {
+    } else if (!summaryOnly && input !== undefined && typeof input !== 'string') {
       if (source) {
         let keys: string[]
         let enumerated = true

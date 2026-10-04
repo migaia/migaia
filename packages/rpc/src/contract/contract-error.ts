@@ -2,18 +2,37 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.js'
 import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.js'
 
-/** Only trusted local factories register code/message summaries; remote fields cannot opt in. */
-const summaries = new WeakMap<Error, Readonly<{ code: string; message: string }>>()
+/** A factory may preserve only its own bounded chain; this permission never propagates to children. */
+type ILocalErrorWireSummary = Readonly<{
+  code: string
+  message: string
+  preserveSerializedError?: true
+}>
+
+/** Only genuine local registration can opt in; serialized or user-defined error properties cannot. */
+const summaries = new WeakMap<Error, ILocalErrorWireSummary>()
 
 /** Retain the original local cause while limiting a contract failure's outbound disclosure. */
-export function registerLocalErrorWireSummary(error: Error, code: string, message: string): void {
-  summaries.set(error, Object.freeze({ code, message }))
+export function registerLocalErrorWireSummary(
+  error: Error,
+  code: string,
+  message: string,
+  options?: Readonly<{ preserveSerializedError?: true }>
+): void {
+  summaries.set(
+    error,
+    Object.freeze({
+      code,
+      message,
+      ...(options?.preserveSerializedError === true
+        ? { preserveSerializedError: true as const }
+        : {})
+    })
+  )
 }
 
 /** Read the factory-owned summary without invoking any untrusted error property getters. */
-export function localErrorWireSummary(
-  error: unknown
-): Readonly<{ code: string; message: string }> | undefined {
+export function localErrorWireSummary(error: unknown): ILocalErrorWireSummary | undefined {
   return (typeof error === 'object' && error !== null) || typeof error === 'function'
     ? summaries.get(error as Error)
     : undefined

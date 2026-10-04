@@ -563,7 +563,8 @@ export class ProviderExecutor<TTargetId extends string> {
           : RpcCoreErrorText.providerFailed),
       data: error instanceof RpcSchemaValidationError ? error.data : undefined,
       sentAt: this.options.timestamp(),
-      ...(!localSummary && (schemaError || includeSerializedError)
+      ...((!localSummary || localSummary.preserveSerializedError === true) &&
+      (schemaError || includeSerializedError)
         ? {
             serializedError: serializeRpcError(error, {
               report: (failure) =>

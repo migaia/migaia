@@ -239,7 +239,7 @@ export class RpcOutboundSender {
         () => this.#sendEnvelope(beforeWrite?.() ?? message, options, true, admission, onStarted),
         admission
       )
-    return this.#sendEnvelope(message, options, false)
+    return this.#sendEnvelope(message, options, false, admission, onStarted)
   }
 
   /** Starts an idle singleton synchronously; only an existing physical write creates a queue. */
@@ -551,7 +551,7 @@ export class RpcOutboundSender {
     }
     return this.#prepareFrames(frames, transfer, hasTransfer, generation).then((preparedFrames) => {
       this.#lifecycle?.assertActive(generation)
-      return gated
+      return gated || admission !== undefined
         ? this.#sendPreparedFramesGated(preparedFrames, transfer, generation, admission, onStarted)
         : this.#sendPreparedFrames(preparedFrames, transfer, generation)
     })

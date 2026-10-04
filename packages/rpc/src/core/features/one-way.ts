@@ -1,4 +1,5 @@
 import type { IRpcFeature } from '../feature.js'
+import type { IRpcAbortSignal } from '../typing.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from '../internal/define-rpc-feature.js'
 import type {
@@ -11,7 +12,14 @@ import type {
  * Optional transfer elements whose identity/order reach the canonical sender; that sender captures
  * the caller list into its own immutable snapshot before physical transport.
  */
-export type IRpcOneWayOptions = Readonly<{ transfer?: readonly unknown[] }>
+export type IRpcOneWayOptions = Readonly<{
+  /** Physical ownership transfer remains exclusively validated by the existing sender. */
+  transfer?: readonly unknown[]
+  /** Cancellation controls only local send admission; it is never sent as business data. */
+  signal?: IRpcAbortSignal
+  /** Only an explicit deadline limits physical send; one-way has no request default timeout. */
+  timeoutMs?: number
+}>
 
 /** Public surface added only when callers select the one-way endpoint preset. */
 export type IOneWaySurface = Readonly<{
@@ -61,7 +69,9 @@ export const createOneWayFeature = (
               targetId,
               method,
               data,
-              ...(options?.transfer === undefined ? {} : { transfer: options.transfer })
+              ...(options?.transfer === undefined ? {} : { transfer: options.transfer }),
+              ...(options?.signal === undefined ? {} : { signal: options.signal }),
+              ...(options?.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs })
             })
         })
         const preparedInstallation: IOneWayInstallation = Object.freeze({ public: publicSurface })
