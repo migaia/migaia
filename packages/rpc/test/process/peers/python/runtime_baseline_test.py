@@ -1,7 +1,8 @@
 """Unit checks for the Python fixture's U36 directory and capability claims."""
 import unittest
 import peer
-from business import Business
+from business import Business, native_response
+from reverse import ReverseCalls
 
 
 class RuntimeBaseline(unittest.TestCase):
@@ -22,6 +23,25 @@ class RuntimeBaseline(unittest.TestCase):
         value, error = Business(False).invoke("migaia.remote.describe", None)
         self.assertIsNone(value)
         self.assertIsNotNone(error)
+
+    def test_reverse_mode_whitelist(self):
+        calls = ReverseCalls("parent", native_response)
+        calls.whitelist = calls.directory({"schemaVersion": 2, "self": {"name": "parent", "instanceId": "parent"},
+            "methods": [{"name": "notifyOnly", "supportedModes": ["notify"], "modeSource": "declared"}]})
+        message = {"kind": "request", "id": "unit-reverse", "method": "peer.reverse", "data": {
+            "route": peer.route("request", "parent", "python-peer"), "payload": {"method": "notifyOnly"}}}
+        self.assertEqual(calls.start(message)[0]["code"], "CAPABILITY_UNSUPPORTED")
+        self.assertEqual(calls.pending, {})
+
+    def test_reverse_close_releases_pending_once(self):
+        calls = ReverseCalls("parent", native_response)
+        message = {"kind": "request", "id": "unit-reverse", "method": "peer.reverse", "data": {
+            "route": peer.route("request", "parent", "python-peer"), "payload": {"method": "parentEcho"}}}
+        self.assertEqual(calls.start(message)[0]["method"], "migaia.remote.runtime.describe")
+        self.assertEqual(calls.close()[0]["id"], "unit-reverse")
+        self.assertEqual(calls.pending, {})
+        self.assertIsNone(calls.whitelist)
+        self.assertEqual(calls.close(), [])
 
 
 if __name__ == "__main__":
