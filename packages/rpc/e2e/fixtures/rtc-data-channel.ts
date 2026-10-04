@@ -131,6 +131,8 @@ globalThis.runRtcScenario = async () => {
       connect({ transport: leftTransport }),
       authentication({
         encodedType: 'string',
+        sign: (value) => value,
+        verify: (value) => value,
         encrypt: (value) => carrierCodec.encode(value as ICodecValue),
         decrypt: (value) => carrierCodec.decode(value as string)
       }),
@@ -169,6 +171,8 @@ globalThis.runRtcScenario = async () => {
       connect({ transport: rightTransport }),
       authentication({
         encodedType: 'string',
+        sign: (value) => value,
+        verify: (value) => value,
         encrypt: (value) => carrierCodec.encode(value as ICodecValue),
         decrypt: (value) => carrierCodec.decode(value as string)
       }),

@@ -36,6 +36,8 @@ const createWebTransportRpc = (
         connect({ transport }),
         authentication({
           encodedType: 'uint8array',
+          sign: (value) => value,
+          verify: (value) => value,
           encrypt: (value) => value,
           decrypt: (value) => value
         }),
