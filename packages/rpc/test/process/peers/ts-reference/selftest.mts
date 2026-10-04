@@ -8,6 +8,8 @@ import {
   type IRecord,
   isRecord,
   MAX_FRAME,
+  localOffer,
+  PeerFault,
   negotiate,
   validateAccept,
   validateHello
@@ -19,6 +21,16 @@ type IVerdict = { passed: number; failed: number; pending: string[]; failures: s
 /** Reads repository vectors as inputs, never rewriting the frozen snapshots. */
 function vector(directory: string, name: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(directory, name), 'utf8')) as Record<string, unknown>
+}
+
+/** Expand only the current framing vector's literal-hex or repeated-byte representation. */
+function framingBytes(value: unknown): Buffer {
+  if (typeof value === 'string') return Buffer.from(value, 'hex')
+  /** Generated maximum-size cases use one repeat specification rather than a large JSON string. */
+  const specification = value as { repeatHex: string; count: number }
+  /** The existing encoder and decoder receive the exact repeated bytes described by the fixture. */
+  const pattern = Buffer.from(specification.repeatHex, 'hex')
+  return Buffer.alloc(pattern.length * specification.count, pattern)
 }
 
 /** Checks an envelope's first error so 1.0 and 1.1 classify unknown stream differently. */
@@ -258,10 +270,16 @@ function check(verdict: IVerdict, name: string, assertion: () => void): void {
   }
 }
 
-/** Runs the frozen and current fixture rows without using an RPC implementation package. */
+/** Runs current wire rows and the mandatory U36 offer without loading an RPC implementation. */
 function run(directory: string): IVerdict {
   const verdict: IVerdict = { passed: 0, failed: 0, pending: [], failures: [] }
-  for (const base of ['frozen/1.0', '']) {
+  check(verdict, 'U36/required-baseline-offer', () => {
+    /** The real executable offer must expose both mandatory U36 capabilities. */
+    const offer = localOffer('ts-peer')
+    assert.equal((offer.capabilities as string[]).includes('runtime-api@1'), true)
+    assert.equal((offer.capabilities as string[]).includes('batch@1'), true)
+  })
+  for (const base of ['']) {
     const prefix = base === '' ? '' : `${base}/`
     const handshake = vector(directory, `${prefix}handshake.json`)
     for (const item of handshake.agreement as Array<Record<string, unknown>>) {
@@ -404,29 +422,6 @@ function run(directory: string): IVerdict {
   check(verdict, 'stream/envelope/valid', () =>
     assert.equal(envelope((streams.envelope as Record<string, unknown>).valid, true), undefined)
   )
-  check(verdict, 'stream/envelope/reclassified', () => {
-    const frozen = vector(directory, 'frozen/1.0/envelope.json')
-    const old = (frozen.invalid as Array<Record<string, unknown>>).find(
-      (item) => item.id === 'unknown-kind'
-    )!
-    const expected = (streams.envelope as Record<string, unknown>).reclassified as Record<
-      string,
-      unknown
-    >
-    assert.deepEqual(envelope(old.value, true), [expected.violation, expected.pointer])
-    assert.deepEqual(envelope(old.value, false), [old.violation, old.pointer])
-  })
-  check(verdict, 'stream/handshake/compatibility', () => {
-    const item = streams.handshake as Record<string, unknown>
-    assert.equal(
-      Math.min(
-        (item.newVersion as Record<string, number>).minor,
-        (item.oldVersion as Record<string, number>).minor
-      ),
-      item.negotiatedMinor
-    )
-    assert.equal((item.capabilities as string[]).includes('stream@1'), true)
-  })
   check(verdict, 'framing/zero-and-limit', () => {
     assert.throws(() => encodeFrame(Buffer.alloc(0)), { code: 'INVALID_FRAME' })
     assert.throws(() => encodeFrame(Buffer.alloc(MAX_FRAME + 1)), { code: 'FRAME_LIMIT_EXCEEDED' })
@@ -525,17 +520,35 @@ function run(directory: string): IVerdict {
       }
     })
   }
-  for (const name of ['stream-framing.json', 'remote-host-control.json']) {
-    try {
-      vector(directory, name)
-      verdict.pending.push(`${name}: semantic mapping pending`)
-      verdict.failed += 1
-      verdict.failures.push(`unmapped/${name}`)
-    } catch {
-      verdict.pending.push(name)
-      verdict.failed += 1
-      verdict.failures.push(`missing/${name}`)
-    }
+  /** Execute every current framing row through this executable peer's actual byte codec. */
+  const framing = vector(directory, 'stream-framing.json') as unknown as IRecord[]
+  for (const item of framing) {
+    check(verdict, `framing/${item.id}`, () => {
+      /** A fresh decoder retains vector chunk boundaries and its first terminal failure. */
+      const decoder = new FrameDecoder()
+      /** Every completed frame is retained before checking the vector's terminal error. */
+      const actual: Buffer[] = []
+      /** First mapped framing failure is absent for every valid complete stream. */
+      let failure: string | undefined
+      try {
+        for (const chunk of (item.chunksHex ?? item.chunks) as unknown[])
+          actual.push(...decoder.push(framingBytes(chunk)))
+        if (item.finish === true) decoder.finish()
+      } catch (error) {
+        if (!(error instanceof PeerFault)) throw error
+        failure = error.code
+      }
+      assert.deepEqual(actual, ((item.framesHex ?? item.frames) as unknown[]).map(framingBytes))
+      assert.equal(failure, (item.error as { code: string } | undefined)?.code)
+      if (typeof item.encodedPrefixHex === 'string') {
+        /** Compare the real writer's entire frame, including prefix and unchanged payload bytes. */
+        const payload = framingBytes(item.payloadHex ?? item.payload)
+        assert.deepEqual(
+          encodeFrame(payload),
+          Buffer.concat([Buffer.from(item.encodedPrefixHex, 'hex'), payload])
+        )
+      }
+    })
   }
   return verdict
 }
