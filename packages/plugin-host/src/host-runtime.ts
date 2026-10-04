@@ -501,10 +501,7 @@ export class PluginHost<
             assertInstall()
             /** Normalize numeric PropertyKey once before entering the canonical ownership map. */
             const slotKey = typeof key === 'number' ? String(key) : key
-            if (
-              Reflect.has(this, slotKey) &&
-              this.#state.readSharedExtension(slotKey) === undefined
-            )
+            if (Reflect.has(this, slotKey) && !this.#state.ownsSharedExtension(slotKey))
               throw new PluginHostError(
                 PluginHostErrorCode.extensionReserved,
                 ERROR_TEXT.EXTENSION_RESERVED(registration.name, slotKey)
@@ -554,6 +551,10 @@ export class PluginHost<
             if (Object.keys(outputs).length === 0) void handle.extensions
             return Object.freeze({
               outputs: Object.freeze(outputs),
+              readCurrent: (feature: string): object => {
+                assertCurrent()
+                return handle.getFeature(feature)
+              },
               assertCurrent: (feature: string): void => {
                 assertCurrent()
                 if (
@@ -573,15 +574,14 @@ export class PluginHost<
     this.#state.configureSharedPublication({
       assertActive: () => this.#assertActive(),
       publish: (key) => {
+        // The canonical owner retains this immutable getter across final withdrawal and reuse.
+        if (Object.hasOwn(this, key)) return
         /** The concrete descriptor reads canonical state, never a facade-maintained registry. */
         Object.defineProperty(this, key, {
           enumerable: true,
-          configurable: true,
+          configurable: false,
           get: () => this.#state.readSharedExtension(key)
         })
-      },
-      revoke: (key) => {
-        Reflect.deleteProperty(this, key)
       }
     })
     this.#configRuntime = new PluginHostConfigRuntime({

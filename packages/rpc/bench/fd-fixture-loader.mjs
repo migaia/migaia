@@ -51,15 +51,25 @@ export function assertFdFixtureImports(source, body) {
  * @throws {Error} Missing original declaration, type erasure or canonical adapter load failure.
  */
 export async function loadFdLauncher() {
-  /** Bun delegates preparation-time type erasure to Node; neither compiler runs in the window. */
-  if (process.versions.bun) {
-    const path = execFileSync('node', [fileURLToPath(import.meta.url), '--prepare'], {
-      encoding: 'utf8'
-    }).trim()
-    return (await import(pathToFileURL(path).href)).fdLauncher()
-  }
-  const path = await prepare()
+  /** The compiler runs in a separate preparation PID for every runtime, never in measured RSS. */
+  const path = execFileSync('node', [fileURLToPath(import.meta.url), '--prepare'], {
+    encoding: 'utf8'
+  }).trim()
   return (await import(pathToFileURL(path).href)).fdLauncher()
+}
+
+/**
+ * Load the canonical public endpoint fixture after offline type erasure in a separate PID.
+ *
+ * @returns {Promise<typeof import('../test/core/a10-p2-f-runtime.ts')>} Unchanged fixture exports.
+ * @throws {Error} Original preparation, file or module loading failure.
+ */
+export async function loadEndpointFixture() {
+  /** Compiler memory is preparation cost, independent of either measured production endpoint. */
+  const path = execFileSync('node', [fileURLToPath(import.meta.url), '--prepare-endpoint'], {
+    encoding: 'utf8'
+  }).trim()
+  return import(pathToFileURL(path).href)
 }
 
 /** Erase the sole canonical function body into a worktree-specific temporary module. */
@@ -84,6 +94,11 @@ import {nodeByteStream} from ${JSON.stringify(new URL('../dist/process/adapters/
 `
   const body = stripTypeScriptTypes(source.slice(start, end))
   assertFdFixtureImports(source, body)
+  return writePrepared(fixture, preamble + body, 'fd-launcher.mjs')
+}
+
+/** Retain one original fixture's emitted bytes in its existing worktree-specific temporary scope. */
+function writePrepared(fixture, contents, filename) {
   const key = createHash('sha256').update(fixture.href).digest('hex').slice(0, 12)
   const directory = join(tmpdir(), `rpc-bench-fd-${key}`)
   mkdirSync(directory, { recursive: true })
@@ -93,13 +108,23 @@ import {nodeByteStream} from ${JSON.stringify(new URL('../dist/process/adapters/
     if (!lstatSync(link, { throwIfNoEntry: false }))
       symlinkSync(resolve(fileURLToPath(new URL('../../', import.meta.url)), name), link)
   }
-  const path = join(directory, 'fd-launcher.mjs')
-  writeFileSync(path, preamble + body)
+  const path = join(directory, filename)
+  writeFileSync(path, contents)
   return path
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.includes('--prepare'))
-  prepare().then(
+/** Erase the entire canonical endpoint module without altering its runtime imports or graph. */
+async function prepareEndpoint() {
+  const { stripTypeScriptTypes } = await import('node:module')
+  const fixture = new URL('../test/core/a10-p2-f-runtime.ts', import.meta.url)
+  return writePrepared(fixture, stripTypeScriptTypes(readFileSync(fixture, 'utf8')), 'endpoint.mjs')
+}
+
+if (
+  process.argv[1] === fileURLToPath(import.meta.url) &&
+  (process.argv.includes('--prepare') || process.argv.includes('--prepare-endpoint'))
+)
+  (process.argv.includes('--prepare-endpoint') ? prepareEndpoint() : prepare()).then(
     (path) => console.log(path),
     (error) => {
       console.error(error)

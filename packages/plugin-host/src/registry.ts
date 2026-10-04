@@ -121,8 +121,14 @@ export type ISharedExtensionSlot<TDomainCore extends object, TValue> = {
   /** Ready physical sessions and live registrations remain separate canonical membership facts. */
   readonly contributions: Set<ISharedExtensionContribution<TDomainCore, TValue>>
   readonly registrations: Set<IRegistration<TDomainCore, TValue>>
-  readonly names: Map<string, Set<ISharedExtensionContribution<TDomainCore, TValue>>>
-  readonly instanceIds: Map<string, Set<ISharedExtensionContribution<TDomainCore, TValue>>>
+  readonly names: Map<string, ISharedExtensionBucket<TDomainCore, TValue>>
+  readonly instanceIds: Map<string, ISharedExtensionBucket<TDomainCore, TValue>>
+}
+
+/** The canonical bucket caches its sole receipt so hot lookup never allocates an iterator. */
+export type ISharedExtensionBucket<TDomainCore extends object, TValue> = {
+  readonly members: Set<ISharedExtensionContribution<TDomainCore, TValue>>
+  single: ISharedExtensionContribution<TDomainCore, TValue> | undefined
 }
 
 /** Revocation compares the receipt itself so late cleanup cannot touch a successor registration. */

@@ -43,7 +43,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     Pick<IRemoteProxyOptions<TUnit, TSpec>, 'keyFactory' | 'retryPort' | 'callDeadlineCapMs'>,
   binding: IRemoteBinding<TUnit, TSpec>,
   bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint,
-  preparation?: IRuntimePreparationContext
+  preparation?: IRuntimePreparationContext,
+  beforeRelease?: () => Promise<void>
 ): Promise<IRuntimePeer> {
   compileRuntimeMethods(options.provide, options.contract)
   /** Safe configuration admission precedes supervisor.start and any native launcher side effect. */
@@ -55,6 +56,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     keyFactory: options.keyFactory,
     retryPort: options.retryPort,
     callDeadlineCapMs: options.callDeadlineCapMs,
+    beforeRelease,
     prepareRuntime: (channel, preparationSignal) =>
       createRuntimePeer(
         {

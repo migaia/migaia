@@ -103,6 +103,8 @@ export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = Omit<
   Readonly<{
     prepareRuntime(channel: IRemoteChannel, signal: IAbortSignal): Promise<IRuntimePeer>
     readRuntimeEndpoint(peer: IRuntimePeer): IRemoteServeEndpoint
+    /** Original native drain completes before this registration disposes its current endpoint. */
+    beforeRelease?(): Promise<void>
   }>
 
 /** Only the package factories construct this union; v1 contract validation remains mandatory there. */
@@ -115,6 +117,7 @@ type IRemoteRegistrationOptions<TUnit, TSpec> = Omit<
     endpointFactory?: IRemoteProxyOptions<TUnit, TSpec>['endpointFactory']
     prepareRuntime?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['prepareRuntime']
     readRuntimeEndpoint?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['readRuntimeEndpoint']
+    beforeRelease?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['beforeRelease']
   }>
 
 /** One setup-scoped resource owner also accepts replacement generation resources. */
@@ -821,20 +824,56 @@ class RemoteRegistration<TUnit, TSpec> {
     const error = createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     this.#releaseReason = error
     this.#rejectWaiters(error)
-    const current = this.#current
-    if (current) this.#leave(current.number, error)
-    const currentClose = current ? this.#closing.get(current.number) : undefined
+    /**
+     * Legacy release keeps immediate retirement; native runtime drain retains the original
+     * endpoint.
+     */
+    const retire = (): Promise<void> | undefined => {
+      const current = this.#current
+      if (current) this.#leave(current.number, error)
+      return current ? this.#closing.get(current.number) : undefined
+    }
+    /**
+     * Release admission is already closed, while an existing native drain may still use its
+     * endpoint.
+     */
+    const currentClose = this.#options.beforeRelease ? undefined : retire()
     this.#releasePromise = (async () => {
+      /** Drain failure cannot prevent native exit or replace its original cause during cleanup. */
+      const failures: unknown[] = []
       try {
-        if (currentClose) await currentClose
-        if (this.#options.binding.ownership === 'owned')
-          await this.#options.binding.supervisor.dispose()
+        if (this.#options.beforeRelease) {
+          try {
+            // This cold boundary publishes the exact release Promise before drain callbacks run.
+            await Promise.resolve().then(() => this.#options.beforeRelease!())
+          } catch (failure) {
+            failures.push(failure)
+          }
+        }
+        /** The sole generation owner still retires and disposes once, after its native drain. */
+        const closing = this.#options.beforeRelease ? retire() : currentClose
+        try {
+          if (closing) await closing
+        } catch (failure) {
+          if (!this.#options.beforeRelease) throw failure
+          failures.push(failure)
+        }
+        if (this.#options.binding.ownership === 'owned') {
+          try {
+            await this.#options.binding.supervisor.dispose()
+          } catch (failure) {
+            if (!this.#options.beforeRelease) throw failure
+            failures.push(failure)
+          }
+        }
       } finally {
         await Promise.allSettled(this.#closing.values())
         this.#departed.clear()
         this.#leaveListeners.clear()
         this.#runtimeReadyListeners.clear()
       }
+      if (failures.length === 1) throw failures[0]
+      if (failures.length > 1) throw codedAggregate(failures, RpcRemoteLayerErrorCode.closed)
     })()
     return this.#releasePromise
   }

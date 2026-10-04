@@ -28,10 +28,12 @@ export type IPluginRuntimeSharedSlot<TFacade extends object = object> = Readonly
   contribute(value: object, instanceId: string): () => void
 }>
 
-/** Captured real Feature outputs cannot acquire authority from a later same-name registration. */
+/** Cold Feature inventory retains original guards and can resolve the current named output. */
 export type IPluginRuntimeFeatureSnapshot = Readonly<{
   readonly outputs: Readonly<Record<string, object>>
   assertCurrent(feature: string): void
+  /** Recheck connection and Feature availability through the original Host handle on each call. */
+  readCurrent(feature: string): object
 }>
 
 /** A canonical install core exposes only Host identity, Feature reads and shared publication. */
@@ -46,7 +48,7 @@ export type IPluginRuntimeIntegration = Readonly<{
     family: object,
     create: (slot: IPluginRuntimeSharedSlot<TFacade>) => TFacade
   ): IPluginRuntimeSharedSlot<TFacade>
-  /** Capture current outputs during install or a later exact-registration generation preparation. */
+  /** Capture the cold inventory once; availability remains a per-call Host decision. */
   readFeatureOutputs(name: string): IPluginRuntimeFeatureSnapshot
 }>
 

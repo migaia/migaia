@@ -10,7 +10,8 @@ import type {
   IExtensionOwner,
   IRegistration,
   ISharedExtensionSlot,
-  ISharedExtensionContribution
+  ISharedExtensionContribution,
+  ISharedExtensionBucket
 } from './registry.js'
 import type { IPluginRuntimeSharedSlot } from './core.js'
 import { assertPluginExtensionKey, isSharedExtensionSlot } from './extension.js'
@@ -56,7 +57,6 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     | Readonly<{
         assertActive(): void
         publish(key: PropertyKey): void
-        revoke(key: PropertyKey): void
       }>
     | undefined
   /** Live definition lanes, written only through the composition entry. */
@@ -82,7 +82,6 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     publication: Readonly<{
       assertActive(): void
       publish(key: PropertyKey): void
-      revoke(key: PropertyKey): void
     }>
   ): void {
     this.#sharedPublication = publication
@@ -92,7 +91,14 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   readSharedExtension(key: PropertyKey): object | undefined {
     /** Exact owner equality prevents an old facade from reading a later same-key registration. */
     const owner = this.extensionOwners.get(key)
-    return owner && isSharedExtensionSlot(owner) ? owner.facade : undefined
+    return owner && isSharedExtensionSlot(owner) && !owner.retired ? owner.facade : undefined
+  }
+
+  /** Immutable class publication reserves the same key and family for this Host's lifetime. */
+  ownsSharedExtension(key: PropertyKey): boolean {
+    /** Retired ownership remains in the original map, without a second publication registry. */
+    const owner = this.extensionOwners.get(key)
+    return owner !== undefined && isSharedExtensionSlot(owner)
   }
 
   /** Stage one family-authorized contribution inside the existing atomic installation batch. */
@@ -125,19 +131,19 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         ERROR_TEXT.EXTENSION_DUPLICATE(registration.name, key)
       )
     /** All address indexes are part of this one canonical slot, never an adapter-side host registry. */
-    const slot: ISharedExtensionSlot<TDomainCore, TValue> = (owner as ISharedExtensionSlot<
-      TDomainCore,
-      TValue
-    >) ?? {
-      key,
-      family,
-      facade: {},
-      retired: false,
-      contributions: new Set(),
-      registrations: new Set(),
-      names: new Map(),
-      instanceIds: new Map()
-    }
+    const slot: ISharedExtensionSlot<TDomainCore, TValue> =
+      owner && isSharedExtensionSlot(owner) && !owner.retired
+        ? owner
+        : {
+            key,
+            family,
+            facade: {},
+            retired: false,
+            contributions: new Set(),
+            registrations: new Set(),
+            names: new Map(),
+            instanceIds: new Map()
+          }
     /** Writes are exact-registration scoped; facade reads require committed slot identity. */
     const view: IPluginRuntimeSharedSlot<TFacade> = Object.freeze({
       get facade() {
@@ -148,9 +154,9 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         if (slot.retired || this.extensionOwners.get(key) !== slot) return undefined
         /** Instance identity takes precedence over an equal human name. */
         const instances = slot.instanceIds.get(target) ?? slot.names.get(target)
-        if (instances && instances.size !== 1) return null
+        if (instances && instances.members.size !== 1) return null
         /** Both indexes select one receipt before the original registration's availability check. */
-        const receipt = instances?.values().next().value
+        const receipt = instances?.single
         return receipt &&
           this.isLive(receipt.registration) &&
           receipt.registration.activated &&
@@ -191,7 +197,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         }
       }
     })
-    if (!owner) {
+    if (!owner || (isSharedExtensionSlot(owner) && owner.retired)) {
       slot.facade = create(view)
       if (typeof slot.facade !== 'object' || slot.facade === null)
         throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
@@ -328,8 +334,6 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         this.extensionOwners.get(slot.key) === slot
       ) {
         slot.retired = true
-        this.extensionOwners.delete(slot.key)
-        this.#sharedPublication?.revoke(slot.key)
       }
     }
     registration.sharedContributions = []
@@ -352,14 +356,23 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       [slot.instanceIds, receipt.instanceId]
     ] as const) {
       /** One exact bucket is updated; stale cleanup never removes a successor receipt. */
-      const members = index.get(key) ?? new Set<ISharedExtensionContribution<TDomainCore, TValue>>()
-      if (publish) {
-        members.add(receipt)
-        index.set(key, members)
-      } else {
-        members.delete(receipt)
-        if (members.size === 0) index.delete(key)
+      const bucket: ISharedExtensionBucket<TDomainCore, TValue> = index.get(key) ?? {
+        members: new Set<ISharedExtensionContribution<TDomainCore, TValue>>(),
+        single: undefined
       }
+      if (publish) {
+        bucket.members.add(receipt)
+        index.set(key, bucket)
+      } else {
+        bucket.members.delete(receipt)
+        if (bucket.members.size === 0) index.delete(key)
+      }
+      bucket.single = undefined
+      // Membership changes are cold; hot selection reads the cached receipt without an iterator.
+      if (bucket.members.size === 1)
+        bucket.members.forEach((remaining) => {
+          bucket.single = remaining
+        })
     }
     if (publish) this.#sharedPublication?.publish(slot.key)
   }

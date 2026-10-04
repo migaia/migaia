@@ -114,7 +114,8 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
       },
       binding,
       (channel, endpoint) => binding.bindEndpoint(channel, endpoint),
-      preparation
+      preparation,
+      () => binding.drainCurrent()
     )
   /** The canonical binding's native health and drain are kept, rather than disabled for v2. */
   return spawn
