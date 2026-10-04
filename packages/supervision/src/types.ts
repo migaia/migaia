@@ -63,12 +63,29 @@ export type IBudgetOutcome =
   | { readonly kind: 'rejected'; readonly reason: BudgetRejection }
 /** Limits and optional parent for one kind of unit. */
 export type IUnitBudgetOptions<TKind extends string> = {
+  /** Unit kind kept on granted leases so process, thread and coroutine budgets cannot be mixed. */
   readonly kind: TKind
+  /** Maximum simultaneously granted leases; queued requests do not occupy a unit slot. */
   readonly maxUnits: number
+  /** Chooses reject or queue when all unit slots are occupied; defaults to reject. */
   readonly overflow?: BudgetOverflow
+  /**
+   * Maximum scheduler-time wait for a queued unit request; expiry returns a rejected admission
+   * outcome.
+   */
   readonly queueTimeoutMs?: number
-  readonly launchRate?: { readonly max: number; readonly windowMs: number } | false
+  /** Optional sliding-window launch-rate limit in addition to the concurrent unit limit. */
+  readonly launchRate?:
+    | {
+        /** Maximum leases granted during one launch-rate window. */
+        readonly max: number
+        /** Scheduler-time duration in milliseconds for the launch-rate window. */
+        readonly windowMs: number
+      }
+    | false
+  /** Optional parent budget acquired before the local lease; release returns both occupied slots. */
   readonly parent?: IUnitBudget<TKind>
+  /** Owns monotonic deadlines, restart delays and health timers; omission uses systemScheduler. */
   readonly scheduler?: IScheduler
 }
 /** Shared admission controller; granted leases survive close. */
@@ -101,35 +118,83 @@ export type ISupervisionHooks<TSpec, THandle> = {
 }
 /** Policy shared by all unit profiles. */
 export type ISupervisorBaseOptions<THandle> = {
+  /** Stable supervisor identity used in unit diagnostics and durable ownership records. */
   readonly id: string
+  /** Required sink for contained launch, health, cleanup and late failures; it must not throw. */
   readonly report: (error: unknown) => void
+  /**
+   * Optional readiness handshake run after launch; honor its cancellation signal and settle before
+   * the startup deadline.
+   */
   readonly ready?: (unit: THandle, signal: IAbortSignal) => PromiseLike<void>
+  /** Maximum launch and readiness time in scheduler milliseconds; defaults to 10000. */
   readonly startupTimeoutMs?: number
+  /** Restart mode and bounded exponential backoff after profile-classified retryable exit. */
   readonly restart?: {
+    /** Selects never, on-failure or always restart after exit; defaults to on-failure. */
     readonly mode?: RestartMode
+    /** First automatic restart delay in scheduler milliseconds; defaults to 250. */
     readonly initialDelayMs?: number
+    /** Multiplier for successive restart delays; defaults to 2 and remains bounded by maxDelayMs. */
     readonly factor?: number
+    /** Upper bound on exponential restart delay in milliseconds; defaults to 30000. */
     readonly maxDelayMs?: number
+    /** Maximum restart attempts in the sliding window before the supervisor enters terminal state. */
     readonly maxRestarts?: number
+    /** Sliding scheduler-time window used to count restart attempts; defaults to 60000 milliseconds. */
     readonly windowMs?: number
   }
+  /** Chooses permanent terminal state or an explicit cooldown before allowing another generation. */
   readonly terminalPolicy?:
-    | { readonly mode: 'stay' }
-    | { readonly mode: 'cooldown'; readonly afterMs: number }
+    | {
+        /** Keeps admission permanently closed after terminal state. */
+        readonly mode: 'stay'
+      }
+    | {
+        /** Reopens admission after the explicit cooldown duration. */
+        readonly mode: 'cooldown'
+        /** Scheduler milliseconds to wait before admitting a new generation. */
+        readonly afterMs: number
+      }
+  /**
+   * Ordered shutdown policy for draining application work, requesting exit and finally reaping the
+   * unit.
+   */
   readonly stop?: {
+    /** Optional cancellable drain callback invoked before profile-specific termination. */
     readonly beforeTerminate?: (unit: THandle, signal: IAbortSignal) => PromiseLike<void>
+    /** Maximum application drain time before termination proceeds; defaults to 5000 milliseconds. */
     readonly drainTimeoutMs?: number
+    /** Maximum wait for graceful actual exit before hard termination; defaults to 5000 milliseconds. */
     readonly exitTimeoutMs?: number
+    /** Maximum wait for actual exit after hard termination; defaults to 5000 milliseconds. */
     readonly reapTimeoutMs?: number
   }
+  /**
+   * Periodic cancellable health checks for a ready unit; repeated failure invalidates that
+   * generation.
+   */
   readonly health?: {
+    /**
+     * Checks the current unit and rejects on unhealthy state; honor the provided cancellation
+     * signal.
+     */
     readonly check: (unit: THandle, signal: IAbortSignal) => PromiseLike<void>
+    /** Scheduler interval between health checks; defaults to 5000 milliseconds. */
     readonly intervalMs?: number
+    /** Maximum duration of one health check; defaults to 2000 milliseconds. */
     readonly timeoutMs?: number
+    /** Consecutive failed checks required to declare the ready generation unhealthy; defaults to 3. */
     readonly failureThreshold?: number
   }
+  /**
+   * Requires declared launcher capabilities or explicitly accepts cooperative isolation; defaults
+   * to required.
+   */
   readonly isolation?: IsolationMode
+  /** Additional launcher capabilities checked together with the profile requirements before launch. */
   readonly requires?: readonly string[]
+  /** Owns monotonic deadlines, restart delays and health timers; omission uses systemScheduler. */
   readonly scheduler?: IScheduler
 }
 /** Core supervisor construction contract. */
@@ -139,10 +204,21 @@ export type ISupervisorOptions<
   TExit,
   TContext extends ILaunchContext
 > = ISupervisorBaseOptions<THandle> & {
+  /**
+   * Runtime adapter that creates handles and reports actual exit; the supervisor does not launch
+   * native resources itself.
+   */
   readonly launcher: IUnitLauncher<TSpec, THandle, TContext>
+  /** Initial launch specification validated by the profile before any unit is admitted. */
   readonly spec: TSpec
+  /** Shared unit admission budget; its lease remains occupied until actual unit exit. */
   readonly budget: IUnitBudget<string>
+  /**
+   * Unit-kind policy for specification validation, capability requirements, exit classification and
+   * termination.
+   */
   readonly profile: IUnitProfile<TSpec, THandle, TExit, TContext>
+  /** Adapter extension points for prewarmed admission, post-launch setup and ready-unit diagnostics. */
   readonly hooks?: ISupervisionHooks<TSpec, THandle>
 }
 /** Nonthrowing readiness observation. */

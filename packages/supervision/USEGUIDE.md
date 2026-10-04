@@ -40,7 +40,7 @@ Cooperative termination depends on the task settling. A task that ignores cancel
 
 Use `heartbeat: { timeoutMs, intervalMs?, failureThreshold? }` when the task calls `heartbeat()` or yields from an async generator. A missed heartbeat becomes `UNHEALTHY` with `HEARTBEAT_MISSED` on its cause chain. `heartbeat` and the generic `health` option are mutually exclusive.
 
-## A supervised process profile
+## Advanced usage: a supervised process profile
 
 `@migaia/supervision/process` is a platform-neutral contract. Supply an adapter whose
 `launch(spec, context)` starts without a shell, transfers only the named `env.inherit` keys plus

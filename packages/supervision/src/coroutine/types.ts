@@ -27,11 +27,20 @@ export type ICoroutineHandle<TPort> = IUnitHandle<ICoroutineExitStatus> & {
 }
 /** Core options plus coroutine-specific heartbeat monitoring. */
 export type ICoroutineSupervisorOptions<TPort> = ISupervisorBaseOptions<ICoroutineHandle<TPort>> & {
+  /** Initial launch specification validated by the profile before any unit is admitted. */
   readonly spec: ICoroutineSpec<TPort>
+  /** Shared unit admission budget; its lease remains occupied until actual unit exit. */
   readonly budget: IUnitBudget<'coroutine'>
+  /**
+   * Coroutine heartbeat watchdog; it observes cooperative task progress rather than native process
+   * health.
+   */
   readonly heartbeat?: {
+    /** Maximum scheduler-time age of the last coroutine heartbeat before a check fails. */
     readonly timeoutMs: number
+    /** Scheduler interval between coroutine heartbeat-age checks. */
     readonly intervalMs?: number
+    /** Consecutive stale heartbeat observations required before invalidating the coroutine. */
     readonly failureThreshold?: number
   }
 }

@@ -54,8 +54,14 @@ export type IThreadBudget = IUnitBudget<ThreadUnitKind>
 /** Core policy plus the thread-specific launcher, specification, and budget. */
 export type IThreadSupervisorOptions<THandle extends IThreadHandle = IThreadHandle> =
   ISupervisorBaseOptions<THandle> & {
+    /**
+     * Runtime adapter that creates handles and reports actual exit; the supervisor does not launch
+     * native resources itself.
+     */
     readonly launcher: IThreadLauncher<THandle>
+    /** Initial launch specification validated by the profile before any unit is admitted. */
     readonly spec: IThreadSpec
+    /** Shared unit admission budget; its lease remains occupied until actual unit exit. */
     readonly budget: IThreadBudget
   }
 
