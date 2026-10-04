@@ -424,9 +424,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             platform: this.kernel.platform
           }
           if (this.#authentication) {
-            /** Native and source-less channels identify one physical endpoint partition. */
+            /** Native or absent (undefined/null) sources use the endpoint partition. */
             let session =
-              this.#native || physical.source === undefined
+              this.#native || physical.source == null
                 ? this.#authenticationPhysicalSession
                 : undefined
             if (
