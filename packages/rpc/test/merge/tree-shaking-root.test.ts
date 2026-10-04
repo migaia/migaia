@@ -8,12 +8,13 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * The user accepts the measured idle callback reuse cost above the X14 repair pin. Caps remain
- * exact emitted costs, without another module or unmeasured headroom.
+ * X14 and the I28 implementation prompt permit exact measured pins after compression. The C0
+ * null-source repair keeps the original source guard and module count. Both byte caps are pinned to
+ * the exact retained-guard measurement, without adding headroom.
  */
 const allowedIncrease = {
-  rawBytes: 130783 / legacyRoot.rawBytes,
-  gzipBytes: 33458 / legacyRoot.gzipBytes
+  rawBytes: 130776 / legacyRoot.rawBytes,
+  gzipBytes: 33466 / legacyRoot.gzipBytes
 } as const
 
 /** I22–I26 ownership includes the two canonical physical batch modules. */
