@@ -1160,7 +1160,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '在自定义 reactive node 的值或连接关系变化后更新已登记版本。未登记 node 会被拒绝，不会静默创建隐藏状态。',
     quickStart:
-      "import { registerVersion, setVersion } from '@migaia/reactive/node-internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log('node version advanced to 1')",
+      "import { registerVersion, setVersion, readVersion } from '@migaia/reactive/node-internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log(readVersion(node))",
     scenariosEn: [
       'A custom node has committed a real change and must invalidate version-aware readers.',
       'Version ownership was established during node construction.'
@@ -1653,7 +1653,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '已登记对象所属 Runtime 与预期不同时拒绝，但允许普通未登记值通过。适用于同时接受普通值与受管值的边界。',
     quickStart:
-      "import { createRuntime } from '@migaia/reactive'\nimport { assertOwnedBy } from '@migaia/reactive/ownership'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.get())",
+      "import { createRuntime } from '@migaia/reactive'\nimport { assertOwnedBy } from '@migaia/reactive/ownership'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.value)\nnode.dispose()",
     scenariosEn: [
       'A Registry accepts plain application values plus Runtime-owned nodes.',
       'A helpful label is required in cross-Runtime diagnostics.'
@@ -1677,7 +1677,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '严格要求 reactive object 已登记给预期 Runtime。未登记的结构伪造对象和属于其他 Runtime 的节点都会在修改依赖边前被拒绝。',
     quickStart:
-      "import { createRuntime } from '@migaia/reactive'\nimport { assertReactiveOwnedBy } from '@migaia/reactive/ownership'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertReactiveOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.get())",
+      "import { createRuntime } from '@migaia/reactive'\nimport { assertReactiveOwnedBy } from '@migaia/reactive/ownership'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertReactiveOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.value)\nnode.dispose()",
     scenariosEn: [
       'A dependency, subscriber, or source is about to enter the reactive graph.',
       'Structural lookalikes must not gain access to mutable graph state.'
