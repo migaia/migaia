@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -20,14 +22,22 @@ type businessStream struct {
 	seq     int
 }
 
+// businessOffer adds the stream capability only for the profile that installs its providers.
+func businessOffer() offer {
+	local := localOffer()
+	local.Capabilities = append(local.Capabilities, "stream@1")
+	return local
+}
+
 // businessState owns one authenticated session's actual Host definition and call receipts.
 type businessState struct {
 	host, installed, closing bool
-	revision, pongs, closes  int
-	received, aborts         []any
-	waiting                  map[string]record
-	streams                  map[string]*businessStream
-	contract                 any
+	// stream records this session's capability agreement, rather than the local offer.
+	stream                  bool
+	revision, pongs, closes int
+	received, aborts        []any
+	waiting                 map[string]record
+	streams                 map[string]*businessStream
 }
 
 // businessRoute answers this exact caller and preserves request trace without leaking other sessions.
@@ -78,11 +88,8 @@ func (b *businessState) item() record {
 func (b *businessState) invoke(method string, payload any, trace any) (any, record) {
 	args, _ := payload.([]any)
 	switch method {
-	case "migaia.remote.describe":
-		if b.host {
-			return record{"schemaVersion": 1, "catalog": record{"p": b.contract}}, nil
-		}
-		return b.contract, nil
+	case runtimeDescribeMethod:
+		return runtimeDescription(true, b.host, b.stream), nil
 	case "migaia.remote.host.use":
 		if !b.host || len(args) < 1 || len(args) > 2 || args[0] != "p" {
 			return nil, wireError("REMOTE_CONTRACT_INVALID", "invalid Host use")
@@ -117,19 +124,28 @@ func (b *businessState) invoke(method string, payload any, trace any) (any, reco
 		cause := record{"source": "@migaia/rpc/core", "code": "INTERNAL", "name": "Error", "message": "peer cause", "stack": "Error: peer cause"}
 		return nil, record{"source": "@migaia/rpc/core", "code": "INTERNAL", "name": "RpcError", "message": "peer error", "stack": "RpcError: peer error", "cause": cause}
 	}
-	if !b.installed {
+	if strings.HasPrefix(method, "p.f.") && !b.installed {
 		failure := wireError("REMOTE_CLOSED", "remote is closed")
 		failure["source"] = "@migaia/rpc/remote"
 		return nil, failure
 	}
 	if method == "p.f.request" {
+		if len(args) != 1 {
+			return nil, runtimeFailure("CONTRACT_INVALID", runtimePayloadInvalid)
+		}
 		return args[0], nil
 	}
 	if method == "p.f.oneWay" {
+		if len(args) != 1 {
+			return nil, runtimeFailure("CONTRACT_INVALID", runtimePayloadInvalid)
+		}
 		b.received = append(b.received, args[0])
 		return nil, nil
 	}
-	return nil, wireError("METHOD_NOT_FOUND", "native peer method unavailable")
+	if method == "p.f.generator" || method == "p.f.asyncGenerator" || strings.HasPrefix(method, runtimeStreamPrefix) {
+		return nil, runtimeFailure("CAPABILITY_UNSUPPORTED", runtimeCapabilityUnavailable)
+	}
+	return nil, runtimeFailure("PROVIDER_NOT_FOUND", runtimeMethodUnavailable)
 }
 
 // native dispatch requires explicit credit before every stream item and records actual abort reasons.
@@ -141,11 +157,7 @@ func (b *businessState) native(message record) ([]record, error) {
 	switch message["kind"] {
 	case "discovery":
 		if header["type"] == "discovery-query" {
-			reply := businessRoute(message, "discovery-response")
-			reply["resolvedTargetId"] = header["targetId"]
-			reply["receiverId"] = header["targetId"]
-			reply["platform"] = "Process"
-			return []record{{"kind": "discovery", "id": id, "version": message["version"], "acceptVersions": message["acceptVersions"], "data": record{"route": reply}}}, nil
+			return []record{baselineDiscovery(message)}, nil
 		}
 	case "variation":
 		switch header["variation"] {
@@ -191,12 +203,29 @@ func (b *businessState) native(message record) ([]record, error) {
 		}
 		method, _ := message["method"].(string)
 		if method == "peer.wait" {
+			if header["dispatchOnly"] == true {
+				fmt.Fprintln(os.Stderr, "PEER_ERROR CAPABILITY_UNSUPPORTED")
+				return nil, nil
+			}
 			b.waiting[id] = message
 			return nil, nil
 		}
-		if method == "p.f.generator" || method == "p.f.asyncGenerator" {
+		if method == runtimeStreamPrefix+"p.f.generator" || method == runtimeStreamPrefix+"p.f.asyncGenerator" {
+			if header["dispatchOnly"] == true {
+				fmt.Fprintln(os.Stderr, "PEER_ERROR CAPABILITY_UNSUPPORTED")
+				return nil, nil
+			}
+			if !b.stream {
+				return []record{businessResponse(message, nil, runtimeFailure("CAPABILITY_UNSUPPORTED", runtimeCapabilityUnavailable))}, nil
+			}
 			args, _ := payload.([]any)
-			items, _ := args[0].([]any)
+			if len(args) != 1 {
+				return []record{businessResponse(message, nil, runtimeFailure("CONTRACT_INVALID", runtimePayloadInvalid))}, nil
+			}
+			items, ok := args[0].([]any)
+			if !ok {
+				return []record{businessResponse(message, nil, runtimeFailure("CONTRACT_INVALID", runtimePayloadInvalid))}, nil
+			}
 			b.streams[id] = &businessStream{request: message, items: items}
 			return []record{businessStreamFrame(message, "open", 0, nil)}, nil
 		}
@@ -210,7 +239,7 @@ func (b *businessState) native(message record) ([]record, error) {
 }
 
 // serveBusiness reuses the peer's strict native framing and hello parser before serving any business.
-func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, contract any, bridge, bare bool) error {
+func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, bridge, bare bool) error {
 	if bridge {
 		if bare {
 			for {
@@ -237,7 +266,7 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 				}
 			}
 		}
-		return serveBridge(reader, writer, host, token, contract)
+		return errors.New("UNSUPPORTED")
 	}
 	hello, err := receive(reader, true)
 	if err != nil {
@@ -247,14 +276,15 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 	if err != nil {
 		return errHandshakeInvalid
 	}
-	chosen, ok := negotiate(remote, localOffer())
-	if !ok || token != "" && hello["auth"] != token {
+	local := businessOffer()
+	chosen, ok := negotiate(remote, local)
+	if !ok || !baselineAgreement(chosen) || token != "" && hello["auth"] != token {
 		return send(writer, rejectRecord("AUTH_REJECTED", "authentication rejected"))
 	}
-	if err := send(writer, acceptRecord(chosen, localOffer())); err != nil {
+	if err := send(writer, acceptRecord(chosen, local)); err != nil {
 		return err
 	}
-	b := businessState{host: host, installed: !host, received: []any{}, aborts: []any{}, waiting: map[string]record{}, streams: map[string]*businessStream{}, contract: contract}
+	b := businessState{host: host, installed: !host, stream: slices.Contains(chosen.Capabilities, "stream@1"), received: []any{}, aborts: []any{}, waiting: map[string]record{}, streams: map[string]*businessStream{}}
 	for {
 		message, err := receive(reader, false)
 		if err == io.EOF {
@@ -263,37 +293,56 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 		if err != nil {
 			return err
 		}
-		method, _ := message["method"].(string)
-		if method == "peer.busy" || method == "peer.pause" || method == "peer.crash" {
-			if err := send(writer, businessResponse(message, "ACK", nil)); err != nil {
+		members, batched, frameErr := baselineMembers(message)
+		if frameErr != nil {
+			return frameErr
+		}
+		for _, message := range members {
+			if memberErr := validateBaselineMember(message); memberErr != nil {
+				if batched || errors.Is(memberErr, errUnsupportedRuntimeProfile) {
+					fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+					continue
+				}
+				return memberErr
+			}
+			method, _ := message["method"].(string)
+			if method == "peer.busy" || method == "peer.pause" || method == "peer.crash" {
+				if field(field(message["data"])["route"])["dispatchOnly"] != true {
+					if err := send(writer, businessResponse(message, "ACK", nil)); err != nil {
+						return err
+					}
+				}
+				if method == "peer.crash" {
+					os.Exit(17)
+				}
+				if method == "peer.pause" {
+					if err := syscall.Kill(os.Getpid(), syscall.SIGSTOP); err != nil {
+						return err
+					}
+				} else {
+					for {
+					}
+				}
+				continue
+			}
+			replies, err := b.native(message)
+			if err != nil {
+				if batched {
+					fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+					continue
+				}
 				return err
 			}
-			if method == "peer.crash" {
-				os.Exit(17)
-			}
-			if method == "peer.pause" {
-				if err := syscall.Kill(os.Getpid(), syscall.SIGSTOP); err != nil {
+			for _, reply := range replies {
+				if err := send(writer, reply); err != nil {
 					return err
 				}
-			} else {
-				for {
-				}
-			}
-			continue
-		}
-		replies, err := b.native(message)
-		if err != nil {
-			return err
-		}
-		for _, reply := range replies {
-			if err := send(writer, reply); err != nil {
-				return err
 			}
 		}
 	}
 }
 
-// bridgeReceive bounds header/body allocations before strict standard-library JSON decoding.
+// bridgeBody bounds header/body allocations before strict standard-library JSON decoding.
 func bridgeBody(reader io.Reader) ([]byte, error) {
 	header := []byte{}
 	one := make([]byte, 1)
@@ -332,34 +381,7 @@ func bridgeBody(reader io.Reader) ([]byte, error) {
 	return body, nil
 }
 
-// bridgeReceive adds RPC envelope validation to the payload parsing shared by the bare baseline.
-func bridgeReceive(reader io.Reader) (record, error) {
-	body, err := bridgeBody(reader)
-	if err != nil {
-		return nil, err
-	}
-	var message record
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.UseNumber()
-	if err := decoder.Decode(&message); err != nil {
-		return nil, err
-	}
-	if message["jsonrpc"] != "2.0" {
-		return nil, fmt.Errorf("invalid bridge envelope")
-	}
-	return message, nil
-}
-
-// bridgeSend writes one byte-counted Content-Length response without native control packets.
-func bridgeSend(writer io.Writer, message record) error {
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-	return bridgeWriteBody(writer, body)
-}
-
-// bridgeWriteBody is the common carrier writer for physical echo and serialized RPC responses.
+// bridgeWriteBody retains only the physical bare carrier used by the existing A10 payload baseline.
 func bridgeWriteBody(writer io.Writer, body []byte) error {
 	if _, err := fmt.Fprintf(writer, "Content-Length: %d\r\n\r\n", len(body)); err != nil {
 		return err
@@ -367,106 +389,8 @@ func bridgeWriteBody(writer io.Writer, body []byte) error {
 	return writeAll(writer, body)
 }
 
-// serveBridge shares real business state while exposing only the negotiated bridge extension surface.
-func serveBridge(reader io.Reader, writer io.Writer, host bool, token string, contract any) error {
-	methods := field(field(field(contract)["features"])["f"])["methods"].(map[string]any)
-	delete(methods, "generator")
-	delete(methods, "asyncGenerator")
-	b := businessState{host: host, installed: !host, received: []any{}, aborts: []any{}, waiting: map[string]record{}, streams: map[string]*businessStream{}, contract: contract}
-	authenticated := false
-	for {
-		message, err := bridgeReceive(reader)
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		params := field(message["params"])
-		var result any
-		var failure record
-		switch message["method"] {
-		case "migaia.hello":
-			var hello record
-			decoder := json.NewDecoder(strings.NewReader(params["hello"].(string)))
-			decoder.UseNumber()
-			if err := decoder.Decode(&hello); err != nil {
-				return err
-			}
-			remote, err := parseHello(hello)
-			if err != nil {
-				return err
-			}
-			local := localOffer()
-			local.Capabilities = []string{"abort@1", "jsonrpc-bridge@1", "wire-error@1", "deadline@1", "trace@1", "idempotency@1"}
-			chosen, ok := negotiate(remote, local)
-			authenticated = ok && token != "" && hello["auth"] == token
-			reply := rejectRecord("AUTH_REJECTED", "authentication rejected")
-			if authenticated {
-				reply = acceptRecord(chosen, local)
-			}
-			bytes, err := json.Marshal(reply)
-			if err != nil {
-				return err
-			}
-			result = record{"reply": string(bytes), "methods": []string{"migaia.hello", "migaia.describe", "migaia.invoke", "migaia.cancel"}}
-		case "migaia.cancel":
-			if !authenticated {
-				return fmt.Errorf("authentication required")
-			}
-			id, _ := params["id"].(string)
-			if _, ok := b.waiting[id]; ok {
-				delete(b.waiting, id)
-				b.aborts = append(b.aborts, params["reason"])
-				if err := bridgeSend(writer, record{"jsonrpc": "2.0", "id": id, "result": "late-after-cancel"}); err != nil {
-					return err
-				}
-			}
-			continue
-		case "migaia.describe":
-			if !authenticated {
-				return fmt.Errorf("authentication required")
-			}
-			result, failure = b.invoke("migaia.remote.describe", []any{}, nil)
-		case "migaia.invoke":
-			if !authenticated {
-				return fmt.Errorf("authentication required")
-			}
-			called, _ := params["method"].(string)
-			args, _ := params["args"].([]any)
-			if called == "peer.wait" || called == "p.f.request" && len(args) == 1 && args[0] == "__wait" {
-				b.waiting[message["id"].(string)] = message
-				continue
-			}
-			result, failure = b.invoke(called, args, field(params["meta"])["trace"])
-		default:
-			failure = wireError("METHOD_NOT_FOUND", "bridge peer method unavailable")
-		}
-		if id, exists := message["id"]; exists {
-			reply := record{"jsonrpc": "2.0", "id": id}
-			if failure == nil {
-				reply["result"] = result
-			} else {
-				reply["error"] = record{"code": -32000, "message": failure["message"], "data": record{"migaiaWireError": failure}}
-			}
-			if err := bridgeSend(writer, reply); err != nil {
-				return err
-			}
-		}
-	}
-}
-
 // runBusiness selects real owned stdio or a borrowed listener; only inherited/bootstrap bytes carry auth.
-func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, contractPath string, bridge, bare, descendant bool) error {
-	raw, err := os.ReadFile(contractPath)
-	if err != nil {
-		return err
-	}
-	var vector record
-	if err = json.Unmarshal(raw, &vector); err != nil {
-		return err
-	}
-	contract := field(vector["contracts"].([]any)[0])["value"]
+func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, bridge, bare, descendant bool) error {
 	token := ""
 	if authFD >= 0 {
 		auth := os.NewFile(uintptr(authFD), "auth")
@@ -494,7 +418,7 @@ func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD
 			defer func() { _ = child.Process.Kill(); _ = child.Wait() }()
 		}
 		fmt.Fprintf(os.Stderr, "READY pid=%d\n", os.Getpid())
-		return serveBusiness(os.Stdin, os.Stdout, host, token, contract, bridge, bare)
+		return serveBusiness(os.Stdin, os.Stdout, host, token, bridge, bare)
 	}
 	if address == "" || token == "" {
 		return fmt.Errorf("authentication required")
@@ -510,7 +434,7 @@ func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD
 		if err != nil {
 			return err
 		}
-		if err := serveBusiness(conn, conn, host, token, contract, bridge, bare); err != nil {
+		if err := serveBusiness(conn, conn, host, token, bridge, bare); err != nil {
 			fmt.Fprintln(os.Stderr, "PEER_FAIL BUSINESS_SESSION")
 		}
 		conn.Close()
