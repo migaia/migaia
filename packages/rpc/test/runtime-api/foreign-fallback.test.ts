@@ -6,13 +6,24 @@ import { createNativeProcessOffer } from '../../src/process/offer.js'
 import { createRpcStreamFrameDecoder } from '../../src/contract/framing/stream.js'
 import { RpcCapability } from '../../src/contract/wire-constants.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
-import { normalizeRemoteContract } from '../../src/remote/contract.js'
-import { createRuntimePeer, type IRuntimePeer } from '../../src/remote/runtime-api/peer.js'
+import {
+  createRuntimePeer,
+  readRuntimePeerConnection,
+  type IRuntimePeer
+} from '../../src/remote/runtime-api/peer.js'
 import { peers } from '../process/fixtures/conformance-business.js'
 
-/** The existing registry identifies unmodified independent Python/Go/Rust and public TS executables. */
-for (const peer of peers.filter((peer) => peer.language !== 'bun')) {
-  it(`[A32] ${peer.language} retains real v1 forward calls without receiving a blind v2 directory`, async () => {
+/** U36 uses the independent new-baseline peers, including the handwritten TS oracle. */
+for (const peer of [
+  ...peers.filter((peer) => ['python', 'go', 'rust'].includes(peer.language)),
+  {
+    language: 'ts-reference',
+    command: 'sh',
+    args: [new URL('../process/peers/ts-reference/run.sh', import.meta.url).pathname],
+    id: 'ts-peer'
+  }
+]) {
+  it(`[A32] ${peer.language} uses the U36 v2 directory and batch baseline`, async () => {
     /** Actual process ownership stays with the existing builtin launcher and its exit receipt. */
     const launcher = createNodeProcessLauncher()
     /** Only this test owns and terminates its child; the new Peer owns the borrowed byte endpoint. */
@@ -21,12 +32,10 @@ for (const peer of peers.filter((peer) => peer.language !== 'bun')) {
     const methods: string[] = []
     /** Actual negotiated capabilities are copied after the independent foreign handshake. */
     let capabilities: readonly string[] = []
-    /** Hidden reverse providers must remain unregistered on a legacy connection. */
+    /** A registered reverse provider remains idle until explicitly called. */
     let hiddenCalls = 0
     /** Preparation diagnostics remain local; no secret-bearing frames enter saved output. */
     const failures: unknown[] = []
-    /** A local fixture credential is written only in the canonical first bootstrap frame. */
-    const token = 'a32-local-fixture-token'
     /** Construction failure still leaves the real child in this test's cleanup ownership. */
     let active: IRuntimePeer | undefined
     try {
@@ -43,20 +52,16 @@ for (const peer of peers.filter((peer) => peer.language !== 'bun')) {
           handle = await launcher.launch(
             {
               command: peer.command,
-              args: [...peer.args, '--stdio', '--bootstrap', 'stdin'],
+              args: [...peer.args, '--stdio'],
               env: { inherit: ['PATH'], set: {} },
-              stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-              bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
+              stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
             },
             { signal: new AbortController().signal, output: () => undefined }
           )
           /** One observer reuses the published decoder; it implements no RPC receiver or dispatcher. */
           const decoder = createRpcStreamFrameDecoder({
             onFrame(frame) {
-              /**
-               * Method spelling is sufficient to distinguish v1 calls from a blind reserved
-               * request.
-               */
+              /** Method spelling proves v2 discovery without retaining business payloads. */
               const value = JSON.parse(new TextDecoder().decode(frame)) as { method?: string }
               if (value.method !== undefined) methods.push(value.method)
             },
@@ -71,8 +76,7 @@ for (const peer of peers.filter((peer) => peer.language !== 'bun')) {
           const raw = handle.channel!
           /** Only declared canonical endpoint capabilities enter the initiator's actual offer. */
           const offer = createNativeProcessOffer({
-            peer: { id: context.self.instanceId, runtime: 'node' },
-            auth: token
+            peer: { id: context.self.instanceId, runtime: 'node' }
           })
           /** The original process handshake still owns authentication and capability intersection. */
           const channel = await createProcessTransport(
@@ -104,24 +108,22 @@ for (const peer of peers.filter((peer) => peer.language !== 'bun')) {
           failures.push(error)
         }
       })
-      /** Existing v1 description is parsed by its unchanged canonical contract owner. */
-      const contract = normalizeRemoteContract(await active.request(RemoteMethodName.describe))
-      assert.equal(contract.schemaVersion, 1, '[A32] the old description grammar remains accepted')
-      assert.equal(contract.plugin, 'p')
-      assert.equal(
-        await active.request('p.f.request', ['fallback-ready']),
-        'fallback-ready',
-        '[A32] real foreign business succeeds through the shared caller'
+      /** The accepted v2 directory describes the actual remote provider whitelist. */
+      const description = readRuntimePeerConnection(active).description!
+      assert.equal(description.schemaVersion, 2)
+      assert.equal(description.self.instanceId, peer.id)
+      assert.ok(description.methods.some((method) => method.name === 'echo'))
+      assert.equal(await active.request('echo', 'baseline-ready'), 'baseline-ready')
+      assert.deepEqual(
+        await Promise.all([active.request('echo', 1), active.request('echo', 2)]),
+        [1, 2]
       )
-      assert.equal(capabilities.includes(RpcCapability.runtimeApi), false)
-      assert.deepEqual((await active.describe()).methods, [])
+      assert.equal(capabilities.includes(RpcCapability.runtimeApi), true)
+      assert.equal(capabilities.includes(RpcCapability.batch), true)
       assert.equal(hiddenCalls, 0)
-      assert.equal(
-        methods.includes(RemoteMethodName.runtimeDescribe),
-        false,
-        '[A32] no foreign peer receives a v2 directory request'
-      )
-      assert.equal(methods.includes('p.f.request'), true)
+      assert.equal(methods.includes(RemoteMethodName.runtimeDescribe), true)
+      assert.equal(methods.includes(RemoteMethodName.describe), false)
+      assert.equal(failures.length, 0)
     } finally {
       try {
         await active?.close()
