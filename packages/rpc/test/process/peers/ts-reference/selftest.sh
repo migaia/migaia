@@ -23,6 +23,8 @@ behavior_status=0
 python3 -B "$SCRIPT_DIR/../behavior_check.py" --language ts-reference || behavior_status=$?
 notification_status=0
 python3 -B "$SCRIPT_DIR/notification-check.py" || notification_status=$?
-if [ "$vector_status" -ne 0 ] || [ "$behavior_status" -ne 0 ] || [ "$notification_status" -ne 0 ]; then
+routing_status=0
+python3 -B "$SCRIPT_DIR/routing-check.py" || routing_status=$?
+if [ "$vector_status" -ne 0 ] || [ "$behavior_status" -ne 0 ] || [ "$notification_status" -ne 0 ] || [ "$routing_status" -ne 0 ]; then
   exit 1
 fi
