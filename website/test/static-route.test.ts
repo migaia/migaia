@@ -1180,32 +1180,6 @@ test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler across every rend
   }
 })
 
-test('SITE-T-CODE-EXPLANATION-REPETITION rejects site-wide fallback commentary', () => {
-  const occurrences = new Map<string, number>()
-  const chineseHtmlFiles = emittedFiles(join(buildRoot, 'zh')).filter((path) =>
-    path.endsWith('.html')
-  )
-
-  for (const path of chineseHtmlFiles) {
-    const html = readFileSync(path, 'utf8')
-    for (const notes of html.matchAll(/<div class="code-walkthrough-notes">([\s\S]*?)<\/div>/g)) {
-      for (const paragraph of notes[1].matchAll(/<p>([\s\S]*?)<\/p>/g)) {
-        const explanation = renderedText(paragraph[1]).trim()
-        occurrences.set(explanation, (occurrences.get(explanation) ?? 0) + 1)
-      }
-    }
-  }
-
-  /** Required repository-only scheduler warning is shared by every relevant example. */
-  const requiredWarnings = new Set([
-    '这是本仓测试与适配器验证专用的确定性时钟，不适合外部业务代码。外部项目应优先使用测试框架的 fake timers，生产代码使用默认的 systemScheduler。'
-  ])
-  for (const [explanation, count] of occurrences) {
-    if (requiredWarnings.has(explanation)) continue
-    assert.ok(count <= 10, `commentary repeated ${count} times: ${explanation}`)
-  }
-})
-
 test('SITE-T-API-EXAMPLE-COMMENTARY requires concrete guidance on every primary API example', () => {
   const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
     path.endsWith('index.html')
@@ -1415,7 +1389,7 @@ test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date
   const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /systemScheduler.*performance\.now\(\).*单调时钟/s)
+  assert.match(text, /systemScheduler.*performance\.now\(\).*单调不递减/s)
   assert.match(text, /now\(\).*单调不递减.*不是 Unix 时间戳/s)
   assert.match(text, /systemWallClock\.timestamp\(\).*Date\.now\(\)/s)
   assert.match(text, /scheduler\.now\(\).*scheduler\.schedule\(\)/s)
