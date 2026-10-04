@@ -27,6 +27,12 @@ export const RpcCoreErrorCode = {
   middlewareMissing: 'MIDDLEWARE_MISSING',
 
   /**
+   * A Runtime API operation requires a mode or capability absent from the actual peer agreement.
+   * Enforces D5/D42; choose a supported method/mode rather than retrying the same operation.
+   */
+  capabilityUnsupported: 'CAPABILITY_UNSUPPORTED',
+
+  /**
    * Factory / middleware / transport 描述符非法或配置字段取值不合法。 Replay r12 also rejects encrypt-only
    * configuration, unavailable entropy and exhausted counters.
    *

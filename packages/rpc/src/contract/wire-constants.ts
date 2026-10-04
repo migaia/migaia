@@ -32,6 +32,8 @@ export const RpcCapability = {
   idempotency: 'idempotency@1',
   trace: 'trace@1',
   stream: 'stream@1',
+  /** Enables the symmetric application directory only when both actual offers contain it. */
+  runtimeApi: 'runtime-api@1',
   /** Optional physical grouping; it never introduces a semantic envelope kind. */
   batch: 'batch@1'
 } as const

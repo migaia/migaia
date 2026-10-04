@@ -1,5 +1,7 @@
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** Stable fail-closed text for a Runtime API mode absent from the actual peer agreement. */
+  capabilityUnsupported: 'Runtime operation capability is unavailable',
   /** Stable construction-hook event name consumed by endpoint diagnostics. */
   componentShadowed: 'component-shadowed',
   /** Stable descriptor diagnostics used by native contract component middleware. */

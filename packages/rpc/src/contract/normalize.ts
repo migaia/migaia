@@ -5,7 +5,8 @@ import { RPC_CONTRACT_SOURCE } from './error-text.js'
 import type { IRpcPortableBytes, IRpcPortableRecord, IRpcPortableValue } from './types.js'
 
 const RESERVED = '$rpc'
-const MAX_DEPTH = 64
+/** Existing portable recursion budget is also reused by cold Runtime API method compilation. */
+export const RPC_PORTABLE_MAX_DEPTH = 64
 
 /** Validate the unpadded base64url spelling, including unused-bit canonicality. */
 function isCanonicalBase64url(value: string): boolean {
@@ -42,7 +43,8 @@ export function normalizePortable(
   depth = 0,
   active = new Set<object>()
 ): IRpcPortableValue {
-  if (depth > MAX_DEPTH) throw createContractError(RpcContractErrorCode.invalidEnvelope)
+  if (depth > RPC_PORTABLE_MAX_DEPTH)
+    throw createContractError(RpcContractErrorCode.invalidEnvelope)
   if (value === null) return null
   switch (typeof value) {
     case 'boolean':

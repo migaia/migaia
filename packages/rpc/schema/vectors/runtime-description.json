@@ -1,0 +1,67 @@
+{
+  "profile": "runtime-description/2",
+  "valid": [
+    {
+      "schemaVersion": 2,
+      "self": {
+        "name": "parent",
+        "instanceId": "parent-1"
+      },
+      "methods": []
+    },
+    {
+      "schemaVersion": 2,
+      "self": {
+        "name": "child",
+        "instanceId": "child-1"
+      },
+      "methods": [
+        {
+          "name": "doc.save",
+          "supportedModes": [
+            "request",
+            "notify",
+            "stream"
+          ],
+          "modeSource": "generated-routes"
+        }
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "schemaVersion": 1,
+      "self": {
+        "name": "child",
+        "instanceId": "child-1"
+      },
+      "methods": []
+    },
+    {
+      "schemaVersion": 2,
+      "self": {
+        "name": "child",
+        "instanceId": "child-1",
+        "token": "fixture-secret"
+      },
+      "methods": []
+    },
+    {
+      "schemaVersion": 2,
+      "self": {
+        "name": "child",
+        "instanceId": "child-1"
+      },
+      "methods": [
+        {
+          "name": "doc.save",
+          "supportedModes": [
+            "request",
+            "request"
+          ],
+          "modeSource": "generated-routes"
+        }
+      ]
+    }
+  ]
+}

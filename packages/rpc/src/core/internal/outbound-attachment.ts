@@ -86,7 +86,8 @@ import type { IRpcDiscoveryResolverPort } from './plugin-shared-keys.js'
 import type { IRpcFrameAdmission, IRpcStreamOpenCommand } from './plugin-shared-keys.js'
 import type { IEndpointTimer } from './time-port.js'
 import { createEndpointTransportActivation } from './transport-activation.js'
-import { resolveAbortReason } from './async-control.js'
+import { resolveAbortReason, raceWithAsyncControl } from './async-control.js'
+import type { IRpcOneWayOptions } from '../features/one-way.js'
 
 /** One pending slim-client request and its terminal cleanup handles. */
 type IOutboundPending = {
@@ -122,7 +123,7 @@ export type IOutboundAttachmentHost = {
     targetId: string,
     method: string,
     data: unknown,
-    options?: { readonly transfer?: readonly unknown[] }
+    options?: IRpcOneWayOptions
   ): Promise<void>
   readonly hooks: { on(listener: IRpcHook): () => void }
   emitFailure(error: unknown, code?: string, field?: string, detail?: IRpcHookEvent['detail']): void
@@ -621,29 +622,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     assertMethod(targetId)
     assertMethod(method)
     this.#validateData(method, 'params', data)
-    if (options.signal) {
-      const probe = (): void => undefined
-      try {
-        options.signal.addEventListener('abort', probe, { once: true })
-        options.signal.removeEventListener('abort', probe)
-      } catch (error) {
-        try {
-          options.signal.removeEventListener('abort', probe)
-        } catch {}
-        throw new RpcError(
-          RpcCoreErrorCode.invalidConfig,
-          RpcCoreErrorText.abortSignalInvalid,
-          error
-        )
-      }
-      if (!this.#abortEnabled)
-        throw new RpcError(
-          RpcCoreErrorCode.middlewareMissing,
-          RpcCoreErrorText.abortMiddlewareMissing
-        )
-      if (options.signal.aborted)
-        throw new RpcAbortError(undefined, undefined, resolveAbortReason(options.signal))
-    }
+    if (options.signal) this.#assertAbortSignal(options.signal)
     const timeoutMs = this.#timeout.resolveTimeout(options.timeoutMs)
     assertTimeout(timeoutMs)
     const operation = new OperationScope(
@@ -880,14 +859,100 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     )
   }
 
+  /** Reuse request's existing signal validation and native reason contract for controlled one-way. */
+  #assertAbortSignal(signal: NonNullable<ISendOptions['signal']>): void {
+    /** The native listener probe retains request's original supported-signal admission. */
+    const probe = (): void => undefined
+    try {
+      signal.addEventListener('abort', probe, { once: true })
+      signal.removeEventListener('abort', probe)
+    } catch (error) {
+      try {
+        signal.removeEventListener('abort', probe)
+      } catch (cleanup) {
+        this.emitFailure(cleanup)
+      }
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.abortSignalInvalid, error)
+    }
+    if (!this.#abortEnabled)
+      throw new RpcError(
+        RpcCoreErrorCode.middlewareMissing,
+        RpcCoreErrorText.abortMiddlewareMissing
+      )
+    if (signal.aborted) throw new RpcAbortError(undefined, undefined, resolveAbortReason(signal))
+  }
+
+  /** Opt-in controls retain the same outbound operation scope without allocating a response waiter. */
+  #sendControlledOneWay(
+    targetId: string,
+    method: string,
+    data: unknown,
+    options: IRpcOneWayOptions
+  ): Promise<void> {
+    this.kernel.assertActive()
+    if (options.signal) this.#assertAbortSignal(options.signal)
+    assertTimeout(options.timeoutMs)
+    /** The original endpoint generation and clock own cancellation and the one total deadline. */
+    const operation = new OperationScope(
+      this.kernel.generation,
+      options.timeoutMs,
+      this.kernel.closingSignal,
+      () => this.kernel.time.scheduler.now()
+    )
+    return raceWithAsyncControl({
+      time: this.kernel.time,
+      timeoutMs: options.timeoutMs,
+      signals: [operation.signal, ...(options.signal ? [options.signal] : [])],
+      operation: () =>
+        this.#sendDispatchOnly(targetId, method, data, options.transfer, {
+          signal: operation.signal,
+          remaining: () => operation.remaining(options.timeoutMs)
+        })
+          .then(() => {
+            operation.markSuccess()
+          })
+          .catch((error: unknown) => {
+            if (
+              operation.signal.aborted &&
+              !(error instanceof RpcAbortError) &&
+              !(error instanceof RpcTimeoutError) &&
+              !(error instanceof RpcLifecycleError)
+            )
+              this.emitFailure(
+                error,
+                error instanceof RpcError ? error.code : RpcCoreErrorCode.internal
+              )
+            throw error
+          }),
+      createTimeoutError: () => {
+        /** The same classified timeout both seals send admission and rejects the caller. */
+        const error = new RpcTimeoutError()
+        operation.abort(error)
+        return error
+      },
+      createAbortError: (reason) => {
+        /** Preserve lifecycle departure, otherwise retain the exact original caller reason as cause. */
+        const error =
+          reason instanceof RpcLifecycleError
+            ? reason
+            : new RpcAbortError(undefined, undefined, reason)
+        operation.abort(error)
+        return error
+      },
+      onDiagnostic: (error) => this.emitFailure(error)
+    }).finally(() => operation.finish())
+  }
+
   /** Sends a dispatch-only request and exposes canonical physical completion to the caller. */
   sendOneWay(
     targetId: string,
     method: string,
     data: unknown,
-    options?: { readonly transfer?: readonly unknown[] }
+    options?: IRpcOneWayOptions
   ): Promise<void> {
-    return this.#sendDispatchOnly(targetId, method, data, options?.transfer)
+    if (options?.signal === undefined && options?.timeoutMs === undefined)
+      return this.#sendDispatchOnly(targetId, method, data, options?.transfer)
+    return this.#sendControlledOneWay(targetId, method, data, options)
   }
 
   /** Owns all dispatch-only request construction, reservation, physical send and release. */
@@ -895,7 +960,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     targetId: string,
     method: string,
     data: unknown,
-    transfer?: readonly unknown[]
+    transfer?: readonly unknown[],
+    operation?: IRpcStreamOpenCommand['operation']
   ): Promise<void> {
     this.kernel.assertActive()
     assertMethod(targetId)
@@ -910,7 +976,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       method,
       data,
       transfer,
-      dispatchOnly: true
+      dispatchOnly: true,
+      operation
     })
   }
 
@@ -945,7 +1012,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       .then(() => this.resolveReceiver(command.targetId))
       .then((receiver) => {
         if (command.operation?.signal.aborted) throw new RpcAbortError()
-        const remaining = command.operation?.remaining()
+        /** Notify's deadline ends at physical send; it never imposes a provider business deadline. */
+        const remaining = command.dispatchOnly ? undefined : command.operation?.remaining()
         const wireTimeout = typeof remaining === 'number' ? Math.floor(remaining) : undefined
         if (wireTimeout === 0) throw new RpcTimeoutError()
         const request = {
@@ -975,19 +1043,19 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         return this.#pipeline.send(
           createOutboundEnvelope(request),
           command.transfer === undefined ? undefined : { transfer: command.transfer },
-          this.#outboundGate && command.operation
+          (this.#outboundGate || command.dispatchOnly) && command.operation
             ? {
                 queueSignal: command.operation.signal,
                 signals: [command.operation.signal],
                 assertCanSend
               }
             : undefined,
-          this.#outboundGate && command.operation
+          (this.#outboundGate || command.dispatchOnly) && command.operation
             ? () => {
                 assertCanSend()
                 const updated = command.operation?.remaining()
                 request.data.route.sentAt = this.kernel.time.timestamp()
-                if (typeof updated === 'number')
+                if (!command.dispatchOnly && typeof updated === 'number')
                   (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(updated)
                 return createOutboundEnvelope(request)
               }

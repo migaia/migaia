@@ -145,6 +145,9 @@ export type IRpcOutboundCommand =
       readonly method: string
       readonly data: unknown
       readonly transfer?: readonly unknown[]
+      /** One-way controls never create a provider response waiter. */
+      readonly signal?: IAbortSignal
+      readonly timeoutMs?: number
     }
   | {
       readonly kind: 'validate'

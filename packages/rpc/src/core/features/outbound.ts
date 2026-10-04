@@ -185,7 +185,9 @@ function createOutboundSharedPorts(
       }
       if (command.kind === 'one-way') {
         const result = owner.sendOneWay(command.targetId, command.method, command.data, {
-          transfer: command.transfer
+          transfer: command.transfer,
+          signal: command.signal,
+          timeoutMs: command.timeoutMs
         })
         observe(result)
         return result
