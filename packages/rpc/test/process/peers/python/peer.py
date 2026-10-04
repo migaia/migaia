@@ -18,7 +18,7 @@ MAX_FRAME = 16_777_216
 MAX_HANDSHAKE = 65_536
 PROTOCOL = "migaia.rpc"
 ROUTE_PROFILE = "migaia.rpc.route"
-CAPABILITIES = ["abort@1", "ping@1", "close@1", "wire-error@1", "stream@1"]
+CAPABILITIES = ["abort@1", "ping@1", "close@1", "wire-error@1", "stream@1", "runtime-api@1", "batch@1"]
 CODEC_RE = re.compile(r"^[a-z][a-z0-9.-]{0,31}$")
 CAPABILITY_RE = re.compile(r"^[a-z][a-z0-9.-]*@[1-9][0-9]*$")
 ABSENT = object()
@@ -197,7 +197,7 @@ def variation(identifier: str, control: str, sender: str, target: str, payload: 
 
 def response(identifier: str, method: str, sender: str, target: str, payload: Any = ABSENT, error: dict[str, str] | None = None) -> dict[str, Any]:
     """Build a success or failed response with its matching method route."""
-    data = {"route": route("response", sender, target, method=method)}
+    data = {"route": route("response", sender, target, method=method, receiverId=target)}
     if error is None:
         if payload is not ABSENT:
             data["payload"] = payload
@@ -206,86 +206,9 @@ def response(identifier: str, method: str, sender: str, target: str, payload: An
 
 
 def run_responder(reader: BinaryIO, writer: BinaryIO) -> None:
-    """Complete handshake, then serve one-way, request and control frames."""
-    local = own_offer()
-    try:
-        first = read_frame(reader, MAX_HANDSHAKE)
-        if first is None:
-            raise PeerFailure("HANDSHAKE_INVALID")
-        hello = decode_frame(first)
-        validate_hello(hello)
-    except PeerFailure:
-        raise PeerFailure("HANDSHAKE_INVALID")
-    agreed = negotiate(hello, local)
-    if agreed is None:
-        reason = "protocol" if hello["protocol"] != local["protocol"] else "version"
-        write_json(writer, {"kind": "handshake", "step": "reject", "protocol": PROTOCOL, "error": wire_error("HANDSHAKE_INCOMPATIBLE", "rpc handshake incompatible: " + reason)})
-        raise PeerFailure("HANDSHAKE_INVALID")
-    write_json(writer, {"kind": "handshake", "step": "accept", "protocol": PROTOCOL, **agreed, "peer": local["peer"]})
-    remote_id = hello["peer"]["id"]
-    open_waits: dict[str, str] = {}
-    closing = False
-    while True:
-        raw = read_frame(reader)
-        if raw is None:
-            return
-        message = decode_frame(raw)
-        if not _plain_object(message):
-            raise PeerFailure("INVALID_ENVELOPE")
-        kind = message.get("kind")
-        if kind not in ("request", "response", "discovery", "variation", "stream"):
-            print("PEER_WARN UNKNOWN_KIND", file=sys.stderr, flush=True)
-            continue
-        identifier = message.get("id")
-        data = message.get("data")
-        header = data.get("route") if _plain_object(data) else None
-        if not isinstance(identifier, str) or not _plain_object(header) or header.get("profile") != ROUTE_PROFILE:
-            raise PeerFailure("INVALID_ENVELOPE")
-        if kind == "variation" and header.get("type") == "variation":
-            control = header.get("variation")
-            if control == "ping" and "ping@1" in agreed["capabilities"]:
-                write_json(writer, variation(identifier, "pong", local["peer"]["id"], remote_id))
-            elif control == "abort" and "abort@1" in agreed["capabilities"]:
-                if closing:
-                    print("PEER_EVENT ABORT_DURING_DRAIN", file=sys.stderr, flush=True)
-                open_waits.pop(identifier, None)
-                if closing and not open_waits:
-                    return
-            elif control == "close" and "close@1" in agreed["capabilities"]:
-                payload = data.get("payload")
-                if not _plain_object(payload) or type(payload.get("drainMs")) is not int or not 0 <= payload["drainMs"] <= 2_147_483_647:
-                    print("PEER_ERROR PROTOCOL_INVALID", file=sys.stderr, flush=True)
-                    continue
-                closing = True
-                if not open_waits:
-                    return
-            continue
-        if kind != "request" or header.get("type") != "request":
-            raise PeerFailure("INVALID_ENVELOPE")
-        method = message.get("method")
-        if not isinstance(method, str):
-            raise PeerFailure("INVALID_ENVELOPE")
-        if closing:
-            continue
-        if method == "peer.finish":
-            for wait_id, wait_method in tuple(open_waits.items()):
-                write_json(writer, response(wait_id, wait_method, local["peer"]["id"], remote_id, payload=None))
-                del open_waits[wait_id]
-            if header.get("dispatchOnly") is not True:
-                write_json(writer, response(identifier, method, local["peer"]["id"], remote_id, payload=None))
-            continue
-        if header.get("dispatchOnly") is True:
-            continue
-        if method == "peer.wait":
-            open_waits[identifier] = method
-            continue
-        if method == "peer.error":
-            result = response(identifier, method, local["peer"]["id"], remote_id, error=wire_error("PEER_ERROR", "native peer requested error"))
-        elif method == "echo":
-            result = response(identifier, method, local["peer"]["id"], remote_id, payload=data.get("payload", ABSENT))
-        else:
-            result = response(identifier, method, local["peer"]["id"], remote_id, error=wire_error("METHOD_NOT_FOUND", "native peer method unavailable"))
-        write_json(writer, result)
+    """Use the same native session owner for the baseline and business fixtures."""
+    from business import serve
+    serve(reader, writer, False, None)
 
 
 def run_initiator(reader: BinaryIO, writer: BinaryIO) -> None:
@@ -301,16 +224,24 @@ def run_initiator(reader: BinaryIO, writer: BinaryIO) -> None:
         raise PeerFailure("HANDSHAKE_INVALID")
     if not _plain_object(reply) or reply.get("kind") != "handshake" or reply.get("step") != "accept" or reply.get("protocol") != PROTOCOL:
         raise PeerFailure("HANDSHAKE_INVALID")
-    if reply.get("major") != 1 or reply.get("minor") not in (0, 1) or reply.get("codec") != "json":
+    if reply.get("major") != 1 or reply.get("minor") != 1 or reply.get("codec") != "json":
         raise PeerFailure("HANDSHAKE_INVALID")
     capabilities = reply.get("capabilities")
-    if not isinstance(capabilities, list) or any(item not in local["capabilities"] for item in capabilities):
+    if not isinstance(capabilities, list) or not {"runtime-api@1", "batch@1"} <= set(capabilities) or any(item not in local["capabilities"] for item in capabilities):
         raise PeerFailure("HANDSHAKE_INVALID")
     remote = reply.get("peer")
     if not _plain_object(remote) or not isinstance(remote.get("id"), str):
         raise PeerFailure("HANDSHAKE_INVALID")
+    write_json(writer, {"kind": "request", "id": "python-describe-1", "method": "migaia.remote.runtime.describe", "data": {"route": route("request", local["peer"]["id"], remote["id"], receiverId=remote["id"]), "payload": None}})
+    raw = read_frame(reader)
+    description = decode_frame(raw) if raw is not None else None
+    if not _plain_object(description) or description.get("ok") is not True:
+        raise PeerFailure("WRONG_DESCRIPTION")
+    directory = description.get("data", {}).get("payload", {})
+    if directory.get("schemaVersion") != 2 or directory.get("self", {}).get("instanceId") != remote["id"]:
+        raise PeerFailure("WRONG_DESCRIPTION")
     payload = {"echo": "python", "number": 1}
-    write_json(writer, {"kind": "request", "id": "python-echo-1", "method": "echo", "data": {"route": route("request", local["peer"]["id"], remote["id"]), "payload": payload}})
+    write_json(writer, {"kind": "batch", "envelopes": [{"kind": "request", "id": "python-echo-1", "method": "echo", "data": {"route": route("request", local["peer"]["id"], remote["id"], receiverId=remote["id"]), "payload": payload}}]})
     raw = read_frame(reader)
     if raw is None:
         raise PeerFailure("MISSING_RESPONSE")
@@ -385,5 +316,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # Business shares this exact framing/error owner when the file is launched as a script.
+    sys.modules["peer"] = sys.modules[__name__]
     sys.dont_write_bytecode = True
     raise SystemExit(main())

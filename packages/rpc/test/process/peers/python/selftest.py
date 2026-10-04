@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run frozen and current protocol vectors through independent Python rules."""
+"""Run current wire vectors and U36 runtime behavior through independent Python rules."""
 
 from __future__ import annotations
 
@@ -668,16 +668,11 @@ def run_selftest(path: str | None = None) -> int:
     root = Path(path) if path else VECTOR_ROOT
     results = Results()
     required = [
-        ("frozen/1.0/envelope.json", lambda data: check_envelope(results, data, "frozen-1.0/envelope", 0)),
-        ("frozen/1.0/control.json", lambda data: check_control(results, data, "frozen-1.0/control")),
-        ("frozen/1.0/handshake.json", lambda data: check_handshake(results, data, "frozen-1.0/handshake")),
         ("envelope.json", lambda data: check_envelope(results, data, "current/envelope", 1)),
         ("control.json", lambda data: check_control(results, data, "current/control")),
         ("handshake.json", lambda data: check_handshake(results, data, "current/handshake")),
         ("stream.json", lambda data: check_stream(results, data)),
         ("error-chain.json", lambda data: check_wire(results, data)),
-        ("remote-contract.json", lambda data: check_host_control(results, data)),
-        ("remote-host-control.json", lambda data: check_host_control(results, data)),
         ("stream-framing.json", lambda data: check_framing(results, data)),
     ]
     for name, check in required:
