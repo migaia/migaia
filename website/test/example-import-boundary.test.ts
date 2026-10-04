@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { createScanner } from 'typescript/unstable/ast/scanner'
 import exampleImportManifest from '../src/generated/manifests/example-imports.json'
 import { normalizeExampleImports } from '../app/example-imports.js'
 
@@ -47,15 +48,10 @@ function authoredGuideExamples(): ICodeExample[] {
     )) {
       const encoded = match[1] ?? match[2] ?? match[3] ?? ''
       const quote = match[1] !== undefined ? '"' : match[2] !== undefined ? "'" : '`'
-      const code =
-        quote === '"'
-          ? JSON.parse(`"${encoded}"`)
-          : encoded
-              .replace(/\\n/gu, '\n')
-              .replace(/\\r/gu, '\r')
-              .replace(/\\t/gu, '\t')
-              .replace(new RegExp(`\\\\${quote}`, 'gu'), quote)
-              .replace(/\\\\/gu, '\\')
+      /** TypeScript's lexer decodes JavaScript escapes without evaluating authored code. */
+      const scanner = createScanner(true, undefined, `${quote}${encoded}${quote}`)
+      scanner.scan()
+      const code = scanner.getTokenValue()
       if (!code.includes('import ') || !code.includes('@migaia/')) continue
       const line = source.slice(0, match.index).split('\n').length
       examples.push({ code, location: `${path}:${line}` })

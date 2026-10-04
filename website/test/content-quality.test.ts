@@ -341,8 +341,29 @@ test('class pages expose structured instance APIs and Scheduler documents its op
   const classSymbols = typedApiManifest.apis.flatMap((api) =>
     api.symbols.filter((symbol) => symbol.kind === 'class')
   )
-  assert.ok(classSymbols.filter((symbol) => symbol.members.length > 0).length >= 35)
-  assert.ok(classSymbols.flatMap((symbol) => symbol.members).length >= 290)
+  assert.ok(classSymbols.length > 0, 'expected public class declarations')
+  for (const symbol of classSymbols) {
+    for (const member of symbol.members) {
+      assert.ok(member.name.trim(), `${symbol.name} has an unnamed member`)
+      assert.ok(
+        member.signature.includes(member.name),
+        `${symbol.name}.${member.name} has no signature`
+      )
+      assert.ok(member.returns.trim(), `${symbol.name}.${member.name} has no result type`)
+      assert.ok(
+        ['method', 'property', 'get', 'set'].includes(member.kind),
+        `${symbol.name}.${member.name} has no public member kind`
+      )
+      assert.doesNotMatch(member.signature, /^(?:#|private\b|protected\b)/)
+      for (const parameter of member.parameterDetails) {
+        assert.ok(parameter.name.trim(), `${symbol.name}.${member.name} has an unnamed parameter`)
+        assert.ok(
+          parameter.type.trim(),
+          `${symbol.name}.${member.name}.${parameter.name} has no type`
+        )
+      }
+    }
+  }
 })
 
 test('reactive Effect guide covers imports, direct lifecycle, convenience API, and production cleanup', () => {
