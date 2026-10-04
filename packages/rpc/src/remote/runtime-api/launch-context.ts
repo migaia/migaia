@@ -1,13 +1,17 @@
-import type { IRuntimePeerSourceContext, IRuntimePeerProvide } from './peer.js'
+import type { IRuntimePeerSourceContext, IRuntimePeerProvide, IRuntimePeer } from './peer.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
 
 /** Original Host operation and resource ownership travel only through exact internal options. */
 export type IRuntimePreparationContext = Readonly<{
+  /** Local configuration provenance distinguishes a library default from an explicit self claim. */
+  selfDefaulted?: boolean
   initialSignal: IAbortSignal
   lifecycleSignal: IAbortSignal
   own(dispose: () => Promise<void>): void
   /** New native generations compile current Feature snapshots from the original integration port. */
   readProvide?(): IRuntimePeerProvide
+  /** Authenticated listener sessions publish through the same original Plugin install slot. */
+  publishPeer?(peer: IRuntimePeer): () => void
 }>
 
 /** This table transfers original scope provenance; it owns no lifecycle state or policy. */

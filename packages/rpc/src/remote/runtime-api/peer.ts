@@ -1,4 +1,5 @@
 import { hostRethrowReporter } from '@migaia/utils/promise'
+import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
 import { normalizePortable } from '../../contract/normalize.js'
 import { registerLocalErrorWireSummary } from '../../contract/contract-error.js'
 import type { IRpcPortableValue } from '../../contract/types.js'
@@ -21,11 +22,17 @@ import type {
   IRpcEndpoint,
   IRpcProvider,
   IRpcProviderLimits,
+  IRpcFactoryConfig,
   IRpcAbortSignal
 } from '../../core/typing.js'
 import { RemoteMethodName } from '../constants.js'
 import type { IRemoteContract } from '../contract.js'
-import type { IRemoteCallOptions, IRemoteChannel, IRemoteProxyOptions } from '../types.js'
+import type {
+  IRemoteCallOptions,
+  IRemoteChannel,
+  IRemoteProxyOptions,
+  IRemoteServeEndpoint
+} from '../types.js'
 import { compileRuntimeMethods, type IRuntimePeerProvide } from './catalog.js'
 import {
   normalizeRuntimeDescription,
@@ -62,6 +69,7 @@ export type IRuntimePeerOptions = Pick<
   IRemoteProxyOptions<object, unknown>,
   'keyFactory' | 'retryPort'
 > &
+  Partial<Pick<IRemoteProxyOptions<object, unknown>, 'endpointFactory'>> &
   Readonly<{
     self?: IRuntimePeerIdentity
     provide?: IRuntimePeerProvide
@@ -76,6 +84,10 @@ export type IRuntimePeerOptions = Pick<
 
 /** Accepted routes are compiled once for both the direct Peer and canonical managed dispatch. */
 type IRuntimePeerRoute = IRuntimePeerDescription['methods'][number] & Readonly<{ stream: string }>
+
+/** Advanced factories may omit unnegotiated stream roots; the actual selected roots own dispatch. */
+type IRuntimePeerEndpoint = Omit<IRuntimeApiEndpoint, 'stream'> &
+  Pick<IRemoteServeEndpoint, 'stream'>
 
 /** Hot calls return the original operation result; only local description queries are asynchronous. */
 export type IRuntimePeer = Readonly<{
@@ -99,16 +111,19 @@ export type IRuntimePeer = Readonly<{
 type IRuntimePeerConnection = Readonly<{
   peerId: string
   description: IRuntimePeerDescription | undefined
-  endpoint: IRuntimeApiEndpoint
+  endpoint: IRuntimePeerEndpoint
   channel: IRemoteChannel
   report(error: unknown): void
   routes: ReadonlyMap<string, IRuntimePeerRoute>
 }>
 
+/** A private reader projects the original listener's actual session records, owning no membership. */
+type IRuntimePeerSessions = Readonly<{ peers(): readonly IRuntimePeer[] }>
+
 /** Only this callable assembly mints metadata for its own prepared facade; no lifecycle lives here. */
 const runtimePeerConnections = new WeakMap<
   IRuntimePeer,
-  IRuntimePeerConnection | (() => IRuntimePeer)
+  IRuntimePeerConnection | (() => IRuntimePeer) | IRuntimePeerSessions
 >()
 
 /** Read the canonical accepted receipt for Plugin publication without another handshake or registry. */
@@ -116,7 +131,32 @@ export function readRuntimePeerConnection(peer: IRuntimePeer): IRuntimePeerConne
   /** An application-shaped Peer cannot inject identity or directory authority into a Host slot. */
   const connection = runtimePeerConnections.get(peer)
   if (!connection) invalid(RuntimeApiErrorText.peerInvalid)
+  if (typeof connection !== 'function' && 'peers' in connection) {
+    /** This cold read retains no membership beyond the original listener owner. */
+    const peers = connection.peers()
+    if (peers.length !== 1)
+      throw new RpcError(
+        peers.length === 0 ? RpcCoreErrorCode.targetUnknown : RpcCoreErrorCode.capabilityConflict,
+        peers.length === 0 ? RuntimeApiErrorText.targetUnknown : RuntimeApiErrorText.targetAmbiguous
+      )
+    return readRuntimePeerConnection(peers[0]!)
+  }
   return typeof connection === 'function' ? readRuntimePeerConnection(connection()) : connection
+}
+
+/** Read only genuine listener provenance; an application-shaped Peer cannot inject sessions. */
+export function readRuntimePeerSessions(peer: IRuntimePeer): readonly IRuntimePeer[] | undefined {
+  /** Only the privately minted provenance reader may project actual native sessions. */
+  const source = runtimePeerConnections.get(peer)
+  return source && typeof source !== 'function' && 'peers' in source ? source.peers() : undefined
+}
+
+/** Retain a reader for the original service handle, without copying its session Set. */
+export function retainRuntimePeerSessions(
+  peer: IRuntimePeer,
+  read: () => readonly IRuntimePeer[]
+): void {
+  runtimePeerConnections.set(peer, Object.freeze({ peers: read }))
 }
 
 /** Configuration rejection keeps its canonical code and does not reflect source secrets. */
@@ -162,6 +202,10 @@ export async function createRuntimePeer(
     /** An original managed generation owns channel cleanup while the Peer owns its endpoint. */
     ownsChannel?: boolean
     signal?: IRpcAbortSignal
+    /** Native policy wraps the original endpoint before its providers are registered. */
+    wrapEndpoint?(endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
+    /** Listener sessions reuse the endpoint already built by their original admission/drain owner. */
+    endpoint?: IRemoteServeEndpoint
   }>
 ): Promise<IRuntimePeer> {
   /** Method descriptors are compiled once; no dispatch searches the application object. */
@@ -236,34 +280,45 @@ export async function createRuntimePeer(
     }
   }
   /** A successfully created endpoint is the only owner disposed during later preparation failure. */
-  let endpoint: IRuntimeApiEndpoint | undefined
+  let endpoint: IRuntimePeerEndpoint | undefined
   try {
-    endpoint = await createRuntimeApiEndpoint(
-      {
-        id: self.instanceId,
-        scheduler: channel.scheduler,
-        transport: channel.transport,
-        targetIds: [channel.peerId],
-        provider: providers,
-        providerLimits: options.providerLimits,
-        middlewares: [
-          codec(channel.pipeline.codec),
-          framer(channel.pipeline.framer),
-          abort(),
-          timeout(),
-          hooks({ onHookError: report }),
-          ...(nativeControl ? [ping()] : []),
-          connect({ transport: channel.transport })
-        ],
-        features: channel.features
-      },
-      { supports: (peerId) => supportsStream && peerId === channel.peerId },
-      nativeControl
+    /** Default roots retain initial registration before core receive activation. */
+    const initialProviders =
+      !options.endpointFactory && !automatic?.endpoint && !automatic?.wrapEndpoint
+    /** An original session/binding contributes its real endpoint rather than a second composition. */
+    const constructed =
+      automatic?.endpoint ??
+      (await prepareRuntimePeerEndpoint(
+        { ...options, self, report },
+        channel,
+        automatic?.signal ?? createAbortController().signal,
+        initialProviders ? { provider: providers } : {}
+      ))
+    endpoint = constructed.endpoint as unknown as IRuntimePeerEndpoint
+    /**
+     * Incoming providers must pass through the selected native policy from their first
+     * registration.
+     */
+    const served = automatic?.wrapEndpoint?.(constructed) ?? constructed
+    if (
+      !served.oneWay ||
+      (supportsStream && !served.stream) ||
+      (nativeControl && typeof served.endpoint.ping !== 'function')
     )
+      rejectRuntimeApiCapability()
+    /** A cold view joins existing roots without replacing frozen methods or adding hot wrappers. */
+    const selected: IRuntimePeerEndpoint = Object.create(served.endpoint)
+    Object.defineProperties(selected, {
+      sendOneWay: { value: served.oneWay.sendOneWay },
+      stream: { value: served.stream }
+    })
+    endpoint = Object.freeze(selected)
+    if (!initialProviders)
+      for (const [name, provider] of Object.entries(providers)) endpoint.provide(name, provider)
     if (supportsStream) {
       for (const entry of methods)
         if (!entry.supportedModes || entry.supportedModes.includes(RuntimeApiMode.stream))
-          endpoint.stream.provide(
+          endpoint.stream!.provide(
             `${RemoteMethodName.runtimeStreamPrefix}${entry.name}`,
             (payload, { context }) =>
               Reflect.apply(entry.method, entry.receiver, [payload, context]) as
@@ -342,7 +397,7 @@ export async function createRuntimePeer(
       stream: (method: string, payload?: unknown, callOptions?: IRemoteCallOptions) => {
         if (!supportsStream) rejectRuntimeApiCapability()
         route(method, RuntimeApiMode.stream)
-        return ready.stream.open(
+        return ready.stream!.open(
           channel.peerId,
           routes.get(method)!.stream,
           payloadValue(payload),
@@ -389,6 +444,56 @@ export async function createRuntimePeer(
       report(cleanup)
     }
     throw failure
+  }
+}
+
+/**
+ * Construct the original endpoint once before runtime routes are installed. Listener sessions
+ * supply their existing limits/store policy; explicit factories retain their original signature.
+ */
+export async function prepareRuntimePeerEndpoint(
+  options: IRuntimePeerOptions,
+  channel: IRemoteChannel,
+  signal: IAbortSignal,
+  policy: Pick<IRpcFactoryConfig, 'providerLimits' | 'idempotency' | 'provider'> = {}
+): Promise<IRemoteServeEndpoint> {
+  if (options.endpointFactory) return options.endpointFactory(channel, signal)
+  /** Only the real channel agreement can install native control and streaming roots. */
+  const nativeControl = channel.agreement.capabilities.includes(RpcCapability.ping)
+  /** Streaming remains optional even when the symmetric application directory is installed. */
+  const supportsStream =
+    channel.agreement.capabilities.includes(RpcCapability.runtimeApi) &&
+    channel.agreement.capabilities.includes(RpcCapability.stream)
+  /**
+   * Each selected endpoint keeps the actual scheduler, framing, security Features and provider
+   * limits.
+   */
+  const endpoint = await createRuntimeApiEndpoint(
+    {
+      id: prepareRuntimePeerSourceContext(options.self).self.instanceId,
+      scheduler: channel.scheduler,
+      transport: channel.transport,
+      targetIds: [channel.peerId],
+      providerLimits: options.providerLimits,
+      ...policy,
+      middlewares: [
+        codec(channel.pipeline.codec),
+        framer(channel.pipeline.framer),
+        abort(),
+        timeout(),
+        hooks({ onHookError: options.report }),
+        ...(nativeControl ? [ping()] : []),
+        connect({ transport: channel.transport })
+      ],
+      features: channel.features
+    },
+    { supports: (peerId) => supportsStream && peerId === channel.peerId },
+    nativeControl
+  )
+  return {
+    endpoint: endpoint as unknown as IRpcEndpoint,
+    oneWay: endpoint,
+    stream: endpoint.stream
   }
 }
 

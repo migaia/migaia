@@ -22,6 +22,7 @@ import {
 import {
   createRuntimePeer,
   readRuntimePeerConnection,
+  readRuntimePeerSessions,
   type IRuntimePeerOptions,
   type IRuntimePeer,
   type IRuntimePeerMethod,
@@ -141,6 +142,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
     contract: options.contract,
     keyFactory: options.keyFactory,
     retryPort: options.retryPort,
+    endpointFactory: options.endpointFactory,
     report: options.report
   })
   return definePlugin({
@@ -213,10 +215,27 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
             : undefined),
         provide
       }
+      /** Each genuine prepared session contributes one exact receipt through this original slot. */
+      const publishPeer = (
+        prepared: IRuntimePeer,
+        routedPeer: IRuntimePeer = prepared
+      ): (() => void) => {
+        const accepted = readRuntimePeerConnection(prepared)
+        const connection: IRuntimePluginConnection = Object.freeze({
+          name,
+          instanceId: accepted.peerId,
+          identity: accepted.description?.self,
+          description: accepted.description,
+          peer: routedPeer,
+          report: accepted.report
+        })
+        return slot.contribute(connection, connection.instanceId)
+      }
       /** Original scope owns native cleanup before any launcher or cold channel preparation. */
       const peer = await withRuntimePreparationContext(
         preparationOptions,
         {
+          selfDefaulted: peerOptions.self === undefined,
           initialSignal: core.operation.signal,
           lifecycleSignal: core.lifecycle.signal,
           own: (dispose) => core.onDispose(dispose),
@@ -228,14 +247,17 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
             )
             if (controls) registerRuntimeControlMethods(current, controls)
             return current
-          }
+          },
+          publishPeer
         },
         () => createPeer(preparationOptions)
       )
       /** Managed native resources were already registered before startup; callbacks transfer here. */
       const registration = readManagedRuntimeRegistration(peer)
+      /** Listener provenance denotes original early scope ownership, even with no ready sessions. */
+      const listenerSource = readRuntimePeerSessions(peer) !== undefined
       try {
-        if (!registration) core.onDispose(() => peer.close())
+        if (!registration && !listenerSource) core.onDispose(() => peer.close())
       } catch (error) {
         // A late prepared Peer belongs to this attempt even after the original Host scope closed.
         try {
@@ -252,20 +274,11 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
       /** Accepted remote metadata is read from the genuine Peer, without reflecting local describe. */
       /** Each actual prepared generation publishes an exact receipt through the canonical slot. */
       const publish = (prepared: IRuntimePeer, generation?: number): void => {
-        const accepted = readRuntimePeerConnection(prepared)
-        const connection: IRuntimePluginConnection = Object.freeze({
-          name,
-          instanceId: accepted.peerId,
-          identity: accepted.description?.self,
-          description: accepted.description,
-          peer,
-          report: accepted.report
-        })
-        const withdraw = slot.contribute(connection, connection.instanceId)
+        const withdraw = publishPeer(prepared, peer)
         if (registration && generation !== undefined)
           registration.events.onLeave(generation, withdraw)
       }
-      publish(peer, registration?.events.current().generation)
+      if (!listenerSource) publish(peer, registration?.events.current().generation)
       if (registration) core.onDispose(registration.onReady(publish))
       return {}
     }

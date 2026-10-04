@@ -67,6 +67,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
       contract: options.contract,
       keyFactory: options.keyFactory ?? source.keyFactory,
       retryPort: options.retryPort ?? source.retryPort,
+      endpointFactory: options.endpointFactory,
       callDeadlineCapMs: source.spec.limits?.callWallTimeMs
     },
     binding,

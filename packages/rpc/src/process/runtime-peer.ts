@@ -5,7 +5,6 @@ import { RuntimeApiErrorText, RuntimePluginKey } from '../remote/runtime-api/con
 import { createManagedRuntimePeer } from '../remote/runtime-api/managed-peer.js'
 import {
   prepareRuntimePeerSourceContext,
-  readRuntimePeerConnection,
   type IRuntimePeerOptions,
   type IRuntimePeerSource
 } from '../remote/runtime-api/peer.js'
@@ -23,6 +22,7 @@ import type {
   IConnectProcessPluginDeployment
 } from './plugin/types.js'
 import { createNativeProcessOffer } from './offer.js'
+import { createProcessListenerPeer, type IRuntimeProcessListen } from './runtime-listener.js'
 
 /**
  * Public deployed sources reuse the original native spawn and borrowed socket-session
@@ -30,11 +30,12 @@ import { createNativeProcessOffer } from './offer.js'
  */
 export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<
   IRuntimePeerOptions,
-  'spawn' | 'connect'
+  'spawn' | 'connect' | 'listen'
 > &
   Readonly<{
     spawn?: IRuntimePeerSource | ISpawnProcessPluginDeployment<THandle>
     connect?: IRuntimePeerSource | IConnectProcessPluginDeployment
+    listen?: IRuntimePeerSource | IRuntimeProcessListen
   }>
 
 /** Real execution and local socket sessions retain their existing independent supervision owners. */
@@ -46,10 +47,17 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
   const sources = [options.spawn, options.connect, options.listen].filter(
     (source) => source !== undefined
   )
-  if (sources.length !== 1 || typeof sources[0] !== 'object' || options.listen)
+  if (sources.length !== 1 || sources[0] === null || typeof sources[0] !== 'object')
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
   /** Parent identity is local; neither bootstrap markers nor peer claims may replace it. */
-  const self = options.self ?? { name: RuntimePluginKey.process, instanceId: defaultRpcId() }
+  const listen = typeof options.listen === 'object' ? options.listen : undefined
+  /** Only the genuine local Plugin scope may identify its own generated default identity. */
+  const preparation = readRuntimePreparationContext(options)
+  /** A caller-owned listener offer fixes the local handshake identity before bind. */
+  const self =
+    listen && (options.self === undefined || preparation?.selfDefaulted)
+      ? { name: options.self?.name ?? RuntimePluginKey.process, instanceId: listen.offer.peer.id }
+      : (options.self ?? { name: RuntimePluginKey.process, instanceId: defaultRpcId() })
   /** The actual default offer names exactly the endpoint roots implemented by the shared owner. */
   const context = prepareRuntimePeerSourceContext(self)
   /**
@@ -66,6 +74,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
   const offer =
     spawn?.offer ??
     connect?.offer ??
+    listen?.offer ??
     createNativeProcessOffer({
       peer: { id: self.instanceId, runtime },
       auth: spawn?.token ?? connect?.token,
@@ -76,6 +85,19 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
     offer.capabilities.some((value) => !context.capabilities.includes(value))
   )
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+  if (listen)
+    return createProcessListenerPeer(
+      {
+        self,
+        provide: options.provide,
+        providerLimits: options.providerLimits,
+        contract: options.contract,
+        endpointFactory: options.endpointFactory,
+        report: options.report
+      },
+      listen,
+      preparation
+    )
   /** Distinct unit/spec domains retain their native types while sharing one generation assembly. */
   const managed = <TUnit extends object, TSpec>(binding: IProcessPluginBinding<TUnit, TSpec>) =>
     createManagedRuntimePeer(
@@ -86,12 +108,13 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
         contract: options.contract,
         keyFactory: options.keyFactory,
         retryPort: options.retryPort,
+        endpointFactory: options.endpointFactory,
         callDeadlineCapMs: spawn?.supervision.spec.limits?.callWallTimeMs,
         report: options.report
       },
       binding,
-      (endpoint, peer) => binding.bindEndpoint(readRuntimePeerConnection(peer).channel, endpoint),
-      readRuntimePreparationContext(options)
+      (channel, endpoint) => binding.bindEndpoint(channel, endpoint),
+      preparation
     )
   /** The canonical binding's native health and drain are kept, rather than disabled for v2. */
   return spawn

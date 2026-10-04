@@ -29,7 +29,8 @@ import type { IRuntimeProcessPeerOptions } from '../runtime-peer.js'
 /** Symmetric Plugin options reuse the process Peer source boundary and canonical Feature exposure. */
 export type IRuntimeProcessPluginOptions = IRuntimePluginOptions<
   IRuntimeProcessPeerOptions['spawn'],
-  IRuntimeProcessPeerOptions['connect']
+  IRuntimeProcessPeerOptions['connect'],
+  IRuntimeProcessPeerOptions['listen']
 >
 
 /** Keep failed endpoint admission inside the generation's rollback boundary. */
