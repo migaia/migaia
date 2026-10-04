@@ -19,6 +19,13 @@ import type { IRemoteContract, IRemoteServeEndpoint } from '@migaia/rpc/remote'
 import { endpointFor, bridgeEndpointFor } from '../peers/ts/runtime.js'
 import { fdLauncher } from '../../bridge/fixtures/jsonrpc-process.js'
 import { createJsonRpcRemoteChannel } from '@migaia/rpc/bridge/jsonrpc'
+import { RpcError, RpcCoreErrorCode } from '@migaia/rpc/core'
+import { RpcCoreErrorText } from '../../../src/core/error-text.js'
+import { createProcessPeer } from '../../../src/process/adapters/node-peer.js'
+import {
+  readRuntimePeerConnection,
+  prepareRuntimePeerSourceContext
+} from '../../../src/remote/runtime-api/peer.js'
 
 /** Portable business outputs are observed on the provider, never inferred from send completion. */
 const expected = JSON.parse(
@@ -67,23 +74,13 @@ const peers = [
   {
     language: 'go',
     command: 'sh',
-    args: [
-      new URL('../peers/go/run.sh', import.meta.url).pathname,
-      '--business',
-      '--contract',
-      new URL('../../../schema/vectors/remote-contract.json', import.meta.url).pathname
-    ],
+    args: [new URL('../peers/go/run.sh', import.meta.url).pathname, '--business'],
     id: 'go-peer'
   },
   {
     language: 'rust',
     command: 'sh',
-    args: [
-      new URL('../peers/rust/run.sh', import.meta.url).pathname,
-      '--business',
-      '--contract',
-      new URL('../../../schema/vectors/remote-contract.json', import.meta.url).pathname
-    ],
+    args: [new URL('../peers/rust/run.sh', import.meta.url).pathname, '--business'],
     id: 'rust-peer'
   },
   {
@@ -124,6 +121,12 @@ function deployment(
   bridge = false,
   budget?: IUnitBudget<'process'>
 ) {
+  /** Independent U36 peers removed RPC bridge support; never launch their obsolete profile. */
+  if (bridge && ['python', 'go', 'rust'].includes(peer.language))
+    throw new RpcError(
+      RpcCoreErrorCode.capabilityUnsupported,
+      RpcCoreErrorText.capabilityUnsupported
+    )
   const handles: IProcessHandle[] = []
   const output: Uint8Array[] = []
   const stdout: Uint8Array[] = []
@@ -271,6 +274,47 @@ async function client(
   budget?: IUnitBudget<'process'>
 ) {
   const fixture = deployment(peer, hostProfile, token, address, bridge, budget)
+  /** Independent peers exchange v2 directories; no v1 contract parser participates. */
+  if (!bridge && ['python', 'go', 'rust'].includes(peer.language)) {
+    /** Source identity and capabilities belong to the canonical runtime Peer preparation. */
+    const self = { name: 'caller', instanceId: 'caller' }
+    /** Existing native proposal retains physical controls while requiring the new runtime baseline. */
+    const source = {
+      ...fixture.selected,
+      offer: {
+        ...fixture.selected.offer!,
+        capabilities: prepareRuntimePeerSourceContext(self).capabilities
+      }
+    }
+    /** Native supervision, budgets, channel ownership and provider roots remain production-owned. */
+    const active = await createProcessPeer({
+      self,
+      ...(source.kind === 'spawn' ? { spawn: source } : { connect: source }),
+      report: (error) => fixture.reports.push(error)
+    })
+    /** The actual selected runtime exposes its original core controls to existing observations. */
+    const accepted = readRuntimePeerConnection(active)
+    /** Pure fixture method projections exercise the current production caller, not a legacy facade. */
+    const feature: IBusinessFeature = {
+      request: (params, options) => active.request('p.f.request', params, options),
+      oneWay: (params) => active.notify('p.f.oneWay', params),
+      generator: (params) => active.stream('p.f.generator', params),
+      asyncGenerator: (params) => active.stream('p.f.asyncGenerator', params)
+    }
+    if (hostProfile) await active.request('migaia.remote.host.use', ['p', { local: 'value' }])
+    return {
+      ...fixture,
+      feature,
+      runtime: {
+        endpoint: accepted.endpoint,
+        oneWay: accepted.endpoint,
+        stream: accepted.endpoint.stream
+      },
+      close: active.close,
+      remove: hostProfile ? () => active.request('migaia.remote.host.unUse', ['p']) : undefined,
+      inspect: hostProfile ? () => active.request('migaia.remote.host.inspect', []) : undefined
+    }
+  }
   const selectedContract = bridge ? bridgeContract : contract
   let runtime: IRemoteServeEndpoint | undefined
   const endpointFactory = async (channel: Parameters<typeof endpointFor>[0]) => {
@@ -404,7 +448,7 @@ async function business(
     ])
   ).toEqual(['h-trace-one', 'h-trace-two', null])
   if (!bridge)
-    expect(await runtime.endpoint.ping(peerId, undefined, { timeoutMs: 1000 })).toBe(true)
+    expect(await runtime.endpoint.ping!(peerId, undefined, { timeoutMs: 1000 })).toBe(true)
   if (active.remove) {
     expect(await active.remove()).toEqual({ ok: true })
     expect(await active.inspect!()).toMatchObject({ plugins: [] })
