@@ -754,8 +754,8 @@ window.runStorageFailureScenario = async () => {
 }
 
 /**
- * Secure cookie 只能在 https 上下文里被写入/可见；e2e 跑在 http://127.0.0.1， 这正是"jsdom 不强制这个约束"必须用真实浏览器验证的场景（SDD
- * §12.4）。
+ * 浏览器决定 Secure cookie 的写入与可见性；loopback HTTP 可能被视为可信来源， 普通 HTTP 主机仍拒绝 Secure
+ * cookie。使用真实浏览器分别验证两类来源（SDD §12.4）。
  */
 window.runCookieSecureScenario = async () => {
   const namespace = `secure-${Math.random().toString(36).slice(2)}`
