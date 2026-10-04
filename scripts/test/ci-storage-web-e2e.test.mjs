@@ -77,9 +77,13 @@ const report = () => ({
  * Runs the actual release-check with a synthetic Playwright producer, without skipping any gate.
  *
  * @param {IPlaywrightReport} input Report emitted by the mocked browser process.
+ * @param {string[]} [arguments_] The selected real Makefile entry and explicit CI policy.
  * @returns {import('node:child_process').SpawnSyncReturns<string>} The real make exit and summary.
  */
-const runGate = (input) => {
+const runGate = (
+  input,
+  arguments_ = ['release-check', 'PACKAGE=storage-web', 'STORAGE_WEB_K269_WAIVE=1']
+) => {
   /** Temporary files stay inside this checkout and are removed by their creator. */
   const directory = mkdtempSync(join(repositoryRoot, 'node_modules/.k269-gate-'))
   try {
@@ -135,7 +139,7 @@ if (process.argv.includes('test:e2e')) {
 `
     )
     chmodSync(producer, 0o755)
-    return spawnSync('make', ['release-check', 'PACKAGE=storage-web'], {
+    return spawnSync('make', arguments_, {
       cwd: directory,
       encoding: 'utf8',
       maxBuffer: 1024 * 1024,
@@ -151,6 +155,13 @@ if (process.argv.includes('test:e2e')) {
 }
 
 describe('K269 exact storage-web E2E failure gate', () => {
+  it('[A272] keeps standalone release validation blocking without the CI waiver', () => {
+    /** Publication preflight must not inherit the CI-only exception for an existing defect. */
+    const result = runGate(report(), ['ship-ci', 'RELEASE_PACKAGES=storage-web'])
+    assert.notEqual(result.status, 0, `[A272] standalone ship-ci must block K269\n${result.stdout}`)
+    assert.match(result.stdout, /FAIL \| storage-web\/test:e2e/)
+  })
+
   it('[A269] warns only for the exact existing Secure cookie assertion', () => {
     /** Only the one accepted browser failure may make release-check non-blocking. */
     const result = runGate(report())
