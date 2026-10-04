@@ -1047,12 +1047,166 @@ fn project_jsonrpc(input: &Value) -> Value {
     Value::Object(fields)
 }
 
+/// Exercise the U36 baseline through the actual native readers and both provider loops.
+fn check_runtime_baseline(counts: &mut Counts) {
+    use crate::json::{number, object, string};
+    /** Both new capabilities are explicitly offered by the authenticated test session. */
+    let hello = object(&[
+        ("kind", string("handshake")),
+        ("step", string("hello")),
+        ("protocol", string("migaia.rpc")),
+        (
+            "versions",
+            Value::Array(vec![object(&[("major", number(1)), ("minor", number(1))])]),
+        ),
+        ("codecs", Value::Array(vec![string("json")])),
+        (
+            "capabilities",
+            Value::Array(
+                [
+                    "runtime-api@1",
+                    "batch@1",
+                    "abort@1",
+                    "ping@1",
+                    "close@1",
+                    "wire-error@1",
+                ]
+                .iter()
+                .map(|cap| string(cap))
+                .collect(),
+            ),
+        ),
+        (
+            "peer",
+            object(&[("id", string("u36-caller")), ("runtime", string("rust"))]),
+        ),
+    ]);
+    /** Requests retain their own ids and ordinary native routes inside a physical batch. */
+    let request = |id: &str, method: &str, payload: Value| {
+        object(&[
+            ("kind", string("request")),
+            ("id", string(id)),
+            ("method", string(method)),
+            (
+                "data",
+                object(&[
+                    (
+                        "route",
+                        object(&[
+                            ("profile", string("migaia.rpc.route")),
+                            ("type", string("request")),
+                            ("applicationVersion", string("1")),
+                            ("senderId", string("u36-caller")),
+                            ("targetId", string("rust-peer")),
+                            ("receiverId", string("rust-peer")),
+                            ("sentAt", number(0)),
+                        ]),
+                    ),
+                    ("payload", payload),
+                ]),
+            ),
+        ])
+    };
+    /** A missing-id member must not suppress the independently admitted later members. */
+    let batch = object(&[
+        ("kind", string("batch")),
+        (
+            "envelopes",
+            Value::Array(vec![
+                request("u36-first", "echo", string("first")),
+                object(&[("kind", string("request")), ("method", string("echo"))]),
+                request("u36-failure", "missing.method", Value::Null),
+                request("u36-last", "echo", string("last")),
+            ]),
+        ),
+    ]);
+    for business in [false, true] {
+        /** Input and output are physical byte frames rather than schema-only objects. */
+        let mut input = Vec::new();
+        for frame in [
+            &hello,
+            &request(
+                "u36-directory",
+                "migaia.remote.runtime.describe",
+                Value::Null,
+            ),
+            &request("u36-old", "migaia.remote.describe", Value::Null),
+            &batch,
+        ] {
+            write_frame(&mut input, frame).unwrap();
+        }
+        let mut output = Vec::new();
+        let result = if business {
+            crate::business::serve(&mut &input[..], &mut output, false, None, false, false)
+        } else {
+            crate::serve(&mut &input[..], &mut output, None)
+        };
+        let mut reader = &output[..];
+        let mut frames = Vec::new();
+        while let Ok(Some(frame)) = crate::read_json(&mut reader) {
+            frames.push(frame);
+        }
+        let profile = if business { "business" } else { "basic" };
+        let check = |counts: &mut Counts, name: &str, good: bool| {
+            counts.case(
+                "u36-runtime-baseline",
+                profile,
+                &object(&[("id", string(name))]),
+                good,
+            );
+        };
+        /** Capability evidence is the real accept frame, not a local constant. */
+        let accepted = frames.first().unwrap_or(&Value::Null);
+        let caps = items(field(accepted, "capabilities"));
+        check(
+            counts,
+            "capabilities",
+            caps.contains(&string("runtime-api@1")) && caps.contains(&string("batch@1")),
+        );
+        /** The directory's public identity must equal the actual accepted peer id. */
+        let response = |id: &str| frames.iter().find(|frame| text(frame, "id") == id);
+        let directory = response("u36-directory")
+            .map(|frame| field(field(frame, "data"), "payload"))
+            .unwrap_or(&Value::Null);
+        check(
+            counts,
+            "v2-directory",
+            field(directory, "schemaVersion").as_u64() == Some(2)
+                && text(field(directory, "self"), "instanceId")
+                    == text(field(accepted, "peer"), "id")
+                && items(field(directory, "methods")).iter().any(|method| {
+                    text(method, "name") == "echo"
+                        && text(method, "modeSource") == "declared"
+                        && items(field(method, "supportedModes")).contains(&string("notify"))
+                }),
+        );
+        check(
+            counts,
+            "old-describe-refused",
+            response("u36-old").is_some_and(|frame| field(frame, "ok") == &Value::Bool(false)),
+        );
+        check(
+            counts,
+            "batch-isolation",
+            result.is_ok()
+                && response("u36-first").is_some_and(|frame| {
+                    field(field(frame, "data"), "payload") == &string("first")
+                })
+                && response("u36-failure")
+                    .is_some_and(|frame| field(frame, "ok") == &Value::Bool(false))
+                && response("u36-last")
+                    .is_some_and(|frame| field(field(frame, "data"), "payload") == &string("last")),
+        );
+    }
+}
+
 pub fn run(root: &Path) -> io::Result<()> {
     let mut counts = Counts {
         passed: 0,
         failed: 0,
     };
-    for prefix in ["frozen/1.0/", ""] {
+    check_runtime_baseline(&mut counts);
+    for prefix in [""] {
         let file = format!("{prefix}handshake.json");
         if let Some(value) = load(root, &file, &mut counts) {
             check_handshake(&file, &value, &mut counts);
@@ -1071,14 +1225,6 @@ pub fn run(root: &Path) -> io::Result<()> {
     }
     if let Some(value) = load(root, "error-chain.json", &mut counts) {
         check_error(&value, &mut counts);
-    }
-    if let Some(schema) = load(root, "../remote-contract.schema.json", &mut counts) {
-        if let Some(vectors) = load(root, "remote-contract.json", &mut counts) {
-            check_host(&vectors, field(&schema, "$defs"), &mut counts);
-        }
-        if let Some(vectors) = load(root, "remote-host-control.json", &mut counts) {
-            check_host(&vectors, field(&schema, "$defs"), &mut counts);
-        }
     }
     if let Some(vectors) = load(root, "stream-framing.json", &mut counts) {
         check_frames(&vectors, &mut counts);
@@ -1119,206 +1265,6 @@ pub fn run(root: &Path) -> io::Result<()> {
         ))
     } else {
         Ok(())
-    }
-}
-
-/// Interpret only constructs present in the published remote schema; unsupported patterns fail.
-fn schema_accepts(value: &Value, rule: &Value, definitions: &Value) -> bool {
-    if let Some(reference) = rule.get("$ref").and_then(Value::as_str) {
-        return schema_accepts(
-            value,
-            field(definitions, reference.rsplit('/').next().unwrap()),
-            definitions,
-        );
-    }
-    for key in ["oneOf", "anyOf"] {
-        if let Some(choices) = rule.get(key) {
-            let count = items(choices)
-                .iter()
-                .filter(|child| schema_accepts(value, child, definitions))
-                .count();
-            if (key == "oneOf" && count != 1) || (key == "anyOf" && count == 0) {
-                return false;
-            }
-        }
-    }
-    if rule
-        .get("not")
-        .is_some_and(|child| schema_accepts(value, child, definitions))
-    {
-        return false;
-    }
-    if rule
-        .get("if")
-        .is_some_and(|child| schema_accepts(value, child, definitions))
-        && !schema_accepts(value, field(rule, "then"), definitions)
-    {
-        return false;
-    }
-    if rule.get("const").is_some_and(|constant| constant != value) {
-        return false;
-    }
-    if rule
-        .get("enum")
-        .is_some_and(|choices| !items(choices).contains(value))
-    {
-        return false;
-    }
-    let valid_type = match text(rule, "type") {
-        "" => true,
-        "object" => matches!(value, Value::Object(_)),
-        "array" => matches!(value, Value::Array(_)),
-        "string" => matches!(value, Value::String(_)),
-        "boolean" => matches!(value, Value::Bool(_)),
-        "null" => matches!(value, Value::Null),
-        "number" => matches!(value, Value::Number(_)),
-        "integer" => value.as_u64().is_some(),
-        _ => false,
-    };
-    if !valid_type {
-        return false;
-    }
-    if let Some(minimum) = rule.get("minimum").and_then(Value::as_u64) {
-        if value.as_u64().is_some_and(|number| number < minimum) {
-            return false;
-        }
-    }
-    if let Some(string) = value.as_str() {
-        if rule
-            .get("maxLength")
-            .and_then(Value::as_u64)
-            .is_some_and(|maximum| string.chars().count() > maximum as usize)
-        {
-            return false;
-        }
-        if let Some(pattern) = rule.get("pattern").and_then(Value::as_str) {
-            if pattern != "^[A-Za-z][A-Za-z0-9_-]{0,39}$"
-                || string.is_empty()
-                || string.len() > 40
-                || !string.as_bytes()[0].is_ascii_alphabetic()
-                || !string
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-            {
-                return false;
-            }
-        }
-    }
-    if let Value::Array(array) = value {
-        if rule
-            .get("minItems")
-            .and_then(Value::as_u64)
-            .is_some_and(|min| array.len() < min as usize)
-            || rule
-                .get("maxItems")
-                .and_then(Value::as_u64)
-                .is_some_and(|max| array.len() > max as usize)
-        {
-            return false;
-        }
-        let prefix = items(field(rule, "prefixItems"));
-        for (index, item) in array.iter().enumerate() {
-            if !schema_accepts(
-                item,
-                prefix.get(index).unwrap_or(field(rule, "items")),
-                definitions,
-            ) {
-                return false;
-            }
-        }
-    }
-    if let Value::Object(object) = value {
-        if rule
-            .get("maxProperties")
-            .and_then(Value::as_u64)
-            .is_some_and(|max| object.len() > max as usize)
-            || rule
-                .get("minProperties")
-                .and_then(Value::as_u64)
-                .is_some_and(|min| object.len() < min as usize)
-            || items(field(rule, "required"))
-                .iter()
-                .any(|key| !value.has(key.as_str().unwrap()))
-        {
-            return false;
-        }
-        for (key, item) in object {
-            if !schema_accepts(
-                &crate::json::string(key),
-                field(rule, "propertyNames"),
-                definitions,
-            ) {
-                return false;
-            }
-            let child = field(rule, "properties")
-                .get(key)
-                .unwrap_or(field(rule, "additionalProperties"));
-            if child == &Value::Bool(false) || !schema_accepts(item, child, definitions) {
-                return false;
-            }
-        }
-    }
-    true
-}
-
-/// Check catalog name identity and canonical inspection ordering separately from schema shape.
-fn check_host(vectors: &Value, definitions: &Value, counts: &mut Counts) {
-    for section in ["contracts", "catalogs", "controls"] {
-        for case in items(field(vectors, section)) {
-            let definition = if section == "contracts" {
-                "contract"
-            } else if section == "catalogs" {
-                "catalog"
-            } else {
-                text(case, "definition")
-            };
-            let value = field(case, "value");
-            let valid = schema_accepts(value, field(definitions, definition), definitions);
-            let mut semantic = valid;
-            let catalog = match definition {
-                "catalog" => Some(value),
-                "describeHost" => value.get("catalog"),
-                _ => None,
-            };
-            if let Some(Value::Object(entries)) = catalog {
-                semantic &= entries
-                    .iter()
-                    .all(|(name, contract)| name == text(contract, "plugin"));
-                // Aggregate catalog methods share the published remote budget.
-                let method_count: usize = entries
-                    .iter()
-                    .map(|(_, contract)| match field(contract, "features") {
-                        Value::Object(features) => features
-                            .iter()
-                            .map(|(_, feature)| match field(feature, "methods") {
-                                Value::Object(methods) => methods.len(),
-                                _ => 0,
-                            })
-                            .sum(),
-                        _ => 0,
-                    })
-                    .sum();
-                semantic &= method_count <= 4096;
-            }
-            if semantic && definition == "hostInspectResult" {
-                let plugins = items(field(value, "plugins"));
-                semantic &= plugins
-                    .windows(2)
-                    .all(|pair| text(&pair[0], "name") < text(&pair[1], "name"));
-                semantic &= plugins.iter().all(|plugin| {
-                    items(field(plugin, "features"))
-                        .windows(2)
-                        .all(|pair| pair[0].as_str() < pair[1].as_str())
-                });
-            }
-            counts.case(
-                "remote-host-control",
-                section,
-                case,
-                field(case, "schemaValid") == &Value::Bool(valid)
-                    && field(case, "semanticValid") == &Value::Bool(semantic),
-            );
-        }
     }
 }
 
