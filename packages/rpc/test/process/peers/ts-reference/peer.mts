@@ -314,9 +314,9 @@ function wireError(code: 'INTERNAL' | 'PROVIDER_NOT_FOUND'): IRecord {
   return { source: '@migaia/rpc/core', code, name, message, stack: `${name}: ${message}` }
 }
 
-/** Builds the route metadata required by control/envelope-v1. */
+/** Replies address the caller's receiver; discovery advertises this peer's separate receiver. */
 function route(
-  type: 'request' | 'response' | 'variation',
+  type: 'request' | 'response' | 'variation' | 'discovery-response',
   senderId: string,
   targetId: string,
   method?: string,
@@ -329,6 +329,7 @@ function route(
     senderId,
     targetId,
     sentAt: 0,
+    ...(type === 'response' || type === 'variation' ? { receiverId: targetId } : {}),
     ...(method === undefined ? {} : { method }),
     ...(variation === undefined ? {} : { variation })
   }
@@ -447,6 +448,24 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
     }
     const inboundRoute = value.data.route
     const sender = typeof inboundRoute.senderId === 'string' ? inboundRoute.senderId : 'caller'
+    if (value.kind === 'discovery' && inboundRoute.type === 'discovery-query') {
+      await writeJson(destination, {
+        kind: 'discovery',
+        id: value.id,
+        version: value.version,
+        acceptVersions: value.acceptVersions,
+        data: {
+          route: {
+            ...route('discovery-response', 'ts-peer', sender),
+            resolvedTargetId: 'ts-peer',
+            receiverId: 'ts-peer',
+            accepted: true,
+            platform: 'Process'
+          }
+        }
+      })
+      continue
+    }
     if (value.kind === 'variation') {
       if (
         inboundRoute.variation === 'ping' &&
@@ -517,7 +536,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
         id: value.id,
         ok: true,
         data: {
-          route: { ...route('response', 'ts-peer', sender, value.method), receiverId: sender },
+          route: route('response', 'ts-peer', sender, value.method),
           payload: REFERENCE_DESCRIPTION
         }
       })
