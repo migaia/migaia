@@ -335,7 +335,10 @@ export type IEventChannelOptions<
   readonly removalPolicy?: 'handle' | 'listener-all'
   /** Maximum listener invocations in one top-level synchronous publish transaction. */
   readonly publishBudget?: number
-  /** Makes already-aborted canonical-channel admission fail after owned cleanup completes. */
+  /**
+   * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the
+   * default returns a rejected receipt without invoking listeners.
+   */
   readonly throwOnAborted?: boolean
   readonly style?: IEventApiStyleOption<S>
   readonly valueConfig?: IValidatedEventValueConfig<T, V>
