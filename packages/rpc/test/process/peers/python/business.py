@@ -19,7 +19,7 @@ METHODS = {
     "echo": ["request", "notify"], "peer.echo": ["request", "notify"],
     "peer.received": ["request"], "peer.aborts": ["request"], "peer.stats": ["request"],
     "peer.trace": ["request"], "peer.error": ["request"], "peer.wait": ["request"],
-    "peer.finish": ["request"], "p.f.request": ["request"], "p.f.oneWay": ["notify"],
+    "peer.finish": ["request"], "peer.reverse": ["request"], "p.f.request": ["request"], "p.f.oneWay": ["notify"],
     "p.f.generator": ["stream"], "p.f.asyncGenerator": ["stream"]
 }
 HOST_METHODS = ["migaia.remote.host.use", "migaia.remote.host.unUse", "migaia.remote.host.inspect"]
@@ -78,6 +78,7 @@ class Business:
         self.closing = False
         self.capabilities = set(peer.CAPABILITIES)
         self.remote_id = ""
+        self.reverse = None
         # Registered providers alone can be invoked; the directory derives from this same whitelist.
         self.providers = {name: (lambda payload, trace, method=name: self.invoke(method, payload, trace))
                           for name in [DESCRIBE, *METHODS, *(HOST_METHODS if host else [])]}
@@ -145,6 +146,8 @@ class Business:
         route = data.get("route", {})
         identifier = message.get("id")
         payload = data.get("payload")
+        if kind == "response":
+            return self.reverse.response(message) if self.reverse is not None else []
         if kind == "discovery" and route.get("type") == "discovery-query":
             header = reply_route(message, "discovery-response")
             header.update(resolvedTargetId=route["targetId"], receiverId=route["targetId"], platform="Process")
@@ -158,9 +161,11 @@ class Business:
             if control == "abort" and "abort@1" in self.capabilities:
                 if self.closing:
                     print("PEER_EVENT ABORT_DURING_DRAIN", file=peer.sys.stderr, flush=True)
+                reverse_aborts = self.reverse.cancel(identifier, payload) if self.reverse is not None else []
                 if self.waiting.pop(identifier, None) is not None:
                     reason = payload.get("reason") if isinstance(payload, dict) and "reason" in payload else payload
                     self.aborts.append(reason)
+                return reverse_aborts
             if control == "close" and "close@1" in self.capabilities:
                 if not isinstance(payload, dict) or type(payload.get("drainMs")) is not int or not 0 <= payload["drainMs"] <= 2_147_483_647:
                     print("PEER_ERROR PROTOCOL_INVALID", file=peer.sys.stderr, flush=True)
@@ -170,6 +175,7 @@ class Business:
                 if payload["drainMs"] == 0:
                     self.waiting.clear()
                     self.streams.clear()
+                return self.reverse.close() if self.reverse is not None else []
             return []
         if kind == "stream":
             state = self.streams.get(identifier)
@@ -192,6 +198,11 @@ class Business:
         modes = ["request"] if method == DESCRIBE or method in HOST_METHODS else METHODS.get(method)
         if modes is not None and ("notify" if route.get("dispatchOnly") is True else "request") not in modes:
             error = {**peer.wire_error("CAPABILITY_UNSUPPORTED", "Runtime operation capability is unavailable"), "source": ERROR_SOURCE}
+            return [] if route.get("dispatchOnly") else [native_response(message, None, error)]
+        if method == "peer.reverse" and self.reverse is not None:
+            return self.providers[method](message, len(self.waiting) + len(self.streams))
+        if self.reverse is not None and len(self.reverse.pending) + len(self.waiting) + len(self.streams) >= 2 and method not in (DESCRIBE, "peer.finish"):
+            error = {**peer.wire_error("OVERLOADED", "Reverse provider concurrency limit reached"), "source": ERROR_SOURCE}
             return [] if route.get("dispatchOnly") else [native_response(message, None, error)]
         if method == "peer.wait":
             self.waiting[identifier] = message
@@ -242,11 +253,15 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bri
     business = Business(host)
     business.capabilities = set(agreed["capabilities"])
     business.remote_id = hello["peer"]["id"]
+    from reverse import ReverseCalls
+    business.reverse = ReverseCalls(business.remote_id, native_response)
+    business.providers["peer.reverse"] = business.reverse.start
     while True:
         raw = peer.read_frame(reader)
         if raw is None:
             business.waiting.clear()
             business.streams.clear()
+            business.reverse.close()
             return
         physical = peer.decode_frame(raw)
         if not isinstance(physical, dict):
