@@ -1,4 +1,5 @@
-import { createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import { PluginHostErrorCode } from './error-code.js'
 import {
   MiddlewarePipelineMode,
   type IAsyncGeneratorMiddlewareStage,
@@ -17,6 +18,52 @@ import type {
 } from './typing.js'
 import type { IRegistration } from './registry.js'
 
+/** Registration-scoped publication stages exact receipts in the original install batch. */
+export type IPluginRuntimeSharedSlot<TFacade extends object = object> = Readonly<{
+  readonly facade: TFacade
+  /** An absent target returns undefined; duplicated instance identity returns null. */
+  find(target: string): object | null | undefined
+  values(): readonly object[]
+  contribute(value: object, instanceId: string): void
+}>
+
+/** Captured real Feature outputs cannot acquire authority from a later same-name registration. */
+export type IPluginRuntimeFeatureSnapshot = Readonly<{
+  readonly outputs: Readonly<Record<string, object>>
+  assertCurrent(feature: string): void
+}>
+
+/** A canonical install core exposes only Host identity, Feature reads and shared publication. */
+export type IPluginRuntimeIntegration = Readonly<{
+  readonly identity: Readonly<{ name: string; id: string }>
+  /** Query only the original managed-host authority; this confers no mutation permission. */
+  matchesHost(host: object): boolean
+  /** Reuse original Host/registration admission for explicitly exposed reserved controls. */
+  assertCurrent(): void
+  acquireSharedSlot<TFacade extends object>(
+    key: PropertyKey,
+    family: object,
+    create: (slot: IPluginRuntimeSharedSlot<TFacade>) => TFacade
+  ): IPluginRuntimeSharedSlot<TFacade>
+  readFeatureOutputs(name: string): IPluginRuntimeFeatureSnapshot
+}>
+
+/** This weak table proves core provenance only; canonical Host state owns slots and registrations. */
+const runtimeIntegrations = new WeakMap<object, IPluginRuntimeIntegration>()
+
+/** Reject structural lookalikes; only the core actually minted for this install gets the port. */
+export function getPluginRuntimeIntegration(core: unknown): IPluginRuntimeIntegration {
+  /** Arbitrary fields and copied descriptors never establish package provenance. */
+  const integration =
+    typeof core === 'object' && core !== null ? runtimeIntegrations.get(core) : undefined
+  if (!integration)
+    throw new PluginHostError(
+      PluginHostErrorCode.pluginDefinitionInvalid,
+      ERROR_TEXT.PLUGIN_DEFINITION_INVALID
+    )
+  return integration
+}
+
 type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly registration: IRegistration<TDomainCore, TValue>
   readonly createDomainCore: () => TDomainCore
@@ -25,6 +72,7 @@ type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly registerStage: (stage: Function, kind: IMiddlewarePipelineMode) => void
   readonly operation: () => IPluginOperationContext
   readonly lifecycle: () => IPluginRegistrationContext
+  readonly runtimeIntegration: () => IPluginRuntimeIntegration
 }
 
 export const createPluginCore = <TDomainCore extends object, TValue>(
@@ -94,5 +142,6 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
     context.registerStage(stage, MiddlewarePipelineMode.asyncGenerator)
     return facade
   })
+  runtimeIntegrations.set(facade, context.runtimeIntegration())
   return facade as TDomainCore & IPluginHostCore<TValue>
 }

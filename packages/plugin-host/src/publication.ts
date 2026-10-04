@@ -16,6 +16,8 @@ type IPluginHostPublicationPort<THost, TDomainCore extends object, TValue> = Rea
     name: string,
     recipe: (previous: Readonly<IPluginConfig>) => Partial<IPluginConfig>
   ): Promise<void>
+  /** Read committed shared slots from canonical state; publication owns no contribution registry. */
+  readSharedExtensions(): ReadonlyMap<PropertyKey, object>
 }>
 
 /** Weak registration-set cache preserving callable identity across disable/enable round trips. */
@@ -84,6 +86,13 @@ export const createPluginHostPublication = <THost, TDomainCore extends object, T
         writable: false
       })
     }
+  for (const [key, facade] of port.readSharedExtensions())
+    Object.defineProperty(extensions, key, {
+      value: facade,
+      enumerable: true,
+      configurable: false,
+      writable: false
+    })
   Object.freeze(extensions)
 
   /** Null-prototype public view whose every read revalidates the captured generation. */

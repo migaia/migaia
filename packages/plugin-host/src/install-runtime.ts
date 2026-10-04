@@ -11,7 +11,7 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import { copyConfig, readPlainDataRecord } from './config.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
-import { mountPluginExtensions } from './extension.js'
+import { mountPluginExtensions, isSharedExtensionSlot } from './extension.js'
 import { invokeCaptured } from './invocation.js'
 import { reportDiagnostic, reportTerminalFailure } from './diagnostic-report.js'
 import { compileFeatures, instantiateFeatures, snapshotFeatureExpose } from './feature-runtime.js'
@@ -21,7 +21,13 @@ import type { IPluginSetupAttempt, IPluginSetupPort } from './setup-runtime.js'
 import { isFeatureReference } from './define-feature.js'
 import type { PluginHostState } from './host-state.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IInstallEntry, IPluginDescriptor, IRegistration } from './registry.js'
+import type {
+  IExtensionOwner,
+  ISharedExtensionContribution,
+  IInstallEntry,
+  IPluginDescriptor,
+  IRegistration
+} from './registry.js'
 import type {
   IPluginHostCore,
   IPluginInstallFailureDetail,
@@ -33,7 +39,9 @@ import type {
 /** Candidate registries held privately until one install batch reaches its commit point. */
 export type IInstallBatchContext<TDomainCore extends object, TValue> = {
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
-  readonly extensionOwners: Map<PropertyKey, IRegistration<TDomainCore, TValue>>
+  readonly extensionOwners: Map<PropertyKey, IExtensionOwner<TDomainCore, TValue>>
+  /** Pending shared receipts become visible only at the existing synchronous commit. */
+  readonly sharedContributions: ISharedExtensionContribution<TDomainCore, TValue>[]
   /** Committed generations whose extension slots are released only when this batch publishes. */
   readonly releasedOwners: Set<IRegistration<TDomainCore, TValue>>
   committed: boolean
@@ -519,7 +527,10 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         has: (key) => {
           if (batch.extensionOwners.has(key)) return true
           const committed = this.#port.state.extensionOwners.get(key)
-          return committed !== undefined && !batch.releasedOwners.has(committed)
+          return (
+            committed !== undefined &&
+            (isSharedExtensionSlot(committed) || !batch.releasedOwners.has(committed))
+          )
         },
         set: (key, owner) => {
           batch.extensionOwners.set(key, owner)
