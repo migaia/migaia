@@ -1,15 +1,38 @@
 import { test, expect } from '@playwright/test'
 
-test('Secure cookie 遵循真实浏览器的 loopback 语义，普通 cookie 也正常', async ({
-  page,
-  browserName
-}) => {
+/** Compare library writes with the native loopback policy, which varies by WebKit platform/version. */
+test('Secure cookie 遵循真实浏览器的 loopback 语义，普通 cookie 也正常', async ({ page }) => {
   await page.goto('/')
+  /** Native cookie control isolates browser policy from the storage-web implementation. */
+  const nativeSecureVisible = await page.evaluate(() => {
+    document.cookie = 'secure-control=value; Path=/; Secure'
+    /** Capture native visibility before removing the isolated control cookie. */
+    const visible = document.cookie.includes('secure-control=value')
+    document.cookie = 'secure-control=; Path=/; Secure; Max-Age=0'
+    return visible
+  })
+  /** The host must retain Secure and delegate visibility to the browser rather than its engine name. */
   const result = await page.evaluate(() => window.runCookieSecureScenario())
   expect(result.insecureVisible).toBe(true)
-  // Chromium treats loopback HTTP as trustworthy here; WebKit rejects Secure
-  // cookiesHost on the same HTTP origin. Both are valid browser-level outcomes.
-  expect(result.secureVisible).toBe(browserName === 'chromium')
+  // WebKit added Cocoa loopback support in https://github.com/WebKit/WebKit/commit/aa297f.
+  // Other builds may still reject it; ordinary HTTP rejection is asserted separately below.
+  expect(result.secureVisible).toBe(nativeSecureVisible)
+})
+
+/** A routed non-loopback origin tests ordinary HTTP without DNS changes or external requests. */
+test('Secure cookie 在普通 HTTP 主机不可见，普通 cookie 保持可用', async ({ page }) => {
+  await page.route('http://storage-web.test:4180/**', async (route) => {
+    /** Serve the real fixture from the local Vite server while preserving the browser origin. */
+    const response = await route.fetch({
+      url: route.request().url().replace('storage-web.test', '127.0.0.1')
+    })
+    await route.fulfill({ response })
+  })
+  await page.goto('http://storage-web.test:4180/')
+  /** Secure writes must be rejected here in every engine; missing Secure attributes fail this case. */
+  const result = await page.evaluate(() => window.runCookieSecureScenario())
+  expect(result.insecureVisible).toBe(true)
+  expect(result.secureVisible).toBe(false)
 })
 
 test('超过约 4KB 的 cookie 值触发 VALUE_TOO_LARGE（应用层先行拦截）', async ({ page }) => {
