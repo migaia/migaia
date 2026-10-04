@@ -207,12 +207,12 @@ func parseHello(value record) (offer, error) {
 	return parsed, nil
 }
 
-// localOffer is the fixed native JSON profile; no auth token enters peer diagnostics.
+// localOffer is the basic native JSON profile; it has no installed stream provider.
 func localOffer() offer {
 	return offer{
 		Versions:     []version{{Major: 1, Minor: 1}},
 		Codecs:       []string{"json"},
-		Capabilities: []string{"abort@1", "ping@1", "close@1", "wire-error@1", "stream@1"},
+		Capabilities: []string{"abort@1", "ping@1", "close@1", "wire-error@1", runtimeCapability, batchCapability},
 		Peer:         record{"id": "go-peer", "runtime": "go"},
 	}
 }
@@ -309,6 +309,9 @@ func replyRoute(inbound record, method string) record {
 	targetID, _ := inbound["senderId"].(string)
 	result := route("response", senderID, targetID)
 	result["method"] = method
+	if _, ok := inbound["receiverId"]; ok {
+		result["receiverId"] = targetID
+	}
 	return result
 }
 
@@ -355,7 +358,13 @@ func response(message record, pending map[string]record) ([]record, error) {
 		return nil, errors.New("invalid request")
 	}
 	if routing["dispatchOnly"] == true {
+		if method == "peer.wait" {
+			fmt.Fprintln(os.Stderr, "PEER_ERROR CAPABILITY_UNSUPPORTED")
+		}
 		return nil, nil
+	}
+	if method == runtimeDescribeMethod {
+		return []record{successResponse(id, method, routing, runtimeDescription(false, false, false), true)}, nil
 	}
 	if method == "peer.wait" {
 		pending[id] = routing
@@ -380,11 +389,16 @@ func response(message record, pending map[string]record) ([]record, error) {
 		payload, present := data["payload"]
 		return []record{successResponse(id, method, routing, payload, present)}, nil
 	}
-	code, messageText := "METHOD_NOT_FOUND", "method not found"
+	code, messageText := "PROVIDER_NOT_FOUND", runtimeMethodUnavailable
+	if strings.HasPrefix(method, runtimeStreamPrefix) {
+		code, messageText = "CAPABILITY_UNSUPPORTED", runtimeCapabilityUnavailable
+	}
+	failure := runtimeFailure(code, messageText)
 	if method == "peer.error" {
 		code, messageText = "PEER_ERROR", "peer requested error"
+		failure = wireError(code, messageText)
 	}
-	return []record{{"kind": "response", "id": id, "ok": false, "code": code, "message": messageText, "error": wireError(code, messageText), "data": record{"route": replyRoute(routing, method)}}}, nil
+	return []record{{"kind": "response", "id": id, "ok": false, "code": code, "message": messageText, "error": failure, "data": record{"route": replyRoute(routing, method)}}}, nil
 }
 
 // control ignores unnegotiated controls and returns a close duration only for negotiated close.
@@ -446,7 +460,7 @@ func responder(reader io.Reader, writer io.Writer) error {
 		return errHandshakeIncompatible
 	}
 	chosen, ok := negotiate(remote, localOffer())
-	if !ok {
+	if !ok || !baselineAgreement(chosen) {
 		_ = send(writer, rejectRecord("HANDSHAKE_INCOMPATIBLE", "incompatible version or codec"))
 		return errHandshakeIncompatible
 	}
@@ -489,57 +503,83 @@ func responder(reader io.Reader, writer io.Writer) error {
 		if received.err != nil {
 			return received.err
 		}
-		message := received.message
-		switch message["kind"] {
-		case "request":
-			if drainTimer != nil {
-				continue
-			}
-			replies, dispatchErr := response(message, pending)
-			if dispatchErr != nil {
-				return dispatchErr
-			}
-			for _, reply := range replies {
-				if sendErr := send(writer, reply); sendErr != nil {
-					return sendErr
+		members, batched, frameErr := baselineMembers(received.message)
+		if frameErr != nil {
+			return frameErr
+		}
+		for _, message := range members {
+			if memberErr := validateBaselineMember(message); memberErr != nil {
+				if batched || errors.Is(memberErr, errUnsupportedRuntimeProfile) {
+					fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+					continue
 				}
+				return memberErr
 			}
-		case "variation":
-			reply, closeMs, controlErr := control(message, pending, chosen.Capabilities)
-			if errors.Is(controlErr, errInvalidClose) {
-				_, _ = fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
-				continue
-			}
-			if controlErr != nil {
-				return controlErr
-			}
-			if reply != nil {
-				if sendErr := send(writer, reply); sendErr != nil {
-					return sendErr
+			switch message["kind"] {
+			case "discovery":
+				if field(field(message["data"])["route"])["type"] == "discovery-query" {
+					if sendErr := send(writer, baselineDiscovery(message)); sendErr != nil {
+						return sendErr
+					}
 				}
-			}
-			data, _ := message["data"].(record)
-			routing, _ := data["route"].(record)
-			if drainTimer != nil && routing["variation"] == "abort" && slices.Contains(chosen.Capabilities, "abort@1") {
-				_, _ = fmt.Fprintln(os.Stderr, "PEER_EVENT ABORT_DURING_DRAIN")
-				if len(pending) == 0 {
-					return nil
+			case "request":
+				if drainTimer != nil {
+					continue
 				}
-			}
-			if closeMs != nil && drainTimer == nil {
-				if *closeMs == 0 || len(pending) == 0 {
-					return nil
+				replies, dispatchErr := response(message, pending)
+				if dispatchErr != nil {
+					if batched {
+						fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+						continue
+					}
+					return dispatchErr
 				}
-				drainTimer = time.NewTimer(time.Duration(*closeMs) * time.Millisecond)
-				drainDeadline = drainTimer.C
+				for _, reply := range replies {
+					if sendErr := send(writer, reply); sendErr != nil {
+						return sendErr
+					}
+				}
+			case "variation":
+				reply, closeMs, controlErr := control(message, pending, chosen.Capabilities)
+				if errors.Is(controlErr, errInvalidClose) {
+					_, _ = fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+					continue
+				}
+				if controlErr != nil {
+					if batched {
+						fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+						continue
+					}
+					return controlErr
+				}
+				if reply != nil {
+					if sendErr := send(writer, reply); sendErr != nil {
+						return sendErr
+					}
+				}
+				data, _ := message["data"].(record)
+				routing, _ := data["route"].(record)
+				if drainTimer != nil && routing["variation"] == "abort" && slices.Contains(chosen.Capabilities, "abort@1") {
+					_, _ = fmt.Fprintln(os.Stderr, "PEER_EVENT ABORT_DURING_DRAIN")
+					if len(pending) == 0 {
+						return nil
+					}
+				}
+				if closeMs != nil && drainTimer == nil {
+					if *closeMs == 0 || len(pending) == 0 {
+						return nil
+					}
+					drainTimer = time.NewTimer(time.Duration(*closeMs) * time.Millisecond)
+					drainDeadline = drainTimer.C
+				}
+			default:
+				_, _ = fmt.Fprintln(os.Stderr, "PEER_WARN UNKNOWN_KIND")
 			}
-		default:
-			_, _ = fmt.Fprintln(os.Stderr, "PEER_WARN UNKNOWN_KIND")
 		}
 	}
 }
 
-// initiator performs the minimal cross-language hello, echo request, and close exchange.
+// initiator requires the U36 baseline, validates v2 identity, sends batch echo, then closes the session.
 func initiator(reader io.Reader, writer io.Writer) error {
 	local := localOffer()
 	if err := send(writer, helloRecord(local)); err != nil {
@@ -552,9 +592,32 @@ func initiator(reader io.Reader, writer io.Writer) error {
 	if err := parseAccept(accept, local); err != nil {
 		return err
 	}
+	capabilities, _ := asStrings(accept["capabilities"], 64, capabilityPattern)
+	if integerField(accept, "major") != 1 || integerField(accept, "minor") != 1 || !slices.Contains(capabilities, runtimeCapability) || !slices.Contains(capabilities, batchCapability) {
+		return errHandshakeIncompatible
+	}
+	remoteID := stringField(field(accept["peer"]), "id")
+	if remoteID == "" {
+		return errHandshakeInvalid
+	}
+	describeRoute := route("request", "go-peer", remoteID)
+	describeRoute["receiverId"] = remoteID
+	if err := send(writer, record{"kind": "request", "id": "go-describe-1", "method": runtimeDescribeMethod, "data": record{"route": describeRoute, "payload": nil}}); err != nil {
+		return err
+	}
+	described, err := receive(reader, false)
+	if err != nil {
+		return err
+	}
+	description := field(field(described["data"])["payload"])
+	if described["kind"] != "response" || described["id"] != "go-describe-1" || described["ok"] != true || integerField(description, "schemaVersion") != 2 || stringField(field(description["self"]), "instanceId") != remoteID {
+		return errors.New("invalid runtime description")
+	}
 	payload := record{"probe": "go"}
-	request := record{"kind": "request", "id": "go-echo-1", "method": "echo", "data": record{"route": route("request", "go-peer", "peer"), "payload": payload}}
-	if err := send(writer, request); err != nil {
+	echoRoute := route("request", "go-peer", remoteID)
+	echoRoute["receiverId"] = remoteID
+	request := record{"kind": "request", "id": "go-echo-1", "method": "echo", "data": record{"route": echoRoute, "payload": payload}}
+	if err := send(writer, record{"kind": "batch", "envelopes": []any{request}}); err != nil {
 		return err
 	}
 	reply, err := receive(reader, false)
@@ -572,7 +635,7 @@ func initiator(reader io.Reader, writer io.Writer) error {
 	if !ok || returned["probe"] != "go" {
 		return errors.New("echo mismatch")
 	}
-	closing := route("variation", "go-peer", "peer")
+	closing := route("variation", "go-peer", remoteID)
 	closing["variation"] = "close"
 	if err := send(writer, record{"kind": "variation", "id": "go-close-1", "data": record{"route": closing, "payload": record{"drainMs": 0}}}); err != nil {
 		return err
@@ -616,7 +679,7 @@ func main() {
 	host := flag.Bool("host", false, "serve portable Host controls")
 	bootstrap := flag.String("bootstrap", "none", "native stdin bootstrap")
 	authFD := flag.Int("auth-fd", -1, "inherited auth descriptor")
-	contractPath := flag.String("contract", "", "published business contract vector")
+	flag.String("contract", "", "retired option; no contract file is read")
 	role := flag.String("role", "responder", "responder or initiator")
 	stdio := flag.Bool("stdio", false, "use framed stdin/stdout")
 	listenUnix := flag.String("listen-unix", "", "listen on a Unix socket")
@@ -637,7 +700,7 @@ func main() {
 	}
 	var err error
 	if *business {
-		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *contractPath, *bridge, *bare, *descendant)
+		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *bridge, *bare, *descendant)
 	} else if *listenUnix != "" {
 		err = serveUnix(*listenUnix, *role)
 	} else if *connectUnix != "" {

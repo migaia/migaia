@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -464,7 +463,7 @@ func streamVectors(suite *vectorSuite, vector record) {
 	suite.check("stream/handshake/minor", compatible && chosen.Minor == integerField(handshake, "negotiatedMinor") && !slices.Contains(chosen.Capabilities, "stream@1"))
 }
 
-// runSelftest executes all available frozen and 1.1 vectors; absent upstream assets stay visible and nonzero.
+// runSelftest executes the current wire vectors and U36 runtime baseline without obsolete v1 contracts.
 func runSelftest(directory string) int {
 	suite := &vectorSuite{}
 	if directory == "" {
@@ -472,7 +471,8 @@ func runSelftest(directory string) int {
 		return 2
 	}
 	runtimeChecks(suite)
-	for _, generation := range []string{"frozen/1.0", "."} {
+	u36BaselineChecks(suite)
+	for _, generation := range []string{"."} {
 		prefix := generation
 		if generation == "." {
 			prefix = "current"
@@ -497,21 +497,6 @@ func runSelftest(directory string) int {
 		streamVectors(suite, vector)
 	} else {
 		suite.unavailable("stream")
-	}
-	if vector, err := loadVector(filepath.Join(directory, "remote-host-control.json")); err == nil {
-		schema, schemaErr := loadVector(filepath.Join(directory, "..", "remote-contract.schema.json"))
-		if schemaErr != nil {
-			suite.unavailable("remote-schema")
-		} else {
-			hostVectors(suite, vector, field(schema["$defs"]))
-			if contracts, err := loadVector(filepath.Join(directory, "remote-contract.json")); err == nil {
-				hostVectors(suite, contracts, field(schema["$defs"]))
-			} else {
-				suite.unavailable("remote-contract")
-			}
-		}
-	} else {
-		suite.unavailable("remote-host-control")
 	}
 	if content, err := os.ReadFile(filepath.Join(directory, "stream-framing.json")); err == nil {
 		decoder := json.NewDecoder(bytes.NewReader(content))
@@ -542,6 +527,141 @@ func runSelftest(directory string) int {
 		return 1
 	}
 	return 0
+}
+
+// u36Request creates a selected-receiver request for the new baseline's real session checks.
+func u36Request(id, method string, payload any) record {
+	header := route("request", "baseline-checker", "go-peer")
+	header["receiverId"] = "go-peer"
+	return record{"kind": "request", "id": id, "method": method, "data": record{"route": header, "payload": payload}}
+}
+
+// u36Replies consumes real framed session output after its accept, preserving the emitted reply order.
+func u36Replies(output *bytes.Buffer) ([]record, error) {
+	accepted, err := receive(output, true)
+	if err != nil || accepted["step"] != "accept" {
+		return nil, errors.New("U36 session did not accept")
+	}
+	var replies []record
+	for {
+		value, err := receive(output, false)
+		if errors.Is(err, io.EOF) {
+			return replies, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		replies = append(replies, value)
+	}
+}
+
+// u36BaselineChecks proves advertised support, v2 directories, removed v1 routes and batch isolation.
+func u36BaselineChecks(suite *vectorSuite) {
+	capabilities := localOffer().Capabilities
+	suite.check("u36/capabilities/runtime-and-batch", slices.Contains(capabilities, "runtime-api@1") && slices.Contains(capabilities, "batch@1"))
+	suite.check("u36/capabilities/stream-business-only", !slices.Contains(capabilities, "stream@1") && slices.Contains(businessOffer().Capabilities, "stream@1"))
+	optional := false
+	for _, capability := range []string{"generation@1", "order@1", "group@1", "cancel-before-start@1", "outcome@1", "portable-binary@1", "native-binary-authenticated-manifest@1", "transfer@1"} {
+		optional = optional || slices.Contains(capabilities, capability)
+	}
+	suite.check("u36/capabilities/no-unimplemented-options", !optional)
+	for _, host := range []bool{false, true} {
+		business := businessState{host: host, installed: !host, received: []any{}, aborts: []any{}, waiting: map[string]record{}, streams: map[string]*businessStream{}}
+		value, failure := business.invoke("migaia.remote.runtime.describe", nil, nil)
+		// JSON roundtrip checks the actual public field shape without sharing the new directory builder.
+		encoded, encodeErr := json.Marshal(value)
+		var description record
+		decodeErr := json.Unmarshal(encoded, &description)
+		self := field(description["self"])
+		directoryOK := failure == nil && encodeErr == nil && decodeErr == nil && len(description) == 3 && description["schemaVersion"] == float64(2) && len(self) == 2 && self["name"] == "go-peer" && self["instanceId"] == "go-peer"
+		methods := entries(description["methods"])
+		echoPresent := false
+		waitRequestOnly := false
+		for _, raw := range methods {
+			method := field(raw)
+			modes := stringSlice(method["supportedModes"])
+			directoryOK = directoryOK && len(method) == 3 && method["modeSource"] == "declared" && stringField(method, "name") != "" && len(modes) > 0
+			if method["name"] == "echo" {
+				echoPresent = slices.Contains(modes, "request") && slices.Contains(modes, "notify")
+			}
+			if method["name"] == "peer.wait" {
+				waitRequestOnly = reflect.DeepEqual(modes, []string{"request"})
+			}
+		}
+		suite.check(fmt.Sprintf("u36/describe/business-host-%t", host), directoryOK && echoPresent && waitRequestOnly)
+		waitNotify := u36Request("wait-notify", "peer.wait", nil)
+		field(field(waitNotify["data"])["route"])["dispatchOnly"] = true
+		waitReplies, waitErr := business.native(waitNotify)
+		suite.check(fmt.Sprintf("u36/modes/wait-notify-no-pending-host-%t", host), waitErr == nil && len(waitReplies) == 0 && len(business.waiting) == 0)
+		_, oldFailure := business.invoke("migaia.remote.describe", nil, nil)
+		suite.check(fmt.Sprintf("u36/describe/v1-removed-host-%t", host), oldFailure != nil && oldFailure["code"] == "PROVIDER_NOT_FOUND")
+	}
+	for _, business := range []bool{false, true} {
+		var input, output bytes.Buffer
+		peerOffer := localOffer()
+		if business {
+			peerOffer = businessOffer()
+		}
+		_ = send(&input, helloRecord(peerOffer))
+		_ = send(&input, u36Request("describe", "migaia.remote.runtime.describe", nil))
+		if business {
+			_ = serveBusiness(&input, &output, false, "", false, false)
+		} else {
+			_ = responder(&input, &output)
+		}
+		replies, err := u36Replies(&output)
+		singleOK := err == nil && len(replies) == 1 && replies[0]["ok"] == true && integerField(field(field(replies[0]["data"])["payload"]), "schemaVersion") == 2
+		suite.check(fmt.Sprintf("u36/describe/live-business-%t", business), singleOK)
+
+		input.Reset()
+		output.Reset()
+		_ = send(&input, helloRecord(peerOffer))
+		_ = send(&input, record{"kind": "batch", "envelopes": []any{u36Request("first", "echo", "one"), json.Number("7"), u36Request("missing", "not-provided", nil), u36Request("last", "echo", "two")}})
+		var sessionErr error
+		if business {
+			sessionErr = serveBusiness(&input, &output, false, "", false, false)
+		} else {
+			sessionErr = responder(&input, &output)
+		}
+		replies, err = u36Replies(&output)
+		batchOK := sessionErr == nil && err == nil && len(replies) == 3
+		if batchOK {
+			batchOK = replies[0]["id"] == "first" && field(replies[0]["data"])["payload"] == "one" && replies[1]["id"] == "missing" && replies[1]["ok"] == false && replies[2]["id"] == "last" && field(replies[2]["data"])["payload"] == "two"
+		}
+		suite.check(fmt.Sprintf("u36/batch/member-isolation-business-%t", business), batchOK)
+	}
+	// A supported baseline session may omit stream; neither directory nor dispatch may re-enable it.
+	var noStreamInput, noStreamOutput bytes.Buffer
+	noStreamOffer := localOffer()
+	_ = send(&noStreamInput, helloRecord(noStreamOffer))
+	_ = send(&noStreamInput, u36Request("describe", "migaia.remote.runtime.describe", nil))
+	_ = send(&noStreamInput, u36Request("stream", "migaia.remote.runtime.stream.p.f.generator", []any{[]any{"one"}}))
+	noStreamErr := serveBusiness(&noStreamInput, &noStreamOutput, false, "", false, false)
+	noStreamReplies, noStreamReadErr := u36Replies(&noStreamOutput)
+	noStreamOK := noStreamErr == nil && noStreamReadErr == nil && len(noStreamReplies) == 2
+	if noStreamOK {
+		description := field(field(noStreamReplies[0]["data"])["payload"])
+		for _, raw := range entries(description["methods"]) {
+			name := field(raw)["name"]
+			noStreamOK = noStreamOK && name != "p.f.generator" && name != "p.f.asyncGenerator"
+		}
+		noStreamOK = noStreamOK && noStreamReplies[1]["kind"] == "response" && noStreamReplies[1]["ok"] == false && noStreamReplies[1]["code"] == "CAPABILITY_UNSUPPORTED"
+	}
+	suite.check("u36/stream/unnegotiated-directory-and-dispatch", noStreamOK)
+	// Ordered-pair interop must exchange v2 before sending one echo inside a real batch frame.
+	var input, output bytes.Buffer
+	remote := localOffer()
+	remote.Peer = record{"id": "other-peer", "runtime": "go"}
+	_ = send(&input, acceptRecord(agreement{Major: 1, Minor: 1, Codec: "json", Capabilities: []string{"runtime-api@1", "batch@1", "close@1"}}, remote))
+	description := record{"schemaVersion": 2, "self": record{"name": "other-peer", "instanceId": "other-peer"}, "methods": []any{record{"name": "echo", "supportedModes": []any{"request", "notify"}, "modeSource": "declared"}}}
+	_ = send(&input, record{"kind": "response", "id": "go-describe-1", "ok": true, "data": record{"route": route("response", "other-peer", "go-peer"), "payload": description}})
+	_ = send(&input, record{"kind": "response", "id": "go-echo-1", "ok": true, "data": record{"route": route("response", "other-peer", "go-peer"), "payload": record{"probe": "go"}}})
+	initiateErr := initiator(&input, &output)
+	_, helloErr := receive(&output, true)
+	describeCall, describeErr := receive(&output, false)
+	batchCall, batchErr := receive(&output, false)
+	closeCall, closeErr := receive(&output, false)
+	suite.check("u36/initiator/v2-then-batch", initiateErr == nil && helloErr == nil && describeErr == nil && batchErr == nil && closeErr == nil && describeCall["method"] == "migaia.remote.runtime.describe" && batchCall["kind"] == "batch" && len(entries(batchCall["envelopes"])) == 1 && closeCall["kind"] == "variation")
 }
 
 // runtimeChecks guards framing, UTF-8, control, one-way, error, and credential boundaries.
@@ -576,7 +696,7 @@ func runtimeChecks(suite *vectorSuite) {
 	suite.check("runtime/request/wire-error", errorErr == nil && len(failures) == 1 && failures[0]["ok"] == false && wire["code"] == "PEER_ERROR" && wire["stack"] != "")
 	request["method"] = "missing-method"
 	missing, missingErr := response(request, map[string]record{})
-	suite.check("runtime/request/method-not-found", missingErr == nil && len(missing) == 1 && missing[0]["code"] == "METHOD_NOT_FOUND" && field(missing[0]["error"])["code"] == "METHOD_NOT_FOUND")
+	suite.check("runtime/request/method-not-found", missingErr == nil && len(missing) == 1 && missing[0]["code"] == "PROVIDER_NOT_FOUND" && field(missing[0]["error"])["code"] == "PROVIDER_NOT_FOUND")
 	pending := map[string]record{"one": requestRoute}
 	abortRoute := route("variation", "a", "b")
 	abortRoute["variation"] = "abort"
@@ -622,209 +742,6 @@ func runtimeChecks(suite *vectorSuite) {
 	_ = send(&badInput, malformedHello)
 	badErr := responder(&badInput, &badOutput)
 	suite.check("runtime/secret/malformed-hello", badErr != nil && !strings.Contains(badErr.Error(), secret) && !bytes.Contains(badOutput.Bytes(), []byte(secret)))
-}
-
-// schemaAccepts executes the constructs used by the published remote schema.
-func schemaAccepts(value any, rule record, definitions record) bool {
-	if ref := stringField(rule, "$ref"); ref != "" {
-		parts := strings.Split(ref, "/")
-		return schemaAccepts(value, field(definitions[parts[len(parts)-1]]), definitions)
-	}
-	for _, key := range []string{"oneOf", "anyOf"} {
-		if choices, exists := rule[key]; exists {
-			count := 0
-			for _, child := range entries(choices) {
-				if schemaAccepts(value, field(child), definitions) {
-					count++
-				}
-			}
-			if key == "oneOf" && count != 1 || key == "anyOf" && count == 0 {
-				return false
-			}
-		}
-	}
-	if child, exists := rule["not"]; exists && schemaAccepts(value, field(child), definitions) {
-		return false
-	}
-	if child, exists := rule["if"]; exists && schemaAccepts(value, field(child), definitions) && !schemaAccepts(value, field(rule["then"]), definitions) {
-		return false
-	}
-	if constant, exists := rule["const"]; exists && !reflect.DeepEqual(value, constant) {
-		return false
-	}
-	if choices, exists := rule["enum"]; exists {
-		found := false
-		for _, item := range entries(choices) {
-			found = found || reflect.DeepEqual(item, value)
-		}
-		if !found {
-			return false
-		}
-	}
-	kind := stringField(rule, "type")
-	switch kind {
-	case "object":
-		if field(value) == nil {
-			return false
-		}
-	case "array":
-		if _, ok := value.([]any); !ok {
-			return false
-		}
-	case "string":
-		if _, ok := value.(string); !ok {
-			return false
-		}
-	case "boolean":
-		if _, ok := value.(bool); !ok {
-			return false
-		}
-	case "null":
-		if value != nil {
-			return false
-		}
-	case "number", "integer":
-		if _, ok := value.(json.Number); !ok {
-			return false
-		}
-		if kind == "integer" {
-			if _, ok := asInt(value); !ok {
-				return false
-			}
-		}
-	}
-	if number, ok := value.(json.Number); ok {
-		if minimum, exists := rule["minimum"]; exists {
-			n, _ := number.Float64()
-			m, _ := minimum.(json.Number).Float64()
-			if n < m {
-				return false
-			}
-		}
-	}
-	if text, ok := value.(string); ok {
-		if max, exists := rule["maxLength"]; exists {
-			length, _ := asInt(max)
-			if len([]rune(text)) > length {
-				return false
-			}
-		}
-		if pattern := stringField(rule, "pattern"); pattern != "" {
-			match, err := regexp.MatchString(pattern, text)
-			if err != nil || !match {
-				return false
-			}
-		}
-	}
-	if array, ok := value.([]any); ok {
-		if minimum, exists := rule["minItems"]; exists {
-			n, _ := asInt(minimum)
-			if len(array) < n {
-				return false
-			}
-		}
-		if maximum, exists := rule["maxItems"]; exists {
-			n, _ := asInt(maximum)
-			if len(array) > n {
-				return false
-			}
-		}
-		prefix := entries(rule["prefixItems"])
-		for index, item := range array {
-			child := field(rule["items"])
-			if index < len(prefix) {
-				child = field(prefix[index])
-			}
-			if !schemaAccepts(item, child, definitions) {
-				return false
-			}
-		}
-	}
-	if object := field(value); object != nil {
-		if minimum, exists := rule["minProperties"]; exists {
-			n, _ := asInt(minimum)
-			if len(object) < n {
-				return false
-			}
-		}
-		if maximum, exists := rule["maxProperties"]; exists {
-			n, _ := asInt(maximum)
-			if len(object) > n {
-				return false
-			}
-		}
-		for _, key := range stringSlice(rule["required"]) {
-			if _, exists := object[key]; !exists {
-				return false
-			}
-		}
-		for key, item := range object {
-			if !schemaAccepts(key, field(rule["propertyNames"]), definitions) {
-				return false
-			}
-			child, exists := field(rule["properties"])[key]
-			if !exists {
-				child = rule["additionalProperties"]
-			}
-			if child == false || !schemaAccepts(item, field(child), definitions) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// hostVectors compares schema acceptance and the independent semantic projection per case.
-func hostVectors(suite *vectorSuite, vector record, definitions record) {
-	for _, section := range []string{"contracts", "catalogs", "controls"} {
-		for _, item := range entries(vector[section]) {
-			entry := field(item)
-			definition := stringField(entry, "definition")
-			if section == "catalogs" {
-				definition = "catalog"
-			}
-			if section == "contracts" {
-				definition = "contract"
-			}
-			value := entry["value"]
-			valid := schemaAccepts(value, field(definitions[definition]), definitions)
-			semantic := valid
-			var catalog record
-			if definition == "catalog" {
-				catalog = field(value)
-			} else if definition == "describeHost" {
-				catalog = field(field(value)["catalog"])
-			}
-			if semantic && catalog != nil {
-				// Catalog aggregate cap mirrors the published remote semantic budget.
-				methodCount := 0
-				for name, child := range catalog {
-					semantic = semantic && name == stringField(field(child), "plugin")
-					for _, feature := range field(field(child)["features"]) {
-						methodCount += len(field(field(feature)["methods"]))
-					}
-				}
-				semantic = semantic && methodCount <= 4096
-			}
-			if semantic && definition == "hostInspectResult" {
-				previous := ""
-				for _, plugin := range entries(field(value)["plugins"]) {
-					name := stringField(field(plugin), "name")
-					if name <= previous {
-						semantic = false
-					}
-					previous = name
-					features := stringSlice(field(plugin)["features"])
-					for index := 1; index < len(features); index++ {
-						if features[index] <= features[index-1] {
-							semantic = false
-						}
-					}
-				}
-			}
-			suite.check("host/"+section+"/"+stringField(entry, "id"), valid == entry["schemaValid"] && semantic == entry["semanticValid"])
-		}
-	}
 }
 
 // expandFrame expands binary vector specifications independently of JSON wire encoding.
