@@ -11,6 +11,46 @@ export const MAX_FRAME = 16_777_216
 /** Bound unmatched abort IDs retained for duplicate control diagnostics. */
 const MAX_EARLY_ABORT_IDS = 1_024
 
+/** These two capabilities define the sole supported U36 application baseline. */
+const REQUIRED_CAPABILITIES = ['runtime-api@1', 'batch@1'] as const
+
+/** Independent fixture dispatch and its directory use these exact public method names. */
+const ReferenceMethod = {
+  /** The v2 directory is separate from the removed v1 remote-contract route. */
+  describe: 'migaia.remote.runtime.describe',
+  /** Echo supports both result-bearing requests and independently counted notifications. */
+  echo: 'echo',
+  /** Exposes receipt counts through a result-bearing request. */
+  receipts: 'peer.receipts',
+  /** Exposes the original request's trace for fixture observations. */
+  trace: 'peer.trace',
+  /** Holds a request until an existing abort or finish operation settles it. */
+  wait: 'peer.wait',
+  /** Produces the existing independent wire-error fixture. */
+  error: 'peer.error',
+  /** Settles outstanding fixture waits without adding a runtime control protocol. */
+  finish: 'peer.finish'
+} as const
+
+/** Only actual scalar routes enter the static directory; stream and optional U25 routes are absent. */
+const REFERENCE_DESCRIPTION = {
+  schemaVersion: 2,
+  self: { name: 'ts-reference', instanceId: 'ts-peer' },
+  methods: [
+    { name: ReferenceMethod.echo, supportedModes: ['request', 'notify'], modeSource: 'declared' },
+    ...[
+      ReferenceMethod.receipts,
+      ReferenceMethod.trace,
+      ReferenceMethod.wait,
+      ReferenceMethod.error,
+      ReferenceMethod.finish
+    ].map((name) => ({ name, supportedModes: ['request'], modeSource: 'declared' }))
+  ]
+} as const
+
+/** Existing core provider refusal keeps one stable registered message across fixture routes. */
+const PROVIDER_NOT_FOUND_MESSAGE = 'Runtime method is not provided by this peer'
+
 /** A JSON object after parsing an untrusted native frame. */
 export type IRecord = Record<string, unknown>
 
@@ -155,7 +195,7 @@ export function localOffer(peerId: string): IRecord {
     protocol: 'migaia.rpc',
     versions: [{ major: 1, minor: 1 }],
     codecs: ['json'],
-    capabilities: ['abort@1', 'ping@1', 'close@1', 'wire-error@1'],
+    capabilities: ['abort@1', 'ping@1', 'close@1', 'wire-error@1', ...REQUIRED_CAPABILITIES],
     peer: { id: peerId, runtime: 'node' }
   }
 }
@@ -268,9 +308,8 @@ export function validateAccept(offer: IRecord, accept: unknown): boolean {
 }
 
 /** Constructs an ordinary wire-error node with fixed text and no input-derived fields. */
-function wireError(code: 'INTERNAL' | 'METHOD_NOT_FOUND'): IRecord {
-  const message =
-    code === 'METHOD_NOT_FOUND' ? 'native peer method unavailable' : 'peer request failed'
+function wireError(code: 'INTERNAL' | 'PROVIDER_NOT_FOUND'): IRecord {
+  const message = code === 'PROVIDER_NOT_FOUND' ? PROVIDER_NOT_FOUND_MESSAGE : 'peer request failed'
   const name = 'Error'
   return { source: '@migaia/rpc/core', code, name, message, stack: `${name}: ${message}` }
 }
@@ -295,6 +334,24 @@ function route(
   }
 }
 
+/** Network sessions require U36 while pure negotiation remains usable by current wire vectors. */
+function supportsBaseline(agreement: IRecord): boolean {
+  /** Capture the accepted list once before the baseline membership callback. */
+  const capabilities = agreement.capabilities
+  return (
+    agreement.major === 1 &&
+    agreement.minor === 1 &&
+    Array.isArray(capabilities) &&
+    REQUIRED_CAPABILITIES.every((capability) => capabilities.includes(capability))
+  )
+}
+
+/** A malformed batch member is isolated; an invalid ordinary envelope keeps its original failure. */
+function rejectEnvelope(fromBatch: boolean): void {
+  if (!fromBatch) throw new PeerFault('INVALID_ENVELOPE')
+  stderr.write('PEER_ERROR INVALID_ENVELOPE\n')
+}
+
 /** Serves one authenticated native connection with no child process or secret logging. */
 async function respond(source: Readable, destination: Writable): Promise<void> {
   const reader = new FrameReader(source)
@@ -308,7 +365,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
   if (violation !== undefined) throw new PeerFault('HANDSHAKE_INVALID')
   const hello = first as IRecord
   const agreement = negotiate(hello, localOffer('ts-peer'))
-  if (agreement === undefined) {
+  if (agreement === undefined || !supportsBaseline(agreement)) {
     await writeJson(destination, {
       kind: 'handshake',
       step: 'reject',
@@ -345,10 +402,15 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
   let drain: Promise<void> | undefined
   /** Timer owned by the current close drain. */
   let drainTimer: NodeJS.Timeout | undefined
+  /** Physical batch members share this connection's existing semantic dispatch and original order. */
+  let batchMembers: unknown[] = []
   while (true) {
     if (closing && pending.size === 0) break
-    const value =
-      closing && drain !== undefined
+    /** Member-local semantic failure must not reject later envelopes from the same physical frame. */
+    const fromBatch = batchMembers.length > 0
+    const value = fromBatch
+      ? batchMembers.shift()
+      : closing && drain !== undefined
         ? await Promise.race([
             readJson(reader),
             drain.then(() => undefined),
@@ -356,6 +418,16 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
           ])
         : await readJson(reader)
     if (value === undefined) break
+    if (!fromBatch && isRecord(value) && value.kind === 'batch') {
+      if (
+        !Array.isArray(value.envelopes) ||
+        value.envelopes.length === 0 ||
+        Object.keys(value).some((key) => key !== 'kind' && key !== 'envelopes')
+      )
+        throw new PeerFault('INVALID_FRAME')
+      batchMembers = [...value.envelopes]
+      continue
+    }
     if (
       isRecord(value) &&
       typeof value.kind === 'string' &&
@@ -369,8 +441,10 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       typeof value.id !== 'string' ||
       !isRecord(value.data) ||
       !isRecord(value.data.route)
-    )
-      throw new PeerFault('INVALID_ENVELOPE')
+    ) {
+      rejectEnvelope(fromBatch)
+      continue
+    }
     const inboundRoute = value.data.route
     const sender = typeof inboundRoute.senderId === 'string' ? inboundRoute.senderId : 'caller'
     if (value.kind === 'variation') {
@@ -420,15 +494,36 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       }
       continue
     }
-    if (value.kind !== 'request' || typeof value.method !== 'string')
-      throw new PeerFault('INVALID_ENVELOPE')
+    if (value.kind !== 'request' || typeof value.method !== 'string') {
+      rejectEnvelope(fromBatch)
+      continue
+    }
     cancelledIds.delete(value.id)
     if (closing) continue
     if (inboundRoute.dispatchOnly === true) {
-      oneWayCount += 1
+      if (value.method === ReferenceMethod.echo) oneWayCount += 1
+      else {
+        /** Notification refusal has no wire response and cannot increment accepted receipts. */
+        const code = REFERENCE_DESCRIPTION.methods.some((method) => method.name === value.method)
+          ? 'CAPABILITY_UNSUPPORTED'
+          : 'PROVIDER_NOT_FOUND'
+        stderr.write(`PEER_ERROR ${code}\n`)
+      }
       continue
     }
-    if (value.method === 'peer.wait') {
+    if (value.method === ReferenceMethod.describe) {
+      await writeJson(destination, {
+        kind: 'response',
+        id: value.id,
+        ok: true,
+        data: {
+          route: { ...route('response', 'ts-peer', sender, value.method), receiverId: sender },
+          payload: REFERENCE_DESCRIPTION
+        }
+      })
+      continue
+    }
+    if (value.method === ReferenceMethod.wait) {
       const id = value.id
       const method = value.method
       let finish!: () => void
@@ -451,7 +546,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       pending.set(id, { timer, done, finish })
       continue
     }
-    if (value.method === 'peer.error') {
+    if (value.method === ReferenceMethod.error) {
       const error = wireError('INTERNAL')
       await writeJson(destination, {
         kind: 'response',
@@ -464,7 +559,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       })
       continue
     }
-    if (value.method === 'peer.finish') {
+    if (value.method === ReferenceMethod.finish) {
       for (const [id, task] of pending) {
         clearTimeout(task.timer)
         pending.delete(id)
@@ -472,7 +567,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
           kind: 'response',
           id,
           ok: true,
-          data: { route: route('response', 'ts-peer', sender, 'peer.wait'), payload: null }
+          data: { route: route('response', 'ts-peer', sender, ReferenceMethod.wait), payload: null }
         })
         task.finish()
       }
@@ -484,8 +579,8 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       })
       continue
     }
-    if (!['echo', 'peer.receipts', 'peer.trace'].includes(value.method)) {
-      const error = wireError('METHOD_NOT_FOUND')
+    if (!REFERENCE_DESCRIPTION.methods.some((method) => method.name === value.method)) {
+      const error = wireError('PROVIDER_NOT_FOUND')
       await writeJson(destination, {
         kind: 'response',
         id: value.id,
@@ -498,9 +593,9 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       continue
     }
     const payload =
-      value.method === 'peer.receipts'
+      value.method === ReferenceMethod.receipts
         ? oneWayCount
-        : value.method === 'peer.trace'
+        : value.method === ReferenceMethod.trace
           ? (inboundRoute.trace ?? null)
           : (value.data.payload ?? null)
     await writeJson(destination, {
@@ -517,20 +612,73 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
   }
 }
 
-/** Initiates one framed handshake and request for pairwise language interop. */
+/** Verifies the mandatory directory and an actual batch echo through the independent peer. */
 async function initiate(source: Readable, destination: Writable): Promise<void> {
   const reader = new FrameReader(source)
   const offer = localOffer('ts-peer')
   await writeJson(destination, offer)
   const accepted = await readJson(reader, 65_536)
-  if (!validateAccept(offer, accepted) || !isRecord(accepted) || accepted.codec !== 'json')
+  if (
+    !validateAccept(offer, accepted) ||
+    !isRecord(accepted) ||
+    accepted.codec !== 'json' ||
+    !supportsBaseline(accepted) ||
+    !isRecord(accepted.peer) ||
+    typeof accepted.peer.id !== 'string'
+  )
     throw new PeerFault('HANDSHAKE_INVALID')
-  const sent = { value: 'cross-language-echo' }
+  /** The accepted handshake identity is also required on the new application directory. */
+  const targetId = accepted.peer.id
+  /** Directory correlation is independent of the later application request. */
+  const descriptionId = 'peer-directory-1'
   await writeJson(destination, {
     kind: 'request',
-    id: 'peer-interop-1',
-    method: 'echo',
-    data: { route: route('request', 'ts-peer', 'remote-peer'), payload: sent }
+    id: descriptionId,
+    method: ReferenceMethod.describe,
+    data: { route: route('request', 'ts-peer', targetId) }
+  })
+  /** The peer answers the real reserved v2 request rather than a local schema interpretation. */
+  const descriptionReply = await readJson(reader)
+  if (
+    !isRecord(descriptionReply) ||
+    descriptionReply.kind !== 'response' ||
+    descriptionReply.id !== descriptionId ||
+    descriptionReply.ok !== true ||
+    !isRecord(descriptionReply.data) ||
+    !isRecord(descriptionReply.data.payload)
+  )
+    throw new PeerFault('INTEROP_FAILED')
+  /** Validate the v2 identity and actual request route before dispatching business. */
+  const description = descriptionReply.data.payload
+  if (
+    description.schemaVersion !== 2 ||
+    !isRecord(description.self) ||
+    description.self.instanceId !== targetId ||
+    !Array.isArray(description.methods) ||
+    !description.methods.some(
+      (method: unknown) =>
+        isRecord(method) &&
+        method.name === ReferenceMethod.echo &&
+        method.modeSource === 'declared' &&
+        Array.isArray(method.supportedModes) &&
+        method.supportedModes.includes('request')
+    )
+  )
+    throw new PeerFault('INTEROP_FAILED')
+  const sent = { value: 'cross-language-echo' }
+  await writeJson(destination, {
+    kind: 'batch',
+    envelopes: [
+      {
+        kind: 'request',
+        id: 'peer-interop-1',
+        method: ReferenceMethod.echo,
+        data: {
+          route: { ...route('request', 'ts-peer', targetId), receiverId: targetId },
+          payload: sent
+        }
+      }
+    ]
   })
   const reply = await readJson(reader)
   if (
@@ -547,7 +695,7 @@ async function initiate(source: Readable, destination: Writable): Promise<void> 
     kind: 'variation',
     id: 'peer-close-1',
     data: {
-      route: route('variation', 'ts-peer', 'remote-peer', undefined, 'close'),
+      route: route('variation', 'ts-peer', targetId, undefined, 'close'),
       payload: { drainMs: 0 }
     }
   })
