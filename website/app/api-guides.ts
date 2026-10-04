@@ -35,6 +35,270 @@ export type IApiGuide = {
 const optionTranslations: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, string>>>>
 > = {
+  'supervision:*:*:id': {
+    en: 'Stable supervisor identity used in unit diagnostics and durable ownership records.',
+    zh: '监督器稳定标识，供单元诊断和持久化资源归属记录使用。'
+  },
+  'supervision:*:*:spec': {
+    en: 'Initial launch specification validated by the profile before any unit is admitted.',
+    zh: '首次启动的规格；准入任何单元前由 profile 验证，替换时再验证新规格。'
+  },
+  'supervision:*:*:launcher': {
+    en: 'Runtime adapter that creates handles and reports actual exit; the supervisor does not launch native resources itself.',
+    zh: '创建 handle 并报告实际退出的运行时适配器；监督器自身不创建原生线程或进程。'
+  },
+  'supervision:*:*:budget': {
+    en: 'Shared unit admission budget; its lease remains occupied until actual unit exit.',
+    zh: '共享单元准入预算；获得的 lease 保持占用，直到单元实际退出。'
+  },
+  'supervision:*:*:profile': {
+    en: 'Unit-kind policy for specification validation, capability requirements, exit classification and termination.',
+    zh: '单元类型策略，负责规格验证、能力要求、退出分类以及终止方式。'
+  },
+  'supervision:*:*:hooks': {
+    en: 'Adapter extension points for prewarmed admission, post-launch setup and ready-unit diagnostics.',
+    zh: '适配器扩展点，用于预热单元准入、启动后装配与 ready 单元诊断。'
+  },
+  'supervision:*:*:report': {
+    en: 'Required sink for contained launch, health, cleanup and late failures; it must not throw.',
+    zh: '接收已隔离的启动、健康检查、清理和迟到失败；必填上报函数不得抛错。'
+  },
+  'supervision:*:*:ready': {
+    en: 'Optional readiness handshake run after launch; honor its cancellation signal and settle before the startup deadline.',
+    zh: '启动后的可选就绪握手；遵守取消信号，并在启动截止时间前完成。'
+  },
+  'supervision:*:*:startupTimeoutMs': {
+    en: 'Maximum launch and readiness time in scheduler milliseconds; defaults to 10000.',
+    zh: '启动与就绪握手的调度器毫秒预算，默认 10000；超时后回收未完成单元。'
+  },
+  'supervision:*:*:restart': {
+    en: 'Restart mode and bounded exponential backoff after profile-classified retryable exit.',
+    zh: 'profile 将退出判为可重试后采用的重启模式与有界指数退避配置。'
+  },
+  'supervision:*:*:restart.mode': {
+    en: 'Selects never, on-failure or always restart after exit; defaults to on-failure.',
+    zh: '退出后的重启策略，可选 never、on-failure 或 always；默认 on-failure。'
+  },
+  'supervision:*:*:restart.initialDelayMs': {
+    en: 'First automatic restart delay in scheduler milliseconds; defaults to 250.',
+    zh: '第一次自动重启的调度器延迟毫秒数，默认 250，后续按 factor 增长。'
+  },
+  'supervision:*:*:restart.factor': {
+    en: 'Multiplier for successive restart delays; defaults to 2 and remains bounded by maxDelayMs.',
+    zh: '连续重启延迟的倍增因子，默认 2；最终延迟受 maxDelayMs 上限约束。'
+  },
+  'supervision:*:*:restart.maxDelayMs': {
+    en: 'Upper bound on exponential restart delay in milliseconds; defaults to 30000.',
+    zh: '指数重启延迟的毫秒上限，默认 30000，避免失败后等待时间无限增长。'
+  },
+  'supervision:*:*:restart.maxRestarts': {
+    en: 'Maximum restart attempts in the sliding window before the supervisor enters terminal state.',
+    zh: '滑动窗口内的最大重启次数；达到上限后监督器进入 terminal 状态。'
+  },
+  'supervision:*:*:restart.windowMs': {
+    en: 'Sliding scheduler-time window used to count restart attempts; defaults to 60000 milliseconds.',
+    zh: '统计重启次数所用的滑动调度器时间窗口，默认 60000 毫秒。'
+  },
+  'supervision:*:*:kind': {
+    en: 'Unit kind kept on granted leases so process, thread and coroutine budgets cannot be mixed.',
+    zh: 'lease 保留的单元类型，防止进程、线程与协程预算被混用。'
+  },
+  'supervision:*:*:maxUnits': {
+    en: 'Maximum simultaneously granted leases; queued requests do not occupy a unit slot.',
+    zh: '同时授予的 lease 数量上限；排队请求尚未占用单元名额。'
+  },
+  'supervision:*:*:overflow': {
+    en: 'Chooses reject or queue when all unit slots are occupied; defaults to reject.',
+    zh: '单元名额耗尽时选择 reject 或 queue；默认拒绝，不无限积压。'
+  },
+  'supervision:*:*:queueTimeoutMs': {
+    en: 'Maximum scheduler-time wait for a queued unit request; expiry returns a rejected admission outcome.',
+    zh: '排队请求的最长调度器等待时间；到期返回 rejected 准入结果。'
+  },
+  'supervision:*:*:launchRate': {
+    en: 'Optional sliding-window launch-rate limit in addition to the concurrent unit limit.',
+    zh: '并发单元上限之外的可选滑动窗口启动速率限制，false 表示不启用。'
+  },
+  'supervision:*:*:launchRate.max': {
+    en: 'Maximum leases granted during one launch-rate window.',
+    zh: '一个启动速率窗口内最多授予的 lease 数量；限制短时间内集中启动。'
+  },
+  'supervision:*:*:launchRate.windowMs': {
+    en: 'Scheduler-time duration in milliseconds for the launch-rate window.',
+    zh: '启动速率窗口的调度器毫秒跨度，与 launchRate.max 一起使用。'
+  },
+  'supervision:*:*:parent': {
+    en: 'Optional parent budget acquired before the local lease; release returns both occupied slots.',
+    zh: '先于本地 lease 获得的可选父级预算；释放时归还两个已占名额。'
+  },
+  'supervision:*:*:terminalPolicy': {
+    en: 'Chooses permanent terminal state or an explicit cooldown before allowing another generation.',
+    zh: '选择永久 terminal 状态，或经过明确 cooldown 后允许新的 generation。'
+  },
+  'supervision:*:*:terminalPolicy.mode': {
+    en: 'Keeps the supervisor terminal with stay, or schedules reopening with cooldown.',
+    zh: 'stay 保持 terminal；cooldown 在指定等待时间后允许重新开始。'
+  },
+  'supervision:*:*:terminalPolicy.afterMs': {
+    en: 'Cooldown duration in scheduler milliseconds before terminal admission can reopen.',
+    zh: 'terminal 后重新开放准入前的 cooldown 毫秒数，仅 cooldown 模式使用。'
+  },
+  'supervision:*:*:stop': {
+    en: 'Ordered shutdown policy for draining application work, requesting exit and finally reaping the unit.',
+    zh: '依次排空应用工作、请求退出及最终回收单元的关闭策略配置。'
+  },
+  'supervision:*:*:stop.beforeTerminate': {
+    en: 'Optional cancellable drain callback invoked before profile-specific termination.',
+    zh: '类型专属终止前调用的可选可取消排空回调；在该阶段停止接收工作。'
+  },
+  'supervision:*:*:stop.drainTimeoutMs': {
+    en: 'Maximum application drain time before termination proceeds; defaults to 5000 milliseconds.',
+    zh: '终止继续执行前的应用排空毫秒预算，默认 5000，超时后继续回收。'
+  },
+  'supervision:*:*:stop.exitTimeoutMs': {
+    en: 'Maximum wait for graceful actual exit before hard termination; defaults to 5000 milliseconds.',
+    zh: '强制终止前等待实际优雅退出的毫秒预算，默认 5000。'
+  },
+  'supervision:*:*:stop.reapTimeoutMs': {
+    en: 'Maximum wait for actual exit after hard termination; defaults to 5000 milliseconds.',
+    zh: '强制终止后等待实际退出的毫秒预算，默认 5000；未退出不能提前释放 lease。'
+  },
+  'supervision:*:*:health': {
+    en: 'Periodic cancellable health checks for a ready unit; repeated failure invalidates that generation.',
+    zh: 'ready 单元的定期可取消健康检查；连续失败会作废该 generation。'
+  },
+  'supervision:*:*:health.check': {
+    en: 'Checks the current unit and rejects on unhealthy state; honor the provided cancellation signal.',
+    zh: '检查当前单元，不健康时拒绝；检查函数必须遵守提供的取消信号。'
+  },
+  'supervision:*:*:health.intervalMs': {
+    en: 'Scheduler interval between health checks; defaults to 5000 milliseconds.',
+    zh: '健康检查之间的调度器时间间隔，默认 5000 毫秒，避免并行叠加检查。'
+  },
+  'supervision:*:*:health.timeoutMs': {
+    en: 'Maximum duration of one health check; defaults to 2000 milliseconds.',
+    zh: '单次健康检查的最长调度器执行时间，默认 2000 毫秒。'
+  },
+  'supervision:*:*:health.failureThreshold': {
+    en: 'Consecutive failed checks required to declare the ready generation unhealthy; defaults to 3.',
+    zh: '宣告 ready generation 不健康所需的连续失败次数，默认 3。'
+  },
+  'supervision:*:*:isolation': {
+    en: 'Requires declared launcher capabilities or explicitly accepts cooperative isolation; defaults to required.',
+    zh: '要求启动器具备声明的隔离能力，或明确接受 cooperative 隔离；默认 required。'
+  },
+  'supervision:*:*:requires': {
+    en: 'Additional launcher capabilities checked together with the profile requirements before launch.',
+    zh: '启动前与 profile 需求一同检查的附加启动器能力列表，不能由适配器忽略。'
+  },
+  'supervision:*:*:scheduler': {
+    en: 'Owns monotonic deadlines, restart delays and health timers; omission uses systemScheduler.',
+    zh: '统一拥有单调截止时间、重启延迟和健康计时器；省略时使用 systemScheduler。'
+  },
+  'supervision:*:*:heartbeat': {
+    en: 'Coroutine heartbeat watchdog; it observes cooperative task progress rather than native process health.',
+    zh: '协程心跳监视器，观察协作任务进度，不替代原生进程健康检查。'
+  },
+  'supervision:*:*:heartbeat.timeoutMs': {
+    en: 'Maximum scheduler-time age of the last coroutine heartbeat before a check fails.',
+    zh: '上次协程心跳距当前调度器时间的最大毫秒数；超过时本次检查失败。'
+  },
+  'supervision:*:*:heartbeat.intervalMs': {
+    en: 'Scheduler interval between coroutine heartbeat-age checks.',
+    zh: '协程心跳年龄检查的调度器间隔，与 timeoutMs 共同确定检测延迟。'
+  },
+  'supervision:*:*:heartbeat.failureThreshold': {
+    en: 'Consecutive stale heartbeat observations required before invalidating the coroutine.',
+    zh: '作废协程前所需的连续心跳过期观察次数；一次恢复可中断失败累计。'
+  },
+  'supervision:*:*:usage': {
+    en: 'Optional native usage sampling policy for process resource-limit enforcement.',
+    zh: '执行进程资源上限检查的可选原生用量采样策略，不以客户端并发替代。'
+  },
+  'supervision:*:*:usage.intervalMs': {
+    en: 'Scheduler interval between native process memory and CPU usage samples.',
+    zh: '原生进程内存与 CPU 用量采样的调度器毫秒间隔，避免连续忙轮询。'
+  },
+  'supervision:*:*:usage.failureThreshold': {
+    en: 'Consecutive resource-limit violations required before terminating the process.',
+    zh: '终止进程前所需的连续资源上限违规次数，以采样值而非推测判定。'
+  },
+  'supervision:*:*:output': {
+    en: 'Policy for bounded stdout and stderr tails and optional streaming chunk observation.',
+    zh: '有界 stdout、stderr 尾部保留和可选流式 chunk 观察的输出策略。'
+  },
+  'supervision:*:*:output.tailBytes': {
+    en: 'Maximum bytes retained separately for each stdout and stderr diagnostic tail.',
+    zh: 'stdout 与 stderr 诊断尾部各自保留的最大字节数，不无限保存完整输出。'
+  },
+  'supervision:*:*:output.onChunk': {
+    en: 'Receives drained stdout or stderr bytes; observation does not own the launcher drain loop.',
+    zh: '接收已排空的 stdout 或 stderr 字节；观察者不拥有启动器排空循环。'
+  },
+  'supervision:*:*:registry': {
+    en: 'Durable process record owner used for fingerprint-aware recovery after parent loss.',
+    zh: '持久化进程记录的所有者，父进程失联后按 fingerprint 恢复，防止误杀复用 PID。'
+  },
+  'supervision:*:*:registry.port': {
+    en: 'Storage port that adds, removes and lists durable process identity records.',
+    zh: '添加、删除和列举持久化进程身份记录的存储端口，由应用提供实现。'
+  },
+  'supervision:*:*:registry.namespace': {
+    en: 'Isolation key that restricts recovery and record listing to this application owner.',
+    zh: '将恢复与记录查询限制在当前应用所有者内的隔离键，避免跨应用回收。'
+  },
+  'supervision:*:*:prewarm': {
+    en: 'Optional pool that transfers a ready idle handle together with its still-occupied lease.',
+    zh: '可选预热池，移交 ready 空闲 handle 及其仍占用的 lease，不重复准入。'
+  },
+  'supervision:*:*:wallClock': {
+    en: 'Epoch timestamp provider used only for durable records; deadlines still use scheduler time.',
+    zh: '只为持久化记录提供 epoch 时间戳；截止时间仍使用 scheduler 单调时间。'
+  },
+  'supervision:*:*:size': {
+    en: 'Target number of ready idle processes; every pooled handle consumes the shared process budget.',
+    zh: '目标 ready 空闲进程数量；池内每个 handle 均占用共享进程预算。'
+  },
+  'supervision:*:*:idleTimeoutMs': {
+    en: 'Maximum time to retain an unused prewarmed process before disposing its handle.',
+    zh: '未使用的预热进程最长保留毫秒数；到期后释放 handle，避免长期占用。'
+  },
+  'supervision:*:*:exitTimeoutMs': {
+    en: 'Maximum graceful exit wait when shutting down a prewarm entry.',
+    zh: '关闭预热条目时等待优雅实际退出的最长毫秒数，随后进入强制回收。'
+  },
+  'supervision:*:*:reapTimeoutMs': {
+    en: 'Maximum actual-exit wait after hard termination of a prewarm entry.',
+    zh: '预热条目强制终止后等待实际退出的最长毫秒数，lease 以实际退出为准。'
+  },
+  'event-subscriber:*:*:throwOnAborted': {
+    en: 'Opt in to throwing when channel admission sees an already-aborted signal, after owned cleanup; the default returns a rejected receipt without invoking listeners.',
+    zh: '遇到已经取消的信号时，在自有清理完成后选择抛错；默认返回拒绝 receipt，不调用 listener。'
+  },
+  'logger:plugins/file:file:rotate.maxBytes': {
+    en: 'Rotate the file before writing when the UTF-8 diagnostic buffer reaches this byte limit.',
+    zh: '诊断缓冲的 UTF-8 字节数达到该上限时，在写入之前轮转文件。'
+  },
+  'logger:plugins/file:file:rotate.maxEntries': {
+    en: 'Rotate the file before writing when the diagnostic buffer reaches this entry-count limit.',
+    zh: '诊断缓冲的条目数量达到该上限时，在写入之前轮转文件。'
+  },
+  'middleware-pipeline:*:*:mode': {
+    en: 'Fixes the execution algebra for every run; stages must match the mode or be lifted explicitly.',
+    zh: '固定每次 run 的执行代数；stage 必须匹配该 mode，或先显式 lift。'
+  },
+  'middleware-pipeline:*:*:onViolation': {
+    en: 'Reports duplicate or late next calls; neither violation starts another downstream traversal.',
+    zh: '上报重复或迟到的 next 调用；两类违规均不启动另一轮下游遍历。'
+  },
+  'middleware-pipeline:*:*:assertActive': {
+    en: 'Checks owner admission before each frame; a thrown failure prevents that stage from starting.',
+    zh: '每个 frame 执行前检查 owner 准入；抛错会阻止该 stage 启动。'
+  },
+  'middleware-pipeline:*:*:signals': {
+    en: 'Optional generator sentinel set; undefined, halt and continue identities must remain distinct.',
+    zh: '可选 generator sentinel 集；undefined、halt 与 continue 必须保持不同身份。'
+  },
   'plugin-host:index:defineHost:host': {
     en: 'Host execution, pipeline, queue, disposal, and diagnostic policies used by the functional handle.',
     zh: '函数式 Host handle 使用的执行、pipeline、队列、清理与诊断策略。'
@@ -2638,10 +2902,663 @@ const createSerializeGuide = createStorageContractGuide
 /** Creates an explicitly maintained bilingual Storage Web guide. */
 const createStorageWebGuide = createStorageContractGuide
 
+/** Maintained guides for current non-RPC runtime exports omitted by the older registries. */
+const runtimeCompletionApiGuides = {
+  'capability:graph-dependency:collectPlanEdges': createStorageContractGuide({
+    purposeEn:
+      'Collects required edges inside the affected set and optional edges touching affected providers in canonical consumer order. It reads the topology only and never starts or releases a node.',
+    purposeZh:
+      '按稳定 consumer 顺序收集受影响集合内的 required 边及接触受影响 provider 的 optional 边，只读拓扑，不启动或释放节点。',
+    quickStart:
+      "import { collectPlanEdges } from '@migaia/capability/graph/dependency'\nimport { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  const plan = collectPlanEdges(index, new Set(['database', 'dashboard']))\n  console.log(plan)\n  return plan\n}",
+    scenariosEn: [
+      'Print dependency facts for a pending mutation.',
+      'Preview a graph change before the owner executes its actions.'
+    ],
+    scenariosZh: [
+      '打印待处理 mutation 涉及的依赖事实。',
+      '图 owner 执行动作之前预览实际影响范围。'
+    ],
+    avoidEn: [
+      'A resource must be launched or disposed immediately; execute through its owner.',
+      'Reactive read tracking is required; this planner models service dependencies.'
+    ],
+    avoidZh: [
+      '需要立即启动或释放资源；应调用资源 owner。',
+      '需要响应式读追踪；该规划器描述服务依赖。'
+    ]
+  }),
+  'capability:graph-dependency:planActivation': createStorageContractGuide({
+    purposeEn:
+      'Plans provider-first activation of a selected node set and its required dependencies. The plan describes work; the caller still owns execution, cancellation and cleanup.',
+    purposeZh:
+      '规划选中节点及其 required 依赖的 provider 优先激活顺序；计划只描述工作，执行、取消和清理仍属于调用方。',
+    quickStart:
+      "import { planActivation } from '@migaia/capability/graph/dependency'\nimport { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  const plan = planActivation(index, state, ['dashboard'])\n  console.log(plan)\n  return plan\n}",
+    scenariosEn: [
+      'Activate a lazily installed capability with its providers.',
+      'Preview a graph change before the owner executes its actions.'
+    ],
+    scenariosZh: ['激活惰性安装的能力及其 provider。', '图 owner 执行动作之前预览实际影响范围。'],
+    avoidEn: [
+      'A resource must be launched or disposed immediately; execute through its owner.',
+      'Reactive read tracking is required; this planner models service dependencies.'
+    ],
+    avoidZh: [
+      '需要立即启动或释放资源；应调用资源 owner。',
+      '需要响应式读追踪；该规划器描述服务依赖。'
+    ]
+  }),
+  'capability:graph-dependency:planDependencyMutation': createStorageContractGuide({
+    purposeEn:
+      'Prepares reject, cascade or suspend behavior for dependency mutations. Reject reports blockers; cascade releases dependents first; suspend keeps affected live dependents dormant. No lifecycle operation runs during planning.',
+    purposeZh:
+      '为依赖 mutation 规划 reject、cascade 或 suspend 行为；reject 报告阻塞者，cascade 优先释放依赖者，suspend 挂起存活依赖者，规划期间不执行生命周期操作。',
+    quickStart:
+      "import { planDependencyMutation } from '@migaia/capability/graph/dependency'\nimport { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  const plan = planDependencyMutation(index, state, { roots: ['database'], kind: 'remove', policy: 'cascade' })\n  console.log(plan)\n  return plan\n}",
+    scenariosEn: [
+      'Inspect which dependents a provider removal affects.',
+      'Preview a graph change before the owner executes its actions.'
+    ],
+    scenariosZh: [
+      '检查移除 provider 会影响哪些依赖者。',
+      '图 owner 执行动作之前预览实际影响范围。'
+    ],
+    avoidEn: [
+      'A resource must be launched or disposed immediately; execute through its owner.',
+      'Reactive read tracking is required; this planner models service dependencies.'
+    ],
+    avoidZh: [
+      '需要立即启动或释放资源；应调用资源 owner。',
+      '需要响应式读追踪；该规划器描述服务依赖。'
+    ]
+  }),
+  'capability:graph-dependency:planReplacement': createStorageContractGuide({
+    purposeEn:
+      'Plans replacement of a provider using the consumer-owned rebind decision. Suspended consumers are invalidated; active consumers either rebind or restart. Applying those actions remains the graph owner responsibility.',
+    purposeZh:
+      '根据 consumer 所属的 rebind 决策规划 provider 替换；挂起 consumer 被作废，活动 consumer 重绑定或重启，实际应用这些动作仍由图 owner 负责。',
+    quickStart:
+      "import { planReplacement } from '@migaia/capability/graph/dependency'\nimport { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  const plan = planReplacement(index, state, { target: 'database', canRebind: () => false })\n  console.log(plan)\n  return plan\n}",
+    scenariosEn: [
+      'Replace a provider after its implementation changes.',
+      'Preview a graph change before the owner executes its actions.'
+    ],
+    scenariosZh: ['provider 实现变化后规划替换。', '图 owner 执行动作之前预览实际影响范围。'],
+    avoidEn: [
+      'A resource must be launched or disposed immediately; execute through its owner.',
+      'Reactive read tracking is required; this planner models service dependencies.'
+    ],
+    avoidZh: [
+      '需要立即启动或释放资源；应调用资源 owner。',
+      '需要响应式读追踪；该规划器描述服务依赖。'
+    ]
+  }),
+  'capability:graph-dependency:planRestart': createStorageContractGuide({
+    purposeEn:
+      'Plans restart across the required dependent closure, releasing affected live nodes in dependent-first order. The frozen plan preserves the topology snapshot without acquiring resource leases.',
+    purposeZh:
+      '在 required 依赖者闭包上规划重启，按依赖者优先顺序释放受影响存活节点；冻结计划保留拓扑事实，但不获得资源 lease。',
+    quickStart:
+      "import { planRestart } from '@migaia/capability/graph/dependency'\nimport { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  const plan = planRestart(index, state, ['database'])\n  console.log(plan)\n  return plan\n}",
+    scenariosEn: [
+      'Restart a provider and its active dependents together.',
+      'Preview a graph change before the owner executes its actions.'
+    ],
+    scenariosZh: ['一起重启 provider 及其活动依赖者。', '图 owner 执行动作之前预览实际影响范围。'],
+    avoidEn: [
+      'A resource must be launched or disposed immediately; execute through its owner.',
+      'Reactive read tracking is required; this planner models service dependencies.'
+    ],
+    avoidZh: [
+      '需要立即启动或释放资源；应调用资源 owner。',
+      '需要响应式读追踪；该规划器描述服务依赖。'
+    ]
+  }),
+  'capability:graph-dependency:planResume': createStorageContractGuide({
+    purposeEn:
+      'Plans recovery through the suspended dependent frontier when required providers become available. Stale nodes restart, while eligible nodes resume or rebind; the planner does not clear state flags itself.',
+    purposeZh:
+      'required provider 恢复可用时沿挂起依赖者前沿规划恢复；stale 节点重启，符合条件的节点恢复或重绑定，规划器不自行清除状态标志。',
+    quickStart:
+      "import { planResume } from '@migaia/capability/graph/dependency'\nimport { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  const plan = planResume(index, state, { provider: 'database', generationChanged: false, canRebind: () => true })\n  console.log(plan)\n  return plan\n}",
+    scenariosEn: [
+      'Resume consumers after a temporarily absent provider returns.',
+      'Preview a graph change before the owner executes its actions.'
+    ],
+    scenariosZh: [
+      '暂时缺席的 provider 返回后恢复 consumer。',
+      '图 owner 执行动作之前预览实际影响范围。'
+    ],
+    avoidEn: [
+      'A resource must be launched or disposed immediately; execute through its owner.',
+      'Reactive read tracking is required; this planner models service dependencies.'
+    ],
+    avoidZh: [
+      '需要立即启动或释放资源；应调用资源 owner。',
+      '需要响应式读追踪；该规划器描述服务依赖。'
+    ]
+  }),
+  'capability:graph-dependency:planTeardown': createStorageContractGuide({
+    purposeEn:
+      'Returns a dependent-first teardown plan for the entire topology. This is an ordering description, not a disposer: the caller runs each release and reports failures under its own lifecycle policy.',
+    purposeZh:
+      '返回整个拓扑的依赖者优先关闭计划；这是顺序描述而非 disposer，调用方按自有生命周期策略执行 release 并上报失败。',
+    quickStart:
+      "import { planTeardown } from '@migaia/capability/graph/dependency'\nimport { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  const plan = planTeardown(index)\n  console.log(plan)\n  return plan\n}",
+    scenariosEn: [
+      'Prepare application-wide capability shutdown.',
+      'Preview a graph change before the owner executes its actions.'
+    ],
+    scenariosZh: ['规划应用内全部能力的关闭顺序。', '图 owner 执行动作之前预览实际影响范围。'],
+    avoidEn: [
+      'A resource must be launched or disposed immediately; execute through its owner.',
+      'Reactive read tracking is required; this planner models service dependencies.'
+    ],
+    avoidZh: [
+      '需要立即启动或释放资源；应调用资源 owner。',
+      '需要响应式读追踪；该规划器描述服务依赖。'
+    ]
+  }),
+  'capability:graph-dependency:resolveInstallSet': createStorageContractGuide({
+    purposeEn:
+      'Expands explicitly installed members through required providers while respecting the supplied lazy-node predicate. The immutable set selects materialization work without enabling capabilities or constructing resources.',
+    purposeZh:
+      '按传入的 lazy 节点判断将显式安装成员扩展到 required provider；不可变集合选择物化工作，不启用能力或构造资源。',
+    quickStart:
+      "import { resolveInstallSet } from '@migaia/capability/graph/dependency'\nimport { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  const plan = resolveInstallSet(index, ['dashboard'], () => false)\n  console.log(plan)\n  return plan\n}",
+    scenariosEn: [
+      'Select providers required by a new installed capability.',
+      'Preview a graph change before the owner executes its actions.'
+    ],
+    scenariosZh: ['选择新安装能力需要的 provider。', '图 owner 执行动作之前预览实际影响范围。'],
+    avoidEn: [
+      'A resource must be launched or disposed immediately; execute through its owner.',
+      'Reactive read tracking is required; this planner models service dependencies.'
+    ],
+    avoidZh: [
+      '需要立即启动或释放资源；应调用资源 owner。',
+      '需要响应式读追踪；该规划器描述服务依赖。'
+    ]
+  }),
+  'capability:graph-topology:createTopologyIndex': createStorageContractGuide({
+    purposeEn:
+      'Creates an incremental service-dependency index with stable level and insertion ordering. Transactions isolate speculative changes until commit; the supplied adapter owns cycle and invalid-input error construction.',
+    purposeZh:
+      '创建增量服务依赖索引，保留稳定层级和插入顺序；事务将试探性变更隔离到 commit，传入 adapter 拥有环与非法输入错误的构造。',
+    quickStart:
+      "import { createTopologyIndex, type ITopologyIndexAdapter } from '@migaia/capability/graph/topology'\n\n/** Inspect the plan without executing its resource actions. */\nexport function inspectPlan(adapter: ITopologyIndexAdapter) {\n  const index = createTopologyIndex(adapter)\n  index.add({ id: 'database', dependencies: [] })\n  index.add({ id: 'dashboard', dependencies: [{ provider: 'database', required: true }] })\n  const state = (id: string) => ({ activated: true, enabled: true, suspended: id === 'dashboard', stale: false })\n  console.log(index.order(), index.snapshot())\n  return index\n}",
+    scenariosEn: [
+      'A dynamic capability owner updates provider edges.',
+      'Preview dependency changes inside a topology transaction.'
+    ],
+    scenariosZh: ['动态能力 owner 更新 provider 依赖边。', '在拓扑事务中预览依赖关系变更。'],
+    avoidEn: [
+      'A reactive computation needs automatic read tracking.',
+      'A lifecycle scope must own disposers and resource leases.'
+    ],
+    avoidZh: ['响应式计算需要自动读追踪。', '生命周期 scope 需要拥有 disposer 与资源 lease。']
+  }),
+  'middleware-pipeline:index:createPipeline': createStorageContractGuide({
+    purposeEn:
+      'Constructs a stateless middleware runner whose sync, async, generator or async-generator algebra is fixed at creation. lift adapts only supported stage directions, and run owns all per-call state and cancellation.',
+    purposeZh:
+      '构造无状态 middleware runner，创建时固定 sync、async、generator 或 async-generator 代数；lift 只适配支持的 stage 方向，run 拥有每次调用的状态和取消。',
+    quickStart:
+      "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run([(value, next) => next(value + 1)], 41, value => console.log(value))",
+    scenariosEn: [
+      'Run synchronous request stages without Promise conversion.',
+      'Lift compatible stages into a selected asynchronous algebra.'
+    ],
+    scenariosZh: ['执行同步请求 stage，避免转换为 Promise。', '将兼容 stage 提升到选定异步代数。'],
+    avoidEn: [
+      'Stages belong to incompatible algebras without a supported lift.',
+      'A reusable runner is expected to retain per-request mutable state.'
+    ],
+    avoidZh: ['stage 代数不兼容且没有支持的 lift。', '希望复用 runner 保存每个请求的可变状态。']
+  }),
+  'serialize:codec:asCodecValue': createStorageContractGuide({
+    purposeEn:
+      'Validates and narrows unknown decoded data to the portable codec value domain; unsupported objects and cycles fail before crossing a format boundary.',
+    purposeZh: '将未知解码数据验证并收窄为可移植 codec 值；不支持的对象与环在跨越格式边界前失败。',
+    quickStart:
+      "import { asCodecValue } from '@migaia/serialize/codec'\n\nconst value = asCodecValue({ user: { id: 'user-1' } })\nconsole.log(value)",
+    scenariosEn: [
+      'Validate unknown decoded input.',
+      'Validate data at an application-owned serialization boundary.'
+    ],
+    scenariosZh: ['验证未知的已解码输入。', '在应用所属的序列化边界验证数据。'],
+    avoidEn: [
+      'The data intentionally contains class instances or functions.',
+      'The operation must silently coerce invalid portable input.'
+    ],
+    avoidZh: ['数据有意包含类实例或函数。', '需要静默转换非法可移植输入。']
+  }),
+  'serialize:codec:assertPortableValue': createStorageContractGuide({
+    purposeEn:
+      'Checks the portable JSON-compatible value domain without changing the input. Reject cycles, accessors, unsupported object shapes and non-finite numbers before handing data to a codec.',
+    purposeZh:
+      '检查可移植 JSON 兼容值域且不修改输入；在交给 codec 前拒绝环、访问器、不支持的对象形状及非有限数。',
+    quickStart:
+      "import { assertPortableValue } from '@migaia/serialize/codec'\n\nconst value = { user: { id: 'user-1' } }\nassertPortableValue(value)\nconsole.log(value)",
+    scenariosEn: [
+      'Reject invalid portable payloads before encoding.',
+      'Validate data at an application-owned serialization boundary.'
+    ],
+    scenariosZh: ['编码前拒绝非法可移植 payload。', '在应用所属的序列化边界验证数据。'],
+    avoidEn: [
+      'The data intentionally contains class instances or functions.',
+      'The operation must silently coerce invalid portable input.'
+    ],
+    avoidZh: ['数据有意包含类实例或函数。', '需要静默转换非法可移植输入。']
+  }),
+  'serialize:codec:toPortableValue': createStorageContractGuide({
+    purposeEn:
+      'Converts runtime byte views into the tagged portable representation and recursively copies supported containers. It preserves format-independent byte meaning rather than relying on JSON to serialize a typed array.',
+    purposeZh:
+      '将运行时字节视图转换为带标记的可移植表示，并递归复制支持的容器；保留与格式无关的字节含义，不依赖 JSON 序列化 typed array。',
+    quickStart:
+      "import { toPortableValue } from '@migaia/serialize/codec'\n\nconst value = toPortableValue({ bytes: new Uint8Array([1, 2, 3]) })\nconsole.log(value)",
+    scenariosEn: [
+      'Encode byte-bearing data through a portable format.',
+      'Validate data at an application-owned serialization boundary.'
+    ],
+    scenariosZh: ['将包含字节的数据交给可移植格式编码。', '在应用所属的序列化边界验证数据。'],
+    avoidEn: [
+      'The data intentionally contains class instances or functions.',
+      'The operation must silently coerce invalid portable input.'
+    ],
+    avoidZh: ['数据有意包含类实例或函数。', '需要静默转换非法可移植输入。']
+  }),
+  'serialize:codec:assertCodecVersion': createStorageContractGuide({
+    purposeEn:
+      'Validates a positive safe integer codec version while preserving its literal type. A codec version identifies format behavior and remains separate from a Protobuf schema version.',
+    purposeZh:
+      '验证 codec version 是正安全整数并保留其字面量类型；codec version 标识格式行为，与 Protobuf schema version 分开。',
+    quickStart:
+      "import { assertCodecVersion } from '@migaia/serialize/codec'\n\nconst version = assertCodecVersion(1)\nconsole.log(version)",
+    scenariosEn: [
+      'Admit a declared codec version during construction.',
+      'Validate data at an application-owned serialization boundary.'
+    ],
+    scenariosZh: ['构造期间准入声明的 codec version。', '在应用所属的序列化边界验证数据。'],
+    avoidEn: [
+      'The data intentionally contains class instances or functions.',
+      'The operation must silently coerce invalid portable input.'
+    ],
+    avoidZh: ['数据有意包含类实例或函数。', '需要静默转换非法可移植输入。']
+  }),
+  'serialize:codec:createCodecError': createStorageContractGuide({
+    purposeEn:
+      'Creates a native TypeError with Serialize source and semantic code, keeping the original cause reachable. This helper belongs to codec adapters, whose caller can still inspect the original failure.',
+    purposeZh:
+      '为 codec 适配器建立 Serialize 错误身份并保留原始 cause；已有带码错误保持原样，调用方仍可检查原始失败实例。',
+    quickStart:
+      "import { createCodecError, CodecErrorText } from '@migaia/serialize/codec'\nimport { SerializeErrorCode } from '@migaia/serialize'\n\nconst original = new Error('format callback failed')\nconst error = createCodecError(SerializeErrorCode.decodeFailed, CodecErrorText.decodeFailed, original)\nconsole.error(error, error.cause)",
+    scenariosEn: [
+      'Report a codec callback failure with stable Serialize identity.',
+      'Preserve original diagnostics when adapting a format implementation.'
+    ],
+    scenariosZh: ['使用稳定 Serialize 身份上报 codec 回调失败。', '适配格式实现时保留原始诊断。'],
+    avoidEn: [
+      'The failure belongs to another owner and must pass through unchanged.',
+      'The caller would replace cause with formatted text.'
+    ],
+    avoidZh: ['失败属于其他 owner 且必须原样透传。', '调用方准备把 cause 替换为格式化文本。']
+  }),
+  'serialize:codec:normalizeCodecFailure': createStorageContractGuide({
+    purposeEn:
+      'Retains an already-coded codec error or wraps a foreign callback failure with Serialize identity and the exact original cause. This helper belongs to codec adapters, whose caller can still inspect the original failure.',
+    purposeZh:
+      '为 codec 适配器建立 Serialize 错误身份并保留原始 cause；已有带码错误保持原样，调用方仍可检查原始失败实例。',
+    quickStart:
+      "import { normalizeCodecFailure, CodecErrorText } from '@migaia/serialize/codec'\nimport { SerializeErrorCode } from '@migaia/serialize'\n\nconst original = new Error('format callback failed')\nconst error = normalizeCodecFailure(original, SerializeErrorCode.decodeFailed, CodecErrorText.decodeFailed)\nconsole.error(error, error.cause)",
+    scenariosEn: [
+      'Report a codec callback failure with stable Serialize identity.',
+      'Preserve original diagnostics when adapting a format implementation.'
+    ],
+    scenariosZh: ['使用稳定 Serialize 身份上报 codec 回调失败。', '适配格式实现时保留原始诊断。'],
+    avoidEn: [
+      'The failure belongs to another owner and must pass through unchanged.',
+      'The caller would replace cause with formatted text.'
+    ],
+    avoidZh: ['失败属于其他 owner 且必须原样透传。', '调用方准备把 cause 替换为格式化文本。']
+  }),
+  'serialize:codecs-json:defineJsonCodec': createStorageContractGuide({
+    purposeEn:
+      'Creates a versioned codec for native JSON text. encode and decode share the portable value profile, including tagged byte values; invalid data yields coded Serialize failures rather than format-specific exceptions.',
+    purposeZh:
+      '创建带版本的原生 JSON 文本 codec；encode 与 decode 共用可移植值域，包括带标记字节值。非法数据产生带码 Serialize 失败，而非格式专属异常。',
+    quickStart:
+      "import { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst codec = defineJsonCodec({ version: 1 })\nconst encoded = codec.encode({ user: { id: 'user-1' } })\nconsole.log(codec.id, codec.version, encoded, codec.decode(encoded))",
+    scenariosEn: [
+      'Encode application payloads as native JSON text.',
+      'Pin format behavior with an explicit codec version.'
+    ],
+    scenariosZh: ['将应用 payload 编码为原生 JSON 文本。', '以显式 codec version 固定格式行为。'],
+    avoidEn: [
+      'The payload requires arbitrary class instances or functions.',
+      'Schema-driven Protobuf messages need their generated binding.'
+    ],
+    avoidZh: ['payload 要求任意类实例或函数。', '基于 schema 的 Protobuf 消息需要生成 binding。']
+  }),
+  'serialize:codecs-cbor:defineCBORCodec': createStorageContractGuide({
+    purposeEn:
+      'Creates a versioned codec for RFC-compatible CBOR bytes. encode and decode share the portable value profile, including tagged byte values; invalid data yields coded Serialize failures rather than format-specific exceptions.',
+    purposeZh:
+      '创建带版本的RFC 兼容 CBOR 字节 codec；encode 与 decode 共用可移植值域，包括带标记字节值。非法数据产生带码 Serialize 失败，而非格式专属异常。',
+    quickStart:
+      "import { defineCBORCodec } from '@migaia/serialize/codecs/cbor'\n\nconst codec = defineCBORCodec({ version: 1 })\nconst encoded = codec.encode({ user: { id: 'user-1' } })\nconsole.log(codec.id, codec.version, encoded, codec.decode(encoded))",
+    scenariosEn: [
+      'Encode application payloads as RFC-compatible CBOR bytes.',
+      'Pin format behavior with an explicit codec version.'
+    ],
+    scenariosZh: [
+      '将应用 payload 编码为RFC 兼容 CBOR 字节。',
+      '以显式 codec version 固定格式行为。'
+    ],
+    avoidEn: [
+      'The payload requires arbitrary class instances or functions.',
+      'Schema-driven Protobuf messages need their generated binding.'
+    ],
+    avoidZh: ['payload 要求任意类实例或函数。', '基于 schema 的 Protobuf 消息需要生成 binding。']
+  }),
+  'serialize:codecs-message-pack:defineMessagePackCodec': createStorageContractGuide({
+    purposeEn:
+      'Creates a versioned codec for extension-free MessagePack bytes. encode and decode share the portable value profile, including tagged byte values; invalid data yields coded Serialize failures rather than format-specific exceptions.',
+    purposeZh:
+      '创建带版本的无扩展 MessagePack 字节 codec；encode 与 decode 共用可移植值域，包括带标记字节值。非法数据产生带码 Serialize 失败，而非格式专属异常。',
+    quickStart:
+      "import { defineMessagePackCodec } from '@migaia/serialize/codecs/message-pack'\n\nconst codec = defineMessagePackCodec({ version: 1 })\nconst encoded = codec.encode({ user: { id: 'user-1' } })\nconsole.log(codec.id, codec.version, encoded, codec.decode(encoded))",
+    scenariosEn: [
+      'Encode application payloads as extension-free MessagePack bytes.',
+      'Pin format behavior with an explicit codec version.'
+    ],
+    scenariosZh: [
+      '将应用 payload 编码为无扩展 MessagePack 字节。',
+      '以显式 codec version 固定格式行为。'
+    ],
+    avoidEn: [
+      'The payload requires arbitrary class instances or functions.',
+      'Schema-driven Protobuf messages need their generated binding.'
+    ],
+    avoidZh: ['payload 要求任意类实例或函数。', '基于 schema 的 Protobuf 消息需要生成 binding。']
+  }),
+  'serialize:codecs-protobuf:defineProtobufCodec': createStorageContractGuide({
+    purposeEn:
+      'Creates a byte codec from a generated Buf message descriptor. Codec version and schema id/version are independent identities; callers supply the executable descriptor matching the message shape.',
+    purposeZh:
+      '使用生成的 Buf 消息描述符创建字节 codec；codec version 与 schema id/version 是独立身份，调用方提供匹配消息形状的可执行描述符。',
+    quickStart:
+      "import { defineProtobufCodec } from '@migaia/serialize/codecs/protobuf'\nimport { create, type DescMessage } from '@bufbuild/protobuf'\n\n/** Pass the generated descriptor for the message owned by your application. */\nexport function encodeDefaultMessage<T extends DescMessage>(binding: T) {\n  const codec = defineProtobufCodec({ version: 1, schema: { id: 'user', version: 1 }, binding })\n  const encoded = codec.encode(create(binding))\n  console.log(codec.schema, codec.decode(encoded))\n  return encoded\n}",
+    scenariosEn: [
+      'Serialize an application message described by generated Buf code.',
+      'Keep schema evolution separate from codec implementation version.'
+    ],
+    scenariosZh: ['序列化由生成 Buf 代码描述的应用消息。', '将 schema 演进与 codec 实现版本分开。'],
+    avoidEn: [
+      'No generated message descriptor is available.',
+      'Arbitrary JSON-like data has no Protobuf schema.'
+    ],
+    avoidZh: ['没有可用的生成消息描述符。', '任意 JSON 数据没有对应 Protobuf schema。']
+  }),
+  'utils:error:tryReadProperty': createStorageContractGuide({
+    purposeEn:
+      'Reads one property exactly once and returns a discriminated result instead of losing a throwing getter. Boundary adapters can preserve the original error without performing a second hostile read.',
+    purposeZh:
+      '只读一次属性，以可区分结果保留抛错 getter 的原始失败；边界适配器据此继续处理，不再次读取 hostile 属性。',
+    quickStart:
+      "import { tryReadProperty } from '@migaia/utils/error'\n\nconst record = { reason: new Error('operation cancelled') }\nconst result = tryReadProperty(record, 'reason')\nconsole.log(result)",
+    scenariosEn: [
+      'Inspect a foreign cancellation reason without a repeated getter.',
+      'Retain property-read failure as structured data for a boundary decision.'
+    ],
+    scenariosZh: ['读取外部取消原因，避免重复 getter。', '将属性读取失败保留为结构化决策数据。'],
+    avoidEn: [
+      'The object is trusted and direct access is sufficient.',
+      'The caller intends to discard the failed-read result.'
+    ],
+    avoidZh: ['对象可信且直接访问已足够。', '调用方准备丢弃失败读取结果。']
+  }),
+  'utils:promise:admitAbortSignal': createStorageContractGuide({
+    purposeEn:
+      'Snapshots the required cancellation methods of an unknown signal for a supported async boundary. Its result distinguishes valid admission from invalid input without inventing a replacement signal or losing accessor failures.',
+    purposeZh:
+      '为支持的异步边界快照未知信号的取消方法；结果区分有效准入与非法输入，不伪造替代信号，不丢失访问器失败。',
+    quickStart:
+      "import { admitAbortSignal } from '@migaia/utils/promise'\n\nconst controller = new AbortController()\nconst admission = admitAbortSignal(controller.signal)\nconsole.log(admission)",
+    scenariosEn: [
+      'Admit cancellation supplied by an external adapter.',
+      'Capture a signal once before scheduling asynchronous work.'
+    ],
+    scenariosZh: ['准入外部适配器提供的取消信号。', '异步排程前一次性捕获信号。'],
+    avoidEn: [
+      'An already-admitted canonical signal is available.',
+      'The caller wants to ignore invalid cancellation input.'
+    ],
+    avoidZh: ['已经有准入完成的 canonical 信号。', '调用方希望忽略非法取消输入。']
+  }),
+  'utils:scheduler:createManualScheduler': createStorageContractGuide({
+    purposeEn:
+      'Creates the repository test clock with explicit advance and pending-count observation. It supports deterministic adapter verification; application tests should prefer their framework fake timers and production should use systemScheduler.',
+    purposeZh:
+      '创建本仓测试时钟，提供显式 advance 与 pendingCount 观察，用于适配器确定性验证；应用测试优先使用框架 fake timers，生产使用 systemScheduler。',
+    quickStart:
+      "import { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst task = scheduler.schedule(() => console.log('deadline reached'), 250)\nscheduler.advance(250)\nconsole.log(scheduler.now(), scheduler.pendingCount)\ntask.cancel()",
+    scenariosEn: [
+      'Verify repository deadline ordering without real waits.',
+      'Observe cancellation and queued timer counts in an adapter fixture.'
+    ],
+    scenariosZh: [
+      '在本仓验证截止时间顺序而不真实等待。',
+      '在适配器夹具观察取消与待执行 timer 数量。'
+    ],
+    avoidEn: [
+      'Production requires a real monotonic clock.',
+      'External application tests already provide framework fake timers.'
+    ],
+    avoidZh: ['生产环境需要真实单调时钟。', '外部应用测试已经提供框架 fake timers。']
+  }),
+  'storage-web:host:readStorageNativePluginMetadata': createStorageContractGuide({
+    purposeEn:
+      'Reads library-owned metadata only for native Storage Web plugins. Foreign objects return undefined; matching metadata reports backend identity and reactive capability expectations without installing the plugin.',
+    purposeZh:
+      '仅读取原生 Storage Web plugin 的包属元数据；外部对象返回 undefined，匹配结果说明 backend 身份与 reactive 能力要求，不安装 plugin。',
+    quickStart:
+      "import { readStorageNativePluginMetadata } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst plugin = memoryBackendPlugin()\nconst metadata = readStorageNativePluginMetadata(plugin)\nconsole.log(metadata?.id, metadata?.backendKind)",
+    scenariosEn: [
+      'Inspect native plugin identity before Host installation.',
+      'Check reactive adapter expectations without opening storage.'
+    ],
+    scenariosZh: ['Host 安装前检查原生 plugin 身份。', '不开启存储地检查 reactive adapter 需求。'],
+    avoidEn: [
+      'A foreign plugin needs to be treated as Storage Web native.',
+      'The caller expects metadata inspection to install a backend.'
+    ],
+    avoidZh: ['希望把外部 plugin 当作 Storage Web 原生。', '希望读取元数据时同时安装 backend。']
+  }),
+  'storage-web:plugins-indexed-db:prepareIndexedDbStore': createStorageContractGuide({
+    purposeEn:
+      'Prepares an IndexedDB-backed key/value store for plugin use by completing its existing readiness path. It does not create a second store or transfer disposal ownership away from the caller.',
+    purposeZh:
+      '通过既有 readiness 路径准备 plugin 要使用的 IndexedDB key/value store，不创建第二个 store，不移交调用方的 dispose 所有权。',
+    quickStart:
+      "import { prepareIndexedDbStore } from '@migaia/storage-web/plugins/indexed-db'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst store = indexedDbHost({ dbName: 'task-cache' })\ntry {\n  await prepareIndexedDbStore(store)\n  await store.set('status', 'ready')\n  console.log(await store.get('status'))\n} finally {\n  await store.dispose()\n}",
+    scenariosEn: [
+      'Prepare a caller-owned IndexedDB store before plugin installation.',
+      'Wait for backend readiness before writing cached state.'
+    ],
+    scenariosZh: [
+      'plugin 安装前准备调用方拥有的 IndexedDB store。',
+      '写入缓存状态前等待 backend 就绪。'
+    ],
+    avoidEn: [
+      'A memory backend needs no IndexedDB preparation.',
+      'The caller cannot dispose its owned store.'
+    ],
+    avoidZh: ['内存 backend 不需要 IndexedDB 准备。', '调用方无法释放自有 store。']
+  }),
+  'supervision:coroutine:createCoroutineSupervisor': createStorageContractGuide({
+    purposeEn:
+      'Supervises a cooperative in-process task with one exposed application port and optional heartbeat checks. Stop aborts its signal; the task still owns releasing its resources before actual exit returns the budget lease.',
+    purposeZh:
+      '监督进程内协作任务，提供一次性暴露的应用 port 与可选心跳检查；stop 取消信号，任务仍负责退出前清理资源，实际退出后归还 budget lease。',
+    quickStart:
+      "import { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor } from '@migaia/supervision/coroutine'\n\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 2 })\nconst supervisor = createCoroutineSupervisor<{ echo(value: string): Promise<string> }>({\n  id: 'echo', budget,\n  spec: { task: async ({ signal, expose, heartbeat }) => {\n    expose({ echo: async value => value })\n    heartbeat()\n    await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))\n  } },\n  ready: unit => unit.exposed.then(() => undefined),\n  report: error => console.error(error)\n})\ntry {\n  const result = await supervisor.start()\n  if (result.state === 'ready') console.log(await (await result.unit.exposed).echo('hello'))\n} finally {\n  await supervisor.dispose()\n  budget.close()\n}",
+    scenariosEn: [
+      'Keep a cooperative service running while its owner is active.',
+      'Require a port readiness handshake before callers use the service.'
+    ],
+    scenariosZh: ['owner 存活期间运行协作服务。', '调用服务前要求 port 就绪握手。'],
+    avoidEn: [
+      'The task ignores cooperative cancellation.',
+      'Native crash isolation or process memory enforcement is required.'
+    ],
+    avoidZh: ['任务忽略协作取消。', '需要原生崩溃隔离或进程内存限制。']
+  }),
+  'supervision:index:createUnitBudget': createStorageContractGuide({
+    purposeEn:
+      'Creates a shared FIFO admission controller for one unit kind. Granted leases occupy concurrency slots until release; overflow, queue deadlines, rate windows and an optional parent bound admission without launching units.',
+    purposeZh:
+      '为一种单元类型创建共享 FIFO 准入控制器；授予 lease 后占用并发名额直到释放，overflow、排队截止时间、速率窗口与父预算约束准入，但不启动单元。',
+    quickStart:
+      "import { createUnitBudget } from '@migaia/supervision'\n\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 2, launchRate: false })\nconst admission = await budget.acquire()\ntry {\n  console.log(admission, budget.inUse)\n} finally {\n  if (admission.kind === 'granted') admission.lease.release()\n  budget.close()\n}",
+    scenariosEn: [
+      'Share a concurrent unit limit across several supervisors.',
+      'Reject or queue admissions without starting unbudgeted resources.'
+    ],
+    scenariosZh: ['多个监督器共享并发单元限制。', '拒绝或排队准入，不启动未获预算的资源。'],
+    avoidEn: [
+      'Different unit kinds would share one typed budget.',
+      'A caller intends to release a lease before actual resource exit.'
+    ],
+    avoidZh: ['不同单元类型准备共用同一类型预算。', '调用方准备在资源实际退出前释放 lease。']
+  }),
+  'supervision:index:createSupervisor': createStorageContractGuide({
+    purposeEn:
+      'Creates the runtime-neutral supervisor from a matching profile, launcher, specification and shared budget. Construction does not start a unit; await start and consume only ready outcomes, then dispose through the owning scope.',
+    purposeZh:
+      '使用匹配的 profile、launcher、spec 与共享 budget 创建运行时中立监督器。 构造不启动单元；等待 start，只消费 ready 结果，最后由所属 scope 执行 dispose。',
+    quickStart:
+      "import { createSupervisor } from '@migaia/supervision'\n\n/** Supply the application's matching launcher, specification and shared budget. */\nexport async function runOwnedUnit(options: Parameters<typeof createSupervisor>[0]) {\n  const supervisor = createSupervisor(options)\n  try {\n    const result = await supervisor.start()\n    console.log(result, supervisor.inspect())\n    return result.state\n  } finally {\n    await supervisor.dispose()\n  }\n}",
+    scenariosEn: [
+      'Control one application-owned unit through explicit start and shutdown.',
+      'Share bounded admission across independent supervised instances.'
+    ],
+    scenariosZh: ['以显式启动和关闭控制一个应用所属单元。', '在多个独立监督实例间共享有界准入。'],
+    avoidEn: [
+      'No matching platform launcher or profile is available.',
+      'The owner cannot wait for actual exit before releasing resources.'
+    ],
+    avoidZh: ['没有匹配的平台 launcher 或 profile。', 'owner 无法等到实际退出后再释放资源。']
+  }),
+  'supervision:process:createProcessSupervisor': createStorageContractGuide({
+    purposeEn:
+      'Creates a process supervisor with launcher-declared crash isolation, bounded output draining and optional durable recovery records. Construction does not start a unit; await start and consume only ready outcomes, then dispose through the owning scope.',
+    purposeZh:
+      '创建进程监督器，使用 launcher 声明的崩溃隔离、有界输出排空与可选持久化恢复记录。 构造不启动单元；等待 start，只消费 ready 结果，最后由所属 scope 执行 dispose。',
+    quickStart:
+      "import { createProcessSupervisor } from '@migaia/supervision/process'\n\n/** Supply the application's matching launcher, specification and shared budget. */\nexport async function runOwnedUnit(options: Parameters<typeof createProcessSupervisor>[0]) {\n  const supervisor = createProcessSupervisor(options)\n  try {\n    const result = await supervisor.start()\n    console.log(result, supervisor.inspect())\n    return result.state\n  } finally {\n    await supervisor.dispose()\n  }\n}",
+    scenariosEn: [
+      'Control one application-owned unit through explicit start and shutdown.',
+      'Share bounded admission across independent supervised instances.'
+    ],
+    scenariosZh: ['以显式启动和关闭控制一个应用所属单元。', '在多个独立监督实例间共享有界准入。'],
+    avoidEn: [
+      'No matching platform launcher or profile is available.',
+      'The owner cannot wait for actual exit before releasing resources.'
+    ],
+    avoidZh: ['没有匹配的平台 launcher 或 profile。', 'owner 无法等到实际退出后再释放资源。']
+  }),
+  'supervision:threads:createThreadSupervisor': createStorageContractGuide({
+    purposeEn:
+      'Creates a thread supervisor that checks truthful launcher capabilities and waits for observed thread exit; it does not promise process crash isolation. Construction does not start a unit; await start and consume only ready outcomes, then dispose through the owning scope.',
+    purposeZh:
+      '创建线程监督器，检查启动器真实能力并等待线程实际退出，不承诺进程崩溃隔离。 构造不启动单元；等待 start，只消费 ready 结果，最后由所属 scope 执行 dispose。',
+    quickStart:
+      "import { createThreadSupervisor } from '@migaia/supervision/threads'\n\n/** Supply the application's matching launcher, specification and shared budget. */\nexport async function runOwnedUnit(options: Parameters<typeof createThreadSupervisor>[0]) {\n  const supervisor = createThreadSupervisor(options)\n  try {\n    const result = await supervisor.start()\n    console.log(result, supervisor.inspect())\n    return result.state\n  } finally {\n    await supervisor.dispose()\n  }\n}",
+    scenariosEn: [
+      'Control one application-owned unit through explicit start and shutdown.',
+      'Share bounded admission across independent supervised instances.'
+    ],
+    scenariosZh: ['以显式启动和关闭控制一个应用所属单元。', '在多个独立监督实例间共享有界准入。'],
+    avoidEn: [
+      'No matching platform launcher or profile is available.',
+      'The owner cannot wait for actual exit before releasing resources.'
+    ],
+    avoidZh: ['没有匹配的平台 launcher 或 profile。', 'owner 无法等到实际退出后再释放资源。']
+  }),
+  'supervision:process:createPrewarmPool': createStorageContractGuide({
+    purposeEn:
+      'Creates a bounded non-restarting pool of idle ready processes. Taking an entry transfers its handle and occupied budget lease; replacement bypasses stale entries and pool disposal reaps entries still owned by the pool.',
+    purposeZh:
+      '创建有界且不自动重启的 ready 空闲进程池；take 移交 handle 和已占用 budget lease，替换绕过 stale 条目，dispose 回收池仍拥有的条目。',
+    quickStart:
+      "import { createPrewarmPool } from '@migaia/supervision/process'\n\n/** Inspect an idle pool while its application-supplied launcher owns native creation. */\nexport async function inspectPool(options: Parameters<typeof createPrewarmPool>[0]) {\n  const pool = createPrewarmPool(options)\n  try {\n    console.log(pool.id, pool.idle)\n  } finally {\n    await pool.dispose()\n  }\n}",
+    scenariosEn: [
+      'Reduce launch latency with budgeted idle processes.',
+      'Transfer a ready process to a supervisor without double admission.'
+    ],
+    scenariosZh: ['用已获预算的空闲进程降低启动延迟。', '将 ready 进程移交监督器，避免重复准入。'],
+    avoidEn: [
+      'The process specification changes between unrelated consumers.',
+      'No bounded size or final disposal owner exists.'
+    ],
+    avoidZh: ['不相关 consumer 之间的进程规格发生变化。', '没有有界 size 或最终释放 owner。']
+  }),
+  'supervision:process:reclaimOrphanProcesses': createStorageContractGuide({
+    purposeEn:
+      'Reclaims durable process records only after launcher probes confirm the recorded fingerprint. Failed termination records remain for another attempt, and each contained failure reaches the supplied reporter.',
+    purposeZh:
+      '只有 launcher probe 确认记录的 fingerprint 后才回收持久化进程记录；终止失败的记录保留供后续尝试，每个隔离失败送达传入 reporter。',
+    quickStart:
+      "import { reclaimOrphanProcesses } from '@migaia/supervision/process'\n\n/** Recover only the durable namespace owned by this application. */\nexport async function recoverProcesses(options: Parameters<typeof reclaimOrphanProcesses>[0]) {\n  const result = await reclaimOrphanProcesses(options)\n  console.log(result)\n  return result\n}",
+    scenariosEn: [
+      'Recover owned native processes after parent loss.',
+      'Retain failed recovery records while reporting their original causes.'
+    ],
+    scenariosZh: ['父进程失联后恢复自有原生进程。', '上报原始原因并保留恢复失败的记录。'],
+    avoidEn: [
+      'The launcher cannot probe fingerprints and terminate recorded processes.',
+      'The namespace contains records owned by another application.'
+    ],
+    avoidZh: [
+      'launcher 无法探测 fingerprint 或终止已记录进程。',
+      'namespace 包含其他应用所属记录。'
+    ]
+  }),
+  'supervision:process:createParentLossGuard': createStorageContractGuide({
+    purposeEn:
+      'Creates an idempotent parent-loss shutdown guard. It invokes cooperative shutdown once, cancels the grace timer after completion and calls the supplied exit callback with the completed or forced exit code.',
+    purposeZh:
+      '创建幂等的父进程丢失关闭 guard。仅调用一次协作 shutdown；完成后取消 grace timer，并以 completed 或 forced code 调用注入的 exit callback。',
+    quickStart: `import { createParentLossGuard } from '@migaia/supervision/process'\n\nconst guard = createParentLossGuard({\n  shutdown: async (signal) => { if (signal.aborted) return; console.log('drained parent-owned work') },\n  exit: (code) => console.log('requested exit code:', code),\n  report: (error) => console.error(error),\n  graceMs: 5000\n})\nguard.trigger()\nconsole.log(guard.triggered)`,
+    scenariosEn: [
+      'A child process must drain owned work when its parent disappears.',
+      'The adapter already owns the real process exit operation and injects it explicitly.'
+    ],
+    scenariosZh: [
+      '父进程消失时，子进程需要排空已有工作。',
+      '适配器拥有实际 process exit 操作，并通过 callback 显式注入。'
+    ],
+    avoidEn: [
+      'The caller expects the guard to detect parent loss; wire the signal separately.',
+      'Ordinary supervisor stop already owns the same shutdown path.'
+    ],
+    avoidZh: [
+      '期望 guard 自行检测父进程丢失；应另行接入已有信号。',
+      '普通 supervisor stop 已拥有相同的关闭路径。'
+    ],
+    optionsEn: [],
+    optionsZh: []
+  })
+} satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
+
 const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>> = {
   ...completionApiGuides,
   ...webRpcApiGuides,
   ...utilsApiGuides,
+  ...runtimeCompletionApiGuides,
   'storage-web:memory:memoryStorageHost': createStorageWebGuide({
     purposeEn:
       'Creates an isolated synchronous in-memory record store with text, byte, structured-record, transaction, iteration, metadata, and post-commit change-feed channels. It is process-local and loses all data when the instance is discarded.',
@@ -12688,7 +13605,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       'Enforces one feature at an API boundary. Missing configuration throws PROVIDER_REQUIRED; a present but disabled path throws FEATURE_DISABLED, preserving separate remediation.',
     purposeZh:
       '在 API boundary 强制一个 feature。缺少 config 抛 PROVIDER_REQUIRED；config 存在但 path disabled 抛 FEATURE_DISABLED，保留不同 remediation。',
-    quickStart: `import { assertStoreFeature } from '@migaia/store-react'\n\nconst config = { features: { wasm: true, experimental: {} } }\nassertStoreFeature(config, 'wasm', 'useWasmField') // 通过后才进入依赖 wasm 的 API`,
+    quickStart: `import { assertStoreFeature } from '@migaia/store-react'\n\nconst config = { features: { wasm: true, experimental: {} } }\nassertStoreFeature(config, 'wasm', 'useWasmField')\nconsole.log('wasm feature admitted') // 通过后才进入依赖 wasm 的 API`,
     scenariosEn: [
       'An enhanced API must fail closed.',
       'Non-React integration enforces Provider-equivalent gates.',
@@ -12849,7 +13766,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       'React hook form of assertStoreFeature. It reads current configuration and fails in render when Provider is absent or the named feature is disabled.',
     purposeZh:
       'assertStoreFeature 的 React hook 形式。读取 current config，并在 Provider 缺失或 named feature disabled 时于 render 阶段失败。',
-    quickStart: `import { useAssertStoreFeature } from '@migaia/store-react'\n\n// 在 StoreProvider 子树的 useOptimisticBatch Hook 开头调用，feature 未启用时交给 Error Boundary。\nuseAssertStoreFeature('experimental.optimisticBatch', 'useOptimisticBatch')`,
+    quickStart: `import { useAssertStoreFeature } from '@migaia/store-react'\n\n/** Render inside the StoreProvider whose Store owns the required feature. */\nexport function OptimisticFeatureGuard() {\n  useAssertStoreFeature('experimental.optimisticBatch', 'OptimisticFeatureGuard')\n  return null // Completion proves feature admission; failures reach the Error Boundary.\n}`,
     scenariosEn: [
       'An experimental hook enforces admission.',
       'Failure must reach an Error Boundary from render.',
@@ -17696,7 +18613,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates a Suspense-safe asynchronous value with abortable generations, stale-value retry, explicit resource and version leases, bounded cache retention, and deterministic terminal cleanup.',
-      quickStart: `import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst report = (error: unknown) => console.error('resource failed:', error)\n\nconst user = createStoreResource(({ signal }) => fetchUser(signal), {\n  keepAliveMs: 5_000,\n  onError: report\n})\nuser.preload()\n\ntry {\n  const value = user.read() // throws the pending Promise for Suspense\n} finally {\n  user.dispose()\n  await user.whenTerminal()\n}',
+      quickStart: `import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst report = (error: unknown) => console.error('resource failed:', error)\n\nconst user = createStoreResource(({ signal }) => fetchUser(signal), {\n  keepAliveMs: 5_000,\n  onError: report\n})\nuser.preload()\n\ntry {\n  const value = user.read() // throws the pending Promise for Suspense\n} finally {\n  user.dispose()\n  await user.whenTerminal()\n}`,
       scenarios: [
         'UI or SSR code needs a readable async value with Suspense semantics.',
         'A retry must keep the previous ready value until a new generation succeeds.',
@@ -17712,7 +18629,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建 Suspense-safe async value，提供可 abort generation、stale-value retry、显式 resource/version lease、有界 cache retention 与确定性终态 cleanup。',
-      quickStart: \`import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst report = (error: unknown) => console.error('resource failed:', error)\n\nconst user = createStoreResource(({ signal }) => fetchUser(signal), {\n  keepAliveMs: 5_000,\n  onError: report\n})\nuser.preload()\n\ntry {\n  const value = user.read() // 为 Suspense throw pending Promise\n} finally {\n  user.dispose()\n  await user.whenTerminal()\n}',
+      quickStart: `import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst report = (error: unknown) => console.error('resource failed:', error)\n\nconst user = createStoreResource(({ signal }) => fetchUser(signal), {\n  keepAliveMs: 5_000,\n  onError: report\n})\nuser.preload()\n\ntry {\n  const value = user.read() // 为 Suspense throw pending Promise\n} finally {\n  user.dispose()\n  await user.whenTerminal()\n}`,
       scenarios: [
         'UI 或 SSR 代码需要带 Suspense 语义的 readable async value。',
         'retry 必须保留 previous ready value，直到新 generation 成功。',
@@ -17730,7 +18647,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates a group owner for Store Resources. resource delegates to createStoreResource, while scope disposal force-disposes every still-live member and removes naturally terminal members.',
-      quickStart: \`import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst fetchSettings = async (signal: AbortSignal) => ({ theme: 'dark', signalAborted: signal.aborted })\n\nconst scope = createStoreResourceScope()\nconst user = scope.resource(({ signal }) => fetchUser(signal))\nconst settings = scope.resource(({ signal }) => fetchSettings(signal))\n\ntry {\n  user.preload()\n  settings.preload()\n} finally {\n  scope.dispose()\n}',
+      quickStart: `import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst fetchSettings = async (signal: AbortSignal) => ({ theme: 'dark', signalAborted: signal.aborted })\n\nconst scope = createStoreResourceScope()\nconst user = scope.resource(({ signal }) => fetchUser(signal))\nconst settings = scope.resource(({ signal }) => fetchSettings(signal))\n\ntry {\n  user.preload()\n  settings.preload()\n} finally {\n  scope.dispose()\n}`,
       scenarios: [
         'A component, route, or request owns several Resources together.',
         'Group shutdown must ignore lingering leases because the whole owner is ending.',
@@ -17746,7 +18663,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '为一组 Store Resource 创建统一 owner。resource 原样委托 createStoreResource；scope dispose 会 force-dispose 全部仍存活成员，并自动摘除自然终态成员。',
-      quickStart: \`import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst fetchSettings = async (signal: AbortSignal) => ({ theme: 'dark', signalAborted: signal.aborted })\n\nconst scope = createStoreResourceScope()\nconst user = scope.resource(({ signal }) => fetchUser(signal))\nconst settings = scope.resource(({ signal }) => fetchSettings(signal))\n\ntry {\n  user.preload()\n  settings.preload()\n} finally {\n  scope.dispose()\n}',
+      quickStart: `import { createStoreResource, createStoreResourceScope } from '@migaia/store-light'\n\nconst fetchUser = async (signal: AbortSignal) => ({ id: 'user-1', signalAborted: signal.aborted })\nconst fetchSettings = async (signal: AbortSignal) => ({ theme: 'dark', signalAborted: signal.aborted })\n\nconst scope = createStoreResourceScope()\nconst user = scope.resource(({ signal }) => fetchUser(signal))\nconst settings = scope.resource(({ signal }) => fetchSettings(signal))\n\ntry {\n  user.preload()\n  settings.preload()\n} finally {\n  scope.dispose()\n}`,
       scenarios: [
         'component、route 或 request 共同拥有多个 Resource。',
         'group shutdown 必须忽略残留 lease，因为整体 owner 正在结束。',
@@ -17764,8 +18681,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates a native Error carrying the canonical Store Light source and a registered semantic code, optionally retaining a lower-level failure as cause.',
-      quickStart:
-        \`import { createStoreLightError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst cause = new Error('custom field configuration was rejected')\nthrow createStoreLightError(StoreLightErrorCode.invalidOption, 'custom field configuration is invalid', { cause })`,
+      quickStart: `import { createStoreLightError, StoreLightErrorCode } from '@migaia/store-light'\n\nconst cause = new Error('custom field configuration was rejected')\nthrow createStoreLightError(StoreLightErrorCode.invalidOption, 'custom field configuration is invalid', { cause })`,
       scenarios: [
         'A custom FieldBuilder extends the Store Light error boundary.',
         'A Store adapter must preserve a lower-level failure through Error.cause.',
@@ -19815,7 +20731,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Returns a transfer list only for transfer ownership plus a byte chunk backed by an exclusive full ArrayBuffer. Slices, SharedArrayBuffer, value chunks, and copy mode return an empty list.',
-      quickStart: `import { transferablesOf, WorkerByteOwnership } from '@migaia/store-worker/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = ['bytes', bytes] as const\nconst message = { chunk }\nconst transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\npostMessage(message, transfer)`,
+      quickStart: `import { transferablesOf, WorkerByteOwnership } from '@migaia/store-worker/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = ['bytes', bytes] as const\nconst message = { chunk }\nconst transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\nconsole.log('transferable buffers:', transfer.length)\npostMessage(message, transfer)`,
       scenarios: [
         'A custom worker protocol needs the same conservative byte-transfer rule.',
         'A full-buffer Uint8Array is exclusively owned and may detach.'
@@ -19852,7 +20768,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '只有 transfer ownership 与独占完整 ArrayBuffer 支撑的 byte chunk 同时成立时才返回 transfer list。slice、SharedArrayBuffer、value chunk 与 copy mode 都返回空数组。',
-      quickStart: `import { transferablesOf, WorkerByteOwnership } from '@migaia/store-worker/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = ['bytes', bytes] as const\nconst message = { chunk }\nconst transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\npostMessage(message, transfer)`,
+      quickStart: `import { transferablesOf, WorkerByteOwnership } from '@migaia/store-worker/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = ['bytes', bytes] as const\nconst message = { chunk }\nconst transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\nconsole.log('transferable buffers:', transfer.length)\npostMessage(message, transfer)`,
       scenarios: [
         '自定义 worker protocol 需要复用同一保守 byte-transfer 规则。',
         'full-buffer Uint8Array 独占且允许 detach。'
@@ -24643,7 +25559,7 @@ try {
     },
     en: {
       purpose:
-        'Use it for production work where only the latest load may become current. For example, an admin page starts loading runtime configuration and the user immediately refreshes it: the second request returns the latest configuration, then the slower first request returns stale data. Plain Promise callbacks can let the stale result overwrite the new one. createLifecycleUnit treats every start or restart as a new generation, permits only the latest generation to update value or error, and exposes the current idle, loading, loaded, or failed state.',
+        'Keeps only the latest asynchronous load current. When an admin refresh starts a second configuration request, a slower first response must not overwrite it. createLifecycleUnit assigns each start or restart a new generation; only the latest updates value or error. Its state exposes idle, loading, loaded or failed.',
       quickStart: `type IRuntimeConfig = {\n  apiBaseUrl: string\n  revision: number\n}\n\nasync function requestRuntimeConfig(): Promise<IRuntimeConfig> {\n  const response = await fetch('/api/runtime-config', { cache: 'no-store' })\n  if (!response.ok) {\n    throw new Error(\`config request failed: \${response.status}\`)\n  }\n  return response.json() as Promise<IRuntimeConfig>\n}\n\nconst runtimeConfig = createLifecycleUnit<IRuntimeConfig>({\n  report: (error) => console.error('runtime config load failed', error)\n})\n\n// First page load: idle → loading; success changes it to loaded and stores value.\nruntimeConfig.start(requestRuntimeConfig)\n\n// A user refresh starts a new generation. A slower old request cannot replace the new value.\nfunction refreshRuntimeConfig(): void {\n  runtimeConfig.restart(requestRuntimeConfig)\n}\n\nconst currentConfig = runtimeConfig.value\nif (runtimeConfig.state === 'loaded' && currentConfig) {\n  console.log(currentConfig.apiBaseUrl)\n}\nif (runtimeConfig.state === 'failed') {\n  console.error(runtimeConfig.error)\n}`,
       scenarios: [
         'An admin page, desktop application, or Worker loads runtime configuration and exposes loading, the successful value, or the failure reason to UI or diagnostics.',
@@ -24724,7 +25640,7 @@ try {
     },
     en: {
       purpose:
-        'When a production service receives a shutdown signal, it normally stops new work and flushes logs, audit events, or buffered writes, but the container platform cannot wait forever. Give boundedWait the flush task and the absolute deadline shared by the whole shutdown: it returns true when the task finishes first and false when the budget expires, so the Host can record the incomplete flush and continue exiting. It limits only how long the Host waits and never cancels the task; a task failure before the deadline is rethrown unchanged.',
+        'Bounds shutdown waiting by one absolute deadline. Give boundedWait the log flush task and the shared shutdown deadline: true means completion, false means the wait expired. The Host can record an incomplete flush and continue exiting. The task keeps running; failure before the deadline is rethrown unchanged.',
       quickStart: `type IAuditBuffer = {\n  stopAcceptingEvents(): void\n  flush(): Promise<void>\n}\n\ntype IShutdownLogger = {\n  info(message: string): void\n  warn(message: string): void\n}\n\nasync function shutdownService(\n  auditBuffer: IAuditBuffer,\n  logger: IShutdownLogger\n): Promise<void> {\n  // The container gives the entire shutdown two seconds, not two seconds per step.\n  const shutdownDeadlineAt = Date.now() + 2_000\n\n  // Stop new events so flush covers one finite batch.\n  auditBuffer.stopAcceptingEvents()\n  const flushTask = auditBuffer.flush()\n\n  // Later shutdown steps should reuse shutdownDeadlineAt and consume only the remaining time.\n  const flushed = await boundedWait(flushTask, shutdownDeadlineAt)\n  if (flushed) {\n    logger.info('audit events flushed before shutdown')\n    return\n  }\n\n  // Only waiting stops here; flushTask was not cancelled, and the Host may continue exiting.\n  logger.warn('shutdown deadline reached before audit events were flushed')\n}`,
       scenarios: [
         'A Kubernetes Pod, Node service, or Worker should flush logs, metrics, audit events, or buffered writes before the platform terminates it.',
@@ -25642,7 +26558,7 @@ try {
     },
     en: {
       purpose:
-        'Represents a writable source of truth in a reactive graph. new Signal(initialValue, runtime, options) retains the full instance, while runtime.signal(initialValue, options) creates the same implementation. Reading value subscribes the current Computed or Effect. Writing a genuinely different value claims a new version and notifies affected downstream nodes in the same Runtime. Object.is-equal writes short-circuit without changing version or scheduling work, while peek() reads without tracking. Signal also exposes observed, subscription-edge hooks, and terminal dispose() for resource-owning hosts.',
+        'A writable reactive source. new Signal(initialValue, runtime, options) and runtime.signal() share one implementation. Reading value tracks dependencies; changed writes advance version and notify the same Runtime. Object.is-equal writes do nothing. peek() reads without tracking, observed and edge hooks report subscriptions, and dispose() permanently ends ownership.',
       quickStart: `import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = new Signal<string | null>(\n  null,\n  runtime,\n  { debugName: 'catalog.selected-product' }\n)\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect logs selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is equal: no notification\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true`,
       scenarios: [
         'Form fields, active filters, selections, and pagination cursors are changed directly by user events and drive validation, derived results, or UI synchronization.',
@@ -25799,7 +26715,7 @@ try {
     },
     en: {
       purpose:
-        'Declares a read-only derived value that combines source facts into one result callers cannot assign directly. Construction does not evaluate it. The first value read calculates and tracks only dependencies actually read during that run, then later reads reuse the cache. Dependency changes merely mark it dirty; the next read recomputes it, and conditional branches replace the dependency set automatically. value subscribes the current observer, peek() reads without that downstream subscription, and dispose() permanently disconnects both sides and rejects later reads.',
+        'A lazy, read-only derived value. new Computed(callback, runtime, options) calculates on the first value read, tracks only dependencies read during that run and caches the result. Changes mark it dirty; the next read recomputes and replaces conditional dependencies. value tracks the observer, peek() does not, and dispose() disconnects both sides and rejects later reads.',
       quickStart: `import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unitPrice = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst freeShipping = runtime.signal(false)\nlet calculationCount = 0\n\nconst checkoutTotal = runtime.computed(() => {\n  calculationCount += 1\n  const subtotal = unitPrice.value * quantity.value\n  return freeShipping.value ? subtotal : subtotal + 5\n}, { debugName: 'checkout.total' })\n\nconsole.log(calculationCount) // 0: construction is lazy\nconsole.log(checkoutTotal.value) // 29: the first read calculates\nconsole.log(checkoutTotal.value) // 29: cached\nconsole.log(calculationCount) // 1\n\nfreeShipping.value = true // mark dirty without calculating\nconsole.log(checkoutTotal.value) // 24: recompute on read\nconsole.log(calculationCount) // 2\ncheckoutTotal.dispose()`,
       scenarios: [
         'A cart derives the payable amount from unit prices, quantities, discounts, tax, and shipping rules while the application maintains only source facts.',
@@ -25886,7 +26802,7 @@ try {
   'reactive:reactive:Effect': {
     zh: {
       purpose:
-        '把响应式状态同步到外部世界。可从 @migaia/reactive 根包导入 Effect 与 createRuntime：直接 new Effect(callback, runtime, options) 可保留实例并检查 disposed，runtime.effect(callback, options) 则返回停止函数。两种入口都会立即执行，自动订阅本次执行读取的节点；依赖变化后由 Runtime 调度重跑，重跑前先执行上一次返回的 cleanup，dispose() 后永久停止。',
+        '把响应式状态同步到外部世界。可从 @migaia/reactive 根包导入 Effect 与 createRuntime：直接 new Effect(callback, runtime, options) 可保留实例并检查 disposed，runtime.effect(callback, options) 则返回停止函数。两种入口都会立即执行，自动订阅本次执行读取的节点；依赖变化后由 Runtime 调度重跑，重跑前先执行上一次返回的 cleanup，dispose() 后永久停止；显式 runtime.flush() 可在同步边界立即冲刷已排队的副作用。',
       quickStart: `import { Effect, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// 构造时立即连接；读取 roomId.value 会把它登记为依赖。\nconst roomConnection = new Effect(() => {\n  const events = new EventSource(\n    \`/api/rooms/\${encodeURIComponent(roomId.value)}/events\`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // 换房间重跑前、以及 dispose() 时，都会先关闭旧连接。\n  return () => events.close()\n}, runtime, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // 关闭 general，再连接 support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true`,
       scenarios: [
         '聊天室、行情或协作页面根据当前 roomId / symbol / documentId 重建 WebSocket、EventSource 或事件监听，并在切换前关闭旧订阅。',
@@ -25949,7 +26865,7 @@ try {
     },
     en: {
       purpose:
-        'Synchronizes reactive state with the outside world. Import Effect and createRuntime from the @migaia/reactive root package. new Effect(callback, runtime, options) retains the instance and exposes disposed, while runtime.effect(callback, options) returns a stop function. Both run immediately, track nodes read during execution, rerun through the Runtime scheduler, execute the previous cleanup first, and stop permanently after disposal.',
+        'Synchronizes reactive state with external resources. Import Effect and createRuntime from @migaia/reactive. new Effect(callback, runtime, options) exposes disposed; runtime.effect() returns a stop function. Both run immediately, track reads, rerun through Runtime scheduling and clean up before reruns and disposal. runtime.flush() observes queued effects at a synchronous boundary.',
       quickStart: `import { Effect, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// Construction connects immediately; reading roomId.value registers it as a dependency.\nconst roomConnection = new Effect(() => {\n  const events = new EventSource(\n    \`/api/rooms/\${encodeURIComponent(roomId.value)}/events\`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // This closes the old connection before a rerun and during dispose().\n  return () => events.close()\n}, runtime, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // close general, then connect support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true`,
       scenarios: [
         'Chat, market-data, or collaboration screens rebuild a WebSocket, EventSource, or event listener from the current roomId, symbol, or documentId and close the previous subscription first.',

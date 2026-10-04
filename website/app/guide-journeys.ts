@@ -7692,7 +7692,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         { label: '快照克隆策略', path: 'snapshot-clone-policies' },
         {
           label: 'StoreMiddlewareHost API',
-          path: 'docs/store-middleware/StoreMiddlewareHost'
+          path: 'docs/store-middleware/createStoreMiddlewareHost'
         }
       ]
     },
@@ -7737,7 +7737,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         { label: 'Snapshot clone policies', path: 'snapshot-clone-policies' },
         {
           label: 'StoreMiddlewareHost API',
-          path: 'docs/store-middleware/StoreMiddlewareHost'
+          path: 'docs/store-middleware/createStoreMiddlewareHost'
         }
       ]
     }
@@ -9013,7 +9013,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Definition 与作用域', path: 'definitions-and-scopes' },
-        { label: 'createAtomStore API', path: 'docs/store-keyed/atom-store/createAtomStore' }
+        { label: 'createAtomStore API', path: 'docs/store-keyed/atom/store/createAtomStore' }
       ]
     },
     en: {
@@ -9045,7 +9045,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Definitions and scopes', path: 'definitions-and-scopes' },
-        { label: 'createAtomStore API', path: 'docs/store-keyed/atom-store/createAtomStore' }
+        { label: 'createAtomStore API', path: 'docs/store-keyed/atom/store/createAtomStore' }
       ]
     }
   },
@@ -9098,7 +9098,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '派生与可写状态', path: 'derived-and-writable-state' },
-        { label: 'atomDef API', path: 'docs/store-keyed/atom-definition/atomDef' }
+        { label: 'atomDef API', path: 'docs/store-keyed/atom/definition/atomDef' }
       ]
     },
     en: {
@@ -9157,7 +9157,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Derived and writable state', path: 'derived-and-writable-state' },
-        { label: 'atomDef API', path: 'docs/store-keyed/atom-definition/atomDef' }
+        { label: 'atomDef API', path: 'docs/store-keyed/atom/definition/atomDef' }
       ]
     }
   },
@@ -9191,7 +9191,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Optics 与列表拆分', path: 'optics-and-split-lists' },
-        { label: 'writableDef API', path: 'docs/store-keyed/atom-definition/writableDef' }
+        { label: 'writableDef API', path: 'docs/store-keyed/atom/definition/writableDef' }
       ]
     },
     en: {
@@ -9223,7 +9223,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Optics and split lists', path: 'optics-and-split-lists' },
-        { label: 'writableDef API', path: 'docs/store-keyed/atom-definition/writableDef' }
+        { label: 'writableDef API', path: 'docs/store-keyed/atom/definition/writableDef' }
       ]
     }
   },
@@ -9518,7 +9518,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         { label: '释放与终态', path: 'release-and-disposal' },
         {
           label: 'preview-safe factory API',
-          path: 'docs/store-keyed/atom-definition/previewSafeAtomDefFactory'
+          path: 'docs/store-keyed/atom/definition/previewSafeAtomDefFactory'
         }
       ]
     },
@@ -9568,7 +9568,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         { label: 'Release and terminal state', path: 'release-and-disposal' },
         {
           label: 'preview-safe factory API',
-          path: 'docs/store-keyed/atom-definition/previewSafeAtomDefFactory'
+          path: 'docs/store-keyed/atom/definition/previewSafeAtomDefFactory'
         }
       ]
     }
@@ -9618,7 +9618,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '返回 Store Keyed 学习路径', path: 'index' },
-        { label: 'AtomStore 参考', path: 'docs/store-keyed/atom-store' }
+        { label: 'AtomStore 参考', path: 'docs/store-keyed/atom/store' }
       ]
     },
     en: {
@@ -9677,7 +9677,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Return to Store Keyed learning paths', path: 'index' },
-        { label: 'AtomStore reference', path: 'docs/store-keyed/atom-store' }
+        { label: 'AtomStore reference', path: 'docs/store-keyed/atom/store' }
       ]
     }
   },
@@ -12091,7 +12091,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'An in-memory array needs lazy filtering, deduplication, and pagination',
-                    'package root',
+                    'root entry',
                     'collect'
                   ]
                 ]
@@ -16041,7 +16041,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'IndexedDB API', path: 'docs/storage-web/indexed-db/indexedDb' },
+        { label: 'IndexedDB API', path: 'docs/storage-web/indexed-db/indexedDbHost' },
         { label: 'Entity 与迁移', path: 'entity-schema-and-codecs' }
       ]
     },
@@ -16255,7 +16255,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'IndexedDB API', path: 'docs/storage-web/indexed-db/indexedDb' },
+        { label: 'IndexedDB API', path: 'docs/storage-web/indexed-db/indexedDbHost' },
         { label: 'Entity and migrations', path: 'entity-schema-and-codecs' }
       ]
     }
@@ -17030,7 +17030,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         { label: 'Reactive adapter API', path: 'docs/storage-web/reactive-adapter' },
         {
           label: 'IndexedDB reactive plugin',
-          path: 'docs/storage-web/plugins-reactive-indexed-db/indexedDbReactive'
+          path: 'docs/storage-web/plugins/reactive/indexed-db/indexedDbReactive'
         }
       ]
     },
@@ -17254,7 +17254,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         { label: 'Reactive adapter API', path: 'docs/storage-web/reactive-adapter' },
         {
           label: 'IndexedDB reactive plugin',
-          path: 'docs/storage-web/plugins-reactive-indexed-db/indexedDbReactive'
+          path: 'docs/storage-web/plugins/reactive/indexed-db/indexedDbReactive'
         }
       ]
     }
@@ -17377,10 +17377,10 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'cookies API', path: 'docs/storage-web/cookies/cookies' },
+        { label: 'cookies API', path: 'docs/storage-web/cookies/cookiesHost' },
         {
           label: 'Cookie reactive plugin',
-          path: 'docs/storage-web/plugins-reactive-cookies/cookiesReactive'
+          path: 'docs/storage-web/plugins/reactive/cookies/cookiesReactive'
         }
       ]
     },
@@ -17501,10 +17501,10 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'cookies API', path: 'docs/storage-web/cookies/cookies' },
+        { label: 'cookies API', path: 'docs/storage-web/cookies/cookiesHost' },
         {
           label: 'Cookie reactive plugin',
-          path: 'docs/storage-web/plugins-reactive-cookies/cookiesReactive'
+          path: 'docs/storage-web/plugins/reactive/cookies/cookiesReactive'
         }
       ]
     }

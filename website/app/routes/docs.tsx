@@ -421,7 +421,7 @@ function ArchitectureIndex({ locale }: { locale: ILocale }) {
         <p>
           {locale === 'zh'
             ? '同一家族解决相邻问题；选择类库前，先确认它属于状态、组合、平台还是通用基础能力。'
-            : 'Packages in one family solve adjacent problems; identify state, composition, platform, or shared foundation concerns before choosing one.'}
+            : 'Libraries in one family solve adjacent problems; identify state, composition, platform, or shared foundation concerns before choosing one.'}
         </p>
         <div className="architecture-stack">
           {ARCHITECTURE_FAMILIES.map((family, index) => (
@@ -532,7 +532,8 @@ function DocsLibrary({
         selectedSymbol,
         Boolean(selectedGuide),
         Boolean(selectedGuide?.options.length),
-        Boolean(selectedGuide?.examples?.length)
+        Boolean(selectedGuide?.examples?.length),
+        Boolean(primaryExample(selectedGuide, selectedSymbol, api!.library))
       )
     : api
       ? moduleReferenceSections(library.documentation, api)
@@ -990,17 +991,27 @@ function referenceSections(
   symbol: IApiSymbol,
   curated: boolean,
   hasGuideOptions = false,
-  hasGuideExamples = false
+  hasGuideExamples = false,
+  hasQuickExample = false
 ): string[] {
   return [
     'overview',
-    ...(symbol.examples.length > 0 ? ['quick-start'] : []),
+    ...(hasQuickExample ? ['quick-start'] : []),
     ...(hasGuideExamples ? ['examples'] : []),
     ...(symbol.configuration.length > 0 || hasGuideOptions ? ['configuration'] : []),
     ...(!curated && locale === 'zh' ? symbol.guidance.map((section) => `guide-${section.id}`) : []),
     'core-usage',
     'signature'
   ]
+}
+
+/** Selects an observable maintained example shared by rendering and its section inventory. */
+function primaryExample(guide: IApiGuide | undefined, symbol: IApiSymbol, library: string) {
+  return (
+    (guide?.quickStart && isObservableExample(guide.quickStart) ? guide.quickStart : undefined) ??
+    diagnosticSourceExample(symbol, library) ??
+    runnableExample(symbol.examples)
+  )
 }
 
 /** Presents a module as a choice guide instead of expanding every declaration inline. */
@@ -1469,10 +1480,8 @@ function SingleApiReference({
   )
   const relatedTypes = collectRelatedTypes(symbol, typingSymbols)
   const coreUsage = symbol.sections.find((section) => section.id === 'core-usage')
-  const rawQuickExample =
-    (guide?.quickStart && isObservableExample(guide.quickStart) ? guide.quickStart : undefined) ??
-    diagnosticSourceExample(symbol, api.library) ??
-    runnableExample(symbol.examples)
+  /** The section and its TOC link share the same maintained example selection. */
+  const rawQuickExample = primaryExample(guide, symbol, api.library)
   const quickExample = rawQuickExample
     ? exampleWithPrimaryImport(rawQuickExample, api, symbol)
     : undefined

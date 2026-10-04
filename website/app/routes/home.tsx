@@ -10,7 +10,7 @@ const DOCUMENTATION_PATHS = [
   },
   {
     title: 'Architecture',
-    description: 'Understand ownership, dependency direction, lifecycle, and package composition.'
+    description: 'Understand ownership, dependency direction, lifecycle, and library composition.'
   }
 ] as const
 

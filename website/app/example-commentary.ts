@@ -107,9 +107,11 @@ function describeMaintainedApiExample(
     : locale === 'zh'
       ? `这里直接执行 ${context.apiName}()，没有创建可供后续复用的实例。`
       : `This invokes ${context.apiName}() directly without creating a reusable instance.`
+  /** The overview retains the full contract; the code note needs only its opening purpose. */
+  const purpose = context.purpose.split(/(?<=[.!?。！？])\s+/u)[0] ?? context.purpose
   if (locale === 'zh')
-    return `${resultUse}${context.purpose}${context.scenario ? ` 本例对应的生产场景是：${context.scenario}` : ''}`
-  return `${resultUse}${context.purpose}${context.scenario ? ` The production situation shown here is: ${context.scenario}` : ''}`
+    return `${resultUse}${purpose}${context.scenario ? ` 本例对应的生产场景是：${context.scenario}` : ''}`
+  return `${resultUse}${purpose}${context.scenario ? ` The production situation shown here is: ${context.scenario}` : ''}`
 }
 
 /** Explains how callers should read a declaration or overload set without narrating syntax. */

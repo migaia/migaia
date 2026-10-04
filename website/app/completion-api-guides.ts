@@ -1160,7 +1160,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '在自定义 reactive node 的值或连接关系变化后更新已登记版本。未登记 node 会被拒绝，不会静默创建隐藏状态。',
     quickStart:
-      "import { registerVersion, setVersion } from '@migaia/reactive/node-internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)",
+      "import { registerVersion, setVersion } from '@migaia/reactive/node-internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log('node version advanced to 1')",
     scenariosEn: [
       'A custom node has committed a real change and must invalidate version-aware readers.',
       'Version ownership was established during node construction.'
@@ -1314,7 +1314,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '给当前 reactive 模块副本创建的对象附加不可变 Migaia 所有权品牌。另一份已安装副本遇到它时会明确拒绝，而不会把它误当作普通无主值。',
     quickStart:
-      "import { brandOwnedValue, assertNoForeignOwnershipBrand } from '@migaia/reactive/copy-check'\n\nconst managedNode = {}\nbrandOwnedValue(managedNode)\nassertNoForeignOwnershipBrand(managedNode)",
+      "import { brandOwnedValue, assertNoForeignOwnershipBrand } from '@migaia/reactive/copy-check'\n\nconst managedNode = {}\nbrandOwnedValue(managedNode)\nassertNoForeignOwnershipBrand(managedNode)\nconsole.log('ownership brand admitted')",
     scenariosEn: [
       'A custom reactive node factory creates values that must never cross between duplicate runtime copies.',
       'A graph entry guard needs to distinguish plain objects from managed objects created elsewhere.'
@@ -1335,7 +1335,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '拒绝由另一份已安装 reactive 模块副本创建的受管对象。普通无品牌值和当前副本创建的值会原样通过。',
     quickStart:
-      "import { assertNoForeignOwnershipBrand } from '@migaia/reactive/copy-check'\n\nassertNoForeignOwnershipBrand(candidate) // throws on a foreign managed value",
+      "import { assertNoForeignOwnershipBrand, brandOwnedValue } from '@migaia/reactive/copy-check'\n\nconst candidate = {}\nbrandOwnedValue(candidate)\nassertNoForeignOwnershipBrand(candidate)\nconsole.log('local managed value admitted')",
     scenariosEn: [
       'A Registry or graph boundary accepts unknown objects but must fail closed for foreign reactive nodes.',
       'A duplicate dependency could otherwise produce permanently stale reads.'
@@ -1383,7 +1383,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '检测到已登记的 reactive runtime 模块副本超过一份时立即失败。宁可启动失败、也不接受跨副本陈旧状态的应用，可在依赖初始化后调用。',
     quickStart:
-      "import { assertSingleRuntimeCopy } from '@migaia/reactive/copy-check'\n\nassertSingleRuntimeCopy() // call once during application startup",
+      "import { assertSingleRuntimeCopy } from '@migaia/reactive/copy-check'\n\nassertSingleRuntimeCopy() // call once during application startup\nconsole.log('single runtime copy admitted')",
     scenariosEn: [
       'A deployed bundle must guarantee one reactive runtime copy.',
       'Micro-frontends share objects and cannot safely isolate duplicate Runtime copies.'
@@ -1407,7 +1407,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '清除测试模拟的副本身份，避免一个用例污染下一个用例。它仅供测试使用，绝不能用来把真实的重复副本部署伪装成有效状态。',
     quickStart:
-      "import { resetRuntimeCopiesForTest } from '@migaia/reactive/copy-check'\n\nafterEach(() => resetRuntimeCopiesForTest())",
+      "import { resetRuntimeCopiesForTest, runtimeCopyCount } from '@migaia/reactive/copy-check'\n\n// Repository test teardown only; never reset a live application registry.\nresetRuntimeCopiesForTest()\nconsole.log(runtimeCopyCount()) // 0",
     scenariosEn: [
       'A copy-conflict unit test registered synthetic module identities.',
       'Parallel test isolation gives each test its own detector lifetime.'
@@ -1473,7 +1473,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '在 Runtime 构造期间，把一组可信的时钟、依赖追踪器与调度器内部能力关联到该 Runtime。重复登记会被拒绝，因为替换活动依赖图组件会破坏所有权。',
     quickStart:
-      "import { registerInternals } from '@migaia/reactive/internals'\n\nregisterInternals(runtime, { clock, tracker, scheduler })",
+      "import { registerInternals, internalsOf } from '@migaia/reactive/internals'\n\n/** Called once by an authorized Runtime constructor with its complete owned internals. */\nexport function registerKernel(...args: Parameters<typeof registerInternals>) {\n  registerInternals(...args)\n  console.log(internalsOf(args[0]) === args[1])\n}",
     scenariosEn: [
       'A custom Runtime implementation assembles the canonical internal services before creating nodes.',
       'An infrastructure adapter needs the same internals lookup used by built-in factories.'
@@ -1497,7 +1497,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '返回此前为 Runtime 登记的可信内部服务。未登记的结构伪造对象会在入口直接失败，避免直到依赖图修改时才出现难追踪错误。',
     quickStart:
-      "import { internalsOf } from '@migaia/reactive/internals'\n\nconst { clock, tracker, scheduler } = internalsOf(runtime)",
+      "import { createRuntime } from '@migaia/reactive'\nimport { internalsOf } from '@migaia/reactive/internals'\n\n// Authorized kernel integrations only; ordinary features use public Runtime methods.\nconst runtime = createRuntime()\nconst internals = internalsOf(runtime)\nconsole.log(internals.now())",
     scenariosEn: [
       'A reactive infrastructure extension needs the exact services owned by one Runtime.',
       'A node factory must reject a forged Runtime before allocating graph state.'
@@ -1653,7 +1653,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '已登记对象所属 Runtime 与预期不同时拒绝，但允许普通未登记值通过。适用于同时接受普通值与受管值的边界。',
     quickStart:
-      "import { assertOwnedBy } from '@migaia/reactive/ownership'\n\nassertOwnedBy(value, runtime, 'registry value')",
+      "import { createRuntime } from '@migaia/reactive'\nimport { assertOwnedBy } from '@migaia/reactive/ownership'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.get())",
     scenariosEn: [
       'A Registry accepts plain application values plus Runtime-owned nodes.',
       'A helpful label is required in cross-Runtime diagnostics.'
@@ -1677,7 +1677,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '严格要求 reactive object 已登记给预期 Runtime。未登记的结构伪造对象和属于其他 Runtime 的节点都会在修改依赖边前被拒绝。',
     quickStart:
-      "import { assertReactiveOwnedBy } from '@migaia/reactive/ownership'\n\nassertReactiveOwnedBy(node, runtime, 'computed dependency')",
+      "import { createRuntime } from '@migaia/reactive'\nimport { assertReactiveOwnedBy } from '@migaia/reactive/ownership'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertReactiveOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.get())",
     scenariosEn: [
       'A dependency, subscriber, or source is about to enter the reactive graph.',
       'Structural lookalikes must not gain access to mutable graph state.'
