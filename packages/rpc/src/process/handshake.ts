@@ -14,7 +14,8 @@ import {
   RpcCodecId,
   RpcHandshakeStep,
   RpcProtocol,
-  RpcReservedKind
+  RpcReservedKind,
+  RpcCapability
 } from '../contract/wire-constants.js'
 import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
@@ -22,6 +23,7 @@ import type { IRemoteChannel } from '../remote/types.js'
 import type { IRuntimePeerSourceResult } from '../remote/runtime-api/peer.js'
 import {
   bindProcessByteWire,
+  deferProcessByteReceive,
   bindProcessMessageTransport,
   type IProcessByteWire
 } from './channel.js'
@@ -196,6 +198,9 @@ export async function createProcessTransport(
   /** The same monotonic scheduler later travels to the remote endpoint factory. */
   const scheduler: IScheduler = byteOptions.scheduler ?? systemScheduler
   const timeoutMs = byteOptions.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS
+  /** V2 route assembly transfers the original bounded receive queue only after provider commit. */
+  if (byteOptions.offer.capabilities.includes(RpcCapability.runtimeApi))
+    deferProcessByteReceive(channel)
   const wire = bindProcessByteWire(channel, byteOptions)
   /** Timer cancellation is owned by this one handshake attempt. */
   let rejectDeadline: (error: Error) => void = () => undefined
@@ -219,14 +224,18 @@ export async function createProcessTransport(
     if (wire.closed) throw createProcessError(RpcProcessErrorCode.channelClosed)
     if (agreement.codec !== RpcCodecId.json)
       throw invalidOption(RpcProcessErrorText.negotiatedCodecUnsupported)
-    wire.activate(agreement.capabilities)
+    /** Only the authenticated v2 agreement replaces a pre-hello listener routing placeholder. */
+    const peerId = agreement.capabilities.includes(RpcCapability.runtimeApi)
+      ? agreement.peer.id
+      : byteOptions.peerId
+    wire.activate(agreement.capabilities, peerId)
     const ipc = attachIpcConnection(wire.transport, byteOptions.ipc, byteOptions.report)
     bindNativeReplayTransport(channel, ipc.transport)
     /** Four network-order prefix bytes count toward the complete native physical frame. */
     registerBatchAgreement(ipc.transport, agreement.capabilities, 4)
     return Object.freeze({
       transport: ipc.transport,
-      peerId: byteOptions.peerId,
+      peerId,
       scheduler,
       agreement: publicAgreement(agreement),
       pipeline: byteProcessPipeline,

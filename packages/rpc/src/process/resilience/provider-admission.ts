@@ -8,6 +8,7 @@ import type {
   IRpcContext,
   IRpcEndpoint,
   IRpcProvider,
+  IRpcProviderLimits,
   IRpcProviderResult
 } from '../../core/typing.js'
 import type { IRpcPortableValue } from '../../contract/types.js'
@@ -22,9 +23,7 @@ const RATE_WINDOW_MS = 60_000
 /** A service connection owns its quota counters and frame observer until it closes. */
 export type IProcessProviderAdmission = Readonly<{
   /** Attach the canonical local core refusal notification before endpoint construction. */
-  limits(
-    limits: import('../../core/typing.js').IRpcProviderLimits
-  ): import('../../core/typing.js').IRpcProviderLimits
+  limits(limits: IRpcProviderLimits, configured?: IRpcProviderLimits): IRpcProviderLimits
   wrap(endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
   close(): void
 }>
@@ -161,13 +160,37 @@ export function createProcessProviderAdmission(
 
   return Object.freeze({
     /** Preserve the caller's limits and observer while linking canonical concurrency refusals. */
-    limits(limits) {
+    limits(limits, configured) {
+      /** Keep valid caller limits within the original governor; invalid values reach core unchanged. */
+      const maximum = (
+        base: number | undefined,
+        selected: number | undefined
+      ): number | undefined =>
+        selected === undefined
+          ? base
+          : base !== undefined && Number.isSafeInteger(selected) && selected > 0
+            ? Math.min(base, selected)
+            : selected
+      /** Distinct original and selected observers retain their exact connection-level ownership. */
+      const observers = [limits.onRejected, configured?.onRejected].filter(
+        (observer, index, all) => observer !== undefined && all.indexOf(observer) === index
+      )
       return Object.freeze({
         ...limits,
+        ...configured,
+        maxGlobal: maximum(limits.maxGlobal, configured?.maxGlobal),
+        maxPerPeer: maximum(limits.maxPerPeer, configured?.maxPerPeer),
         /** Only local concurrency refusal joins the connection's consecutive violation count. */
         onRejected(rejection: IRpcProviderRejection) {
           if (rejection.reason === RpcProviderRejectionReason.concurrency) violate()
-          return limits.onRejected?.(rejection)
+          if (observers.length < 2) return observers[0]?.(rejection)
+          /** Every observer failure is reported without suppressing the other refusal observer. */
+          return Promise.allSettled(
+            observers.map((observer) => Promise.resolve().then(() => observer!(rejection)))
+          ).then((outcomes) => {
+            for (const outcome of outcomes)
+              if (outcome.status === 'rejected') report(outcome.reason)
+          })
         }
       })
     },

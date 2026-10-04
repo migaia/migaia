@@ -21,6 +21,8 @@ import type { IProcessResilience } from '../resilience/types.js'
 import { RpcCapability } from '../../contract/wire-constants.js'
 import type { IProcessServeListenerIngress, IProcessServeEndpointFactory } from './types.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IRpcProviderLimits } from '../../core/typing.js'
+import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IProcessSessionIdentity } from '../resilience/types.js'
 import { invalidOption, reportSafely } from './binding.js'
 import { ProcessPluginChannelKind } from './constants.js'
@@ -34,7 +36,28 @@ import type {
 type IProcessServeSession = Readonly<{
   channel: IRemoteChannel
   service: IRemoteServePluginHandle
+  /** Read the original close Promise rather than copying a ready/closing state. */
+  active(): boolean
   close(): Promise<void>
+}>
+
+/** Runtime publication follows the same authenticated candidate, commit and shutdown ownership. */
+type IProcessRuntimeSessionPublication = Readonly<{
+  signal?: IAbortSignal
+  initialSignal?: IAbortSignal
+  own?(close: () => Promise<void>): void
+  publish?(service: IRemoteServePluginHandle): () => void
+  /** Original close retains owned governor cleanup failures alongside session cleanup failures. */
+  release?(): Promise<void>
+  /** The selected core policy is merged by the original connection admission owner. */
+  providerLimits?: IRpcProviderLimits
+}>
+
+/** Private service reads use the original session Set, without another listener registry. */
+export type IProcessSessionsHandle = Readonly<{
+  close(): Promise<void>
+  services(): readonly IRemoteServePluginHandle[]
+  current(): IRemoteServePluginHandle | null | undefined
 }>
 
 /** Preserves every cleanup failure under one registered process code. */
@@ -55,7 +78,8 @@ function createSession(
   lease: IProcessConnectionLease,
   closeAdmission: () => void,
   identity: IProcessSessionIdentity,
-  fallback?: IProcessInstanceFallback
+  fallback?: IProcessInstanceFallback,
+  publication?: IProcessRuntimeSessionPublication
 ): IProcessServeSession {
   /** Repeated EOF, listener close, and explicit close share one cleanup outcome. */
   let closePromise: Promise<void> | undefined
@@ -63,11 +87,15 @@ function createSession(
   let unsubscribe: (() => void) | undefined
   /** The fault owner retains only sessions that still own a live endpoint. */
   let unregisterFallback: (() => void) | undefined
+  /** Only this committed session may withdraw its ready contribution. */
+  let withdraw: (() => void) | undefined
   const session: IProcessServeSession = {
     channel,
     service,
+    active: () => closePromise === undefined,
     close: () =>
       (closePromise ??= (async () => {
+        withdraw?.()
         unsubscribe?.()
         closeAdmission()
         const errors: unknown[] = []
@@ -93,6 +121,12 @@ function createSession(
     void session.close().catch((error: unknown) => reportSafely(report, error))
   })
   unregisterFallback = fallback?.add({ connectionId: identity.connectionId, close: session.close })
+  try {
+    withdraw = publication?.publish?.(service)
+  } catch (error) {
+    reportSafely(report, error)
+    void session.close().catch((cleanup: unknown) => reportSafely(report, cleanup))
+  }
   return session
 }
 
@@ -125,8 +159,9 @@ export async function serveProcessSessions(
   fallback?: IProcessInstanceFallback,
   scheduler: IScheduler = ingress.kind === 'listener'
     ? (ingress.scheduler ?? systemScheduler)
-    : systemScheduler
-): Promise<Readonly<{ close(): Promise<void> }>> {
+    : systemScheduler,
+  publication?: IProcessRuntimeSessionPublication
+): Promise<IProcessSessionsHandle> {
   if (ingress.kind === 'listener' && typeof ingress.verify !== 'function')
     invalidOption('ingress.verify')
   if (ingress.kind === 'child' && typeof ingress.parentLoss?.exit !== 'function')
@@ -153,12 +188,24 @@ export async function serveProcessSessions(
   let removeProbe: (() => void) | undefined
   /** Explicit close returns the same Promise to all callers. */
   let closePromise: Promise<void> | undefined
+  /** The original external lifecycle is detached when this service scope closes. */
+  const onAbort = (): void => {
+    void close().catch((error: unknown) => reportSafely(report, error))
+  }
   const close = (): Promise<void> =>
     (closePromise ??= (async () => {
       /** Detach parent-loss observers before abort synchronously closes this owned channel. */
       removeParentClose?.()
       removeProbe?.()
-      controller.abort()
+      publication?.signal?.removeEventListener('abort', onAbort)
+      publication?.initialSignal?.removeEventListener('abort', onAbort)
+      controller.abort(
+        publication?.initialSignal?.aborted
+          ? resolveAbortReason(publication.initialSignal)
+          : publication?.signal?.aborted
+            ? resolveAbortReason(publication.signal)
+            : undefined
+      )
       const fallbackClose = fallback?.close()
       const errors: unknown[] = []
       try {
@@ -177,8 +224,35 @@ export async function serveProcessSessions(
 
       await fallbackClose
       if (!borrowedManager) manager.close()
+      try {
+        await publication?.release?.()
+      } catch (error) {
+        errors.push(error)
+      }
       if (errors.length > 0) throw cleanupFailure(errors)
     })())
+
+  publication?.own?.(close)
+  publication?.signal?.addEventListener('abort', onAbort, { once: true })
+  publication?.initialSignal?.addEventListener('abort', onAbort, { once: true })
+  if (publication?.signal?.aborted || publication?.initialSignal?.aborted) onAbort()
+  /**
+   * Actual active sessions alone are projected; closing resource records remain owned until
+   * settled.
+   */
+  const services = (): readonly IRemoteServePluginHandle[] =>
+    [...sessions].filter((session) => session.active()).map((session) => session.service)
+  /** One implicit Peer target is safe only when this original owner has one active session. */
+  const current = (): IRemoteServePluginHandle | null | undefined => {
+    /** No second index or availability flag is maintained for this private selection. */
+    let selected: IRemoteServePluginHandle | undefined
+    for (const session of sessions) {
+      if (!session.active()) continue
+      if (selected) return null
+      selected = session.service
+    }
+    return selected
+  }
 
   if (ingress.kind === 'listener') {
     const listenerIngress = ingress
@@ -248,7 +322,7 @@ export async function serveProcessSessions(
                 {
                   identity,
                   ...sessionOptions,
-                  limits: admission.limits(sessionOptions.limits)
+                  limits: admission.limits(sessionOptions.limits, publication?.providerLimits)
                 }
               ))
               validateServiceEndpoint(channel, builtEndpoint)
@@ -285,7 +359,8 @@ export async function serveProcessSessions(
                 lease,
                 admission.close,
                 identity,
-                fallback
+                fallback,
+                publication
               )
               candidateService = undefined
               lease = undefined
@@ -330,6 +405,14 @@ export async function serveProcessSessions(
           return acceptingOne
         }
       })
+      publication?.initialSignal?.removeEventListener('abort', onAbort)
+      if (controller.signal.aborted) {
+        await listener.close()
+        throw createProcessError(
+          RpcProcessErrorCode.channelClosed,
+          resolveAbortReason(controller.signal)
+        )
+      }
     } catch (error) {
       try {
         await fallback?.close()
@@ -338,7 +421,7 @@ export async function serveProcessSessions(
       }
       throw error
     }
-    return Object.freeze({ close })
+    return Object.freeze({ close, services, current })
   }
 
   const guard = createParentLossGuard({
@@ -418,7 +501,7 @@ export async function serveProcessSessions(
     const builtEndpoint = (candidateEndpoint = await endpointFactory(channel, controller.signal, {
       identity,
       ...sessionOptions,
-      limits: admission.limits(sessionOptions.limits)
+      limits: admission.limits(sessionOptions.limits, publication?.providerLimits)
     }))
     validateServiceEndpoint(channel, builtEndpoint)
     const endpoint: IRemoteServeEndpoint = admission.wrap(drain.wrap(channel, builtEndpoint))
@@ -452,13 +535,14 @@ export async function serveProcessSessions(
       lease,
       admission.close,
       identity,
-      fallback
+      fallback,
+      publication
     )
     candidateService = undefined
     lease = undefined
     closeAdmission = undefined
     removeParentClose = raw.onClose((reason) => guard.trigger(reason))
-    return Object.freeze({ close })
+    return Object.freeze({ close, services, current })
   } catch (error) {
     closeAdmission?.()
     if (candidateService) {

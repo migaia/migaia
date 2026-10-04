@@ -71,7 +71,7 @@ export type IProcessByteWire = Readonly<{
   readHandshakeFrame(): Promise<string>
   beginAccept?(): void
   activateReceive?(): void
-  activate(capabilities?: readonly string[]): void
+  activate(capabilities?: readonly string[], peerId?: string): void
   writeText(value: string): Promise<void>
   close(reason?: unknown): Promise<void>
   readonly closed: boolean
@@ -110,6 +110,8 @@ export function bindProcessByteWire(
     Readonly<{ role?: 'initiator' | 'responder' }>
 ): IProcessByteWire {
   claim(channel)
+  /** Authentication replaces a listener's pre-hello routing placeholder at activation. */
+  let peerId = options.peerId
   /** The strict decoder rejects invalid UTF-8 rather than replacing bytes. */
   const textDecoder = new TextDecoder('utf-8', { fatal: true })
   /** Frame writes each allocate one prefix plus UTF-8 payload. */
@@ -200,7 +202,7 @@ export function bindProcessByteWire(
   const deliverBusiness = (text: string): void => {
     for (const listener of listeners) {
       try {
-        listener({ data: text, peerId: options.peerId })
+        listener({ data: text, peerId })
       } catch (error) {
         report(error)
       }
@@ -371,7 +373,9 @@ export function bindProcessByteWire(
     topology: RpcTransportTopology.exclusive,
     ownership: RpcTransportOwnership.owned,
     encodedType: RpcTransportEncoding.string,
-    peerId: options.peerId,
+    get peerId() {
+      return peerId
+    },
     send: (value) => writeText(asProcessString(value)),
     subscribe(listener) {
       listeners.add(listener)
@@ -440,9 +444,10 @@ export function bindProcessByteWire(
         handshakeWaiter = { resolve, reject }
       })
     },
-    activate(capabilities) {
+    activate(capabilities, acceptedPeerId) {
       if (closed) throw terminalError
       if (!handshakeReceived) throw createContractError(RpcContractErrorCode.handshakeInvalid)
+      if (acceptedPeerId !== undefined) peerId = acceptedPeerId
       ready = true
       batch = capabilities?.includes(RpcCapability.batch) === true
       frameSource?.activate?.()

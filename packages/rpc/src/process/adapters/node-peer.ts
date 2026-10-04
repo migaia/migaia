@@ -17,7 +17,12 @@ export function createProcessPeer(options: IRuntimeProcessPeerOptions) {
   }
   /** Node-compatible launchers retain the runtime's actual protocol label. */
   const runtime = process.versions.bun === undefined ? 'node' : 'bun'
-  if (!marker && (typeof options.spawn === 'object' || typeof options.connect === 'object'))
+  if (
+    !marker &&
+    (typeof options.spawn === 'object' ||
+      typeof options.connect === 'object' ||
+      typeof options.listen === 'object')
+  )
     return createProcessSourcePeer(options, runtime)
   return createAutomaticProcessPeer(options as IRuntimePeerOptions, {
     marker,

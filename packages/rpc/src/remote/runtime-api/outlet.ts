@@ -140,15 +140,15 @@ export function createRuntimeOutlet(
     broadcast: async (method, payload, options) => {
       /** Snapshot only ready exact receipts; later joins cannot enter this explicit one-way send. */
       const connections = slot.values().filter((value) => {
-        /** The original name index checks Host/registration availability without copied booleans. */
+        /** The original instance index preserves distinct ready sessions with an ambiguous name. */
         const connection = value as IRuntimePluginConnection
-        return slot.find(connection.name) === connection
+        return slot.find(connection.instanceId) === connection
       }) as readonly IRuntimePluginConnection[]
       /** Every member records success or a reported original failure in snapshot order. */
       const results: IRuntimeBroadcastResult[] = []
       for (const connection of connections) {
         try {
-          if (slot.find(connection.name) !== connection)
+          if (slot.find(connection.instanceId) !== connection)
             throw new RpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
           await connection.peer.notify(method, payload, options)
           results.push(Object.freeze({ instanceId: connection.instanceId, ok: true }))

@@ -27,7 +27,12 @@ export function createProcessPeer(options: IRuntimeProcessPeerOptions) {
     automaticMarker = marker
     runtime.env.delete(PROCESS_RUNTIME_API_ENV)
   }
-  if (!marker && (typeof options.spawn === 'object' || typeof options.connect === 'object'))
+  if (
+    !marker &&
+    (typeof options.spawn === 'object' ||
+      typeof options.connect === 'object' ||
+      typeof options.listen === 'object')
+  )
     return createProcessSourcePeer(options, 'deno')
   return createAutomaticProcessPeer(options as IRuntimePeerOptions, {
     marker,

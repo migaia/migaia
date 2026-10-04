@@ -1,7 +1,12 @@
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import type { IRemoteBinding, IRemoteServeEndpoint, IRemoteProxyOptions } from '../types.js'
+import type {
+  IRemoteBinding,
+  IRemoteServeEndpoint,
+  IRemoteProxyOptions,
+  IRemoteChannel
+} from '../types.js'
 import {
   createRemoteRuntimeRegistration,
   createRemoteGenerationHolder,
@@ -37,7 +42,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   options: IRuntimePeerOptions &
     Pick<IRemoteProxyOptions<TUnit, TSpec>, 'keyFactory' | 'retryPort' | 'callDeadlineCapMs'>,
   binding: IRemoteBinding<TUnit, TSpec>,
-  bindEndpoint?: (endpoint: IRemoteServeEndpoint, peer: IRuntimePeer) => IRemoteServeEndpoint,
+  bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint,
   preparation?: IRuntimePreparationContext
 ): Promise<IRuntimePeer> {
   compileRuntimeMethods(options.provide, options.contract)
@@ -57,19 +62,23 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           provide: preparation?.readProvide?.() ?? options.provide,
           providerLimits: options.providerLimits,
           contract: options.contract,
+          endpointFactory: options.endpointFactory,
           report: options.report
         },
         {
           self: context.self,
           source: async () => channel,
           ownsChannel: false,
-          signal: preparationSignal
+          signal: preparationSignal,
+          ...(bindEndpoint
+            ? { wrapEndpoint: (endpoint: IRemoteServeEndpoint) => bindEndpoint(channel, endpoint) }
+            : {})
         }
       ),
     readRuntimeEndpoint: (peer) => {
       /** Native health/drain receives the actual endpoint, never a synthetic successful ping. */
       const endpoint = readRuntimePeerEndpoint(peer)
-      return bindEndpoint ? bindEndpoint(endpoint, peer) : endpoint
+      return endpoint
     }
   })
   /** Every startup/rebind disposer joins the original holder's exact generation resource group. */
