@@ -8,7 +8,8 @@ import {
 import { resolveAbortReason } from '../core/internal/async-control.js'
 import { registerBatchAgreement } from '../core/internal/batch-frame.js'
 import type { IRpcTransport } from '../core/transport.js'
-import type { IRemoteChannel } from '../remote/types.js'
+import type { IRuntimePeerSourceResult } from '../remote/runtime-api/peer.js'
+import type { IThreadReceiveHandoff } from './receive-handoff.js'
 import { THREAD_CHANNEL_PROFILE } from './constants.js'
 import type { IThreadChannelOptions, IThreadWebPort } from './types.js'
 
@@ -27,8 +28,9 @@ export function threadWebPort(port: IThreadWebPort): IBrowserMessagePortLike {
 function threadChannel(
   transport: IRpcTransport,
   peerId: string,
-  options: IThreadChannelOptions
-): IRemoteChannel {
+  options: IThreadChannelOptions,
+  handoff?: Pick<IThreadReceiveHandoff<unknown>, 'activateReceive' | 'close'>
+): IRuntimePeerSourceResult {
   /** Concurrent teardown shares the exact same Promise, including cleanup rejection. */
   let closing: Promise<void> | undefined
   registerBatchAgreement(transport, options.capabilities ?? THREAD_CHANNEL_PROFILE.capabilities)
@@ -45,7 +47,12 @@ function threadChannel(
     }),
     pipeline: THREAD_CHANNEL_PROFILE.pipeline,
     features: [],
-    close: () => (closing ??= Promise.resolve().then(() => transport.close?.()))
+    ...(handoff ? { activateReceive: handoff.activateReceive } : {}),
+    close: () =>
+      (closing ??= Promise.resolve().then(() => {
+        handoff?.close()
+        return transport.close?.()
+      }))
   })
 }
 
@@ -53,34 +60,37 @@ function threadChannel(
 export function createNodeThreadChannel(
   port: INodeMessagePortLike,
   peerId: string,
-  options: IThreadChannelOptions
-): IRemoteChannel {
-  return threadChannel(createNodeMessagePortTransport(port), peerId, options)
+  options: IThreadChannelOptions,
+  handoff?: Pick<IThreadReceiveHandoff<unknown>, 'activateReceive' | 'close'>
+): IRuntimePeerSourceResult {
+  return threadChannel(createNodeMessagePortTransport(port), peerId, options, handoff)
 }
 
 /** Create an EventTarget borrowed channel after its bootstrap listener has left. */
 export function createWebThreadChannel(
   port: IThreadWebPort,
   peerId: string,
-  options: IThreadChannelOptions
-): IRemoteChannel {
+  options: IThreadChannelOptions,
+  handoff?: Pick<IThreadReceiveHandoff<unknown>, 'activateReceive' | 'close'>
+): IRuntimePeerSourceResult {
   return threadChannel(
     createBrowserMessagePortTransport(threadWebPort(port), { ownership: 'borrowed' }),
     peerId,
-    options
+    options,
+    handoff
   )
 }
 
 /** Await only adapter preparation; abort reasons retain their original identity. */
-export async function awaitThreadPreparation(
-  prepared: Promise<void>,
+export async function awaitThreadPreparation<T>(
+  prepared: Promise<T>,
   signal: IAbortSignal
-): Promise<void> {
+): Promise<T> {
   if (signal.aborted) throw resolveAbortReason(signal)
   /** Abort is scoped to this open attempt and never leaves a listener behind. */
   let abort: (() => void) | undefined
   try {
-    await Promise.race([
+    return await Promise.race([
       prepared,
       new Promise<never>((_resolve, reject) => {
         abort = () => reject(resolveAbortReason(signal))

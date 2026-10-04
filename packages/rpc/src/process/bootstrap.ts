@@ -9,12 +9,26 @@ import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from './constants.js'
 import { RpcProcessErrorCode } from './error-code.js'
 import { createProcessError } from './error.js'
 import type { IProcessByteChannel } from './types.js'
+import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
+import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
+import { RpcProcessErrorText } from './error-text.js'
+import { hostRethrowReporter } from '@migaia/utils/promise'
+import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 
 /** Consume a framed stdin bootstrap and transfer the same decoder to handshake. */
 export async function openBootstrapFrameChannel(
   channel: IProcessByteChannel,
-  bootstrap: 'stdin' | 'none'
+  bootstrap: 'stdin' | 'none',
+  options: Readonly<{ bootstrapTimeoutMs?: number; scheduler?: IScheduler }> = {}
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {
+  if (
+    options.bootstrapTimeoutMs !== undefined &&
+    (!Number.isFinite(options.bootstrapTimeoutMs) || options.bootstrapTimeoutMs < 0)
+  )
+    throw tagRpcError(
+      new TypeError(RpcProcessErrorText.handshakeTimeoutInvalid),
+      RpcCoreErrorCode.invalidConfig
+    )
   if (bootstrap === 'none') return Object.freeze({ channel })
   /** The first decoded frame is bootstrap; all later frames retain this same decoder. */
   let bootstrapped = false
@@ -33,7 +47,11 @@ export async function openBootstrapFrameChannel(
   let onError: ((error: Error) => void) | undefined
   /** Decoder failure and the awaiting caller share one physical teardown. */
   let closing: Promise<void> | undefined
-  const close = (): Promise<void> => (closing ??= Promise.resolve().then(() => channel.close()))
+  /** Cleanup failure is reported once; it cannot replace the bootstrap failure being settled. */
+  const close = (): Promise<void> =>
+    (closing ??= Promise.resolve()
+      .then(() => channel.close())
+      .catch((cleanup) => hostRethrowReporter(cleanup, IpcReporterContext)))
   const decoder = createRpcStreamFrameDecoderWithLimit(
     {
       onFrame(frame) {
@@ -81,10 +99,18 @@ export async function openBootstrapFrameChannel(
     decoder.finish()
     if (!bootstrapped) rejectBootstrap(createProcessError(RpcProcessErrorCode.channelClosed))
   })
+  /** Only opt-in discovery installs this original bootstrap owner's bounded wait. */
+  let timer: IScheduledTask | undefined
   try {
+    if (options.bootstrapTimeoutMs !== undefined)
+      timer = (options.scheduler ?? systemScheduler).schedule(() => {
+        rejectBootstrap(createProcessError(RpcProcessErrorCode.handshakeTimeout))
+      }, options.bootstrapTimeoutMs)
     return Object.freeze({ channel, bootstrap: await payload })
   } catch (error) {
     await close()
     throw error
+  } finally {
+    timer?.cancel()
   }
 }

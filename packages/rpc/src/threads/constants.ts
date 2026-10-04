@@ -12,12 +12,16 @@ export const THREAD_CHANNEL_PROFILE = Object.freeze({
 /** Private bootstrap records are consumed before core owns the message listener. */
 export const ThreadBootstrap = {
   data: 'migaia.thread.data',
-  acknowledged: 'migaia.thread.data.ack'
+  acknowledged: 'migaia.thread.data.ack',
+  /** Independent runtime ACK carries the child's actual offer rather than endpoint readiness. */
+  runtimeAcknowledged: 'migaia.thread.runtime.ack'
 } as const
 
 /** Native lifecycle event names belong to launcher adapters, never RPC transport policy. */
 export const ThreadEvent = {
   message: 'message',
+  /** Native deserialization failure retires an incomplete private bootstrap. */
+  messageerror: 'messageerror',
   error: 'error',
   exit: 'exit',
   close: 'close'
@@ -28,3 +32,6 @@ export const THREAD_FINGERPRINT_PREFIX = 'rpc-thread-'
 
 /** Native Node heap-limit identity selects supervision's resource-violation classification. */
 export const THREAD_HEAP_ERROR_CODE = 'ERR_WORKER_OUT_OF_MEMORY'
+
+/** Private runtime bootstrap and capability ACK use the same independently validated version. */
+export const THREAD_RUNTIME_API_VERSION = 1
