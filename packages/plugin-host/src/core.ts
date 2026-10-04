@@ -24,7 +24,8 @@ export type IPluginRuntimeSharedSlot<TFacade extends object = object> = Readonly
   /** An absent target returns undefined; duplicated instance identity returns null. */
   find(target: string): object | null | undefined
   values(): readonly object[]
-  contribute(value: object, instanceId: string): void
+  /** Withdraw only this exact ready contribution; the live registration retains its shared slot. */
+  contribute(value: object, instanceId: string): () => void
 }>
 
 /** Captured real Feature outputs cannot acquire authority from a later same-name registration. */
@@ -45,6 +46,7 @@ export type IPluginRuntimeIntegration = Readonly<{
     family: object,
     create: (slot: IPluginRuntimeSharedSlot<TFacade>) => TFacade
   ): IPluginRuntimeSharedSlot<TFacade>
+  /** Capture current outputs during install or a later exact-registration generation preparation. */
   readFeatureOutputs(name: string): IPluginRuntimeFeatureSnapshot
 }>
 

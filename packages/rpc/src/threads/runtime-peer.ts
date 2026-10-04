@@ -8,7 +8,10 @@ import {
   type IRuntimePeerOptions,
   type IRuntimePeerSource
 } from '../remote/runtime-api/peer.js'
-import { withRuntimeLaunchContext } from '../remote/runtime-api/launch-context.js'
+import {
+  withRuntimeLaunchContext,
+  readRuntimePreparationContext
+} from '../remote/runtime-api/launch-context.js'
 import { createThreadBinding } from './binding.js'
 import type { IThreadCommonOptions } from './types.js'
 
@@ -60,8 +63,14 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
       self,
       provide: options.provide,
       providerLimits: options.providerLimits,
-      report: options.report
+      report: options.report,
+      contract: options.contract,
+      keyFactory: options.keyFactory ?? source.keyFactory,
+      retryPort: options.retryPort ?? source.retryPort,
+      callDeadlineCapMs: source.spec.limits?.callWallTimeMs
     },
-    binding
+    binding,
+    undefined,
+    readRuntimePreparationContext(options)
   )
 }

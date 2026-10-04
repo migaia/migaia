@@ -515,15 +515,28 @@ export class PluginHost<
               slotKey,
               family,
               create,
-              assertInstall
+              assertInstall,
+              () => {
+                this.#assertActive()
+                this.#state.assertRegistrationValid(registration, (current) =>
+                  this.#operationRuntime.assertCurrent(current)
+                )
+              }
             )
           },
           readFeatureOutputs: (name: string) => {
-            assertInstall()
+            /**
+             * The original install batch owns candidates; later generations require this exact live
+             * core.
+             */
+            const candidateBatch = batch && !batch.committed ? batch : undefined
+            if (candidateBatch) assertInstall()
+            else assertCurrent()
             /** A name is resolved only once to the exact registered Feature owner. */
-            const target = batch?.registrations.get(name) ?? this.#state.registrations.get(name)
+            const target =
+              candidateBatch?.registrations.get(name) ?? this.#state.registrations.get(name)
             /** Original getFeature access enforces activation and output identity. */
-            const handle = this.#createHandle(name, batch) as unknown as {
+            const handle = this.#createHandle(name, candidateBatch) as unknown as {
               readonly extensions: object
               getFeature(feature: string): object
             }

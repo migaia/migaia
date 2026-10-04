@@ -52,7 +52,7 @@ export async function createAutomaticProcessPeer(
   if (options.spawn !== undefined || options.connect !== undefined || options.listen !== undefined)
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
   // Reuse the method owner for admission before opening the sole process input reader.
-  compileRuntimeMethods(options.provide)
+  compileRuntimeMethods(options.provide, options.contract)
   claimed = true
   /** Bootstrap and hello share the original decoder and byte channel. */
   const opened = await platform.open()
