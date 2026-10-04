@@ -10,7 +10,7 @@ import type { IThreadCommonOptions } from './types.js'
 
 /** One supervisor owns Worker lifecycle; remote owns channel generations and shared retry. */
 export function createThreadBinding<THandle extends IThreadHandle>(
-  options: IThreadCommonOptions<THandle>
+  options: Omit<IThreadCommonOptions<THandle>, 'endpointFactory'>
 ): IRemoteBinding<THandle, IThreadSpec> {
   /** Admission snapshots data before constructing any lifecycle owner. */
   const spec = portableThreadSpec(options.spec)

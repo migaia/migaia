@@ -8,13 +8,13 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * X14 permits exact measured pins after compression. C2 reuses the original signal admission and
- * operation/control owners for opt-in one-way cancellation; the retained source guard and module
- * count are unchanged. Both byte caps equal the c2-acceptance-r3 measurement, without headroom.
+ * X14 permits exact measured pins after compression. C4 shares the canonical extension owner and
+ * removes duplicate receipt lookup; registry declarations remain erased. The module count stays
+ * exact, and both byte caps equal c4-a9-compressed-r2, without headroom.
  */
 const allowedIncrease = {
-  rawBytes: 134205 / legacyRoot.rawBytes,
-  gzipBytes: 34366 / legacyRoot.gzipBytes
+  rawBytes: 140543 / legacyRoot.rawBytes,
+  gzipBytes: 35746 / legacyRoot.gzipBytes
 } as const
 
 /** I22–I26 ownership includes the two canonical physical batch modules. */

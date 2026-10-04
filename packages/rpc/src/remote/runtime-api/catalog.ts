@@ -4,7 +4,7 @@ import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'
 import type { IRpcContext } from '../../core/typing.js'
 import { RemoteMethodName } from '../constants.js'
 import { RemoteCatalogLimit, REMOTE_NAME_PATTERN } from '../contract.js'
-import { RuntimeApiErrorText } from './constants.js'
+import { RuntimeApiErrorText, type RuntimeApiMode } from './constants.js'
 
 /** A callable receives the portable application payload and the original core provider context. */
 export type IRuntimePeerMethod = (payload: unknown, context: IRpcContext) => unknown
@@ -19,7 +19,20 @@ export type IRuntimeMethodEntry = Readonly<{
   name: string
   method: IRuntimePeerMethod
   receiver: object
+  /** Canonical reserved operations narrow their actual installed aliases at construction time. */
+  supportedModes?: readonly RuntimeApiMode[]
 }>
+
+/** Cold compilation metadata belongs to the same root object, never a second provider registry. */
+const runtimeControlEntries = new WeakMap<IRuntimePeerProvide, readonly IRuntimeMethodEntry[]>()
+
+/** Only the package Plugin builder appends its original reserved Host operations to compilation. */
+export function registerRuntimeControlMethods(
+  provide: IRuntimePeerProvide,
+  methods: readonly IRuntimeMethodEntry[]
+): void {
+  runtimeControlEntries.set(provide, Object.freeze([...methods]))
+}
 
 /** Reject malformed explicit configuration without disclosing the supplied member or value. */
 function invalid(cause?: unknown): never {
@@ -92,5 +105,9 @@ export function compileRuntimeMethods(
   }
 
   visit(input, '', 0)
+  for (const entry of runtimeControlEntries.get(input) ?? []) {
+    if (methods.has(entry.name) || methods.size >= RemoteCatalogLimit.methodsPerCatalog) invalid()
+    methods.set(entry.name, entry)
+  }
   return Object.freeze([...methods.values()])
 }

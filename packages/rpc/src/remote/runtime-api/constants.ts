@@ -14,8 +14,38 @@ export const RuntimeApiErrorText = {
   /** Whitelist admission refuses unknown methods without reflecting arbitrary input text. */
   methodUnavailable: 'Runtime method is not provided by this peer',
   /** Only scalar result normalization, never handler failures, opts in to this payload summary. */
-  resultInvalid: 'Runtime request result must be portable'
+  resultInvalid: 'Runtime request result must be portable',
+  /** Only a successfully prepared package Peer carries its accepted directory receipt. */
+  peerInvalid: 'Runtime Peer is not prepared by the canonical owner',
+  /** Plugin registration labels are validated before any source is opened. */
+  pluginNameInvalid: 'Runtime plugin name must be a non-empty string',
+  /** Exposure is a copied unique whitelist of existing managed Feature providers. */
+  exposeInvalid: 'Runtime plugin expose must contain unique plugin names',
+  /** Directory construction never invokes an accessor or imports arbitrary Host members. */
+  featureInvalid: 'Runtime plugin exposure requires own enumerable data methods',
+  /** Two Features cannot silently select a winner for the same plugin.method route. */
+  featureConflict: 'Runtime plugin features contain conflicting method names',
+  /** Routing takes only a logical name or library instance id, never an OS pid. */
+  targetInvalid: 'Runtime outlet target must be a non-empty string',
+  /** Exact contribution retirement cannot select a same-name successor through an old handle. */
+  targetUnknown: 'Runtime outlet target is not a live connection',
+  /** Canonical indexes preserve all matches and reject ambiguity instead of selecting one. */
+  targetAmbiguous: 'Runtime outlet target identifies multiple connections',
+  /** Host controls require the original catalog, synchronous resolver and this exact managed Host. */
+  hostControlInvalid: 'Runtime host exposure requires its managed Host catalog and resolver'
 } as const
+
+/** Each RPC module family alone may share its canonical PluginHost extension slot. */
+export const RuntimePluginFamily = {
+  process: Object.freeze({}),
+  thread: Object.freeze({})
+} as const
+
+/** Direct Host publication uses these canonical platform keys throughout runtime assembly. */
+export const RuntimePluginKey = { process: 'process', thread: 'thread' } as const
+
+/** This explicit whitelist entry alone enables the original reserved Host-control operations. */
+export const RuntimePluginExpose = { host: 'host' } as const
 
 /** Routes describe actual installed call capabilities, never inferred handler return shapes. */
 export const RuntimeApiMode = {
@@ -31,3 +61,13 @@ export const RuntimeApiModeSource = {
   generatedRoutes: 'generated-routes'
 } as const
 export type RuntimeApiModeSource = (typeof RuntimeApiModeSource)[keyof typeof RuntimeApiModeSource]
+import { RpcCapability } from '../../contract/wire-constants.js'
+
+/** Only these genuinely composed shared endpoint capabilities enter native bootstrap offers. */
+export const RUNTIME_API_CAPABILITIES = Object.freeze([
+  RpcCapability.ping,
+  RpcCapability.close,
+  RpcCapability.stream,
+  RpcCapability.batch,
+  RpcCapability.runtimeApi
+])

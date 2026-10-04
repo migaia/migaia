@@ -2,6 +2,7 @@ import { parentPort, workerData } from 'node:worker_threads'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { bindNativeReplayTransport } from '../../core/internal/native-replay.js'
 import { createRuntimePeer, type IRuntimePeerOptions } from '../../remote/runtime-api/peer.js'
+import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from '../runtime-peer.js'
 import { readThreadRuntimeBootstrap, intersectThreadCapabilities } from '../bootstrap.js'
 import { createNodeThreadBootstrapHandoff } from '../receive-handoff.js'
 import { createNodeThreadChannel } from '../channel.js'
@@ -10,13 +11,16 @@ import { ThreadBootstrap, THREAD_RUNTIME_API_VERSION } from '../constants.js'
 import './node.js'
 
 /** Only a genuine parentPort and complete library bootstrap supply an automatic Worker source. */
-export function createThreadPeer(options: IRuntimePeerOptions) {
-  if (!parentPort) return createRuntimePeer(options)
+export function createThreadPeer(options: IRuntimeThreadPeerOptions) {
+  if (!parentPort)
+    return typeof options.spawn === 'object'
+      ? createThreadSourcePeer(options)
+      : createRuntimePeer(options as IRuntimePeerOptions)
   /** Native object identity is independent of every business/bootstrap field. */
   const native = parentPort
   /** Bootstrap reader retains the original fingerprint and safe launch name. */
   const bootstrap = readThreadRuntimeBootstrap(workerData)
-  return createRuntimePeer(options, {
+  return createRuntimePeer(options as IRuntimePeerOptions, {
     self: bootstrap.self,
     async source(context) {
       /** Cold capture attaches before ACK can cause the parent to send its directory. */

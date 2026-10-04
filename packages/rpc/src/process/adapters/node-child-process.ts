@@ -17,6 +17,7 @@ import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
 import type { IRuntimePeerIdentity } from '../../remote/runtime-api/description.js'
+import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
 import {
   prepareProcessRuntimeBootstrap,
   invalidProcessRuntimeBootstrap,
@@ -81,19 +82,27 @@ export function createNodeProcessLauncher(
   return Object.freeze({
     capabilities: NODE_CAPABILITIES,
     async launch(spec, context) {
-      if (options.runtimeApiBootstrap && context.signal.aborted)
-        throw resolveAbortReason(context.signal)
+      /** Bootstrap learns this parent's identity without mutating the caller's spec or launcher. */
+      const runtime = readRuntimeLaunchContext(context)
+      /** Caller opt-in remains the original path when no managed source context exists. */
+      const runtimeApiBootstrap = runtime
+        ? {
+            name: runtime.childName ?? options.runtimeApiBootstrap?.name ?? runtime.self.name,
+            parentInstanceId: runtime.self.instanceId
+          }
+        : options.runtimeApiBootstrap
+      if (runtimeApiBootstrap && context.signal.aborted) throw resolveAbortReason(context.signal)
       /** Opt-in metadata is admitted before native spawn or any secret-bearing write. */
       if (
-        options.runtimeApiBootstrap &&
+        runtimeApiBootstrap &&
         (spec.bootstrap?.via !== 'stdin' ||
           spec.stdio.stdin !== 'channel' ||
           spec.stdio.stdout !== 'channel')
       )
         invalidProcessRuntimeBootstrap()
       /** The original launcher uses one prepared identity for bootstrap and its returned handle. */
-      const runtimeBootstrap = options.runtimeApiBootstrap
-        ? prepareProcessRuntimeBootstrap(options.runtimeApiBootstrap, spec.bootstrap?.payload)
+      const runtimeBootstrap = runtimeApiBootstrap
+        ? prepareProcessRuntimeBootstrap(runtimeApiBootstrap, spec.bootstrap?.payload)
         : undefined
       /** Only explicitly inherited environment keys pass to the child. */
       const env: Record<string, string> = {}

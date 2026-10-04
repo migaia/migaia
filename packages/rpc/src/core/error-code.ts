@@ -158,7 +158,8 @@ export const RpcCoreErrorCode = {
   schemaInvalid: 'SCHEMA_INVALID',
 
   /**
-   * 同一个 capability 被重复发布，或冻结的 capability registry 被二次写入。
+   * 同一个 capability 被重复发布，或冻结的 capability registry 被二次写入。 I28 D8/D11 also rejects folded Feature
+   * method collisions and ambiguous runtime instances.
    *
    * 调用方检查 middleware 是否重复声明了保留 capability；这是配置错误。
    */

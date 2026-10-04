@@ -5,7 +5,8 @@ import {
   PluginHostErrorCode,
   type IHostHandle,
   type IPluginHandle,
-  type IPluginHostOptions
+  type IPluginHostOptions,
+  type IPluginDependencyMutationOptions
 } from '@migaia/plugin-host'
 import type { IRpcTransport } from '../transport.js'
 import type { IRpcHookEvent } from '../typing.js'
@@ -165,7 +166,7 @@ export function createWebRpcPluginHost(
         throw error
       }
     },
-    unUse: async (name, mutationOptions) => {
+    unUse: async (name: string, mutationOptions?: IPluginDependencyMutationOptions) => {
       const result = await host.unUse(name, mutationOptions as never)
       if (mutationOptions?.dryRun !== true) prunePorts()
       return result

@@ -12,6 +12,7 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { createJsonRpcRemoteChannel } from '../../src/bridge/jsonrpc/index.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
+import type { IProcessPlugin } from '../../src/process/plugin/types.js'
 import { createProcessResilience } from '../../src/process/resilience/index.js'
 import { CHILD_STDERR_REDACTED } from '../../src/process/constants.js'
 import { nodeByteStream } from '../../src/process/adapters/node-byte-stream.js'
@@ -23,10 +24,7 @@ import { BRIDGE_CONTRACT, bridgeEndpoint, bridgeFixture } from './fixture.js'
 import { childPath, token, fdLauncher, establish } from './fixtures/jsonrpc-process.js'
 
 /** Invoke the real remote proxy, then inspect only independently recorded wire events. */
-async function exercise(
-  host: PluginHost<Record<string, never>>,
-  plugin: ReturnType<typeof createProcessPlugin>
-) {
+async function exercise(host: PluginHost<Record<string, never>>, plugin: IProcessPlugin) {
   const [installed] = await host.use(plugin)
   const feature = installed!.getFeature('f') as {
     request(
