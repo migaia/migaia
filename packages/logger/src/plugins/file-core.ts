@@ -15,7 +15,12 @@ export type IFilePluginConfig = {
   readonly path: string
   readonly batch?: IBatchPluginConfig
   /** Per-batch rotation threshold; injected fs supplies the rotation operation. */
-  readonly rotate?: { readonly maxBytes?: number; readonly maxEntries?: number }
+  readonly rotate?: {
+    /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */
+    readonly maxBytes?: number
+    /** Rotate before a write when the buffered diagnostic count reaches this limit. */
+    readonly maxEntries?: number
+  }
 }
 
 export const FILE_PLUGIN_NAME = 'file' as const
