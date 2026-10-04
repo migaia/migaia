@@ -24,11 +24,6 @@ CI_ALLOW_MISSING_TOOLCHAINS ?= 0
 # Indirection keeps `make -n ci` from executing a whole multi-command recipe
 # merely because it contains a recursive make invocation.
 CI_MAKE = $(MAKE) --no-print-directory
-# K269 owns this one failure policy and warning status; its runner receives the status.
-STORAGE_WEB_K269_WARN_EXIT_CODE := 78
-STORAGE_WEB_K269_POLICY := storage-web-k269
-# Only the non-publishing ci entry explicitly propagates the known-failure policy.
-STORAGE_WEB_K269_WAIVE ?= 0
 
 # Manual measurements use the existing package fixtures and their own budgets.
 PERF_SCENARIO ?= sequential
@@ -60,7 +55,6 @@ run_gate() { \
 	if "$$@"; then code=0; else code=$$?; fi; \
 	seconds=$$(($$(date +%s) - started)); \
 	if [ "$$code" -eq 0 ]; then state=PASS; \
-	elif [ "$$policy" = "$(STORAGE_WEB_K269_POLICY)" ] && [ "$$code" -eq "$(STORAGE_WEB_K269_WARN_EXIT_CODE)" ]; then state=WARN; \
 	elif [ "$$policy" = warning ]; then state=WARN; \
 	else state=FAIL; fi; \
 	record_gate "$$state" "$$label" "$$code" "$$seconds"; \
@@ -110,15 +104,13 @@ ship-dry-run:
 	@echo "==> ship dry-run passed; no release mutations performed"
 
 # Full local CI preserves release-package ownership and adds repository gates
-# serially. Website tests and the exact K269 storage-web cookie failure are
-# explicit known failures; all other failures stay blocking. No release mutation
-# or registry authentication runs.
+# serially. Website tests remain an explicit known failure; all other failures
+# stay blocking. No release mutation or registry authentication runs.
 ci:
 	@$(CI_REPORT) \
 	run_gate required dependencies-check $(CI_MAKE) dependencies-check; \
 	run_gate required release-plan-check $(CI_MAKE) release-plan-check; \
-	run_gate required storage-web/k269-guard node --test scripts/test/ci-storage-web-e2e.test.mjs; \
-	run_gate required ship-ci $(CI_MAKE) STORAGE_WEB_K269_WAIVE=1 ship-ci; \
+	run_gate required ship-ci $(CI_MAKE) ship-ci; \
 	run_gate required store-ship-ci $(CI_MAKE) store-ship-ci; \
 	run_gate required registry:check pnpm run registry:check; \
 	run_gate required typecheck:consumers pnpm run typecheck:consumers; \
@@ -345,9 +337,7 @@ release-check: check-package
 	run_gate required "$$package/test" pnpm --filter "$$directory" run test; \
 	for gate in test:packed test:e2e; do \
 		if node -e 'const p=require("./"+process.argv[1]); process.exit(p.scripts?.[process.argv[2]] ? 0 : 1)' "$$manifest" "$$gate"; then \
-			if [ "$$package/$$gate" = storage-web/test:e2e ] && [ "$(STORAGE_WEB_K269_WAIVE)" = 1 ]; then \
-				run_gate "$(STORAGE_WEB_K269_POLICY)" "$$package/$$gate" node scripts/ci-storage-web-e2e.mjs "$(STORAGE_WEB_K269_WARN_EXIT_CODE)"; \
-			else run_gate required "$$package/$$gate" pnpm --filter "$$directory" run "$$gate"; fi; \
+			run_gate required "$$package/$$gate" pnpm --filter "$$directory" run "$$gate"; \
 		fi; \
 	done; \
 	run_gate required "$$package/build" pnpm --filter "$$directory" run build; \
