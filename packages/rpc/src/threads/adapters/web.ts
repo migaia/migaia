@@ -7,6 +7,7 @@ import {
 } from '../bootstrap.js'
 import { createWebThreadBootstrapHandoff } from '../receive-handoff.js'
 import type { IRuntimePeerSourceContext } from '../../remote/runtime-api/peer.js'
+import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
 import { invalidThreadConfig } from '../error.js'
 import { THREAD_FINGERPRINT_PREFIX, ThreadBootstrap, ThreadEvent } from '../constants.js'
 import { absoluteThreadEntry, portableThreadSpec } from '../error.js'
@@ -46,6 +47,8 @@ export function createWebThreadLauncher(
       'heap-limit': 'unsupported'
     }),
     async launch(input, context) {
+      /** The exact original request carries each independent parent's compiled bootstrap offer. */
+      const runtimeApi = readRuntimeLaunchContext(context) ?? options.runtimeApi
       if (context.signal.aborted) throw resolveAbortReason(context.signal)
       /** Portable data admission precedes all runtime side effects. */
       const spec = portableThreadSpec(input)
@@ -58,8 +61,8 @@ export function createWebThreadLauncher(
       /** The service receives the exact peerId used by the client channel factory. */
       const fingerprint = `${THREAD_FINGERPRINT_PREFIX}web-${++sequence}`
       /** The shared bootstrap owner admits safe metadata before native Worker construction. */
-      const bootstrap = options.runtimeApi
-        ? createThreadRuntimeBootstrap(spec.name || fingerprint, fingerprint, options.runtimeApi)
+      const bootstrap = runtimeApi
+        ? createThreadRuntimeBootstrap(spec.name || fingerprint, fingerprint, runtimeApi)
         : undefined
       /** Worker lifecycle hooks attach synchronously before the host can deliver events. */
       const worker = new Constructor(entry, { type: 'module', name: spec.name })

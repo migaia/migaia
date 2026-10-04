@@ -16,7 +16,13 @@ import { connect } from '../../core/middleware/connect.js'
 import { framer } from '../../core/middleware/framer.js'
 import { timeout } from '../../core/middleware/timeout.js'
 import { hooks } from '../../core/middleware/hooks.js'
-import type { IRpcProvider, IRpcProviderLimits } from '../../core/typing.js'
+import { ping } from '../../core/middleware/ping.js'
+import type {
+  IRpcEndpoint,
+  IRpcProvider,
+  IRpcProviderLimits,
+  IRpcAbortSignal
+} from '../../core/typing.js'
 import { RemoteMethodName } from '../constants.js'
 import type { IRemoteCallOptions, IRemoteChannel } from '../types.js'
 import { compileRuntimeMethods, type IRuntimePeerProvide } from './catalog.js'
@@ -29,7 +35,8 @@ import {
   RuntimeApiErrorText,
   RuntimeApiMode,
   RuntimeApiModeSource,
-  RUNTIME_API_SCHEMA_VERSION
+  RUNTIME_API_SCHEMA_VERSION,
+  RUNTIME_API_CAPABILITIES
 } from './constants.js'
 
 export type { IRuntimePeerProvide, IRuntimePeerMethod } from './catalog.js'
@@ -78,6 +85,26 @@ export type IRuntimePeer = Readonly<{
   close(): Promise<void>
 }>
 
+/** Cold connection data comes from the channel's accepted directory, never local describe data. */
+type IRuntimePeerConnection = Readonly<{
+  peerId: string
+  description: IRuntimePeerDescription | undefined
+  endpoint: IRuntimeApiEndpoint
+  channel: IRemoteChannel
+  report(error: unknown): void
+}>
+
+/** Only this callable assembly mints metadata for its own prepared facade; no lifecycle lives here. */
+const runtimePeerConnections = new WeakMap<IRuntimePeer, IRuntimePeerConnection>()
+
+/** Read the canonical accepted receipt for Plugin publication without another handshake or registry. */
+export function readRuntimePeerConnection(peer: IRuntimePeer): IRuntimePeerConnection {
+  /** An application-shaped Peer cannot inject identity or directory authority into a Host slot. */
+  const connection = runtimePeerConnections.get(peer)
+  if (!connection) invalid(RuntimeApiErrorText.peerInvalid)
+  return connection
+}
+
 /** Configuration rejection keeps its canonical code and does not reflect source secrets. */
 function invalid(message: string): never {
   throw new RpcError(RpcCoreErrorCode.invalidConfig, message)
@@ -88,6 +115,26 @@ function payloadValue(payload: unknown): IRpcPortableValue | undefined {
   return payload === undefined ? undefined : normalizePortable(payload)
 }
 
+/** Both raw and supervised factories validate safe identity through this same cold owner. */
+export function prepareRuntimePeerSourceContext(
+  configured: IRuntimePeerIdentity | undefined
+): IRuntimePeerSourceContext {
+  if (
+    !configured ||
+    typeof configured.name !== 'string' ||
+    !configured.name ||
+    configured.name.length > RpcWireLimit.maxIdentifierChars ||
+    typeof configured.instanceId !== 'string' ||
+    !configured.instanceId ||
+    configured.instanceId.length > RpcWireLimit.maxIdentifierChars
+  )
+    invalid(RuntimeApiErrorText.identityInvalid)
+  return Object.freeze({
+    self: Object.freeze({ name: configured.name, instanceId: configured.instanceId }),
+    capabilities: RUNTIME_API_CAPABILITIES
+  })
+}
+
 /**
  * Construct a symmetric callable endpoint using one canonical provider/outbound/stream closure.
  * Source and method validation precede connection effects; failure closes only resources obtained
@@ -95,7 +142,13 @@ function payloadValue(payload: unknown): IRpcPortableValue | undefined {
  */
 export async function createRuntimePeer(
   options: IRuntimePeerOptions,
-  automatic?: Readonly<{ self: IRuntimePeerIdentity; source: IRuntimePeerSource }>
+  automatic?: Readonly<{
+    self: IRuntimePeerIdentity
+    source: IRuntimePeerSource
+    /** An original managed generation owns channel cleanup while the Peer owns its endpoint. */
+    ownsChannel?: boolean
+    signal?: IRpcAbortSignal
+  }>
 ): Promise<IRuntimePeer> {
   /** Method descriptors are compiled once; no dispatch searches the application object. */
   const methods = compileRuntimeMethods(options.provide)
@@ -109,16 +162,7 @@ export async function createRuntimePeer(
     invalid(RuntimeApiErrorText.sourceInvalid)
   /** Only safe identity fields are retained from user configuration or trusted bootstrap. */
   const configured = automatic?.self ?? options.self
-  if (
-    !configured ||
-    typeof configured.name !== 'string' ||
-    !configured.name ||
-    configured.name.length > RpcWireLimit.maxIdentifierChars ||
-    typeof configured.instanceId !== 'string' ||
-    !configured.instanceId ||
-    configured.instanceId.length > RpcWireLimit.maxIdentifierChars
-  )
-    invalid(RuntimeApiErrorText.identityInvalid)
+  const sourceContext = prepareRuntimePeerSourceContext(configured)
   if (
     automatic &&
     options.self &&
@@ -127,17 +171,14 @@ export async function createRuntimePeer(
   )
     invalid(RuntimeApiErrorText.identityInvalid)
   /** Arbitrary extra fields, token, environment and source data never enter this projection. */
-  const self = Object.freeze({ name: configured.name, instanceId: configured.instanceId })
+  const self = sourceContext.self
   /** Offer only implemented shared capabilities; the platform owner supplies the real intersection. */
-  const capabilities = Object.freeze([
-    RpcCapability.stream,
-    RpcCapability.batch,
-    RpcCapability.runtimeApi
-  ])
   /** One acquired channel transfers to this construction's rollback/close owner. */
-  const channel = await sources[0]!({ self, capabilities })
+  const channel = await sources[0]!(sourceContext)
   /** A local offer alone cannot enable application description or reverse registration. */
   const supportsRuntime = channel.agreement.capabilities.includes(RpcCapability.runtimeApi)
+  /** Health and drain remain real native control operations from the original core owner. */
+  const nativeControl = channel.agreement.capabilities.includes(RpcCapability.ping)
   /** The existing stream capability remains an independent AND requirement. */
   const supportsStream =
     supportsRuntime && channel.agreement.capabilities.includes(RpcCapability.stream)
@@ -196,21 +237,24 @@ export async function createRuntimePeer(
           abort(),
           timeout(),
           hooks({ onHookError: report }),
+          ...(nativeControl ? [ping()] : []),
           connect({ transport: channel.transport })
         ],
         features: channel.features
       },
-      { supports: (peerId) => supportsStream && peerId === channel.peerId }
+      { supports: (peerId) => supportsStream && peerId === channel.peerId },
+      nativeControl
     )
     if (supportsStream) {
       for (const entry of methods)
-        endpoint.stream.provide(
-          `${RemoteMethodName.runtimeStreamPrefix}${entry.name}`,
-          (payload, { context }) =>
-            Reflect.apply(entry.method, entry.receiver, [payload, context]) as
-              | AsyncIterable<IRpcPortableValue>
-              | Iterable<IRpcPortableValue>
-        )
+        if (!entry.supportedModes || entry.supportedModes.includes(RuntimeApiMode.stream))
+          endpoint.stream.provide(
+            `${RemoteMethodName.runtimeStreamPrefix}${entry.name}`,
+            (payload, { context }) =>
+              Reflect.apply(entry.method, entry.receiver, [payload, context]) as
+                | AsyncIterable<IRpcPortableValue>
+                | Iterable<IRpcPortableValue>
+          )
     }
     localDescription = normalizeRuntimeDescription({
       schemaVersion: RUNTIME_API_SCHEMA_VERSION,
@@ -218,12 +262,14 @@ export async function createRuntimePeer(
       methods: supportsRuntime
         ? methods.map((entry) => ({
             name: entry.name,
-            supportedModes: [
+            supportedModes: entry.supportedModes ?? [
               RuntimeApiMode.request,
               RuntimeApiMode.notify,
               ...(supportsStream ? [RuntimeApiMode.stream] : [])
             ],
-            modeSource: RuntimeApiModeSource.generatedRoutes
+            modeSource: entry.supportedModes
+              ? RuntimeApiModeSource.declared
+              : RuntimeApiModeSource.generatedRoutes
           }))
         : []
     })
@@ -231,7 +277,9 @@ export async function createRuntimePeer(
     /** Only mutually negotiated application capability permits sending the new reserved method. */
     const remote = supportsRuntime
       ? normalizeRuntimeDescription(
-          await endpoint.send(channel.peerId, RemoteMethodName.runtimeDescribe, null)
+          await endpoint.send(channel.peerId, RemoteMethodName.runtimeDescribe, null, {
+            signal: automatic?.signal
+          })
         )
       : undefined
     if (remote && remote.self.instanceId !== channel.peerId)
@@ -259,7 +307,8 @@ export async function createRuntimePeer(
     const ready = endpoint
     /** Close retains one Promise identity, including failure and concurrent provider reentry. */
     let closing: Promise<void> | undefined
-    return Object.freeze({
+    /** This exact facade is minted only after both directory and endpoint preparation succeed. */
+    const peer: IRuntimePeer = Object.freeze({
       self,
       request: (method: string, payload?: unknown, callOptions?: IRemoteCallOptions) => {
         route(method, RuntimeApiMode.request)
@@ -291,15 +340,26 @@ export async function createRuntimePeer(
             await ready.dispose()
           } catch (failure) {
             try {
-              await channel.close()
+              if (automatic?.ownsChannel !== false) await channel.close()
             } catch (cleanup) {
               report(cleanup)
             }
             throw failure
           }
-          await channel.close()
+          if (automatic?.ownsChannel !== false) await channel.close()
         })())
     })
+    runtimePeerConnections.set(
+      peer,
+      Object.freeze({
+        peerId: channel.peerId,
+        description: remote,
+        endpoint: ready,
+        channel,
+        report
+      })
+    )
+    return peer
   } catch (failure) {
     try {
       await endpoint?.dispose()
@@ -307,10 +367,29 @@ export async function createRuntimePeer(
       report(cleanup)
     }
     try {
-      await channel.close()
+      if (automatic?.ownsChannel !== false) await channel.close()
     } catch (cleanup) {
       report(cleanup)
     }
     throw failure
   }
+}
+
+/**
+ * The real composed endpoint is handed to native health/drain only after its controls are
+ * installed.
+ */
+export function readRuntimePeerEndpoint(peer: IRuntimePeer) {
+  /** No synthetic control implementation is created; the binding validates this real composition. */
+  const endpoint = readRuntimePeerConnection(peer).endpoint
+  return {
+    endpoint: endpoint as unknown as IRpcEndpoint,
+    oneWay: endpoint,
+    stream: endpoint.stream
+  }
+}
+
+/** A managed facade retains accepted metadata from its exact genuine first-generation Peer. */
+export function retainRuntimePeerConnection(facade: IRuntimePeer, prepared: IRuntimePeer): void {
+  runtimePeerConnections.set(facade, readRuntimePeerConnection(prepared))
 }

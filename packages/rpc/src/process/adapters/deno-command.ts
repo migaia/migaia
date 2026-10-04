@@ -15,6 +15,7 @@ import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
 import type { IRuntimePeerIdentity } from '../../remote/runtime-api/description.js'
+import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
 import {
   prepareProcessRuntimeBootstrap,
   invalidProcessRuntimeBootstrap,
@@ -107,19 +108,33 @@ export function createDenoProcessLauncher(
   return Object.freeze({
     capabilities: DENO_CAPABILITIES,
     async launch(spec, context) {
-      if (options.runtimeApiBootstrap && context.signal.aborted)
-        throw resolveAbortReason(context.signal)
+      /**
+       * Each exact managed launch supplies its parent route; ordinary launcher behavior remains
+       * local.
+       */
+      const launchRuntime = readRuntimeLaunchContext(context)
+      /** The local launch specification, never a peer claim, supplies the child label. */
+      const runtimeApiBootstrap = launchRuntime
+        ? {
+            name:
+              launchRuntime.childName ??
+              options.runtimeApiBootstrap?.name ??
+              launchRuntime.self.name,
+            parentInstanceId: launchRuntime.self.instanceId
+          }
+        : options.runtimeApiBootstrap
+      if (runtimeApiBootstrap && context.signal.aborted) throw resolveAbortReason(context.signal)
       /** Opt-in metadata is admitted before native spawn or any secret-bearing write. */
       if (
-        options.runtimeApiBootstrap &&
+        runtimeApiBootstrap &&
         (spec.bootstrap?.via !== 'stdin' ||
           spec.stdio.stdin !== 'channel' ||
           spec.stdio.stdout !== 'channel')
       )
         invalidProcessRuntimeBootstrap()
       /** The original launcher uses one prepared identity for bootstrap and its returned handle. */
-      const runtimeBootstrap = options.runtimeApiBootstrap
-        ? prepareProcessRuntimeBootstrap(options.runtimeApiBootstrap, spec.bootstrap?.payload)
+      const runtimeBootstrap = runtimeApiBootstrap
+        ? prepareProcessRuntimeBootstrap(runtimeApiBootstrap, spec.bootstrap?.payload)
         : undefined
       const runtime = denoRuntime()
       /** Clearing the ambient environment precedes the caller's selected keys. */

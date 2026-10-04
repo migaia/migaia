@@ -22,6 +22,15 @@ import type {
   IProcessPluginOptions,
   IProcessPluginReplaceResult
 } from './types.js'
+import { createRuntimePlugin, type IRuntimePluginOptions } from '../../remote/runtime-api/plugin.js'
+import { createProcessPeer } from '../peer.js'
+import type { IRuntimeProcessPeerOptions } from '../runtime-peer.js'
+
+/** Symmetric Plugin options reuse the process Peer source boundary and canonical Feature exposure. */
+export type IRuntimeProcessPluginOptions = IRuntimePluginOptions<
+  IRuntimeProcessPeerOptions['spawn'],
+  IRuntimeProcessPeerOptions['connect']
+>
 
 /** Keep failed endpoint admission inside the generation's rollback boundary. */
 function processEndpointFactory<TUnit extends object, TSpec>(
@@ -52,10 +61,20 @@ function staleDefinition(): never {
   })
 }
 
-/** Adds one supervised process deployment to remote's single trusted PluginHost assembly. */
+/** The original advanced declaration is retained only for the serial C7 consumer migration. */
 export function createProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle>
-): IProcessPlugin {
+): IProcessPlugin
+/** Adds one symmetric connection to the canonical process slot. */
+export function createProcessPlugin(
+  options: IRuntimeProcessPluginOptions
+): ReturnType<typeof createRuntimePlugin>
+/** Route the four-factory migration through one symmetric builder without copying platform owners. */
+export function createProcessPlugin<THandle extends IProcessHandle>(
+  options: IProcessPluginOptions<THandle> | IRuntimeProcessPluginOptions
+): IProcessPlugin | ReturnType<typeof createRuntimePlugin> {
+  if (options.contract === undefined)
+    return createRuntimePlugin(options, 'process', createProcessPeer)
   return assembleProcessPlugin(options)
 }
 

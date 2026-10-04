@@ -2,6 +2,7 @@ import type { IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizePortable } from '../contract/normalize.js'
 import type { IRpcPortableValue } from '../contract/types.js'
+import type { IRuntimePeer } from './runtime-api/peer.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
 import { RpcCoreErrorCode, RpcError, RpcRemoteError } from '../core/errors.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
@@ -36,6 +37,7 @@ type IRemoteGeneration = Readonly<{
   number: number
   channel: IRemoteChannel
   served: IRemoteServeEndpoint
+  runtime?: IRuntimePeer
   close(): Promise<void>
 }>
 
@@ -73,9 +75,42 @@ export type IRemoteRegistration = Readonly<{
   release(): Promise<void>
 }>
 
+/** The same generation owner accepts a negotiated runtime directory without a synthetic v1 contract. */
+export type IRemoteRuntimeRegistration = Pick<
+  IRemoteRegistration,
+  'events' | 'prepareGeneration' | 'whenClosed' | 'release' | 'revoke' | 'departedReasonCount'
+> &
+  Readonly<{
+    currentPeer(): IRuntimePeer
+  }>
+
+/** Runtime preparation stays inside the original binding/channel/generation rollback boundary. */
+export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = Omit<
+  IRemoteProxyOptions<TUnit, TSpec>,
+  'contract' | 'endpointFactory'
+> &
+  Readonly<{
+    prepareRuntime(channel: IRemoteChannel, signal: IAbortSignal): Promise<IRuntimePeer>
+    readRuntimeEndpoint(peer: IRuntimePeer): IRemoteServeEndpoint
+  }>
+
+/** Only the package factories construct this union; v1 contract validation remains mandatory there. */
+type IRemoteRegistrationOptions<TUnit, TSpec> = Omit<
+  IRemoteProxyOptions<TUnit, TSpec>,
+  'contract' | 'endpointFactory'
+> &
+  Readonly<{
+    contract?: IRemoteContract | IRemoteHostCatalog
+    endpointFactory?: IRemoteProxyOptions<TUnit, TSpec>['endpointFactory']
+    prepareRuntime?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['prepareRuntime']
+    readRuntimeEndpoint?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['readRuntimeEndpoint']
+  }>
+
 /** One setup-scoped resource owner also accepts replacement generation resources. */
-export type IRemoteGenerationHolder = Readonly<{
-  readonly registration: IRemoteRegistration
+export type IRemoteGenerationHolder<
+  TRegistration extends IRemoteRegistration | IRemoteRuntimeRegistration = IRemoteRegistration
+> = Readonly<{
+  readonly registration: TRegistration
   prepareInitial(signal: IAbortSignal, rollbackOnFailure?: boolean): Promise<number>
   prepareRebind(signal: IAbortSignal): Promise<number>
   retainedResourceCount(): number
@@ -111,15 +146,15 @@ function restoreTaggedProviderFailure(error: unknown): never {
 }
 
 /** One generation holder owns leave ordering and the retry port's neutral events. */
-class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
+class RemoteRegistration<TUnit, TSpec> {
   /** Validated method description, independent of a live connection. */
-  readonly contract: IRemoteContract | IRemoteHostCatalog
+  readonly contract: IRemoteContract | IRemoteHostCatalog | undefined
   /** Host mode validates one catalog over one shared generation. */
   readonly #catalog: IRemoteHostCatalog | undefined
   /** Generation observations consumed by retry and Host readiness. */
   readonly events: IRemoteGenerationEvents
   /** The current binding and its single scheduler. */
-  readonly #options: IRemoteProxyOptions<TUnit, TSpec>
+  readonly #options: IRemoteRegistrationOptions<TUnit, TSpec>
   /** An explicit port replaces the shared default for this registration. */
   readonly #retryPort: IRemoteRetryPort
   /** Most recent described and active generation. */
@@ -140,10 +175,15 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
   #releaseReason: unknown
 
   /** Validates local options before any launcher side effect. */
-  constructor(options: IRemoteProxyOptions<TUnit, TSpec>, kind: 'plugin' | 'host') {
+  constructor(options: IRemoteRegistrationOptions<TUnit, TSpec>, kind: 'plugin' | 'host') {
     this.#options = options
-    this.#catalog = kind === 'host' ? normalizeRemoteHostCatalog(options.contract) : undefined
-    this.contract = this.#catalog ?? normalizeRemoteContract(options.contract)
+    this.#catalog =
+      !options.prepareRuntime && kind === 'host'
+        ? normalizeRemoteHostCatalog(options.contract)
+        : undefined
+    this.contract = options.prepareRuntime
+      ? undefined
+      : (this.#catalog ?? normalizeRemoteContract(options.contract))
     if (
       options.callDeadlineCapMs !== undefined &&
       (!Number.isSafeInteger(options.callDeadlineCapMs) || options.callDeadlineCapMs <= 0)
@@ -326,9 +366,11 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
     own(closeChannel)
     if (channel.scheduler !== this.#options.binding.scheduler)
       throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schedulerInvalid)
-    const contracts = this.#catalog
-      ? Object.values(this.#catalog)
-      : [this.contract as IRemoteContract]
+    const contracts = this.#options.prepareRuntime
+      ? []
+      : this.#catalog
+        ? Object.values(this.#catalog)
+        : [this.contract as IRemoteContract]
     const hasStream = contracts.some((contract) =>
       Object.values(contract.features).some((feature) =>
         Object.values(feature.methods).some(
@@ -351,10 +393,19 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
       if (channel.transport.closed === true) this.#leave(outcome.generation, reason)
     })
     if (removeTransportError) own(async () => removeTransportError())
-    const served = await this.#options.endpointFactory(channel, signal)
+    /** Runtime directory preparation and v1 describe share the same exact departure/resource owner. */
+    const runtime = this.#options.prepareRuntime
+      ? await this.#options.prepareRuntime(channel, signal)
+      : undefined
     /** Endpoint is registered before the first describe frame. */
     let endpointClose: Promise<void> | undefined
-    const closeEndpoint = (): Promise<void> => (endpointClose ??= served.endpoint.dispose())
+    const closeEndpoint = (): Promise<void> =>
+      (endpointClose ??= runtime ? runtime.close() : served.endpoint.dispose())
+    if (runtime) own(closeEndpoint)
+    /** Binding validation can itself fail, so acquired runtime cleanup is already retained above. */
+    const served = runtime
+      ? this.#options.readRuntimeEndpoint!(runtime)
+      : await this.#options.endpointFactory!(channel, signal)
     try {
       this.#assertPreparing(signal, outcome.generation)
     } catch (error) {
@@ -367,27 +418,35 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
-    const description = await served.endpoint.send(channel.peerId, RemoteMethodName.describe, [], {
-      signal
-    })
-    if (this.#catalog) {
-      const envelope = normalizeRemoteControlShape('describeHost', description) as {
-        readonly catalog: IRemoteHostCatalog
-      }
-      if (
-        JSON.stringify(this.#catalog) !==
-        JSON.stringify(normalizeRemoteHostCatalog(envelope.catalog))
+    if (!runtime) {
+      const description = await served.endpoint.send(
+        channel.peerId,
+        RemoteMethodName.describe,
+        [],
+        {
+          signal
+        }
+      )
+      if (this.#catalog) {
+        const envelope = normalizeRemoteControlShape('describeHost', description) as {
+          readonly catalog: IRemoteHostCatalog
+        }
+        if (
+          JSON.stringify(this.#catalog) !==
+          JSON.stringify(normalizeRemoteHostCatalog(envelope.catalog))
+        )
+          throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+      } else if (
+        !sameRemoteContract(this.contract as IRemoteContract, normalizeRemoteContract(description))
       )
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-    } else if (
-      !sameRemoteContract(this.contract as IRemoteContract, normalizeRemoteContract(description))
-    )
-      throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+    }
     /** Close endpoint before channel regardless of who owns the registration. */
     const generation: IRemoteGeneration = Object.freeze({
       number: outcome.generation,
       channel,
       served,
+      ...(runtime ? { runtime } : {}),
       close: async () => {
         await closeEndpoint()
         await closeChannel()
@@ -412,6 +471,13 @@ class RemoteRegistration<TUnit, TSpec> implements IRemoteRegistration {
     throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed, this.#departed.get(generation), {
       generation
     })
+  }
+
+  /** Return only the current original generation, never a cached same-name successor handle. */
+  currentPeer(): IRuntimePeer {
+    const active = this.#active()
+    if (!active.runtime) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+    return active.runtime
   }
 
   /** Portable method arguments are checked before guard, retry, or frame emission. */
@@ -720,14 +786,24 @@ export function createRemoteRegistration<TUnit, TSpec>(
   options: IRemoteProxyOptions<TUnit, TSpec>,
   kind: 'plugin' | 'host' = 'plugin'
 ): IRemoteRegistration {
-  return new RemoteRegistration(options, kind)
+  // The v1 constructor branch always validates and retains its required contract.
+  return new RemoteRegistration(options, kind) as IRemoteRegistration
+}
+
+/** Runtime facades reuse the original supervisor, leave ordering, waiters and resource holder. */
+export function createRemoteRuntimeRegistration<TUnit, TSpec>(
+  options: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>
+): IRemoteRuntimeRegistration {
+  return new RemoteRegistration(options, 'plugin')
 }
 
 /** Owns generation resources once across setup, replacement, and final removal. */
-export function createRemoteGenerationHolder(
-  registration: IRemoteRegistration,
+export function createRemoteGenerationHolder<
+  TRegistration extends IRemoteRegistration | IRemoteRuntimeRegistration
+>(
+  registration: TRegistration,
   report: (error: unknown) => void
-): IRemoteGenerationHolder {
+): IRemoteGenerationHolder<TRegistration> {
   /** A departed generation drops its resource group instead of growing a lifetime stack. */
   const retained = new Set<Set<() => Promise<void>>>()
   /** Final removal shares one settlement with repeated PluginHost cleanup. */

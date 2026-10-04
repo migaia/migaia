@@ -72,12 +72,9 @@ export async function legacyEndpoint(
  * This fixture joins actual source offers; its transport remains the existing reference memory
  * owner.
  */
-export async function connected(
-  leftProvide: IRuntimePeerProvide,
-  rightProvide: IRuntimePeerProvide,
+export function runtimeSources(
   leftCapabilities?: readonly string[],
-  rightCapabilities?: readonly string[],
-  report?: (error: unknown) => void
+  rightCapabilities?: readonly string[]
 ) {
   /** Each endpoint subscribes to one real physical side. */
   const transports = createMemoryTransportPair()
@@ -92,8 +89,6 @@ export async function connected(
   const agreed = new Promise<void>((resolve) => {
     accept = resolve
   })
-  /** Rejections remain visible to the assertions that exercise notification failure reporting. */
-  const failures: unknown[] = []
   /** Build only the canonical shared Peer; there is no fixture dispatcher or provider registry. */
   const source = (index: number) => async (context: IRuntimePeerSourceContext) => {
     offers[index] = context
@@ -120,12 +115,27 @@ export async function connected(
       close: async () => undefined
     }
   }
+  return { sources: [source(0), source(1)] as const, close: () => transports[0].close() }
+}
+
+/** Construct two genuine callable owners over the independently agreed fixture sources. */
+export async function connected(
+  leftProvide: IRuntimePeerProvide,
+  rightProvide: IRuntimePeerProvide,
+  leftCapabilities?: readonly string[],
+  rightCapabilities?: readonly string[],
+  report?: (error: unknown) => void
+) {
+  /** Both Peers and Plugin acceptance fixtures use the same real agreement boundary. */
+  const channel = runtimeSources(leftCapabilities, rightCapabilities)
+  /** Rejections remain visible to the assertions that exercise notification failure reporting. */
+  const failures: unknown[] = []
   /** Different directories and identities are established concurrently by the actual factory. */
   const peers = await Promise.all([
     createRuntimePeer({
       self: { name: 'parent', instanceId: 'parent-1' },
       provide: leftProvide,
-      connect: source(0),
+      connect: channel.sources[0],
       report: (error) => {
         failures.push(error)
         report?.(error)
@@ -134,7 +144,7 @@ export async function connected(
     createRuntimePeer({
       self: { name: 'child', instanceId: 'child-1' },
       provide: rightProvide,
-      connect: source(1),
+      connect: channel.sources[1],
       report: (error) => {
         failures.push(error)
         report?.(error)
@@ -147,7 +157,7 @@ export async function connected(
     close: async () => {
       await peers[0].close()
       await peers[1].close()
-      transports[0].close()
+      channel.close()
     }
   }
 }

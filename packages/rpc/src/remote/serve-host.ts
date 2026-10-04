@@ -102,22 +102,13 @@ function inspectItem(
   }
 }
 
-/** Exposes one Host through the reserved core control methods. */
-export async function serveRemoteHost(
-  options: IRemoteServeHostOptions
-): Promise<IRemoteServeHostHandle> {
+/** The same explicit catalog/resolver authority is reused by both reserved-control assemblies. */
+export type IRemoteHostControlOptions = Omit<IRemoteServeHostOptions, 'endpoint'>
+
+/** Extract only callable operations from the original adoption owner, never a second Host registry. */
+export function createRemoteHostControl(options: IRemoteHostControlOptions) {
+  /** The original catalog normalizer owns both legacy and symmetric control configuration. */
   const catalog = normalizeRemoteHostCatalog(options.catalog)
-  if (Object.values(catalog).some(contractRequiresStream) && !options.endpoint.stream) {
-    try {
-      await options.endpoint.endpoint.dispose()
-    } catch (cleanupError) {
-      options.report(cleanupError)
-    }
-    throw new RpcError(
-      RpcCoreErrorCode.capabilityConflict,
-      RpcRemoteLayerErrorText.streamUnavailable
-    )
-  }
   const installed = installedByHost.get(options.host) ?? new Map<string, IInstalledRemotePlugin>()
   installedByHost.set(options.host, installed)
   /** Concurrent connections consult one admission record for each Host plugin name. */
@@ -173,26 +164,13 @@ export async function serveRemoteHost(
       }
     }
   }
-  /** Stream providers release their registrations before endpoint disposal. */
-  const streamReleases: (() => void)[] = []
-  try {
-    for (const contract of Object.values(catalog))
-      streamReleases.push(
-        ...registerRemoteMethods(
-          contract,
-          options.endpoint,
-          (featureName) => liveFeature(contract.plugin, featureName),
-          () => options.host.plugin.disabled().includes(contract.plugin),
-          options.report
-        )
-      )
-    options.endpoint.endpoint.provide(RemoteMethodName.describe, (context) =>
-      context.success({ schemaVersion: 1, catalog })
-    )
-    options.endpoint.endpoint.provide(RemoteMethodName.hostUse, async (context) => {
+  return Object.freeze({
+    catalog,
+    liveFeature,
+    use: async (data: unknown): Promise<IRpcPortableValue> => {
       const params = normalizeRemoteControlShape(
         'hostUseParams',
-        context.data
+        data
       ) as readonly IRpcPortableValue[]
       const name = params[0] as string
       declared(catalog, name)
@@ -207,12 +185,12 @@ export async function serveRemoteHost(
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
       const captured = await ensureInstalled(name, candidate)
       handles.set(name, captured)
-      return context.success(inspectItem(options.host, catalog, name, captured))
-    })
-    options.endpoint.endpoint.provide(RemoteMethodName.hostUnUse, async (context) => {
+      return inspectItem(options.host, catalog, name, captured)
+    },
+    unUse: async (data: unknown): Promise<IRpcPortableValue> => {
       const params = normalizeRemoteControlShape(
         'hostUnUseParams',
-        context.data
+        data
       ) as readonly IRpcPortableValue[]
       const name = params[0] as string
       declared(catalog, name)
@@ -227,31 +205,77 @@ export async function serveRemoteHost(
       const policy = input.policy ?? 'reject'
       if (input.dryRun === true) {
         const plan = await options.host.unUse(name, { policy, dryRun: true })
-        return context.success(normalizePortable({ dryRun: true, ...plan }))
+        return normalizePortable({ dryRun: true, ...plan })
       }
       const removal = (await options.host.unUse(name, { policy })) as IPluginRemoval
       handles.delete(name)
       installed.delete(name)
-      if (removal.ok) return context.success({ ok: true })
-      return context.success({
+      if (removal.ok) return { ok: true }
+      return {
         ok: false,
         errors: removal.errors.map((error) =>
           serializeRpcError(error, { report: ({ error: failure }) => options.report(failure) })
         )
-      })
-    })
-    options.endpoint.endpoint.provide(RemoteMethodName.hostInspect, (context) => {
-      normalizeRemoteControlShape('hostInspectParams', context.data)
+      }
+    },
+    inspect: (data: unknown): IRpcPortableValue => {
+      normalizeRemoteControlShape('hostInspectParams', data)
       for (const [name, record] of installed)
         if (registrationState(record) === 'stale') installed.delete(name)
-      return context.success({
+      return {
         revision: options.host.revision,
         plugins: [...installed.keys()]
           .filter((name) => Object.hasOwn(catalog, name))
           .sort()
           .map((name) => inspectItem(options.host, catalog, name, installed.get(name)!))
-      })
-    })
+      }
+    }
+  })
+}
+
+/** Exposes one Host through the reserved core control methods. */
+export async function serveRemoteHost(
+  options: IRemoteServeHostOptions
+): Promise<IRemoteServeHostHandle> {
+  /** Reuse the original resolver and exact-adopter owner for this physical connection. */
+  const control = createRemoteHostControl(options)
+  const catalog = control.catalog
+  if (Object.values(catalog).some(contractRequiresStream) && !options.endpoint.stream) {
+    try {
+      await options.endpoint.endpoint.dispose()
+    } catch (cleanupError) {
+      options.report(cleanupError)
+    }
+    throw new RpcError(
+      RpcCoreErrorCode.capabilityConflict,
+      RpcRemoteLayerErrorText.streamUnavailable
+    )
+  }
+  /** Stream providers release their registrations before endpoint disposal. */
+  const streamReleases: (() => void)[] = []
+  try {
+    for (const contract of Object.values(catalog))
+      streamReleases.push(
+        ...registerRemoteMethods(
+          contract,
+          options.endpoint,
+          (featureName) => control.liveFeature(contract.plugin, featureName),
+          () => options.host.plugin.disabled().includes(contract.plugin),
+          options.report
+        )
+      )
+    options.endpoint.endpoint.provide(RemoteMethodName.describe, (context) =>
+      context.success({ schemaVersion: 1, catalog })
+    )
+    options.endpoint.endpoint.provide(RemoteMethodName.hostUse, async (context) =>
+      context.success(await control.use(context.data))
+    )
+    options.endpoint.endpoint.provide(RemoteMethodName.hostUnUse, async (context) =>
+      context.success(await control.unUse(context.data))
+    )
+    options.endpoint.endpoint.provide(RemoteMethodName.hostInspect, (context) =>
+      context.success(control.inspect(context.data))
+    )
   } catch (error) {
     for (const release of streamReleases) release()
     try {

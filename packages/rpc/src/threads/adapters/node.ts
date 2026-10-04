@@ -15,6 +15,7 @@ import {
 } from '../bootstrap.js'
 import { createNodeThreadBootstrapHandoff } from '../receive-handoff.js'
 import type { IRuntimePeerSourceContext } from '../../remote/runtime-api/peer.js'
+import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
 import { invalidThreadConfig } from '../error.js'
 import { ThreadErrorText } from '../error-text.js'
 import {
@@ -57,7 +58,7 @@ export function createNodeThreadLauncher(
   options: Readonly<{ runtimeApi?: IRuntimePeerSourceContext }> = {}
 ): IThreadLauncher<INodeThreadHandle> {
   /** Only the source's actual compiled offer enters private capability negotiation. */
-  const runtimeApi = options.runtimeApi
+  const configuredRuntimeApi = options.runtimeApi
   return {
     capabilities: Object.freeze({
       termination: 'enforced',
@@ -65,6 +66,8 @@ export function createNodeThreadLauncher(
       'heap-limit': 'enforced'
     }),
     async launch(input, context) {
+      /** Per-launch metadata cannot leak across concurrent uses of a caller-owned launcher. */
+      const runtimeApi = readRuntimeLaunchContext(context) ?? configuredRuntimeApi
       if (context.signal.aborted) throw resolveAbortReason(context.signal)
       /** Snapshot data and resolve entry before importing or constructing a platform Worker. */
       const spec = portableThreadSpec(input)
