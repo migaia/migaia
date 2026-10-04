@@ -67,10 +67,12 @@ merged.dispose()`,
   it('explains why scheduler-aware code does not call Date.now directly', () => {
     const example = commentExample('const now = systemScheduler.now()', 'ts', 'zh')
 
-    expect(example.notes[0]).toContain('数值与 Date.now() 相同')
+    expect(example.notes[0]).toContain('performance.now() 的单调毫秒数')
+    expect(example.notes[0]).toContain('不是 Date.now() 的 Unix 时间戳')
     expect(example.notes[0]).toContain('now() 与 schedule()')
     expect(example.notes[0]).toContain('一起替换为虚拟时钟')
-    expect(example.notes[0]).toContain('普通业务只读真实时间可直接用 Date.now()')
+    expect(example.notes[0]).toContain('systemWallClock.timestamp()')
+    expect(example.notes[0]).toContain('不要混用两种时钟')
   })
 
   it('explains the policy-slot use case and shared ownership of identitySnapshot', () => {

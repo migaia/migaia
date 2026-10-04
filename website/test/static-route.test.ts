@@ -1420,6 +1420,7 @@ test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date
   assert.match(text, /systemWallClock\.timestamp\(\).*Date\.now\(\)/s)
   assert.match(text, /scheduler\.now\(\).*scheduler\.schedule\(\)/s)
   assert.match(text, /不要把它与 now\(\) 混用或参与截止时间比较/)
+  assert.doesNotMatch(text, /数值与 Date\.now\(\) 相同|Unix 时间戳，数值与精度没有区别/)
 })
 
 test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () => {

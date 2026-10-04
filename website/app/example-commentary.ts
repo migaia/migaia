@@ -165,8 +165,8 @@ function describeSegment(segment: string, locale: ILocale): string | undefined {
       : 'Whenever a value actually changes, set() returns a new root without mutating the input. It shallow-copies only nodes on the written path and shares untouched branches. Immutable describes the update operation, not a deep clone or frozen result; an unchanged value reuses the original root.'
   if (/\bsystemScheduler\.now\s*\(/.test(executable))
     return locale === 'zh'
-      ? '这里得到的数值与 Date.now() 相同；通过 IUtilsScheduler 读取，是为了让 now() 与 schedule() 能在测试中一起替换为虚拟时钟。普通业务只读真实时间可直接用 Date.now()，可注入的调度逻辑应使用 scheduler.now()。'
-      : 'This returns the same value as Date.now(); reading through IUtilsScheduler lets tests replace now() and schedule() together with a virtual clock. Use Date.now() for ordinary wall-clock reads and scheduler.now() inside injectable scheduling logic.'
+      ? '这里读取 performance.now() 的单调毫秒数，只用于差值与本地截止时间，不是 Date.now() 的 Unix 时间戳。通过 IScheduler 配对使用 now() 与 schedule()，可在测试中一起替换为虚拟时钟；需要 epoch 时间戳时使用 systemWallClock.timestamp()，不要混用两种时钟。'
+      : 'This reads monotonic milliseconds from performance.now() for elapsed time and local deadlines, not the Unix timestamp from Date.now(). Pair now() and schedule() through IScheduler so tests can replace both with a virtual clock. Use systemWallClock.timestamp() for epoch timestamps and do not mix the two clocks.'
   if (/\bcreateAbortTimeoutSignal\s*\(/.test(executable)) {
     /** Assigned handle name makes the generated explanation traceable to this exact example. */
     const handle = executable.match(
@@ -237,8 +237,7 @@ function describeLocalStorageConstruction(executable: string, locale: ILocale): 
   const owner =
     executable.match(
       /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:localStorageHost|sessionStorageHost|cookiesHost|memoryStorageHost|indexedDbHost|localStorage)\(/
-    )?.[1] ??
-    executable.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*createStorageHost\(/)?.[1]
+    )?.[1] ?? executable.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*createStorageHost\(/)?.[1]
   /** Namespace literal identifies the exact key partition used by the example. */
   const namespace = executable.match(/\bnamespace\s*:\s*['"]([^'"]+)['"]/)?.[1]
   if (!owner || !namespace) return undefined
