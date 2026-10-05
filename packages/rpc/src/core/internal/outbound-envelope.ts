@@ -1,4 +1,62 @@
 import { normalizeRpcEnvelope, RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
+import type { IRpcPortableValue } from '../../contract/types.js'
+import type { IRpcContext } from '../typing.js'
+
+/**
+ * Private options provenance is minted only by the compiled forwarding provider, never a public
+ * flag.
+ */
+const forwardedPayload = Symbol('rpc-forwarded-payload')
+/** Route metadata travels only with the package-minted admitted payload options. */
+const forwardedRoute = Symbol('rpc-forwarded-route')
+
+/** Carry the already admitted input through the existing Peer, generation and core send owners. */
+export function createForwardOptions(
+  context: IRpcContext,
+  route?: readonly string[]
+): Readonly<{
+  signal: IRpcContext['signal']
+  timeoutMs?: number
+  [forwardedPayload]: unknown
+  [forwardedRoute]?: readonly string[]
+}> {
+  return {
+    signal: context.signal,
+    ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs }),
+    [forwardedPayload]: context.data,
+    ...(route === undefined ? {} : { [forwardedRoute]: route })
+  }
+}
+
+/**
+ * Identity, rather than a public boolean, identifies the precise input admitted at the previous
+ * hop.
+ */
+export function isForwardedPayload(options: unknown, payload: unknown): boolean {
+  return (
+    isForwardedOperation(options) && Reflect.get(options as object, forwardedPayload) === payload
+  )
+}
+
+/** The original retry owner recognizes package-minted forwarding provenance without a public flag. */
+export function isForwardedOperation(options: unknown): boolean {
+  return typeof options === 'object' && options !== null && Object.hasOwn(options, forwardedPayload)
+}
+
+/** Copy only internal provenance through a canonical owner that reconstructs its send options. */
+export function retainForwardOptions<T extends object>(source: unknown, target: T): T {
+  if (typeof source === 'object' && source !== null && Object.hasOwn(source, forwardedPayload))
+    Object.defineProperty(target, forwardedPayload, {
+      value: Reflect.get(source, forwardedPayload),
+      enumerable: true
+    })
+  if (typeof source === 'object' && source !== null && Object.hasOwn(source, forwardedRoute))
+    Object.defineProperty(target, forwardedRoute, {
+      value: Reflect.get(source, forwardedRoute),
+      enumerable: true
+    })
+  return target
+}
 
 /**
  * Weak identity proves a package-owned immutable snapshot; public freezing/metadata cannot forge
@@ -7,7 +65,41 @@ import { normalizeRpcEnvelope, RpcEnvelopeKind, type IRpcEnvelope } from '../../
 const outbound = new WeakSet<object>()
 
 /** Performs original first-user normalization before proving only non-opaque outbound envelopes. */
-export function createOutboundEnvelope(value: unknown): IRpcEnvelope {
+export function createOutboundEnvelope(value: unknown, options?: unknown): IRpcEnvelope {
+  /** Trusted forwarding replaces only the validated payload slot; all header checks still run. */
+  if (
+    typeof options === 'object' &&
+    options !== null &&
+    Object.hasOwn(options, forwardedPayload) &&
+    typeof value === 'object' &&
+    value !== null &&
+    Reflect.get(value, 'kind') === RpcEnvelopeKind.request
+  ) {
+    const data = Reflect.get(value, 'data') as
+      | { route?: unknown; payload?: IRpcPortableValue }
+      | undefined
+    if (data && isForwardedPayload(options, data.payload)) {
+      const route = Reflect.get(options as object, forwardedRoute) as readonly string[] | undefined
+      const header = normalizeRpcEnvelope({
+        ...value,
+        data: {
+          route: {
+            ...(data.route as object),
+            ...(route === undefined ? {} : { forwardRoute: route })
+          }
+        }
+      }) as Extract<IRpcEnvelope, { kind: 'request' }>
+      const envelope = Object.freeze({
+        ...header,
+        data: Object.freeze({
+          ...header.data,
+          ...(data.payload === undefined ? {} : { payload: data.payload })
+        })
+      })
+      outbound.add(envelope)
+      return envelope
+    }
+  }
   /** The canonical contract owner retains getter order, failure pointers and portable snapshots. */
   const envelope = normalizeRpcEnvelope(value)
   if (envelope.kind !== RpcEnvelopeKind.variation) outbound.add(envelope)

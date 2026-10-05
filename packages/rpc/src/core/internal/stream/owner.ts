@@ -1,4 +1,5 @@
-import { createOutboundEnvelope } from '../outbound-envelope.js'
+import { createOutboundEnvelope, retainForwardOptions } from '../outbound-envelope.js'
+import { retainProviderPreflight, retainProviderFailureRoute } from '../provider.js'
 import {
   deserializeRpcError,
   invalidRpcStream,
@@ -67,6 +68,8 @@ type IPendingCancel = {
 
 /** Producer state is keyed by admitted sender and id, never by method alone. */
 type IProducerState = {
+  /** The admitted immutable node route accompanies failures from later iterator pulls. */
+  readonly route?: readonly string[]
   /** Protected stream admission waits until all next/return/write work actually finishes. */
   readonly lifetime?: {
     /** Counts only operations already started for this exact producer, independent of Map deletion. */
@@ -210,8 +213,13 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   /** Claim a provider method in the ordinary namespace and release it idempotently. */
   provide(method: string, run: IRpcStreamRun): () => void {
     if (this.#closed) throw new RpcAbortError()
-    const release = this.#registerStream(method, (message, createContext) =>
-      this.#acceptRequest(message, run, createContext)
+    const release = this.#registerStream(
+      method,
+      retainProviderPreflight(
+        run,
+        (message: unknown, createContext: (signal: IRpcAbortSignal) => IRpcContext) =>
+          this.#acceptRequest(message, run, createContext)
+      )
     )
     this.#registrations.add(release)
     return () => {
@@ -292,15 +300,17 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     }
     this.#consumers.set(tupleKey(targetId, id), state)
     state.openSend = Promise.resolve().then(() =>
-      this.#outbound.send({
-        kind: 'stream-open',
-        id,
-        targetId,
-        method,
-        data: params,
-        timeoutMs: options?.timeoutMs,
-        operation: { signal: scope.signal, remaining: () => scope.remaining(options?.timeoutMs) }
-      })
+      this.#outbound.send(
+        retainForwardOptions(options, {
+          kind: 'stream-open',
+          id,
+          targetId,
+          method,
+          data: params,
+          timeoutMs: options?.timeoutMs,
+          operation: { signal: scope.signal, remaining: () => scope.remaining(options?.timeoutMs) }
+        })
+      )
     )
     void state.openSend.catch((error) => {
       if (!state.terminal) this.#finishConsumer(state, { error: this.#sendFailureReason(error) })
@@ -580,6 +590,15 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const request = (message as { envelope?: IRpcEnvelope }).envelope
     if (request?.kind !== 'request') return
     const senderId = request.data.route.senderId
+    if ((message as { preflightError?: unknown }).preflightError !== undefined) {
+      await this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        (message as { preflightError: unknown }).preflightError
+      )
+      return
+    }
     if ((message as { replayRejected?: boolean }).replayRejected) {
       await this.#sendFailure(
         senderId,
@@ -663,6 +682,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         lifetime = { pending: 1, settled, resolve }
       }
       state = {
+        route: request.data.route.forwardRoute,
         lifetime,
         id: request.id,
         senderId,
@@ -688,7 +708,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         }, request.data.route.timeoutMs)
     } catch (error) {
       scope.abort()
-      await this.#sendFailure(senderId, request.id, 0, error)
+      await this.#sendFailure(senderId, request.id, 0, error, request.data.route.forwardRoute)
       return
     }
     try {
@@ -799,7 +819,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       } catch (cleanupError) {
         failure = new AggregateError([error, cleanupError], RpcStreamErrorText.cleanupFailed)
       }
-      await this.#sendFailure(senderId, id, state.seq, failure)
+      await this.#sendFailure(senderId, id, state.seq, failure, state.route)
       state.busy = false
       return
     }
@@ -915,8 +935,16 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   }
 
   /** Send a serialized failure while keeping the producer's original error graph reachable. */
-  async #sendFailure(targetId: string, id: string, seq: number, error: unknown): Promise<void> {
-    const wire = serializeRpcError(error, { report: (failure) => this.#report(failure.error) })
+  async #sendFailure(
+    targetId: string,
+    id: string,
+    seq: number,
+    error: unknown,
+    route?: readonly string[]
+  ): Promise<void> {
+    const wire = serializeRpcError(retainProviderFailureRoute(error, route), {
+      report: (failure) => this.#report(failure.error)
+    })
     try {
       await this.#sendFrame(targetId, id, { event: RpcStreamEvent.fail, seq, error: wire })
     } catch (sendError) {

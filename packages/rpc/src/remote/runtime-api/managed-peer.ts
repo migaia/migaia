@@ -70,6 +70,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
         {
           self: context.self,
           source: async () => channel,
+          nodeId: preparation?.nodeId,
           ownsChannel: false,
           signal: preparationSignal,
           ...(bindEndpoint

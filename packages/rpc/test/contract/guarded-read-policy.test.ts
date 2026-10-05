@@ -31,6 +31,22 @@ describe('contract guarded property policy', () => {
     ])
   })
 
+  it('[A107] forwarding metadata adds no own-property trap to ordinary errors', () => {
+    /** Original error serialization reads fixed fields, never unrelated own descriptors. */
+    let ownReads = 0
+    /** The proxy is an ordinary supported thrown error with no package-minted route. */
+    const original = new Proxy(new Error('ordinary-route-free'), {
+      getOwnPropertyDescriptor(target, key) {
+        ownReads += 1
+        return Reflect.getOwnPropertyDescriptor(target, key)
+      }
+    })
+    /** A new diagnostic property must not alter ordinary business error admission. */
+    const wire = serializeRpcError(original, { report: () => undefined })
+    expect(wire.message).toBe('ordinary-route-free')
+    expect(ownReads).toBe(0)
+  })
+
   it('throws INVALID_WIRE_ERROR with the hostile field read as cause', () => {
     const failure = new Error('message failed')
     let reads = 0

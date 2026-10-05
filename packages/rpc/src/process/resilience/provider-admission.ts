@@ -1,3 +1,4 @@
+import { retainProviderPreflight } from '../../core/internal/provider.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { portableBytes } from '../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
@@ -138,9 +139,8 @@ export function createProcessProviderAdmission(
   }
 
   /** Preserve the provider's native result and Promise identity while tracking its activity. */
-  const guarded =
-    (provider: IRpcProvider): IRpcProvider =>
-    (context) => {
+  const guarded = (provider: IRpcProvider): IRpcProvider =>
+    retainProviderPreflight(provider, (context: IRpcContext) => {
       admit(context)
       /** The deadline subscription preserves the provider's returned Promise identity. */
       const settle = track(context)
@@ -156,7 +156,7 @@ export function createProcessProviderAdmission(
         () => settle(false)
       )
       return result
-    }
+    })
 
   return Object.freeze({
     /** Preserve the caller's limits and observer while linking canonical concurrency refusals. */
@@ -211,20 +211,25 @@ export function createProcessProviderAdmission(
               method: string,
               run: Parameters<NonNullable<IRemoteServeEndpoint['stream']>['provide']>[1]
             ) =>
-              endpoint.stream!.provide(method, (params, streamContext) =>
-                (async function* () {
-                  const context = streamContext.context
-                  admit(context)
-                  /** Stream cancellation uses the same single deadline observer as requests. */
-                  const settle = track(context)
-                  let succeeded = false
-                  try {
-                    yield* run(params, streamContext)
-                    succeeded = true
-                  } finally {
-                    settle(succeeded)
-                  }
-                })()
+              endpoint.stream!.provide(
+                method,
+                retainProviderPreflight(
+                  run,
+                  (params: unknown, streamContext: Parameters<typeof run>[1]) =>
+                    (async function* () {
+                      const context = streamContext.context
+                      admit(context)
+                      /** Stream cancellation uses the same single deadline observer as requests. */
+                      const settle = track(context)
+                      let succeeded = false
+                      try {
+                        yield* run(params, streamContext)
+                        succeeded = true
+                      } finally {
+                        settle(succeeded)
+                      }
+                    })()
+                )
               )
           })
         : undefined

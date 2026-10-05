@@ -18,6 +18,8 @@ export type IRuntimeMethodDescription = Readonly<{
   supportedModes: readonly RuntimeApiMode[]
   modeSource: RuntimeApiModeSource
   idempotent?: boolean
+  /** Safe immediate connection name; it confers no remote principal or mutation authority. */
+  forwardedVia?: string
 }>
 
 /** The new application description travels on an ordinary request after runtime-api agreement. */
@@ -25,6 +27,8 @@ export type IRuntimePeerDescription = Readonly<{
   schemaVersion: 2
   self: IRuntimePeerIdentity
   methods: readonly IRuntimeMethodDescription[]
+  /** Exchanged only after both actual offers negotiate forward-route@1. */
+  nodeId?: string
 }>
 
 /** Reject a malformed directory without copying untrusted keys or values into public diagnostics. */
@@ -75,7 +79,12 @@ export function runtimeIdentity(value: unknown): IRuntimePeerIdentity {
 export function normalizeRuntimeDescription(value: unknown): IRuntimePeerDescription {
   try {
     /** The application description is a separate schema; v1 contract parsing stays unchanged. */
-    const description = record(value, ['schemaVersion', 'self', 'methods'])
+    const description = record(value, ['schemaVersion', 'self', 'methods', 'nodeId'])
+    if (
+      description.nodeId !== undefined &&
+      (typeof description.nodeId !== 'string' || !/^[0-9a-f]{32}$/u.test(description.nodeId))
+    )
+      invalid()
     if (
       description.schemaVersion !== RUNTIME_API_SCHEMA_VERSION ||
       !Array.isArray(description.methods) ||
@@ -90,7 +99,18 @@ export function normalizeRuntimeDescription(value: unknown): IRuntimePeerDescrip
     const methods: IRuntimeMethodDescription[] = []
     for (const value of description.methods) {
       /** Schema fields are safe descriptors, not application handlers or parameters. */
-      const method = record(value, ['name', 'supportedModes', 'modeSource', 'idempotent'])
+      const method = record(value, [
+        'name',
+        'supportedModes',
+        'modeSource',
+        'idempotent',
+        'forwardedVia'
+      ])
+      if (
+        method.forwardedVia !== undefined &&
+        (typeof method.forwardedVia !== 'string' || !segment.test(method.forwardedVia))
+      )
+        invalid()
       if (
         typeof method.name !== 'string' ||
         method.name.length > RpcWireLimit.maxIdentifierChars ||
@@ -118,7 +138,10 @@ export function normalizeRuntimeDescription(value: unknown): IRuntimePeerDescrip
           name: method.name,
           supportedModes: Object.freeze([...method.supportedModes]) as readonly RuntimeApiMode[],
           modeSource: method.modeSource as RuntimeApiModeSource,
-          ...(method.idempotent === undefined ? {} : { idempotent: method.idempotent as boolean })
+          ...(method.idempotent === undefined ? {} : { idempotent: method.idempotent as boolean }),
+          ...(method.forwardedVia === undefined
+            ? {}
+            : { forwardedVia: method.forwardedVia as string })
         })
       )
     }
@@ -126,6 +149,7 @@ export function normalizeRuntimeDescription(value: unknown): IRuntimePeerDescrip
     return normalizePortable({
       schemaVersion: RUNTIME_API_SCHEMA_VERSION,
       self: runtimeIdentity(description.self),
+      ...(description.nodeId === undefined ? {} : { nodeId: description.nodeId }),
       methods
     }) as unknown as IRuntimePeerDescription
   } catch (cause) {

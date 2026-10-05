@@ -1,3 +1,4 @@
+import { retainProviderPreflight } from '../../core/internal/provider.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { RpcCapability } from '../../contract/wire-constants.js'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
@@ -101,23 +102,26 @@ export function createProcessBindingDrain(
         },
         provide: {
           value: (method: string, provider: Parameters<IRpcEndpoint['provide']>[1]) => {
-            endpoint.endpoint.provide(method, (context) => {
-              generation.pending += 1
-              let result: ReturnType<typeof provider>
-              try {
-                result = provider(context)
-              } catch (error) {
-                generation.pending -= 1
-                finish(generation)
-                throw error
-              }
-              const settled = (): void => {
-                generation.pending -= 1
-                finish(generation)
-              }
-              void Promise.resolve(result).then(settled, settled)
-              return result
-            })
+            endpoint.endpoint.provide(
+              method,
+              retainProviderPreflight(provider, (context: Parameters<typeof provider>[0]) => {
+                generation.pending += 1
+                let result: ReturnType<typeof provider>
+                try {
+                  result = provider(context)
+                } catch (error) {
+                  generation.pending -= 1
+                  finish(generation)
+                  throw error
+                }
+                const settled = (): void => {
+                  generation.pending -= 1
+                  finish(generation)
+                }
+                void Promise.resolve(result).then(settled, settled)
+                return result
+              })
+            )
             return trackedEndpoint
           }
         }
@@ -146,16 +150,21 @@ export function createProcessBindingDrain(
               method: string,
               run: Parameters<NonNullable<IRemoteServeEndpoint['stream']>['provide']>[1]
             ) =>
-              endpoint.stream!.provide(method, (params, context) =>
-                (async function* () {
-                  generation.pending += 1
-                  try {
-                    yield* run(params, context)
-                  } finally {
-                    generation.pending -= 1
-                    finish(generation)
-                  }
-                })()
+              endpoint.stream!.provide(
+                method,
+                retainProviderPreflight(
+                  run,
+                  (params: unknown, context: Parameters<typeof run>[1]) =>
+                    (async function* () {
+                      generation.pending += 1
+                      try {
+                        yield* run(params, context)
+                      } finally {
+                        generation.pending -= 1
+                        finish(generation)
+                      }
+                    })()
+                )
               )
           })
         : undefined

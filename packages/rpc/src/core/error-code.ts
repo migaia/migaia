@@ -11,6 +11,18 @@ export const ERROR_SOURCE = '@migaia/rpc/core'
  * 本表只保留有实际抛出点的码；迁移时删除的历史预留码记录在 `rpc-layering.sdd.md` R2。
  */
 export const RpcCoreErrorCode = {
+  /** U38 retires an admitted forward execution with its exact generation; never replay it. */
+  providerGenerationRetired: 'PROVIDER_GENERATION_RETIRED',
+  /**
+   * A signed route already contains this Host or the selected next Host. D51 rejects before
+   * admission and sending; callers must choose a route that does not revisit a Host.
+   */
+  forwardLoop: 'FORWARD_LOOP',
+  /**
+   * Three forwarding nodes have already been visited. D51 rejects a fourth before admission and
+   * sending; callers may establish a direct connect/listen channel instead.
+   */
+  forwardHopLimit: 'FORWARD_HOP_LIMIT',
   /**
    * 两个 middleware 在同一 factory 里声明了相同的 `name`。
    *

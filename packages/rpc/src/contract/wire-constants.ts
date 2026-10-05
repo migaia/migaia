@@ -34,6 +34,8 @@ export const RpcCapability = {
   stream: 'stream@1',
   /** Enables the symmetric application directory only when both actual offers contain it. */
   runtimeApi: 'runtime-api@1',
+  /** Independently negotiates signed Host routes and synchronous transparent-forward loop checks. */
+  forwardRoute: 'forward-route@1',
   /** Optional physical grouping; it never introduces a semantic envelope kind. */
   batch: 'batch@1'
 } as const
@@ -97,7 +99,9 @@ export const RpcRouteField = {
   variation: 'variation',
   timeoutMs: 'timeoutMs',
   idempotencyKey: 'idempotencyKey',
-  trace: 'trace'
+  trace: 'trace',
+  /** Optional ordered origin and forwarding nodes, admitted only for runtime forward-route peers. */
+  forwardRoute: 'forwardRoute'
 } as const
 
 /** Bounds untrusted identifiers, handshake input, and relative durations. */

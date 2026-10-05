@@ -70,9 +70,17 @@
           },
           "idempotent": {
             "type": "boolean"
+          },
+          "forwardedVia": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,39}$"
           }
         }
       }
+    },
+    "nodeId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
     }
   }
 }

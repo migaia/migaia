@@ -9,8 +9,26 @@ type ILocalErrorWireSummary = Readonly<{
   preserveSerializedError?: true
 }>
 
-/** Only genuine local registration can opt in; serialized or user-defined error properties cannot. */
-const summaries = new WeakMap<Error, ILocalErrorWireSummary>()
+/** Route provenance joins the existing summary owner; unrelated thrown values incur no new reads. */
+type ILocalErrorWireMetadata = Readonly<{
+  summary?: ILocalErrorWireSummary
+  route?: readonly string[]
+}>
+
+/** Only genuine local registration can opt in; serialized or user-defined properties cannot. */
+const summaries = new WeakMap<Error, ILocalErrorWireMetadata>()
+
+/** Retain only admitted node ids on the existing error metadata owner without inspecting an Error. */
+export function registerLocalErrorWireRoute(error: Error, route: readonly string[]): void {
+  summaries.set(error, Object.freeze({ ...summaries.get(error), route }))
+}
+
+/** Read package-minted metadata without invoking ordinary business error property traps. */
+export function localErrorWireRoute(error: unknown): readonly string[] | undefined {
+  return (typeof error === 'object' && error !== null) || typeof error === 'function'
+    ? summaries.get(error as Error)?.route
+    : undefined
+}
 
 /** Retain the original local cause while limiting a contract failure's outbound disclosure. */
 export function registerLocalErrorWireSummary(
@@ -22,11 +40,14 @@ export function registerLocalErrorWireSummary(
   summaries.set(
     error,
     Object.freeze({
-      code,
-      message,
-      ...(options?.preserveSerializedError === true
-        ? { preserveSerializedError: true as const }
-        : {})
+      ...summaries.get(error),
+      summary: Object.freeze({
+        code,
+        message,
+        ...(options?.preserveSerializedError === true
+          ? { preserveSerializedError: true as const }
+          : {})
+      })
     })
   )
 }
@@ -34,7 +55,7 @@ export function registerLocalErrorWireSummary(
 /** Read the factory-owned summary without invoking any untrusted error property getters. */
 export function localErrorWireSummary(error: unknown): ILocalErrorWireSummary | undefined {
   return (typeof error === 'object' && error !== null) || typeof error === 'function'
-    ? summaries.get(error as Error)
+    ? summaries.get(error as Error)?.summary
     : undefined
 }
 

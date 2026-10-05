@@ -55,6 +55,7 @@ export const RpcWireErrorField = [
   'cause',
   'errors',
   'data',
+  'route',
   'truncated'
 ] as const
 

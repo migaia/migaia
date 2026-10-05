@@ -12,6 +12,10 @@ import {
   type IRemoteMethodContract
 } from '../contract.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './constants.js'
+import type { IRuntimePluginConnection } from './outlet.js'
+import { readRuntimePeerConnection } from './peer.js'
+import { RpcCapability } from '../../contract/wire-constants.js'
+import { assertProviderForwardRoute } from '../../core/internal/provider.js'
 
 /** A callable receives the portable application payload and the original core provider context. */
 export type IRuntimePeerMethod = (payload: any, context: IRpcContext) => unknown
@@ -22,7 +26,8 @@ export type IRuntimePeerProvide = Readonly<{
 }>
 
 /** Captured receiver/function identity makes runtime calls independent of later object mutation. */
-export type IRuntimeMethodEntry = Readonly<{
+type IRuntimeLocalMethodEntry = Readonly<{
+  kind?: 'local'
   name: string
   method: IRuntimePeerMethod
   receiver: object
@@ -33,6 +38,47 @@ export type IRuntimeMethodEntry = Readonly<{
   /** Only package-owned Host control routes retain authority outside an advanced business catalog. */
   reserved?: boolean
 }>
+
+/** Forward entries belong to the same compiled whitelist; their slot resolves a current Peer. */
+export type IRuntimeForwardMethodEntry = Readonly<{
+  kind: 'forward'
+  name: string
+  method: string
+  slot(): IRuntimePluginConnection
+  forwardedVia: string
+  /** The original Host identity owner mints this once across all local connection families. */
+  nodeId: string
+  supportedModes: readonly RuntimeApiMode[]
+  declaration?: IRemoteMethodContract
+  reserved?: false
+}>
+
+/** One method table holds both captured local callables and explicit transparent forward routes. */
+export type IRuntimeMethodEntry = IRuntimeLocalMethodEntry | IRuntimeForwardMethodEntry
+
+/** Check the same current slot both before provider admission and immediately before sending. */
+export function runtimeForwardRoute(
+  entry: IRuntimeForwardMethodEntry,
+  incoming: readonly string[] | undefined,
+  origin: string | undefined
+): readonly string[] | undefined {
+  /** A next hop without the optional capability is a plain terminal, never a route participant. */
+  const next = readRuntimePeerConnection(entry.slot().peer)
+  /** Route facts confer no principal; authentication still authorizes only this direct connection. */
+  const route = incoming ?? (origin === undefined ? [] : [origin])
+  /** Only the actual bilateral agreement can expose a remote node for the next-hop test. */
+  const node = next.channel.agreement.capabilities.includes(RpcCapability.forwardRoute)
+    ? next.description?.nodeId
+    : undefined
+  assertProviderForwardRoute(route, entry.nodeId, node)
+  if (node === undefined) return undefined
+  if (route.length === 0)
+    throw new RpcError(
+      RpcCoreErrorCode.capabilityUnsupported,
+      RuntimeApiErrorText.forwardOriginUnavailable
+    )
+  return Object.freeze([...route, entry.nodeId])
+}
 
 /** Cold compilation metadata belongs to the same root object, never a second provider registry. */
 const runtimePluginEntries = new WeakMap<IRuntimePeerProvide, readonly IRuntimeMethodEntry[]>()

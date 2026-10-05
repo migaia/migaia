@@ -3,6 +3,8 @@ export const RUNTIME_API_SCHEMA_VERSION = 2
 
 /** Automatic provide descriptor errors are stable, non-reflecting configuration diagnostics. */
 export const RuntimeApiErrorText = {
+  /** A foreign origin without a negotiated node cannot safely begin a native forwarding route. */
+  forwardOriginUnavailable: 'RPC forwarding origin node is unavailable',
   /** Descriptor compilation cannot read accessors or accept non-own/reserved callable paths. */
   provideInvalid: 'Runtime provide must contain valid own data methods or groups',
   /** A Peer chooses one explicit source, or the platform's verified automatic bootstrap. */
@@ -70,5 +72,6 @@ export const RUNTIME_API_CAPABILITIES = Object.freeze([
   RpcCapability.abort,
   RpcCapability.stream,
   RpcCapability.batch,
-  RpcCapability.runtimeApi
+  RpcCapability.runtimeApi,
+  RpcCapability.forwardRoute
 ])

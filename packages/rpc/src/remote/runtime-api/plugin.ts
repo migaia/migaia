@@ -1,5 +1,7 @@
 import {
   definePlugin,
+  PluginHostError,
+  PluginHostErrorCode,
   getPluginRuntimeIntegration,
   type IDefinedPluginConstraint,
   type IPluginRuntimeFeatureSnapshot
@@ -10,6 +12,7 @@ import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
 import {
   createRuntimeOutlet,
+  readRuntimeOutletConnection,
   type IRuntimeOutlet,
   type IRuntimePluginConnection
 } from './outlet.js'
@@ -36,6 +39,7 @@ import { RemoteMethodName } from '../constants.js'
 import {
   compileRuntimeMethods,
   registerRuntimePluginMethods,
+  type IRuntimeForwardMethodEntry,
   type IRuntimeMethodEntry
 } from './catalog.js'
 import { RuntimeApiMode } from './constants.js'
@@ -84,7 +88,10 @@ function exposedMethod(
 /** Compile only explicitly exposed real Feature methods, flattening away their local Feature name. */
 function exposedProvide(
   expose: readonly string[],
-  read: (name: string) => IPluginRuntimeFeatureSnapshot
+  read: (name: string) => IPluginRuntimeFeatureSnapshot,
+  resolve: (name: string) => IRuntimePluginConnection | undefined,
+  forwards: Map<string, IRuntimeForwardMethodEntry>,
+  nodeId: string
 ): IRuntimePeerProvide {
   /** One group per Plugin gives the stable plugin.method public namespace. */
   const provide: Record<string, IRuntimePeerProvide> = Object.create(null)
@@ -99,6 +106,58 @@ function exposedProvide(
     const name = separator < 0 ? path : path.slice(0, separator)
     /** Local method spelling is checked against descriptors, never a mutable property lookup. */
     const selectedMethod = separator < 0 ? undefined : path.slice(separator + 1)
+    /** A genuine ready connection contributes its accepted remote catalog, never Feature reflection. */
+    const connection = resolve(name)
+    if (connection) {
+      /** An explicit miss is a configuration failure before acquiring the exposing source. */
+      const methods =
+        connection.description?.methods.filter(
+          (entry) => selectedMethod === undefined || selectedMethod === entry.name
+        ) ?? []
+      if (selectedMethod !== undefined && methods.length === 0)
+        throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
+      for (const entry of methods) {
+        /** A whole-plus-method union owns exactly one entry and retains no prepared Peer. */
+        const fullName = `${name}.${entry.name}`
+        forwards.set(
+          fullName,
+          Object.freeze({
+            kind: 'forward',
+            name: fullName,
+            method: entry.name,
+            forwardedVia: name,
+            nodeId,
+            supportedModes: entry.supportedModes,
+            slot: () => {
+              /** The receiving registration's original Feature guard still owns call admission. */
+              try {
+                read(name)
+              } catch (cause) {
+                /** An uninstalled connection is an unavailable target, retaining its Host cause. */
+                if (
+                  cause instanceof PluginHostError &&
+                  cause.code === PluginHostErrorCode.pluginNotInstalled
+                )
+                  throw new RpcError(
+                    RpcCoreErrorCode.targetUnknown,
+                    RuntimeApiErrorText.targetUnknown,
+                    cause
+                  )
+                throw cause
+              }
+              const current = resolve(name)
+              if (!current)
+                throw new RpcError(
+                  RpcCoreErrorCode.targetUnknown,
+                  RuntimeApiErrorText.targetUnknown
+                )
+              return current
+            }
+          })
+        )
+      }
+      continue
+    }
     /** Both connection permission and output identity come from the original managed Host. */
     const snapshot = snapshots.get(name) ?? read(name)
     snapshots.set(name, snapshot)
@@ -185,10 +244,31 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
     install: async (core) => {
       /** The actual core is the only provenance accepted by the original integration owner. */
       const integration = getPluginRuntimeIntegration(core)
+      /**
+       * Original committed slot indexes select a connection across the two physical adapter
+       * families.
+       */
+      const resolve = (target: string): IRuntimePluginConnection | undefined => {
+        for (const key of Object.values(RuntimePluginKey)) {
+          const current = readRuntimeOutletConnection(integration.readSharedExtension(key), target)
+          if (current === null)
+            throw new RpcError(
+              RpcCoreErrorCode.capabilityConflict,
+              RuntimeApiErrorText.targetAmbiguous
+            )
+          if (current) return current
+        }
+        return undefined
+      }
+      /** This cold union compiles into the existing method table and owns no live connection state. */
+      const forwards = new Map<string, IRuntimeForwardMethodEntry>()
       /** Validate Feature permissions and collisions before acquiring the physical source. */
       const provide = exposedProvide(
         expose.filter((target) => target !== RuntimePluginExpose.host),
-        (target) => integration.readFeatureOutputs(target)
+        (target) => integration.readFeatureOutputs(target),
+        resolve,
+        forwards,
+        integration.nodeId
       )
       /** Reserved Host operations are additional canonical entries, not an authority bypass. */
       let controls: readonly IRuntimeMethodEntry[] = []
@@ -228,7 +308,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
           })
         )
       }
-      registerRuntimePluginMethods(provide, [...ownMethods, ...controls])
+      registerRuntimePluginMethods(provide, [...ownMethods, ...controls, ...forwards.values()])
       /** Later same-family installs reuse this facade while retaining separate endpoint owners. */
       const slot = integration.acquireSharedSlot<IRuntimeOutlet>(
         RuntimePluginKey[kind],
@@ -269,6 +349,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         preparationOptions,
         {
           selfDefaulted: peerOptions.self === undefined,
+          nodeId: integration.nodeId,
           initialSignal: core.operation.signal,
           lifecycleSignal: core.lifecycle.signal,
           own: (dispose) => core.onDispose(dispose),

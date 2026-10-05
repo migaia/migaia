@@ -1,5 +1,11 @@
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** A108 retains the departed execution's failure instead of targeting its replacement. */
+  providerGenerationRetired: 'Provider generation retired',
+  /** D51 refuses a repeated Host before provider admission; node ids remain structured route data. */
+  forwardLoop: 'RPC forwarding route revisits a Host',
+  /** D51 fixes three forwarding nodes independently of a caller's timeout or provider limits. */
+  forwardHopLimit: 'RPC forwarding route exceeds three forwarding Hosts',
   /** Stable fail-closed text for a Runtime API mode absent from the actual peer agreement. */
   capabilityUnsupported: 'Runtime operation capability is unavailable',
   /** Stable construction-hook event name consumed by endpoint diagnostics. */
