@@ -51,7 +51,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
    * The exact compiled offer is passed through private launch metadata, never a platform field in
    * core.
    */
-  const context = prepareRuntimePeerSourceContext(self)
+  const context = prepareRuntimePeerSourceContext(self, !options.endpointFactory)
   /** Stable provider identity belongs to this original factory, not to a Worker launch attempt. */
   const providerId = defaultRpcId()
   /**

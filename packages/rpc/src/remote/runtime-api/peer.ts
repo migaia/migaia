@@ -112,7 +112,8 @@ import {
   RuntimeApiMode,
   RuntimeApiModeSource,
   RUNTIME_API_SCHEMA_VERSION,
-  RUNTIME_API_CAPABILITIES
+  RUNTIME_API_CAPABILITIES,
+  RUNTIME_API_BASE_CAPABILITIES
 } from './constants.js'
 
 export type { IRuntimePeerProvide, IRuntimePeerMethod } from './catalog.js'
@@ -252,7 +253,8 @@ function restoreForwardError(error: unknown): never {
 
 /** Both raw and supervised factories validate safe identity through this same cold owner. */
 export function prepareRuntimePeerSourceContext(
-  configured: IRuntimePeerIdentity | undefined
+  configured: IRuntimePeerIdentity | undefined,
+  canonicalAssembly = true
 ): IRuntimePeerSourceContext {
   if (
     !configured ||
@@ -266,7 +268,7 @@ export function prepareRuntimePeerSourceContext(
     invalid(RuntimeApiErrorText.identityInvalid)
   return Object.freeze({
     self: Object.freeze({ name: configured.name, instanceId: configured.instanceId }),
-    capabilities: RUNTIME_API_CAPABILITIES
+    capabilities: canonicalAssembly ? RUNTIME_API_CAPABILITIES : RUNTIME_API_BASE_CAPABILITIES
   })
 }
 
@@ -309,7 +311,7 @@ export async function createRuntimePeer(
     invalid(RuntimeApiErrorText.sourceInvalid)
   /** Only safe identity fields are retained from user configuration or trusted bootstrap. */
   const configured = automatic?.self ?? options.self
-  const sourceContext = prepareRuntimePeerSourceContext(configured)
+  const sourceContext = prepareRuntimePeerSourceContext(configured, !options.endpointFactory)
   if (
     automatic &&
     options.self &&
