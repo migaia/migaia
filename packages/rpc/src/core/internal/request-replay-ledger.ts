@@ -13,7 +13,8 @@ type IReplayEntry = {
 /** Exact group entries either roll back before execution or settle under the original replay mode. */
 export type IReplayReservation = Readonly<{
   rollback(): void
-  release(now: number): void
+  /** Retain only the invoked prefix; omitted count preserves ordinary all-member settlement. */
+  release(now: number, invokedCount?: number): void
 }>
 
 /** Non-evicting replay ledger for business requests. */
@@ -196,12 +197,20 @@ export class RequestReplayLedger {
           this.#release?.(peerKey)
         }
       },
-      release: (at: number) => {
+      release: (at: number, invokedCount = keys.length) => {
         if (settled) return
         settled = true
-        for (let index = 0; index < keys.length; index++)
-          if (this.#active.get(keys[index]!) === entries[index])
-            this.releaseActive(keys[index]!, at)
+        for (let index = 0; index < keys.length; index++) {
+          /** An unused member releases its exact original capacity and identity retention. */
+          const entry = entries[index]!
+          if (this.#active.get(keys[index]!) !== entry) continue
+          if (index < invokedCount) this.releaseActive(keys[index]!, at)
+          else {
+            this.#active.delete(keys[index]!)
+            entry.releaseCount()
+            this.#release?.(peerKey)
+          }
+        }
       }
     })
   }
