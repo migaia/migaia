@@ -1,5 +1,7 @@
 /** Stable messages exposed by the remote layer's coded errors. */
 export const RpcRemoteLayerErrorText = {
+  /** Slow passive consumers fail explicitly instead of silently losing lifecycle facts. */
+  runtimeEventOverflow: 'Runtime event watch buffer overflowed',
   /** Replaces malformed untrusted keys in contract diagnostics without reflecting input. */
   invalidPathSegment: '<invalid-key>',
   /** Used for invalid descriptions and reserved control payloads. */

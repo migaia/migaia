@@ -31,7 +31,7 @@ import {
   DEFAULT_HEALTH_INTERVAL_MS,
   DEFAULT_HEALTH_TIMEOUT_MS
 } from '../resilience/constants.js'
-import { createProcessBindingDrain } from '../resilience/drain.js'
+import { createRemoteBindingDrain } from '../../remote/internal/binding-drain.js'
 import type { IProcessRegistrationSupervisorPort } from '../resilience/types.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import {
@@ -61,7 +61,7 @@ export type IProcessPluginBinding<TUnit extends object, TSpec> = IRemoteBinding<
     /** Preserve logical request Promise identity while joining the canonical drain barrier. */
     trackRequest<T>(operation: () => Promise<T>): Promise<T>
     bindEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
-    drainCurrent(options?: Readonly<{ hostRemainingMs?: number }>): Promise<void>
+    drainCurrent(options?: Readonly<{ hostRemainingMs?: number; drainMs?: number }>): Promise<void>
   }>
 
 /** Project the canonical supervisor without storing another lifecycle or restart policy. */
@@ -275,7 +275,7 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
     Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }>
   >()
   const scheduler = deployment.supervision.scheduler ?? systemScheduler
-  const drain = createProcessBindingDrain(scheduler, (error) => reportSafely(report, error))
+  const drain = createRemoteBindingDrain(scheduler, (error) => reportSafely(report, error))
   const stderr = createStderrSource(report)
   const callerOutput = deployment.supervision.output?.onChunk
   /** Retain only a live owned unit; a borrowed binding has no corresponding termination port. */
@@ -285,6 +285,15 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   const supervisor = createProcessSupervisor({
     ...deployment.supervision,
     scheduler,
+    stop: {
+      ...deployment.supervision.stop,
+      beforeTerminate: async (unit, signal, remainingMs) => {
+        /** The selected original endpoint receives the exact remaining grace, not a Host budget. */
+        await drain.drainCurrent({ drainMs: remainingMs() })
+        if (!signal.aborted)
+          await deployment.supervision.stop?.beforeTerminate?.(unit, signal, remainingMs)
+      }
+    },
     ...(trackOwned
       ? {
           async ready(unit: THandle, signal: IAbortSignal) {
@@ -480,7 +489,7 @@ export function createConnectProcessBinding(
     Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }>
   >()
   const scheduler = deployment.supervision?.scheduler ?? systemScheduler
-  const drain = createProcessBindingDrain(scheduler, (error) => reportSafely(report, error))
+  const drain = createRemoteBindingDrain(scheduler, (error) => reportSafely(report, error))
   const supervisor = createProcessConnectionSupervisor(
     deployment.address,
     scheduler,

@@ -188,45 +188,51 @@ type IRuntimeNames<P extends readonly unknown[], K> = IRuntimeConnections<P, K>[
 export type IRuntimeTypedOutlet<P extends readonly unknown[], K> =
   string extends IRuntimeNames<P, K>
     ? string extends keyof IRuntimeRemote<P, K, IRuntimeNames<P, K>>
-      ? import('./outlet.js').IRuntimeOutlet
+      ? Omit<
+          import('./outlet.js').IRuntimeOutlet,
+          keyof import('./outlet.js').IRuntimeOutletControls<K>
+        > &
+          import('./outlet.js').IRuntimeOutletControls<K>
       : IRuntimeOutletCalls<P, K>
     : IRuntimeOutletCalls<P, K>
 
 /** Each registered literal name keeps its own method and payload associations. */
-type IRuntimeOutletCalls<P extends readonly unknown[], K> = Readonly<{
-  /** Local query retains the same format overloads regardless of erased remote surface. */
-  list: import('./outlet.js').IRuntimeOutlet['list']
-  request<
-    N extends IRuntimeNames<P, K>,
-    M extends Extract<IRuntimeScalarKeys<IRuntimeRemote<P, K, N>>, string>
-  >(
-    target: IRuntimeTarget<N>,
-    method: M,
-    ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
-  ): Promise<IRuntimeResult<IRuntimeRemote<P, K, N>[M]>>
-  notify<
-    N extends IRuntimeNames<P, K>,
-    M extends Extract<IRuntimeScalarKeys<IRuntimeRemote<P, K, N>>, string>
-  >(
-    target: IRuntimeTarget<N>,
-    method: M,
-    ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
-  ): Promise<void>
-  stream<
-    N extends IRuntimeNames<P, K>,
-    M extends Extract<IRuntimeStreamKeys<IRuntimeRemote<P, K, N>>, string>
-  >(
-    target: IRuntimeTarget<N>,
-    method: M,
-    ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
-  ): AsyncIterableIterator<IRuntimeYield<IRuntimeRemote<P, K, N>[M]>>
-  get<N extends IRuntimeNames<P, K>>(
-    target: IRuntimeTarget<N>
-  ): IRuntimeTypedPeer<IRuntimeRemote<P, K, N>> &
-    Pick<import('./outlet.js').IRuntimeChild, 'name' | 'instanceId' | 'host'>
-  broadcast(
-    method: string,
-    payload?: unknown,
-    options?: IRemoteCallOptions
-  ): Promise<readonly import('./outlet.js').IRuntimeBroadcastResult[]>
-}>
+type IRuntimeOutletCalls<
+  P extends readonly unknown[],
+  K
+> = import('./outlet.js').IRuntimeOutletControls<K> &
+  Readonly<{
+    /** Local query retains the same format overloads regardless of erased remote surface. */
+    list: import('./outlet.js').IRuntimeOutlet['list']
+    request<
+      N extends IRuntimeNames<P, K>,
+      M extends Extract<IRuntimeScalarKeys<IRuntimeRemote<P, K, N>>, string>
+    >(
+      target: IRuntimeTarget<N>,
+      method: M,
+      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
+    ): Promise<IRuntimeResult<IRuntimeRemote<P, K, N>[M]>>
+    notify<
+      N extends IRuntimeNames<P, K>,
+      M extends Extract<IRuntimeScalarKeys<IRuntimeRemote<P, K, N>>, string>
+    >(
+      target: IRuntimeTarget<N>,
+      method: M,
+      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
+    ): Promise<void>
+    stream<
+      N extends IRuntimeNames<P, K>,
+      M extends Extract<IRuntimeStreamKeys<IRuntimeRemote<P, K, N>>, string>
+    >(
+      target: IRuntimeTarget<N>,
+      method: M,
+      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
+    ): AsyncIterableIterator<IRuntimeYield<IRuntimeRemote<P, K, N>[M]>>
+    /** Cold queries have the same portable format overloads as every runtime outlet. */
+    get: import('./outlet.js').IRuntimeOutlet['get']
+    broadcast(
+      method: string,
+      payload?: unknown,
+      options?: IRemoteCallOptions
+    ): Promise<readonly import('./outlet.js').IRuntimeBroadcastResult[]>
+  }>

@@ -1,9 +1,9 @@
 import { retainProviderPreflight } from '../../core/internal/provider.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { RpcCapability } from '../../contract/wire-constants.js'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '../types.js'
 import type { IRpcEndpoint } from '../../core/typing.js'
-import { DEFAULT_DRAIN_MS } from './constants.js'
+import { DEFAULT_DRAIN_MS } from '../constants.js'
 
 /** A generation retains only the calls started on its own endpoint. */
 type IDrainGeneration = {
@@ -18,19 +18,19 @@ type IDrainGeneration = {
 }
 
 /** Process bindings share one drain owner without exporting a new public surface. */
-export type IProcessBindingDrain = Readonly<{
+export type IRemoteBindingDrain = Readonly<{
   wrap(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
   /** Keep logical request settlement inside the same physical generation's drain barrier. */
   trackCurrent<T>(operation: () => Promise<T>): Promise<T>
-  drainCurrent(options?: Readonly<{ hostRemainingMs?: number }>): Promise<void>
+  drainCurrent(options?: Readonly<{ hostRemainingMs?: number; drainMs?: number }>): Promise<void>
 }>
 
 /** One counter follows each physical generation, so a replacement cannot inherit old work. */
-export function createProcessBindingDrain(
+export function createRemoteBindingDrain(
   scheduler: IScheduler,
   report: (error: unknown) => void,
   drainMs = DEFAULT_DRAIN_MS
-): IProcessBindingDrain {
+): IRemoteBindingDrain {
   /** The currently published endpoint is replaced only by a successfully admitted generation. */
   let current: IDrainGeneration | undefined
 
@@ -179,10 +179,11 @@ export function createProcessBindingDrain(
       const generation = current
       if (!generation || generation.channel.transport.closed) return Promise.resolve()
       const hostRemainingMs = options.hostRemainingMs
+      const limit = Math.floor(options.drainMs ?? drainMs)
       const remainingMs =
         hostRemainingMs === undefined
-          ? drainMs
-          : Math.min(drainMs, Math.floor(0.8 * Math.max(0, hostRemainingMs)))
+          ? limit
+          : Math.min(limit, Math.floor(0.8 * Math.max(0, hostRemainingMs)))
       if (generation.promise) {
         if (generation.resolve) setDeadline(generation, remainingMs)
         return generation.promise

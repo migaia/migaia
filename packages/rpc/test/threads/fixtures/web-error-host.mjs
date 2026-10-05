@@ -62,6 +62,11 @@ assert.equal(reported.length, 1)
 assert.ok(posted.length > 0)
 assert.ok(posted.every((transfer) => transfer === undefined))
 assert.equal(launcher.capabilities.termination, 'unsupported')
+assert.equal(
+  handle.sampleUsage,
+  undefined,
+  '[A45][A55] this native Worker has no local isolate sampler'
+)
 handle.terminate()
 console.log(
   JSON.stringify({
@@ -71,7 +76,8 @@ console.log(
     preventCalls,
     reports: reported.length,
     nativePosts: posted.length,
-    termination: launcher.capabilities.termination
+    termination: launcher.capabilities.termination,
+    resourceSampler: typeof handle.sampleUsage
   })
 )
 // Unsupported exit observation is not promoted to an actual-exit receipt by fixture shutdown.

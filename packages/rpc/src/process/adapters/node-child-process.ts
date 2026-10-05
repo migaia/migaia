@@ -27,6 +27,7 @@ import { deferProcessByteReceive } from '../channel.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
 import { nodeByteStream, nativeNodeByteOwner } from './node-byte-stream.js'
 import { registerNativeReplayOwner } from '../../core/internal/native-replay.js'
+import { sampleNativeProcess } from './native-usage.js'
 
 /** A Node handle exposes stdout/stdin only when the specification chose byte channels. */
 export type INodeProcessHandle = IProcessHandle &
@@ -188,6 +189,8 @@ export function createNodeProcessLauncher(
         if (channel) registerNativeReplayOwner(channel, nativeNodeByteOwner(channel)!)
         if (channel && runtimeBootstrap) deferProcessByteReceive(channel)
         child.stdin?.removeListener('error', onStdinError)
+        /** Successful handoff gives stop/force exclusively to the original supervisor slot. */
+        context.signal.removeEventListener('abort', onAbort)
         return Object.freeze({
           identity: Object.freeze({
             fingerprint: runtimeBootstrap?.self.instanceId ?? randomUUID(),
@@ -195,6 +198,15 @@ export function createNodeProcessLauncher(
           }),
           exited,
           channel,
+          /** Sampling follows this actual child; a completed child never substitutes another PID. */
+          ...(child.pid === undefined
+            ? {}
+            : {
+                sampleUsage: () =>
+                  child.exitCode !== null || child.signalCode !== null
+                    ? Promise.resolve({})
+                    : sampleNativeProcess(child.pid!)
+              }),
           ...(runtimeBootstrap ? { runtimeApiIdentity: runtimeBootstrap.self } : {}),
           terminate: (mode: TerminationMode) => terminateChild(child, mode)
         })

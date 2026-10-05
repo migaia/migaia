@@ -48,7 +48,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint,
   preparation?: IRuntimePreparationContext,
   beforeRelease?: () => Promise<void>,
-  origin?: IRuntimeConnectionOrigin
+  origin?: IRuntimeConnectionOrigin,
+  ownsExecution = false
 ): Promise<IRuntimePeer> {
   compileRuntimeMethods(options.provide, options.contract)
   /** Safe configuration admission precedes supervisor.start and any native launcher side effect. */
@@ -56,6 +57,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   /** This is the original canonical current/leave/ready owner, shared with existing remote facades. */
   const registration = createRemoteRuntimeRegistration({
     binding,
+    ownsExecution,
     report: options.report,
     keyFactory: options.keyFactory,
     retryPort: options.retryPort,

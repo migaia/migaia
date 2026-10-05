@@ -31,6 +31,12 @@ export const EndpointKernelState = {
 /** Lifecycle state value exposed to internal feature attachments. */
 export type IEndpointKernelState = (typeof EndpointKernelState)[keyof typeof EndpointKernelState]
 
+/** Cold client counts reuse these actual canonical registries; no provider count is included. */
+export const EndpointOwnerKey = {
+  pendingRegistry: 'pending-registry',
+  streamConsumerRegistry: 'stream-consumer-registry'
+} as const
+
 /** One decoded frame owner installed into the kernel's constant-time route table. */
 export type IEndpointKernelRoute = (message: unknown) => void | Promise<void>
 
@@ -87,6 +93,8 @@ export type IEndpointKernelHost = {
   ): void | Promise<void>
   registerRoute(kind: string, route: IEndpointKernelRoute): () => void
   registerOwner(key: string, owner: object): void
+  /** Cold reads reuse the original owner table without exposing it on the public endpoint. */
+  readOwner(key: string): object | undefined
   dispatchRoute(kind: string, message: unknown): Promise<boolean>
   beginClose(reason?: unknown): void
   completeDispose(): void
@@ -119,6 +127,10 @@ class EndpointKernel implements IEndpointKernelHost {
   readonly #routes = new Map<string, IEndpointKernelRoute>()
   /** Per-kernel owner topology used to prevent duplicate runtime allocations. */
   readonly #owners = new Map<string, object>()
+  /** Returns one exact registered owner without installing an observer or reconstructing state. */
+  readOwner(key: string): object | undefined {
+    return this.#owners.get(key)
+  }
   /** Current lifecycle state; only this kernel mutates it. */
   #state: IEndpointKernelState = EndpointKernelState.constructing
   /** Invalidates callbacks captured before close without allocating per callback. */

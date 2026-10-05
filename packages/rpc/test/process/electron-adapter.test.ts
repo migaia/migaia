@@ -137,7 +137,7 @@ describe('Electron utility process boundary without a platform fixture', () => {
     ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CONNECT_FAILED', cause: failure })
   })
 
-  it('[A9] preserves a native message error and aborts the launched child', async () => {
+  it('[A9][A51] preserves a native message error after launch ownership is handed off', async () => {
     const fake = child()
     const failure = new Error('post failed')
     fake.process.postMessage = () => {
@@ -160,6 +160,8 @@ describe('Electron utility process boundary without a platform fixture', () => {
     )
     expect(failure).toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
     controller.abort()
+    expect(fake.killed).toBe(0)
+    await handle.terminate('force')
     await handle.exited
     expect(fake.killed).toBe(1)
   })

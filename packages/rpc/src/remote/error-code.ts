@@ -3,6 +3,8 @@ export const ERROR_SOURCE = '@migaia/rpc/remote'
 
 /** Public remote failures; each code has one owner and one caller action. */
 export const RpcRemoteLayerErrorCode = {
+  /** A passive watch exceeded 100 unread events; query current state before subscribing again. */
+  runtimeEventOverflow: 'RUNTIME_EVENT_OVERFLOW',
   /** A description or control payload violates the remote contract; correct it before retrying. */
   contractInvalid: 'REMOTE_CONTRACT_INVALID',
   /**

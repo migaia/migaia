@@ -16,7 +16,7 @@ import {
 import { RpcCoreErrorCode, RpcError, RpcAbortError, RpcTimeoutError } from '../../errors.js'
 import { RpcCoreErrorText } from '../../error-text.js'
 import { RpcStreamErrorText } from './error-text.js'
-import type { IEndpointKernelHost } from '../../endpoint-kernel.js'
+import { EndpointOwnerKey, type IEndpointKernelHost } from '../../endpoint-kernel.js'
 import type {
   IRpcStreamCapabilityPort,
   IRpcStreamRun,
@@ -151,6 +151,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     this.#outbound = outbound
     this.#registerStream = registerStream
     this.#capability = capability
+    /** The existing consumer Map is the sole logical client stream count; producers are excluded. */
+    kernel.registerOwner(EndpointOwnerKey.streamConsumerRegistry, this.#consumers)
     this.#releaseTransportFailure = outbound.onTransportFailure?.((error) =>
       this.#transportFailed(error)
     )

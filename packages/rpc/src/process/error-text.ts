@@ -1,5 +1,9 @@
 /** Canonical process diagnostics never contain token, frame, or stderr payload bytes. */
 export const RpcProcessErrorText = {
+  /** Native resource reads report this stable text, keeping OS diagnostics only on cause. */
+  usageSampleFailed: 'process resource sampling failed',
+  /** Invalid OS statistics cannot be converted into fabricated resource values. */
+  usageInvalid: 'process resource statistics are invalid',
   /** Invalid discovery or bootstrap rejects before authentication and provider publication. */
   runtimeBootstrapInvalid: 'process runtime API bootstrap is invalid',
   /** Host admission rejects invalid deployment or replacement options before side effects. */

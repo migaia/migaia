@@ -256,7 +256,7 @@ for (const kind of ['process', 'thread'] as const) {
         assert.throws(() => outlet.request('bridge', 'service.data.probe'), {
           code: 'PROVIDER_NOT_FOUND'
         })
-        assert.equal(outlet.get('bridge').host, undefined)
+        assert.equal(Object.hasOwn(await outlet.get('bridge'), 'host'), false)
       } finally {
         await host.dispose()
         thread?.terminate()

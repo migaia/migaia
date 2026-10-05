@@ -1,3 +1,4 @@
+import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
 import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
@@ -81,7 +82,7 @@ it('[A99] method-level expose admits only add, and whole plus method is one unio
     carriers.push(await attach(owners, { expose: ['math'] }))
     assert.equal(await owners[1].thread!.request('remote', 'math.add'), 42)
     /** The object form chooses the exact canonical receipt without widening its declared name. */
-    const child = owners[1].thread!.get('remote')
+    const child = readRuntimeOutletConnection(owners[1].thread, 'remote')!
     assert.equal(
       await owners[1].thread!.request({ name: 'remote', instanceId: child.instanceId }, 'math.add'),
       42

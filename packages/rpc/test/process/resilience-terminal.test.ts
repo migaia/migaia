@@ -1,3 +1,4 @@
+import * as resilienceOwner from '../../src/process/resilience/index.js'
 import { definePlugin, PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
@@ -364,4 +365,60 @@ describe('process resilience terminal registration', () => {
     expect(scheduler.pendingCount).toBe(1)
     await resilience.close()
   })
+})
+
+it('[A52][A53] passive liquidation notifications follow successful cleanup and cannot handle terminal state', async () => {
+  /** The canonical governor schedules terminal handling independently from passive observers. */
+  const scheduler = createManualScheduler()
+  const reports: unknown[] = []
+  const supervisor = supervisorFixture((error) => reports.push(error))
+  /** Actual cleanup has not committed while this owner release remains pending. */
+  let finish!: () => void
+  const cleanup = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  const release = vi.fn(() => cleanup)
+  const resilience = createProcessResilience({
+    scheduler,
+    report: (error) => reports.push(error),
+    reportAtMs: [0, 10],
+    unhandledLimit: 1
+  })
+  const registration = resilience.attachRegistration('p', supervisor.binding, {
+    kind: 'standalone-host',
+    release
+  })
+  try {
+    /** Reflection preserves a semantic RED before the private passive seam has been added. */
+    const listen = Reflect.get(resilienceOwner, 'listenProcessLiquidated')
+    expect(
+      typeof listen,
+      '[A52] the original governor exposes passive successful-liquidation facts'
+    ).toBe('function')
+    const notifications: unknown[] = []
+    const unsubscribe = listen(resilience, (snapshot: unknown) => {
+      notifications.push(snapshot)
+      expect(resilience.inspect('p')?.liquidated).toBe(true)
+    })
+    expect(typeof unsubscribe).toBe('function')
+    supervisor.enter(new Error('terminal fixture'))
+    await settle()
+    expect(notifications).toEqual([])
+    expect(registration.inspect()?.unhandled).toBe(1)
+    scheduler.advance(10)
+    await settle()
+    expect(release).toHaveBeenCalledOnce()
+    expect(notifications).toEqual([])
+    finish()
+    await settle()
+    expect(notifications).toHaveLength(1)
+    expect(registration.inspect()?.unhandled).toBe(2)
+    unsubscribe?.()
+    unsubscribe?.()
+  } finally {
+    finish()
+    await settle()
+    await registration.close()
+    await resilience.close()
+  }
 })

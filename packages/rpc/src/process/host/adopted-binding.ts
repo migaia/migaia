@@ -10,7 +10,7 @@ import {
   type IProcessConnectionUnit,
   type IProcessPluginBinding
 } from '../plugin/binding.js'
-import { createProcessBindingDrain } from '../resilience/drain.js'
+import { createRemoteBindingDrain } from '../../remote/internal/binding-drain.js'
 import {
   DEFAULT_HEALTH_FAILURE_THRESHOLD,
   DEFAULT_HEALTH_INTERVAL_MS,
@@ -75,7 +75,7 @@ export function createAdoptedProcessBinding(
   /** Native negotiated ping selects the existing health check rather than a new protocol. */
   const health = channel.agreement.capabilities.includes(RpcCapability.ping) ? 'ping' : 'none'
   /** One generation drain accounts for endpoint work and logical request settlement. */
-  const drain = createProcessBindingDrain(scheduler, (error) => reportSafely(report, error))
+  const drain = createRemoteBindingDrain(scheduler, (error) => reportSafely(report, error))
   /** The canonical supervisor owns readiness, health and close-only unit retirement. */
   const supervisor = createProcessConnectionSupervisor(
     candidate.identity.connectionId,

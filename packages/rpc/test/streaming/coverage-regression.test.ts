@@ -15,6 +15,7 @@ function producerFixture(rejectOpen: boolean, rejectFail = false) {
   let accept!: (message: unknown) => void | Promise<void>
   const sendError = new Error('open send failed')
   const kernel = {
+    registerOwner: () => undefined,
     generation: 0,
     closingSignal: new AbortController().signal,
     state: 'active',

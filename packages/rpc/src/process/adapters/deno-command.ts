@@ -1,5 +1,6 @@
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { CapabilityLevel, StandardCapability, type TerminationMode } from '@migaia/supervision'
+import { sampleNativeProcess } from './native-usage.js'
 import {
   ProcessCapability,
   type IProcessHandle,
@@ -208,6 +209,9 @@ export function createDenoProcessLauncher(
             ? webByteStream(child.stdout, child.stdin, () => undefined)
             : undefined
         if (channel && runtimeBootstrap) deferProcessByteReceive(channel)
+        if (context.signal.aborted) throw resolveAbortReason(context.signal)
+        /** Startup cancellation must not bypass graceful retirement after the handle is adopted. */
+        context.signal.removeEventListener('abort', onAbort)
         return Object.freeze({
           identity: Object.freeze({
             fingerprint: runtimeBootstrap?.self.instanceId ?? crypto.randomUUID(),
@@ -215,6 +219,7 @@ export function createDenoProcessLauncher(
           }),
           exited,
           channel,
+          sampleUsage: () => sampleNativeProcess(child.pid),
           ...(runtimeBootstrap ? { runtimeApiIdentity: runtimeBootstrap.self } : {}),
           terminate
         })

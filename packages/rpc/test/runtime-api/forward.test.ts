@@ -240,7 +240,7 @@ for (const mode of ['tell', 'values'] as const) {
         if (event.name === 'failure') failures.push(event.error)
       })
       /** Replacement identity must differ; the old logical execution must not enter it. */
-      const first = owners[1].thread!.get('c').instanceId
+      const first = readRuntimeOutletConnection(owners[1].thread, 'c')!.instanceId
       /** Catch is attached immediately so a real transport failure cannot become unhandled. */
       const pending =
         mode === 'tell'
@@ -256,9 +256,13 @@ for (const mode of ['tell', 'values'] as const) {
       assert.equal(failure.code, 'PROVIDER_GENERATION_RETIRED')
       assert.equal(failure.source, '@migaia/rpc/core')
       assert.ok(failure.cause instanceof Error, '[A108] native departure remains reachable')
-      await vi.waitFor(() => assert.notEqual(owners[1].thread!.get('c').instanceId, first), {
-        timeout: 3000
-      })
+      await vi.waitFor(
+        () =>
+          assert.notEqual(readRuntimeOutletConnection(owners[1].thread, 'c')!.instanceId, first),
+        {
+          timeout: 3000
+        }
+      )
       assert.equal(calls.old, 1, '[A108] retired work is never replayed')
       if (mode === 'tell') {
         await owners[0].thread!.notify('b', 'c.service.data.tell', 'replacement')
@@ -554,7 +558,9 @@ it('[A107/A116] C business identity, stack and cause cross both hops with forwar
       await nodeOf(owners[1], 'a')
     ])
     assert.equal(
-      owners[0].thread!.get('b').methods.find((method) => method.name === 'c.fail')?.forwardedVia,
+      readRuntimeOutletConnection(owners[0].thread, 'b')!.description!.methods.find(
+        (method) => method.name === 'c.fail'
+      )?.forwardedVia,
       'c'
     )
   } finally {
@@ -948,7 +954,7 @@ it('[A108] a forwarded native call retires once and a fresh call uses C replacem
     )
     carriers.push(await attach(owners[0], owners[1], 'b', 'a', {}, { expose: ['c'] }))
     /** The first success independently establishes the final native business path. */
-    const first = owners[1].thread!.get('c').instanceId
+    const first = readRuntimeOutletConnection(owners[1].thread, 'c')!.instanceId
     assert.equal(
       await owners[0].thread!.request('b', 'c.service.data.read', 'ordinary'),
       'ordinary'
@@ -969,7 +975,7 @@ it('[A108] a forwarded native call retires once and a fresh call uses C replacem
           await owners[0].thread!.request('b', 'c.service.data.read', 'replacement'),
           'replacement'
         )
-        assert.notEqual(owners[1].thread!.get('c').instanceId, first)
+        assert.notEqual(readRuntimeOutletConnection(owners[1].thread, 'c')!.instanceId, first)
       },
       { timeout: 3000 }
     )

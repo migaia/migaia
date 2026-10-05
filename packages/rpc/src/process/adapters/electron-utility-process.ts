@@ -204,6 +204,8 @@ export function createElectronUtilityProcessLauncher(): IProcessLauncher<IElectr
         await exited
         throw createProcessError(RpcProcessErrorCode.connectFailed, error)
       }
+      /** The supervisor now owns termination; launch cancellation no longer owns this child. */
+      context.signal.removeEventListener('abort', onAbort)
       return Object.freeze({
         identity: Object.freeze({ fingerprint: randomUUID(), pid: child.pid }),
         exited,

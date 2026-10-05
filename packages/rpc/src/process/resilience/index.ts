@@ -1,3 +1,4 @@
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
@@ -24,14 +25,27 @@ import type {
 } from './types.js'
 
 /** Package-local session ownership lets both service facades reuse the same governor. */
-const sessionManagers = new WeakMap<IProcessResilience, IProcessSessionManager>()
+const sessionManagers = new WeakMap<
+  IProcessResilience,
+  Readonly<{
+    manager: IProcessSessionManager
+    listenLiquidated(listener: (snapshot: IProcessResilienceSnapshot) => unknown): () => void
+  }>
+>()
 
 /** Obtain the canonical quotas and store for a service-owned governor. */
 export function processSessionManager(
   resilience: IProcessResilience
 ): IProcessSessionManager | undefined {
-  const manager = sessionManagers.get(resilience)
-  return manager
+  return sessionManagers.get(resilience)?.manager
+}
+
+/** Passive observers subscribe to this genuine governor without becoming terminal handlers. */
+export function listenProcessLiquidated(
+  resilience: IProcessResilience,
+  listener: (snapshot: IProcessResilienceSnapshot) => unknown
+): (() => void) | undefined {
+  return sessionManagers.get(resilience)?.listenLiquidated(listener)
 }
 
 /** One close outcome retains every independently failing listener or registration. */
@@ -72,6 +86,8 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
   const terminalSubscribers = new Set<
     (snapshot: IProcessResilienceSnapshot) => void | Promise<void>
   >()
+  /** Only successful original liquidation commits notify this passive subscriber Set. */
+  const liquidationSubscribers = new Set<(snapshot: IProcessResilienceSnapshot) => unknown>()
   /** Stable guard objects can be handed to remote before a registration is attached. */
   const guards = new Map<string, IRemoteCallGuard>()
   let closed = false
@@ -85,6 +101,7 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
     }
   }
 
+  /** Tombstone publication is the same successful commit observed by passive subscribers. */
   const recordTombstone = (snapshot: IProcessResilienceSnapshot): void => {
     tombstones.delete(snapshot.id)
     tombstones.set(snapshot.id, {
@@ -94,6 +111,15 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
     while (tombstones.size > MAX_LIQUIDATION_TOMBSTONES) {
       const oldest = tombstones.keys().next().value
       if (oldest !== undefined) tombstones.delete(oldest)
+    }
+    const committed = tombstones.get(snapshot.id)!.snapshot
+    for (const listener of Array.from(liquidationSubscribers)) {
+      try {
+        const result = listener(committed)
+        observeThenableRejection(result, inspectThenable(result), report)
+      } catch (error) {
+        report(error)
+      }
     }
   }
 
@@ -287,6 +313,7 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
         dependents.clear()
         tombstones.clear()
         terminalSubscribers.clear()
+        liquidationSubscribers.clear()
         guards.clear()
         const errors = outcomes.flatMap((outcome) =>
           outcome.status === 'rejected' ? [outcome.reason] : []
@@ -295,6 +322,15 @@ export function createProcessResilience(options: IProcessResilienceOptions): IPr
       })())
     }
   })
-  sessionManagers.set(resilience, manager)
+  sessionManagers.set(resilience, {
+    manager,
+    listenLiquidated(listener) {
+      if (closed) return () => undefined
+      liquidationSubscribers.add(listener)
+      return () => {
+        liquidationSubscribers.delete(listener)
+      }
+    }
+  })
   return resilience
 }
