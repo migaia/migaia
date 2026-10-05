@@ -576,7 +576,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   ): Promise<unknown> {
     if (state.runtime) {
       if (state.terminal) return Promise.resolve(undefined)
-      /** Before-start intent waits for the final provider's real decision and keeps its consumer. */
+      /** Only selected before-start intent keeps its consumer for the final provider's decision. */
+      if (state.runtime.options.cancel !== RpcRuntimeCancel) this.#finishConsumer(state, terminal)
+      /** The same prepared task emits cancellation even after ordinary local settlement. */
       void state.runtime.prepared
         ?.then(() =>
           this.#sendRuntimeIntent(
@@ -592,6 +594,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         )
         .catch((error: unknown) => {
           if (!state.terminal) this.#finishConsumer(state, { error })
+          else this.#report(error)
         })
       return Promise.resolve(undefined)
     }

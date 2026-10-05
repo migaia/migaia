@@ -403,11 +403,17 @@ it.each(['cancel', 'return', 'throw', 'forged-order-only', 'forged-order-only-ca
        * errors.
        */
       const result = await next
-      assert.equal(
-        Reflect.get(result as object, 'code'),
-        RpcCoreErrorCode.cancelled,
-        `[A66] original result: ${String(result)}; cause: ${String(Reflect.get(result as object, 'cause'))}`
-      )
+      if (intent === 'forged-order-only-cancel') {
+        /** Ordering alone preserves the local native reason instead of awaiting a remote wrapper. */
+        assert.equal(result, cancel.signal.reason)
+        assert.ok(result instanceof DOMException)
+        assert.equal(result.name, 'AbortError')
+      } else
+        assert.equal(
+          Reflect.get(result as object, 'code'),
+          RpcCoreErrorCode.cancelled,
+          `[A66] original result: ${String(result)}; cause: ${String(Reflect.get(result as object, 'cause'))}`
+        )
       if (returned) {
         /** Finish must settle on the actual cancellation before fixture close can clean anything up. */
         const terminal = await returned
