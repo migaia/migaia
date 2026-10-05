@@ -45,8 +45,10 @@ import type {
 import {
   compileRuntimeMethods,
   runtimeForwardRoute,
+  runtimeForwardDiagnosticRoute,
   type IRuntimePeerProvide,
-  type IRuntimeMethodEntry
+  type IRuntimeMethodEntry,
+  type IRuntimeForwardMethodEntry
 } from './catalog.js'
 import { attachProviderPreflight, readProviderInvocation } from '../../core/internal/provider.js'
 import type { IRpcStreamRun } from '../../core/features/stream.js'
@@ -294,14 +296,30 @@ export async function createRuntimePeer(
             runtimeForwardRoute(entry, route.forwardRoute, remoteNodeId)
           } catch (error) {
             /** Slot withdrawal still keeps its known path; an existing loop route remains exact. */
-            const incoming = route.forwardRoute ?? (remoteNodeId ? [remoteNodeId] : undefined)
             throw retainProviderFailureRoute(
               error,
-              incoming ? Object.freeze([...incoming, entry.nodeId]) : undefined
+              runtimeForwardDiagnosticRoute(entry, route.forwardRoute, remoteNodeId)
             )
           }
         })
       : provider
+  /** Delegate the original lazy iterator and retain known route facts on terminal business errors. */
+  const forwardStream = async function* (
+    entry: IRuntimeForwardMethodEntry,
+    context: Parameters<IRpcProvider>[0]
+  ): AsyncIterableIterator<IRpcPortableValue> {
+    const route = runtimeForwardRoute(entry, context.route, remoteNodeId)
+    try {
+      yield* entry
+        .slot()
+        .peer.stream(entry.method, context.data, createForwardOptions(context, route))
+    } catch (error) {
+      throw retainProviderFailureRoute(
+        error,
+        runtimeForwardDiagnosticRoute(entry, context.route, remoteNodeId)
+      )
+    }
+  }
   if (supportsRuntime) {
     providers[RemoteMethodName.runtimeDescribe] = (context) => {
       if (supportsForward) {
@@ -337,7 +355,10 @@ export async function createRuntimePeer(
                 : await connection.peer.request(entry.method, context.data, options)
             return context.success(result)
           } catch (error) {
-            throw retainProviderFailureRoute(error, route)
+            throw retainProviderFailureRoute(
+              error,
+              runtimeForwardDiagnosticRoute(entry, context.route, remoteNodeId)
+            )
           }
         }
         /** Handler failure stays outside the scalar result validation error boundary. */
@@ -407,16 +428,7 @@ export async function createRuntimePeer(
               entry,
               (payload: unknown, { context }: Parameters<IRpcStreamRun>[1]) =>
                 (entry.kind === 'forward'
-                  ? entry
-                      .slot()
-                      .peer.stream(
-                        entry.method,
-                        payload,
-                        createForwardOptions(
-                          context,
-                          runtimeForwardRoute(entry, context.route, remoteNodeId)
-                        )
-                      )
+                  ? forwardStream(entry, context)
                   : Reflect.apply(entry.method, entry.receiver, [payload, context])) as
                   | AsyncIterable<IRpcPortableValue>
                   | Iterable<IRpcPortableValue>

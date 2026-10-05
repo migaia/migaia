@@ -159,7 +159,7 @@ for (const peer of [
           createThreadPlugin({
             name: 'a',
             self: { name: 'b', instanceId: 'b-forward-caller' },
-            expose: ['c.echo'],
+            expose: ['c.echo', 'c.peer.error'],
             connect: carrier.sources[1],
             report: (error) => failures.push(error)
           })
@@ -170,10 +170,30 @@ for (const peer of [
         'forward-terminal'
       )
       assert.equal(routedFrames, 0, '[A112] the foreign physical wire never carries route')
+      /** Foreign terminals omit wire extensions, but B must retain its already known prefix. */
+      const knownRoute = [
+        (await readRuntimeOutletConnection(owners[0].thread, 'b')!.peer.describe()).nodeId,
+        (await readRuntimeOutletConnection(owners[1].thread, 'a')!.peer.describe()).nodeId
+      ]
+      /** The independent language's direct error is the oracle for its exact stack and chain. */
+      let original: any
+      await assert.rejects(active.request('peer.error'), (error: any) => {
+        original = error.cause ?? error
+        return true
+      })
+      await assert.rejects(owners[0].thread!.request('b', 'c.peer.error'), (error: any) => {
+        assert.equal(error.source, original.source)
+        assert.equal(error.code, original.code)
+        assert.equal(error.stack, original.stack)
+        assert.equal(error.cause?.stack, original.cause?.stack)
+        assert.deepEqual(error.route, knownRoute, '[A107/A112] the known native prefix survives')
+        return true
+      })
+      assert.equal(routedFrames, 0, '[A112] failing foreign frames also omit route')
       assert.equal(hiddenCalls, 0)
       assert.equal(methods.includes(RemoteMethodName.runtimeDescribe), true)
       assert.equal(methods.includes(RemoteMethodName.describe), false)
-      assert.equal(failures.length, 0)
+      assert.ok(failures.every((error: any) => error.code === 'INTERNAL'))
     } finally {
       try {
         for (const host of owners) await host.dispose()
