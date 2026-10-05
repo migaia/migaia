@@ -239,7 +239,10 @@ export type IRpcOutboundOperationsPort = {
 
 /** Discovery-backed receiver selection shared with the canonical outbound sender. */
 export type IRpcDiscoveryResolverPort = {
-  readonly resolve: (id: string) => Promise<{
+  readonly resolve: (
+    id: string,
+    receiverId?: string
+  ) => Promise<{
     readonly receiverId: string
     readonly verifiedPeerKey?: string
   }>

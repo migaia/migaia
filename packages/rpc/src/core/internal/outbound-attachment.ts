@@ -1110,9 +1110,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
 
   /** Resolves an explicit receiver or delegates to the endpoint-local discovery owner. */
   resolveReceiver(targetId: string, receiverId?: string): Promise<IOutboundReceiver> {
-    if (receiverId !== undefined) return Promise.resolve({ receiverId, verifiedPeerKey: undefined })
     const discoveryResolver = this.#discoveryResolver?.()
-    if (discoveryResolver) return discoveryResolver.resolve(targetId)
+    if (discoveryResolver) return discoveryResolver.resolve(targetId, receiverId)
+    if (receiverId !== undefined) return Promise.resolve({ receiverId, verifiedPeerKey: undefined })
     return this.#receiverResolver(targetId)
   }
 

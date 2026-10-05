@@ -607,8 +607,13 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     await this.#automaticDiscovery(targetId, false)
   }
 
-  /** Returns one active receiver, discovering the target when its registry is empty. */
-  async resolveReceiver(targetId: TTargetId): Promise<IOutboundReceiver> {
+  /** Refreshes invalidated exact receivers without retargeting; otherwise selects an active peer. */
+  async resolveReceiver(targetId: TTargetId, receiverId?: string): Promise<IOutboundReceiver> {
+    if (receiverId !== undefined) {
+      if (readAuthenticationChallengePort(this.#authentication)?.needed(receiverId))
+        await this.#automaticDiscovery(targetId, false)
+      return { receiverId }
+    }
     const pinned = this.#registry.getPin(targetId)
     let entries = this.#activeReceivers(targetId, pinned)
     if (
