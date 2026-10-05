@@ -610,7 +610,7 @@ func initiator(reader io.Reader, writer io.Writer) error {
 		return err
 	}
 	description := field(field(described["data"])["payload"])
-	if described["kind"] != "response" || described["id"] != "go-describe-1" || described["ok"] != true || integerField(description, "schemaVersion") != 2 || stringField(field(description["self"]), "instanceId") != remoteID {
+	if described["kind"] != "response" || described["id"] != "go-describe-1" || described["ok"] != true || !validRuntimeDescription(description, remoteID) {
 		return errors.New("invalid runtime description")
 	}
 	payload := record{"probe": "go"}

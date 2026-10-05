@@ -1188,6 +1188,95 @@ fn check_runtime_baseline(counts: &mut Counts) {
     }
 }
 
+/// Restored vectors call the actual initiator and physical owners; v1 describe/catalog stays retired.
+fn check_entry_vectors(root: &Path, counts: &mut Counts) {
+    use crate::json::{number, object, string};
+    if let Some(schema) = load(root, "../remote-contract.schema.json", counts) {
+        if let Some(vector) = load(root, "remote-host-control.json", counts) {
+            check_host(&vector, field(&schema, "$defs"), counts);
+        }
+    }
+    if let Some(vector) = load(root, "runtime-description.json", counts) {
+        for section in ["valid", "invalid"] {
+            for (index, value) in items(field(&vector, section)).iter().enumerate() {
+                let remote_id = text(field(value, "self"), "instanceId");
+                let mut accepted = crate::accept(&object(&[
+                    ("major", number(1)),
+                    ("minor", number(1)),
+                    (
+                        "capabilities",
+                        Value::Array(vec![
+                            string("runtime-api@1"),
+                            string("batch@1"),
+                            string("close@1"),
+                        ]),
+                    ),
+                ]));
+                if let Value::Object(fields) = &mut accepted {
+                    fields
+                        .iter_mut()
+                        .find(|(name, _)| name == "peer")
+                        .unwrap()
+                        .1 = object(&[("id", string(remote_id)), ("runtime", string("rust"))]);
+                }
+                let mut input = Vec::new();
+                let mut output = Vec::new();
+                let _ = write_frame(&mut input, &accepted);
+                let _ = write_frame(
+                    &mut input,
+                    &object(&[
+                        ("kind", string("response")),
+                        ("id", string("rust-describe-1")),
+                        ("ok", Value::Bool(true)),
+                        ("data", object(&[("payload", value.clone())])),
+                    ]),
+                );
+                let _ = write_frame(
+                    &mut input,
+                    &object(&[
+                        ("kind", string("response")),
+                        ("id", string("rust-echo-1")),
+                        ("ok", Value::Bool(true)),
+                        ("data", field(&crate::request(remote_id), "data").clone()),
+                    ]),
+                );
+                counts.case(
+                    "runtime-description.json",
+                    section,
+                    &object(&[("id", string(&index.to_string()))]),
+                    crate::initiate(&mut &input[..], &mut output, None).is_ok()
+                        == (section == "valid"),
+                );
+            }
+        }
+    }
+    if let Some(vector) = load(root, "batch.json", counts) {
+        for section in ["valid", "invalid", "isolated"] {
+            for case in items(field(&vector, section)) {
+                let result = crate::physical_envelopes(field(case, "value").clone());
+                let mut good = result.is_ok() == (section != "invalid");
+                if let Ok(members) = result {
+                    let actual: Vec<_> = members
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, member)| crate::native_envelope_valid(member))
+                        .map(|(index, _)| number(index as u64))
+                        .collect();
+                    let expected = if section == "isolated" {
+                        items(field(case, "validMembers")).to_vec()
+                    } else {
+                        (0..members.len())
+                            .map(|index| number(index as u64))
+                            .collect()
+                    };
+                    good &= actual == expected;
+                }
+                counts.case("batch", section, case, good);
+            }
+        }
+    }
+}
+
 pub fn run(root: &Path) -> io::Result<()> {
     let mut counts = Counts {
         passed: 0,
@@ -1195,6 +1284,7 @@ pub fn run(root: &Path) -> io::Result<()> {
     };
     check_runtime_baseline(&mut counts);
     check_bridge_baseline(&mut counts);
+    check_entry_vectors(root, &mut counts);
     for prefix in [""] {
         let file = format!("{prefix}handshake.json");
         if let Some(value) = load(root, &file, &mut counts) {
@@ -1438,4 +1528,176 @@ fn check_bridge_baseline(counts: &mut Counts) {
         &object(&[("id", string("v2-batch-notification-isolation"))]),
         good,
     );
+}
+
+/// Interpret only constructs present in the published remote schema; unsupported patterns fail.
+fn schema_accepts(value: &Value, rule: &Value, definitions: &Value) -> bool {
+    if let Some(reference) = rule.get("$ref").and_then(Value::as_str) {
+        return schema_accepts(
+            value,
+            field(definitions, reference.rsplit('/').next().unwrap()),
+            definitions,
+        );
+    }
+    for key in ["oneOf", "anyOf"] {
+        if let Some(choices) = rule.get(key) {
+            let count = items(choices)
+                .iter()
+                .filter(|child| schema_accepts(value, child, definitions))
+                .count();
+            if (key == "oneOf" && count != 1) || (key == "anyOf" && count == 0) {
+                return false;
+            }
+        }
+    }
+    if rule
+        .get("not")
+        .is_some_and(|child| schema_accepts(value, child, definitions))
+    {
+        return false;
+    }
+    if rule
+        .get("if")
+        .is_some_and(|child| schema_accepts(value, child, definitions))
+        && !schema_accepts(value, field(rule, "then"), definitions)
+    {
+        return false;
+    }
+    if rule.get("const").is_some_and(|constant| constant != value) {
+        return false;
+    }
+    if rule
+        .get("enum")
+        .is_some_and(|choices| !items(choices).contains(value))
+    {
+        return false;
+    }
+    let valid_type = match text(rule, "type") {
+        "" => true,
+        "object" => matches!(value, Value::Object(_)),
+        "array" => matches!(value, Value::Array(_)),
+        "string" => matches!(value, Value::String(_)),
+        "boolean" => matches!(value, Value::Bool(_)),
+        "null" => matches!(value, Value::Null),
+        "number" => matches!(value, Value::Number(_)),
+        "integer" => value.as_u64().is_some(),
+        _ => false,
+    };
+    if !valid_type {
+        return false;
+    }
+    if let Some(minimum) = rule.get("minimum").and_then(Value::as_u64) {
+        if value.as_u64().is_some_and(|number| number < minimum) {
+            return false;
+        }
+    }
+    if let Some(string) = value.as_str() {
+        if rule
+            .get("maxLength")
+            .and_then(Value::as_u64)
+            .is_some_and(|maximum| string.chars().count() > maximum as usize)
+        {
+            return false;
+        }
+        if let Some(pattern) = rule.get("pattern").and_then(Value::as_str) {
+            if pattern != "^[A-Za-z][A-Za-z0-9_-]{0,39}$"
+                || string.is_empty()
+                || string.len() > 40
+                || !string.as_bytes()[0].is_ascii_alphabetic()
+                || !string
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+            {
+                return false;
+            }
+        }
+    }
+    if let Value::Array(array) = value {
+        if rule
+            .get("minItems")
+            .and_then(Value::as_u64)
+            .is_some_and(|min| array.len() < min as usize)
+            || rule
+                .get("maxItems")
+                .and_then(Value::as_u64)
+                .is_some_and(|max| array.len() > max as usize)
+        {
+            return false;
+        }
+        let prefix = items(field(rule, "prefixItems"));
+        for (index, item) in array.iter().enumerate() {
+            if !schema_accepts(
+                item,
+                prefix.get(index).unwrap_or(field(rule, "items")),
+                definitions,
+            ) {
+                return false;
+            }
+        }
+    }
+    if let Value::Object(object) = value {
+        if rule
+            .get("maxProperties")
+            .and_then(Value::as_u64)
+            .is_some_and(|max| object.len() > max as usize)
+            || rule
+                .get("minProperties")
+                .and_then(Value::as_u64)
+                .is_some_and(|min| object.len() < min as usize)
+            || items(field(rule, "required"))
+                .iter()
+                .any(|key| !value.has(key.as_str().unwrap()))
+        {
+            return false;
+        }
+        for (key, item) in object {
+            if !schema_accepts(
+                &crate::json::string(key),
+                field(rule, "propertyNames"),
+                definitions,
+            ) {
+                return false;
+            }
+            let child = field(rule, "properties")
+                .get(key)
+                .unwrap_or(field(rule, "additionalProperties"));
+            if child == &Value::Bool(false) || !schema_accepts(item, child, definitions) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// Check catalog name identity and canonical inspection ordering separately from schema shape.
+fn check_host(vectors: &Value, definitions: &Value, counts: &mut Counts) {
+    for section in ["controls"] {
+        for case in items(field(vectors, section)) {
+            let definition = text(case, "definition");
+            if definition == "describeHost" {
+                continue;
+            }
+            let value = field(case, "value");
+            let valid = schema_accepts(value, field(definitions, definition), definitions);
+            let mut semantic = valid;
+            if semantic && definition == "hostInspectResult" {
+                let plugins = items(field(value, "plugins"));
+                semantic &= plugins
+                    .windows(2)
+                    .all(|pair| text(&pair[0], "name") < text(&pair[1], "name"));
+                semantic &= plugins.iter().all(|plugin| {
+                    items(field(plugin, "features"))
+                        .windows(2)
+                        .all(|pair| pair[0].as_str() < pair[1].as_str())
+                });
+            }
+            counts.case(
+                "remote-host-control",
+                section,
+                case,
+                field(case, "schemaValid") == &Value::Bool(valid)
+                    && field(case, "semanticValid") == &Value::Bool(semantic),
+            );
+        }
+    }
 }

@@ -4,9 +4,66 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
+
+// Runtime directory names share the current logical method grammar, without a second catalog.
+var runtimeMethodName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,39}(\.[A-Za-z][A-Za-z0-9_-]{0,39})*$`)
+
+// validRuntimeDescription admits only a closed v2 directory bound to the authenticated peer.
+func validRuntimeDescription(value record, remoteID string) bool {
+	if len(value) != 3 || integerField(value, "schemaVersion") != 2 {
+		return false
+	}
+	identity := field(value["self"])
+	name, nameOK := identity["name"].(string)
+	id, idOK := identity["instanceId"].(string)
+	if len(identity) != 2 || !nameOK || !idOK || len(name) == 0 || utf8.RuneCountInString(name) > 128 || len(id) == 0 || utf8.RuneCountInString(id) > 128 || id != remoteID {
+		return false
+	}
+	methods, ok := value["methods"].([]any)
+	if !ok || len(methods) > 4096 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, raw := range methods {
+		method := field(raw)
+		for key := range method {
+			if key != "name" && key != "supportedModes" && key != "modeSource" && key != "idempotent" {
+				return false
+			}
+		}
+		name, ok := method["name"].(string)
+		if !ok || len(name) > 128 || !runtimeMethodName.MatchString(name) || seen[name] {
+			return false
+		}
+		seen[name] = true
+		modes, ok := method["supportedModes"].([]any)
+		if !ok || len(modes) == 0 || len(modes) > 3 {
+			return false
+		}
+		accepted := map[string]bool{}
+		for _, rawMode := range modes {
+			mode, ok := rawMode.(string)
+			if !ok || mode != "request" && mode != "notify" && mode != "stream" || accepted[mode] {
+				return false
+			}
+			accepted[mode] = true
+		}
+		if method["modeSource"] != "declared" && method["modeSource"] != "generated-routes" {
+			return false
+		}
+		if declaration, exists := method["idempotent"]; exists {
+			if _, ok := declaration.(bool); !ok {
+				return false
+			}
+		}
+	}
+	return true
+}
 
 // U36 uses one baseline directory and physical batch contract, independent of optional runtime profiles.
 const (

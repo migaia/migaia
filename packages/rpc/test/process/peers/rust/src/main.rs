@@ -68,6 +68,90 @@ fn runtime_description(methods: &[(&str, &[&str])]) -> Value {
     ])
 }
 
+/// Admit a closed v2 directory using the actual negotiated peer identity and logical method grammar.
+fn valid_runtime_description(value: &Value, remote_id: &str) -> bool {
+    let Value::Object(fields) = value else {
+        return false;
+    };
+    if fields.len() != 3 || value.get("schemaVersion").and_then(Value::as_u64) != Some(2) {
+        return false;
+    }
+    let Some(Value::Object(identity)) = value.get("self") else {
+        return false;
+    };
+    if identity.len() != 2
+        || !["name", "instanceId"].iter().all(|key| {
+            value
+                .get("self")
+                .and_then(|value| value.get(key))
+                .and_then(Value::as_str)
+                .is_some_and(|text| !text.is_empty() && text.chars().count() <= 128)
+        })
+        || value
+            .get("self")
+            .and_then(|value| value.get("instanceId"))
+            .and_then(Value::as_str)
+            != Some(remote_id)
+    {
+        return false;
+    }
+    let Some(methods) = value.get("methods").and_then(Value::as_array) else {
+        return false;
+    };
+    if methods.len() > 4096 {
+        return false;
+    }
+    let mut seen = std::collections::HashSet::new();
+    for method in methods {
+        let Value::Object(fields) = method else {
+            return false;
+        };
+        if fields.iter().any(|(key, _)| {
+            !["name", "supportedModes", "modeSource", "idempotent"].contains(&key.as_str())
+        }) {
+            return false;
+        }
+        let Some(name) = method.get("name").and_then(Value::as_str) else {
+            return false;
+        };
+        if name.len() > 128
+            || !seen.insert(name)
+            || !name.split('.').all(|part| {
+                !part.is_empty()
+                    && part.len() <= 40
+                    && part.as_bytes()[0].is_ascii_alphabetic()
+                    && part
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+            })
+        {
+            return false;
+        }
+        let Some(modes) = method.get("supportedModes").and_then(Value::as_array) else {
+            return false;
+        };
+        if modes.is_empty()
+            || modes.len() > 3
+            || modes.iter().enumerate().any(|(index, mode)| {
+                !matches!(mode.as_str(), Some("request" | "notify" | "stream"))
+                    || modes[..index].contains(mode)
+            })
+        {
+            return false;
+        }
+        if !matches!(
+            method.get("modeSource").and_then(Value::as_str),
+            Some("declared" | "generated-routes")
+        ) || method
+            .get("idempotent")
+            .is_some_and(|value| !matches!(value, Value::Bool(_)))
+        {
+            return false;
+        }
+    }
+    true
+}
+
 /// Decode the native physical batch without changing individual member admission or correlation.
 fn physical_envelopes(message: Value) -> io::Result<Vec<Value>> {
     if message.get("kind").and_then(Value::as_str) != Some("batch") {
@@ -727,14 +811,7 @@ fn initiate(input: &mut impl Read, output: &mut impl Write, auth: Option<&str>) 
     if description.get("kind").and_then(Value::as_str) != Some("response")
         || description.get("id") != describe.get("id")
         || description.get("ok") != Some(&Value::Bool(true))
-        || directory
-            .and_then(|value| value.get("schemaVersion"))
-            .and_then(Value::as_u64)
-            != Some(2)
-        || directory
-            .and_then(|value| value.get("self"))
-            .and_then(|value| value.get("instanceId"))
-            != accepted.get("peer").and_then(|peer| peer.get("id"))
+        || directory.is_none_or(|value| !valid_runtime_description(value, remote_id))
     {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
