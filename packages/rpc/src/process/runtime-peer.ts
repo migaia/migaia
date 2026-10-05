@@ -1,3 +1,4 @@
+import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import { RpcRuntimeGenerationKind } from '../contract/runtime-api/constants.js'
 import { defaultRpcId } from '../core/internal/id.js'
@@ -49,6 +50,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
   options: IRuntimeProcessPeerOptions<THandle>,
   runtime: string
 ) {
+  readRuntimeDefaultTimeout(options)
   /** Multiple or unsupported source specifications fail before any original launcher or dial starts. */
   const sources = [options.spawn, options.connect, options.listen].filter(
     (source) => source !== undefined
@@ -99,6 +101,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
         self,
         provide: options.provide,
         providerLimits: options.providerLimits,
+        defaultTimeoutMs: options.defaultTimeoutMs,
         contract: options.contract,
         endpointFactory: options.endpointFactory,
         report: options.report
@@ -113,6 +116,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
         self,
         provide: options.provide,
         providerLimits: options.providerLimits,
+        defaultTimeoutMs: options.defaultTimeoutMs,
         contract: options.contract,
         keyFactory: options.keyFactory,
         retryPort: options.retryPort,

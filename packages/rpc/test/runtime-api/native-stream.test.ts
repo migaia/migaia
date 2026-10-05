@@ -131,9 +131,12 @@ it('[A59][A67][A69] authenticated native stream retains its shared lease through
     assert.deepEqual(await iterator.next(), { done: false, value: 1 })
     assert.ok(signal)
     assert.equal((await client.outcome('native-final')).state, 'pending')
-    follower = client.request('after', undefined, { orderKey: 'same' })
+    follower = client.request('after', undefined, { orderKey: 'same', timeoutMs: false })
     void follower.catch(() => undefined)
-    assert.equal(await client.request('other', undefined, { orderKey: 'other' }), 9)
+    assert.equal(
+      await client.request('other', undefined, { orderKey: 'other', timeoutMs: false }),
+      9
+    )
     assert.deepEqual(effects, ['first'])
     /** Actual native registration carries the same canonical shared admission object. */
     const session = readRuntimePeerSessions(server)![0]!

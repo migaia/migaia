@@ -41,6 +41,8 @@ it.each(['memory', 'external'] as const)(
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     const capabilities = [
+      /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+      RpcCapability.deadline,
       ...RUNTIME_API_CAPABILITIES,
       RpcCapability.generation,
       RpcCapability.order,

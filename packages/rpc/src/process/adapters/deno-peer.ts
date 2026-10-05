@@ -1,3 +1,4 @@
+import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import { createAutomaticProcessPeer } from '../automatic-peer.js'
 import type { IRuntimePeerOptions } from '../../remote/runtime-api/peer.js'
 import { createProcessSourcePeer, type IRuntimeProcessPeerOptions } from '../runtime-peer.js'
@@ -9,6 +10,7 @@ let automaticMarker: string | undefined
 
 /** Deno discovery borrows its native environment and stream owner, never a Node stdin shim. */
 export function createProcessPeer(options: IRuntimeProcessPeerOptions) {
+  readRuntimeDefaultTimeout(options)
   /** This deep adapter is selected only in a native Deno runtime. */
   const runtime = Reflect.get(globalThis, 'Deno') as {
     env: { get(key: string): string | undefined; delete(key: string): void }

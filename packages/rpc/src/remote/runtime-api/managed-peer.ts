@@ -17,6 +17,7 @@ import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
 import type { IRuntimePreparationContext } from './launch-context.js'
 import { isForwardedPayload } from '../../core/internal/outbound-envelope.js'
 import { RuntimeApiMode } from './constants.js'
+import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
 import { RpcRuntimeGenerationKind } from '../../contract/runtime-api/constants.js'
 import { compileRuntimeMethods } from './catalog.js'
 import {
@@ -52,6 +53,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   origin?: IRuntimeConnectionOrigin,
   ownsExecution = false
 ): Promise<IRuntimePeer> {
+  /** The original registration receives a logical deadline before applying its launcher cap. */
+  const callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
   compileRuntimeMethods(options.provide, options.contract)
   /** Safe configuration admission precedes supervisor.start and any native launcher side effect. */
   const context = prepareRuntimePeerSourceContext(options.self, !options.endpointFactory)
@@ -70,6 +73,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           self: context.self,
           provide: preparation?.readProvide?.() ?? options.provide,
           providerLimits: options.providerLimits,
+          defaultTimeoutMs: options.defaultTimeoutMs,
           contract: options.contract,
           endpointFactory: options.endpointFactory,
           report: options.report
@@ -136,7 +140,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   const peer: IRuntimePeer = Object.freeze({
     self: context.self,
     request: (method, payload, callOptions) =>
-      registration.invokeRequest(method, payload, callOptions),
+      registration.invokeRequest(method, payload, callTimeout(callOptions)),
     notify: (method, payload, callOptions) =>
       isForwardedPayload(callOptions, payload)
         ? registration
@@ -144,9 +148,9 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
             .then(() => undefined)
         : registration.currentPeer().notify(method, payload, callOptions),
     stream: (method, payload, callOptions) =>
-      isForwardedPayload(callOptions, payload)
-        ? registration.invokeStream(method, payload, callOptions)
-        : registration.currentPeer().stream(method, payload, callOptions),
+      isForwardedPayload(callOptions, payload) || options.callDeadlineCapMs !== undefined
+        ? registration.invokeStream(method, payload, callTimeout(callOptions))
+        : registration.currentPeer().stream(method, payload, callTimeout(callOptions)),
     group: (steps, callOptions) => registration.invokeGroup(steps, callOptions),
     outcome: (key) => registration.currentPeer().outcome(key),
     describe: runtimeQuery(() => registration.inspectRuntime()),

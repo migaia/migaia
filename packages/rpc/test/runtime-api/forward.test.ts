@@ -953,7 +953,10 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
       )
       const downstream = owners[1].thread as unknown as IRuntimeOutlet
       const upstream = owners[0].thread as unknown as IRuntimeOutlet
-      holding = downstream.request('c', 'service.hold', undefined, { orderKey: 'same' })
+      holding = downstream.request('c', 'service.hold', undefined, {
+        orderKey: 'same',
+        timeoutMs: false
+      })
       void holding.catch(() => undefined)
       await vi.waitFor(() => assert.equal(started, true))
       const cancel = new AbortController()
@@ -961,6 +964,8 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
         orderKey: 'same',
         cancel: 'before-start' as const,
         idempotencyKey: 'forward-key',
+        /** This fixture tests cancellation on an offer that deliberately omits deadline. */
+        timeoutMs: false as const,
         signal: cancel.signal
       }
       operation = (

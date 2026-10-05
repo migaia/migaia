@@ -21,7 +21,12 @@ import type { ProviderAdmissionRegistry } from '../../src/core/internal/provider
 
 it('[A59][A60] the real authenticated process listener injects one logical provider scope across accepted sockets', async () => {
   /** Source offers are independent of defaults until all U25 ports are implemented. */
-  const capabilities = [...RUNTIME_API_CAPABILITIES, RpcCapability.generation, RpcCapability.order]
+  const capabilities = [
+    ...RUNTIME_API_CAPABILITIES,
+    RpcCapability.generation,
+    RpcCapability.order,
+    RpcCapability.deadline
+  ]
   /** The OS supplies one fresh loopback address, with no external service or filesystem socket. */
   let address = ''
   /** Accepted principal scopes come from the native authentication owner. */

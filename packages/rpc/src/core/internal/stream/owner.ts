@@ -238,7 +238,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     targetId: string,
     method: string,
     params: unknown,
-    options?: Readonly<{ signal?: IAbortSignal; timeoutMs?: number }>
+    options?: Readonly<{ signal?: IAbortSignal; timeoutMs?: number | false }>
   ): AsyncIterableIterator<IRpcPortableValue> {
     return this.#open(targetId, method, params, options)
   }

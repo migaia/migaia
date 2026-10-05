@@ -33,6 +33,16 @@ prepared = createThreadPeer({
         }
       : {}),
   provide: {
+    /** D40 observes the real Worker timer, never a parent-side synthetic deadline. */
+    delay: async (duration) => {
+      await new Promise((resolve) => setTimeout(resolve, duration))
+      return 7
+    },
+    /** The original stream consumer must enforce its launcher cap from lazy first-next. */
+    delayedValues: async function* (duration) {
+      await new Promise((resolve) => setTimeout(resolve, duration))
+      yield 7
+    },
     probe: async (value) => {
       const peer = await prepared
       return { value, self: peer.self, parent: await peer.request('parent.echo') }

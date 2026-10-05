@@ -56,6 +56,8 @@ import {
 import { retainProviderFailureRoute } from '../../core/internal/provider.js'
 import { RpcCoreErrorText } from '../../core/error-text.js'
 import { readRuntimePreparationContext } from './launch-context.js'
+import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
+import type { IRuntimeCallOptions } from './typing.js'
 import type {
   IProviderAdmissionScope,
   ProviderAdmissionRegistry
@@ -73,12 +75,7 @@ import type {
 } from '../../core/typing.js'
 import { RemoteMethodName } from '../constants.js'
 import type { IRemoteContract } from '../contract.js'
-import type {
-  IRemoteCallOptions,
-  IRemoteChannel,
-  IRemoteProxyOptions,
-  IRemoteServeEndpoint
-} from '../types.js'
+import type { IRemoteChannel, IRemoteProxyOptions, IRemoteServeEndpoint } from '../types.js'
 import {
   compileRuntimeMethods,
   runtimeForwardRoute,
@@ -147,6 +144,8 @@ export type IRuntimePeerOptions = Pick<
     connect?: IRuntimePeerSource
     listen?: IRuntimePeerSource
     providerLimits?: IRpcProviderLimits
+    /** Only request/stream inherit this positive default in their original timeout scope. */
+    defaultTimeoutMs?: number
     /** Explicit advanced schema, modes and idempotency retain their original contract owner. */
     contract?: IRemoteContract
     report(error: unknown): void
@@ -165,13 +164,13 @@ export type IRuntimePeer = Readonly<{
   request(
     method: string,
     payload?: unknown,
-    options?: IRemoteCallOptions
+    options?: IRuntimeCallOptions
   ): Promise<IRpcPortableValue | undefined>
-  notify(method: string, payload?: unknown, options?: IRemoteCallOptions): Promise<void>
+  notify(method: string, payload?: unknown, options?: IRuntimeCallOptions): Promise<void>
   stream(
     method: string,
     payload?: unknown,
-    options?: IRemoteCallOptions
+    options?: IRuntimeCallOptions
   ): AsyncIterableIterator<IRpcPortableValue>
   group(
     steps: readonly IRpcRuntimeStep[],
@@ -300,6 +299,8 @@ export async function createRuntimePeer(
     endpoint?: IRemoteServeEndpoint
   }>
 ): Promise<IRuntimePeer> {
+  /** Invalid timeout configuration cannot consume bootstrap or acquire a physical channel. */
+  const callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
   /** Method descriptors are compiled once; no dispatch searches the application object. */
   const methods = compileRuntimeMethods(options.provide, options.contract)
   /** A platform automatic source and an explicit source can never compete for one Peer. */
@@ -739,7 +740,8 @@ export async function createRuntimePeer(
     /** This exact facade is minted only after both directory and endpoint preparation succeed. */
     const peer: IRuntimePeer = Object.freeze({
       self,
-      request: (method: string, payload?: unknown, callOptions?: IRemoteCallOptions) => {
+      request: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
+        callOptions = callTimeout(callOptions)
         route(method, RuntimeApiMode.request)
         if (callOptions?.orderKey !== undefined || callOptions?.cancel !== undefined) {
           if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
@@ -763,7 +765,7 @@ export async function createRuntimePeer(
           ? result.catch(restoreForwardError)
           : result
       },
-      notify: (method: string, payload?: unknown, callOptions?: IRemoteCallOptions) => {
+      notify: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
         route(method, RuntimeApiMode.notify)
         if (callOptions?.orderKey !== undefined || callOptions?.cancel !== undefined) {
           if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
@@ -786,7 +788,8 @@ export async function createRuntimePeer(
             .then(() => undefined, restoreForwardError)
         return ready.sendOneWay(channel.peerId, method, payloadValue(payload), callOptions)
       },
-      stream: (method: string, payload?: unknown, callOptions?: IRemoteCallOptions) => {
+      stream: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
+        callOptions = callTimeout(callOptions)
         if (!supportsStream) rejectRuntimeApiCapability()
         route(method, RuntimeApiMode.stream)
         if (callOptions?.orderKey !== undefined || callOptions?.cancel !== undefined) {

@@ -1,3 +1,4 @@
+import type { IRuntimeCallOptions } from './runtime-api/typing.js'
 import { SupervisorState, type ISupervisor } from '@migaia/supervision'
 import {
   runtimeConnectionDetail,
@@ -134,14 +135,14 @@ export type IRemoteRuntimeRegistration = Pick<
     invokeRequest(
       method: string,
       payload: unknown,
-      options?: IRemoteCallOptions,
+      options?: IRuntimeCallOptions,
       mode?: RuntimeApiMode
     ): Promise<IRpcPortableValue>
     /** Forward streams retain the original generation and iterator lifecycle without replay. */
     invokeStream(
       method: string,
       payload: unknown,
-      options?: IRemoteCallOptions
+      options?: IRuntimeCallOptions
     ): AsyncIterableIterator<IRpcPortableValue>
     /** Observe only a genuinely prepared canonical generation, after current pointer publication. */
     onReady(listener: (peer: IRuntimePeer, generation: number) => void): () => void
@@ -762,7 +763,10 @@ class RemoteRegistration<TUnit, TSpec> {
   }
 
   /** Rejects control data that is not part of a declared request or stream call. */
-  #callOptions(options: unknown, allowKey: boolean): asserts options is IRemoteCallOptions {
+  #callOptions(
+    options: unknown,
+    allowKey: boolean
+  ): asserts options is IRemoteCallOptions | IRuntimeCallOptions {
     if (options === null || typeof options !== 'object' || Array.isArray(options))
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
     for (const key of Object.keys(options))
@@ -775,8 +779,12 @@ class RemoteRegistration<TUnit, TSpec> {
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid, undefined, {
           path: `$.options.${key}`
         })
-    const call = options as IRemoteCallOptions
-    if (call.timeoutMs !== undefined && (!Number.isFinite(call.timeoutMs) || call.timeoutMs < 0))
+    const call = options as IRuntimeCallOptions
+    if (
+      call.timeoutMs !== undefined &&
+      !(this.#options.prepareRuntime && call.timeoutMs === false) &&
+      (typeof call.timeoutMs !== 'number' || !Number.isFinite(call.timeoutMs) || call.timeoutMs < 0)
+    )
       throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
   }
 
@@ -784,7 +792,7 @@ class RemoteRegistration<TUnit, TSpec> {
   invokeRequest(
     method: string,
     params: unknown,
-    options: IRemoteCallOptions = {},
+    options: IRemoteCallOptions | IRuntimeCallOptions = {},
     mode: RuntimeApiMode = RuntimeApiMode.request
   ): Promise<IRpcPortableValue> {
     /** Direct runtime admission keeps its existing synchronous failure boundary. */
@@ -894,7 +902,9 @@ class RemoteRegistration<TUnit, TSpec> {
                 ...(options.signal ? { signal: options.signal } : {}),
                 ...(input.remainingMs === undefined
                   ? timeoutMs === undefined
-                    ? {}
+                    ? runtime && options.timeoutMs === false
+                      ? { timeoutMs: false as const }
+                      : {}
                     : { timeoutMs }
                   : { timeoutMs: input.remainingMs }),
                 ...(key === undefined ? {} : { idempotencyKey: key })
@@ -996,7 +1006,7 @@ class RemoteRegistration<TUnit, TSpec> {
   invokeStream(
     method: string,
     params: unknown,
-    options: IRemoteCallOptions = {}
+    options: IRemoteCallOptions | IRuntimeCallOptions = {}
   ): AsyncIterableIterator<IRpcPortableValue> {
     if (this.#options.prepareRuntime) {
       /** The existing registration facade delegates all controls to exactly one original consumer. */
@@ -1011,7 +1021,12 @@ class RemoteRegistration<TUnit, TSpec> {
         /** Only package-minted forwarding can reuse the previous hop's admitted payload. */
         const forwarded = isForwardedPayload(options, params)
         /** Caller values otherwise enter the same canonical portable admission as before. */
-        const data = forwarded ? (params as IRpcPortableValue) : normalizePortable(params)
+        const data =
+          params === undefined
+            ? undefined
+            : forwarded
+              ? (params as IRpcPortableValue)
+              : normalizePortable(params)
         this.#runtimeMethod(method, RuntimeApiMode.stream)
         this.#callOptions(options, true)
         this.#options.callGuard?.beforeDispatch({
@@ -1078,7 +1093,7 @@ class RemoteRegistration<TUnit, TSpec> {
   async *#legacyStream(
     method: string,
     params: unknown,
-    options: IRemoteCallOptions
+    options: IRemoteCallOptions | IRuntimeCallOptions
   ): AsyncIterableIterator<IRpcPortableValue> {
     /** Advanced forwarding keeps its existing generation owner without another iterator registry. */
     const forwarded = isForwardedPayload(options, params)
@@ -1144,7 +1159,8 @@ class RemoteRegistration<TUnit, TSpec> {
   }
 
   /** Applies one registration cap at the logical-call entry. */
-  #timeout(requested?: number): number | undefined {
+  #timeout(requested?: number | false): number | undefined {
+    if (requested === false) return this.#options.callDeadlineCapMs
     if (requested !== undefined && (!Number.isFinite(requested) || requested < 0))
       throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
     const cap = this.#options.callDeadlineCapMs
