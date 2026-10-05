@@ -21,6 +21,7 @@ import {
 } from '../../contract/index.js'
 import type { IRpcAbortSignal, IRpcContext, IRpcProviderResult } from '../typing.js'
 import type { ProviderRegistry } from './provider.js'
+import { readProviderPreflight, retainProviderInvocation } from './provider.js'
 import { safeRead, safeString, tupleKey } from './safe-value.js'
 import { RpcMessageKind, RpcProviderRejectionReason } from '../semantic-constants.js'
 import { localErrorWireSummary } from '../../contract/contract-error.js'
@@ -119,6 +120,13 @@ export class ProviderExecutor<TTargetId extends string> {
     isExpired: () => boolean,
     taskToken: object = {}
   ): IRpcContext {
+    /** This context retains one relative budget; later reads cannot restart the original deadline. */
+    const deadlineAt =
+      request.route.route.timeoutMs === undefined
+        ? undefined
+        : this.options.now() + request.route.route.timeoutMs
+    /** Capture the canonical clock rather than using wire sentAt or a context receiver. */
+    const now = this.options.now
     /** Expired callbacks retain the same task brand as live provider results. */
     const expiredResult = (): IBrandedProviderResult => ({
       ok: false,
@@ -126,8 +134,13 @@ export class ProviderExecutor<TTargetId extends string> {
       code: RpcCoreErrorCode.contextExpired,
       [providerResultBrand]: taskToken
     })
-    return {
+    const context: IRpcContext = {
       data: request.route.payload,
+      senderId: request.route.route.senderId,
+      route: request.route.route.forwardRoute,
+      get timeoutMs() {
+        return deadlineAt === undefined ? undefined : Math.max(0, Math.floor(deadlineAt - now()))
+      },
       get signal() {
         return typeof signal === 'function' ? signal() : signal
       },
@@ -166,6 +179,15 @@ export class ProviderExecutor<TTargetId extends string> {
           if (peer !== request.route.route.senderId) this.options.dispatch(peer, method, data)
       }
     }
+    /** Only forward providers retain private operation metadata; ordinary contexts need no copy. */
+    if (
+      readProviderPreflight(
+        this.options.registry.getProvider(request.envelope.method) ??
+          this.options.registry.streamProviders.get(request.envelope.method)
+      )
+    )
+      retainProviderInvocation(context, request.route.route)
+    return context
   }
 
   /** Report observer failures locally; neither synchronous nor asynchronous failure changes replies. */
@@ -211,6 +233,20 @@ export class ProviderExecutor<TTargetId extends string> {
 
   /** Validates, executes, and settles one inbound request. */
   async execute(request: IProviderRequestInput, verifiedPeerKey = ''): Promise<void> {
+    /** Forward refusal runs synchronously before replay or provider admission can allocate a lease. */
+    try {
+      readProviderPreflight(this.options.registry.getProvider(request.envelope.method))?.(
+        request.route.route
+      )
+    } catch (error) {
+      this.options.emitFailure(
+        error,
+        error instanceof RpcError ? error.code : RpcCoreErrorCode.internal
+      )
+      if (!request.route.route.dispatchOnly)
+        await this.failureResponse(request, error, undefined, true)
+      return
+    }
     const controllerKey = tupleKey(
       verifiedPeerKey,
       request.route.route.senderId,

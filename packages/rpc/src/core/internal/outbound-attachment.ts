@@ -811,7 +811,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             this.kernel.assertActive()
           }
           return this.#pipeline.send(
-            createOutboundEnvelope(request),
+            createOutboundEnvelope(request, options),
             options,
             this.#outboundGate
               ? {
@@ -830,7 +830,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                   request.data.route.sentAt = this.kernel.time.timestamp()
                   if (typeof remaining === 'number')
                     (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(remaining)
-                  return createOutboundEnvelope(request)
+                  return createOutboundEnvelope(request, options)
                 }
               : undefined,
             () => {
@@ -1041,7 +1041,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           if (command.operation?.remaining() === 0) throw new RpcTimeoutError()
         }
         return this.#pipeline.send(
-          createOutboundEnvelope(request),
+          createOutboundEnvelope(request, command),
           command.transfer === undefined ? undefined : { transfer: command.transfer },
           (this.#outboundGate || command.dispatchOnly) && command.operation
             ? {
@@ -1057,7 +1057,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 request.data.route.sentAt = this.kernel.time.timestamp()
                 if (!command.dispatchOnly && typeof updated === 'number')
                   (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(updated)
-                return createOutboundEnvelope(request)
+                return createOutboundEnvelope(request, command)
               }
             : undefined
         )

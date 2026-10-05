@@ -1,6 +1,7 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizePortable } from '../contract/normalize.js'
+import { isForwardedPayload, retainForwardOptions } from '../core/internal/outbound-envelope.js'
 import type { IRpcPortableValue } from '../contract/types.js'
 import type { IRuntimePeer, IRuntimePeerSourceResult } from './runtime-api/peer.js'
 import { readRuntimePeerConnection } from './runtime-api/peer.js'
@@ -26,7 +27,7 @@ import { describeRemoteMethods } from './serve-methods.js'
 import { ERROR_SOURCE, RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
 import { RpcRemoteLayerErrorText } from './error-text.js'
-import { createRemoteRetryPort } from './retry.js'
+import { createRemoteRetryPort, dispatchRemoteRetry } from './retry.js'
 import type {
   IRemoteCallOptions,
   IRemoteChannel,
@@ -577,7 +578,13 @@ class RemoteRegistration<TUnit, TSpec> {
     /** Direct runtime admission keeps its existing synchronous failure boundary. */
     const runtime = this.#options.prepareRuntime !== undefined
     /** The portable runtime payload is normalized once before dispatch allocates any work. */
-    const runtimeData = runtime && params !== undefined ? normalizePortable(params) : undefined
+    const forwarded = isForwardedPayload(options, params)
+    const runtimeData =
+      runtime && params !== undefined
+        ? forwarded
+          ? (params as IRpcPortableValue)
+          : normalizePortable(params)
+        : undefined
     /** The original accepted route index supplies the declaration without a directory query. */
     const runtimeDeclaration = runtime ? this.#runtimeRequestMethod(method) : undefined
     try {
@@ -635,19 +642,37 @@ class RemoteRegistration<TUnit, TSpec> {
               { generation: input.expectedGeneration }
             )
           return live.served.endpoint
-            .send<IRpcPortableValue>(live.channel.peerId, method, data, {
-              ...(options.signal ? { signal: options.signal } : {}),
-              ...(input.remainingMs === undefined
-                ? timeoutMs === undefined
-                  ? {}
-                  : { timeoutMs }
-                : { timeoutMs: input.remainingMs }),
-              ...(key === undefined ? {} : { idempotencyKey: key })
-            })
+            .send<IRpcPortableValue>(
+              live.channel.peerId,
+              method,
+              data,
+              retainForwardOptions(options, {
+                ...(options.signal ? { signal: options.signal } : {}),
+                ...(input.remainingMs === undefined
+                  ? timeoutMs === undefined
+                    ? {}
+                    : { timeoutMs }
+                  : { timeoutMs: input.remainingMs }),
+                ...(key === undefined ? {} : { idempotencyKey: key })
+              })
+            )
             .catch(restoreTaggedProviderFailure)
         }
       }
-      return this.#retryPort.dispatch(dispatch)
+      /**
+       * Forwarded work belongs to this admitted execution; a retired generation is never
+       * re-entered.
+       */
+      return forwarded
+        ? dispatchRemoteRetry(
+            {
+              events: this.events,
+              scheduler: this.#options.binding.scheduler,
+              report: this.#options.report
+            },
+            retainForwardOptions(options, dispatch)
+          )
+        : this.#retryPort.dispatch(dispatch)
     } catch (error) {
       return Promise.reject(error)
     }

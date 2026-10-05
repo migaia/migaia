@@ -30,6 +30,8 @@ export type IRpcRouteHeader = Readonly<{
   timeoutMs?: number
   idempotencyKey?: string
   trace?: string
+  /** Signed route contains the origin followed by at most three actual forwarding Hosts. */
+  forwardRoute?: readonly string[]
 }>
 
 /** A normalized data slot with contract-owned routing and portable application data. */
@@ -61,7 +63,8 @@ const OPTIONAL_FIELDS: Readonly<Record<IRpcRouteType, readonly string[]>> = {
     RpcRouteField.dispatchOnly,
     RpcRouteField.timeoutMs,
     RpcRouteField.idempotencyKey,
-    RpcRouteField.trace
+    RpcRouteField.trace,
+    RpcRouteField.forwardRoute
   ],
   [RpcRouteType.response]: [RpcRouteField.receiverId, RpcRouteField.method, RpcRouteField.message],
   [RpcRouteType.discoveryQuery]: [RpcRouteField.manual],
@@ -164,7 +167,8 @@ export function normalizeRpcRoute(
     const current = record[field]
     if (!isRouteFieldValid(field, current))
       throw invalidRpcEnvelope('route', `/data/route/${field}`)
-    normalized[field] = current
+    normalized[field] =
+      field === RpcRouteField.forwardRoute ? Object.freeze([...(current as string[])]) : current
   }
   const requiredOptional =
     routeType === RpcRouteType.response
@@ -193,6 +197,13 @@ function isIdentifier(value: unknown): value is string {
 
 /** Validate each optional field according to its declared wire domain. */
 function isRouteFieldValid(field: string, value: unknown): boolean {
+  if (field === RpcRouteField.forwardRoute)
+    return (
+      Array.isArray(value) &&
+      value.length >= 2 &&
+      value.length <= 4 &&
+      value.every((node) => typeof node === 'string' && /^[0-9a-f]{32}$/u.test(node))
+    )
   if (
     field === RpcRouteField.receiverId ||
     field === RpcRouteField.method ||

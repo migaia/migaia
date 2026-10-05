@@ -120,7 +120,11 @@ export function runtimeSources(
       close: async () => undefined
     }
   }
-  return { sources: [source(0), source(1)] as const, close: () => transports[0].close() }
+  return {
+    sources: [source(0), source(1)] as const,
+    transports,
+    close: () => transports[0].close()
+  }
 }
 
 /** Construct two genuine callable owners over the independently agreed fixture sources. */

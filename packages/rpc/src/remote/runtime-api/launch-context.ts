@@ -5,6 +5,8 @@ import type { IAbortSignal } from '@migaia/lifecycle'
 export type IRuntimePreparationContext = Readonly<{
   /** Local configuration provenance distinguishes a library default from an explicit self claim. */
   selfDefaulted?: boolean
+  /** Adapter-independent node identity is minted by the original Host, never a physical generation. */
+  nodeId?: string
   initialSignal: IAbortSignal
   lifecycleSignal: IAbortSignal
   own(dispose: () => Promise<void>): void

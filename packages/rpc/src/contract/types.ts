@@ -28,6 +28,8 @@ export type IRpcSerializedError = Readonly<{
   cause?: IRpcSerializedError
   errors?: readonly IRpcSerializedError[]
   data?: IRpcPortableValue
+  /** Bounded node-only route diagnostics accompany transparent-forward failures. */
+  route?: readonly string[]
   truncated?: true
 }>
 

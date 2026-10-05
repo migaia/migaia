@@ -1,4 +1,5 @@
 import { createOutboundEnvelope } from './outbound-envelope.js'
+import { readProviderPreflight } from './provider.js'
 import { hasFastEndpoint } from './fast-path.js'
 import type { IRpcProviderController } from './plugin-shared-keys.js'
 import { RpcPlatform } from '../transport-constants.js'
@@ -393,6 +394,15 @@ export class RpcProviderAttachment {
     if (!record.admission) return
     const stream = this.#registry.streamProviders.get(request.method)
     if (stream) {
+      /** Forward refusals occur before stream replay/admission; the original stream owner replies. */
+      try {
+        readProviderPreflight(stream)?.(route.route)
+      } catch (error) {
+        await stream({ ...record, preflightError: error }, (signal) =>
+          this.#executor.createContext({ envelope: request, route }, signal, () => signal.aborted)
+        )
+        return
+      }
       /** Unauthenticated unsupported streams retain their original stream-only budget behavior. */
       const native = nativeReplayReceipt(this.#kernel.transport)
       if (!native && !this.#authenticated) {

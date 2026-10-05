@@ -19,6 +19,12 @@ export type IRpcProviderResult =
 export type IRpcContext = {
   readonly data: unknown
   readonly signal: IRpcAbortSignal
+  /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */
+  readonly senderId: string
+  /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */
+  readonly timeoutMs?: number
+  /** Ordered signed forwarding nodes; absent on ordinary originating calls and foreign terminals. */
+  readonly route?: readonly string[]
   /** Opaque trace supplied by the caller; downstream sends must pass it explicitly. */
   readonly trace?: string
   success(data?: unknown, options?: { readonly transfer?: readonly unknown[] }): IRpcProviderResult

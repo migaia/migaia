@@ -16,6 +16,23 @@ import { RemoteMethodName } from '../constants.js'
 import type { IRemoteHostRemovalOptions } from '../host.js'
 import { RuntimeApiMode } from './constants.js'
 
+/** Internal cold/current reads use the original slot's indexes without a second connection table. */
+const connectionReader = Symbol('runtime-outlet-connection-reader')
+
+/** Resolve only a canonical facade's current exact receipt; absent names do not select a fallback. */
+export function readRuntimeOutletConnection(
+  facade: object | undefined,
+  target: string
+): IRuntimePluginConnection | null | undefined {
+  return facade && connectionReader in facade
+    ? (
+        facade as {
+          [connectionReader]: (target: string) => IRuntimePluginConnection | null | undefined
+        }
+      )[connectionReader](target)
+    : undefined
+}
+
 /** Canonical slot receipts retain their exact prepared Peer; projection never exposes this object. */
 export type IRuntimePluginConnection = Readonly<{
   name: string
@@ -38,6 +55,8 @@ export type IRuntimeChild = Pick<IRuntimePeer, 'request' | 'notify' | 'stream'> 
   Readonly<{
     name: string
     instanceId: string
+    /** The accepted safe method directory marks immediate forwarding without expanding connections. */
+    methods: IRuntimePeerDescription['methods']
     host?: Readonly<{
       use(name: string, config?: IRpcPortableValue): Promise<IRpcPortableValue | undefined>
       unUse(
@@ -98,6 +117,8 @@ export function createRuntimeOutlet(
     return connection as IRuntimePluginConnection
   }
   return Object.freeze({
+    [connectionReader]: (target: string) =>
+      slot.find(target) as IRuntimePluginConnection | null | undefined,
     request: (target, method, payload, options) =>
       selected(target).peer.request(method, payload, options),
     notify: (target, method, payload, options) =>
@@ -126,6 +147,7 @@ export function createRuntimeOutlet(
       return Object.freeze({
         name: connection.name,
         instanceId: connection.instanceId,
+        methods: connection.description?.methods ?? Object.freeze([]),
         request: (method, payload, options) => current().request(method, payload, options),
         notify: (method, payload, options) => current().notify(method, payload, options),
         stream: (method, payload, options) => current().stream(method, payload, options),

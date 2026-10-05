@@ -1,5 +1,10 @@
 import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
-import { createContractError, localErrorWireSummary } from './contract-error.js'
+import {
+  createContractError,
+  localErrorWireSummary,
+  localErrorWireRoute,
+  registerLocalErrorWireRoute
+} from './contract-error.js'
 import { RpcContractErrorCode } from './error-code.js'
 import { normalizePortable } from './normalize.js'
 import type {
@@ -33,6 +38,7 @@ type IWireNode = {
   cause?: IRpcSerializedError
   errors?: readonly IRpcSerializedError[]
   data?: IRpcPortableValue
+  route?: readonly string[]
   truncated?: true
 }
 
@@ -78,6 +84,7 @@ function snapshotError(
       report(pointer, key, read.error)
     } else fields[key] = read.value
   }
+  if (!summaryOnly) fields.route = localErrorWireRoute(input)
   return { fields, failed, truncated: failed.size > 0 }
 }
 
@@ -217,6 +224,31 @@ export function serializeRpcError(
      */
     if (errorLike && !summaryOnly) {
       projectData(source.fields.data, pointer, node, depth)
+      if (source.fields.route !== undefined) {
+        try {
+          /** Error routes contain only the fixed node grammar, never arbitrary diagnostic payloads. */
+          const route = normalizePortable(source.fields.route)
+          if (
+            !Array.isArray(route) ||
+            route.length < 1 ||
+            route.length > 4 ||
+            route.some((id) => typeof id !== 'string' || !/^[0-9a-f]{32}$/u.test(id))
+          )
+            throw createInvalidWireError(
+              source.fields.route,
+              `${pointer}/route`,
+              RpcWireErrorViolation.type
+            )
+          if (budget.bytes + route.length * 32 > RpcWireErrorLimit.maxBytes) node.truncated = true
+          else {
+            node.route = route as readonly string[]
+            budget.bytes += route.length * 32
+          }
+        } catch (error) {
+          node.truncated = true
+          report(pointer, 'route', error)
+        }
+      }
       if (source.fields.cause !== undefined) {
         const cause = visit(source.fields.cause, `${pointer}/cause`, depth + 1)
         if (cause) node.cause = cause
@@ -580,6 +612,7 @@ export function normalizeRpcSerializedError(
       cause?: IRpcSerializedError
       errors?: readonly IRpcSerializedError[]
       data?: IRpcPortableValue
+      route?: readonly string[]
       truncated?: true
     } = {
       source: fields.source as string,
@@ -622,6 +655,18 @@ export function normalizeRpcSerializedError(
       if (fields.truncated !== true)
         invalid(`${pointer}/truncated`, RpcWireErrorViolation.truncatedValue)
       result.truncated = true
+    }
+    if (keys.includes('route')) {
+      const route = normalizePortable(fields.route)
+      if (
+        !Array.isArray(route) ||
+        route.length < 1 ||
+        route.length > 4 ||
+        route.some((id) => typeof id !== 'string' || !/^[0-9a-f]{32}$/u.test(id))
+      )
+        invalid(`${pointer}/route`, RpcWireErrorViolation.type)
+      for (const id of route) countText(id as string, `${pointer}/route`)
+      result.route = route as readonly string[]
     }
     if (keys.includes('cause')) result.cause = visit(fields.cause, `${pointer}/cause`, depth + 1)
     if (keys.includes('errors')) {
@@ -695,6 +740,10 @@ function restore(value: IRpcSerializedError): Error {
     })
   if (value.data !== undefined)
     Object.defineProperty(error, 'data', { value: value.data, enumerable: true })
+  if (value.route !== undefined) {
+    Object.defineProperty(error, 'route', { value: value.route, enumerable: true })
+    registerLocalErrorWireRoute(error, value.route)
+  }
   if (value.truncated === true) Object.defineProperty(error, 'truncated', { value: true })
   return error
 }
