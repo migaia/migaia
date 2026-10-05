@@ -14,7 +14,7 @@ import {
 import { RuntimeApiErrorText, RuntimeApiMode } from './constants.js'
 
 /** A callable receives the portable application payload and the original core provider context. */
-export type IRuntimePeerMethod = (payload: unknown, context: IRpcContext) => unknown
+export type IRuntimePeerMethod = (payload: any, context: IRpcContext) => unknown
 
 /** Explicit own data members are the only methods admitted to the automatic directory. */
 export type IRuntimePeerProvide = Readonly<{
@@ -30,17 +30,19 @@ export type IRuntimeMethodEntry = Readonly<{
   supportedModes?: readonly RuntimeApiMode[]
   /** Only the original normalized advanced declaration authorizes logical retry. */
   declaration?: IRemoteMethodContract
+  /** Only package-owned Host control routes retain authority outside an advanced business catalog. */
+  reserved?: boolean
 }>
 
 /** Cold compilation metadata belongs to the same root object, never a second provider registry. */
-const runtimeControlEntries = new WeakMap<IRuntimePeerProvide, readonly IRuntimeMethodEntry[]>()
+const runtimePluginEntries = new WeakMap<IRuntimePeerProvide, readonly IRuntimeMethodEntry[]>()
 
-/** Only the package Plugin builder appends its original reserved Host operations to compilation. */
-export function registerRuntimeControlMethods(
+/** The Plugin builder adds canonically compiled provide methods and its original Host controls. */
+export function registerRuntimePluginMethods(
   provide: IRuntimePeerProvide,
   methods: readonly IRuntimeMethodEntry[]
 ): void {
-  runtimeControlEntries.set(provide, Object.freeze([...methods]))
+  runtimePluginEntries.set(provide, Object.freeze([...methods]))
 }
 
 /** Reject malformed explicit configuration without disclosing the supplied member or value. */
@@ -115,7 +117,7 @@ export function compileRuntimeMethods(
   }
 
   visit(input, '', 0)
-  for (const entry of runtimeControlEntries.get(input) ?? []) {
+  for (const entry of runtimePluginEntries.get(input) ?? []) {
     if (methods.has(entry.name) || methods.size >= RemoteCatalogLimit.methodsPerCatalog) invalid()
     methods.set(entry.name, entry)
   }
@@ -145,7 +147,8 @@ export function compileRuntimeMethods(
       }
     }
     /** Explicit Host controls keep their independent actual permission and scalar modes. */
-    for (const entry of runtimeControlEntries.get(input) ?? []) declared.set(entry.name, entry)
+    for (const entry of runtimePluginEntries.get(input) ?? [])
+      if (entry.reserved) declared.set(entry.name, entry)
     return Object.freeze([...declared.values()])
   }
   return Object.freeze([...methods.values()])

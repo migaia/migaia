@@ -1,16 +1,19 @@
+import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { runtimeSources } from './fixture.js'
 
 it('[A11][A33] one genuine Host batch exposes the real Feature prepared before its connection', async () => {
   /** Both managed Hosts keep original batch visibility and commit semantics. */
   const hosts = [
-    defineHost({
+    runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     }),
-    defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+    runtimeTestHost({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
   ] as const
   /** Actual independent offers use the existing carrier rather than a fixture method dispatcher. */
   const carrier = runtimeSources()

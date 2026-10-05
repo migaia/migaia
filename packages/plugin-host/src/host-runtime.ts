@@ -887,7 +887,7 @@ export class PluginHost<
   use<const TPlugins extends readonly IPluginConstraint<any>[]>(
     ...plugins: TPlugins &
       IUniquePluginNames<TPlugins> &
-      IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins>
+      IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins, TInstalled>
   ): Promise<IPluginHandleTuple<TPlugins>> {
     this.#assertActive()
     this.#assertMutationAllowed()

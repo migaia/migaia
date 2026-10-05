@@ -1,3 +1,4 @@
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { fileURLToPath } from 'node:url'
@@ -22,7 +23,7 @@ it('[A2][A17] the genuine launcher supplies trusted child name and parent route 
   /** A real ordinary call proves worker startup, imports and provider dispatch before the RED. */
   let parent: IRuntimePeer | undefined
   try {
-    parent = await createThreadPeer({
+    parent = await createThreadPeer<IRuntimeDynamicSurface>({
       self: { name: 'parent', instanceId: 'automatic-parent' },
       provide: {
         parentEcho: () => {

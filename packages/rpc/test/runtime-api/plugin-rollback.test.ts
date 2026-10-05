@@ -1,6 +1,7 @@
+import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { runtimeSources } from './fixture.js'
 
@@ -16,7 +17,7 @@ it('[A33][A34] a real prepared shared-slot candidate rolls back without revoking
   /** Original Host disposal reports retain the native failures from the failed batch. */
   const diagnostics: unknown[] = []
   /** Every registration belongs to a true managed Host and the original atomic batch owner. */
-  const owner = defineHost({
+  const owner = runtimeTestHost({
     host: {
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       diagnostic: (_text, _code, error) => diagnostics.push(error)
@@ -24,10 +25,12 @@ it('[A33][A34] a real prepared shared-slot candidate rolls back without revoking
   })
   /** Separate physical endpoints cannot share pending, providers, stream or rollback resources. */
   const targets = [
-    defineHost({
+    runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     }),
-    defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+    runtimeTestHost({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
   ] as const
   /** Both sources prove actual capability agreement and deliver through the existing carrier owner. */
   const carriers = [runtimeSources(), runtimeSources()] as const

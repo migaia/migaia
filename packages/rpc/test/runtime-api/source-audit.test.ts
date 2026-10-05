@@ -1,3 +1,4 @@
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -38,7 +39,7 @@ it('[A2][A3] consumed process discovery cannot redirect a genuine grandchild std
   /** The one-off authentication token remains inside bootstrap and the actual native handshake. */
   const token = 'source-audit-native-token'
   try {
-    peer = await createProcessPeer({
+    peer = await createProcessPeer<IRuntimeDynamicSurface>({
       self: { name: 'audit-parent', instanceId: 'automatic-process-parent' },
       provide: { parentEcho: () => 'automatic-process-parent' },
       spawn: async (context) => {

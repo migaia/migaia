@@ -1,4 +1,10 @@
-import type { IPluginRuntimeSharedSlot } from '@migaia/plugin-host'
+import type {
+  IRuntimeTypedOutlet,
+  IRuntimeTarget,
+  IRuntimePluginTyping,
+  IRuntimeExpose
+} from './typing.js'
+import type { IPluginConstraint, IPluginRuntimeSharedSlot } from '@migaia/plugin-host'
 import type { IRpcPortableValue } from '../../contract/types.js'
 import { serializeRpcError } from '../../contract/error.js'
 import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
@@ -45,24 +51,24 @@ export type IRuntimeChild = Pick<IRuntimePeer, 'request' | 'notify' | 'stream'> 
 /** This stable facade routes by the existing shared-slot indexes, with no second Host registry. */
 export type IRuntimeOutlet = Readonly<{
   request(
-    target: string,
+    target: IRuntimeTarget<string>,
     method: string,
     payload?: unknown,
     options?: IRemoteCallOptions
   ): Promise<IRpcPortableValue | undefined>
   notify(
-    target: string,
+    target: IRuntimeTarget<string>,
     method: string,
     payload?: unknown,
     options?: IRemoteCallOptions
   ): Promise<void>
   stream(
-    target: string,
+    target: IRuntimeTarget<string>,
     method: string,
     payload?: unknown,
     options?: IRemoteCallOptions
   ): AsyncIterableIterator<IRpcPortableValue>
-  get(target: string): IRuntimeChild
+  get(target: IRuntimeTarget<string>): IRuntimeChild
   broadcast(
     method: string,
     payload?: unknown,
@@ -75,14 +81,19 @@ export function createRuntimeOutlet(
   slot: IPluginRuntimeSharedSlot<IRuntimeOutlet>
 ): IRuntimeOutlet {
   /** All availability and Host closing checks remain in the original shared-slot owner. */
-  const selected = (target: string): IRuntimePluginConnection => {
-    if (typeof target !== 'string' || !target)
+  const selected = (target: IRuntimeTarget<string>): IRuntimePluginConnection => {
+    /** Instance identity is checked through the same index, then correlated with its declared name. */
+    const name = typeof target === 'string' ? target : target?.name
+    const id = typeof target === 'string' ? target : target?.instanceId
+    if (typeof name !== 'string' || !name || typeof id !== 'string' || !id)
       throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
     /** The canonical index rejects multiple matches without selecting a winner. */
-    const connection = slot.find(target)
+    const connection = slot.find(id)
     if (connection === null)
       throw new RpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.targetAmbiguous)
     if (!connection)
+      throw new RpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
+    if (typeof target !== 'string' && (connection as IRuntimePluginConnection).name !== name)
       throw new RpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
     return connection as IRuntimePluginConnection
   }
@@ -172,8 +183,22 @@ export function createRuntimeOutlet(
 
 /** TypeScript declaration merging exposes only actually committed optional runtime outlets. */
 declare module '@migaia/plugin-host' {
-  interface IPluginHostRuntimeExtensions {
-    readonly process?: IRuntimeOutlet
-    readonly thread?: IRuntimeOutlet
+  interface IPluginHostRuntimeExtensions<
+    TInstalled extends readonly IPluginConstraint<any>[] = readonly [],
+    _TCandidate = unknown
+  > {
+    readonly __pluginConstraint?: _TCandidate extends IRuntimePluginTyping<
+      any,
+      any,
+      any,
+      infer E extends readonly string[],
+      any
+    >
+      ? Exclude<E[number], IRuntimeExpose<TInstalled>> extends never
+        ? unknown
+        : never
+      : unknown
+    readonly process?: IRuntimeTypedOutlet<TInstalled, 'process'>
+    readonly thread?: IRuntimeTypedOutlet<TInstalled, 'thread'>
   }
 }

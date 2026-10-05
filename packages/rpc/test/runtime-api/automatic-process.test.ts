@@ -1,3 +1,4 @@
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { fileURLToPath } from 'node:url'
@@ -26,7 +27,7 @@ it('[A2][A17] framed bootstrap supplies child identity and parent route before a
   /** The existing parent source executes before the missing automatic-source assertion. */
   let parent: IRuntimePeer | undefined
   try {
-    parent = await createProcessPeer({
+    parent = await createProcessPeer<IRuntimeDynamicSurface>({
       self: { name: 'parent', instanceId: 'automatic-process-parent' },
       provide: {
         parentEcho: () => {

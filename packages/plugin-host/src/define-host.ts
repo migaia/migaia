@@ -91,10 +91,12 @@ export type IHostHandle<
   readonly revision: number
   readonly config: IPluginHostConfigFor<TInstalled>
   useSync<const TPlugins extends readonly IPluginConstraint<any>[]>(
-    ...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins>
+    ...plugins: TPlugins &
+      IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins, TInstalled>
   ): IPluginHandleTuple<TPlugins>
   use<const TPlugins extends readonly IPluginConstraint<any>[]>(
-    ...plugins: TPlugins & IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins>
+    ...plugins: TPlugins &
+      IPluginConstraintTuple<TDomainCore & IPluginHostCore<TValue>, TPlugins, TInstalled>
   ): Promise<IPluginHandleTuple<TPlugins>>
   unUse(
     name: string,
@@ -123,7 +125,7 @@ export type IHostHandle<
   runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
   dispose(): Promise<IPluginHostDisposalResult>
 }> &
-  IPluginHostRuntimeExtensions
+  IPluginHostRuntimeExtensions<TInstalled>
 
 /**
  * A host as a value instead of a base class.
@@ -137,9 +139,11 @@ export type IHostHandle<
  * the same terms as a class instance: a composing package branches on what a value _is_, not on
  * which of the two entries produced it.
  */
-export function defineHost<TDomainCore extends object = Record<string, never>, TValue = never>(
-  options: IDefineHostOptions<TDomainCore>
-): IHostHandle<TDomainCore, TValue, readonly []> {
+export function defineHost<
+  TDomainCore extends object = Record<string, never>,
+  TValue = never,
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
+>(options: IDefineHostOptions<TDomainCore>): IHostHandle<TDomainCore, TValue, TInstalled> {
   /** Per-batch admission counters, keyed by the batch token the core runtime supplies. */
   const batchCounters = new WeakMap<object, number>()
   class Runtime extends PluginHost<TDomainCore, TValue> {
@@ -247,5 +251,5 @@ export function defineHost<TDomainCore extends object = Record<string, never>, T
   Object.freeze(handleSurface)
   registerManagedHost(handle, openComposition(runtime))
   if (options.receiver) registerManagedHost(options.receiver, openComposition(runtime))
-  return handle as unknown as IHostHandle<TDomainCore, TValue, readonly []>
+  return handle as unknown as IHostHandle<TDomainCore, TValue, TInstalled>
 }

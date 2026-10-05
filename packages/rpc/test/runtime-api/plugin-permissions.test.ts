@@ -1,6 +1,8 @@
+import type { IRuntimeTestRegistry } from './fixture.js'
+import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
-import { PluginHost, defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { runtimeSources } from './fixture.js'
 import { RpcCoreErrorCode } from '../../src/core/errors.js'
@@ -18,14 +20,14 @@ function permission(error: unknown, code: string): boolean {
 
 /** Actual Hosts retain their original admission, mutation queue and disposal scopes. */
 function host() {
-  return defineHost({
+  return runtimeTestHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
 }
 
 it('[A12][A13][A34] genuine connections revoke inbound modes and exact target receipts without affecting a sibling', async () => {
   /** This supported class entry also exercises static typing of its actual published slot. */
-  const owner = new PluginHost<Record<string, never>>({
+  const owner = new PluginHost<Record<string, never>, never, IRuntimeTestRegistry>({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** Each other side owns an independent endpoint and the same public installation entry. */

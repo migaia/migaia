@@ -60,3 +60,9 @@ export type {
   IRemotePluginHostPort,
   IRemoteProxyOptions
 } from './types.js'
+
+export type {
+  IRuntimeSurface,
+  IRuntimeDynamicSurface,
+  IRuntimeTypedPeer
+} from './runtime-api/typing.js'

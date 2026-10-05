@@ -1,11 +1,8 @@
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
+import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import {
-  defineFeature,
-  defineHost,
-  definePlugin,
-  getPluginRuntimeIntegration
-} from '@migaia/plugin-host'
+import { defineFeature, definePlugin, getPluginRuntimeIntegration } from '@migaia/plugin-host'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { createThreadPeer } from '../../src/threads/peer.js'
 import * as callable from '../../src/remote/runtime-api/peer.js'
@@ -30,7 +27,7 @@ function connection(name: string, source: IRuntimePeerSource) {
       /** This supported baseline keeps the old Feature segment and delegates to the true Peer. */
       const snapshot = getPluginRuntimeIntegration(core).readFeatureOutputs('service')
       /** Baseline exposure forwards the original Feature output without a fixture dispatcher. */
-      const peer = await createThreadPeer({
+      const peer = await createThreadPeer<IRuntimeDynamicSurface>({
         self: { name, instanceId: `${name}-instance` },
         connect: source,
         provide: { service: { data: snapshot.outputs.data as callable.IRuntimePeerProvide } },
@@ -45,10 +42,12 @@ function connection(name: string, source: IRuntimePeerSource) {
 it('[A11] two genuine Host installations flatten real Feature names into plugin.method in both directions', async () => {
   /** Each side is a real frozen managed Host with its original installation transaction. */
   const hosts = [
-    defineHost({
+    runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     }),
-    defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+    runtimeTestHost({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
   ] as const
   /** The source offers are independent, and the existing memory carrier moves real envelopes. */
   const channels = runtimeSources()
@@ -111,7 +110,7 @@ it('[A11] two genuine Host installations flatten real Feature names into plugin.
 
 /** Each acceptance owner is a true public frozen Host with the existing operation/drain budgets. */
 function managedHost() {
-  return defineHost({
+  return runtimeTestHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
 }

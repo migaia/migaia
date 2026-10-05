@@ -1,7 +1,8 @@
+import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createThreadPlugin } from '../../src/threads/index.js'
@@ -29,7 +30,7 @@ for (const unavailable of [
   'connection-suspended'
 ] as const) {
   it(`[A13][A17][C4-fix:M1] native rebind survives ${unavailable} and resumes real calls`, async () => {
-    const host = defineHost({
+    const host = runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
