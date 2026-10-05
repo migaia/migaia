@@ -8,6 +8,7 @@ import { createDiscoveryFeature } from '../../src/core/features/discovery.js'
 import { createBroadcastChannelTransport } from '../../src/browser/adapters/broadcast-channel.js'
 import { authentication } from '../../src/core/middleware/authentication.js'
 import { connect } from '../../src/core/middleware/connect.js'
+import { ping } from '../../src/core/middleware/ping.js'
 import { readAuthenticationEnvelope } from '../../src/core/middleware/authentication-envelope.js'
 import { RpcAuthenticationControl } from '../../src/core/internal/authentication-replay.js'
 import { RpcEnvelopeKind, RpcRouteType } from '../../src/contract/index.js'
@@ -18,7 +19,11 @@ import { installPlugin } from '../core/middleware/helpers.js'
 import type { IRpcAuthenticationCapability } from '../../src/core/typing.js'
 
 /** Fixture controls model a lost physical reply and observe the original codec boundary only. */
-type IParticipantOptions = { dropResponse?: boolean; decode?: (value: unknown) => unknown }
+type IParticipantOptions = {
+  dropResponse?: boolean
+  decode?: (value: unknown) => unknown
+  ping?: boolean
+}
 
 /** Fixture signatures cover exact physical values and never use a production credential. */
 function signature(value: unknown): string {
@@ -64,7 +69,7 @@ async function participant(
   const endpoint = await createEndpoint({
     id,
     transport,
-    middlewares: [connect({ transport }), signed()],
+    middlewares: [connect({ transport }), signed(), ...(options?.ping ? [ping()] : [])],
     ...(options?.decode ? { codec: { ...identityCodecV1, decode: options.decode } } : {}),
     ...(execute
       ? { provider: { echo: async (context) => context.success(await execute(context.data)) } }
@@ -98,6 +103,65 @@ function queries(frames: any[]) {
       RpcRouteType.discoveryQuery
   )
 }
+
+it('[A32/A36] a new explicit-receiver ping rediscovers after unknown without resending its old ping', async () => {
+  /** Receiver replacement keeps its exact address while discarding its old session window. */
+  const name = randomUUID()
+  /** Business execution is independent of ping recovery and must never be repeated. */
+  let calls = 0
+  /** Both genuine endpoints install the existing public ping capability. */
+  const client = await participant(name, 'client', undefined, { ping: true })
+  /** Replacement uses the same physical receiver address, never a different sibling receiver. */
+  let server = await participant(
+    name,
+    'server',
+    (value) => {
+      calls += 1
+      return value
+    },
+    { ping: true }
+  )
+  try {
+    assert.equal(await client.endpoint.send('server', 'echo', 'once'), 'once')
+    /** The receiver is read from the actual admitted business route, not guessed from its name. */
+    const receiverId = (readAuthenticationEnvelope(business(client.frames).value).payload as any)
+      .data.route.receiverId
+    assert.equal(await client.endpoint.ping('server', receiverId, { timeoutMs: 150 }), true)
+    await close(server)
+    server = await participant(
+      name,
+      'server',
+      (value) => {
+        calls += 1
+        return value
+      },
+      { ping: true }
+    )
+    assert.equal(await client.endpoint.ping('server', receiverId, { timeoutMs: 150 }), false)
+    await vi.waitFor(() => assert.equal(server.failures.at(-1)?.reason, 'SESSION_UNKNOWN'))
+    /** This failed operation remains settled; only a later caller starts discovery recovery. */
+    const before = queries(client.frames).length
+    assert.equal(
+      await client.endpoint.ping('server', receiverId, { timeoutMs: 250 }),
+      true,
+      '[A36] the next explicit ping must refresh the invalidated receiver challenge'
+    )
+    assert.equal(queries(client.frames).length, before + 1)
+    assert.equal(calls, 1)
+    assert.equal(
+      client.frames.filter(
+        (frame) =>
+          (readAuthenticationEnvelope(frame.value).payload as any)?.data?.route?.variation ===
+          'ping'
+      ).length,
+      3,
+      '[A32] no failed ping is automatically resent'
+    )
+  } finally {
+    await close(client)
+    await close(server)
+  }
+})
 
 it('[A31/A34] a new sender nonce works and an already accepted old frame stays rejected', async () => {
   const name = randomUUID()

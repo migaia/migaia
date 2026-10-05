@@ -161,10 +161,7 @@ export class RpcControlAttachment {
     )
       throw new RpcContractError(RpcCoreErrorText.drainInvalid)
     const taskId = allocateRpcId(this.#uuid, 'variation', this.#id, targetId, () => false)
-    const selectedReceiver =
-      options.receiverId === undefined
-        ? this.#ports.discoveryResolver.resolve(targetId)
-        : Promise.resolve({ receiverId: options.receiverId })
+    const selectedReceiver = this.#ports.discoveryResolver.resolve(targetId, options.receiverId)
     return selectedReceiver.then((selected) =>
       this.#ports.outboundOperations.send({
         kind: 'frame',
@@ -217,17 +214,15 @@ export class RpcControlAttachment {
             )
       if (options?.signal) options.signal.addEventListener('abort', onAbort, { once: true })
       this.#pending.set(taskId, { resolve: settle, timer })
-      const selectedReceiver =
-        receiverId === undefined
-          ? this.#ports.discoveryResolver.resolve(targetId)
-          : Promise.resolve({ receiverId })
+      const selectedReceiver = this.#ports.discoveryResolver.resolve(targetId, receiverId)
       void selectedReceiver
-        .then((selected) =>
-          this.#ports.outboundOperations.send({
+        .then((selected) => {
+          if (settled) return
+          return this.#ports.outboundOperations.send({
             kind: 'frame',
             message: this.#variationEnvelope(RpcControl.ping, taskId, targetId, selected.receiverId)
           })
-        )
+        })
         .catch((error) => {
           settle(false)
           try {

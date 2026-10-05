@@ -78,7 +78,8 @@ export const createDiscoveryFeature = (
           })
           scope.own(surface, () => surface.dispose())
           dependencies.outbound.connectResolver({
-            resolve: (id: string) => attachment!.resolveReceiver(id)
+            resolve: (id: string, receiverId?: string) =>
+              attachment!.resolveReceiver(id, receiverId)
           })
           installation = surface
           const publicSurface = Object.freeze({
@@ -104,7 +105,10 @@ export const createDiscoveryFeature = (
           )
           preparedInstallation = Object.freeze({
             public: publicSurface,
-            resolver: Object.freeze({ resolve: (id: string) => attachment!.resolveReceiver(id) }),
+            resolver: Object.freeze({
+              resolve: (id: string, receiverId?: string) =>
+                attachment!.resolveReceiver(id, receiverId)
+            }),
             cleanupTarget: surface
           })
           return preparedInstallation
@@ -117,7 +121,8 @@ export const createDiscoveryFeature = (
             )
           return Object.freeze({
             [RpcPortName.discoveryResolver]: Object.freeze({
-              resolve: (id: string) => attachment!.resolveReceiver(id)
+              resolve: (id: string, receiverId?: string) =>
+                attachment!.resolveReceiver(id, receiverId)
             })
           })
         }
