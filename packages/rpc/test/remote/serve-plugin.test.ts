@@ -203,7 +203,9 @@ describe('remote service plugin', () => {
     try {
       await registration.prepareGeneration(new AbortController().signal, () => undefined)
       expect(await client.send('server', 'p.f.request', ['ordinary'])).toBe('ordinary')
-      const iterator = client.stream.open('server', 'p.f.generator', ['stream'])
+      const iterator = client.stream.open('server', 'migaia.remote.runtime.stream.p.f.generator', [
+        'stream'
+      ])
       expect(await iterator.next()).toEqual({ done: false, value: 'stream' })
       expect(await iterator.next()).toEqual({ done: true, value: 'done' })
       expect(hookCalls).toBe(2)

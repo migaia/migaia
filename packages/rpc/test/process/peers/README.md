@@ -35,8 +35,11 @@ provider cancellation reason, ping, Host removal and a second socket session.
 Its JSON oracle is `ts/public-behavior.json`. Full stdout/stderr and received
 socket frames are saved under `RPC_PEERS_EVIDENCE` (default `/tmp/m2-e-evidence`).
 The executable peer implements no manual RPC envelopes, framing or codecs.
-JSON-RPC bridge mode returns explicit `UNSUPPORTED`; bridge consumption and
-threads integration await their production owners.
+The executable responder retains native-only support and returns explicit
+`UNSUPPORTED` for JSON-RPC bridge mode. Production Runtime Peer bridge consumption
+is covered separately by `runtime-interop.test.ts`. Callers release the channel
+receive queue only after their provider set is ready; every socket session owns
+that activation and cleanup independently.
 
 ## Independent language fixtures
 
@@ -53,14 +56,26 @@ directories. The TS reference selftest cache is also scoped to its worktree.
 All four fixtures return the closed directory
 `{schemaVersion:2,self:{name,instanceId},methods:[{name,supportedModes,modeSource}]}`
 from `migaia.remote.runtime.describe`; methods declare only installed modes.
-The v1 describe and RPC bridge paths are removed. Non-bare `--jsonrpc` is
-unsupported; the existing bare physical carrier is separate from RPC.
+The v1 describe path is removed. Python, Go and Rust restore their existing
+`--business --jsonrpc` profile on the v2/batch baseline; TS reference and the
+public TS responder retain their original native-only support. Content-Length
+and the physical writer are shared by bridge RPC and `--bare-jsonrpc`.
+Bridge directories declare only installed request/notify methods, and native
+batch admission maps to JSON-RPC 2.0 arrays. A failing member preserves valid
+siblings; notifications update the same business state without responses.
+`--role initiator --business --jsonrpc --stdio --auth-fd FD` runs the fixture's
+bridge initiator on that same codec. Credentials remain inherited bytes.
 
 A native batch is `{kind:'batch',envelopes:[...]}`. Members enter in array order;
 a malformed member or provider failure does not discard valid siblings.
 Ordinary single envelopes remain part of the new protocol for handshake,
 control and single calls. There is no capability/version downgrade path.
 Python, Rust and Go `--business` provide their installed business routes;
+`--non-idempotent-request` fixes the actual `p.f.request` declaration and its
+v2 directory before accepting a session (the retired `--contract` override is
+removed). Python `peer.pause`, `peer.busy`, `peer.crash` flush ACK before acting
+on the actual provider PID; the shared native reader retains reverse calls,
+its concurrency limit and pending-operation cleanup.
 stream methods use `migaia.remote.runtime.stream.<logical-name>` only after
 actual stream agreement. The TS reference implements discovery and addressed
 responses so a standard production Runtime Peer request can settle.
@@ -92,12 +107,15 @@ pnpm --filter @migaia/rpc exec vitest run test/process/peers/runtime-interop.tes
 
 Language selftests exercise their own unit/vector rules and the real-process
 control cases. They no longer consume frozen 1.0 or v1 remote-contract/Host
-schema vectors. Current framing/control/error vectors remain in use pending
-I28's final baseline vectors; missing required files fail explicitly. The
-12 ordered pairs prove v2 negotiation and batch echo between independent
-fixtures. The production TS test uses the canonical Runtime Peer request path
-without receiver overrides, covering all four fixtures and an actual Python
-reverse call into a TS provider. Its remote directory assertion reads the
+schema vectors. Current framing/control/error vectors remain in use under
+`schema/vectors/protocol-baseline.json`; missing required files fail explicitly. The
+12 ordered native pairs prove v2 negotiation and batch echo between independent
+fixtures. Six additional directed Python/Go/Rust pairs prove authenticated
+bridge v2 describe, JSON-RPC arrays and ordered failed-member isolation. The production TS test uses the canonical Runtime Peer request path
+without receiver overrides, covering all four native fixtures and an actual Python
+reverse call into a TS provider. Three additional cases use that production
+Runtime Peer over bridge, including actual simultaneous calls observed as a
+physical JSON-RPC batch. Its remote directory assertion reads the
 accepted connection receipt; `Peer.describe()` describes the local peer.
 
 ## A10 bare baseline

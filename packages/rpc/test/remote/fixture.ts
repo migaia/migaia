@@ -4,6 +4,7 @@ import { createManualScheduler } from '@migaia/utils/scheduler'
 import type { IRpcPortableValue } from '../../src/contract/types.js'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import type { IRpcTransport } from '../../src/core/transport.js'
+import { describeRemoteMethods } from '../../src/remote/serve-methods.js'
 import { createRemoteRegistration } from '../../src/remote/proxy.js'
 import type { IRemoteContract } from '../../src/remote/contract.js'
 import type { IRemoteProxyOptions, IRemoteServeEndpoint } from '../../src/remote/types.js'
@@ -22,6 +23,19 @@ export const REMOTE_FIXTURE_CONTRACT: IRemoteContract = {
       }
     }
   }
+}
+
+/** Mock directories use the same installed route declarations as genuine legacy service assembly. */
+export function remoteDescription(
+  contracts: readonly IRemoteContract[] = [REMOTE_FIXTURE_CONTRACT],
+  peerId = 'peer',
+  host = false
+) {
+  return describeRemoteMethods(
+    contracts,
+    { name: host ? peerId : contracts[0]!.plugin, instanceId: peerId },
+    host
+  )
 }
 
 /** A test harness records the neutral boundary without constructing platform channels. */
@@ -81,7 +95,11 @@ export function remoteHarness(
     transport: {} as IRpcTransport,
     peerId: 'peer',
     scheduler: mismatchScheduler ? createManualScheduler() : scheduler,
-    agreement: { source: 'static' as const, codec: 'identity', capabilities: ['stream@1'] },
+    agreement: {
+      source: 'static' as const,
+      codec: 'identity',
+      capabilities: ['runtime-api@1', 'batch@1', 'stream@1']
+    },
     pipeline: { codec: {} as never, framer: {} as never },
     features: [],
     async close() {
@@ -91,7 +109,7 @@ export function remoteHarness(
   const endpoint = {
     async send(_peer: string, method: string, params: unknown, options: unknown) {
       sends.push({ method, params, options })
-      return method === 'migaia.remote.describe' ? REMOTE_FIXTURE_CONTRACT : 'result'
+      return method === 'migaia.remote.runtime.describe' ? remoteDescription() : 'result'
     },
     async dispose() {
       calls.push('endpoint.dispose')

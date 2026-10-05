@@ -157,22 +157,13 @@ async function runProducerVector(vector: ISequenceVector): Promise<void> {
   }
 }
 
-/** The new vector owns the one frozen invalid case reclassified in 1.1. */
+/** Current vectors retain exact malformed stream-route classification on the new baseline. */
 describe('streaming A13 1.1 vectors', () => {
-  it('reclassifies the registered stream kind without editing frozen 1.0 bytes', () => {
+  it('rejects a stream envelope with a request route using the current vector', () => {
     const vectors = JSON.parse(
       readFileSync(new URL('../../../../schema/vectors/stream.json', import.meta.url), 'utf8')
     )
-    const frozen = JSON.parse(
-      readFileSync(
-        new URL('../../../../schema/vectors/frozen/1.0/envelope.json', import.meta.url),
-        'utf8'
-      )
-    )
-    const example = frozen.invalid.find(
-      (entry: { id: string }) => entry.id === vectors.envelope.reclassified.id
-    )
-    expect(example).toBeDefined()
+    const example = vectors.envelope.reclassified
     expect(() => normalizeRpcEnvelope(example.value)).toThrow(
       expect.objectContaining({
         violation: vectors.envelope.reclassified.violation,

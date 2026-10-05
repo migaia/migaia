@@ -163,7 +163,7 @@ describe('process Host facade admission and ownership', () => {
     await host.inspect()
     await host.unUse('p')
     expect(fixture.send.mock.calls.map((row) => row[1])).toEqual([
-      'migaia.remote.describe',
+      'migaia.remote.runtime.describe',
       'migaia.remote.host.use',
       'migaia.remote.host.inspect',
       'migaia.remote.host.unUse'

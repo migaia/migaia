@@ -402,7 +402,7 @@ describe('process Host reverse native registration', () => {
                   input[0],
                   input[1],
                   input[2],
-                  input[1] === RemoteMethodName.describe
+                  input[1] === RemoteMethodName.runtimeDescribe
                     ? { ...input[3], timeoutMs: REGISTRATION_CONNECTION_TIMEOUT_MS }
                     : input[3]
                 )

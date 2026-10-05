@@ -2,8 +2,25 @@ import { RpcError, RpcCoreErrorCode, RpcLifecycleError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { registerComposedDisposalPromises } from './composed-disposal-observer.js'
 
+/** Canonical projections retain construction identity without adding a public endpoint member. */
+const identities = new WeakMap<object, string>()
+
+/** Read construction identity without adding a public endpoint member or reflecting user data. */
+export function readEndpointIdentity(endpoint: object): string {
+  /** Existing admission and drain views inherit from the original canonical projection. */
+  let projection: object | null = endpoint
+  while (projection !== null) {
+    const identity = identities.get(projection)
+    if (identity !== undefined) return identity
+    projection = Object.getPrototypeOf(projection)
+  }
+  throw projectionError()
+}
+
 /** Inputs owned by the composition shell for one immutable public endpoint projection. */
 export type IEndpointProjectionOptions = {
+  /** Original prepared endpoint identity; omitted only by standalone projection fixtures. */
+  readonly identity?: string
   readonly host: object
   readonly publicKeys: readonly string[]
   readonly exposedKeys: readonly string[]
@@ -111,6 +128,7 @@ export function createEndpointProjection(
           : value
     )
   }
+  if (options.identity) identities.set(target, options.identity)
   return Object.freeze(target)
 }
 

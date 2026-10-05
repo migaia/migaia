@@ -26,8 +26,9 @@ describe('JSON-RPC envelope mapping', () => {
           cancel()
           respond()
         }
-        /** Raw receive still traverses async codec/framer; synchronous abort wins core admission. */
-        await expect(pending).rejects.toMatchObject({ code: 'CANCELLED' })
+        /** The required batch object path admits the first event synchronously to the core owner. */
+        if (order === 'response-first') await expect(pending).resolves.toBe('response-won')
+        else await expect(pending).rejects.toMatchObject({ code: 'CANCELLED' })
         await flush()
         expect(
           fixture.messages.filter((message) => message.method === 'migaia.cancel').length

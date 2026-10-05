@@ -11,6 +11,7 @@ import { serializeRpcError } from '../contract/error.js'
 import { normalizePortable } from '../contract/normalize.js'
 import type { IRpcPortableValue } from '../contract/types.js'
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
+import { readEndpointIdentity } from '../core/internal/endpoint-projection.js'
 import { RemoteMethodName } from './constants.js'
 import {
   normalizeRemoteControlShape,
@@ -20,7 +21,11 @@ import {
 import { RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
 import { RpcRemoteLayerErrorText } from './error-text.js'
-import { contractRequiresStream, registerRemoteMethods } from './serve-methods.js'
+import {
+  contractRequiresStream,
+  registerRemoteMethods,
+  describeRemoteMethods
+} from './serve-methods.js'
 import type { IRemoteServeEndpoint } from './types.js'
 
 /** One successful installation is shared by connections using the same Host definition. */
@@ -264,8 +269,17 @@ export async function serveRemoteHost(
           options.report
         )
       )
-    options.endpoint.endpoint.provide(RemoteMethodName.describe, (context) =>
-      context.success({ schemaVersion: 1, catalog })
+    options.endpoint.endpoint.provide(RemoteMethodName.runtimeDescribe, (context) =>
+      context.success(
+        describeRemoteMethods(
+          Object.values(catalog),
+          {
+            name: readEndpointIdentity(options.endpoint.endpoint),
+            instanceId: readEndpointIdentity(options.endpoint.endpoint)
+          },
+          true
+        )
+      )
     )
     options.endpoint.endpoint.provide(RemoteMethodName.hostUse, async (context) =>
       context.success(await control.use(context.data))

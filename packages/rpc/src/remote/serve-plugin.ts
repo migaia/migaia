@@ -8,11 +8,16 @@ import {
 } from '@migaia/plugin-host'
 import type { IHostHandle } from '@migaia/plugin-host'
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
+import { readEndpointIdentity } from '../core/internal/endpoint-projection.js'
 import type { IRpcContext } from '../core/typing.js'
 import { REMOTE_SERVE_PLUGIN_PREFIX, RemoteMethodName } from './constants.js'
 import { normalizeRemoteContract, type IRemoteContract } from './contract.js'
 import { RpcRemoteLayerErrorText } from './error-text.js'
-import { contractRequiresStream, registerRemoteMethods } from './serve-methods.js'
+import {
+  contractRequiresStream,
+  registerRemoteMethods,
+  describeRemoteMethods
+} from './serve-methods.js'
 import type { IRemoteServeEndpoint } from './types.js'
 
 /** Service registration names are never reused, including after failed installation. */
@@ -113,8 +118,13 @@ export async function serveRemotePlugin(
     const [handle] = await options.host.use(service as IDefinedPluginConstraint)
     serviceHandle = handle
     installed = true
-    options.endpoint.endpoint.provide(RemoteMethodName.describe, (context) =>
-      context.success(contract)
+    options.endpoint.endpoint.provide(RemoteMethodName.runtimeDescribe, (context) =>
+      context.success(
+        describeRemoteMethods([contract], {
+          name: contract.plugin,
+          instanceId: readEndpointIdentity(options.endpoint.endpoint)
+        })
+      )
     )
     streamReleases.push(
       ...registerRemoteMethods(

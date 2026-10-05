@@ -10,8 +10,8 @@
           "result": 1
         }
       ],
-      "action": "close",
-      "code": "JSONRPC_PROFILE_INVALID"
+      "action": "settle",
+      "code": null
     },
     {
       "id": "empty-batch",
@@ -180,7 +180,7 @@
         "id": "migaia.hello",
         "method": "migaia.hello",
         "params": {
-          "hello": "{\"kind\":\"handshake\",\"step\":\"hello\",\"protocol\":\"migaia.rpc\",\"versions\":[{\"major\":1,\"minor\":1}],\"codecs\":[\"json\"],\"capabilities\":[\"jsonrpc-bridge@1\",\"abort@1\",\"wire-error@1\"],\"peer\":{\"id\":\"vector-client\",\"runtime\":\"node\"},\"auth\":\"vector-only-token\"}"
+          "hello": "{\"kind\":\"handshake\",\"step\":\"hello\",\"protocol\":\"migaia.rpc\",\"versions\":[{\"major\":1,\"minor\":1}],\"codecs\":[\"json\"],\"capabilities\":[\"runtime-api@1\",\"batch@1\",\"jsonrpc-bridge@1\",\"abort@1\",\"wire-error@1\"],\"peer\":{\"id\":\"vector-client\",\"runtime\":\"node\"},\"auth\":\"vector-only-token\"}"
         }
       }
     },

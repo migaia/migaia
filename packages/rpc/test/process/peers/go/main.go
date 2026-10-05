@@ -679,7 +679,7 @@ func main() {
 	host := flag.Bool("host", false, "serve portable Host controls")
 	bootstrap := flag.String("bootstrap", "none", "native stdin bootstrap")
 	authFD := flag.Int("auth-fd", -1, "inherited auth descriptor")
-	flag.String("contract", "", "retired option; no contract file is read")
+	nonIdempotentRequest := flag.Bool("non-idempotent-request", false, "declare actual business request non-idempotent")
 	role := flag.String("role", "responder", "responder or initiator")
 	stdio := flag.Bool("stdio", false, "use framed stdin/stdout")
 	listenUnix := flag.String("listen-unix", "", "listen on a Unix socket")
@@ -687,6 +687,7 @@ func main() {
 	selftest := flag.Bool("selftest", false, "run vector selftest")
 	vectors := flag.String("vectors", "", "path to schema/vectors")
 	flag.Parse()
+	businessRequestIdempotent = !*nonIdempotentRequest
 	if *selftest {
 		os.Exit(runSelftest(*vectors))
 	}
@@ -700,7 +701,7 @@ func main() {
 	}
 	var err error
 	if *business {
-		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *bridge, *bare, *descendant)
+		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *bridge, *bare, *descendant, *role == "initiator")
 	} else if *listenUnix != "" {
 		err = serveUnix(*listenUnix, *role)
 	} else if *connectUnix != "" {

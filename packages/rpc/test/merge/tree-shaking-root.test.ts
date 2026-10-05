@@ -8,13 +8,14 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * X14 permits exact measured pins after compression. C4 shares the canonical extension owner and
- * caches the sole receipt without a hot iterator. C4-fix compresses its cold cache update before
- * pinning c4-fix-a9-compressed-r2 exactly; module count and byte caps have no headroom.
+ * X14 permits exact measured pins after compression. U41 keeps v2 identity private on the canonical
+ * projection and reuses the existing owned JSON byte proof for mandatory batch. The new cold
+ * identity registration is compressed before pinning u41-owner-a9-compressed-r5; module count and
+ * byte caps have no headroom.
  */
 const allowedIncrease = {
-  rawBytes: 141473 / legacyRoot.rawBytes,
-  gzipBytes: 36008 / legacyRoot.gzipBytes
+  rawBytes: 141862 / legacyRoot.rawBytes,
+  gzipBytes: 36110 / legacyRoot.gzipBytes
 } as const
 
 /** I22–I26 ownership includes the two canonical physical batch modules. */

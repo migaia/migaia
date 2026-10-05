@@ -450,7 +450,7 @@ func streamVectors(suite *vectorSuite, vector record) {
 	_, _, validErr := normalizeEnvelope(field(envelope["valid"]))
 	suite.check("stream/envelope/valid", validErr == nil)
 	reclassified := field(envelope["reclassified"])
-	_, _, classifiedErr := normalizeEnvelope(record{"kind": "stream", "id": "req-1", "data": record{"route": record{"profile": "migaia.rpc.route", "applicationVersion": "1", "senderId": "caller", "targetId": "provider", "sentAt": json.Number("0"), "type": "request"}}})
+	_, _, classifiedErr := normalizeEnvelope(field(reclassified["value"]))
 	suite.check("stream/envelope/"+stringField(reclassified, "id"), classifiedErr != nil && classifiedErr.violation == stringField(reclassified, "violation") && classifiedErr.pointer == stringField(reclassified, "pointer"))
 	handshake := field(vector["handshake"])
 	newVersion, oldVersion := field(handshake["newVersion"]), field(handshake["oldVersion"])
@@ -472,6 +472,7 @@ func runSelftest(directory string) int {
 	}
 	runtimeChecks(suite)
 	u36BaselineChecks(suite)
+	u41BridgeChecks(suite)
 	for _, generation := range []string{"."} {
 		prefix := generation
 		if generation == "." {
@@ -580,7 +581,7 @@ func u36BaselineChecks(suite *vectorSuite) {
 		for _, raw := range methods {
 			method := field(raw)
 			modes := stringSlice(method["supportedModes"])
-			directoryOK = directoryOK && len(method) == 3 && method["modeSource"] == "declared" && stringField(method, "name") != "" && len(modes) > 0
+			directoryOK = directoryOK && (len(method) == 3 || len(method) == 4 && method["name"] == "p.f.request" && method["idempotent"] == true) && method["modeSource"] == "declared" && stringField(method, "name") != "" && len(modes) > 0
 			if method["name"] == "echo" {
 				echoPresent = slices.Contains(modes, "request") && slices.Contains(modes, "notify")
 			}
@@ -818,4 +819,39 @@ func framingVectors(suite *vectorSuite, vectors []any) {
 		}
 		suite.check("framing/"+stringField(entry, "id"), good)
 	}
+}
+
+// u41BridgeChecks exercises the real reader, v2 response, notification state and failed-member siblings.
+func u41BridgeChecks(suite *vectorSuite) {
+	var input, output bytes.Buffer
+	hello := helloRecord(localOffer())
+	hello["auth"] = "unit-token"
+	hello["capabilities"] = []string{runtimeCapability, batchCapability, "jsonrpc-bridge@1", "abort@1", "wire-error@1"}
+	encoded, _ := json.Marshal(hello)
+	_ = bridgeSend(&input, record{"jsonrpc": "2.0", "id": "hello", "method": "migaia.hello", "params": record{"hello": string(encoded)}})
+	_ = bridgeSend(&input, []any{
+		record{"jsonrpc": "2.0", "id": "directory", "method": "migaia.describe", "params": record{"args": []any{}}},
+		record{"jsonrpc": "2.0", "method": "migaia.invoke", "params": record{"method": "p.f.oneWay", "args": []any{"receipt"}}},
+		record{"jsonrpc": "2.0", "id": "missing", "method": "migaia.invoke", "params": record{"method": "absent", "args": []any{}}},
+		record{"jsonrpc": "2.0", "id": "received", "method": "migaia.invoke", "params": record{"method": "peer.received", "args": []any{}}},
+	})
+	err := serveBridge(&input, &output, false, "unit-token")
+	helloReply, helloErr := bridgeReceive(&output)
+	var accepted record
+	decodeErr := json.Unmarshal([]byte(stringField(field(field(helloReply)["result"]), "reply")), &accepted)
+	suite.check("u41/bridge/baseline", err == nil && helloErr == nil && decodeErr == nil && accepted["step"] == "accept" && slices.Contains(stringSlice(accepted["capabilities"]), runtimeCapability) && slices.Contains(stringSlice(accepted["capabilities"]), batchCapability))
+	batch, batchErr := bridgeReceive(&output)
+	replies := entries(batch)
+	good := batchErr == nil && len(replies) == 3
+	if good {
+		description := field(field(replies[0])["result"])
+		good = field(replies[0])["id"] == "directory" && integerField(description, "schemaVersion") == 2 && field(description["self"])["instanceId"] == "go-peer"
+		for _, method := range entries(description["methods"]) {
+			good = good && !slices.Contains(stringSlice(field(method)["supportedModes"]), "stream")
+		}
+		missing := field(field(field(field(replies[1])["error"])["data"])["migaiaWireError"])
+		received := field(field(replies[2])["result"])
+		good = good && field(replies[1])["id"] == "missing" && missing["code"] == "PROVIDER_NOT_FOUND" && field(replies[2])["id"] == "received" && integerField(received, "count") == 1 && reflect.DeepEqual(received["values"], []any{"receipt"})
+	}
+	suite.check("u41/bridge/v2-batch-notification-isolation", good)
 }

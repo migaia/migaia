@@ -11,21 +11,20 @@ import threading
 from behavior_check import COMMANDS, collect_frames, frame
 
 PEERS = Path(__file__).resolve().parent
-DESCRIBE = "migaia.remote.runtime.describe"
+BASELINE = json.loads((PEERS.parents[2] / "schema/vectors/protocol-baseline.json").read_text())
+DESCRIBE = BASELINE["descriptionMethod"]
 
 
 class Session:
     """Own one child and a concurrent reader, with bounded response waits."""
 
-    def __init__(self, language, business=False):
+    def __init__(self, language, business=False, hello=None):
         self.process = subprocess.Popen(COMMANDS[language] + ["--stdio"] + (["--business"] if business else []),
                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=PEERS)
         self.frames = queue.Queue()
         self.reader = threading.Thread(target=collect_frames, args=(self.process.stdout, self), daemon=True)
         self.reader.start()
-        self.send({"kind": "handshake", "step": "hello", "protocol": "migaia.rpc", "versions": [{"major": 1, "minor": 1}],
-                   "codecs": ["json"], "capabilities": ["runtime-api@1", "batch@1", "ping@1", "close@1", "wire-error@1", "stream@1"],
-                   "peer": {"id": "u36-caller", "runtime": "python"}})
+        self.send(hello or BASELINE["handshake"][0]["hello"])
         self.accept = self.receive()
         self.remote = self.accept.get("peer", {}).get("id", "unknown")
 
@@ -72,6 +71,20 @@ def directory(value, remote):
     assert any(m["name"] == "echo" and "request" in m["supportedModes"] for m in value["methods"])
 
 
+def handshake_check(language, case):
+    """Use the published new-baseline offers against an actual process, including required-cap refusals."""
+    session = Session(language, hello=case["hello"])
+    try:
+        assert session.accept["step"] == ("accept" if case["accepted"] else "reject")
+        if case["accepted"]:
+            assert set(BASELINE["requiredCapabilities"]) <= set(session.accept["capabilities"])
+        else:
+            assert session.accept["error"]["code"] == case["code"]
+        return {"language": language, "id": case["id"], "ok": True}
+    finally:
+        session.close()
+
+
 def check(language, business=False):
     """Check baseline negotiation, v2, removed v1 and independent ordered batch siblings."""
     session = Session(language, business)
@@ -115,6 +128,7 @@ def main():
     rows = []
     for language in [args.language] if args.language else COMMANDS:
         try:
+            rows.extend(handshake_check(language, case) for case in BASELINE["handshake"])
             rows.append(check(language, args.business))
         except Exception as error:
             rows.append({"language": language, "business": args.business, "ok": False, "failure": type(error).__name__})

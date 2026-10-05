@@ -849,23 +849,11 @@ fn check_stream(root: &Value, counts: &mut Counts) {
         "envelope",
         reclassified,
         envelope_violation(valid, true).is_none()
-            && envelope_violation(
-                &crate::json::object(&[
-                    ("kind", crate::json::string("stream")),
-                    ("id", crate::json::string("req-1")),
-                    (
-                        "data",
-                        crate::json::object(&[(
-                            "route",
-                            crate::json::object(&[("type", crate::json::string("request"))]),
-                        )]),
-                    ),
-                ]),
-                true,
-            ) == Some((
-                text(reclassified, "violation"),
-                text(reclassified, "pointer"),
-            )),
+            && envelope_violation(field(reclassified, "value"), true)
+                == Some((
+                    text(reclassified, "violation"),
+                    text(reclassified, "pointer"),
+                )),
     );
     let handshake = field(root, "handshake");
     // The actual negotiation consumes both offers and selects the lower compatible minor.
@@ -1206,6 +1194,7 @@ pub fn run(root: &Path) -> io::Result<()> {
         failed: 0,
     };
     check_runtime_baseline(&mut counts);
+    check_bridge_baseline(&mut counts);
     for prefix in [""] {
         let file = format!("{prefix}handshake.json");
         if let Some(value) = load(root, &file, &mut counts) {
@@ -1346,4 +1335,107 @@ fn check_frames(vectors: &Value, counts: &mut Counts) {
         }
         counts.case("stream-framing", "bytes", case, good);
     }
+}
+
+/// Exercise the restored bridge's actual framing, directory and one-way state with failed siblings.
+fn check_bridge_baseline(counts: &mut Counts) {
+    use crate::json::{object, string, Value};
+    let mut input = vec![];
+    let mut output = vec![];
+    let mut hello = crate::hello(Some("unit-token"));
+    if let Value::Object(fields) = &mut hello {
+        if let Some((_, caps)) = fields.iter_mut().find(|(key, _)| key == "capabilities") {
+            if let Value::Array(caps) = caps {
+                caps.push(string("jsonrpc-bridge@1"));
+            }
+        }
+    }
+    let request = |id: &str, method: &str, params: Value| {
+        object(&[
+            ("jsonrpc", string("2.0")),
+            ("id", string(id)),
+            ("method", string(method)),
+            ("params", params),
+        ])
+    };
+    let _ = crate::business::bridge_write_body(
+        &mut input,
+        request(
+            "hello",
+            "migaia.hello",
+            object(&[("hello", string(&hello.text()))]),
+        )
+        .text()
+        .as_bytes(),
+    );
+    let batch = Value::Array(vec![
+        request(
+            "directory",
+            "migaia.describe",
+            object(&[("args", Value::Array(vec![]))]),
+        ),
+        object(&[
+            ("jsonrpc", string("2.0")),
+            ("method", string("migaia.invoke")),
+            (
+                "params",
+                object(&[
+                    ("method", string("p.f.oneWay")),
+                    ("args", Value::Array(vec![string("receipt")])),
+                ]),
+            ),
+        ]),
+        request(
+            "missing",
+            "migaia.invoke",
+            object(&[("method", string("absent")), ("args", Value::Array(vec![]))]),
+        ),
+        request(
+            "received",
+            "migaia.invoke",
+            object(&[
+                ("method", string("peer.received")),
+                ("args", Value::Array(vec![])),
+            ]),
+        ),
+    ]);
+    let _ = crate::business::bridge_write_body(&mut input, batch.text().as_bytes());
+    let result =
+        crate::business::serve_bridge(&mut &input[..], &mut output, false, Some("unit-token"));
+    let mut reader = &output[..];
+    let hello_reply = crate::business::bridge_read(&mut reader).unwrap_or(Value::Null);
+    let accepted = crate::json::parse(text(field(&hello_reply, "result"), "reply").as_bytes())
+        .unwrap_or(Value::Null);
+    counts.case(
+        "u41",
+        "bridge",
+        &object(&[("id", string("baseline"))]),
+        result.is_ok() && text(&accepted, "step") == "accept" && crate::baseline_agreed(&accepted),
+    );
+    let response = crate::business::bridge_read(&mut reader).unwrap_or(Value::Null);
+    let replies = items(&response);
+    let good = replies.len() == 3
+        && text(&replies[0], "id") == "directory"
+        && field(field(&replies[0], "result"), "schemaVersion").as_u64() == Some(2)
+        && text(field(field(&replies[0], "result"), "self"), "instanceId") == "rust-peer"
+        && items(field(field(&replies[0], "result"), "methods"))
+            .iter()
+            .all(|m| !items(field(m, "supportedModes")).contains(&string("stream")))
+        && text(&replies[1], "id") == "missing"
+        && text(
+            field(
+                field(field(&replies[1], "error"), "data"),
+                "migaiaWireError",
+            ),
+            "code",
+        ) == "PROVIDER_NOT_FOUND"
+        && text(&replies[2], "id") == "received"
+        && field(field(&replies[2], "result"), "count").as_u64() == Some(1)
+        && items(field(field(&replies[2], "result"), "values")) == [string("receipt")];
+    counts.case(
+        "u41",
+        "bridge",
+        &object(&[("id", string("v2-batch-notification-isolation"))]),
+        good,
+    );
 }

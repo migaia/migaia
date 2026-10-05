@@ -38,6 +38,8 @@ export const BRIDGE_PEER_OFFER = {
   versions: [{ major: 1, minor: 1 }],
   codecs: ['json'],
   capabilities: [
+    'runtime-api@1',
+    'batch@1',
     'jsonrpc-bridge@1',
     'abort@1',
     'wire-error@1',
@@ -80,21 +82,28 @@ export function bridgeFixture(
       const text = Buffer.from(chunk).toString('utf8')
       const boundary = text.indexOf('\r\n\r\n')
       if (boundary < 0) throw new Error('fixture received a non-Content-Length frame')
-      const message = JSON.parse(text.slice(boundary + 4)) as Record<string, unknown>
-      messages.push(message)
+      const physical = JSON.parse(text.slice(boundary + 4)) as
+        | Record<string, unknown>
+        | Record<string, unknown>[]
+      messages.push(physical as Record<string, unknown>)
+      const members = Array.isArray(physical) ? physical : [physical]
+      const replies: unknown[] = []
       if (input.drain) await input.drain
-      if (input.responder) {
-        const answer = input.responder(message)
-        if (answer !== undefined) deliver(answer)
-      } else if (message.method === 'migaia.hello' && input.autoHello !== false) {
-        const hello = (message.params as { hello: string }).hello
-        const result = acceptRpcHandshake(BRIDGE_PEER_OFFER, hello)
-        deliver({
-          jsonrpc: '2.0',
-          id: message.id,
-          result: { reply: result.reply, methods: BRIDGE_METHODS }
-        })
+      for (const message of members) {
+        if (input.responder) {
+          const answer = input.responder(message)
+          if (answer !== undefined) replies.push(answer)
+        } else if (message.method === 'migaia.hello' && input.autoHello !== false) {
+          const hello = (message.params as { hello: string }).hello
+          const result = acceptRpcHandshake(BRIDGE_PEER_OFFER, hello)
+          replies.push({
+            jsonrpc: '2.0',
+            id: message.id,
+            result: { reply: result.reply, methods: BRIDGE_METHODS }
+          })
+        }
       }
+      if (replies.length > 0) deliver(Array.isArray(physical) ? replies : replies[0])
     },
     onData(listener) {
       data = listener

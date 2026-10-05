@@ -66,12 +66,7 @@ describe('[A10] release peer and JSON bare baseline', () => {
       const args =
         language === 'python'
           ? ['-B', fileURLToPath(new URL('python/peer.py', peerRoot)), '--business']
-          : [
-              fileURLToPath(new URL(`${language}/run.sh`, peerRoot)),
-              '--business',
-              '--contract',
-              fileURLToPath(new URL('../../../schema/vectors/remote-contract.json', peerRoot))
-            ]
+          : [fileURLToPath(new URL(`${language}/run.sh`, peerRoot)), '--business']
       args.push('--stdio', '--jsonrpc', '--bare-jsonrpc', '--auth-fd', '3')
       /** Returned bytes must reflect JSON serialization, not unchanged input whitespace. */
       const actual = await echoed(command, args, true)

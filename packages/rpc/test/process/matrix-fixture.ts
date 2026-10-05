@@ -302,7 +302,8 @@ export async function matrixFixture(
           offer: createNativeProcessOffer({
             peer: { id: 'parent', runtime: 'node' },
             auth: token,
-            stream: true
+            stream: true,
+            capabilities: ['runtime-api@1']
           }),
           supervision: {
             scheduler,
@@ -327,7 +328,8 @@ export async function matrixFixture(
           offer: createNativeProcessOffer({
             peer: { id: 'parent', runtime: 'node' },
             auth: token,
-            stream: true
+            stream: true,
+            capabilities: ['runtime-api@1']
           }),
           supervision: {
             id: 'matrix-child',
@@ -361,7 +363,7 @@ export async function matrixFixture(
         endpoint: {
           ...endpoint,
           send: (peer, method, params, sendOptions) => {
-            if (method === 'migaia.remote.describe') describes += 1
+            if (method === 'migaia.remote.runtime.describe') describes += 1
             else if (method.startsWith('p.f.')) business += 1
             return endpoint.send(peer, method, params, sendOptions)
           }

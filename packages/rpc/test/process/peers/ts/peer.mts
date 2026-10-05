@@ -33,6 +33,7 @@ const { values } = parseArgs({
     'connect-unix': { type: 'string' },
     host: { type: 'boolean' },
     contract: { type: 'string' },
+    'non-idempotent-request': { type: 'boolean' },
     bootstrap: { type: 'string', default: 'none' },
     'auth-fd': { type: 'string' },
     wire: { type: 'string', default: 'native' }
@@ -45,7 +46,7 @@ const report = (error: unknown): void => {
   process.stderr.write(`${PeerText.failurePrefix}${String(code)}\n`)
 }
 /** The vector owns the portable service description, shared with non-JS oracle cases. */
-const contract = JSON.parse(
+const declaredContract = JSON.parse(
   readFileSync(
     values.contract ??
       (process.env.RPC_PEERS_VECTOR_ROOT
@@ -54,6 +55,20 @@ const contract = JSON.parse(
     'utf8'
   )
 ).contracts[0].value as IRemoteContract
+/** The real fixture declaration is conservative when exercising non-idempotent departure. */
+const contract: IRemoteContract = values['non-idempotent-request']
+  ? {
+      ...declaredContract,
+      features: {
+        f: {
+          methods: {
+            ...declaredContract.features.f!.methods,
+            request: { mode: 'request', idempotent: false }
+          }
+        }
+      }
+    }
+  : declaredContract
 /** Received one-way values are observed independently of outbound delivery promises. */
 const received: unknown[] = []
 /** Provider-observed cancellation reasons are independently queried after the caller settles. */
@@ -154,6 +169,8 @@ async function serve(channel: IRemoteChannel): Promise<void> {
         report
       })
     : await serveRemotePlugin({ host, contract, endpoint: runtime, report })
+  /** Publish all providers before releasing the canonical U36 native receive queue. */
+  ;(channel as IRemoteChannel & { activateReceive?: () => void }).activateReceive?.()
   /** Observation delegates the exact public close promise; it does not replace its ownership. */
   const cleanup = { calls: 0, settled: 0, providerAborts: 0 }
   cleanups.push(cleanup)
@@ -196,6 +213,8 @@ async function serve(channel: IRemoteChannel): Promise<void> {
 async function initiate(channel: IRemoteChannel): Promise<void> {
   /** The public endpoint generates request IDs and routes. */
   const runtime = await endpointFor(channel, 'ts-peer')
+  /** The initiator has installed its empty provider set before receiving replies. */
+  ;(channel as IRemoteChannel & { activateReceive?: () => void }).activateReceive?.()
   try {
     /** Stable fixture payload compares value semantics across independent languages. */
     const payload = { echo: 'typescript', number: 1 }
@@ -225,7 +244,7 @@ async function main(): Promise<void> {
   const offer = createNativeProcessOffer({
     peer: { id: 'ts-peer', runtime: 'node' },
     stream: true,
-    capabilities: ['abort@1', 'wire-error@1']
+    capabilities: ['runtime-api@1', 'abort@1', 'wire-error@1']
   })
   if (values['listen-unix']) {
     /** The inherited descriptor is fixture-owned; only the adapter performs authentication. */

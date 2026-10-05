@@ -11,7 +11,7 @@ import { RpcRemoteLayerErrorCode } from '../../src/remote/error-code.js'
 import { createRemoteHost } from '../../src/remote/host.js'
 import { serveRemoteHost, type IRemoteServeHostOptions } from '../../src/remote/serve-host.js'
 import { streamRoots } from '../streaming/fixture.js'
-import { remoteHarness } from './fixture.js'
+import { remoteHarness, remoteDescription } from './fixture.js'
 
 /** One catalog covers trusted resolver admission and Host control projection. */
 const catalog: IRemoteHostCatalog = {
@@ -311,8 +311,8 @@ describe('remote Host trusted control', () => {
           endpoint: {
             ...fixture.served.endpoint,
             async send(_peer: string, method: string) {
-              return method === RemoteMethodName.describe
-                ? { schemaVersion: 1, catalog }
+              return method === RemoteMethodName.runtimeDescribe
+                ? remoteDescription(Object.values(catalog), 'peer', true)
                 : { revision: 1, plugins: [] }
             }
           } as unknown as IRpcEndpoint
@@ -345,7 +345,7 @@ describe('remote Host trusted control', () => {
         endpoint: {
           ...fixture.served.endpoint,
           async send() {
-            return { schemaVersion: 1, catalog }
+            return remoteDescription(Object.values(catalog), 'peer', true)
           }
         } as unknown as IRpcEndpoint
       }),
@@ -494,7 +494,8 @@ describe('remote Host trusted control', () => {
       ...harness.served.endpoint,
       async send(_peer: string, method: string, params: unknown) {
         sends.push({ method, params })
-        if (method === RemoteMethodName.describe) return { schemaVersion: 1, catalog }
+        if (method === RemoteMethodName.runtimeDescribe)
+          return remoteDescription(Object.values(catalog), 'peer', true)
         if (method === RemoteMethodName.hostUse)
           return { name: 'p', state: 'enabled', revision: 1, features: ['f'] }
         if (method === RemoteMethodName.hostInspect) return { revision: 1, plugins: [] }
@@ -522,7 +523,7 @@ describe('remote Host trusted control', () => {
     await remote.inspect()
     await remote.unUse('p')
     expect(sends.map((call) => call.method)).toEqual([
-      RemoteMethodName.describe,
+      RemoteMethodName.runtimeDescribe,
       RemoteMethodName.hostUse,
       RemoteMethodName.hostInspect,
       RemoteMethodName.hostUnUse
@@ -616,7 +617,8 @@ describe('remote Host trusted control', () => {
     let constructions = 0
     const endpoint = {
       async send(_peer: string, method: string) {
-        if (method === RemoteMethodName.describe) return { schemaVersion: 1, catalog }
+        if (method === RemoteMethodName.runtimeDescribe)
+          return remoteDescription(Object.values(catalog), 'peer', true)
         return { revision: 2, plugins: [] }
       },
       async dispose() {}

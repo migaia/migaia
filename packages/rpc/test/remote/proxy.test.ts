@@ -47,7 +47,7 @@ describe('A2 remote generation proxy', () => {
     const first = await fixture.registration.prepareGeneration(signal, fixture.own)
     expect(first).toBe(1)
     expect(fixture.calls).toEqual(['channel.open', 'endpoint.create'])
-    expect(fixture.sends.map((entry) => entry.method)).toEqual(['migaia.remote.describe'])
+    expect(fixture.sends.map((entry) => entry.method)).toEqual(['migaia.remote.runtime.describe'])
     expect(fixture.sends[0]?.options).toMatchObject({ signal })
     const proxy = fixture.registration.featureProxies().f!.request!
     await expect(proxy(['first'])).resolves.toBe('result')
@@ -73,9 +73,9 @@ describe('A2 remote generation proxy', () => {
     await expect(ready).resolves.toBe(2)
     await expect(proxy(['second'])).resolves.toBe('result')
     expect(fixture.sends.map((entry) => entry.method)).toEqual([
-      'migaia.remote.describe',
+      'migaia.remote.runtime.describe',
       'p.f.request',
-      'migaia.remote.describe',
+      'migaia.remote.runtime.describe',
       'p.f.request'
     ])
     await fixture.registration.release()
@@ -104,7 +104,7 @@ describe('A2 remote generation proxy', () => {
     const fixture = remoteHarness()
     const send = fixture.served.endpoint.send
     fixture.served.endpoint.send = async (peer, method, data, options) => {
-      if (method === 'migaia.remote.describe') {
+      if (method === 'migaia.remote.runtime.describe') {
         enteredDescribe?.()
         await describeGate
       }
@@ -318,7 +318,12 @@ describe('A2 remote generation proxy', () => {
     const stream = registration.invokeStream('p.f.generator', [], { timeoutMs: 90 })
     await stream.next()
     expect(fixture.calls).toContain('stream.open')
-    expect(streamOpen).toHaveBeenCalledWith('peer', 'p.f.generator', [], { timeoutMs: 50 })
+    expect(streamOpen).toHaveBeenCalledWith(
+      'peer',
+      'migaia.remote.runtime.stream.p.f.generator',
+      [],
+      { timeoutMs: 50 }
+    )
     const beforeOneWay = fixture.sends.length
     await registration.invokeOneWay('p.f.oneWay', [])
     expect(fixture.calls).toContain('oneWay.send')

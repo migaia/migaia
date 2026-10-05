@@ -607,8 +607,8 @@ describe('handshake redaction', () => {
     }
   })
 
-  it('A7 preserves the frozen 1.0 handshake vector bytes', () => {
-    const directory = resolve(PACKAGE_ROOT, 'schema/vectors/frozen/1.0')
+  it('A7 verifies current baseline handshake bytes without credentials', () => {
+    const directory = resolve(PACKAGE_ROOT, 'schema/vectors')
     const vector = readFileSync(resolve(directory, 'handshake.json'))
     const sums = readFileSync(resolve(directory, 'SHA256SUMS'), 'utf8')
     expect(sums).toContain(createHash('sha256').update(vector).digest('hex') + '  handshake.json')

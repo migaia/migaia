@@ -18,7 +18,15 @@ describe('JSON-RPC bridge readiness', () => {
     expect(channel.agreement).toEqual({
       source: 'negotiated',
       codec: 'json',
-      capabilities: ['jsonrpc-bridge@1', 'abort@1', 'wire-error@1', 'deadline@1', 'trace@1']
+      capabilities: [
+        'jsonrpc-bridge@1',
+        'runtime-api@1',
+        'batch@1',
+        'abort@1',
+        'wire-error@1',
+        'deadline@1',
+        'trace@1'
+      ]
     })
     expect(channel.peerId).toBe('peer')
     expect(channel.scheduler).toBe(fixture.scheduler)

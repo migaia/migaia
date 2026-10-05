@@ -9,11 +9,12 @@ import { RpcCodecId } from '../../contract/wire-constants.js'
 import {
   normalizeRemoteContract,
   normalizeRemoteHostCatalog,
-  normalizeRemoteControlShape,
   type IRemoteContract,
   type IRemoteHostCatalog
 } from '../../remote/contract.js'
 import { contractRequiresStream } from '../../remote/serve-methods.js'
+import { normalizeRuntimeDescription } from '../../remote/runtime-api/description.js'
+import { RuntimeApiMode } from '../../remote/runtime-api/constants.js'
 import type { IProcessByteChannel, IProcessCommonOptions } from '../../process/types.js'
 import {
   JSONRPC_ALLOWED_CAPABILITIES,
@@ -41,21 +42,10 @@ export type IJsonRpcBridgeOptions = Readonly<{
 }>
 
 /** Use remote's canonical description shape before applying the bridge's stream exclusion. */
-export function validateJsonRpcDescription(
-  target: IJsonRpcBridgeOptions['target'],
-  value: unknown
-): void {
-  /** Host shape validation includes exactly schemaVersion/catalog before catalog normalization. */
-  const contracts =
-    target.kind === 'plugin'
-      ? [normalizeRemoteContract(value)]
-      : Object.values(
-          normalizeRemoteHostCatalog(
-            (normalizeRemoteControlShape('describeHost', value) as unknown as { catalog: unknown })
-              .catalog
-          )
-        )
-  if (contracts.some(contractRequiresStream))
+export function validateJsonRpcDescription(value: unknown): void {
+  /** The remote directory is always v2, independent of the temporary local facade declaration. */
+  const description = normalizeRuntimeDescription(value)
+  if (description.methods.some((method) => method.supportedModes.includes(RuntimeApiMode.stream)))
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.unsupportedMode)
 }
 
@@ -94,10 +84,13 @@ export function prepareJsonRpcHello(
       : !Object.hasOwn(target, 'catalog') || Object.hasOwn(target, 'contract'))
   )
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
-  validateJsonRpcDescription(
-    target,
-    target.kind === 'plugin' ? target.contract : { schemaVersion: 1, catalog: target.catalog }
-  )
+  /** Local legacy facade declarations remain configuration until their C7 API removal. */
+  const contracts =
+    target.kind === 'plugin'
+      ? [normalizeRemoteContract(target.contract)]
+      : Object.values(normalizeRemoteHostCatalog(target.catalog))
+  if (contracts.some(contractRequiresStream))
+    throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.unsupportedMode)
   if (
     options.offer.capabilities.some(
       (capability) => !JSONRPC_ALLOWED_CAPABILITIES.includes(capability)

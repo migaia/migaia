@@ -64,7 +64,7 @@
     "reclassified": {
       "id": "unknown-kind",
       "violation": "route",
-      "pointer": "/data/route/type"
+      "pointer": "/data/route/type", "value": {"kind":"stream","id":"req-1","data":{"route":{"profile":"migaia.rpc.route","type":"request","applicationVersion":"1","senderId":"caller","targetId":"provider","sentAt":0}}}
     }
   },
   "handshake": {

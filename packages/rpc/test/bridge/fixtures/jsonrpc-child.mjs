@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { acceptRpcHandshake } from '../../../dist/contract/handshake.js'
+import { describeRemoteMethods } from '../../../dist/remote/serve-methods.js'
 import { serializeRpcError } from '../../../dist/contract/error.js'
 
 /** The parent sends the secret through a dedicated fd, never argv, environment or RPC stdin. */
@@ -51,8 +52,14 @@ function serve(input, output) {
   let revision = 0
   /** Use/inspect project the frozen remote-control result shape. */
   const item = () => ({ name: 'p', state: 'enabled', revision, features: ['f'] })
+  /** A physical batch keeps all responses in its original ordered array. */
+  let batchReplies
   /** Encode each response as one canonical Content-Length write. */
   const send = (value) => {
+    if (batchReplies) {
+      batchReplies.push(value)
+      return
+    }
     const body = Buffer.from(JSON.stringify(value))
     output.write(Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]))
   }
@@ -64,68 +71,85 @@ function serve(input, output) {
       if (end < 0) return
       const length = Number(/Content-Length: (\d+)/i.exec(buffer.subarray(0, end).toString())[1])
       if (buffer.length < end + 4 + length) return
-      const message = JSON.parse(buffer.subarray(end + 4, end + 4 + length).toString())
+      const physical = JSON.parse(buffer.subarray(end + 4, end + 4 + length).toString())
       buffer = buffer.subarray(end + 4 + length)
-      events.push({ method: message.method, id: message.id, params: message.params })
-      if (message.method === 'migaia.hello') {
-        const hello = JSON.parse(message.params.hello)
-        let reply
-        if (hello.auth !== token) {
-          const denied = new Error('Fixture authentication denied')
-          Object.defineProperties(denied, {
-            source: { value: 'jsonrpc-fixture' },
-            code: { value: 'AUTH_DENIED' }
-          })
-          reply = JSON.stringify({
-            kind: 'handshake',
-            step: 'reject',
-            protocol: 'migaia.rpc',
-            error: serializeRpcError(denied, { report: () => undefined })
-          })
-        } else
-          reply = acceptRpcHandshake(
-            {
-              versions: [{ major: 1, minor: 1 }],
-              codecs: ['json'],
-              capabilities: ['abort@1', 'jsonrpc-bridge@1', 'wire-error@1', 'deadline@1'],
-              peer: { id: 'child', runtime: 'node' }
-            },
-            message.params.hello
-          ).reply
-        send({ jsonrpc: '2.0', id: message.id, result: { reply, methods } })
-      } else if (message.method === 'migaia.describe')
-        send({
-          jsonrpc: '2.0',
-          id: message.id,
-          result: hostMode ? { schemaVersion: 1, catalog: { p: contract } } : contract
-        })
-      else if (message.method === 'migaia.invoke' && message.id) {
-        const args = message.params.args
-        if (hostMode && message.params.method === 'migaia.remote.host.use') {
-          installed.add(args[0])
-          revision++
-          send({ jsonrpc: '2.0', id: message.id, result: item() })
-          continue
-        }
-        if (hostMode && message.params.method === 'migaia.remote.host.unUse') {
-          installed.delete(args[0])
-          revision++
-          send({ jsonrpc: '2.0', id: message.id, result: { ok: true } })
-          continue
-        }
-        if (hostMode && message.params.method === 'migaia.remote.host.inspect') {
+      batchReplies = Array.isArray(physical) ? [] : undefined
+      for (const message of Array.isArray(physical) ? physical : [physical]) {
+        events.push({ method: message.method, id: message.id, params: message.params })
+        if (message.method === 'migaia.hello') {
+          const hello = JSON.parse(message.params.hello)
+          let reply
+          if (hello.auth !== token) {
+            const denied = new Error('Fixture authentication denied')
+            Object.defineProperties(denied, {
+              source: { value: 'jsonrpc-fixture' },
+              code: { value: 'AUTH_DENIED' }
+            })
+            reply = JSON.stringify({
+              kind: 'handshake',
+              step: 'reject',
+              protocol: 'migaia.rpc',
+              error: serializeRpcError(denied, { report: () => undefined })
+            })
+          } else
+            reply = acceptRpcHandshake(
+              {
+                versions: [{ major: 1, minor: 1 }],
+                codecs: ['json'],
+                capabilities: [
+                  'runtime-api@1',
+                  'batch@1',
+                  'abort@1',
+                  'jsonrpc-bridge@1',
+                  'wire-error@1',
+                  'deadline@1'
+                ],
+                peer: { id: 'child', runtime: 'node' }
+              },
+              message.params.hello
+            ).reply
+          send({ jsonrpc: '2.0', id: message.id, result: { reply, methods } })
+        } else if (message.method === 'migaia.describe')
           send({
             jsonrpc: '2.0',
             id: message.id,
-            result: { revision, plugins: [...installed].map(item) }
+            result: describeRemoteMethods(
+              [contract],
+              { name: hostMode ? 'peer' : 'p', instanceId: 'peer' },
+              hostMode
+            )
           })
-          continue
+        else if (message.method === 'migaia.invoke' && message.id) {
+          const args = message.params.args
+          if (hostMode && message.params.method === 'migaia.remote.host.use') {
+            installed.add(args[0])
+            revision++
+            send({ jsonrpc: '2.0', id: message.id, result: item() })
+            continue
+          }
+          if (hostMode && message.params.method === 'migaia.remote.host.unUse') {
+            installed.delete(args[0])
+            revision++
+            send({ jsonrpc: '2.0', id: message.id, result: { ok: true } })
+            continue
+          }
+          if (hostMode && message.params.method === 'migaia.remote.host.inspect') {
+            send({
+              jsonrpc: '2.0',
+              id: message.id,
+              result: { revision, plugins: [...installed].map(item) }
+            })
+            continue
+          }
+          if (args[0] === '__wait') continue
+          if (args[0] === '__stderr1') process.stderr.write(token.slice(0, token.length / 2))
+          if (args[0] === '__stderr2') process.stderr.write(token.slice(token.length / 2))
+          send({ jsonrpc: '2.0', id: message.id, result: { args, first, events: [...events] } })
         }
-        if (args[0] === '__wait') continue
-        if (args[0] === '__stderr1') process.stderr.write(token.slice(0, token.length / 2))
-        if (args[0] === '__stderr2') process.stderr.write(token.slice(token.length / 2))
-        send({ jsonrpc: '2.0', id: message.id, result: { args, first, events: [...events] } })
       }
+      const replies = batchReplies
+      batchReplies = undefined
+      if (replies?.length) send(replies)
     }
   })
   input.on('end', () => output.end())

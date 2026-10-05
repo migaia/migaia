@@ -83,7 +83,8 @@ describe('default process resilience wiring', () => {
             peerId: 'parent',
             offer: createNativeProcessOffer({
               peer: { id: 'server', runtime: 'node' },
-              stream: true
+              stream: true,
+              capabilities: ['runtime-api@1']
             }),
             auth: { mode: 'required', verify: context.verify! },
             ipc: { ...context.session, log: () => undefined },
@@ -97,17 +98,22 @@ describe('default process resilience wiring', () => {
       offer: createNativeProcessOffer({
         peer: { id: 'parent', runtime: 'node' },
         auth: 'child-secret',
-        stream: true
+        stream: true,
+        capabilities: ['runtime-api@1']
       }),
       ipc: { connectionId: 'parent', sessionId: 'parent', log: () => undefined },
       report: (error) => reports.push(error)
     })
     const client = await nativeEndpoint(parentChannel, 'parent')
+    /** This caller has no deferred provider installation before receiving replies. */
+    ;(parentChannel as typeof parentChannel & { activateReceive?: () => void }).activateReceive?.()
     const service = await serving
     try {
       expect(await client.endpoint.send('server', 'p.f.request', ['value'])).toBe('value')
       await client.oneWay!.sendOneWay('server', 'p.f.notify', ['notify'])
-      const stream = client.stream!.open('server', 'p.f.generator', ['stream'])
+      const stream = client.stream!.open('server', 'migaia.remote.runtime.stream.p.f.generator', [
+        'stream'
+      ])
       expect(await stream.next()).toEqual({ done: false, value: 'stream' })
       await stream.next()
       expect(sessions).toHaveLength(3)

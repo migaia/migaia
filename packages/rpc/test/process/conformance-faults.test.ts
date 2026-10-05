@@ -30,6 +30,7 @@ import {
 } from '@migaia/rpc/contract/framing/stream'
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '../../src/bridge/jsonrpc/framing.js'
 import { endpointFor, bridgeEndpointFor } from './peers/ts/runtime.js'
+import { RemoteMethodName } from '../../src/remote/constants.js'
 import {
   peers,
   evidence,
@@ -938,7 +939,9 @@ describe('[A4] real started streams do not resume after crash', () => {
         expect(await next).toHaveProperty('error')
         expect(
           wireFrames(active.sent).filter(
-            (frame) => frame.kind === 'request' && frame.method === 'p.f.generator'
+            (frame) =>
+              frame.kind === 'request' &&
+              frame.method === `${RemoteMethodName.runtimeStreamPrefix}p.f.generator`
           )
         ).toHaveLength(1)
       } finally {
@@ -1037,12 +1040,8 @@ describe('[A4] real non-idempotent request crash', () => {
           }
         }
       }
-      const directory = await mkdtemp(join(tmpdir(), 'rpc-hf-contract-'))
-      const contractPath = join(directory, 'contract.json')
-      writeFileSync(contractPath, JSON.stringify({ contracts: [{ value: selectedContract }] }), {
-        mode: 0o600
-      })
-      const peer = { ...original, args: [...original.args, '--contract', contractPath] }
+      /** The installed provider publishes its false declaration in v2; no v1 contract file exists. */
+      const peer = { ...original, args: [...original.args, '--non-idempotent-request'] }
       const scheduler = createManualScheduler()
       let active: Awaited<ReturnType<typeof faultClient>> | undefined
       let call: Promise<unknown> | undefined
@@ -1090,7 +1089,6 @@ describe('[A4] real non-idempotent request crash', () => {
           await Promise.all(active.handles.map((handle) => handle.exited))
           receipt(active, `${peer.language}-non-idempotent-crash`)
         }
-        await rm(directory, { recursive: true, force: true })
       }
       expect(active!.budget.inUse).toBe(0)
       expect(scheduler.pendingCount).toBe(0)

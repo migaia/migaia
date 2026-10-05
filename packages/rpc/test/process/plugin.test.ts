@@ -166,7 +166,7 @@ describe('process plugin spawn binding', () => {
       expect(keyFactory).toHaveBeenCalledTimes(1)
       expect(retryPort.dispatch).toHaveBeenCalledTimes(1)
       expect(fixture.sends[1]?.options).toMatchObject({ idempotencyKey: 'process-logical-key' })
-      expect(fixture.sends[0]?.method).toBe('migaia.remote.describe')
+      expect(fixture.sends[0]?.method).toBe('migaia.remote.runtime.describe')
       expect(fixture.sends[1]?.method).toBe('p.f.request')
     } finally {
       await host.dispose()

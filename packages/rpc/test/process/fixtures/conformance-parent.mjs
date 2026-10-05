@@ -22,7 +22,7 @@ const offer = {
   ...createNativeProcessOffer({
     peer: { id: 'caller', runtime: 'node' },
     stream: true,
-    capabilities: ['abort@1', 'wire-error@1']
+    capabilities: ['runtime-api@1', 'abort@1', 'wire-error@1']
   }),
   auth: token
 }

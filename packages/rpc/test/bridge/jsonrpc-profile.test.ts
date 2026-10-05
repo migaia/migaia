@@ -35,6 +35,13 @@ describe('JSON-RPC profile boundary', () => {
           fixture.deliver({ jsonrpc: '2.0', id: 'pending', result: 'still works' })
         }
         expect(responses).toHaveLength(1)
+        if (vector.action === 'settle') {
+          /** The saved request binds every accepted singleton or batch member to its exact result. */
+          const member = Array.isArray(vector.value) ? vector.value[0]! : vector.value
+          expect(responses[0]).toMatchObject({ id: 'pending', data: { payload: member.result } })
+          expect(fixture.reports).toEqual([])
+          expect(terminals).toEqual([])
+        }
         await channel.close()
       }
       const unaffected: unknown[] = []

@@ -265,7 +265,7 @@ def main() -> int:
     parser.add_argument("--jsonrpc", action="store_true")
     parser.add_argument("--bare-jsonrpc", action="store_true")
     parser.add_argument("--host", action="store_true")
-    parser.add_argument("--contract")
+    parser.add_argument("--non-idempotent-request", action="store_true")
     parser.add_argument("--bootstrap", choices=("none", "stdin"), default="none")
     parser.add_argument("--auth-fd", type=int)
     parser.add_argument("--selftest", action="store_true")
