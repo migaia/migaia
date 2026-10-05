@@ -915,3 +915,12 @@ rejects default required isolation before Worker creation. See [USEGUIDE](./USEG
 
 
 内建载体协商 `batch@1` 后，core 在物理写空闲时立即发送单帧，在写进行中合并就绪的请求与响应；未协商的载体保持单帧。等待对端处理完成用现有请求方法（worker contract 为 `request`）；只等待发出用现有单向发送方法（worker contract 为 `notify`）。独立调用请用 `Promise.all`；有依赖的串行 `await` 无法自动合并。
+
+
+### 本地运行时总览
+
+对称 Peer 的 `await peer.describe()` 返回本端安全身份、提供的方法摘要以及直接连接的安全详情。`await host.process.list()` 与 `await host.thread.list()` 从原 shared slot 读取当前连接；不会展开转发目标的远端连接。查询使用现有连接、监督及生命周期 owner，不发送隐藏管理请求，也不触发重连、重启或清理。
+
+传入 `{ format: 'json' | 'yaml' | 'toml' }` 返回字符串；不传 format 返回对象。三格式均来自同一个字段白名单投影，token/auth、环境变量、bootstrap data、业务 payload、原错误 message/stack/cause 从不进入总览。`kind` 是本端来源 spawn/connect/listen，`direction` 是 spawned/spawned-by/connect/listen，二者独立。执行单元状态放在对应连接的 `unit.state`，本端身份不会被子执行单元身份替代；缺少原 owner 事实时显示 `{ status: 'unavailable', reason }`，不虚构健康或零值。
+
+近期生命周期记录每个原 registration 最多 100 条。`timestamp` 使用该 owner 的 scheduler 毫秒时钟，`clock: 'scheduler'`，不是墙钟时间。记录只含代数、安全身份、退出/失活分类与 source/code；不保留退休 endpoint 或 native handle。资源采样、全部已登记但未就绪的记录与控制/事件将在 U24 批次接入对应 owner。查询和格式输出不加入应用 provide/expose 或交换用 describe 线材。

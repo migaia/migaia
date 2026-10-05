@@ -313,7 +313,11 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
       const slot = integration.acquireSharedSlot<IRuntimeOutlet>(
         RuntimePluginKey[kind],
         RuntimePluginFamily[kind],
-        createRuntimeOutlet
+        (shared) =>
+          createRuntimeOutlet(
+            shared,
+            Object.freeze({ name: integration.identity.name, instanceId: integration.identity.id })
+          )
       )
       /**
        * Automatic bootstrap retains its trusted identity; explicit sources use the original id

@@ -1,3 +1,17 @@
+import {
+  runtimeConnectionDetail,
+  runtimeDetail,
+  runtimeErrorIdentity,
+  type IRuntimeDetail,
+  type IRuntimeConnectionDirectory,
+  type IRuntimeRecent
+} from './runtime-api/overview.js'
+import {
+  RuntimeQueryStatus,
+  RuntimeRecentKind,
+  RuntimeQueryClock,
+  RuntimeQueryLimit
+} from './runtime-api/constants.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizePortable } from '../contract/normalize.js'
@@ -88,6 +102,8 @@ export type IRemoteRuntimeRegistration = Pick<
 > &
   Readonly<{
     currentPeer(): IRuntimePeer
+    /** Read original native state and bounded safe lifecycle history without preparing a generation. */
+    inspectRuntime(): IRuntimeDetail
     /** Logical runtime calls reuse the original retry/key/deadline dispatch below. */
     invokeRequest(
       method: string,
@@ -183,6 +199,13 @@ class RemoteRegistration<TUnit, TSpec> {
   readonly #retryPort: IRemoteRetryPort
   /** Most recent described and active generation. */
   #current: IRemoteGeneration | undefined
+  /** Last admitted safe directory survives retirement without retaining channel or native resources. */
+  #runtimeDirectory: IRuntimeConnectionDirectory | undefined
+  /**
+   * The original leave owner records at most 100 safe lifecycle observations, never business
+   * errors.
+   */
+  readonly #runtimeRecent: IRuntimeRecent[] = []
   /** Departures retain their original reason for late listeners. */
   readonly #departed = new Map<number, unknown>()
   /** Active generation closures remain observable until their cleanup settles. */
@@ -312,6 +335,26 @@ class RemoteRegistration<TUnit, TSpec> {
     if (this.#departed.has(generation)) return
     this.#departed.set(generation, reason)
     const current = this.#current?.number === generation ? this.#current : undefined
+    if (this.#options.prepareRuntime) {
+      /**
+       * Capture safe identity before disposing the exact current endpoint; never label a candidate
+       * with an old identity.
+       */
+      const identity = current?.runtime
+        ? readRuntimePeerConnection(current.runtime).description?.self
+        : undefined
+      this.#runtimeRecent.push(
+        Object.freeze({
+          generation,
+          timestamp: this.#options.binding.scheduler.now(),
+          clock: RuntimeQueryClock.scheduler,
+          kind: RuntimeRecentKind.departed,
+          ...(identity ? { identity } : {}),
+          ...runtimeErrorIdentity(reason, this.#options.report)
+        })
+      )
+      if (this.#runtimeRecent.length > RuntimeQueryLimit.recent) this.#runtimeRecent.shift()
+    }
     if (current) this.#current = undefined
     for (const listener of this.#leaveListeners.get(generation) ?? []) {
       try {
@@ -512,6 +555,7 @@ class RemoteRegistration<TUnit, TSpec> {
       throw error
     }
     this.#current = generation
+    if (runtime) this.#runtimeDirectory = readRuntimePeerConnection(runtime).directory
     if (runtime)
       for (const listener of this.#runtimeReadyListeners) {
         try {
@@ -539,6 +583,26 @@ class RemoteRegistration<TUnit, TSpec> {
     const active = this.#active()
     if (!active.runtime) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     return active.runtime
+  }
+
+  /** Query the same canonical supervisor and accepted directory even between generations. */
+  inspectRuntime(): IRuntimeDetail {
+    if (!this.#runtimeDirectory) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+    return runtimeDetail(
+      this.#runtimeDirectory.localDescription,
+      [
+        runtimeConnectionDetail(
+          this.#runtimeDirectory,
+          this.#current ? RuntimeQueryStatus.ready : RuntimeQueryStatus.departed,
+          {
+            supervisor: this.#options.binding.supervisor.inspect(),
+            recent: this.#runtimeRecent,
+            report: this.#options.report
+          }
+        )
+      ],
+      this.#runtimeRecent
+    )
   }
 
   /** Subscribe to actual prepared replacements without launching or querying a second lifecycle. */

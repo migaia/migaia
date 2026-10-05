@@ -1,3 +1,12 @@
+import {
+  runtimeConnectionDetail,
+  runtimeDetail,
+  runtimeQuery,
+  type IRuntimeQuery,
+  type IRuntimeDetail,
+  type IRuntimeConnectionDirectory,
+  type IRuntimeConnectionOrigin
+} from './overview.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
 import { normalizePortable } from '../../contract/normalize.js'
@@ -59,6 +68,9 @@ import {
 } from './description.js'
 import {
   RuntimeApiErrorText,
+  RuntimeSourceKind,
+  RuntimeConnectionDirection,
+  RuntimeQueryStatus,
   RuntimeApiMode,
   RuntimeApiModeSource,
   RUNTIME_API_SCHEMA_VERSION,
@@ -121,13 +133,15 @@ export type IRuntimePeer = Readonly<{
     payload?: unknown,
     options?: IRemoteCallOptions
   ): AsyncIterableIterator<IRpcPortableValue>
-  describe(): Promise<IRuntimePeerDescription>
+  describe: IRuntimeQuery<IRuntimeDetail>
   close(): Promise<void>
 }>
 
 /** Cold connection data comes from the channel's accepted directory, never local describe data. */
 type IRuntimePeerConnection = Readonly<{
   peerId: string
+  /** Safe cold metadata is separate from the accepted private wire directory. */
+  directory: IRuntimeConnectionDirectory
   description: IRuntimePeerDescription | undefined
   endpoint: IRuntimePeerEndpoint
   channel: IRemoteChannel
@@ -223,6 +237,8 @@ export async function createRuntimePeer(
   automatic?: Readonly<{
     self: IRuntimePeerIdentity
     source: IRuntimePeerSource
+    /** The platform branch supplies trusted local direction without inferring ownership. */
+    origin?: IRuntimeConnectionOrigin
     /** An original managed generation owns channel cleanup while the Peer owns its endpoint. */
     ownsChannel?: boolean
     signal?: IRpcAbortSignal
@@ -540,7 +556,18 @@ export async function createRuntimePeer(
           callOptions
         )
       },
-      describe: () => Promise.resolve(localDescription!),
+      describe: runtimeQuery(() => {
+        /** The original adapter alone can prove physical closure; absent proof remains unavailable. */
+        const state =
+          channel.transport.closed === undefined
+            ? undefined
+            : channel.transport.closed
+              ? RuntimeQueryStatus.closed
+              : RuntimeQueryStatus.ready
+        return runtimeDetail(localDescription!, [
+          runtimeConnectionDetail(readRuntimePeerConnection(peer).directory, state)
+        ])
+      }),
       close: () =>
         (closing ??= (async () => {
           try {
@@ -560,6 +587,23 @@ export async function createRuntimePeer(
       peer,
       Object.freeze({
         peerId: channel.peerId,
+        directory: Object.freeze({
+          localDescription,
+          description: remote,
+          carrier: channel.transport.platform,
+          ...(automatic?.origin ?? {
+            kind: options.spawn
+              ? RuntimeSourceKind.spawn
+              : options.listen
+                ? RuntimeSourceKind.listen
+                : RuntimeSourceKind.connect,
+            direction: options.spawn
+              ? RuntimeConnectionDirection.spawned
+              : options.listen
+                ? RuntimeConnectionDirection.listen
+                : RuntimeConnectionDirection.connect
+          })
+        }),
         description: remote,
         endpoint: ready,
         channel,

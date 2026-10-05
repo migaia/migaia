@@ -1,7 +1,12 @@
 import type { IProcessHandle } from '@migaia/supervision/process'
 import { defaultRpcId } from '../core/internal/id.js'
 import { RpcError, RpcCoreErrorCode } from '../core/errors.js'
-import { RuntimeApiErrorText, RuntimePluginKey } from '../remote/runtime-api/constants.js'
+import {
+  RuntimeApiErrorText,
+  RuntimePluginKey,
+  RuntimeSourceKind,
+  RuntimeConnectionDirection
+} from '../remote/runtime-api/constants.js'
 import { createManagedRuntimePeer } from '../remote/runtime-api/managed-peer.js'
 import {
   prepareRuntimePeerSourceContext,
@@ -115,7 +120,11 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
       binding,
       (channel, endpoint) => binding.bindEndpoint(channel, endpoint),
       preparation,
-      () => binding.drainCurrent()
+      () => binding.drainCurrent(),
+      {
+        kind: spawn ? RuntimeSourceKind.spawn : RuntimeSourceKind.connect,
+        direction: spawn ? RuntimeConnectionDirection.spawned : RuntimeConnectionDirection.connect
+      }
     )
   /** The canonical binding's native health and drain are kept, rather than disabled for v2. */
   return spawn

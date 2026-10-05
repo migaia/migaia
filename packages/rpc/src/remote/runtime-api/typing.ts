@@ -194,6 +194,8 @@ export type IRuntimeTypedOutlet<P extends readonly unknown[], K> =
 
 /** Each registered literal name keeps its own method and payload associations. */
 type IRuntimeOutletCalls<P extends readonly unknown[], K> = Readonly<{
+  /** Local query retains the same format overloads regardless of erased remote surface. */
+  list: import('./outlet.js').IRuntimeOutlet['list']
   request<
     N extends IRuntimeNames<P, K>,
     M extends Extract<IRuntimeScalarKeys<IRuntimeRemote<P, K, N>>, string>

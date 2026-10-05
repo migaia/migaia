@@ -1,3 +1,7 @@
+import {
+  RuntimeSourceKind,
+  RuntimeConnectionDirection
+} from '../../remote/runtime-api/constants.js'
 import { parentPort, workerData } from 'node:worker_threads'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { bindNativeReplayTransport } from '../../core/internal/native-replay.js'
@@ -22,6 +26,7 @@ export function createThreadPeer(options: IRuntimeThreadPeerOptions) {
   const bootstrap = readThreadRuntimeBootstrap(workerData)
   return createRuntimePeer(options as IRuntimePeerOptions, {
     self: bootstrap.self,
+    origin: { kind: RuntimeSourceKind.connect, direction: RuntimeConnectionDirection.spawnedBy },
     async source(context) {
       /** Cold capture attaches before ACK can cause the parent to send its directory. */
       const handoff = createNodeThreadBootstrapHandoff(native)

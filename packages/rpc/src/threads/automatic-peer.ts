@@ -1,3 +1,4 @@
+import { RuntimeSourceKind, RuntimeConnectionDirection } from '../remote/runtime-api/constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
@@ -64,6 +65,7 @@ export async function createAutomaticWebThreadPeer(
     deadline.cancel()
     return await createRuntimePeer(options, {
       self: bootstrap.self,
+      origin: { kind: RuntimeSourceKind.connect, direction: RuntimeConnectionDirection.spawnedBy },
       async source(context) {
         native.postMessage(
           {

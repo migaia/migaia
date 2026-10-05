@@ -1,3 +1,4 @@
+import { runtimeQuery, type IRuntimeQuery, type IRuntimeOverview } from './overview.js'
 import type {
   IRuntimeTypedOutlet,
   IRuntimeTarget,
@@ -87,6 +88,8 @@ export type IRuntimeOutlet = Readonly<{
     payload?: unknown,
     options?: IRemoteCallOptions
   ): AsyncIterableIterator<IRpcPortableValue>
+  /** Read current canonical contributions without selecting a business target. */
+  list: IRuntimeQuery<IRuntimeOverview>
   get(target: IRuntimeTarget<string>): IRuntimeChild
   broadcast(
     method: string,
@@ -97,7 +100,8 @@ export type IRuntimeOutlet = Readonly<{
 
 /** Select a committed exact receipt before forwarding the original callable operation. */
 export function createRuntimeOutlet(
-  slot: IPluginRuntimeSharedSlot<IRuntimeOutlet>
+  slot: IPluginRuntimeSharedSlot<IRuntimeOutlet>,
+  self: IRuntimePeerIdentity
 ): IRuntimeOutlet {
   /** All availability and Host closing checks remain in the original shared-slot owner. */
   const selected = (target: IRuntimeTarget<string>): IRuntimePluginConnection => {
@@ -125,6 +129,22 @@ export function createRuntimeOutlet(
       selected(target).peer.notify(method, payload, options),
     stream: (target, method, payload, options) =>
       selected(target).peer.stream(method, payload, options),
+    list: runtimeQuery(async () => {
+      /** Capture exact original receipts; later accepted replacements cannot enter this read. */
+      const connections = slot.values() as readonly IRuntimePluginConnection[]
+      /** Each genuine Peer projects its own owner facts; exact identity excludes a newer generation. */
+      const details = await Promise.all(
+        connections.map(async (connection) => {
+          const snapshot = await connection.peer.describe()
+          return snapshot.connections.filter(
+            (detail) =>
+              'instanceId' in detail.identity &&
+              detail.identity.instanceId === connection.instanceId
+          )
+        })
+      )
+      return Object.freeze({ self, connections: Object.freeze(details.flat()) })
+    }),
     get: (target): IRuntimeChild => {
       /** This cold lookup captures exactly one generation; each later call checks the same receipt. */
       const connection = selected(target)

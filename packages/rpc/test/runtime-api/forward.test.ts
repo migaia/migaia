@@ -4,7 +4,10 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { createThreadPlugin, type IRuntimeThreadPluginOptions } from '../../src/threads/plugin.js'
 import { runtimeSources, runtimeTestHost } from './fixture.js'
 import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
-import { readRuntimePeerEndpoint } from '../../src/remote/runtime-api/peer.js'
+import {
+  readRuntimePeerEndpoint,
+  readRuntimePeerConnection
+} from '../../src/remote/runtime-api/peer.js'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -36,7 +39,8 @@ import type { IRpcEndpoint } from '../../src/core/typing.js'
 
 /** Read the original handshake's actual Host node, independently of an observed business route. */
 async function nodeOf(host: ReturnType<typeof owner>, connection: string): Promise<string> {
-  return (await readRuntimeOutletConnection(host.thread, connection)!.peer.describe()).nodeId!
+  return readRuntimePeerConnection(readRuntimeOutletConnection(host.thread, connection)!.peer)
+    .directory.localDescription.nodeId!
 }
 
 /** Genuine Hosts retain the canonical registration, availability and cleanup owners. */
