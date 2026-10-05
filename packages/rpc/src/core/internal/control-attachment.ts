@@ -7,6 +7,7 @@ import {
   RpcTransportError
 } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
+import { authenticationReplyReceiverId } from './authentication-replay.js'
 import {
   RpcControl,
   RpcRouteProfile,
@@ -297,7 +298,12 @@ export class RpcControlAttachment {
     void this.#ports.outboundOperations
       .send({
         kind: 'frame',
-        message: this.#variationEnvelope(RpcControl.pong, taskId, senderId, senderId)
+        message: this.#variationEnvelope(
+          RpcControl.pong,
+          taskId,
+          senderId,
+          authenticationReplyReceiverId(record.envelope!) ?? senderId
+        )
       })
       .catch((error) => this.#ports.outboundOperations.send({ kind: 'report', error }))
   }

@@ -1,5 +1,9 @@
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** U40 rejects a forgotten receiver challenge before decoding any business payload. */
+  authenticationSessionUnknown: 'Authentication challenge session is unknown',
+  /** U40 rejects malformed or misdirected signed challenge/control bindings. */
+  authenticationChallengeInvalid: 'Authentication challenge binding is invalid',
   /** A108 retains the departed execution's failure instead of targeting its replacement. */
   providerGenerationRetired: 'Provider generation retired',
   /** D51 refuses a repeated Host before provider admission; node ids remain structured route data. */

@@ -23,17 +23,21 @@ export class DiscoveryRegistry {
   readonly #retainBinding: ((token: string) => boolean) | undefined
   readonly #releaseBinding: ((token: string) => void) | undefined
   readonly #reportCleanupError: ((error: unknown) => void) | undefined
+  /** Dependent private facts expire with the same canonical receiver snapshot. */
+  readonly #releaseRemote: ((value: unknown) => void) | undefined
 
   constructor(
     lease?: {
       readonly retain: (token: string) => boolean
       readonly release: (token: string) => void
     },
-    reportCleanupError?: (error: unknown) => void
+    reportCleanupError?: (error: unknown) => void,
+    releaseRemote?: (value: unknown) => void
   ) {
     this.#retainBinding = lease?.retain
     this.#releaseBinding = lease?.release
     this.#reportCleanupError = reportCleanupError
+    this.#releaseRemote = releaseRemote
   }
 
   /** Returns counts for package-level lifecycle assertions without exposing registry state. */
@@ -121,8 +125,7 @@ export class DiscoveryRegistry {
     let removed = 0
     for (const [key, value] of this.#remoteTargets) {
       const typed = value as T
-      if (isStale(typed) && !isProtected(typed) && this.#remoteTargets.delete(key)) {
-        this.#releaseRemoteBinding(key)
+      if (isStale(typed) && !isProtected(typed) && this.deleteRemote(key)) {
         removed += 1
       }
     }
@@ -131,6 +134,8 @@ export class DiscoveryRegistry {
 
   /** Removes one remote receiver snapshot. */
   deleteRemote(key: string): boolean {
+    const value = this.#remoteTargets.get(key)
+    if (value !== undefined) this.#releaseRemote?.(value)
     this.#releaseRemoteBinding(key)
     return this.#remoteTargets.delete(key)
   }

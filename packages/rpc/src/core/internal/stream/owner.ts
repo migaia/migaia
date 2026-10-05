@@ -28,6 +28,7 @@ import { OperationScope } from '../operation-scope.js'
 import type { IRpcFrameAdmission, IRpcOutboundOperationsPort } from '../plugin-shared-keys.js'
 import { tupleKey } from '../safe-value.js'
 import { resolveAbortReason, type IAbortSignal } from '../async-control.js'
+import { authenticationReplyReceiverId } from '../authentication-replay.js'
 import type { IEndpointTimer } from '../time-port.js'
 import type { IRpcAbortSignal, IRpcContext } from '../../typing.js'
 import { RpcStreamLimit } from '../../../contract/stream-constants.js'
@@ -40,6 +41,8 @@ type IConsumerPull = {
 
 /** Caller state is keyed by the selected target and the initial request id. */
 type IConsumerState = {
+  /** Only an originally admitted open reply can select the exact source-less stream receiver. */
+  receiverId?: string
   readonly id: string
   readonly targetId: string
   readonly method: string
@@ -68,6 +71,8 @@ type IPendingCancel = {
 
 /** Producer state is keyed by admitted sender and id, never by method alone. */
 type IProducerState = {
+  /** The admitted request's signed reply identity survives terminal removal from the producer Map. */
+  readonly receiverId?: string
   /** The admitted immutable node route accompanies failures from later iterator pulls. */
   readonly route?: readonly string[]
   /** Protected stream admission waits until all next/return/write work actually finishes. */
@@ -353,7 +358,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
             this.#kernel.assertActive()
             if (state.terminal || !state.pending || state.seq !== seq) throw new RpcAbortError()
           }
-        }
+        },
+        state.receiverId
       ).catch((error) => {
         if (state.terminal) return
         void this.#cancelConsumer(state, { error: this.#sendFailureReason(error) }, error)
@@ -423,10 +429,12 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
                 })
               })
         }
-        void this.#sendFrame(state.targetId, state.id, payload).catch((error) => {
-          this.#report(error)
-          this.#resolveCancel(key, error)
-        })
+        void this.#sendFrame(state.targetId, state.id, payload, undefined, state.receiverId).catch(
+          (error) => {
+            this.#report(error)
+            this.#resolveCancel(key, error)
+          }
+        )
       },
       () => this.#resolveCancel(key)
     )
@@ -449,7 +457,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     targetId: string,
     id: string,
     payload: IRpcStreamPayload,
-    admission?: IRpcFrameAdmission
+    admission?: IRpcFrameAdmission,
+    receiverId?: string
   ): Promise<void> {
     const normalized = normalizeStreamPayload(payload)
     const message = createOutboundEnvelope({
@@ -462,6 +471,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           applicationVersion: this.#prepared.options.contract?.version ?? '1.0',
           senderId: this.#prepared.id,
           targetId,
+          ...(receiverId === undefined ? {} : { receiverId }),
           sentAt: this.#kernel.time.timestamp()
         },
         payload: normalized
@@ -500,17 +510,32 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         void Promise.resolve()
           .then(() => producer.iterator.return?.())
           .catch((cleanupError) => this.#report(cleanupError))
-          .then(() => this.#sendFailure(senderId, envelope.id, producer.seq, error))
+          .then(() =>
+            this.#sendFailure(
+              senderId,
+              envelope.id,
+              producer.seq,
+              error,
+              undefined,
+              producer.receiverId
+            )
+          )
       }
       return
     }
     if (payload.event === RpcStreamEvent.pull || payload.event === RpcStreamEvent.cancel)
       await this.#receiveProducer(senderId, envelope.id, payload)
-    else this.#receiveConsumer(senderId, envelope.id, payload)
+    else
+      this.#receiveConsumer(senderId, envelope.id, payload, authenticationReplyReceiverId(envelope))
   }
 
   /** Drive the consumer's one pending credit or terminal notification. */
-  #receiveConsumer(senderId: string, id: string, payload: IRpcStreamPayload): void {
+  #receiveConsumer(
+    senderId: string,
+    id: string,
+    payload: IRpcStreamPayload,
+    receiverId?: string
+  ): void {
     const key = tupleKey(senderId, id)
     const state = this.#consumers.get(key)
     if (!state) {
@@ -539,6 +564,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         this.#invalid(state, '/seq')
         return
       }
+      if (receiverId !== undefined) state.receiverId = receiverId
       state.resolveReady()
       return
     }
@@ -590,12 +616,16 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const request = (message as { envelope?: IRpcEnvelope }).envelope
     if (request?.kind !== 'request') return
     const senderId = request.data.route.senderId
+    /** Original identity admission precedes this proof read; logical names cannot select replies. */
+    const receiverId = authenticationReplyReceiverId(request)
     if ((message as { preflightError?: unknown }).preflightError !== undefined) {
       await this.#sendFailure(
         senderId,
         request.id,
         0,
-        (message as { preflightError: unknown }).preflightError
+        (message as { preflightError: unknown }).preflightError,
+        undefined,
+        receiverId
       )
       return
     }
@@ -604,7 +634,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         senderId,
         request.id,
         0,
-        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull)
+        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull),
+        undefined,
+        receiverId
       )
       return
     }
@@ -618,10 +650,16 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const early = this.#earlyCancels.get(key)
     if (early) {
       this.#earlyCancels.delete(key)
-      await this.#sendFrame(senderId, request.id, {
-        event: RpcStreamEvent.cancelled,
-        seq: early.seq
-      })
+      await this.#sendFrame(
+        senderId,
+        request.id,
+        {
+          event: RpcStreamEvent.cancelled,
+          seq: early.seq
+        },
+        undefined,
+        receiverId
+      )
       return
     }
     if (this.#earlyCancelOverflow.has(senderId)) {
@@ -629,7 +667,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         senderId,
         request.id,
         0,
-        new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded)
+        new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
+        undefined,
+        receiverId
       )
       return
     }
@@ -641,7 +681,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         senderId,
         request.id,
         0,
-        new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded)
+        new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
+        undefined,
+        receiverId
       )
       return
     }
@@ -682,6 +724,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         lifetime = { pending: 1, settled, resolve }
       }
       state = {
+        ...(receiverId === undefined ? {} : { receiverId }),
         route: request.data.route.forwardRoute,
         lifetime,
         id: request.id,
@@ -708,11 +751,24 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         }, request.data.route.timeoutMs)
     } catch (error) {
       scope.abort()
-      await this.#sendFailure(senderId, request.id, 0, error, request.data.route.forwardRoute)
+      await this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        error,
+        request.data.route.forwardRoute,
+        receiverId
+      )
       return
     }
     try {
-      await this.#sendFrame(senderId, request.id, { event: RpcStreamEvent.open, seq: 0 })
+      await this.#sendFrame(
+        senderId,
+        request.id,
+        { event: RpcStreamEvent.open, seq: 0 },
+        undefined,
+        receiverId
+      )
     } catch (error) {
       const failure = this.#sendFailureReason(error)
       this.#finishProducer(state, failure)
@@ -721,7 +777,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       } catch (cleanupError) {
         this.#report(cleanupError)
       }
-      await this.#sendFailure(senderId, request.id, 0, failure)
+      await this.#sendFailure(senderId, request.id, 0, failure, undefined, state.receiverId)
     } finally {
       if (state.lifetime) state.lifetime.pending -= 1
       this.#settleProducer(state)
@@ -782,17 +838,23 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         cleanupError = error
       }
       this.#producers.delete(tupleKey(senderId, id))
-      await this.#sendFrame(senderId, id, {
-        event: RpcStreamEvent.cancelled,
-        seq: payload.seq,
-        ...(cleanupError === undefined
-          ? {}
-          : {
-              error: serializeRpcError(cleanupError, {
-                report: (failure) => this.#report(failure.error)
+      await this.#sendFrame(
+        senderId,
+        id,
+        {
+          event: RpcStreamEvent.cancelled,
+          seq: payload.seq,
+          ...(cleanupError === undefined
+            ? {}
+            : {
+                error: serializeRpcError(cleanupError, {
+                  report: (failure) => this.#report(failure.error)
+                })
               })
-            })
-      })
+        },
+        undefined,
+        state.receiverId
+      )
       return
     }
     if (payload.seq !== state.seq || state.busy) {
@@ -804,7 +866,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       } catch (cleanupError) {
         this.#report(cleanupError)
       }
-      await this.#sendFailure(senderId, id, state.seq, error)
+      await this.#sendFailure(senderId, id, state.seq, error, undefined, state.receiverId)
       return
     }
     state.busy = true
@@ -819,7 +881,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       } catch (cleanupError) {
         failure = new AggregateError([error, cleanupError], RpcStreamErrorText.cleanupFailed)
       }
-      await this.#sendFailure(senderId, id, state.seq, failure, state.route)
+      await this.#sendFailure(senderId, id, state.seq, failure, state.route, state.receiverId)
       state.busy = false
       return
     }
@@ -848,14 +910,14 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       } catch (cleanupError) {
         this.#report(cleanupError)
       }
-      await this.#sendFailure(senderId, id, state.seq, failure)
+      await this.#sendFailure(senderId, id, state.seq, failure, undefined, state.receiverId)
       state.busy = false
       return
     }
     if (result.done) {
       this.#finishProducer(state)
       try {
-        await this.#sendFrame(senderId, id, outboundPayload)
+        await this.#sendFrame(senderId, id, outboundPayload, undefined, state.receiverId)
       } catch (error) {
         this.#report(error)
       }
@@ -875,14 +937,20 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     }
     try {
       await this.#yieldDataTurn(state)
-      await this.#sendFrame(senderId, id, outboundPayload, {
-        queueSignal: admission.signal,
-        assertCanSend: () => {
-          this.#kernel.assertActive()
-          if (state.terminal || state.seq !== seq) throw new RpcAbortError()
+      await this.#sendFrame(
+        senderId,
+        id,
+        outboundPayload,
+        {
+          queueSignal: admission.signal,
+          assertCanSend: () => {
+            this.#kernel.assertActive()
+            if (state.terminal || state.seq !== seq) throw new RpcAbortError()
+          },
+          onStarted: commit
         },
-        onStarted: commit
-      })
+        state.receiverId
+      )
       if (!started) commit()
     } catch (error) {
       if (state.terminal) return
@@ -893,7 +961,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       } catch (cleanupError) {
         this.#report(cleanupError)
       }
-      await this.#sendFailure(senderId, id, seq, failure)
+      await this.#sendFailure(senderId, id, seq, failure, undefined, state.receiverId)
     }
     admission.abort()
     /** Earlier physical completion must not clear a subsequent credit's active admission. */
@@ -940,13 +1008,20 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     id: string,
     seq: number,
     error: unknown,
-    route?: readonly string[]
+    route?: readonly string[],
+    receiverId?: string
   ): Promise<void> {
     const wire = serializeRpcError(retainProviderFailureRoute(error, route), {
       report: (failure) => this.#report(failure.error)
     })
     try {
-      await this.#sendFrame(targetId, id, { event: RpcStreamEvent.fail, seq, error: wire })
+      await this.#sendFrame(
+        targetId,
+        id,
+        { event: RpcStreamEvent.fail, seq, error: wire },
+        undefined,
+        receiverId
+      )
     } catch (sendError) {
       this.#report(sendError)
     }

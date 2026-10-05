@@ -71,7 +71,12 @@ import { createNativeDefaultAllocator } from './native-default-id.js'
 import { NativeDefaultIdText } from './native-default-id-text.js'
 import {
   bindAuthenticationReplayContext,
-  markAuthenticationReplayEnvelope
+  markAuthenticationReplayEnvelope,
+  consumedAuthenticationFrame,
+  readAuthenticationChallengeProof,
+  readAuthenticationChallengePort,
+  RpcAuthenticationControl,
+  assertAuthenticationChallengeEnvelope
 } from './authentication-replay.js'
 import { OperationScope } from './operation-scope.js'
 import { InboundIdentityCoordinator, type IInboundIdentityAdmission } from './inbound-identity.js'
@@ -315,7 +320,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       (error) => this.emitFailure(error, RpcCoreErrorCode.invalidConfig),
       this.#fast,
       this.#batch,
-      this.#physicalLimit
+      this.#physicalLimit,
+      this.receiverId
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
       native: this.#native,
@@ -450,9 +456,24 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 () =>
                   this.kernel.state === 'active' &&
                   this.kernel.generation === generation &&
-                  (this.#native?.active ?? true)
+                  (this.#native?.active ?? true),
+                this.kernel.topology !== 'exclusive' && physical.source == null
+                  ? {
+                      receiverId: this.receiverId,
+                      unknown: (nonce, counter) =>
+                        this.#pipeline
+                          .sendAuthenticationControl({
+                            control: RpcAuthenticationControl.unknown,
+                            echoNonce: nonce,
+                            counter,
+                            receiverId: this.receiverId
+                          })
+                          .catch((error) => this.emitFailure(error))
+                    }
+                  : undefined
               )
             frame = await this.#authentication.unprotect(frame, authenticationContext)
+            if (frame === consumedAuthenticationFrame) return
           }
           this.#native?.observeOwner()
           this.kernel.assertActive(generation)
@@ -562,6 +583,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     }
     for (const [pointer, field] of ignored)
       this.#unknownFields.note(physical.sourceToken, envelope.kind, pointer, field)
+    assertAuthenticationChallengeEnvelope(authenticationContext, envelope)
     markAuthenticationReplayEnvelope(authenticationContext, envelope)
     const route = envelope.data
     const pendingAdmission = this.inboundIdentity.admitPrepared(
@@ -582,6 +604,22 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     if (!admission) return
     try {
       this.kernel.assertActive(generation)
+      /** Reverse freshness is retained only after the original identity owner admitted this member. */
+      const challenge = readAuthenticationChallengeProof(envelope)
+      if (
+        challenge?.control === undefined &&
+        challenge?.replyChallenge &&
+        challenge.replyReceiverId &&
+        (challenge.replyReceiverId === route.route.senderId ||
+          challenge.replyReceiverId.startsWith(`${route.route.senderId}:`))
+      )
+        readAuthenticationChallengePort(this.#authentication)?.remember(
+          challenge.replyReceiverId,
+          challenge.nonce,
+          challenge.replyChallenge,
+          true,
+          route.route.senderId
+        )
       const handled = await this.kernel.dispatchRoute(
         envelope.kind,
         Object.freeze({ envelope, route, inbound: message, admission })
