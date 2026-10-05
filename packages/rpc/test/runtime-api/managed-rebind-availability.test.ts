@@ -11,13 +11,7 @@ import {
   createNodeThreadChannelFactory,
   type INodeThreadHandle
 } from '../../src/threads/adapters/node.js'
-import { createRuntimeApiEndpoint } from '../../src/core/internal/runtime-api-endpoint.js'
-import { codec } from '../../src/core/middleware/codec.js'
-import { framer } from '../../src/core/middleware/framer.js'
-import { abort } from '../../src/core/middleware/abort.js'
-import { connect } from '../../src/core/middleware/connect.js'
-import { ping } from '../../src/core/middleware/ping.js'
-import type { IRpcEndpoint } from '../../src/core/typing.js'
+import * as runtimeEndpoint from '../../src/core/internal/runtime-api-endpoint.js'
 
 /** Every case restarts the same genuine Worker used by the original generation acceptance. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
@@ -41,6 +35,16 @@ for (const unavailable of [
     let calls = 0
     /** Completion of the selected original endpoint proves readProvide has already completed. */
     let constructed = 0
+    /** Observe the canonical assembly, including its genuine borrowed Host admission owner. */
+    const assemble = runtimeEndpoint.createRuntimeApiEndpoint
+    /** This observer preserves every original argument and returned endpoint. */
+    const construction = vi
+      .spyOn(runtimeEndpoint, 'createRuntimeApiEndpoint')
+      .mockImplementation(async (...args: Parameters<typeof assemble>) => {
+        const endpoint = await assemble(...args)
+        constructed += 1
+        return endpoint
+      })
     const gate = definePlugin({
       name: 'gate',
       features: { data: defineFeature(() => ({ read: () => 42 })) },
@@ -83,32 +87,6 @@ for (const unavailable of [
           channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
           supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
           report: (error) => reports.push(error)
-        },
-        endpointFactory: async (channel) => {
-          const endpoint = await createRuntimeApiEndpoint(
-            {
-              id: 'availability-parent',
-              targetIds: [channel.peerId],
-              transport: channel.transport,
-              features: channel.features,
-              scheduler: channel.scheduler,
-              middlewares: [
-                codec(channel.pipeline.codec),
-                framer(channel.pipeline.framer),
-                abort(),
-                connect({ transport: channel.transport }),
-                ping()
-              ]
-            },
-            { supports: () => true },
-            true
-          )
-          constructed += 1
-          return {
-            endpoint: endpoint as unknown as IRpcEndpoint,
-            oneWay: endpoint,
-            stream: endpoint.stream
-          }
         }
       })
       await host.use(
@@ -187,8 +165,20 @@ for (const unavailable of [
         },
         { timeout: 3000 }
       )
+      /** Default assembly reports the original business failure through its existing hook. */
+      const businessReports = reports.filter(
+        (error) =>
+          error instanceof Error &&
+          Reflect.get(error, 'source') === expected.source &&
+          Reflect.get(error, 'code') === expected.code
+      )
       assert.equal(
-        reports.length,
+        businessReports.length,
+        unavailable.startsWith('connection-') ? 0 : 1,
+        '[A13] the canonical hook reports exactly the actual inbound permission denial'
+      )
+      assert.equal(
+        reports.length - businessReports.length,
         0,
         '[A13] availability denial is per call, never a rebind failure'
       )
@@ -210,6 +200,7 @@ for (const unavailable of [
       )
       assert.equal(constructed, 2, '[C4-fix:M1] recovery never opens a third endpoint')
     } finally {
+      construction.mockRestore()
       await host.dispose()
       for (const handle of handles) handle.terminate()
       await Promise.all(handles.map((handle) => handle.exited))

@@ -64,6 +64,7 @@ export async function createAutomaticProcessPeer(
     deferProcessByteReceive(opened.channel)
     return await createRuntimePeer(options, {
       self: bootstrap.self,
+      generation: bootstrap.generation,
       origin: { kind: RuntimeSourceKind.connect, direction: RuntimeConnectionDirection.spawnedBy },
       async source(context) {
         /** Override the legacy native offer's defaults with the endpoint's actual installed roots. */

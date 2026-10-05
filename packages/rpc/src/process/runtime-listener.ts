@@ -29,6 +29,8 @@ import type { IProcessServeListenerIngress } from './plugin/types.js'
 import { reportSafely } from './plugin/binding.js'
 import { createProcessResilience } from './resilience/index.js'
 import type { IProcessResilience } from './resilience/types.js'
+import { RpcCapability } from '../contract/wire-constants.js'
+import { readRpcSingleFrameFacts } from '../contract/framing/reassembler.js'
 
 /** The original authenticated ingress retains its caller-selected connection governor. */
 export type IRuntimeProcessListen = IProcessServeListenerIngress &
@@ -67,11 +69,26 @@ export async function createProcessListenerPeer(
   try {
     sessions = await serveProcessSessions(
       ingress,
-      (channel, signal, session) =>
-        prepareRuntimePeerEndpoint(options, channel, signal, {
-          idempotency: session.idempotency,
-          providerLimits: session.limits
-        }),
+      (channel, signal, session, manager) =>
+        prepareRuntimePeerEndpoint(
+          options,
+          channel,
+          signal,
+          {
+            idempotency: session.idempotency,
+            providerLimits: session.limits
+          },
+          channel.agreement.capabilities.includes(RpcCapability.generation)
+            ? (preparation?.providerAdmission ?? manager.runtimeAdmission).prepare(
+                session.limits.maxGlobal,
+                session.limits.maxPerPeer,
+                readRpcSingleFrameFacts(
+                  channel.pipeline.framer.accept,
+                  channel.pipeline.framer.frame
+                )?.maxConcurrentMessages
+              )
+            : undefined
+        ),
       async ({ channel, endpoint, signal }): Promise<IRuntimeProcessService> => {
         /** Each actual accept captures current Feature output guards through the original Host. */
         const peer = await createRuntimePeer(
@@ -130,6 +147,8 @@ export async function createProcessListenerPeer(
     request: (method, payload, callOptions) => current().request(method, payload, callOptions),
     notify: (method, payload, callOptions) => current().notify(method, payload, callOptions),
     stream: (method, payload, callOptions) => current().stream(method, payload, callOptions),
+    group: (steps, callOptions) => current().group(steps, callOptions),
+    outcome: (key) => current().outcome(key),
     describe: runtimeQuery(async () => {
       /** The original listener Set supplies every current session without a winner or new index. */
       const details = await Promise.all(

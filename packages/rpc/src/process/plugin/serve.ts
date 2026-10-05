@@ -14,7 +14,11 @@ import {
   createRemoteBindingDrain,
   type IRemoteBindingDrain
 } from '../../remote/internal/binding-drain.js'
-import { createProcessSessionManager, type IProcessConnectionLease } from '../resilience/session.js'
+import {
+  createProcessSessionManager,
+  type IProcessConnectionLease,
+  type IProcessSessionManager
+} from '../resilience/session.js'
 import { createProcessProviderAdmission } from '../resilience/provider-admission.js'
 import {
   createProcessInstanceFallback,
@@ -56,6 +60,11 @@ type IProcessRuntimeSessionPublication = Readonly<{
   /** The selected core policy is merged by the original connection admission owner. */
   providerLimits?: IRpcProviderLimits
 }>
+
+/** Runtime assembly receives the exact original service manager; the public factory stays unchanged. */
+type IProcessSessionEndpointFactory = (
+  ...args: [...Parameters<IProcessServeEndpointFactory>, IProcessSessionManager]
+) => Promise<IRemoteServeEndpoint>
 
 /** Private service reads use the original session Set, without another listener registry. */
 export type IProcessSessionsHandle = Readonly<{
@@ -158,7 +167,7 @@ function validateServiceEndpoint(channel: IRemoteChannel, endpoint: IRemoteServe
 /** Own one accept/parent-loss loop for Plugin and Host services, with canonical session quotas. */
 export async function serveProcessSessions(
   ingress: IProcessServeChildIngress | IProcessServeListenerIngress,
-  endpointFactory: IProcessServeEndpointFactory,
+  endpointFactory: IProcessSessionEndpointFactory,
   onReadySession: (session: IProcessReadySession) => Promise<IRemoteServePluginHandle>,
   resilience: IProcessResilience,
   report: (error: unknown) => void,
@@ -329,7 +338,8 @@ export async function serveProcessSessions(
                   identity,
                   ...sessionOptions,
                   limits: admission.limits(sessionOptions.limits, publication?.providerLimits)
-                }
+                },
+                manager
               ))
               validateServiceEndpoint(channel, builtEndpoint)
               const endpoint = admission.wrap(drain.wrap(channel, builtEndpoint))
@@ -505,11 +515,16 @@ export async function serveProcessSessions(
     )
     closeAdmission = admission.close
 
-    const builtEndpoint = (candidateEndpoint = await endpointFactory(channel, controller.signal, {
-      identity,
-      ...sessionOptions,
-      limits: admission.limits(sessionOptions.limits, publication?.providerLimits)
-    }))
+    const builtEndpoint = (candidateEndpoint = await endpointFactory(
+      channel,
+      controller.signal,
+      {
+        identity,
+        ...sessionOptions,
+        limits: admission.limits(sessionOptions.limits, publication?.providerLimits)
+      },
+      manager
+    ))
     validateServiceEndpoint(channel, builtEndpoint)
     const endpoint: IRemoteServeEndpoint = admission.wrap(drain.wrap(channel, builtEndpoint))
     if (controller.signal.aborted) {

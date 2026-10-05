@@ -33,6 +33,14 @@ export type IEndpointKernelState = (typeof EndpointKernelState)[keyof typeof End
 
 /** Cold client counts reuse these actual canonical registries; no provider count is included. */
 export const EndpointOwnerKey = {
+  /** Cold runtime assembly reads the genuine attachments from this existing owner table. */
+  outboundAttachment: 'outbound-attachment',
+  /** The same provider attachment retains runtime execution and cancellation authority. */
+  providerAttachment: 'provider-attachment',
+  /** All opt-in ingress and execution share the original logical provider's admission owner. */
+  providerAdmission: 'provider-admission',
+  /** The canonical stream owner alone handles new-profile credit and terminal state. */
+  streamOwner: 'stream-owner',
   pendingRegistry: 'pending-registry',
   streamConsumerRegistry: 'stream-consumer-registry'
 } as const

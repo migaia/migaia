@@ -6,6 +6,7 @@ import type { IRpcConnectCapability } from '../typing.js'
 import type { IRpcInboundMessage, IRpcTransportTopology } from '../transport.js'
 import type { IRpcPlatform } from '../typing.js'
 import type { INativeReplayReceipt } from './native-replay.js'
+import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
 
 /** Result of shared inbound identity admission; token is leased until release. */
 export type IInboundIdentityAdmission = {
@@ -247,6 +248,22 @@ export class InboundIdentityCoordinator {
   /** Releases one replay/operation identity lease. */
   release(token: string): void {
     this.#peers.release(token)
+  }
+
+  /** Clears all endpoint-local identity state during terminal disposal. */
+  bindGeneration(token: string, generation: IRpcRuntimeGeneration): boolean {
+    return !this.#closed && this.#peers.bindGeneration(token, generation)
+  }
+
+  /** A verified response uses the same established source binding as the directory request. */
+  bindResponseGeneration(binding: string, generation: IRpcRuntimeGeneration): boolean {
+    const token = this.#established.get(binding)
+    return token !== undefined && this.bindGeneration(token, generation)
+  }
+
+  /** Runtime fences read only previously accepted describe identity on this original peer owner. */
+  readGeneration(token: string): IRpcRuntimeGeneration | undefined {
+    return this.#closed ? undefined : this.#peers.readGeneration(token)
   }
 
   /** Clears all endpoint-local identity state during terminal disposal. */

@@ -65,6 +65,7 @@ export async function createAutomaticWebThreadPeer(
     deadline.cancel()
     return await createRuntimePeer(options, {
       self: bootstrap.self,
+      generation: bootstrap.generation,
       origin: { kind: RuntimeSourceKind.connect, direction: RuntimeConnectionDirection.spawnedBy },
       async source(context) {
         native.postMessage(

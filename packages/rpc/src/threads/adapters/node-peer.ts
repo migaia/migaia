@@ -26,6 +26,7 @@ export function createThreadPeer(options: IRuntimeThreadPeerOptions) {
   const bootstrap = readThreadRuntimeBootstrap(workerData)
   return createRuntimePeer(options as IRuntimePeerOptions, {
     self: bootstrap.self,
+    generation: bootstrap.generation,
     origin: { kind: RuntimeSourceKind.connect, direction: RuntimeConnectionDirection.spawnedBy },
     async source(context) {
       /** Cold capture attaches before ACK can cause the parent to send its directory. */

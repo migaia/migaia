@@ -1,4 +1,7 @@
-import { retainProviderPreflight } from '../../core/internal/provider.js'
+import {
+  retainProviderPreflight,
+  wrapProviderStreamAdmission
+} from '../../core/internal/provider.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { RpcCapability } from '../../contract/wire-constants.js'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '../types.js'
@@ -102,13 +105,14 @@ export function createRemoteBindingDrain(
         },
         provide: {
           value: (method: string, provider: Parameters<IRpcEndpoint['provide']>[1]) => {
-            endpoint.endpoint.provide(
-              method,
-              retainProviderPreflight(provider, (context: Parameters<typeof provider>[0]) => {
+            /** Prepaid groups and ordinary calls enter this same original drain tracking body. */
+            const tracked =
+              (invoke: typeof provider): typeof provider =>
+              (context) => {
                 generation.pending += 1
                 let result: ReturnType<typeof provider>
                 try {
-                  result = provider(context)
+                  result = invoke(context)
                 } catch (error) {
                   generation.pending -= 1
                   finish(generation)
@@ -120,7 +124,10 @@ export function createRemoteBindingDrain(
                 }
                 void Promise.resolve(result).then(settled, settled)
                 return result
-              })
+              }
+            endpoint.endpoint.provide(
+              method,
+              retainProviderPreflight(provider, tracked(provider), tracked)
             )
             return trackedEndpoint
           }
@@ -154,16 +161,33 @@ export function createRemoteBindingDrain(
                 method,
                 retainProviderPreflight(
                   run,
-                  (params: unknown, context: Parameters<typeof run>[1]) =>
-                    (async function* () {
+                  wrapProviderStreamAdmission(
+                    run,
+                    (params: unknown, context: Parameters<typeof run>[1]) =>
+                      (async function* () {
+                        if (context.context.targetGeneration === undefined) generation.pending += 1
+                        try {
+                          /**
+                           * Only the new profile exposes final outcome; legacy terminal stays
+                           * unchanged.
+                           */
+                          const result = yield* run(params, context)
+                          return context.context.targetGeneration === undefined ? undefined : result
+                        } finally {
+                          if (context.context.targetGeneration === undefined) {
+                            generation.pending -= 1
+                            finish(generation)
+                          }
+                        }
+                      })(),
+                    () => {
                       generation.pending += 1
-                      try {
-                        yield* run(params, context)
-                      } finally {
+                      return () => {
                         generation.pending -= 1
                         finish(generation)
                       }
-                    })()
+                    }
+                  )
                 )
               )
           })

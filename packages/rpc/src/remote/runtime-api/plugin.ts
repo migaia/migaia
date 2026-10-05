@@ -50,6 +50,10 @@ import {
 import { RuntimeApiMode } from './constants.js'
 import { withRuntimePreparationContext } from './launch-context.js'
 import { readManagedRuntimeRegistration } from './managed-peer.js'
+import { createProviderAdmissionScope } from '../../core/internal/provider-admission.js'
+
+/** A private extension uses the original atomic shared-slot owner across both adapter families. */
+const providerAdmissionSlot = Symbol('runtime-provider-admission')
 
 /** Platform factories share this application contract while retaining their original source owner. */
 export type IRuntimePluginOptions<
@@ -325,6 +329,45 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
             kind
           )
       )
+      /** This private cold reference owns no connections, callable catalog or additional quota map. */
+      const admission = integration.acquireSharedSlot(
+        providerAdmissionSlot,
+        RuntimePluginFamily,
+        createProviderAdmissionScope
+      )
+      /**
+       * Policy metadata belongs to this original reservation, so failed candidates never publish
+       * it.
+       */
+      const admissionPolicy: { maxGlobal?: number; maxPerPeer?: number } = {}
+      admission.register(admissionPolicy, () =>
+        admission.facade.constrain(admissionPolicy.maxGlobal, admissionPolicy.maxPerPeer)
+      )
+      /**
+       * Cold source preparation reads the actual original commit index rather than a readiness
+       * flag.
+       */
+      const providerAdmission = Object.freeze({
+        prepare: (
+          maxGlobal: number | undefined,
+          maxPerPeer: number | undefined,
+          maxIngress: number | undefined
+        ) => {
+          if (maxGlobal !== undefined)
+            admissionPolicy.maxGlobal = Math.min(admissionPolicy.maxGlobal ?? maxGlobal, maxGlobal)
+          if (maxPerPeer !== undefined)
+            admissionPolicy.maxPerPeer = Math.min(
+              admissionPolicy.maxPerPeer ?? maxPerPeer,
+              maxPerPeer
+            )
+          return admission.facade.prepare(
+            maxGlobal,
+            maxPerPeer,
+            maxIngress,
+            admission.registered().includes(admissionPolicy)
+          )
+        }
+      })
       /**
        * Automatic bootstrap retains its trusted identity; explicit sources use the original id
        * owner.
@@ -365,6 +408,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         {
           selfDefaulted: peerOptions.self === undefined,
           nodeId: integration.nodeId,
+          providerAdmission,
           initialSignal: core.operation.signal,
           lifecycleSignal: core.lifecycle.signal,
           own: (dispose) => core.onDispose(dispose),

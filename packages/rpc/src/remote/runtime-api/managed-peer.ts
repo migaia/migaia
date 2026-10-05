@@ -17,6 +17,7 @@ import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
 import type { IRuntimePreparationContext } from './launch-context.js'
 import { isForwardedPayload } from '../../core/internal/outbound-envelope.js'
 import { RuntimeApiMode } from './constants.js'
+import { RpcRuntimeGenerationKind } from '../../contract/runtime-api/constants.js'
 import { compileRuntimeMethods } from './catalog.js'
 import {
   createRuntimePeer,
@@ -63,7 +64,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     retryPort: options.retryPort,
     callDeadlineCapMs: options.callDeadlineCapMs,
     beforeRelease,
-    prepareRuntime: (channel, preparationSignal) =>
+    prepareRuntime: (channel, preparationSignal, sessionGeneration) =>
       createRuntimePeer(
         {
           self: context.self,
@@ -77,9 +78,15 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           self: context.self,
           source: async () => channel,
           nodeId: preparation?.nodeId,
+          providerAdmission: preparation?.providerAdmission,
           origin,
           ownsChannel: false,
           signal: preparationSignal,
+          generation: {
+            kind: RpcRuntimeGenerationKind.session,
+            value: sessionGeneration,
+            providerId: context.self.instanceId
+          },
           ...(bindEndpoint
             ? { wrapEndpoint: (endpoint: IRemoteServeEndpoint) => bindEndpoint(channel, endpoint) }
             : {})
@@ -140,6 +147,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
       isForwardedPayload(callOptions, payload)
         ? registration.invokeStream(method, payload, callOptions)
         : registration.currentPeer().stream(method, payload, callOptions),
+    group: (steps, callOptions) => registration.currentPeer().group(steps, callOptions),
+    outcome: (key) => registration.currentPeer().outcome(key),
     describe: runtimeQuery(() => registration.inspectRuntime()),
     close
   })

@@ -1,4 +1,5 @@
 import type { IProcessHandle } from '@migaia/supervision/process'
+import { RpcRuntimeGenerationKind } from '../contract/runtime-api/constants.js'
 import { defaultRpcId } from '../core/internal/id.js'
 import { RpcError, RpcCoreErrorCode } from '../core/errors.js'
 import {
@@ -70,6 +71,8 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
    * policy.
    */
   const spawn = typeof options.spawn === 'object' ? options.spawn : undefined
+  /** One factory owns the child's logical namespace across accepted execution replacements. */
+  const providerId = spawn ? defaultRpcId() : undefined
   /** Connect supervision owns a local session, never the external target process. */
   const connect = typeof options.connect === 'object' ? options.connect : undefined
   /**
@@ -141,7 +144,15 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
                 launch: (spec, request) =>
                   withRuntimeLaunchContext(
                     request,
-                    { ...context, childName: spawn.supervision.id },
+                    {
+                      ...context,
+                      childName: spawn.supervision.id,
+                      generation: {
+                        kind: RpcRuntimeGenerationKind.restart,
+                        value: request.executionGeneration!,
+                        providerId: providerId!
+                      }
+                    },
                     () => spawn.supervision.launcher.launch(spec, request)
                   )
               }

@@ -1,6 +1,10 @@
 import { isUint8Array } from '@migaia/utils/bytes'
 import { createDescriptor } from '../protocol.js'
-import { registerNativeRpcFrameIngress, type IRpcNativeFrameOutputDomain } from './reassembler.js'
+import {
+  registerNativeRpcFrameIngress,
+  registerRpcSingleFrameFacts,
+  type IRpcNativeFrameOutputDomain
+} from './reassembler.js'
 import { RpcContractErrorCode } from '../error-code.js'
 import { createContractError } from '../contract-error.js'
 import type {
@@ -385,6 +389,10 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     },
     nativeOutputDomain
   )
+  registerRpcSingleFrameFacts(accept, frame, {
+    maxConcurrentMessages: options.maxConcurrentMessages,
+    maxMessageBytes: options.maxMessageBytes
+  })
   return Object.freeze({
     ...createDescriptor('message', 1),
     inputEncodedType: kind === 'string' ? 'string' : 'uint8array',
@@ -426,4 +434,9 @@ export const messageFramerV1 = Object.freeze({
     value
   }),
   close: (_reason?: unknown): void => undefined
+})
+
+registerRpcSingleFrameFacts(messageFramerV1.accept, messageFramerV1.frame, {
+  maxConcurrentMessages: DEFAULT_MAX_CONCURRENT,
+  maxMessageBytes: DEFAULT_MAX_MESSAGE_BYTES
 })

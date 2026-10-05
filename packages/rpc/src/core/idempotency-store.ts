@@ -1,7 +1,14 @@
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import type { IRpcPortableValue, IRpcSerializedError } from '../contract/index.js'
-import { RpcConfigurationError } from './errors.js'
+import { RpcConfigurationError, RpcContractError } from './errors.js'
 import { RpcCoreErrorText } from './error-text.js'
+import { RpcRuntimeOutcomeState } from '../contract/runtime-api/constants.js'
+import {
+  RpcRuntimeStoreKind,
+  RpcRuntimeStoreContinuity
+} from '../contract/runtime-api/constants.js'
+import type { IRpcRuntimeStore } from '../contract/runtime-api/types.js'
+import { defaultRpcId } from './internal/id.js'
 
 /** A portable provider outcome that can be replayed with a new request identifier. */
 export type IRpcIdempotencyOutcome = Readonly<
@@ -31,13 +38,28 @@ export type IRpcIdempotencyClaim =
 
 /** Injectable store boundary; the session owner chooses scopes only after identity admission. */
 export type IRpcIdempotencyStore = Readonly<{
-  claim: (scope: string, key: string, now: number) => IRpcIdempotencyClaim
+  claim: (scope: string, key: string, now: number, fingerprint?: string) => IRpcIdempotencyClaim
+  /** Optional U25 extension; a legacy store without lookup cannot advertise outcome semantics. */
+  lookup?: (scope: string, key: string, now: number) => IRpcIdempotencyLookup
+  /** Opt-in store facts describe this actual owner; ordinary claims never create or read an epoch. */
+  readRuntimeFacts?: () => IRpcRuntimeStore
 }>
+
+/** A lookup reports only retained store facts and never allocates execution or waiter ownership. */
+export type IRpcIdempotencyLookup = Readonly<
+  | { state: 'pending' | 'unknown' }
+  | { state: 'done'; outcome: IRpcIdempotencyOutcome | 'unavailable' }
+>
 
 /** One entry is retained until release or a post-settlement expiry. */
 type IEntry = {
   readonly scope: string
   readonly key: string
+  /**
+   * Only new-profile claims carry an admitted fingerprint; old method/key claims retain their
+   * domain.
+   */
+  readonly fingerprint?: string
   readonly waiters: Array<(value: IRpcIdempotencyOutcome | 'unavailable' | undefined) => void>
   status: 'pending' | 'done'
   outcome?: IRpcIdempotencyOutcome | 'unavailable'
@@ -108,6 +130,8 @@ export function createRpcIdempotencyStore(
   let entries = 0
   let bytes = 0
   let sequence = 0
+  /** Lazily minted only when U25 queries this exact in-memory store incarnation. */
+  let epoch: string | undefined
 
   /** Remove an entry only if the same owner still holds that key. */
   function remove(entry: IEntry): void {
@@ -147,9 +171,36 @@ export function createRpcIdempotencyStore(
   }
 
   return Object.freeze({
-    claim(scope: string, key: string, now: number): IRpcIdempotencyClaim {
+    /** Read one original entry without purge, waiters, retention refresh or quota mutation. */
+    readRuntimeFacts(): IRpcRuntimeStore {
+      return Object.freeze({
+        kind: RpcRuntimeStoreKind.memory,
+        epoch: (epoch ??= defaultRpcId()),
+        continuity: RpcRuntimeStoreContinuity.retained
+      })
+    },
+    lookup(scope: string, key: string, now: number): IRpcIdempotencyLookup {
+      /**
+       * Missing/expired/body-evicted keys are unknown; continuity belongs to the actual store
+       * owner.
+       */
+      const entry = scopes.get(scope)?.get(key)
+      if (
+        !entry ||
+        (entry.status === 'done' && now - entry.settledAt! >= retentionMs) ||
+        entry.outcome === 'unavailable'
+      )
+        return Object.freeze({ state: RpcRuntimeOutcomeState.unknown })
+      return entry.status === 'pending'
+        ? Object.freeze({ state: RpcRuntimeOutcomeState.pending })
+        : Object.freeze({ state: RpcRuntimeOutcomeState.done, outcome: entry.outcome! })
+    },
+    /** Existing atomic claim retains one optional new-domain fingerprint until its result expires. */
+    claim(scope: string, key: string, now: number, fingerprint?: string): IRpcIdempotencyClaim {
       purge(now)
       const existing = scopes.get(scope)?.get(key)
+      if (fingerprint !== undefined && existing && existing.fingerprint !== fingerprint)
+        throw new RpcContractError(RpcCoreErrorText.runtimeIdempotencyConflict)
       if (existing?.status === 'done')
         return Object.freeze({ status: 'done', outcome: existing.outcome! })
       if (existing?.status === 'pending')
@@ -166,6 +217,7 @@ export function createRpcIdempotencyStore(
       const entry: IEntry = {
         scope,
         key,
+        ...(fingerprint === undefined ? {} : { fingerprint }),
         waiters: [],
         status: 'pending',
         bytes: 0,

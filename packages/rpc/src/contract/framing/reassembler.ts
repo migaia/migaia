@@ -31,6 +31,12 @@ export type IRpcBoundFrameIngress<TFrame> = ((
 }
 /** Stable context identifier for opaque custom frames with no native fragment identity. */
 const RpcWholeFrameMessageId = 'whole'
+
+/** Actual constructor facts bound candidate retention and complete single-frame admission. */
+export type IRpcSingleFrameFacts = Readonly<{
+  maxConcurrentMessages: number
+  maxMessageBytes: number
+}>
 /**
  * Associates each package-native callable with only the fact it owns: accept owns preparation;
  * frame owns its output domain. Structural copies retain each exact callable independently.
@@ -40,8 +46,34 @@ const rpcFrameCallableFacts = new WeakMap<
   Readonly<{
     prepare?: (frame: unknown, context: IRpcFrameContext) => IRpcPreparedFrame<unknown>
     nativeOutputDomain?: IRpcNativeFrameOutputDomain
+    singleFrame?: Readonly<{ accept: Function; limits: IRpcSingleFrameFacts }>
   }>
 >()
+
+/** Record only package-native paired callables, after their constructor snapshots original limits. */
+export function registerRpcSingleFrameFacts(
+  accept: Function,
+  frame: Function,
+  limits: IRpcSingleFrameFacts
+): void {
+  rpcFrameCallableFacts.set(
+    frame,
+    Object.freeze({
+      ...rpcFrameCallableFacts.get(frame),
+      singleFrame: Object.freeze({ accept, limits: Object.freeze({ ...limits }) })
+    })
+  )
+}
+
+/** Copies of the actual pair retain facts; a wrapped or opaque callable cannot invent them. */
+export function readRpcSingleFrameFacts(
+  accept: Function,
+  frame: Function
+): IRpcSingleFrameFacts | undefined {
+  /** Identity is checked at this original framing owner, never inferred from public descriptor text. */
+  const proof = rpcFrameCallableFacts.get(frame)?.singleFrame
+  return proof?.accept === accept ? proof.limits : undefined
+}
 
 /** Internal native-constructor hook; deliberately absent from the public framing barrel. */
 export function registerNativeRpcFrameIngress(

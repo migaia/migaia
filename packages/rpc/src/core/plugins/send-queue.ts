@@ -9,7 +9,8 @@ import { RpcPluginErrorText } from './error-text.js'
 import { createEventChannel } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcStreamEvent } from '../../contract/index.js'
-import type { IRpcEnvelope } from '../../contract/index.js'
+import type { IRpcEnvelope, IRpcRuntimeEnvelope } from '../../contract/index.js'
+import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcCoreErrorCode } from '../error-code.js'
 import { RpcError, RpcLifecycleError, tagRpcError } from '../errors.js'
@@ -47,7 +48,9 @@ const HIGH_WATERMARK_RATIO = 0.75
 const LOW_WATERMARK_RATIO = 0.5
 
 /** Selects the reserved control class from normalized fields without invoking user getters. */
-function classify(envelope: IRpcEnvelope): IIpcSendClass {
+function classify(envelope: IRpcEnvelope | IRpcRuntimeEnvelope): IIpcSendClass {
+  if (envelope.kind === RpcRuntimeKind.control || envelope.kind === RpcRuntimeKind.outcome)
+    return IpcSendClass.control
   if (envelope.kind === 'variation') {
     const variation = envelope.data.route.variation
     if (
@@ -113,10 +116,10 @@ export function createIpcSendQueueFeature(
   /** Captures counters at emission time without storing user envelope objects. */
   const snapshot = (
     name: IIpcBacklogEvent['name'],
-    envelope?: IRpcEnvelope,
+    envelope?: IRpcEnvelope | IRpcRuntimeEnvelope,
     error?: unknown
   ): IIpcBacklogEvent => {
-    const trace = envelope?.data.route.trace
+    const trace = envelope && 'data' in envelope ? envelope.data.route.trace : undefined
     return Object.freeze({
       name,
       connectionId,
@@ -168,7 +171,7 @@ export function createIpcSendQueueFeature(
   /** Gate owns the whole-envelope capacity and settlement lifetime. */
   const gate: IIpcSendGate = Object.freeze({
     run(
-      envelope: IRpcEnvelope,
+      envelope: IRpcEnvelope | IRpcRuntimeEnvelope,
       sendNow: () => void | Promise<void>,
       admission?: IIpcSendAdmission
     ): Promise<void> {

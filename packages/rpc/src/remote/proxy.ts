@@ -145,7 +145,11 @@ export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = Omit<
   Readonly<{
     /** Private native factory provenance; local connection ownership cannot set execution authority. */
     ownsExecution?: boolean
-    prepareRuntime(channel: IRemoteChannel, signal: IAbortSignal): Promise<IRuntimePeer>
+    prepareRuntime(
+      channel: IRemoteChannel,
+      signal: IAbortSignal,
+      sessionGeneration: number
+    ): Promise<IRuntimePeer>
     readRuntimeEndpoint(peer: IRuntimePeer): IRemoteServeEndpoint
     /** Original native drain completes before this registration disposes its current endpoint. */
     beforeRelease?(): Promise<void>
@@ -218,6 +222,8 @@ class RemoteRegistration<TUnit, TSpec> {
   readonly #retryPort: IRemoteRetryPort
   /** Most recent described and active generation. */
   #current: IRemoteGeneration | undefined
+  /** Accepted runtime sessions start at zero; failed channel/describe candidates never advance it. */
+  #runtimeSession = -1
   /** Last admitted safe directory survives retirement without retaining channel or native resources. */
   #runtimeDirectory: IRuntimeConnectionDirectory | undefined
   /**
@@ -496,8 +502,10 @@ class RemoteRegistration<TUnit, TSpec> {
       if (removeRetirement) own(async () => removeRetirement())
     }
     /** Runtime directory preparation and v1 describe share the same exact departure/resource owner. */
+    /** Only the eventual original pointer publication commits this reserved session ordinal. */
+    const sessionGeneration = this.#runtimeSession + 1
     const runtime = this.#options.prepareRuntime
-      ? await this.#options.prepareRuntime(channel, signal)
+      ? await this.#options.prepareRuntime(channel, signal, sessionGeneration)
       : undefined
     /** Endpoint is registered before the first describe frame. */
     let endpointClose: Promise<void> | undefined
@@ -581,6 +589,7 @@ class RemoteRegistration<TUnit, TSpec> {
       await this.#closeFailedCandidate([closeEndpoint, closeChannel])
       throw error
     }
+    if (runtime) this.#runtimeSession = sessionGeneration
     this.#current = generation
     if (runtime) this.#runtimeDirectory = readRuntimePeerConnection(runtime).directory
     if (runtime)
@@ -716,7 +725,12 @@ class RemoteRegistration<TUnit, TSpec> {
     if (options === null || typeof options !== 'object' || Array.isArray(options))
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
     for (const key of Object.keys(options))
-      if (key !== 'signal' && key !== 'timeoutMs' && !(allowKey && key === 'idempotencyKey'))
+      if (
+        key !== 'signal' &&
+        key !== 'timeoutMs' &&
+        !(allowKey && key === 'idempotencyKey') &&
+        !(this.#options.prepareRuntime && (key === 'orderKey' || key === 'cancel'))
+      )
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid, undefined, {
           path: `$.options.${key}`
         })
@@ -798,6 +812,17 @@ class RemoteRegistration<TUnit, TSpec> {
               this.#departed.get(input.expectedGeneration),
               { generation: input.expectedGeneration }
             )
+          /** Explicit U25 options enter the accepted Peer; legacy send cannot enforce its profile. */
+          if (
+            live.runtime &&
+            !forwarded &&
+            (options.orderKey !== undefined || options.cancel !== undefined)
+          )
+            return live.runtime.request(method, data, {
+              ...options,
+              ...(input.remainingMs === undefined ? {} : { timeoutMs: input.remainingMs }),
+              ...(key === undefined ? {} : { idempotencyKey: key })
+            }) as Promise<IRpcPortableValue>
           return live.served.endpoint
             .send<IRpcPortableValue>(
               live.channel.peerId,

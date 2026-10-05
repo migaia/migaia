@@ -1,4 +1,4 @@
-import type { IRpcEnvelope } from '../../contract/index.js'
+import type { IRpcEnvelope, IRpcRuntimeEnvelope } from '../../contract/index.js'
 import type { IRpcFeature } from '../feature.js'
 import type { IRpcTransport } from '../transport.js'
 import type { IRpcOutboundAdmission, IRpcOutboundGate } from '../internal/outbound-gate.js'
@@ -36,7 +36,7 @@ export type IIpcSendAdmission = IRpcOutboundAdmission
 export type IIpcSendGate = Omit<IRpcOutboundGate, 'onEvent'> &
   Readonly<{
     run(
-      envelope: IRpcEnvelope,
+      envelope: IRpcEnvelope | IRpcRuntimeEnvelope,
       sendNow: () => void | Promise<void>,
       admission?: IIpcSendAdmission
     ): Promise<void>

@@ -54,6 +54,10 @@ export type IRemoteCallOptions = Readonly<{
   signal?: IRpcAbortSignal
   timeoutMs?: number
   idempotencyKey?: string
+  /** Only runtime profile operations negotiate provider-wide ordered execution. */
+  orderKey?: string
+  /** The final provider start decides this intent; resource revocation retains its original owner. */
+  cancel?: 'before-start'
 }>
 
 /** A one-shot guard runs after input validation and before the generation gate. */

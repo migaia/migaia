@@ -1,7 +1,31 @@
-import { createOutboundEnvelope } from './outbound-envelope.js'
+import { createOutboundEnvelope, readForwardRoute } from './outbound-envelope.js'
 import { hasFastEndpoint, hasFastComponents } from './fast-path.js'
-import { hasBatchAgreement, batchPayloadLimit } from './batch-frame.js'
-import { readRpcBatchMembers, assertRpcPhysicalFrameSize } from '../../contract/batch-frame.js'
+import { hasBatchAgreement, batchPayloadLimit, readTransportCapabilities } from './batch-frame.js'
+import { readRuntimeCarrier } from '../../contract/runtime-api/carrier.js'
+import { normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize.js'
+import { runtimeOperationCapabilities } from '../../contract/runtime-api/capabilities.js'
+import {
+  RpcRuntimeKind,
+  RpcRuntimeOperation,
+  RpcRuntimeCancel,
+  RpcRuntimeMode,
+  RpcRuntimeProfile
+} from '../../contract/runtime-api/constants.js'
+import type {
+  IRpcRuntimeEnvelope,
+  IRpcRuntimeGeneration,
+  IRpcRuntimeTask,
+  IRpcRuntimeOptions,
+  IRpcRuntimeStep
+} from '../../contract/runtime-api/types.js'
+import { RpcCapability, RpcBatchPhysical } from '../../contract/wire-constants.js'
+import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
+import type { ProviderAdmissionRegistry, IProviderIngressReceipt } from './provider-admission.js'
+import {
+  readRpcBatchMembers,
+  assertRpcPhysicalFrameSize,
+  rejectRpcPhysicalFrameSize
+} from '../../contract/batch-frame.js'
 import type { IInboundIdentityPreparedSource } from './inbound-identity.js'
 import { RpcSerializationError } from '../errors.js'
 import { enableFastTimePort } from './time-port.js'
@@ -81,7 +105,7 @@ import {
 import { OperationScope } from './operation-scope.js'
 import { InboundIdentityCoordinator, type IInboundIdentityAdmission } from './inbound-identity.js'
 import { RpcVariationCoordinator } from './variation-coordinator.js'
-import { createSafeRecord, fanoutDeliveryKey } from './safe-value.js'
+import { createSafeRecord, fanoutDeliveryKey, runtimeTaskKey } from './safe-value.js'
 import {
   readSelectedFramerChunks,
   RpcDebugProperty,
@@ -101,7 +125,13 @@ type IOutboundPending = {
   readonly resolve: (value: unknown) => void
   readonly reject: (error: unknown) => void
   readonly cleanup: () => void
+  /** Opt-in tasks correlate full mode/method/generation identity in the original pending registry. */
+  readonly runtimeTask?: IRpcRuntimeTask
 }
+
+/** Signals remain local; only the closed portable options enter an opted-in physical frame. */
+export type IRpcRuntimeSendOptions = Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+  Pick<ISendOptions, 'timeoutMs' | 'signal'>
 
 /** Receiver identity selected for one logical target before a frame is emitted. */
 export type IOutboundReceiver = {
@@ -192,6 +222,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #batch: boolean
   /** Factory-owned framing overhead is shared by ingress and the existing sender. */
   readonly #physicalLimit: number
+  /** Only a genuine negotiated runtime base enables selector parsing on this original port. */
+  readonly #runtimeCapabilities: readonly string[] | undefined
+  /** The original runtime assembly supplies its accepted execution/session identity once. */
+  #runtimeGeneration: IRpcRuntimeGeneration | undefined
   /** Optional wrapper-owned whole-envelope gate selected before the sender is constructed. */
   readonly #outboundGate: IRpcOutboundGate | undefined
   /** Active request settlements keyed by wire task id. */
@@ -307,6 +341,13 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     }
     this.#batch = hasBatchAgreement(kernel.transport) && hasFastComponents(this.#components)
     this.#physicalLimit = batchPayloadLimit(kernel.transport)
+    /** A local capability offer alone cannot install a parser or create physical receipts. */
+    const negotiated = readTransportCapabilities(kernel.transport)
+    this.#runtimeCapabilities =
+      negotiated?.includes(RpcCapability.runtimeApi) &&
+      negotiated.includes(RpcCapability.generation)
+        ? negotiated
+        : undefined
     this.#fast = hasFastEndpoint(prepared.options)
     if (this.#fast) enableFastTimePort(kernel.time)
     this.#outboundGate = readOutboundGate(kernel.transport)
@@ -351,6 +392,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           this.#replay.clear()
         })
       )
+    if (this.#runtimeCapabilities) kernel.registerOwner(EndpointOwnerKey.outboundAttachment, this)
     kernel.registerOwner('outbound-pipeline', this.#pipeline)
     kernel.registerOwner(EndpointOwnerKey.pendingRegistry, this.#pending)
     kernel.registerOwner('replay-window', this.#replay)
@@ -373,6 +415,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     for (const event of prepared.options.initialHookEvents ?? []) this.#emit(event)
     kernel.registerRoute(RpcMessageKind.response, (message) => this.#receiveResponse(message))
     kernel.registerRoute(RpcMessageKind.variation, (message) => this.#receiveVariation(message))
+    kernel.registerRoute(RpcRuntimeKind.control, (message) => this.#receiveRuntimeControl(message))
+    kernel.registerRoute(RpcRuntimeKind.outcome, (message) => this.#receiveRuntimeOutcome(message))
   }
 
   /** Routes one variation through the shared coordinator after identity admission. */
@@ -421,120 +465,173 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           if (this.#native && !this.#native.active) return
           const physical = this.inboundIdentity.prepareSource(message)
           if (!physical) return
-          let frame = physical.data
-          if (this.#batch && (this.#authentication || typeof frame === 'string'))
-            assertRpcPhysicalFrameSize(frame, this.#physicalLimit)
-          /** Private physical binding follows this exact context through async transforms. */
-          const authenticationContext = {
-            direction: 'inbound' as const,
-            endpointId: this.id,
-            platform: this.kernel.platform
-          }
-          if (this.#authentication) {
-            /** Native or absent (undefined/null) sources use the endpoint partition. */
-            let session =
-              this.#native || physical.source == null
-                ? this.#authenticationPhysicalSession
-                : undefined
-            if (
-              !session &&
-              physical.source !== null &&
-              (typeof physical.source === 'object' || typeof physical.source === 'function')
-            ) {
-              /** Actual source object is weakly owned; token text cannot create trusted sessions. */
-              const source = physical.source as object
-              session = this.#authenticationSessions.get(source)
-              if (!session) {
-                session = {}
-                this.#authenticationSessions.set(source, session)
+          /** Default traffic never probes a new selector unless the actual base was negotiated. */
+          const carrier = this.#runtimeCapabilities ? readRuntimeCarrier(physical.data) : undefined
+          /** Capture arrival in the existing provider scope before any transform can yield. */
+          const receipt = carrier
+            ? (
+                this.kernel.readOwner(EndpointOwnerKey.providerAdmission) as
+                  | ProviderAdmissionRegistry
+                  | undefined
+              )?.captureIngress()
+            : undefined
+          if (carrier && !receipt) rejectRpcPhysicalFrameSize()
+          /** Closing withdraws exact candidates while a caller-owned asynchronous transform waits. */
+          const closeCandidate = receipt
+            ? () => {
+                receipt.release()
+              }
+            : undefined
+          if (closeCandidate)
+            this.kernel.closingSignal.addEventListener('abort', closeCandidate, { once: true })
+          try {
+            let frame = carrier ? carrier.frame : physical.data
+            if (carrier) {
+              /**
+               * Only original paired callables prove whole acceptance and the complete frame
+               * budget.
+               */
+              const facts = readRpcSingleFrameFacts(
+                this.#components.framer.accept,
+                this.#components.framer.frame
+              )
+              if (!facts)
+                throw new RpcError(
+                  RpcCoreErrorCode.capabilityUnsupported,
+                  RpcCoreErrorText.capabilityUnsupported
+                )
+              assertRpcPhysicalFrameSize(
+                physical.data,
+                Math.min(RpcBatchPhysical.maxBytes, this.#physicalLimit, facts.maxMessageBytes)
+              )
+            }
+            if (this.#batch && (this.#authentication || typeof frame === 'string'))
+              assertRpcPhysicalFrameSize(frame, this.#physicalLimit)
+            /** Private physical binding follows this exact context through async transforms. */
+            const authenticationContext = {
+              direction: 'inbound' as const,
+              endpointId: this.id,
+              platform: this.kernel.platform
+            }
+            if (this.#authentication) {
+              /** Native or absent (undefined/null) sources use the endpoint partition. */
+              let session =
+                this.#native || physical.source == null
+                  ? this.#authenticationPhysicalSession
+                  : undefined
+              if (
+                !session &&
+                physical.source !== null &&
+                (typeof physical.source === 'object' || typeof physical.source === 'function')
+              ) {
+                /** Actual source object is weakly owned; token text cannot create trusted sessions. */
+                const source = physical.source as object
+                session = this.#authenticationSessions.get(source)
+                if (!session) {
+                  session = {}
+                  this.#authenticationSessions.set(source, session)
+                }
+              }
+              if (session)
+                bindAuthenticationReplayContext(
+                  authenticationContext,
+                  session,
+                  () =>
+                    this.kernel.state === 'active' &&
+                    this.kernel.generation === generation &&
+                    (this.#native?.active ?? true),
+                  this.kernel.topology !== 'exclusive' && physical.source == null
+                    ? {
+                        receiverId: this.receiverId,
+                        unknown: (nonce, counter) =>
+                          this.#pipeline
+                            .sendAuthenticationControl({
+                              control: RpcAuthenticationControl.unknown,
+                              echoNonce: nonce,
+                              counter,
+                              receiverId: this.receiverId
+                            })
+                            .catch((error) => this.emitFailure(error))
+                      }
+                    : undefined
+                )
+              frame = await this.#authentication.unprotect(frame, authenticationContext)
+              if (frame === consumedAuthenticationFrame) return
+            }
+            this.#native?.observeOwner()
+            this.kernel.assertActive(generation)
+            if (this.#native && !this.#native.active) return
+            /** Private component proof omits generic whole-frame fanout, never semantic admission. */
+            let decoded: unknown
+            if (this.#fast && !carrier) decoded = this.#runtimeComponents.codec.decode(frame)
+            else {
+              const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
+                source: physical.sourceToken,
+                messageId: 'whole'
+              })
+              const accepted = this.#runtimeComponents.framer.accept(preparedFrame.frame, {
+                source: physical.sourceToken,
+                messageId: preparedFrame.messageId
+              })
+              if (accepted.status === 'pending') return
+              if (accepted.status === 'rejected') {
+                this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
+                return
+              }
+              decoded = this.#runtimeComponents.codec.decode(accepted.value)
+            }
+            if (carrier)
+              return await this.#receiveRuntimeEnvelope(
+                decoded,
+                physical,
+                message,
+                generation,
+                authenticationContext,
+                receipt!
+              )
+            /**
+             * Unknown/no-capability carriers keep their original normalize path without batch
+             * probing.
+             */
+            let members: readonly unknown[] | undefined
+            if (this.#batch) {
+              try {
+                members = readRpcBatchMembers(decoded)
+              } catch (cause) {
+                throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
               }
             }
-            if (session)
-              bindAuthenticationReplayContext(
-                authenticationContext,
-                session,
-                () =>
-                  this.kernel.state === 'active' &&
-                  this.kernel.generation === generation &&
-                  (this.#native?.active ?? true),
-                this.kernel.topology !== 'exclusive' && physical.source == null
-                  ? {
-                      receiverId: this.receiverId,
-                      unknown: (nonce, counter) =>
-                        this.#pipeline
-                          .sendAuthenticationControl({
-                            control: RpcAuthenticationControl.unknown,
-                            echoNonce: nonce,
-                            counter,
-                            receiverId: this.receiverId
-                          })
-                          .catch((error) => this.emitFailure(error))
-                    }
-                  : undefined
-              )
-            frame = await this.#authentication.unprotect(frame, authenticationContext)
-            if (frame === consumedAuthenticationFrame) return
-          }
-          this.#native?.observeOwner()
-          this.kernel.assertActive(generation)
-          if (this.#native && !this.#native.active) return
-          /** Private component proof omits generic whole-frame fanout, never semantic admission. */
-          let decoded: unknown
-          if (this.#fast) decoded = this.#runtimeComponents.codec.decode(frame)
-          else {
-            const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
-              source: physical.sourceToken,
-              messageId: 'whole'
-            })
-            const accepted = this.#runtimeComponents.framer.accept(preparedFrame.frame, {
-              source: physical.sourceToken,
-              messageId: preparedFrame.messageId
-            })
-            if (accepted.status === 'pending') return
-            if (accepted.status === 'rejected') {
-              this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
-              return
-            }
-            decoded = this.#runtimeComponents.codec.decode(accepted.value)
-          }
-          /**
-           * Unknown/no-capability carriers keep their original normalize path without batch
-           * probing.
-           */
-          let members: readonly unknown[] | undefined
-          if (this.#batch) {
-            try {
-              members = readRpcBatchMembers(decoded)
-            } catch (cause) {
-              throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
-            }
-          }
-          if (!members)
-            return this.#receiveEnvelope(
-              decoded,
-              physical,
-              message,
-              generation,
-              authenticationContext
-            )
-          /**
-           * Each sibling owns its own identity lease and dispatch completion; no member awaits
-           * another.
-           */
-          const proofs = this.inboundIdentity.splitPrepared(physical, members.length)
-          await Promise.all(
-            members.map((member, index) =>
-              this.#receiveEnvelope(
-                member,
-                proofs[index]!,
+            if (!members)
+              return this.#receiveEnvelope(
+                decoded,
+                physical,
                 message,
                 generation,
                 authenticationContext
-              ).catch((error: unknown) => {
-                this.emitFailure(error)
-              })
+              )
+            /**
+             * Each sibling owns its own identity lease and dispatch completion; no member awaits
+             * another.
+             */
+            const proofs = this.inboundIdentity.splitPrepared(physical, members.length)
+            await Promise.all(
+              members.map((member, index) =>
+                this.#receiveEnvelope(
+                  member,
+                  proofs[index]!,
+                  message,
+                  generation,
+                  authenticationContext
+                ).catch((error: unknown) => {
+                  this.emitFailure(error)
+                })
+              )
             )
-          )
+          } finally {
+            receipt?.release()
+            if (closeCandidate)
+              this.kernel.closingSignal.removeEventListener('abort', closeCandidate)
+          }
         },
         transportError: (error) => {
           /** Settle with the original transport error before retirement can emit a lifecycle abort. */
@@ -548,6 +645,555 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     )
     this.kernel.activate(activation)
     this.#activated = true
+  }
+
+  /** Admit one independent semantic frame through the original auth, identity and route owners. */
+  async #receiveRuntimeEnvelope(
+    decoded: unknown,
+    physical: IInboundIdentityPreparedSource,
+    message: IRpcInboundMessage,
+    generation: number,
+    authenticationContext: import('../typing.js').IRpcAuthenticationContext,
+    receipt: IProviderIngressReceipt
+  ): Promise<void> {
+    /** Closed metadata, task association and portable payloads are checked before identity leases. */
+    const envelope = normalizeRuntimeEnvelope(decoded)
+    assertAuthenticationChallengeEnvelope(authenticationContext, envelope)
+    markAuthenticationReplayEnvelope(authenticationContext, envelope)
+    /** Every explicitly requested capability must be present in the actual completed intersection. */
+    const required = runtimeOperationCapabilities(
+      envelope.task.mode,
+      'options' in envelope ? envelope.options : {}
+    )
+    if (required.some((capability) => !this.#runtimeCapabilities?.includes(capability)))
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    if (envelope.route.targetId !== this.id || envelope.route.receiverId !== this.receiverId) return
+    if (
+      envelope.kind === RpcRuntimeKind.control &&
+      envelope.operation === RpcRuntimeOperation.cancel &&
+      !this.#runtimeCapabilities?.includes(RpcCapability.abort) &&
+      !this.#runtimeCapabilities?.includes(RpcCapability.cancelBeforeStart)
+    )
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    /** Selector fields grant no source authority; the same connect verifier sees actual content. */
+    const admission = await this.inboundIdentity.admitPrepared(physical, {
+      senderId: envelope.route.senderId,
+      targetId: envelope.route.targetId,
+      data:
+        'payload' in envelope ? envelope.payload : 'steps' in envelope ? envelope.steps : undefined,
+      inbound: message
+    })
+    if (!admission) return
+    /** One identity release serves rejection, withdrawal and eventual business completion. */
+    let released = false
+    const releaseIdentity = (): void => {
+      if (!released) {
+        released = true
+        admission.release()
+      }
+    }
+    try {
+      this.kernel.assertActive(generation)
+      this.#rememberAuthenticationReply(envelope, envelope.route.senderId)
+      if (envelope.kind !== RpcRuntimeKind.call && envelope.kind !== RpcRuntimeKind.group) {
+        receipt.release()
+        await this.kernel.dispatchRoute(
+          envelope.kind,
+          Object.freeze({ envelope, inbound: message, admission })
+        )
+        return
+      }
+      /** Prefix submission enters the original route synchronously and never waits for its result. */
+      await new Promise<void>((resolve) => {
+        const close = (): void => {
+          receipt.release()
+          releaseIdentity()
+          resolve()
+        }
+        const finish = (): void => {
+          this.kernel.closingSignal.removeEventListener('abort', close)
+          releaseIdentity()
+          resolve()
+        }
+        this.kernel.closingSignal.addEventListener('abort', close, { once: true })
+        if (
+          !receipt.ready(() => {
+            if (this.kernel.state !== 'active' || this.kernel.generation !== generation) {
+              finish()
+              return
+            }
+            void this.kernel
+              .dispatchRoute(
+                envelope.kind,
+                Object.freeze({ envelope, inbound: message, admission })
+              )
+              .catch((error: unknown) => this.emitFailure(error))
+              .finally(finish)
+          })
+        )
+          finish()
+      })
+    } finally {
+      releaseIdentity()
+    }
+  }
+
+  /** Reverse freshness is retained only after the original identity owner accepted this hop. */
+  configureRuntime(generation: IRpcRuntimeGeneration): void {
+    if (this.#runtimeGeneration !== undefined || !this.#runtimeCapabilities)
+      throw new RpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.providerGenerationMismatch
+      )
+    this.#runtimeGeneration = generation
+  }
+
+  /** Incoming describe binds its exact already-authenticated invocation token. */
+  bindRuntimeCaller(token: string, generation: IRpcRuntimeGeneration): void {
+    if (!this.inboundIdentity.bindGeneration(token, generation))
+      throw new RpcError(
+        RpcCoreErrorCode.providerGenerationMismatch,
+        RpcCoreErrorText.providerGenerationMismatch
+      )
+  }
+
+  /**
+   * Outgoing describe binds only the original verified response source, never a self-reported
+   * token.
+   */
+  bindRuntimeTarget(targetId: string, generation: IRpcRuntimeGeneration): void {
+    const binding = this.#responseBindings.get(targetId)
+    if (!binding || !this.inboundIdentity.bindResponseGeneration(binding, generation))
+      throw new RpcError(
+        RpcCoreErrorCode.providerGenerationMismatch,
+        RpcCoreErrorText.providerGenerationMismatch
+      )
+  }
+
+  /** Provider execution reads the same local generation reference held by the original caller owner. */
+  get runtimeGeneration(): IRpcRuntimeGeneration | undefined {
+    return this.#runtimeGeneration
+  }
+
+  /** Original controls and executor replies use the one codec/framer/auth/physical sender. */
+  sendRuntimeFrame(
+    envelope: IRpcRuntimeEnvelope,
+    admission?: IRpcFrameAdmission,
+    onPrepared?: () => Promise<void>
+  ): Promise<void> {
+    return this.#pipeline.sendRuntime(
+      envelope,
+      this.#runtimeCapabilities ?? [],
+      admission
+        ? {
+            queueSignal: admission.queueSignal,
+            signals: admission.queueSignal ? [admission.queueSignal] : [],
+            assertCanSend: admission.assertCanSend
+          }
+        : undefined,
+      admission?.onStarted,
+      onPrepared
+    )
+  }
+
+  /** The original replay owner bounds a lazy stream's single task until its actual terminal. */
+  reserveRuntimeStream(
+    id: string,
+    targetGeneration: IRpcRuntimeGeneration,
+    method: string,
+    options: IRpcRuntimeSendOptions
+  ): Readonly<{ task: IRpcRuntimeTask; options: IRpcRuntimeOptions }> {
+    this.kernel.assertActive()
+    /** Full capability and local control validation precedes original task reservation. */
+    const wireOptions = this.#runtimeOptions(RpcRuntimeMode.stream, options)
+    if (!this.#replay.reserveId(id))
+      throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+    return {
+      task: {
+        mode: RpcRuntimeMode.stream,
+        callerId: this.id,
+        callerGeneration: this.#runtimeGeneration!,
+        targetGeneration,
+        method
+      },
+      options: wireOptions
+    }
+  }
+
+  /** Stream cleanup releases only its original reserved task identity, never another pending. */
+  releaseRuntimeStream(id: string): void {
+    this.#replay.releaseId(id)
+  }
+
+  /** Lazy open uses the original receiver selection, complete task grammar and one physical sender. */
+  async prepareRuntimeStreamOpen(
+    id: string,
+    targetId: string,
+    task: IRpcRuntimeTask,
+    options: IRpcRuntimeOptions,
+    payload: IRpcPortableValue | undefined,
+    forwardRoute?: readonly string[]
+  ): Promise<IRpcRuntimeEnvelope> {
+    /** The accepted original binding supplies the actual physical receiver. */
+    const receiver = await this.resolveReceiver(targetId)
+    return normalizeRuntimeEnvelope({
+      profile: RpcRuntimeProfile,
+      kind: RpcRuntimeKind.call,
+      id,
+      task,
+      options,
+      route: {
+        applicationVersion: this.#version,
+        senderId: this.id,
+        targetId,
+        receiverId: receiver.receiverId,
+        sentAt: this.kernel.time.timestamp(),
+        ...(forwardRoute === undefined ? {} : { forwardRoute })
+      },
+      ...(payload === undefined ? {} : { payload })
+    })
+  }
+
+  /** Stream replies use the same exact authenticated binding fence as original request pending. */
+  runtimeReplyMatches(
+    envelope: IRpcRuntimeEnvelope,
+    task: IRpcRuntimeTask,
+    admission: IInboundIdentityAdmission
+  ): boolean {
+    return (
+      runtimeTaskKey(task) === runtimeTaskKey(envelope.task) &&
+      this.#responseBindings.get(envelope.route.senderId) === admission.bindingKey
+    )
+  }
+
+  /** Every new mode uses one option/capability policy; ordinary calls never enter this branch. */
+  #runtimeOptions(mode: RpcRuntimeMode, options: IRpcRuntimeSendOptions): IRpcRuntimeOptions {
+    if (!this.#runtimeGeneration)
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    const wireOptions: IRpcRuntimeOptions = {
+      ...(options.orderKey === undefined ? {} : { orderKey: options.orderKey }),
+      ...(options.cancel === undefined ? {} : { cancel: options.cancel }),
+      ...(options.idempotencyKey === undefined ? {} : { idempotencyKey: options.idempotencyKey }),
+      ...(options.timeoutMs === undefined ||
+      options.timeoutMs === false ||
+      (mode === RpcRuntimeMode.notify && options.cancel !== RpcRuntimeCancel)
+        ? {}
+        : { timeoutMs: options.timeoutMs })
+    }
+    const required = runtimeOperationCapabilities(mode, wireOptions, options.signal !== undefined)
+    if (required.some((capability) => !this.#runtimeCapabilities?.includes(capability)))
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    if (options.signal) this.#assertAbortSignal(options.signal)
+    assertTimeout(options.timeoutMs)
+    if (options.signal?.aborted)
+      throw new RpcAbortError(undefined, undefined, resolveAbortReason(options.signal))
+    return wireOptions
+  }
+
+  /** Opted-in business uses the original task allocator, replay budget, pending registry and scope. */
+  async sendRuntimeOperation(
+    targetId: string,
+    targetGeneration: IRpcRuntimeGeneration,
+    mode: 'request' | 'notify' | 'group' | 'outcome',
+    input: Readonly<{
+      method?: string
+      payload?: IRpcPortableValue
+      steps?: readonly IRpcRuntimeStep[]
+      idempotencyKey?: string
+    }>,
+    options: IRpcRuntimeSendOptions = {},
+    awaitNotifyTerminal = false
+  ): Promise<unknown> {
+    this.kernel.assertActive()
+    /** All new modes share the same original capability and option validation owner. */
+    const wireOptions = this.#runtimeOptions(mode, options)
+    const taskId = allocateRpcId(this.#uuid, 'task', this.id, targetId, (id) =>
+      this.#replay.hasReservedId(id)
+    )
+    if (!this.#replay.reserveId(taskId))
+      throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+    /** Invalid/custom ID allocation cannot strand a child lifecycle listener. */
+    const operation = new OperationScope(
+      this.kernel.generation,
+      options.timeoutMs,
+      this.kernel.closingSignal,
+      () => this.kernel.time.scheduler.now()
+    )
+    const task: IRpcRuntimeTask = {
+      mode,
+      callerId: this.id,
+      callerGeneration: this.#runtimeGeneration!,
+      targetGeneration,
+      ...(input.method === undefined ? {} : { method: input.method })
+    }
+    let envelope: IRpcRuntimeEnvelope
+    try {
+      const receiver = await this.resolveReceiver(targetId)
+      operation.assertActive(this.kernel.generation)
+      envelope = normalizeRuntimeEnvelope({
+        profile: RpcRuntimeProfile,
+        kind:
+          mode === RpcRuntimeMode.group
+            ? RpcRuntimeKind.group
+            : mode === RpcRuntimeMode.outcome
+              ? RpcRuntimeKind.outcome
+              : RpcRuntimeKind.call,
+        id: taskId,
+        task,
+        ...(mode === RpcRuntimeMode.outcome
+          ? { operation: RpcRuntimeOperation.lookup, idempotencyKey: input.idempotencyKey }
+          : { options: wireOptions }),
+        route: {
+          applicationVersion: this.#version,
+          senderId: this.id,
+          targetId,
+          receiverId: receiver.receiverId,
+          sentAt: this.kernel.time.timestamp(),
+          ...(readForwardRoute(options) === undefined
+            ? {}
+            : { forwardRoute: readForwardRoute(options) })
+        },
+        ...(mode === RpcRuntimeMode.group
+          ? { steps: input.steps }
+          : input.payload === undefined
+            ? {}
+            : { payload: input.payload })
+      })
+    } catch (error) {
+      this.#replay.releaseId(taskId)
+      operation.finish()
+      throw error
+    }
+    return new Promise<unknown>((resolve, reject) => {
+      /** Opt-in order needs true completion for forwarding leases; public notify still ends at send. */
+      const terminalReceipt =
+        mode !== RpcRuntimeMode.notify ||
+        options.cancel === RpcRuntimeCancel ||
+        options.orderKey !== undefined
+      /** Physical commit and terminal settlement are distinct for internal notification receipts. */
+      let sent = false
+      /** Every original registry/budget/listener is released by this one terminal guard. */
+      let settled = false
+      let timer: IEndpointTimer | undefined
+      const cleanup = (): void => {
+        if (timer) this.kernel.time.clearTimeout(timer)
+        options.signal?.removeEventListener('abort', onAbort)
+        this.#pending.delete(taskId)
+        this.#replay.releaseId(taskId)
+        operation.finish()
+      }
+      const fail = (error: unknown): void => {
+        if (settled) return
+        settled = true
+        cleanup()
+        if (mode === RpcRuntimeMode.notify && sent && !awaitNotifyTerminal) this.emitFailure(error)
+        else reject(error)
+      }
+      const complete = (result: unknown): void => {
+        if (settled) return
+        settled = true
+        operation.markSuccess()
+        cleanup()
+        if (mode !== RpcRuntimeMode.notify || awaitNotifyTerminal) resolve(result)
+      }
+      const cancel = (reason: unknown): void => {
+        if (settled) return
+        if (!sent || mode === RpcRuntimeMode.outcome) {
+          fail(reason)
+          return
+        }
+        void this.sendRuntimeFrame({
+          profile: RpcRuntimeProfile,
+          id: envelope.id,
+          kind: RpcRuntimeKind.control,
+          operation: RpcRuntimeOperation.cancel,
+          task,
+          route: envelope.route,
+          reason: serializeRpcError(reason, {
+            report: (failure) => this.emitFailure(failure.error)
+          })
+        }).catch((error) => this.emitFailure(error))
+        if (options.cancel !== RpcRuntimeCancel) fail(reason)
+      }
+      const onAbort = (): void =>
+        cancel(
+          new RpcAbortError(
+            undefined,
+            undefined,
+            options.signal ? resolveAbortReason(options.signal) : undefined
+          )
+        )
+      if (terminalReceipt)
+        this.#pending.set(taskId, {
+          targetId,
+          method: input.method ?? '',
+          runtimeTask: task,
+          resolve: complete,
+          reject: fail,
+          cleanup
+        })
+      try {
+        options.signal?.addEventListener('abort', onAbort, { once: true })
+        if (options.signal?.aborted) onAbort()
+        if (settled) return
+        if (options.timeoutMs !== undefined && options.timeoutMs !== false)
+          timer = this.kernel.time.setTimeout(
+            () => cancel(new RpcTimeoutError()),
+            options.timeoutMs
+          )
+        void this.#pipeline
+          .sendRuntime(
+            envelope,
+            this.#runtimeCapabilities!,
+            {
+              queueSignal: operation.signal,
+              signals: options.signal ? [options.signal] : [],
+              assertCanSend: () => {
+                if (settled) throw new RpcAbortError()
+                operation.assertActive(this.kernel.generation)
+              }
+            },
+            () => {
+              sent = true
+            }
+          )
+          .then(
+            () => {
+              if (mode === RpcRuntimeMode.notify) {
+                if (!terminalReceipt) {
+                  settled = true
+                  operation.markSuccess()
+                  cleanup()
+                }
+                if (!awaitNotifyTerminal) resolve(undefined)
+              }
+            },
+            (error: unknown) => {
+              fail(error)
+              /**
+               * A terminal may arrive before the physical write settles; neither can hide write
+               * failure.
+               */
+              reject(error)
+            }
+          )
+      } catch (error) {
+        fail(error)
+      }
+    })
+  }
+
+  /** Only an authenticated terminal with the full selected task can settle the original pending. */
+  async #receiveRuntimeOutcome(message: unknown): Promise<void> {
+    const record = message as {
+      envelope: IRpcRuntimeEnvelope
+      admission: IInboundIdentityAdmission
+    }
+    const envelope = record.envelope
+    if (envelope.kind !== RpcRuntimeKind.outcome) return
+    if (envelope.operation === RpcRuntimeOperation.lookup) {
+      const provider = this.kernel.readOwner(EndpointOwnerKey.providerAttachment) as
+        | { receiveRuntimeOutcome(message: unknown): Promise<void> }
+        | undefined
+      await provider?.receiveRuntimeOutcome(message)
+      return
+    }
+    const pending = this.#runtimePending(envelope, record.admission)
+    pending?.resolve({
+      state: envelope.state,
+      store: envelope.store,
+      ...(envelope.state === 'done' ? { outcome: envelope.outcome } : {})
+    })
+  }
+
+  /** Complete task and original source binding jointly fence every terminal and lookup response. */
+  #runtimePending(
+    envelope: IRpcRuntimeEnvelope,
+    admission: IInboundIdentityAdmission
+  ): IOutboundPending | undefined {
+    const pending = this.#pending.get(envelope.id)
+    if (
+      !pending?.runtimeTask ||
+      pending.targetId !== envelope.route.senderId ||
+      runtimeTaskKey(pending.runtimeTask) !== runtimeTaskKey(envelope.task)
+    )
+      return undefined
+    const binding = this.#responseBindings.get(envelope.route.senderId)
+    return binding && binding === admission.bindingKey ? pending : undefined
+  }
+
+  /** Only an authenticated terminal with the full selected task can settle the original pending. */
+  async #receiveRuntimeControl(message: unknown): Promise<void> {
+    const record = message as {
+      envelope: IRpcRuntimeEnvelope
+      admission: IInboundIdentityAdmission
+    }
+    const envelope = record.envelope
+    if (envelope.kind !== RpcRuntimeKind.control) return
+    if (envelope.operation === RpcRuntimeOperation.stream) {
+      if (envelope.stream.event === 'pull' || envelope.stream.event === 'finish-without-items') {
+        /** The original final controller performs authentication/task/start fencing for credits. */
+        const provider = this.kernel.readOwner(EndpointOwnerKey.providerAttachment) as
+          | { receiveRuntimeControl(message: unknown): Promise<void> }
+          | undefined
+        await provider?.receiveRuntimeControl(message)
+      } else {
+        /** Replies belong to the original consumer registry, independently from scalar pending. */
+        const owner = this.kernel.readOwner(EndpointOwnerKey.streamOwner) as
+          | {
+              receiveRuntimeControl(
+                envelope: IRpcRuntimeEnvelope,
+                admission: IInboundIdentityAdmission
+              ): void
+            }
+          | undefined
+        owner?.receiveRuntimeControl(envelope, record.admission)
+      }
+      return
+    }
+    if (envelope.operation === RpcRuntimeOperation.cancel) {
+      const provider = this.kernel.readOwner(EndpointOwnerKey.providerAttachment) as
+        | { receiveRuntimeControl(message: unknown): Promise<void> }
+        | undefined
+      await provider?.receiveRuntimeControl(message)
+      return
+    }
+    if (envelope.operation !== RpcRuntimeOperation.terminal) return
+    const pending = this.#runtimePending(envelope, record.admission)
+    if (!pending) return
+    if (envelope.completion.ok) pending.resolve(envelope.completion.result)
+    else pending.reject(deserializeRpcError(envelope.completion.error))
+  }
+
+  /** Reverse freshness is retained only after the original identity owner accepted this hop. */
+  #rememberAuthenticationReply(envelope: object, senderId: string): void {
+    const challenge = readAuthenticationChallengeProof(envelope)
+    if (
+      challenge?.control === undefined &&
+      challenge?.replyChallenge &&
+      challenge.replyReceiverId &&
+      (challenge.replyReceiverId === senderId ||
+        challenge.replyReceiverId.startsWith(`${senderId}:`))
+    )
+      readAuthenticationChallengePort(this.#authentication)?.remember(
+        challenge.replyReceiverId,
+        challenge.nonce,
+        challenge.replyChallenge,
+        true,
+        senderId
+      )
   }
 
   /**
@@ -605,21 +1251,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     try {
       this.kernel.assertActive(generation)
       /** Reverse freshness is retained only after the original identity owner admitted this member. */
-      const challenge = readAuthenticationChallengeProof(envelope)
-      if (
-        challenge?.control === undefined &&
-        challenge?.replyChallenge &&
-        challenge.replyReceiverId &&
-        (challenge.replyReceiverId === route.route.senderId ||
-          challenge.replyReceiverId.startsWith(`${route.route.senderId}:`))
-      )
-        readAuthenticationChallengePort(this.#authentication)?.remember(
-          challenge.replyReceiverId,
-          challenge.nonce,
-          challenge.replyChallenge,
-          true,
-          route.route.senderId
-        )
+      this.#rememberAuthenticationReply(envelope, route.route.senderId)
       const handled = await this.kernel.dispatchRoute(
         envelope.kind,
         Object.freeze({ envelope, route, inbound: message, admission })
@@ -1323,7 +1955,13 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     const method = route.route.method
     if (typeof method !== 'string') return
     const pending = this.#pending.get(canonical.id)
-    if (!pending || pending.targetId !== route.route.senderId || pending.method !== method) return
+    if (
+      !pending ||
+      pending.runtimeTask ||
+      pending.targetId !== route.route.senderId ||
+      pending.method !== method
+    )
+      return
     const binding = record.admission?.bindingKey
     if (!binding || this.kernel.state !== 'active') return
     const existing = this.#responseBindings.get(route.route.senderId)

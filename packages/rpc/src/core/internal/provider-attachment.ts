@@ -13,6 +13,8 @@ import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcAbortSignal, IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
   deserializeRpcError,
+  invalidRpcStream,
+  RpcStreamViolation,
   RpcControl,
   RpcRouteProfile,
   type IRpcEnvelope,
@@ -21,7 +23,8 @@ import {
 } from '../../contract/index.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IInboundIdentityAdmission } from './inbound-identity.js'
-import type { IEndpointKernelHost } from '../endpoint-kernel.js'
+import { EndpointOwnerKey, type IEndpointKernelHost } from '../endpoint-kernel.js'
+import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
 import type {
   IRpcInboundIdentityPort,
   IRpcOutboundOperationsPort,
@@ -38,8 +41,11 @@ import {
   authenticationReplyReceiverId
 } from './authentication-replay.js'
 import { NativeDefaultIdText } from './native-default-id-text.js'
-import { tupleKey } from './safe-value.js'
+import { tupleKey, runtimeTaskKey } from './safe-value.js'
 import { createRpcIdempotencyStore } from '../idempotency-store.js'
+import type { RpcOutboundAttachment } from './outbound-attachment.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
+import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/runtime-api/constants.js'
 import {
   readSelectedFramerChunks,
   RpcDebugProperty,
@@ -71,6 +77,8 @@ export class RpcProviderAttachment {
   readonly #authenticated: boolean
   /** Per-task provider execution quotas. */
   readonly #admission: ProviderAdmissionRegistry
+  /** Opt-in runtime sessions borrow one logical-provider scope; ordinary quotas stay endpoint-local. */
+  readonly #runtimeAdmission: ProviderAdmissionRegistry
   /** Active provider abort controllers. */
   readonly #controllers = new Map<string, IRpcProviderController>()
   /** Provider execution owner. */
@@ -100,7 +108,8 @@ export class RpcProviderAttachment {
   constructor(
     kernel: IEndpointKernelHost,
     ports: IRpcProviderPorts,
-    prepared: IPreparedEndpoint<string>
+    prepared: IPreparedEndpoint<string>,
+    admission?: ProviderAdmissionRegistry
   ) {
     this.#kernel = kernel
     this.#chunks = readSelectedFramerChunks(prepared.options.components!)
@@ -116,8 +125,13 @@ export class RpcProviderAttachment {
     this.#abortEnabled = prepared.options.features?.abort === true
     this.#admission = new ProviderAdmissionRegistry(
       prepared.options.providerLimits?.maxGlobal ?? 256,
-      prepared.options.providerLimits?.maxPerPeer ?? 64
+      prepared.options.providerLimits?.maxPerPeer ?? 64,
+      readRpcSingleFrameFacts(
+        prepared.options.components!.framer.accept,
+        prepared.options.components!.framer.frame
+      )?.maxConcurrentMessages
     )
+    this.#runtimeAdmission = admission ?? this.#admission
     if (
       prepared.options.providerLimits?.onRejected !== undefined &&
       typeof prepared.options.providerLimits.onRejected !== 'function'
@@ -146,6 +160,7 @@ export class RpcProviderAttachment {
       setTimeout: (task, delayMs) => kernel.time.setTimeout(task, delayMs),
       clearTimeout: (timer) => kernel.time.clearTimeout(timer),
       idempotencyStore: prepared.options.idempotency?.store ?? createRpcIdempotencyStore(),
+      runtimeDefaultMemoryStore: prepared.options.idempotency?.store === undefined,
       idempotencyScope: prepared.options.idempotency?.scope,
       id: this.#id,
       registry: this.#registry,
@@ -201,8 +216,8 @@ export class RpcProviderAttachment {
           nativeReplayReceipt(kernel.transport)?.qualified === true &&
             (!this.#authenticated || hasAuthenticationReplayBinding(request.envelope))
         ),
-      consumePendingAbort: (key) =>
-        this.#variations.admit({ operation: 'consumeAbort', key }) as {
+      consumePendingAbort: (key, association) =>
+        this.#variations.admit({ operation: 'consumeAbort', key, association }) as {
           readonly found: boolean
           readonly reason: unknown
         },
@@ -217,12 +232,16 @@ export class RpcProviderAttachment {
         NativeDefaultIdText.providerTerminalSubscription,
         native.onRetire(() => this.#replay.clear())
       )
+    if (kernel.readOwner(EndpointOwnerKey.outboundAttachment))
+      kernel.registerOwner(EndpointOwnerKey.providerAttachment, this)
     kernel.registerOwner('provider-registry', this.#registry)
     kernel.registerOwner('request-replay', this.#replay)
-    kernel.registerOwner('provider-admission', this.#admission)
+    kernel.registerOwner(EndpointOwnerKey.providerAdmission, this.#runtimeAdmission)
     kernel.registerOwner('provider-controllers', this.#controllers)
     kernel.registerOwner('provider-executor', this.#executor)
     kernel.registerRoute(RpcMessageKind.request, (message) => this.#receiveRequest(message))
+    kernel.registerRoute(RpcRuntimeKind.call, (message) => this.#receiveRuntime(message))
+    kernel.registerRoute(RpcRuntimeKind.group, (message) => this.#receiveRuntime(message))
     this.#releaseAbortHandler = this.#variations.admit({
       operation: 'register',
       variation: RpcControl.abort,
@@ -375,6 +394,121 @@ export class RpcProviderAttachment {
           this.#outbound.noteUnknownField(peerKey, 'variation', `/data/payload${pointer}`, field)
       )
     })
+  }
+
+  /** Verifies source identity, rejects replay, and executes one provider request. */
+  async #receiveRuntime(message: unknown): Promise<void> {
+    const record = message as {
+      envelope: IRpcRuntimeEnvelope
+      admission: IInboundIdentityAdmission
+    }
+    if (this.#kernel.state !== 'active') return
+    const outbound = this.#kernel.readOwner(
+      EndpointOwnerKey.outboundAttachment
+    ) as RpcOutboundAttachment
+    const generation = outbound.runtimeGeneration
+    const callerGeneration = outbound.inboundIdentity.readGeneration(record.admission.token)
+    if (!generation || !callerGeneration)
+      throw new RpcError(
+        RpcCoreErrorCode.providerGenerationMismatch,
+        RpcCoreErrorText.providerGenerationMismatch
+      )
+    const native = nativeReplayReceipt(this.#kernel.transport)
+    await this.#executor.executeRuntime(record.envelope, record.admission.token, {
+      generation,
+      callerGeneration,
+      admission: this.#runtimeAdmission,
+      replay: this.#replay,
+      activeReplay:
+        native?.qualified === true &&
+        (!this.#authenticated || hasAuthenticationReplayBinding(record.envelope)),
+      replyReceiverId:
+        authenticationReplyReceiverId(record.envelope) ?? record.envelope.route.senderId,
+      send: (envelope, onPrepared) => outbound.sendRuntimeFrame(envelope, undefined, onPrepared)
+    })
+  }
+
+  /** The original controller map remains the authority for a same-hop cancel intent. */
+  async receiveRuntimeOutcome(message: unknown): Promise<void> {
+    const record = message as {
+      envelope: IRpcRuntimeEnvelope
+      admission: IInboundIdentityAdmission
+    }
+    const outbound = this.#kernel.readOwner(
+      EndpointOwnerKey.outboundAttachment
+    ) as RpcOutboundAttachment
+    const generation = outbound.runtimeGeneration
+    const callerGeneration = outbound.inboundIdentity.readGeneration(record.admission.token)
+    if (!generation || !callerGeneration)
+      throw new RpcError(
+        RpcCoreErrorCode.providerGenerationMismatch,
+        RpcCoreErrorText.providerGenerationMismatch
+      )
+    await this.#executor.lookupRuntime(record.envelope, record.admission.token, {
+      generation,
+      callerGeneration,
+      replay: this.#replay,
+      replyReceiverId:
+        authenticationReplyReceiverId(record.envelope) ?? record.envelope.route.senderId,
+      send: (envelope) => outbound.sendRuntimeFrame(envelope)
+    })
+  }
+
+  /** The original controller map remains the authority for a same-hop cancel intent. */
+  async receiveRuntimeControl(message: unknown): Promise<void> {
+    const record = message as {
+      envelope: IRpcRuntimeEnvelope
+      admission: IInboundIdentityAdmission
+    }
+    const envelope = record.envelope
+    if (
+      envelope.kind !== RpcRuntimeKind.control ||
+      (envelope.operation !== RpcRuntimeOperation.cancel &&
+        envelope.operation !== RpcRuntimeOperation.stream)
+    )
+      return
+    const key = tupleKey(record.admission.token, envelope.route.senderId, envelope.id)
+    const controller = this.#controllers.get(key)
+    const association = runtimeTaskKey(envelope.task)
+    if (
+      controller &&
+      (!controller.runtimeTask || runtimeTaskKey(controller.runtimeTask) !== association)
+    )
+      return
+    const outbound = this.#kernel.readOwner(
+      EndpointOwnerKey.outboundAttachment
+    ) as RpcOutboundAttachment
+    const generation = outbound.runtimeGeneration
+    const callerGeneration = outbound.inboundIdentity.readGeneration(record.admission.token)
+    if (
+      !generation ||
+      !callerGeneration ||
+      runtimeTaskKey({ ...envelope.task, callerGeneration, targetGeneration: generation }) !==
+        association
+    )
+      throw new RpcError(
+        RpcCoreErrorCode.providerGenerationMismatch,
+        RpcCoreErrorText.providerGenerationMismatch
+      )
+    if (envelope.operation === RpcRuntimeOperation.stream) {
+      if (controller?.streamIntent) await controller.streamIntent(envelope.stream)
+      else if (envelope.stream.event === 'finish-without-items') {
+        /**
+         * Unknown finish cannot prove an admitted before-start option; lazy early return uses
+         * cancel.
+         */
+        throw invalidRpcStream(RpcStreamViolation.event, '/stream/event')
+      }
+      return
+    }
+    const reason = envelope.reason === undefined ? undefined : deserializeRpcError(envelope.reason)
+    outbound.variations.abort(
+      key,
+      controller ? { abort: (cause) => controller.cancelIntent?.(cause) } : undefined,
+      this.#kernel.time.now() + 310_000,
+      reason,
+      association
+    )
   }
 
   /** Verifies source identity, rejects replay, and executes one provider request. */

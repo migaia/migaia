@@ -12,7 +12,7 @@ export class RpcVariationCoordinator {
   /** Abort-before-request tombstones retained by the canonical variation owner. */
   readonly #pendingAborts = new Map<
     string,
-    { readonly expiresAt: number; readonly reason: unknown }
+    { readonly expiresAt: number; readonly reason: unknown; readonly association?: string }
   >()
   /** Single-provider typed variation handlers. */
   readonly #handlers = new Map<string, IVariationHandler>()
@@ -73,25 +73,35 @@ export class RpcVariationCoordinator {
     key: string,
     controller: Pick<IRpcProviderController, 'abort'> | undefined,
     expiresAt: number,
-    reason: unknown
+    reason: unknown,
+    association?: string
   ): boolean {
     if (controller) {
       controller.abort(reason)
       return true
     }
     this.#purgeAborts()
-    if (this.#pendingAborts.has(key)) return true
+    if (this.#pendingAborts.has(key))
+      return this.#pendingAborts.get(key)!.association === association
     if (this.#pendingAborts.size >= 4096) return false
-    this.#pendingAborts.set(key, Object.freeze({ expiresAt, reason }))
+    this.#pendingAborts.set(
+      key,
+      Object.freeze({ expiresAt, reason, ...(association === undefined ? {} : { association }) })
+    )
     return true
   }
 
   /** Consumes one early-abort tombstone when provider execution creates its controller. */
-  consumeAbort(key: string): { readonly found: boolean; readonly reason: unknown } {
+  consumeAbort(
+    key: string,
+    association?: string
+  ): { readonly found: boolean; readonly reason: unknown } {
     this.#purgeAborts()
     const pending = this.#pendingAborts.get(key)
     if (!pending) return Object.freeze({ found: false, reason: undefined })
     this.#pendingAborts.delete(key)
+    if (pending.association !== association)
+      return Object.freeze({ found: false, reason: undefined })
     return Object.freeze({ found: true, reason: pending.reason })
   }
 

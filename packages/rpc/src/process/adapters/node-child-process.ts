@@ -89,7 +89,8 @@ export function createNodeProcessLauncher(
       const runtimeApiBootstrap = runtime
         ? {
             name: runtime.childName ?? options.runtimeApiBootstrap?.name ?? runtime.self.name,
-            parentInstanceId: runtime.self.instanceId
+            parentInstanceId: runtime.self.instanceId,
+            ...(runtime.generation ? { generation: runtime.generation } : {})
           }
         : options.runtimeApiBootstrap
       if (runtimeApiBootstrap && context.signal.aborted) throw resolveAbortReason(context.signal)

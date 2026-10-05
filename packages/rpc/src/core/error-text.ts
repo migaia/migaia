@@ -1,5 +1,15 @@
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** Stable fence refusal discloses no foreign task, payload or generation identity. */
+  providerGenerationMismatch: 'Provider generation does not match the selected task',
+  /** D35 runtime keys are unique across methods/bodies; callers must choose a new key for new work. */
+  runtimeIdempotencyConflict: 'Runtime idempotency key conflicts with its original operation',
+  /** D52 forbids splitting one atomic group across local business and distinct downstream providers. */
+  runtimeGroupTargetsInvalid: 'Runtime group must use one local provider or one forwarding target',
+  /** Public local group configuration must use the canonical request-only dense step grammar. */
+  runtimeGroupStepsInvalid: 'Runtime group steps are invalid',
+  /** A completed group must settle a bounded failure when its full protected result cannot fit. */
+  runtimeGroupResultTooLarge: 'Runtime group result exceeds the physical frame limit',
   /** U40 rejects a forgotten receiver challenge before decoding any business payload. */
   authenticationSessionUnknown: 'Authentication challenge session is unknown',
   /** U40 rejects malformed or misdirected signed challenge/control bindings. */

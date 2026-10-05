@@ -1,6 +1,12 @@
 import type { IRpcFramer } from '../contract/types.js'
 import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
 import { RpcProcessErrorText } from './error-text.js'
+import { messageFramerV1 } from '../contract/framing/message-framer.js'
+import {
+  readRpcSingleFrameFacts,
+  registerRpcSingleFrameFacts
+} from '../contract/framing/reassembler.js'
+import { RPC_STREAM_MAX_FRAME_BYTES } from '../contract/framing/stream.js'
 
 /** Exact whole-message string framer; native length framing already marks message boundaries. */
 export const processStringFramer: IRpcFramer<string, string, 'process-stream', 1> = Object.freeze({
@@ -34,3 +40,24 @@ export const remoteProcessStringFramer: IRpcFramer<unknown, unknown, string, num
     accept: (value, context) => processStringFramer.accept(asProcessString(value), context),
     close: (reason) => processStringFramer.close(reason)
   })
+
+/**
+ * Whole-message process framing uses the canonical framing candidate policy and the native byte
+ * decoder's actual frame ceiling. Exact native callables retain this cold proof; opaque wrappers do
+ * not. Ordinary string framing keeps its original methods and incurs no per-message work.
+ */
+const processSingleFrameFacts = Object.freeze({
+  maxConcurrentMessages: readRpcSingleFrameFacts(messageFramerV1.accept, messageFramerV1.frame)!
+    .maxConcurrentMessages,
+  maxMessageBytes: RPC_STREAM_MAX_FRAME_BYTES
+})
+registerRpcSingleFrameFacts(
+  processStringFramer.accept,
+  processStringFramer.frame,
+  processSingleFrameFacts
+)
+registerRpcSingleFrameFacts(
+  remoteProcessStringFramer.accept,
+  remoteProcessStringFramer.frame,
+  processSingleFrameFacts
+)

@@ -3,6 +3,7 @@ export { isUint8Array } from '@migaia/utils/bytes'
 import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
 import { ERROR_SOURCE, RpcCoreErrorCode } from '../error-code.js'
 import { RpcCoreErrorText } from '../error-text.js'
+import type { IRpcRuntimeTask } from '../../contract/runtime-api/types.js'
 
 /** Synchronous sink for a property-read failure; Promise-returning callbacks are rejected. */
 export type IRpcPropertyReadReporter = (
@@ -73,6 +74,21 @@ export function safeString(
 /** Builds an injective key for attacker-controlled tuple components. */
 export function tupleKey(...parts: readonly string[]): string {
   return JSON.stringify(parts)
+}
+
+/** Exact task association uses admitted scalar fields, independent of wire object key order. */
+export function runtimeTaskKey(task: IRpcRuntimeTask): string {
+  return tupleKey(
+    task.mode,
+    task.method ?? '',
+    task.callerId,
+    task.callerGeneration.kind,
+    String(task.callerGeneration.value),
+    task.callerGeneration.providerId,
+    task.targetGeneration.kind,
+    String(task.targetGeneration.value),
+    task.targetGeneration.providerId
+  )
 }
 
 /** Creates a dictionary that cannot interpret attacker-controlled keys as properties. */

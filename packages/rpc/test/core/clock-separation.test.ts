@@ -488,9 +488,9 @@ describe('A8 rpc core timestamp sources', () => {
     }
     const sentAtCounts: readonly [string, number][] = [
       ['internal/discovery-attachment.ts', 5],
-      ['internal/outbound-attachment.ts', 3],
+      ['internal/outbound-attachment.ts', 5],
       ['internal/control-attachment.ts', 1],
-      ['internal/provider-executor.ts', 3]
+      ['internal/provider-executor.ts', 7]
     ]
     for (const [file, count] of sentAtCounts) {
       const initializers = propertyInitializers(join(coreRoot, file), 'sentAt')

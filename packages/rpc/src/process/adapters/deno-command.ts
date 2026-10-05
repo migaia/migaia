@@ -121,7 +121,8 @@ export function createDenoProcessLauncher(
               launchRuntime.childName ??
               options.runtimeApiBootstrap?.name ??
               launchRuntime.self.name,
-            parentInstanceId: launchRuntime.self.instanceId
+            parentInstanceId: launchRuntime.self.instanceId,
+            ...(launchRuntime.generation ? { generation: launchRuntime.generation } : {})
           }
         : options.runtimeApiBootstrap
       if (runtimeApiBootstrap && context.signal.aborted) throw resolveAbortReason(context.signal)

@@ -189,14 +189,14 @@ export function normalizeRpcRoute(
 }
 
 /** A bounded nonempty identifier is the common routing identity domain. */
-function isIdentifier(value: unknown): value is string {
+export function isIdentifier(value: unknown): value is string {
   return (
     typeof value === 'string' && value.length > 0 && value.length <= RpcWireLimit.maxIdentifierChars
   )
 }
 
 /** Validate each optional field according to its declared wire domain. */
-function isRouteFieldValid(field: string, value: unknown): boolean {
+export function isRouteFieldValid(field: string, value: unknown): boolean {
   if (field === RpcRouteField.forwardRoute)
     return (
       Array.isArray(value) &&

@@ -12,20 +12,63 @@ import {
   RpcSchemaValidationError,
   RpcTimeoutError
 } from '../errors.js'
+import { RpcAbortError, RpcRemoteError } from '../errors.js'
+import type { RequestReplayLedger } from './request-replay-ledger.js'
+import type {
+  IRpcRuntimeEnvelope,
+  IRpcRuntimeGeneration,
+  IRpcRuntimeCompletion,
+  IRpcRuntimeTask,
+  IRpcRuntimeStep,
+  IRpcRuntimeStepOutcome,
+  IRpcRuntimeOutcome,
+  IRpcRuntimeOutcomeResult,
+  IRpcRuntimeStore
+} from '../../contract/runtime-api/types.js'
+import {
+  RpcRuntimeKind,
+  RpcRuntimeMode,
+  RpcRuntimeOperation,
+  RpcRuntimeCancel,
+  RpcRuntimeFinish,
+  RpcRuntimeStepState,
+  RpcRuntimeProfile,
+  RpcRuntimeOutcomeState,
+  RpcRuntimeStoreKind,
+  RpcRuntimeStoreContinuity,
+  RpcRuntimeGenerationKind,
+  RpcRuntimeStreamPrefix
+} from '../../contract/runtime-api/constants.js'
+import { RpcRouteProfile, RpcRouteType } from '../../contract/wire-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
+import { ERROR_SOURCE as RpcCoreErrorSource } from '../error-code.js'
 import {
   normalizePortable,
+  invalidRpcStream,
+  RpcStreamViolation,
+  RpcStreamEvent,
   type IRpcEnvelope,
   type IRpcEnvelopeData,
   type IRpcSerializedError
 } from '../../contract/index.js'
 import type { IRpcAbortSignal, IRpcContext, IRpcProviderResult } from '../typing.js'
 import type { ProviderRegistry } from './provider.js'
-import { readProviderPreflight, retainProviderInvocation } from './provider.js'
-import { safeRead, safeString, tupleKey } from './safe-value.js'
+import {
+  readProviderBulkAdmission,
+  readRuntimeIdempotencyScope,
+  readProviderPreflight,
+  retainProviderInvocation,
+  type IProviderAdmissionReservation,
+  type IProviderBulkAdmission,
+  type IProviderRuntimeStream,
+  type IProviderRuntimeRelay
+} from './provider.js'
+import type { IRpcPortableValue } from '../../contract/types.js'
+import { safeRead, safeString, tupleKey, runtimeTaskKey } from './safe-value.js'
 import { RpcMessageKind, RpcProviderRejectionReason } from '../semantic-constants.js'
 import { localErrorWireSummary } from '../../contract/contract-error.js'
-import { serializeRpcError } from '../../contract/error.js'
+import { serializeRpcError, deserializeRpcError } from '../../contract/error.js'
+import { RpcContractErrorCode } from '../../contract/error-code.js'
 import type {
   IRpcIdempotencyClaim,
   IRpcIdempotencyOutcome,
@@ -41,6 +84,8 @@ export type IProviderRequestInput = Readonly<{
 type IProviderAdmission = {
   acquire(taskKey: string, peerKey: string): boolean
   release(taskKey: string): void
+  acquireMany?(taskKeys: readonly string[], peerKey: string): boolean
+  enqueueOrder?(orderKey: string, start: () => void): () => void
 }
 type IControllerRegistry = {
   has(key: string): boolean
@@ -68,7 +113,10 @@ type IProviderExecutorOptions<TTargetId extends string> = {
   readonly isReplay?: (request: IProviderRequestInput, verifiedPeerKey: string) => boolean
   readonly admitReplay?: (request: IProviderRequestInput, verifiedPeerKey: string) => boolean
   readonly markCompleted?: (request: IProviderRequestInput, verifiedPeerKey: string) => void
-  readonly consumePendingAbort?: (key: string) => {
+  readonly consumePendingAbort?: (
+    key: string,
+    association?: string
+  ) => {
     readonly found: boolean
     readonly reason: unknown
   }
@@ -80,11 +128,70 @@ type IProviderExecutorOptions<TTargetId extends string> = {
   /** Selects response receiver identity for composed attachment admission. */
   readonly responseReceiverId?: (request: IProviderRequestInput) => string | undefined
   readonly idempotencyStore?: IRpcIdempotencyStore
+  /** Only the attachment-created default memory store is necessarily replaced with native execution. */
+  readonly runtimeDefaultMemoryStore?: boolean
   readonly idempotencyScope?: (admission: Readonly<{ token: string; senderId: string }>) => string
 }
 const providerResultBrand = Symbol('web-rpc-provider-result')
 type IBrandedProviderResult = IRpcProviderResult & { readonly [providerResultBrand]: object }
 const maxProviderTransferItems = 64
+
+/** These facts come from the accepted original identity and replay owners, never business data. */
+export type IRuntimeExecutionPorts = Readonly<{
+  generation: IRpcRuntimeGeneration
+  callerGeneration: IRpcRuntimeGeneration
+  /** Listener/Host assembly can borrow the same original registry across physical sessions. */
+  admission?: IProviderAdmission
+  replay: RequestReplayLedger
+  /** Original authentication/native qualification decides active replay, never the new grammar. */
+  activeReplay?: boolean
+  /** Reverse authentication supplies an exact multiplexed reply receiver. */
+  replyReceiverId?: string
+  send(envelope: IRpcRuntimeEnvelope, onPrepared?: () => Promise<void>): Promise<void>
+}>
+
+/** Exact tuple equality fences this physical hop without treating an attempt number as a restart. */
+function sameGeneration(left: IRpcRuntimeGeneration, right: IRpcRuntimeGeneration): boolean {
+  return (
+    left.kind === right.kind && left.value === right.value && left.providerId === right.providerId
+  )
+}
+
+/** Internal context input reuses the original executor; this record never enters a physical frame. */
+function runtimeRequestInput(
+  envelope: IRpcRuntimeEnvelope,
+  step: IRpcRuntimeStep,
+  elapsedMs = 0
+): IProviderRequestInput {
+  const route: IRpcEnvelopeData = {
+    route: {
+      ...envelope.route,
+      profile: RpcRouteProfile,
+      type: RpcRouteType.request,
+      ...('options' in envelope && envelope.options.timeoutMs !== undefined
+        ? { timeoutMs: Math.max(0, envelope.options.timeoutMs - elapsedMs) }
+        : {}),
+      ...(envelope.task.mode === RpcRuntimeMode.notify ? { dispatchOnly: true } : {})
+    },
+    ...(step.payload === undefined ? {} : { payload: step.payload })
+  }
+  return {
+    envelope: { kind: RpcMessageKind.request, id: envelope.id, method: step.method, data: route },
+    route
+  }
+}
+
+/** Canonical portable object ordering makes the same admitted body independent of insertion order. */
+function runtimeFingerprint(mode: string, steps: readonly IRpcRuntimeStep[]): string {
+  return JSON.stringify([mode, steps], (_key, value: unknown) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, Reflect.get(value, key)])
+    )
+  })
+}
 
 /** Normalizes provider-owned metadata before it can cross the transport boundary. */
 function normalizeTransfer(value: readonly unknown[] | undefined): readonly unknown[] | undefined {
@@ -118,7 +225,11 @@ export class ProviderExecutor<TTargetId extends string> {
     request: IProviderRequestInput,
     signal: IRpcAbortSignal | (() => IRpcAbortSignal),
     isExpired: () => boolean,
-    taskToken: object = {}
+    taskToken: object = {},
+    runtimeTask?: IRpcRuntimeTask,
+    peerKey?: string,
+    runtime?: IRpcRuntimeEnvelope,
+    relay?: IProviderRuntimeRelay
   ): IRpcContext {
     /** This context retains one relative budget; later reads cannot restart the original deadline. */
     const deadlineAt =
@@ -138,6 +249,12 @@ export class ProviderExecutor<TTargetId extends string> {
       data: request.route.payload,
       senderId: request.route.route.senderId,
       route: request.route.route.forwardRoute,
+      ...(runtimeTask === undefined
+        ? {}
+        : {
+            callerGeneration: runtimeTask.callerGeneration,
+            targetGeneration: runtimeTask.targetGeneration
+          }),
       get timeoutMs() {
         return deadlineAt === undefined ? undefined : Math.max(0, Math.floor(deadlineAt - now()))
       },
@@ -186,7 +303,7 @@ export class ProviderExecutor<TTargetId extends string> {
           this.options.registry.streamProviders.get(request.envelope.method)
       )
     )
-      retainProviderInvocation(context, request.route.route)
+      retainProviderInvocation(context, request.route.route, peerKey, runtime, relay)
     return context
   }
 
@@ -229,6 +346,730 @@ export class ProviderExecutor<TTargetId extends string> {
       tupleKey(verifiedPeerKey, request.route.route.senderId, request.envelope.id),
       RpcProviderRejectionReason.replayLedgerFull
     )
+  }
+
+  /** The same final executor admits a complete group and owns its single start/terminal decision. */
+  async lookupRuntime(
+    envelope: IRpcRuntimeEnvelope,
+    peerKey: string,
+    ports: IRuntimeExecutionPorts
+  ): Promise<void> {
+    if (
+      envelope.kind !== RpcRuntimeKind.outcome ||
+      envelope.operation !== RpcRuntimeOperation.lookup
+    )
+      return
+    if (
+      !sameGeneration(envelope.task.targetGeneration, ports.generation) ||
+      !sameGeneration(envelope.task.callerGeneration, ports.callerGeneration)
+    )
+      throw new RpcError(
+        RpcCoreErrorCode.providerGenerationMismatch,
+        RpcCoreErrorText.providerGenerationMismatch
+      )
+    /** One query result belongs to the final store; a relay never reads or claims its local store. */
+    let result: IRpcRuntimeOutcomeResult
+    try {
+      if (this.options.registry.runtimeLookup)
+        result = await this.options.registry.runtimeLookup(envelope)
+      else {
+        /** Lookup neither leases business/replay capacity nor allocates a claim waiter. */
+        const store = this.options.idempotencyStore
+        const scope = this.#runtimeScope(
+          peerKey,
+          envelope.route.senderId,
+          ports.generation.providerId
+        )
+        const lookup = store?.lookup?.(scope, envelope.idempotencyKey, this.options.now())
+        const retainedFacts = store?.readRuntimeFacts?.() ?? {
+          kind: RpcRuntimeStoreKind.unavailable,
+          continuity: RpcRuntimeStoreContinuity.unavailable
+        }
+        /**
+         * Trusted restart identity describes store replacement; missing keys alone never imply
+         * loss.
+         */
+        const facts: IRpcRuntimeStore =
+          this.options.runtimeDefaultMemoryStore &&
+          ports.generation.kind === RpcRuntimeGenerationKind.restart &&
+          ports.generation.value > 0 &&
+          retainedFacts.kind === RpcRuntimeStoreKind.memory
+            ? { ...retainedFacts, continuity: RpcRuntimeStoreContinuity.lost }
+            : retainedFacts
+        const retained = lookup?.state === RpcRuntimeOutcomeState.done ? lookup.outcome : undefined
+        const outcome =
+          retained && retained !== 'unavailable' && retained.ok && retained.data !== undefined
+            ? (retained.data as unknown as IRpcRuntimeOutcome)
+            : undefined
+        result =
+          outcome === undefined
+            ? {
+                store: facts,
+                state:
+                  lookup?.state === RpcRuntimeOutcomeState.pending
+                    ? RpcRuntimeOutcomeState.pending
+                    : RpcRuntimeOutcomeState.unknown
+              }
+            : { store: facts, state: RpcRuntimeOutcomeState.done, outcome }
+      }
+    } catch (error) {
+      /**
+       * Existing terminal/correlation grammar carries an actual lookup failure rather than hanging
+       * the query.
+       */
+      await ports.send({
+        profile: RpcRuntimeProfile,
+        kind: RpcRuntimeKind.control,
+        operation: RpcRuntimeOperation.terminal,
+        id: envelope.id,
+        task: envelope.task,
+        route: {
+          ...envelope.route,
+          senderId: this.options.id,
+          targetId: envelope.route.senderId,
+          receiverId: ports.replyReceiverId ?? envelope.route.senderId,
+          sentAt: this.options.timestamp()
+        },
+        completion: {
+          ok: false,
+          error: serializeRpcError(error, {
+            report: (failure) => this.options.emitFailure(failure.error, RpcCoreErrorCode.internal)
+          })
+        }
+      })
+      return
+    }
+    await ports.send({
+      profile: RpcRuntimeProfile,
+      kind: RpcRuntimeKind.outcome,
+      operation: RpcRuntimeOperation.result,
+      id: envelope.id,
+      task: envelope.task,
+      route: {
+        ...envelope.route,
+        senderId: this.options.id,
+        targetId: envelope.route.senderId,
+        receiverId: ports.replyReceiverId ?? envelope.route.senderId,
+        sentAt: this.options.timestamp()
+      },
+      ...result
+    })
+  }
+
+  /** New key scope is logical provider plus authenticated direct caller, independent of method. */
+  #runtimeScope(peerKey: string, senderId: string, providerId: string): string {
+    return tupleKey(
+      RpcRuntimeProfile,
+      providerId,
+      readRuntimeIdempotencyScope(this.options.idempotencyScope) ??
+        this.options.idempotencyScope?.({ token: peerKey, senderId }) ??
+        peerKey
+    )
+  }
+
+  /** The same final executor admits a complete group and owns its single start/terminal decision. */
+  async executeRuntime(
+    envelope: IRpcRuntimeEnvelope,
+    peerKey: string,
+    ports: IRuntimeExecutionPorts
+  ): Promise<void> {
+    if (envelope.kind !== RpcRuntimeKind.call && envelope.kind !== RpcRuntimeKind.group) return
+    /** This cold opt-in branch never replaces the ordinary executor's endpoint-local quota. */
+    const admission = ports.admission ?? this.options.admission
+    /**
+     * Stream construction and lifetime must be handed to the original stream owner, never
+     * scalarized.
+     */
+    const steps: readonly IRpcRuntimeStep[] =
+      envelope.kind === RpcRuntimeKind.group
+        ? envelope.steps
+        : [
+            {
+              method: envelope.task.method!,
+              ...('payload' in envelope ? { payload: envelope.payload } : {})
+            }
+          ]
+    /** Every member lease is a child of this hop's one original controller/replay task identity. */
+    const controllerKey = tupleKey(peerKey, envelope.route.senderId, envelope.id)
+    const memberKeys = steps.map((_step, index) => tupleKey(controllerKey, String(index)))
+    const input = runtimeRequestInput(envelope, steps[0]!)
+    /** This hop captures the original relative deadline before any key waiting or downstream send. */
+    const receivedAt = this.options.now()
+    /** Only a compiled forward route may delegate final start and complete-group execution. */
+    let relay: IProviderRuntimeRelay | undefined
+    const report = (error: unknown): void =>
+      this.options.emitFailure(
+        error,
+        error instanceof RpcError ? error.code : RpcCoreErrorCode.internal
+      )
+    const failed = (error: unknown): IRpcRuntimeCompletion => ({
+      ok: false,
+      error: serializeRpcError(error, { report: (failure) => report(failure.error) })
+    })
+    /** Responses echo the original selected task even when the local fence refused it. */
+    const respond = (
+      completion: IRpcRuntimeCompletion,
+      onPrepared?: () => Promise<void>
+    ): Promise<void> =>
+      envelope.task.mode === RpcRuntimeMode.stream
+        ? ports.send(
+            {
+              profile: RpcRuntimeProfile,
+              kind: RpcRuntimeKind.control,
+              id: envelope.id,
+              route: {
+                ...envelope.route,
+                senderId: this.options.id,
+                targetId: envelope.route.senderId,
+                receiverId: ports.replyReceiverId ?? envelope.route.senderId,
+                sentAt: this.options.timestamp()
+              },
+              task: envelope.task,
+              operation: RpcRuntimeOperation.stream,
+              stream: completion.ok
+                ? {
+                    event: RpcStreamEvent.end,
+                    seq: 0,
+                    ...(completion.result === undefined ? {} : { value: completion.result })
+                  }
+                : {
+                    event:
+                      completion.error.code === RpcCoreErrorCode.cancelled ||
+                      completion.error.code === RpcCoreErrorCode.deadlineExceeded
+                        ? RpcStreamEvent.cancelled
+                        : RpcStreamEvent.fail,
+                    seq: 0,
+                    error: completion.error
+                  }
+            },
+            onPrepared
+          )
+        : envelope.task.mode === RpcRuntimeMode.notify &&
+            envelope.options.cancel !== RpcRuntimeCancel &&
+            envelope.options.orderKey === undefined
+          ? Promise.resolve()
+          : ports.send(
+              {
+                profile: RpcRuntimeProfile,
+                kind: RpcRuntimeKind.control,
+                id: envelope.id,
+                route: {
+                  ...envelope.route,
+                  senderId: this.options.id,
+                  targetId: envelope.route.senderId,
+                  receiverId: ports.replyReceiverId ?? envelope.route.senderId,
+                  sentAt: this.options.timestamp()
+                },
+                task: envelope.task,
+                operation: RpcRuntimeOperation.terminal,
+                completion
+              },
+              onPrepared
+            )
+    try {
+      if (
+        !sameGeneration(envelope.task.targetGeneration, ports.generation) ||
+        !sameGeneration(envelope.task.callerGeneration, ports.callerGeneration)
+      )
+        throw new RpcError(
+          RpcCoreErrorCode.providerGenerationMismatch,
+          RpcCoreErrorText.providerGenerationMismatch
+        )
+      if (
+        !admission.acquireMany ||
+        (envelope.options.orderKey !== undefined && !admission.enqueueOrder)
+      )
+        throw new RpcError(
+          RpcCoreErrorCode.capabilityUnsupported,
+          RpcCoreErrorText.capabilityUnsupported
+        )
+      /** Whitelist/schema/forward preflight finishes for the entire set before either quota changes. */
+      for (const step of steps) {
+        const provider =
+          envelope.task.mode === RpcRuntimeMode.stream
+            ? this.options.registry.streamProviders.get(`${RpcRuntimeStreamPrefix}${step.method}`)
+            : this.options.registry.getProvider(step.method)
+        if (!provider)
+          throw new RpcError(RpcCoreErrorCode.providerNotFound, RpcCoreErrorText.providerNotFound)
+        this.options.validate(step.method, 'params', step.payload)
+        readProviderPreflight(provider)?.(runtimeRequestInput(envelope, step).route.route)
+      }
+      relay = this.options.registry.runtimeRelay?.(envelope)
+    } catch (error) {
+      report(error)
+      await respond(failed(error))
+      return
+    }
+    /** Duplicates never acquire the original task's release ownership. */
+    if (
+      ports.replay.has(memberKeys[0]!, this.options.now()) ||
+      this.options.controllers.has(controllerKey)
+    )
+      return
+    const reserved = ports.replay.reserveMany(
+      memberKeys,
+      peerKey,
+      this.options.now(),
+      ports.activeReplay
+    )
+    if (!reserved) {
+      this.#notifyRejection(
+        input,
+        peerKey,
+        controllerKey,
+        envelope.kind === RpcRuntimeKind.group
+          ? RpcProviderRejectionReason.groupReplayFull
+          : RpcProviderRejectionReason.replayLedgerFull
+      )
+      await respond(
+        failed(
+          new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull)
+        )
+      )
+      return
+    }
+    if (!admission.acquireMany!(memberKeys, peerKey)) {
+      reserved.rollback()
+      this.#notifyRejection(
+        input,
+        peerKey,
+        controllerKey,
+        envelope.kind === RpcRuntimeKind.group
+          ? RpcProviderRejectionReason.groupConcurrency
+          : RpcProviderRejectionReason.orderedQueueFull
+      )
+      await respond(
+        failed(
+          new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.providerAdmissionLimitReached)
+        )
+      )
+      return
+    }
+    /** Only a group discovers native policies; scalar and ordinary execution retain their guards. */
+    const bulkRegistrations =
+      envelope.kind === RpcRuntimeKind.group
+        ? steps.map((step) =>
+            readProviderBulkAdmission(this.options.registry.getProvider(step.method)!)
+          )
+        : undefined
+    /** These bounded task-local reservations belong to existing native counters, not a quota table. */
+    const bulkReservations = new Map<IProviderBulkAdmission, IProviderAdmissionReservation>()
+    try {
+      /** Every original policy owner validates its complete member set before any invocation. */
+      const payloads = new Map<IProviderBulkAdmission, (IRpcPortableValue | undefined)[]>()
+      for (let index = 0; index < steps.length; index += 1) {
+        /** Cold callback provenance identifies the actual shared native policy owner. */
+        const registration = bulkRegistrations?.[index]
+        if (!registration) continue
+        /** One owner can guard several methods in this same physical group. */
+        const members = payloads.get(registration.admission) ?? []
+        members.push(steps[index]!.payload)
+        payloads.set(registration.admission, members)
+      }
+      for (const [owner, members] of payloads)
+        bulkReservations.set(owner, owner.reserveMany(members))
+    } catch (error) {
+      for (const reservation of bulkReservations.values()) reservation.release()
+      for (const key of memberKeys) admission.release(key)
+      reserved.rollback()
+      report(error)
+      await respond(failed(error))
+      return
+    }
+    /** The original native controller is never aborted by a before-start intent after start wins. */
+    const native = new AbortController()
+    /** One task state linearizes cancellation, start and terminal in this final executor. */
+    let state: 'queued' | 'started' | 'cancelled' | 'terminal' = 'queued'
+    let deadline: IEndpointTimer | undefined
+    let claim: IRpcIdempotencyClaim | undefined
+    /** Queued keyed work retains the actual selected store/scope/fingerprint from admission. */
+    let claimInput:
+      | Readonly<{ store: IRpcIdempotencyStore; scope: string; key: string; fingerprint: string }>
+      | undefined
+    /** Stream terminal seals once before its original owner sends end/fail. */
+    let sealed = false
+    /** Only a real producer terminal can supply the stream's final completion. */
+    let streamCompletion: IRpcRuntimeCompletion | undefined
+    let releaseOrder: (() => void) | undefined
+    let finishTask!: () => void
+    const finished = new Promise<void>((resolve) => {
+      finishTask = resolve
+    })
+    /**
+     * Settlement seals keyed results before delivery, then releases each original member exactly
+     * once.
+     */
+    const seal = async (completion: IRpcRuntimeCompletion): Promise<void> => {
+      if (sealed) return
+      if (claim?.status === 'claimed') {
+        /** Same original store owner retains only the actual final result, never yielded items. */
+        const outcome: IRpcRuntimeOutcome = {
+          mode: envelope.task.mode as IRpcRuntimeOutcome['mode'],
+          targetGeneration: ports.generation,
+          completion
+        }
+        claim.settle({ ok: true, data: normalizePortable(outcome) }, this.options.now())
+      }
+      sealed = true
+    }
+    const settle = async (completion: IRpcRuntimeCompletion, delivered = false): Promise<void> => {
+      if (state === 'terminal') return
+      state = 'terminal'
+      if (deadline) this.options.clearTimeout(deadline)
+      try {
+        if (envelope.kind === RpcRuntimeKind.group && !delivered)
+          await respond(completion, () => seal(completion))
+        else {
+          await seal(completion)
+          if (!delivered) await respond(completion)
+        }
+      } catch (error) {
+        report(error)
+        if (
+          envelope.kind === RpcRuntimeKind.group &&
+          completion.ok &&
+          !sealed &&
+          safeRead(error, 'code') === RpcContractErrorCode.frameLimitExceeded
+        ) {
+          /**
+           * A rejected prepared result has zero writes; retain the actual failure instead of a
+           * tombstone.
+           */
+          const failure = failed(
+            new RpcError(
+              RpcCoreErrorCode.payloadInvalid,
+              RpcCoreErrorText.runtimeGroupResultTooLarge,
+              error
+            )
+          )
+          try {
+            await seal(failure)
+            await respond(failure)
+          } catch (failureError) {
+            report(failureError)
+          }
+        }
+      } finally {
+        if (claim?.status === 'claimed') claim.release()
+        this.options.controllers.delete(controllerKey)
+        for (const reservation of bulkReservations.values()) reservation.release()
+        for (const key of memberKeys) admission.release(key)
+        reserved.release(this.options.now())
+        releaseOrder?.()
+        finishTask()
+      }
+    }
+    try {
+      /** All original quotas are committed before a key becomes visible; no provider has started. */
+      const key = envelope.options.idempotencyKey
+      if (key !== undefined && !relay) {
+        /** The canonical configured store owns the whole queued lifetime, including cancellation. */
+        const store = this.options.idempotencyStore
+        if (!store?.lookup)
+          throw new RpcError(
+            RpcCoreErrorCode.capabilityUnsupported,
+            RpcCoreErrorText.capabilityUnsupported
+          )
+        claimInput = {
+          store,
+          key,
+          scope: this.#runtimeScope(peerKey, envelope.route.senderId, ports.generation.providerId),
+          fingerprint: runtimeFingerprint(envelope.task.mode, steps)
+        }
+        claim = store.claim(claimInput.scope, key, this.options.now(), claimInput.fingerprint)
+        if (claim.status === 'full')
+          throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
+      }
+    } catch (error) {
+      report(error)
+      await settle(failed(error))
+      return
+    }
+    /** Remote intent uses the original controller map; it cannot create a facade start decision. */
+    const revoke = (reason?: unknown): void => {
+      if (state === 'terminal' || state === 'cancelled') return
+      /** A constructed stream retains its lease until original iterator cleanup really ends. */
+      const streamCleanup = state === 'started' ? controller.cancelStream : undefined
+      state = 'cancelled'
+      native.abort(reason)
+      /** Preserve the cancellation's original native source, code, stack and primary reason. */
+      const completion = failed(
+        reason instanceof RpcTimeoutError ||
+          (safeRead(reason, 'source') === RpcCoreErrorSource &&
+            safeRead(reason, 'code') === RpcCoreErrorCode.deadlineExceeded)
+          ? reason
+          : new RpcAbortError(undefined, undefined, reason)
+      )
+      if (streamCleanup)
+        void streamCleanup(reason).then(
+          () => settle(completion, true),
+          (error: unknown) => {
+            report(error)
+            return settle(failed(error))
+          }
+        )
+      else void settle(completion)
+    }
+    const cancelIntent = (reason?: unknown): void => {
+      if (relay && state === 'started') {
+        /** B sends intent through the original downstream signal; C alone decides its final start. */
+        native.abort(reason)
+        return
+      }
+      if (state === 'started' && envelope.options.cancel === RpcRuntimeCancel) return
+      revoke(reason)
+    }
+    const controller: IRpcProviderController = {
+      signal: native.signal,
+      runtimeTask: envelope.task,
+      abort: revoke,
+      cancelIntent,
+      ...(envelope.task.mode === RpcRuntimeMode.stream
+        ? {
+            /** Before construction, only this task's selected before-start finish may revoke start. */
+            streamIntent: (payload) => {
+              if (payload.event !== RpcRuntimeFinish) return Promise.resolve()
+              if (envelope.options.cancel !== RpcRuntimeCancel)
+                throw invalidRpcStream(RpcStreamViolation.event, '/stream/event')
+              cancelIntent(
+                payload.reason === undefined ? undefined : deserializeRpcError(payload.reason)
+              )
+              return Promise.resolve()
+            }
+          }
+        : {})
+    }
+    this.options.controllers.set(controllerKey, controller)
+    const pendingAbort = this.options.consumePendingAbort?.(
+      controllerKey,
+      runtimeTaskKey(envelope.task)
+    )
+    if (pendingAbort?.found) cancelIntent(pendingAbort.reason)
+    if (envelope.options.timeoutMs === 0) cancelIntent(new RpcTimeoutError())
+    else if (envelope.options.timeoutMs !== undefined && state === 'queued')
+      deadline = this.options.setTimeout(
+        () => cancelIntent(new RpcTimeoutError()),
+        envelope.options.timeoutMs
+      )
+    /** Claim waiting remains queued, retains original quotas and cannot run the first group member. */
+    const run = async (): Promise<void> => {
+      if (state !== 'queued') return
+      try {
+        if (claimInput && claim) {
+          while (claim.status === 'pending') {
+            const retained = await Promise.race([claim.outcome, finished.then(() => undefined)])
+            if (state !== 'queued') return
+            if (retained !== undefined) {
+              if (retained === 'unavailable' || !retained.ok || retained.data === undefined)
+                throw new RpcError(
+                  RpcCoreErrorCode.idempotencyResultUnavailable,
+                  RpcCoreErrorText.idempotencyResultUnavailable
+                )
+              await settle((retained.data as unknown as IRpcRuntimeOutcome).completion)
+              return
+            }
+            claim = claimInput.store.claim(
+              claimInput.scope,
+              claimInput.key,
+              this.options.now(),
+              claimInput.fingerprint
+            )
+          }
+          if (claim.status === 'done') {
+            if (
+              claim.outcome === 'unavailable' ||
+              !claim.outcome.ok ||
+              claim.outcome.data === undefined
+            )
+              throw new RpcError(
+                RpcCoreErrorCode.idempotencyResultUnavailable,
+                RpcCoreErrorText.idempotencyResultUnavailable
+              )
+            await settle((claim.outcome.data as unknown as IRpcRuntimeOutcome).completion)
+            return
+          }
+          if (claim.status === 'full')
+            throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
+        }
+        if (state !== 'queued') return
+        /** The sole synchronous final start point precedes any invocation or iterator construction. */
+        state = 'started'
+        if (!relay && envelope.options.cancel === RpcRuntimeCancel && deadline) {
+          this.options.clearTimeout(deadline)
+          deadline = undefined
+        }
+        if (envelope.task.mode === RpcRuntimeMode.stream && envelope.kind === RpcRuntimeKind.call) {
+          /** Logical mode selects the same precompiled canonical stream wire route, not another map. */
+          const method = `${RpcRuntimeStreamPrefix}${steps[0]!.method}`
+          /** The original context still carries this hop's authenticated task and caller identity. */
+          const request = runtimeRequestInput(
+            envelope,
+            { ...steps[0]!, method },
+            this.options.now() - receivedAt
+          )
+          /** Start is already committed; the stream owner alone constructs and drives its iterator. */
+          const runtime: IProviderRuntimeStream = {
+            envelope,
+            signal: native.signal,
+            replyReceiverId: ports.replyReceiverId,
+            ...(relay ? { forwarded: true } : {}),
+            ...(relay
+              ? { prepareStream: relay.prepareStream, finishStream: relay.finishStream }
+              : {}),
+            seal: async (completion) => {
+              streamCompletion = completion
+              await seal(completion)
+            },
+            bindControl: (handler) => {
+              controller.streamIntent = handler
+            },
+            bindCancel: (handler) => {
+              controller.cancelStream = handler
+            }
+          }
+          await this.options.registry.streamProviders.get(method)!(
+            { envelope: request.envelope, activeLifetime: true, runtime },
+            (signal) =>
+              this.createContext(
+                request,
+                signal,
+                () => state !== 'started',
+                {},
+                envelope.task,
+                peerKey,
+                envelope,
+                relay
+              )
+          )
+          if (state === 'started')
+            await settle(
+              streamCompletion ??
+                failed(
+                  new RpcError(
+                    RpcCoreErrorCode.providerNotSettled,
+                    RpcCoreErrorText.providerDidNotSettle
+                  )
+                ),
+              streamCompletion !== undefined
+            )
+          return
+        }
+        if (relay && envelope.kind === RpcRuntimeKind.group) {
+          /**
+           * The original first callback still owns native activity/drain for this whole forwarding
+           * task.
+           */
+          const request = runtimeRequestInput(envelope, steps[0]!, this.options.now() - receivedAt)
+          const taskToken = {}
+          const context = this.createContext(
+            request,
+            native.signal,
+            () => state !== 'started',
+            taskToken,
+            envelope.task,
+            peerKey,
+            envelope,
+            relay
+          )
+          for (const registration of bulkRegistrations ?? [])
+            if (registration) bulkReservations.get(registration.admission)!.consume()
+          const response = await (
+            bulkRegistrations?.[0]?.invoke ?? this.options.registry.getProvider(steps[0]!.method)!
+          )(context)
+          if (state !== 'started') return
+          if (
+            !response ||
+            typeof response !== 'object' ||
+            (response as Partial<IBrandedProviderResult>)[providerResultBrand] !== taskToken
+          )
+            throw new RpcError(
+              RpcCoreErrorCode.providerNotSettled,
+              RpcCoreErrorText.providerDidNotSettle
+            )
+          if (!response.ok) throw new RpcRemoteError(response.code, response.message)
+          await settle({
+            ok: true,
+            ...(response.data === undefined ? {} : { result: normalizePortable(response.data) })
+          })
+          return
+        }
+        const results: IRpcRuntimeStepOutcome[] = []
+        for (const [index, step] of steps.entries()) {
+          if (results.some((result) => result.state === RpcRuntimeStepState.failure)) {
+            results.push({ state: RpcRuntimeStepState.notExecuted })
+            continue
+          }
+          const request = runtimeRequestInput(envelope, step, this.options.now() - receivedAt)
+          const taskToken = {}
+          const context = this.createContext(
+            request,
+            native.signal,
+            () => state === 'terminal' || state === 'cancelled',
+            taskToken,
+            envelope.task,
+            peerKey,
+            envelope,
+            relay
+          )
+          try {
+            /** Prepaid invocation retains native activity and drain owners without charging twice. */
+            const registration = bulkRegistrations?.[index]
+            if (registration) bulkReservations.get(registration.admission)!.consume()
+            const response = await (
+              registration?.invoke ?? this.options.registry.getProvider(step.method)!
+            )(context)
+            if (state !== 'started') return
+            if (
+              !response ||
+              typeof response !== 'object' ||
+              (response as Partial<IBrandedProviderResult>)[providerResultBrand] !== taskToken
+            )
+              throw new RpcError(
+                RpcCoreErrorCode.providerNotSettled,
+                RpcCoreErrorText.providerDidNotSettle
+              )
+            if (!response.ok) throw new RpcRemoteError(response.code, response.message)
+            this.options.validate(step.method, 'result', response.data)
+            results.push({
+              state: RpcRuntimeStepState.success,
+              ...(response.data === undefined ? {} : { result: normalizePortable(response.data) })
+            })
+          } catch (error) {
+            report(error)
+            results.push({
+              state: RpcRuntimeStepState.failure,
+              error: serializeRpcError(error, { report: (failure) => report(failure.error) })
+            })
+          }
+        }
+        if (envelope.kind === RpcRuntimeKind.group)
+          await settle({ ok: true, result: normalizePortable(results) })
+        else {
+          const result = results[0]!
+          await settle(
+            result.state === RpcRuntimeStepState.failure
+              ? { ok: false, error: result.error }
+              : {
+                  ok: true,
+                  ...(result.state === RpcRuntimeStepState.success && result.result !== undefined
+                    ? { result: result.result }
+                    : {})
+                }
+          )
+        }
+      } catch (error) {
+        report(error)
+        await settle(failed(error))
+      }
+    }
+    if (state === 'queued') {
+      if (envelope.options.orderKey !== undefined)
+        releaseOrder = admission.enqueueOrder!(envelope.options.orderKey, () => {
+          void run()
+        })
+      else void run()
+    }
+    await finished
   }
 
   /** Validates, executes, and settles one inbound request. */
@@ -469,7 +1310,9 @@ export class ProviderExecutor<TTargetId extends string> {
       request,
       fast ? () => controller.signal : controller.signal,
       isExpired,
-      taskToken
+      taskToken,
+      undefined,
+      verifiedPeerKey
     )
     try {
       if (

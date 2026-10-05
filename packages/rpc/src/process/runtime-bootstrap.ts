@@ -1,6 +1,8 @@
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
 import { RpcWireLimit } from '../contract/wire-constants.js'
 import type { IRuntimePeerIdentity } from '../remote/runtime-api/description.js'
+import type { IRpcRuntimeGeneration } from '../contract/runtime-api/types.js'
+import { normalizeRuntimeGeneration } from '../contract/runtime-api/normalize.js'
 import {
   PROCESS_HANDSHAKE_MAX_FRAME_BYTES,
   PROCESS_RUNTIME_API_BOOTSTRAP_KIND,
@@ -13,6 +15,8 @@ import { RpcProcessErrorText } from './error-text.js'
 export type IProcessRuntimeBootstrapOptions = Readonly<{
   name: string
   parentInstanceId: string
+  /** Only an original supervised launch supplies real restart facts. */
+  generation?: IRpcRuntimeGeneration
 }>
 
 /** Secret first-frame material is never projected into business metadata or supervisor identity. */
@@ -20,6 +24,8 @@ export type IProcessRuntimeBootstrap = Readonly<{
   self: IRuntimePeerIdentity
   parentInstanceId: string
   token: string
+  /** Execution identity is separate from the new physical instance fingerprint. */
+  generation?: IRpcRuntimeGeneration
 }>
 
 /** All opt-in platform launchers allocate from this original bootstrap owner exactly once. */
@@ -43,7 +49,7 @@ function snapshot(value: unknown): IProcessRuntimeBootstrap {
   /** Bootstrap JSON supplies own data properties; extra fields never enter the projection. */
   const record = value as Record<string, unknown>
   if (
-    Object.keys(record).length !== 5 ||
+    Object.keys(record).length !== (record.generation === undefined ? 5 : 6) ||
     record.kind !== PROCESS_RUNTIME_API_BOOTSTRAP_KIND ||
     record.version !== PROCESS_RUNTIME_API_BOOTSTRAP_VERSION ||
     !identifier(record.parentInstanceId) ||
@@ -58,10 +64,20 @@ function snapshot(value: unknown): IProcessRuntimeBootstrap {
   const self = record.self as Record<string, unknown>
   if (Object.keys(self).length !== 2 || !identifier(self.name) || !identifier(self.instanceId))
     invalidProcessRuntimeBootstrap()
+  /** Generation admission stays in the canonical profile parser, with secret-free bootstrap failure. */
+  let generation: IRpcRuntimeGeneration | undefined
+  if (record.generation !== undefined) {
+    try {
+      generation = normalizeRuntimeGeneration(record.generation)
+    } catch {
+      return invalidProcessRuntimeBootstrap()
+    }
+  }
   return Object.freeze({
     self: Object.freeze({ name: self.name, instanceId: self.instanceId }),
     parentInstanceId: record.parentInstanceId,
-    token: record.token
+    token: record.token,
+    ...(generation ? { generation } : {})
   })
 }
 
@@ -100,7 +116,8 @@ export function prepareProcessRuntimeBootstrap(
     version: PROCESS_RUNTIME_API_BOOTSTRAP_VERSION,
     self,
     parentInstanceId: options.parentInstanceId,
-    token
+    token,
+    ...(options.generation ? { generation: options.generation } : {})
   }
   snapshot(record)
   /** The original unauthenticated frame bound also caps complete encoded metadata. */
