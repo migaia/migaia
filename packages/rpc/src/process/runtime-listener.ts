@@ -1,3 +1,10 @@
+import { runtimeQuery, runtimeDetail } from '../remote/runtime-api/overview.js'
+import { normalizeRuntimeDescription } from '../remote/runtime-api/description.js'
+import {
+  RuntimeSourceKind,
+  RuntimeConnectionDirection,
+  RUNTIME_API_SCHEMA_VERSION
+} from '../remote/runtime-api/constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
@@ -30,7 +37,14 @@ export async function createProcessListenerPeer(
   ingress: IRuntimeProcessListen,
   preparation?: IRuntimePreparationContext
 ): Promise<IRuntimePeer> {
-  compileRuntimeMethods(options.provide, options.contract)
+  /** The local safe directory exists independently of accepted session count. */
+  const methods = compileRuntimeMethods(options.provide, options.contract)
+  /** These are local registered route summaries, never a query wire reply. */
+  const local = normalizeRuntimeDescription({
+    schemaVersion: RUNTIME_API_SCHEMA_VERSION,
+    self: options.self,
+    methods: []
+  })
   /** This governor is closed only when this construction created it. */
   const resilience =
     ingress.resilience ??
@@ -56,7 +70,14 @@ export async function createProcessListenerPeer(
         /** Each actual accept captures current Feature output guards through the original Host. */
         const peer = await createRuntimePeer(
           { ...options, provide: preparation?.readProvide?.() ?? options.provide },
-          { self: options.self!, source: async () => channel, ownsChannel: false, signal, endpoint }
+          {
+            self: options.self!,
+            source: async () => channel,
+            ownsChannel: false,
+            signal,
+            endpoint,
+            origin: { kind: RuntimeSourceKind.listen, direction: RuntimeConnectionDirection.listen }
+          }
         )
         return Object.freeze({ peer, close: peer.close })
       },
@@ -103,7 +124,18 @@ export async function createProcessListenerPeer(
     request: (method, payload, callOptions) => current().request(method, payload, callOptions),
     notify: (method, payload, callOptions) => current().notify(method, payload, callOptions),
     stream: (method, payload, callOptions) => current().stream(method, payload, callOptions),
-    describe: () => current().describe(),
+    describe: runtimeQuery(async () => {
+      /** The original listener Set supplies every current session without a winner or new index. */
+      const details = await Promise.all(
+        sessions.services().map((service) => (service as IRuntimeProcessService).peer.describe())
+      )
+      return runtimeDetail(
+        local,
+        details.flatMap((detail) => detail.connections),
+        [],
+        methods.map((method) => method.name)
+      )
+    }),
     close
   })
   retainRuntimePeerSessions(peer, () =>

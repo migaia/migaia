@@ -1,3 +1,4 @@
+import { RuntimeSourceKind, RuntimeConnectionDirection } from '../remote/runtime-api/constants.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
 import { defaultRpcId } from '../core/internal/id.js'
@@ -63,6 +64,7 @@ export async function createAutomaticProcessPeer(
     deferProcessByteReceive(opened.channel)
     return await createRuntimePeer(options, {
       self: bootstrap.self,
+      origin: { kind: RuntimeSourceKind.connect, direction: RuntimeConnectionDirection.spawnedBy },
       async source(context) {
         /** Override the legacy native offer's defaults with the endpoint's actual installed roots. */
         const offer = createNativeProcessOffer({

@@ -1,7 +1,12 @@
 import type { IThreadHandle } from '@migaia/supervision/threads'
 import { defaultRpcId } from '../core/internal/id.js'
 import { RpcError, RpcCoreErrorCode } from '../core/errors.js'
-import { RuntimeApiErrorText, RuntimePluginKey } from '../remote/runtime-api/constants.js'
+import {
+  RuntimeApiErrorText,
+  RuntimePluginKey,
+  RuntimeSourceKind,
+  RuntimeConnectionDirection
+} from '../remote/runtime-api/constants.js'
 import { createManagedRuntimePeer } from '../remote/runtime-api/managed-peer.js'
 import {
   prepareRuntimePeerSourceContext,
@@ -72,6 +77,8 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
     },
     binding,
     undefined,
-    readRuntimePreparationContext(options)
+    readRuntimePreparationContext(options),
+    undefined,
+    { kind: RuntimeSourceKind.spawn, direction: RuntimeConnectionDirection.spawned }
   )
 }

@@ -167,3 +167,20 @@ multiHost.thread!.request('d', 'c.math.add', { x: 1 })
 // @ts-expect-error A95: a non-callable Feature member never becomes an exposed method.
 const nonCallable: IRuntimeExpose<readonly [typeof math]> = 'math.version'
 void nonCallable
+
+/** A24: object and text overloads remain independent of the remote callable surface. */
+const overview: Promise<import('../../src/remote/runtime-api/overview.js').IRuntimeOverview> =
+  hostA.thread!.list()
+/** A26: a selected format returns text, rather than an erased union or application description. */
+const overviewText: Promise<string> = hostA.thread!.list({ format: 'toml' })
+/** A24: local Peer identity and remote connection details are typed without widening methods. */
+const detail: Promise<import('../../src/remote/runtime-api/overview.js').IRuntimeDetail> =
+  peer.describe()
+/** A26: all three supported formats use the same cold query surface. */
+const detailText: Promise<string> = peer.describe({ format: 'yaml' })
+// @ts-expect-error A26: an unknown format cannot silently select a supported emitter.
+peer.describe({ format: 'xml' })
+void overview
+void overviewText
+void detail
+void detailText

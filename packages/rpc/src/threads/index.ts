@@ -21,3 +21,12 @@ export type {
   IRuntimeDynamicSurface,
   IRuntimeTypedPeer
 } from '../remote/runtime-api/typing.js'
+
+export type {
+  IRuntimeQueryOptions,
+  IRuntimeUnavailable,
+  IRuntimeDetail,
+  IRuntimeConnectionDetail,
+  IRuntimeOverview,
+  IRuntimeRecent
+} from '../remote/runtime-api/overview.js'

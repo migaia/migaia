@@ -63,6 +63,43 @@ export const RuntimeApiModeSource = {
   generatedRoutes: 'generated-routes'
 } as const
 export type RuntimeApiModeSource = (typeof RuntimeApiModeSource)[keyof typeof RuntimeApiModeSource]
+
+/** Source configuration and connection direction are separate local query axes. */
+export const RuntimeSourceKind = { spawn: 'spawn', connect: 'connect', listen: 'listen' } as const
+export type RuntimeSourceKind = (typeof RuntimeSourceKind)[keyof typeof RuntimeSourceKind]
+
+/** Automatic children report the trusted bootstrap direction, never a guessed parent role. */
+export const RuntimeConnectionDirection = {
+  spawned: 'spawned',
+  spawnedBy: 'spawned-by',
+  connect: 'connect',
+  listen: 'listen'
+} as const
+export type RuntimeConnectionDirection =
+  (typeof RuntimeConnectionDirection)[keyof typeof RuntimeConnectionDirection]
+
+/** Query absence is explicit and portable across all supported output formats. */
+export const RuntimeQueryStatus = {
+  unavailable: 'unavailable',
+  ready: 'ready',
+  closed: 'closed',
+  departed: 'departed'
+} as const
+
+/** These reasons identify absent owner facts without exposing configuration or native errors. */
+export const RuntimeQueryReason = {
+  localUnit: 'local-execution-unit-not-observed',
+  owner: 'owner-fact-not-available',
+  health: 'native-health-fact-not-available',
+  restarts: 'restart-count-not-observed',
+  counters: 'canonical-counter-not-available',
+  resources: 'native-resource-sampling-not-connected'
+} as const
+
+/** Registration departure is a channel fact; it does not fabricate a native exit status. */
+export const RuntimeRecentKind = { departed: 'departed' } as const
+/** Original scheduler timestamps are monotonic milliseconds, not wall-clock epoch time. */
+export const RuntimeQueryClock = { scheduler: 'scheduler' } as const
 import { RpcCapability } from '../../contract/wire-constants.js'
 
 /** Only these genuinely composed shared endpoint capabilities enter native bootstrap offers. */
@@ -75,3 +112,6 @@ export const RUNTIME_API_CAPABILITIES = Object.freeze([
   RpcCapability.runtimeApi,
   RpcCapability.forwardRoute
 ])
+
+/** Recent lifecycle summaries have the design's fixed 100-record capacity per original owner. */
+export const RuntimeQueryLimit = { recent: 100 } as const

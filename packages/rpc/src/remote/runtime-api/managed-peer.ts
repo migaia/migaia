@@ -1,3 +1,4 @@
+import { runtimeQuery, type IRuntimeConnectionOrigin } from './overview.js'
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
@@ -46,7 +47,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   binding: IRemoteBinding<TUnit, TSpec>,
   bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint,
   preparation?: IRuntimePreparationContext,
-  beforeRelease?: () => Promise<void>
+  beforeRelease?: () => Promise<void>,
+  origin?: IRuntimeConnectionOrigin
 ): Promise<IRuntimePeer> {
   compileRuntimeMethods(options.provide, options.contract)
   /** Safe configuration admission precedes supervisor.start and any native launcher side effect. */
@@ -73,6 +75,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           self: context.self,
           source: async () => channel,
           nodeId: preparation?.nodeId,
+          origin,
           ownsChannel: false,
           signal: preparationSignal,
           ...(bindEndpoint
@@ -135,7 +138,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
       isForwardedPayload(callOptions, payload)
         ? registration.invokeStream(method, payload, callOptions)
         : registration.currentPeer().stream(method, payload, callOptions),
-    describe: () => registration.currentPeer().describe(),
+    describe: runtimeQuery(() => registration.inspectRuntime()),
     close
   })
   managedRegistrations.set(peer, registration)

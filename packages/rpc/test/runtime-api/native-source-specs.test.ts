@@ -293,6 +293,20 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
         assert.equal(await host.process!.request(`client-${index + 1}`, 'child.echo'), index + 1)
       })
     }
+    /** A cold list must retain both genuine listener sessions without choosing a business winner. */
+    const overview = await host.process!.list()
+    assert.equal(
+      overview.connections.length,
+      2,
+      '[A24] listener overview contains both real accepted sessions'
+    )
+    assert.deepEqual(
+      overview.connections.map((connection) => [connection.kind, connection.direction]),
+      [
+        ['listen', 'listen'],
+        ['listen', 'listen']
+      ]
+    )
     assert.throws(
       () => host.process!.request('listener', 'child.echo'),
       (error: { code?: string }) => error.code === 'CAPABILITY_CONFLICT'

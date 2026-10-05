@@ -172,8 +172,10 @@ for (const peer of [
       assert.equal(routedFrames, 0, '[A112] the foreign physical wire never carries route')
       /** Foreign terminals omit wire extensions, but B must retain its already known prefix. */
       const knownRoute = [
-        (await readRuntimeOutletConnection(owners[0].thread, 'b')!.peer.describe()).nodeId,
-        (await readRuntimeOutletConnection(owners[1].thread, 'a')!.peer.describe()).nodeId
+        readRuntimePeerConnection(readRuntimeOutletConnection(owners[0].thread, 'b')!.peer)
+          .directory.localDescription.nodeId,
+        readRuntimePeerConnection(readRuntimeOutletConnection(owners[1].thread, 'a')!.peer)
+          .directory.localDescription.nodeId
       ]
       /** The independent language's direct error is the oracle for its exact stack and chain. */
       let original: any
