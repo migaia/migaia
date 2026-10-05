@@ -8,12 +8,18 @@ import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc/pr
 import { createNodeProcessLauncher } from '@migaia/rpc/process/adapters/node-child-process'
 import { endpointFor } from './peers/ts/runtime.js'
 
-/** U36 baseline selects current independent oracles; retired facade declarations are local only. */
-const baseline = JSON.parse(
-  readFileSync(new URL('../../schema/vectors/protocol-baseline.json', import.meta.url), 'utf8')
-) as { selftestVectors: string[] }
-/** Every selected group remains mandatory; this list comes from the current contract artifact. */
-const vectorFiles = baseline.selftestVectors
+/** [A119] Independent scope is frozen here, so editing the baseline artifact cannot shrink it. */
+const vectorFiles = [
+  'handshake.json',
+  'control.json',
+  'envelope.json',
+  'stream.json',
+  'error-chain.json',
+  'stream-framing.json',
+  'remote-host-control.json',
+  'runtime-description.json',
+  'batch.json'
+] as const
 /** Every applicable case ID must appear in a real independent selftest receipt. */
 const requiredIds = [
   ...new Set(
@@ -21,11 +27,29 @@ const requiredIds = [
       const vector = JSON.parse(
         readFileSync(new URL(`../../schema/vectors/${file}`, import.meta.url), 'utf8')
       )
-      return Object.values(vector).flatMap((section) =>
+      /** U36 retires only v1 catalogs and describeHost; use/unUse/inspect stay live wire methods. */
+      const sections =
+        file === 'remote-host-control.json'
+          ? [
+              vector.controls.filter(
+                (value: { definition: string }) => value.definition !== 'describeHost'
+              )
+            ]
+          : Object.values(vector)
+      return sections.flatMap((section) =>
         Array.isArray(section)
           ? section
-              .filter((value) => value && typeof value === 'object' && typeof value.id === 'string')
-              .map((value) => value.id as string)
+              .filter(
+                (value) =>
+                  value &&
+                  typeof value === 'object' &&
+                  (typeof value.id === 'string' || file === 'runtime-description.json')
+              )
+              .map((value, index) =>
+                typeof value.id === 'string'
+                  ? (value.id as string)
+                  : `${file}/${section === vector.valid ? 'valid' : 'invalid'}/${index}`
+              )
           : []
       )
     })
@@ -41,7 +65,7 @@ beforeAll(async () => {
   if (!receipt.accepted) throw new Error(JSON.stringify(receipt))
 })
 
-describe('[A2] published vectors evaluated by independent language owners', () => {
+describe('[A2][A119] published vectors evaluated by independent language owners', () => {
   for (const peer of peers.slice(0, 4))
     it(`${peer.language} missing negotiated stream capability rejects before its first physical write`, async () => {
       /** The public proposal deliberately omits stream while preserving native mandatory controls. */
@@ -129,7 +153,8 @@ describe('[A2] published vectors evaluated by independent language owners', () =
           rows.some(
             (line) =>
               (line.startsWith('PASS ') || (id === 'absent' && line.startsWith('SKIP '))) &&
-              (line.endsWith('/' + id) ||
+              (line === 'PASS ' + id ||
+                line.endsWith('/' + id) ||
                 line.includes('/' + id + '/') ||
                 (id === 'absent' && line.includes('/absent:')))
           ),

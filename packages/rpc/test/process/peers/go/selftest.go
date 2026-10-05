@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -473,6 +474,7 @@ func runSelftest(directory string) int {
 	runtimeChecks(suite)
 	u36BaselineChecks(suite)
 	u41BridgeChecks(suite)
+	entryVectorChecks(suite, directory)
 	for _, generation := range []string{"."} {
 		prefix := generation
 		if generation == "." {
@@ -528,6 +530,66 @@ func runSelftest(directory string) int {
 		return 1
 	}
 	return 0
+}
+
+// entryVectorChecks restores live Host controls and checks real directory/batch admission.
+func entryVectorChecks(suite *vectorSuite, directory string) {
+	host, hostErr := loadVector(filepath.Join(directory, "remote-host-control.json"))
+	schema, schemaErr := loadVector(filepath.Join(directory, "..", "remote-contract.schema.json"))
+	if hostErr != nil || schemaErr != nil {
+		suite.unavailable("remote-host-control")
+	} else {
+		hostVectors(suite, host, field(schema["$defs"]))
+	}
+	if vector, err := loadVector(filepath.Join(directory, "runtime-description.json")); err != nil {
+		suite.unavailable("runtime-description")
+	} else {
+		for _, section := range []string{"valid", "invalid"} {
+			for index, raw := range entries(vector[section]) {
+				value := field(raw)
+				remoteID := stringField(field(value["self"]), "instanceId")
+				remote := localOffer()
+				remote.Peer = record{"id": remoteID, "runtime": "go"}
+				var input, output bytes.Buffer
+				_ = send(&input, acceptRecord(agreement{Major: 1, Minor: 1, Codec: "json", Capabilities: []string{runtimeCapability, batchCapability, "close@1"}}, remote))
+				_ = send(&input, record{"kind": "response", "id": "go-describe-1", "ok": true, "data": record{"payload": value}})
+				_ = send(&input, record{"kind": "response", "id": "go-echo-1", "ok": true, "data": record{"payload": record{"probe": "go"}}})
+				suite.check(fmt.Sprintf("runtime-description.json/%s/%d", section, index), (initiator(&input, &output) == nil) == (section == "valid"))
+			}
+		}
+	}
+	if vector, err := loadVector(filepath.Join(directory, "batch.json")); err != nil {
+		suite.unavailable("batch")
+	} else {
+		for _, section := range []string{"valid", "invalid", "isolated"} {
+			for _, raw := range entries(vector[section]) {
+				entry := field(raw)
+				members, batched, err := baselineMembers(field(entry["value"]))
+				good := batched && (err == nil) == (section != "invalid")
+				if err == nil {
+					actual := []int{}
+					for index, member := range members {
+						if validateBaselineMember(member) == nil {
+							actual = append(actual, index)
+						}
+					}
+					expected := []int{}
+					if section == "isolated" {
+						for _, value := range entries(entry["validMembers"]) {
+							index, _ := asInt(value)
+							expected = append(expected, index)
+						}
+					} else {
+						for index := range members {
+							expected = append(expected, index)
+						}
+					}
+					good = good && reflect.DeepEqual(actual, expected)
+				}
+				suite.check("batch/"+stringField(entry, "id"), good)
+			}
+		}
+	}
 }
 
 // u36Request creates a selected-receiver request for the new baseline's real session checks.
@@ -854,4 +916,187 @@ func u41BridgeChecks(suite *vectorSuite) {
 		good = good && field(replies[1])["id"] == "missing" && missing["code"] == "PROVIDER_NOT_FOUND" && field(replies[2])["id"] == "received" && integerField(received, "count") == 1 && reflect.DeepEqual(received["values"], []any{"receipt"})
 	}
 	suite.check("u41/bridge/v2-batch-notification-isolation", good)
+}
+
+// schemaAccepts executes the constructs used by the published remote schema.
+func schemaAccepts(value any, rule record, definitions record) bool {
+	if ref := stringField(rule, "$ref"); ref != "" {
+		parts := strings.Split(ref, "/")
+		return schemaAccepts(value, field(definitions[parts[len(parts)-1]]), definitions)
+	}
+	for _, key := range []string{"oneOf", "anyOf"} {
+		if choices, exists := rule[key]; exists {
+			count := 0
+			for _, child := range entries(choices) {
+				if schemaAccepts(value, field(child), definitions) {
+					count++
+				}
+			}
+			if key == "oneOf" && count != 1 || key == "anyOf" && count == 0 {
+				return false
+			}
+		}
+	}
+	if child, exists := rule["not"]; exists && schemaAccepts(value, field(child), definitions) {
+		return false
+	}
+	if child, exists := rule["if"]; exists && schemaAccepts(value, field(child), definitions) && !schemaAccepts(value, field(rule["then"]), definitions) {
+		return false
+	}
+	if constant, exists := rule["const"]; exists && !reflect.DeepEqual(value, constant) {
+		return false
+	}
+	if choices, exists := rule["enum"]; exists {
+		found := false
+		for _, item := range entries(choices) {
+			found = found || reflect.DeepEqual(item, value)
+		}
+		if !found {
+			return false
+		}
+	}
+	kind := stringField(rule, "type")
+	switch kind {
+	case "object":
+		if field(value) == nil {
+			return false
+		}
+	case "array":
+		if _, ok := value.([]any); !ok {
+			return false
+		}
+	case "string":
+		if _, ok := value.(string); !ok {
+			return false
+		}
+	case "boolean":
+		if _, ok := value.(bool); !ok {
+			return false
+		}
+	case "null":
+		if value != nil {
+			return false
+		}
+	case "number", "integer":
+		if _, ok := value.(json.Number); !ok {
+			return false
+		}
+		if kind == "integer" {
+			if _, ok := asInt(value); !ok {
+				return false
+			}
+		}
+	}
+	if number, ok := value.(json.Number); ok {
+		if minimum, exists := rule["minimum"]; exists {
+			n, _ := number.Float64()
+			m, _ := minimum.(json.Number).Float64()
+			if n < m {
+				return false
+			}
+		}
+	}
+	if text, ok := value.(string); ok {
+		if max, exists := rule["maxLength"]; exists {
+			length, _ := asInt(max)
+			if len([]rune(text)) > length {
+				return false
+			}
+		}
+		if pattern := stringField(rule, "pattern"); pattern != "" {
+			match, err := regexp.MatchString(pattern, text)
+			if err != nil || !match {
+				return false
+			}
+		}
+	}
+	if array, ok := value.([]any); ok {
+		if minimum, exists := rule["minItems"]; exists {
+			n, _ := asInt(minimum)
+			if len(array) < n {
+				return false
+			}
+		}
+		if maximum, exists := rule["maxItems"]; exists {
+			n, _ := asInt(maximum)
+			if len(array) > n {
+				return false
+			}
+		}
+		prefix := entries(rule["prefixItems"])
+		for index, item := range array {
+			child := field(rule["items"])
+			if index < len(prefix) {
+				child = field(prefix[index])
+			}
+			if !schemaAccepts(item, child, definitions) {
+				return false
+			}
+		}
+	}
+	if object := field(value); object != nil {
+		if minimum, exists := rule["minProperties"]; exists {
+			n, _ := asInt(minimum)
+			if len(object) < n {
+				return false
+			}
+		}
+		if maximum, exists := rule["maxProperties"]; exists {
+			n, _ := asInt(maximum)
+			if len(object) > n {
+				return false
+			}
+		}
+		for _, key := range stringSlice(rule["required"]) {
+			if _, exists := object[key]; !exists {
+				return false
+			}
+		}
+		for key, item := range object {
+			if !schemaAccepts(key, field(rule["propertyNames"]), definitions) {
+				return false
+			}
+			child, exists := field(rule["properties"])[key]
+			if !exists {
+				child = rule["additionalProperties"]
+			}
+			if child == false || !schemaAccepts(item, field(child), definitions) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// hostVectors compares schema acceptance and the independent semantic projection per case.
+func hostVectors(suite *vectorSuite, vector record, definitions record) {
+	for _, section := range []string{"controls"} {
+		for _, item := range entries(vector[section]) {
+			entry := field(item)
+			definition := stringField(entry, "definition")
+			if definition == "describeHost" {
+				continue
+			}
+			value := entry["value"]
+			valid := schemaAccepts(value, field(definitions[definition]), definitions)
+			semantic := valid
+			if semantic && definition == "hostInspectResult" {
+				previous := ""
+				for _, plugin := range entries(field(value)["plugins"]) {
+					name := stringField(field(plugin), "name")
+					if name <= previous {
+						semantic = false
+					}
+					previous = name
+					features := stringSlice(field(plugin)["features"])
+					for index := 1; index < len(features); index++ {
+						if features[index] <= features[index-1] {
+							semantic = false
+						}
+					}
+				}
+			}
+			suite.check("host/"+section+"/"+stringField(entry, "id"), valid == entry["schemaValid"] && semantic == entry["semanticValid"])
+		}
+	}
 }

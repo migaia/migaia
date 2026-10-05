@@ -596,6 +596,106 @@ def check_framing(results: Results, data: list[dict[str, Any]]) -> None:
         results.check(f"framing/{case['id']}", framing)
 
 
+def schema_accepts(value: Any, rule: dict[str, Any], definitions: dict[str, Any]) -> bool:
+    """Interpret the published remote schema constructs without a third-party validator."""
+    if "$ref" in rule:
+        return schema_accepts(value, definitions[rule["$ref"].split("/")[-1]], definitions)
+    if "oneOf" in rule and sum(schema_accepts(value, child, definitions) for child in rule["oneOf"]) != 1:
+        return False
+    if "anyOf" in rule and not any(schema_accepts(value, child, definitions) for child in rule["anyOf"]):
+        return False
+    if "not" in rule and schema_accepts(value, rule["not"], definitions):
+        return False
+    if "if" in rule and schema_accepts(value, rule["if"], definitions) and not schema_accepts(value, rule["then"], definitions):
+        return False
+    if "const" in rule and (type(value) != type(rule["const"]) or value != rule["const"]):
+        return False
+    if "enum" in rule and value not in rule["enum"]:
+        return False
+    expected = rule.get("type")
+    types = {"object": isinstance(value, dict), "array": isinstance(value, list), "string": isinstance(value, str), "boolean": isinstance(value, bool), "null": value is None, "number": type(value) in (int, float), "integer": type(value) is int}
+    if expected and not types[expected]:
+        return False
+    if isinstance(value, str):
+        if len(value) > rule.get("maxLength", len(value)) or ("pattern" in rule and not re.search(rule["pattern"], value)):
+            return False
+    if type(value) in (int, float) and value < rule.get("minimum", value):
+        return False
+    if isinstance(value, list):
+        if not rule.get("minItems", 0) <= len(value) <= rule.get("maxItems", len(value)):
+            return False
+        for index, item in enumerate(value):
+            child = rule.get("prefixItems", [])[index] if index < len(rule.get("prefixItems", [])) else rule.get("items", {})
+            if not schema_accepts(item, child, definitions):
+                return False
+    if isinstance(value, dict):
+        if len(value) > rule.get("maxProperties", len(value)) or len(value) < rule.get("minProperties", 0) or any(key not in value for key in rule.get("required", [])):
+            return False
+        for key, item in value.items():
+            if not schema_accepts(key, rule.get("propertyNames", {}), definitions):
+                return False
+            child = rule.get("properties", {}).get(key, rule.get("additionalProperties", {}))
+            if child is False or not schema_accepts(item, child, definitions):
+                return False
+    return True
+
+
+def check_host_control(results: Results, data: dict[str, Any]) -> None:
+    """Check schema and semantic catalog identity and inspect ordering per case."""
+    definitions = json.loads((VECTOR_ROOT.parent / "remote-contract.schema.json").read_text())["$defs"]
+    for section in ("controls",):
+        for case in data.get(section, []):
+            if case["definition"] == "describeHost":
+                continue
+            def check(case: dict[str, Any] = case, section: str = section) -> None:
+                value = case["value"]
+                definition = case["definition"]
+                valid = schema_accepts(value, definitions[definition], definitions)
+                semantic = valid
+                if semantic and definition == "hostInspectResult":
+                    names = [item["name"] for item in value["plugins"]]
+                    semantic = names == sorted(set(names)) and all(item["features"] == sorted(set(item["features"])) for item in value["plugins"])
+                expect((valid, semantic), (case["schemaValid"], case["semanticValid"]))
+            results.check(f"host/{section}/{case['id']}", check)
+
+
+def check_runtime_description(results: Results, data: dict[str, Any]) -> None:
+    """Use the actual reverse initiator's admission, including identity and duplicate modes."""
+    from reverse import ReverseCalls
+    for section in ("valid", "invalid"):
+        for index, value in enumerate(data[section]):
+            def check(value=value, section=section):
+                owner = ReverseCalls(value["self"]["instanceId"], None)
+                try:
+                    owner.directory(value)
+                    accepted = True
+                except (ValueError, TypeError):
+                    accepted = False
+                expect(accepted, section == "valid")
+            results.check(f"runtime-description.json/{section}/{index}", check)
+
+
+def check_batch(results: Results, data: dict[str, Any]) -> None:
+    """Check physical admission and each sibling independently; one invalid member stays isolated."""
+    for section in ("valid", "invalid", "isolated"):
+        for case in data[section]:
+            def check(case=case, section=section):
+                value = case["value"]
+                admitted = isinstance(value, dict) and set(value) == {"kind", "envelopes"} and value["kind"] == "batch" and isinstance(value["envelopes"], list) and bool(value["envelopes"])
+                expect(admitted, section != "invalid")
+                if not admitted:
+                    return
+                indices = []
+                for index, member in enumerate(value["envelopes"]):
+                    try:
+                        normalize_envelope(member, 1)
+                    except VectorFailure:
+                        continue
+                    indices.append(index)
+                expect(indices, case.get("validMembers", list(range(len(value["envelopes"])))))
+            results.check(f"batch/{case['id']}", check)
+
+
 def run_selftest(path: str | None = None) -> int:
     """Run relevant vectors and exit nonzero for any failed or missing case."""
     root = Path(path) if path else VECTOR_ROOT
@@ -607,6 +707,9 @@ def run_selftest(path: str | None = None) -> int:
         ("stream.json", lambda data: check_stream(results, data)),
         ("error-chain.json", lambda data: check_wire(results, data)),
         ("stream-framing.json", lambda data: check_framing(results, data)),
+        ("remote-host-control.json", lambda data: check_host_control(results, data)),
+        ("runtime-description.json", lambda data: check_runtime_description(results, data)),
+        ("batch.json", lambda data: check_batch(results, data)),
     ]
     for name, check in required:
         data = load(root, name)
