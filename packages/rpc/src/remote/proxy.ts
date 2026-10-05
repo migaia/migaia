@@ -28,6 +28,10 @@ import { readRuntimePeerConnection } from './runtime-api/peer.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
 import { createProviderGenerationRetired } from '../core/internal/provider.js'
+import {
+  prepareRuntimeStreamConsumer,
+  retainRuntimeStreamPreparation
+} from '../core/internal/stream/owner.js'
 import { RpcAbortError, RpcCoreErrorCode, RpcError, RpcRemoteError } from '../core/errors.js'
 import { nativeReplayReceipt } from '../core/internal/native-replay.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
@@ -779,6 +783,38 @@ class RemoteRegistration<TUnit, TSpec> {
         (declaration?.idempotent ? (this.#options.keyFactory?.() ?? defaultRpcId()) : undefined)
       if (key !== undefined) assertRpcIdempotencyKey(key)
       const timeoutMs = this.#timeout(options.timeoutMs)
+      /** The final runtime owner alone settles opted-in cancellation and start deadlines. */
+      if (active.runtime && (options.orderKey !== undefined || options.cancel !== undefined)) {
+        /** Preserve the selected mode, full options and original private forwarding provenance. */
+        const callOptions = retainForwardOptions(options, {
+          ...options,
+          ...(timeoutMs === undefined ? {} : { timeoutMs }),
+          ...(key === undefined ? {} : { idempotencyKey: key })
+        })
+        /** This is the actual downstream result, without the legacy retry timer or abort winner. */
+        const operation = (
+          mode === RuntimeApiMode.notify
+            ? active.runtime.notify(method, data, callOptions)
+            : active.runtime.request(method, data, callOptions)
+        ) as Promise<IRpcPortableValue>
+        if (!forwarded) return operation
+        /** The existing leave receipt wins only when this captured downstream generation retires. */
+        let retired: Error | undefined
+        const unsubscribe = this.events.onLeave(active.number, (reason) => {
+          retired = createProviderGenerationRetired(reason)
+        })
+        return operation
+          .then(
+            (result) => {
+              if (retired) throw retired
+              return result
+            },
+            (error: unknown) => {
+              throw retired ?? error
+            }
+          )
+          .finally(unsubscribe)
+      }
       const deadlineAt =
         timeoutMs === undefined ? undefined : this.#options.binding.scheduler.now() + timeoutMs
       /** Retry ports see the same event source and a sendOnce bound to the logical key. */
@@ -812,17 +848,6 @@ class RemoteRegistration<TUnit, TSpec> {
               this.#departed.get(input.expectedGeneration),
               { generation: input.expectedGeneration }
             )
-          /** Explicit U25 options enter the accepted Peer; legacy send cannot enforce its profile. */
-          if (
-            live.runtime &&
-            !forwarded &&
-            (options.orderKey !== undefined || options.cancel !== undefined)
-          )
-            return live.runtime.request(method, data, {
-              ...options,
-              ...(input.remainingMs === undefined ? {} : { timeoutMs: input.remainingMs }),
-              ...(key === undefined ? {} : { idempotencyKey: key })
-            }) as Promise<IRpcPortableValue>
           return live.served.endpoint
             .send<IRpcPortableValue>(
               live.channel.peerId,
@@ -931,26 +956,98 @@ class RemoteRegistration<TUnit, TSpec> {
   }
 
   /** Stream opening remains lazy so guard errors reach the first next call. */
-  async *invokeStream(
+  invokeStream(
     method: string,
     params: unknown,
     options: IRemoteCallOptions = {}
   ): AsyncIterableIterator<IRpcPortableValue> {
-    /** Runtime forwarding joins the existing generation owner without another iterator registry. */
-    const runtime = this.#options.prepareRuntime !== undefined
+    if (this.#options.prepareRuntime) {
+      /** The existing registration facade delegates all controls to exactly one original consumer. */
+      let consumer: AsyncIterableIterator<IRpcPortableValue> | undefined
+      /** A genuine leave overrides only errors from the captured downstream generation. */
+      let retired: Error | undefined
+      /** The original leave subscription survives preparation until that consumer terminates. */
+      let unsubscribe: (() => void) | undefined
+      /** Create only the one lazy canonical consumer and capture its accepted generation. */
+      const current = (): AsyncIterableIterator<IRpcPortableValue> => {
+        if (consumer) return consumer
+        /** Only package-minted forwarding can reuse the previous hop's admitted payload. */
+        const forwarded = isForwardedPayload(options, params)
+        /** Caller values otherwise enter the same canonical portable admission as before. */
+        const data = forwarded ? (params as IRpcPortableValue) : normalizePortable(params)
+        this.#runtimeMethod(method, RuntimeApiMode.stream)
+        this.#callOptions(options, true)
+        this.#options.callGuard?.beforeDispatch({
+          method,
+          mode: RemoteMethodMode.asyncGenerator,
+          generation: this.#current?.number ?? this.#options.binding.supervisor.generation
+        })
+        /** All controls keep this original generation rather than resolving another target later. */
+        const active = this.#active()
+        /** The native registration's existing wall-time cap still bounds this call. */
+        const timeoutMs = this.#timeout(options.timeoutMs)
+        consumer = active.runtime!.stream(
+          method,
+          data,
+          retainForwardOptions(options, {
+            ...options,
+            ...(timeoutMs === undefined ? {} : { timeoutMs })
+          })
+        )
+        if (forwarded)
+          unsubscribe = this.events.onLeave(active.number, (reason) => {
+            retired = createProviderGenerationRetired(reason)
+          })
+        return consumer
+      }
+      /** The facade owns no credit, pending or terminal state; the original iterator settles each. */
+      const observe = async (
+        operation: () => Promise<IteratorResult<IRpcPortableValue>>
+      ): Promise<IteratorResult<IRpcPortableValue>> => {
+        try {
+          /** Completion and cleanup remain facts from the original consumer's terminal boundary. */
+          const result = await operation()
+          if (result.done) unsubscribe?.()
+          return result
+        } catch (error) {
+          unsubscribe?.()
+          throw retired ?? error
+        }
+      }
+      /** Replace the existing generator wrapper with direct control delegation, without pre-pull. */
+      const facade: AsyncIterableIterator<IRpcPortableValue> = {
+        next: () => observe(() => current().next()),
+        return: (value) => observe(() => current().return!(value)),
+        throw: (reason) => observe(() => current().throw!(reason)),
+        [Symbol.asyncIterator]() {
+          return this
+        }
+      }
+      if (options.orderKey !== undefined || options.cancel !== undefined)
+        retainRuntimeStreamPreparation(facade, async () => {
+          try {
+            await prepareRuntimeStreamConsumer(current())
+          } catch (error) {
+            unsubscribe?.()
+            throw retired ?? error
+          }
+        })
+      return Object.freeze(facade)
+    }
+    return this.#legacyStream(method, params, options)
+  }
+
+  /** Frozen advanced streams retain their original lazy generator and option contract. */
+  async *#legacyStream(
+    method: string,
+    params: unknown,
+    options: IRemoteCallOptions
+  ): AsyncIterableIterator<IRpcPortableValue> {
+    /** Advanced forwarding keeps its existing generation owner without another iterator registry. */
     const forwarded = isForwardedPayload(options, params)
-    const data = runtime
-      ? forwarded
-        ? (params as IRpcPortableValue)
-        : normalizePortable(params)
-      : this.#params(params)
-    const declaration = runtime
-      ? this.#runtimeMethod(method, RuntimeApiMode.stream)
-      : this.#method(method)
+    const data = this.#params(params)
+    const declaration = this.#method(method)
     if (
-      !runtime &&
-      declaration &&
-      'mode' in declaration &&
       declaration.mode !== RemoteMethodMode.generator &&
       declaration.mode !== RemoteMethodMode.asyncGenerator
     )
@@ -959,7 +1056,7 @@ class RemoteRegistration<TUnit, TSpec> {
     const observedGeneration = this.#current?.number ?? this.#options.binding.supervisor.generation
     this.#options.callGuard?.beforeDispatch({
       method,
-      mode: runtime ? RemoteMethodMode.asyncGenerator : (declaration as IRemoteMethodContract).mode,
+      mode: declaration.mode,
       generation: observedGeneration
     })
     const active = this.#active()
@@ -984,14 +1081,12 @@ class RemoteRegistration<TUnit, TSpec> {
           ? {}
           : { timeoutMs: this.#timeout(options.timeoutMs) })
       })
-      yield* runtime
-        ? active.runtime!.stream(method, data, callOptions)
-        : active.served.stream.open(
-            active.channel.peerId,
-            `${RemoteMethodName.runtimeStreamPrefix}${method}`,
-            data,
-            callOptions
-          )
+      yield* active.served.stream.open(
+        active.channel.peerId,
+        `${RemoteMethodName.runtimeStreamPrefix}${method}`,
+        data,
+        callOptions
+      )
     } catch (error) {
       throw retired ?? error
     } finally {

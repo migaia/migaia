@@ -51,6 +51,192 @@ import type { IRpcRuntimeEnvelope } from '../../src/contract/runtime-api/types.j
 import { createProcessProviderAdmission } from '../../src/process/resilience/provider-admission.js'
 import { normalizeProcessResilienceOptions } from '../../src/process/resilience/session.js'
 import { createRemoteBindingDrain } from '../../src/remote/internal/binding-drain.js'
+import {
+  readRuntimeLaunchContext,
+  withRuntimeLaunchContext
+} from '../../src/remote/runtime-api/launch-context.js'
+import { readManagedRuntimeRegistration } from '../../src/remote/runtime-api/managed-peer.js'
+
+it.each(['request', 'notify', 'stream', 'retire', 'missing-order'] as const)(
+  '[A59][A66][A67][A74] managed native relay preserves %s final-owner semantics',
+  async (mode) => {
+    /** A-to-B uses genuine Host slots; B-to-C is the original managed Worker assembly. */
+    const owners = [owner(), owner()] as const
+    const carriers: ReturnType<typeof runtimeSources>[] = []
+    const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
+    const native = createNodeThreadLauncher()
+    /** The true native handle supplies retirement independently of any facade counter. */
+    let unit: Awaited<ReturnType<typeof native.launch>> | undefined
+    const capabilities = [
+      ...RUNTIME_API_CAPABILITIES,
+      RpcCapability.generation,
+      RpcCapability.order,
+      RpcCapability.cancelBeforeStart,
+      RpcCapability.outcome
+    ]
+    let holding: Promise<unknown> | undefined
+    let follower: Promise<unknown> | undefined
+    let iterator: AsyncIterableIterator<unknown> | undefined
+    try {
+      await owners[1].use(
+        createThreadPlugin({
+          name: 'c',
+          spawn: {
+            spec: {
+              entry: fileURLToPath(new URL('./fixtures/runtime-u25-worker.mjs', import.meta.url))
+            },
+            budget,
+            scheduler: systemScheduler,
+            launcher: {
+              ...native,
+              launch: async (spec, request) => {
+                unit = await (mode === 'missing-order'
+                  ? (() => {
+                      const context = readRuntimeLaunchContext(request)!
+                      return withRuntimeLaunchContext(
+                        request,
+                        {
+                          ...context,
+                          capabilities: context.capabilities.filter(
+                            (capability) => capability !== RpcCapability.order
+                          )
+                        },
+                        () => native.launch(spec, request)
+                      )
+                    })()
+                  : native.launch(spec, request))
+                return unit
+              }
+            },
+            channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+            report: () => undefined
+          },
+          report: () => undefined
+        })
+      )
+      carriers.push(
+        await attach(
+          owners[0],
+          owners[1],
+          'b',
+          'a',
+          {},
+          { expose: ['c'] },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      const caller = owners[0].thread as unknown as IRuntimeOutlet
+      const direct = owners[1].thread as unknown as IRuntimeOutlet
+      assert.equal(await direct.request('c', 'count'), 0)
+      if (mode === 'missing-order') {
+        const result = await caller
+          .request('b', 'c.value', undefined, { orderKey: 'shared' })
+          .catch((error: unknown) => error)
+        assert.equal(
+          result && typeof result === 'object' && Reflect.get(result, 'code'),
+          RpcCoreErrorCode.capabilityUnsupported,
+          '[A74] a managed downstream cannot silently omit an unsupported order option'
+        )
+        assert.equal(await direct.request('c', 'count'), 0)
+      } else if (mode === 'stream' || mode === 'retire') {
+        iterator = caller.stream('b', 'c.values', undefined, {
+          orderKey: 'shared',
+          cancel: 'before-start',
+          idempotencyKey: 'managed-forward-stream'
+        })
+        const first = await iterator.next().catch((error: unknown) => error)
+        if (first instanceof Error)
+          assert.fail(
+            JSON.stringify({
+              source: Reflect.get(first, 'source'),
+              code: Reflect.get(first, 'code'),
+              name: first.name,
+              message: first.message
+            })
+          )
+        assert.equal(
+          first && typeof first === 'object' && Reflect.get(first, 'done'),
+          false,
+          '[A67] managed forwarding must retain the original runtime stream task'
+        )
+        if (mode === 'retire') {
+          /** OS exit and the original registration's retirement publication are distinct facts. */
+          const registration = readManagedRuntimeRegistration(
+            readRuntimeOutletConnection(owners[1].thread, 'c')!.peer
+          )!
+          const departed = new Promise<void>((resolve) => {
+            const unsubscribe = registration.events.onLeave(
+              registration.events.current().generation,
+              () => {
+                unsubscribe()
+                resolve()
+              }
+            )
+          })
+          unit!.terminate()
+          await unit!.exited
+          await departed
+          const failure = await iterator.next().catch((error: unknown) => error)
+          assert.equal(
+            Reflect.get(failure as object, 'code'),
+            'PROVIDER_GENERATION_RETIRED',
+            JSON.stringify({
+              source: Reflect.get(failure as object, 'source'),
+              code: Reflect.get(failure as object, 'code'),
+              name: Reflect.get(failure as object, 'name'),
+              message: String(Reflect.get(failure as object, 'message')).slice(0, 160)
+            })
+          )
+          assert.ok(Reflect.get(failure as object, 'cause') instanceof Error)
+        } else {
+          const terminal = await iterator.return!()
+          assert.equal(terminal.done, true)
+          assert.deepEqual({ ...(terminal.value as object) }, { final: 99, aborted: false })
+          const outcome = await caller.outcome('b', 'managed-forward-stream')
+          assert.equal(outcome.state, 'done')
+          if (outcome.state === 'done') assert.equal(outcome.outcome.mode, 'stream')
+        }
+      } else {
+        const options = {
+          orderKey: 'shared',
+          cancel: 'before-start' as const,
+          idempotencyKey: `managed-forward-${mode}`
+        }
+        if (mode === 'notify') await caller.notify('b', 'c.hold', undefined, options)
+        else
+          holding = caller
+            .request('b', 'c.hold', undefined, options)
+            .catch((error: unknown) => error)
+        await vi.waitFor(async () => assert.equal(await direct.request('c', 'count'), 1))
+        /** Same B caller/connection makes the final C key scope identical to the forwarded call. */
+        follower = direct
+          .request('c', 'value', undefined, { orderKey: 'shared' })
+          .catch((error: unknown) => error)
+        assert.equal(
+          await direct.request('c', 'count'),
+          1,
+          '[A59] C owns one FIFO across managed forwarded and direct calls from B'
+        )
+        assert.equal(await direct.request('c', 'release'), 7)
+        if (holding) assert.equal(await holding, 42)
+        assert.equal(await follower, 2)
+        const outcome = await caller.outcome('b', `managed-forward-${mode}`)
+        assert.equal(outcome.state, 'done')
+        if (outcome.state === 'done') assert.equal(outcome.outcome.mode, mode)
+      }
+    } finally {
+      await Promise.resolve()
+        .then(() => owners[1].thread?.request('c', 'release'))
+        .catch(() => undefined)
+      await iterator?.return?.(undefined).catch(() => undefined)
+      for (const host of owners) await host.dispose()
+      for (const carrier of carriers) carrier.close()
+      await holding
+      await follower
+    }
+    assert.equal(budget.inUse, 0)
+  }
+)
 
 it.each(['quota', 'drain'] as const)(
   '[A60][A67][A114] original native %s owns a forwarded stream before C open',
