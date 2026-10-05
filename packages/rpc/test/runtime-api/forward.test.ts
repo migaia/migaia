@@ -70,12 +70,12 @@ async function attach(
               name: leftName,
               self: { name: leftName, instanceId: `${leftName}-caller` },
               connect: carrier.sources[0],
-              report: () => undefined
+              report: leftOptions.report ?? (() => undefined)
             })
           )
           return carrier.sources[1](context)
         },
-        report: () => undefined
+        report: rightOptions.report ?? (() => undefined)
       })
     )
     await opposite
@@ -86,6 +86,78 @@ async function attach(
     throw error
   }
 }
+
+it('[A104/A105] two forward Hosts preserve a notify-only terminal and await its completion', async () => {
+  /** Four actual Hosts exercise two forward entries before the declared one-way provider. */
+  const owners = [owner(), owner(), owner(), owner()] as const
+  /** Original carriers remain alive until every Host has disposed its admitted work. */
+  const carriers: ReturnType<typeof runtimeSources>[] = []
+  /** Terminal execution is observed independently of A ordinary physical-send completion. */
+  const calls: unknown[] = []
+  /** Actual forwarding failures are recorded through the original provider reporter. */
+  const failures: any[] = []
+  try {
+    carriers.push(
+      await attach(
+        owners[2],
+        owners[3],
+        'd',
+        'c',
+        {},
+        {
+          contract: {
+            schemaVersion: 1,
+            plugin: 'service',
+            features: { data: { methods: { tell: { mode: 'one-way', idempotent: false } } } }
+          },
+          provide: {
+            service: {
+              data: {
+                tell: (value) => {
+                  calls.push(value)
+                }
+              }
+            }
+          }
+        }
+      )
+    )
+    await owners[2].thread!.notify('d', 'service.data.tell', 'direct')
+    await vi.waitFor(() => assert.deepEqual(calls, ['direct']))
+    carriers.push(
+      await attach(
+        owners[1],
+        owners[2],
+        'c',
+        'b',
+        {},
+        {
+          expose: ['d.service.data.tell'],
+          report: (error) => failures.push(error)
+        }
+      )
+    )
+    carriers.push(
+      await attach(
+        owners[0],
+        owners[1],
+        'b',
+        'a',
+        {},
+        {
+          expose: ['c.d.service.data.tell'],
+          report: (error) => failures.push(error)
+        }
+      )
+    )
+    await owners[0].thread!.notify('b', 'c.d.service.data.tell', 'forwarded')
+    await vi.waitFor(() => assert.deepEqual(calls, ['direct', 'forwarded']))
+    assert.equal(failures.length, 0)
+  } finally {
+    for (const host of owners) await host.dispose()
+    for (const carrier of carriers) carrier.close()
+  }
+})
 
 it('[A102/A104] one explicit connection method forwards through B with B as the direct caller', async () => {
   /** Three independent Hosts distinguish the original caller from the forwarding authority. */

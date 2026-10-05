@@ -329,9 +329,12 @@ export async function createRuntimePeer(
           const connection = entry.slot()
           const options = createForwardOptions(context, route)
           try {
-            const result = readProviderInvocation(context)?.dispatchOnly
-              ? await connection.peer.notify(entry.method, context.data, options)
-              : await connection.peer.request(entry.method, context.data, options)
+            /** A response-waiting forward preserves the accepted notify-only business mode. */
+            const result =
+              readProviderInvocation(context)?.dispatchOnly ||
+              entry.supportedModes.every((mode) => mode === RuntimeApiMode.notify)
+                ? await connection.peer.notify(entry.method, context.data, options)
+                : await connection.peer.request(entry.method, context.data, options)
             return context.success(result)
           } catch (error) {
             throw retainProviderFailureRoute(error, route)
