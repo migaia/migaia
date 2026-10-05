@@ -29,6 +29,8 @@ it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
   async (policy) => {
     /** Fixture offers only the profile under test, independently of production default offers. */
     const capabilities = [
+      /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+      RpcCapability.deadline,
       ...RUNTIME_API_CAPABILITIES,
       RpcCapability.generation,
       RpcCapability.group,

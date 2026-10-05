@@ -1,3 +1,4 @@
+import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import { createAutomaticProcessPeer } from '../automatic-peer.js'
 import type { IRuntimePeerOptions } from '../../remote/runtime-api/peer.js'
 import { createProcessSourcePeer, type IRuntimeProcessPeerOptions } from '../runtime-peer.js'
@@ -9,6 +10,7 @@ let automaticMarker: string | undefined
 
 /** Node and Bun use their original Node-compatible byte adapter for genuine child stdio. */
 export function createProcessPeer(options: IRuntimeProcessPeerOptions) {
+  readRuntimeDefaultTimeout(options)
   /** Automatic source authority is checked before accepting any full explicit deployment. */
   const marker = automaticMarker ?? process.env[PROCESS_RUNTIME_API_ENV]
   if (marker !== undefined) {

@@ -17,8 +17,8 @@ export type IRpcOneWayOptions = Readonly<{
   transfer?: readonly unknown[]
   /** Cancellation controls only local send admission; it is never sent as business data. */
   signal?: IRpcAbortSignal
-  /** Only an explicit deadline limits physical send; one-way has no request default timeout. */
-  timeoutMs?: number
+  /** Only an explicit deadline limits physical send; false keeps the original unbounded send. */
+  timeoutMs?: number | false
 }>
 
 /** Public surface added only when callers select the one-way endpoint preset. */

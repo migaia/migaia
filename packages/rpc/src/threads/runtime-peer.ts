@@ -1,3 +1,4 @@
+import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
 import type { IThreadHandle } from '@migaia/supervision/threads'
 import { RpcRuntimeGenerationKind } from '../contract/runtime-api/constants.js'
 import { defaultRpcId } from '../core/internal/id.js'
@@ -41,6 +42,7 @@ export type IRuntimeThreadPeerOptions<THandle extends IThreadHandle = IThreadHan
 export function createThreadSourcePeer<THandle extends IThreadHandle>(
   options: IRuntimeThreadPeerOptions<THandle>
 ) {
+  readRuntimeDefaultTimeout(options)
   if (!options.spawn || typeof options.spawn !== 'object' || options.connect || options.listen)
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
   /** The caller's source object is snapshotted before the original binding can start. */
@@ -82,6 +84,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
       self,
       provide: options.provide,
       providerLimits: options.providerLimits,
+      defaultTimeoutMs: options.defaultTimeoutMs,
       report: options.report,
       contract: options.contract,
       keyFactory: options.keyFactory ?? source.keyFactory,

@@ -76,6 +76,8 @@ async function sharedProvider(provide: IRuntimePeerProvide) {
   )
   /** Both source offers exercise real authenticated-generation and ordering ports. */
   const capabilities = [
+    /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+    RpcCapability.deadline,
     RpcCapability.runtimeApi,
     RpcCapability.generation,
     RpcCapability.order,

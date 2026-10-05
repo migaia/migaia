@@ -1,3 +1,4 @@
+import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
 import { RuntimeSourceKind, RuntimeConnectionDirection } from '../remote/runtime-api/constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
@@ -25,6 +26,7 @@ export async function createAutomaticWebThreadPeer(
   options: IRuntimePeerOptions,
   native: IThreadWebPort
 ) {
+  readRuntimeDefaultTimeout(options)
   if (options.spawn !== undefined || options.connect !== undefined || options.listen !== undefined)
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
   compileRuntimeMethods(options.provide, options.contract)

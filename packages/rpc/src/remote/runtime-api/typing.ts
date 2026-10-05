@@ -4,6 +4,10 @@ import type { IRpcRuntimeSendOptions } from '../../core/internal/outbound-attach
 import type { IRpcRuntimeStepOutcome } from '../../contract/runtime-api/types.js'
 import type { IRuntimePeer as IRuntimePeerHandle } from './peer.js'
 
+/** Runtime calls retain the original core false override without widening legacy remote options. */
+export type IRuntimeCallOptions = Omit<IRemoteCallOptions, 'timeoutMs'> &
+  Readonly<{ timeoutMs?: number | false }>
+
 /** Explicit dynamic invocation is opt-in and still checked against the accepted runtime catalog. */
 export type IRuntimeDynamicSurface = Readonly<
   Record<
@@ -167,15 +171,15 @@ export type IRuntimeTypedPeer<TRemote = Record<never, never>, S = IRuntimeFlatte
     ): Promise<readonly IRpcRuntimeStepOutcome[]>
     request<M extends Extract<IRuntimeScalarKeys<S>, string>>(
       method: M,
-      ...args: [...IRuntimePayload<S[M]>, options?: IRemoteCallOptions]
+      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeCallOptions]
     ): Promise<IRuntimeResult<S[M]>>
     notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(
       method: M,
-      ...args: [...IRuntimePayload<S[M]>, options?: IRemoteCallOptions]
+      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeCallOptions]
     ): Promise<void>
     stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(
       method: M,
-      ...args: [...IRuntimePayload<S[M]>, options?: IRemoteCallOptions]
+      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeCallOptions]
     ): AsyncIterableIterator<IRuntimeYield<S[M]>>
   }>
 
@@ -239,7 +243,7 @@ type IRuntimeOutletCalls<
     >(
       target: IRuntimeTarget<N>,
       method: M,
-      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
+      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRuntimeCallOptions]
     ): Promise<IRuntimeResult<IRuntimeRemote<P, K, N>[M]>>
     notify<
       N extends IRuntimeNames<P, K>,
@@ -247,7 +251,7 @@ type IRuntimeOutletCalls<
     >(
       target: IRuntimeTarget<N>,
       method: M,
-      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
+      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRuntimeCallOptions]
     ): Promise<void>
     stream<
       N extends IRuntimeNames<P, K>,
@@ -255,13 +259,13 @@ type IRuntimeOutletCalls<
     >(
       target: IRuntimeTarget<N>,
       method: M,
-      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRemoteCallOptions]
+      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRuntimeCallOptions]
     ): AsyncIterableIterator<IRuntimeYield<IRuntimeRemote<P, K, N>[M]>>
     /** Cold queries have the same portable format overloads as every runtime outlet. */
     get: import('./outlet.js').IRuntimeOutlet['get']
     broadcast(
       method: string,
       payload?: unknown,
-      options?: IRemoteCallOptions
+      options?: IRuntimeCallOptions
     ): Promise<readonly import('./outlet.js').IRuntimeBroadcastResult[]>
   }>

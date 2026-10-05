@@ -1,3 +1,4 @@
+import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import {
   RuntimeSourceKind,
   RuntimeConnectionDirection
@@ -16,6 +17,7 @@ import './node.js'
 
 /** Only a genuine parentPort and complete library bootstrap supply an automatic Worker source. */
 export function createThreadPeer(options: IRuntimeThreadPeerOptions) {
+  readRuntimeDefaultTimeout(options)
   if (!parentPort)
     return typeof options.spawn === 'object'
       ? createThreadSourcePeer(options)

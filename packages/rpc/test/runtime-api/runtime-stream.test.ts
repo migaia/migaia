@@ -145,6 +145,8 @@ it('[A67][A73] finish intent cannot enable discard on a stream that selected onl
 
 /** The fixture explicitly opts into the profile while production offers remain unadvertised. */
 const capabilities = [
+  /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+  RpcCapability.deadline,
   ...RUNTIME_API_CAPABILITIES,
   RpcCapability.generation,
   RpcCapability.order,

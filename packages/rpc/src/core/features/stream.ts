@@ -30,7 +30,7 @@ export type IRpcStreamRuntime = Readonly<{
     targetId: string,
     method: string,
     params: unknown,
-    options?: Readonly<{ signal?: IAbortSignal; timeoutMs?: number }>
+    options?: Readonly<{ signal?: IAbortSignal; timeoutMs?: number | false }>
   ) => AsyncIterableIterator<IRpcPortableValue>
   provide: (method: string, run: IRpcStreamRun) => () => void
   dispose: () => Promise<void>

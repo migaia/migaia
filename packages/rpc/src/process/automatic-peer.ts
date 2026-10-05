@@ -1,3 +1,4 @@
+import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
 import { RuntimeSourceKind, RuntimeConnectionDirection } from '../remote/runtime-api/constants.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
@@ -47,6 +48,7 @@ export async function createAutomaticProcessPeer(
     open(): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>>
   }>
 ): Promise<IRuntimePeer> {
+  readRuntimeDefaultTimeout(options)
   if (platform.marker === undefined) return createRuntimePeer(options)
   if (platform.marker !== PROCESS_RUNTIME_API_ENV_VERSION || claimed)
     invalidProcessRuntimeBootstrap()

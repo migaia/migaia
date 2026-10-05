@@ -139,7 +139,7 @@ it('[A72] a legacy response cannot settle a new task that requires the full auth
   const dispatch = vi.spyOn(client.kernel, 'dispatchRoute')
   let settled = false
   const running = fixture.peers[0]
-    .request('hold', undefined, { orderKey: 'same' })
+    .request('hold', undefined, { orderKey: 'same', timeoutMs: false })
     .then((value) => {
       settled = true
       return value

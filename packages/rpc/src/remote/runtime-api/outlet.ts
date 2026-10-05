@@ -28,7 +28,7 @@ import type { IPluginConstraint, IPluginRuntimeSharedSlot } from '@migaia/plugin
 import type { IRpcPortableValue } from '../../contract/types.js'
 import { serializeRpcError } from '../../contract/error.js'
 import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
-import type { IRemoteCallOptions } from '../types.js'
+import type { IRuntimeCallOptions } from './typing.js'
 import type { IRuntimePeerDescription, IRuntimePeerIdentity } from './description.js'
 import type { IRuntimePeer } from './peer.js'
 import type {
@@ -169,19 +169,19 @@ export type IRuntimeOutlet = Pick<IRuntimeEventPublisher, 'on' | 'watch'> &
       target: IRuntimeTarget<string>,
       method: string,
       payload?: unknown,
-      options?: IRemoteCallOptions
+      options?: IRuntimeCallOptions
     ): Promise<IRpcPortableValue | undefined>
     notify(
       target: IRuntimeTarget<string>,
       method: string,
       payload?: unknown,
-      options?: IRemoteCallOptions
+      options?: IRuntimeCallOptions
     ): Promise<void>
     stream(
       target: IRuntimeTarget<string>,
       method: string,
       payload?: unknown,
-      options?: IRemoteCallOptions
+      options?: IRuntimeCallOptions
     ): AsyncIterableIterator<IRpcPortableValue>
     /** Complete groups keep one exact target receipt through the original Peer operation. */
     group(
@@ -200,7 +200,7 @@ export type IRuntimeOutlet = Pick<IRuntimeEventPublisher, 'on' | 'watch'> &
     broadcast(
       method: string,
       payload?: unknown,
-      options?: IRemoteCallOptions
+      options?: IRuntimeCallOptions
     ): Promise<readonly IRuntimeBroadcastResult[]>
   }>
 

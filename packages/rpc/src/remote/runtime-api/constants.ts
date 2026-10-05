@@ -1,8 +1,13 @@
 /** New application descriptions are isolated from the unchanged v1 remote contract schema. */
 export const RUNTIME_API_SCHEMA_VERSION = 2
 
+/** Only simple runtime request/stream calls inherit this deadline; core defaults stay unchanged. */
+export const RUNTIME_API_DEFAULT_TIMEOUT_MS = 30_000
+
 /** Automatic provide descriptor errors are stable, non-reflecting configuration diagnostics. */
 export const RuntimeApiErrorText = {
+  /** Factory admission rejects this value before bootstrap or physical resource acquisition. */
+  defaultTimeoutInvalid: 'Runtime defaultTimeoutMs must be a positive finite number',
   /** A foreign origin without a negotiated node cannot safely begin a native forwarding route. */
   forwardOriginUnavailable: 'RPC forwarding origin node is unavailable',
   /** Descriptor compilation cannot read accessors or accept non-own/reserved callable paths. */

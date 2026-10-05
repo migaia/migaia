@@ -50,6 +50,7 @@ import {
 import { RuntimeApiMode } from './constants.js'
 import { withRuntimePreparationContext } from './launch-context.js'
 import { readManagedRuntimeRegistration } from './managed-peer.js'
+import { readRuntimeDefaultTimeout } from './timeout.js'
 import { createProviderAdmissionScope } from '../../core/internal/provider-admission.js'
 import { attachProviderPreflight } from '../../core/internal/provider.js'
 
@@ -230,6 +231,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
   kind: keyof typeof RuntimePluginFamily,
   createPeer: (options: IRuntimePeerOptions) => Promise<IRuntimePeer> = createRuntimePeer
 ): IDefinedPluginConstraint<Record<string, never>, never, Record<string, never>> {
+  /** Invalid defaults fail during cold Plugin construction, before any installation side effects. */
+  const defaultTimeoutMs = readRuntimeDefaultTimeout(options)
   /** Registration name is copied before installation; caller mutation cannot change publication. */
   const name = options.name
   if (typeof name !== 'string' || !name || !Object.hasOwn(RuntimePluginFamily, kind))
@@ -254,6 +257,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
     connect: options.connect as IRuntimePeerSource | undefined,
     listen: options.listen as IRuntimePeerSource | undefined,
     providerLimits: options.providerLimits,
+    defaultTimeoutMs,
     contract: options.contract,
     keyFactory: options.keyFactory,
     retryPort: options.retryPort,

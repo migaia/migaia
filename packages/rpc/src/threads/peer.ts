@@ -1,3 +1,4 @@
+import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
 import type { IRuntimeTypedPeer } from '../remote/runtime-api/typing.js'
 import { createRuntimePeer, type IRuntimePeerOptions } from '../remote/runtime-api/peer.js'
 import { createAutomaticWebThreadPeer } from './automatic-peer.js'
@@ -10,6 +11,7 @@ export function createThreadPeer<TRemote = Record<never, never>>(
 ): Promise<IRuntimeTypedPeer<TRemote>>
 /** Platform implementations retain their original untyped internal callable owner. */
 export function createThreadPeer(options: IRuntimeThreadPeerOptions): Promise<object> {
+  readRuntimeDefaultTimeout(options)
   /** Browser automatic discovery is limited to genuine dedicated Worker globals. */
   const Scope = Reflect.get(globalThis, 'DedicatedWorkerGlobalScope') as
     | (new (...args: never[]) => object)

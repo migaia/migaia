@@ -64,5 +64,6 @@ export type {
 export type {
   IRuntimeSurface,
   IRuntimeDynamicSurface,
-  IRuntimeTypedPeer
+  IRuntimeTypedPeer,
+  IRuntimeCallOptions
 } from './runtime-api/typing.js'

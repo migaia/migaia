@@ -11,6 +11,8 @@ import { connected } from './fixture.js'
 
 /** Source offers exercise each actual keyed mode without advertising unfinished production ports. */
 const capabilities = [
+  /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+  RpcCapability.deadline,
   ...RUNTIME_API_CAPABILITIES,
   RpcCapability.generation,
   RpcCapability.order,

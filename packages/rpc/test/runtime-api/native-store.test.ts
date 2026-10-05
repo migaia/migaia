@@ -19,6 +19,8 @@ import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } fro
 
 /** Actual native handshake offers exercise the new store port independently of unfinished defaults. */
 const capabilities = [
+  /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+  RpcCapability.deadline,
   ...RUNTIME_API_CAPABILITIES,
   RpcCapability.generation,
   RpcCapability.order,
