@@ -44,6 +44,8 @@ import type { RpcOutboundSender } from '../../src/core/internal/outbound-sender.
 import { readEndpointOwner } from '../../src/core/internal/endpoint-projection.js'
 import type { IRuntimeOutlet } from '../../src/remote/runtime-api/outlet.js'
 import type { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
+import type { RequestReplayLedger } from '../../src/core/internal/request-replay-ledger.js'
+import { EndpointOwnerKey } from '../../src/core/endpoint-kernel.js'
 import type { IRpcAbortSignal } from '../../src/core/typing.js'
 import { RpcError, RpcCoreErrorCode } from '../../src/core/errors.js'
 import { RpcCoreErrorText } from '../../src/core/error-text.js'
@@ -569,6 +571,29 @@ it.each(['mixed', 'multiple', 'failure', 'keyed-local', 'lookup'] as const)(
       const send = vi.spyOn(sender.transport, 'send')
       try {
         if (policy === 'failure') {
+          /** Both physical hops retain only the final provider's actually invoked group prefix. */
+          const endpoints = [
+            readRuntimePeerConnection(readRuntimeOutletConnection(owners[1].thread, 'a')!.peer)
+              .endpoint,
+            readRuntimePeerConnection(readRuntimeOutletConnection(owners[2].thread, 'b')!.peer)
+              .endpoint
+          ]
+          /** These are the original non-L replay owners, including B's transparent-forward hop. */
+          const ledgers = endpoints.map((endpoint) =>
+            readEndpointOwner<RequestReplayLedger>(endpoint, 'request-replay')!
+          )
+          /** Genuine terminal cleanup, rather than response arrival, releases the business leases. */
+          const admissions = endpoints.map((endpoint) =>
+            readEndpointOwner<ProviderAdmissionRegistry>(
+              endpoint,
+              EndpointOwnerKey.providerAdmission
+            )!
+          )
+          await vi.waitFor(() => {
+            for (const admission of admissions) assert.equal(admission.size, 0)
+          })
+          /** Freeze retained occupancy after the original directory requests have settled. */
+          const before = ledgers.map((replay) => replay.size)
           const result = await upstream.group(
             'b',
             [{ method: 'c.first' }, { method: 'c.fail' }, { method: 'c.last' }],
@@ -583,6 +608,17 @@ it.each(['mixed', 'multiple', 'failure', 'keyed-local', 'lookup'] as const)(
             assert.fail('[A65] actual C failure must stay in complete group report')
           assert.equal(result[1]!.error.code, RpcCoreErrorCode.capabilityUnsupported)
           assert.ok(result[1]!.error.stack)
+          await vi.waitFor(() => {
+            for (const admission of admissions) assert.equal(admission.size, 0)
+          })
+          for (const [index, replay] of ledgers.entries()) {
+            assert.equal(replay.activeSize, 0)
+            assert.equal(
+              replay.size,
+              before[index]! + 2,
+              '[A62] both hops release the never-executed group suffix'
+            )
+          }
           assert.equal((await upstream.outcome('b', 'forward-group')).state, 'done')
           const groups = send.mock.calls
             .map((args) => readRuntimeCarrier(args[0])?.frame as { kind?: string } | undefined)

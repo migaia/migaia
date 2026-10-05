@@ -677,6 +677,8 @@ export class ProviderExecutor<TTargetId extends string> {
     const native = new AbortController()
     /** One task state linearizes cancellation, start and terminal in this final executor. */
     let state: 'queued' | 'started' | 'cancelled' | 'terminal' = 'queued'
+    /** Known invocation retains only its prefix; cancellation or uncertain forwarding keeps replay. */
+    let invokedMembers: number | undefined
     let deadline: IEndpointTimer | undefined
     let claim: IRpcIdempotencyClaim | undefined
     /** Queued keyed work retains the actual selected store/scope/fingerprint from admission. */
@@ -758,7 +760,10 @@ export class ProviderExecutor<TTargetId extends string> {
         this.options.controllers.delete(controllerKey)
         for (const reservation of bulkReservations.values()) reservation.release()
         for (const key of memberKeys) admission.release(key)
-        reserved.release(this.options.now())
+        reserved.release(
+          this.options.now(),
+          envelope.kind === RpcRuntimeKind.group ? invokedMembers : undefined
+        )
         releaseOrder?.()
         finishTask()
       }
@@ -987,6 +992,8 @@ export class ProviderExecutor<TTargetId extends string> {
           )
           for (const registration of bulkRegistrations ?? [])
             if (registration) bulkReservations.get(registration.admission)!.consume()
+          /** Sending one complete group can execute any member until C returns its final report. */
+          invokedMembers = steps.length
           const response = await (
             bulkRegistrations?.[0]?.invoke ?? this.options.registry.getProvider(steps[0]!.method)!
           )(context)
@@ -1001,6 +1008,13 @@ export class ProviderExecutor<TTargetId extends string> {
               RpcCoreErrorText.providerDidNotSettle
             )
           if (!response.ok) throw new RpcRemoteError(response.code, response.message)
+          /** Only C's genuine fail-stop report can prove that a forwarded suffix never executed. */
+          const firstUnused = Array.isArray(response.data)
+            ? response.data.findIndex(
+                (step) => safeRead(step, 'state') === RpcRuntimeStepState.notExecuted
+              )
+            : -1
+          if (firstUnused >= 0) invokedMembers = firstUnused
           await settle({
             ok: true,
             ...(response.data === undefined ? {} : { result: normalizePortable(response.data) })
@@ -1029,6 +1043,7 @@ export class ProviderExecutor<TTargetId extends string> {
             /** Prepaid invocation retains native activity and drain owners without charging twice. */
             const registration = bulkRegistrations?.[index]
             if (registration) bulkReservations.get(registration.admission)!.consume()
+            invokedMembers = index + 1
             const response = await (
               registration?.invoke ?? this.options.registry.getProvider(step.method)!
             )(context)
