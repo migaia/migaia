@@ -5,6 +5,14 @@ import type { IRpcProviderController } from './plugin-shared-keys.js'
 /** Private handler port for one verified variation subkind. */
 export type IVariationHandler = (message: unknown, peerKey: string) => void | Promise<void>
 
+/** A finish is conditional on the later call's mode; a subsequent real cancel remains independent. */
+export type IRpcEarlyProviderIntent = Readonly<{
+  found: boolean
+  reason: unknown
+  finish?: true
+  cancelReason?: Readonly<{ value: unknown }>
+}>
+
 /** Canonical variation route, replay, admission, and subkind dispatch owner. */
 export class RpcVariationCoordinator {
   /** Shared replay/admission owner for all variation subkinds. */
@@ -12,7 +20,10 @@ export class RpcVariationCoordinator {
   /** Abort-before-request tombstones retained by the canonical variation owner. */
   readonly #pendingAborts = new Map<
     string,
-    { readonly expiresAt: number; readonly reason: unknown; readonly association?: string }
+    { readonly expiresAt: number; readonly association?: string } & Omit<
+      IRpcEarlyProviderIntent,
+      'found'
+    >
   >()
   /** Single-provider typed variation handlers. */
   readonly #handlers = new Map<string, IVariationHandler>()
@@ -74,35 +85,49 @@ export class RpcVariationCoordinator {
     controller: Pick<IRpcProviderController, 'abort'> | undefined,
     expiresAt: number,
     reason: unknown,
-    association?: string
+    association?: string,
+    finish = false
   ): boolean {
     if (controller) {
       controller.abort(reason)
       return true
     }
     this.#purgeAborts()
-    if (this.#pendingAborts.has(key))
-      return this.#pendingAborts.get(key)!.association === association
+    const pending = this.#pendingAborts.get(key)
+    if (pending) {
+      if (pending.association !== association) return false
+      /** An unselected finish must not erase a later valid cancel or replace its original reason. */
+      if (pending.finish && !finish && !pending.cancelReason)
+        this.#pendingAborts.set(key, Object.freeze({ ...pending, cancelReason: { value: reason } }))
+      return true
+    }
     if (this.#pendingAborts.size >= 4096) return false
     this.#pendingAborts.set(
       key,
-      Object.freeze({ expiresAt, reason, ...(association === undefined ? {} : { association }) })
+      Object.freeze({
+        expiresAt,
+        reason,
+        ...(association === undefined ? {} : { association }),
+        ...(finish ? { finish: true as const } : {})
+      })
     )
     return true
   }
 
   /** Consumes one early-abort tombstone when provider execution creates its controller. */
-  consumeAbort(
-    key: string,
-    association?: string
-  ): { readonly found: boolean; readonly reason: unknown } {
+  consumeAbort(key: string, association?: string): IRpcEarlyProviderIntent {
     this.#purgeAborts()
     const pending = this.#pendingAborts.get(key)
     if (!pending) return Object.freeze({ found: false, reason: undefined })
     this.#pendingAborts.delete(key)
     if (pending.association !== association)
       return Object.freeze({ found: false, reason: undefined })
-    return Object.freeze({ found: true, reason: pending.reason })
+    return Object.freeze({
+      found: true,
+      reason: pending.reason,
+      ...(pending.finish ? { finish: true as const } : {}),
+      ...(pending.cancelReason ? { cancelReason: pending.cancelReason } : {})
+    })
   }
 
   /** Clears replay/admission and handler state during endpoint disposal. */
