@@ -12,6 +12,15 @@ export const SupervisorState = {
 } as const
 export type SupervisorState = (typeof SupervisorState)[keyof typeof SupervisorState]
 
+/** Health observations belong to the original serialized monitor, independent of unit readiness. */
+export const HealthState = {
+  pending: 'pending',
+  checking: 'checking',
+  healthy: 'healthy',
+  unhealthy: 'unhealthy'
+} as const
+export type HealthState = (typeof HealthState)[keyof typeof HealthState]
+
 /** Why a unit ceased to run. */
 export const ExitReason = {
   exited: 'exited',
@@ -91,7 +100,11 @@ export const SupervisorEventType = {
   state: 'state',
   exit: 'exit',
   terminal: 'terminal',
-  switched: 'switched'
+  switched: 'switched',
+  /** Successful manual or automatic restart, not a generation-number inference. */
+  restart: 'restart',
+  /** The original admitted capability degradation set changed. */
+  degraded: 'degraded'
 } as const
 export type SupervisorEventType = (typeof SupervisorEventType)[keyof typeof SupervisorEventType]
 

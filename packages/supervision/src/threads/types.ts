@@ -36,9 +36,21 @@ export type IThreadIdentity = {
 }
 
 /** Termination requests and actual exit are separate lifecycle events. */
+export type IThreadUsage = Readonly<{
+  sharedPid?: number
+  heapUsedBytes?: number
+  heapTotalBytes?: number
+  cpuUserMicros?: number
+  cpuSystemMicros?: number
+  /** Event-loop activity has a distinct unit and is never presented as CPU time. */
+  elu?: Readonly<{ active: number; idle: number; utilization: number }>
+}>
+/** Termination requests and actual exit are separate lifecycle events. */
 export type IThreadHandle = IUnitHandle<IThreadExitStatus> & {
   readonly identity: IThreadIdentity
   terminate(): void
+  /** Cold local read of this isolate; absent APIs remain absent, never parent aggregates. */
+  sampleUsage?(): Promise<IThreadUsage>
 }
 
 /** A runtime adapter must resolve exited only after execution has stopped. */
