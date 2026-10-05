@@ -1154,7 +1154,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
                 payload.reason === undefined ? undefined : deserializeRpcError(payload.reason)
               )
               .then(() =>
-                state.busy || state.terminal
+                state.busy || state.itemAdmission !== undefined || state.terminal
                   ? undefined
                   : this.#receiveProducer(
                       senderId,
@@ -1163,7 +1163,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
                       true
                     )
               )
-          return state.busy
+          /** An outstanding physical item write retains its original discard-driving invocation. */
+          return state.busy || state.itemAdmission !== undefined
             ? Promise.resolve()
             : this.#receiveProducer(
                 senderId,
@@ -1483,9 +1484,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       /** Earlier physical completion must not clear a subsequent credit's active admission. */
       if (state.itemAdmission === admission) {
         state.itemAdmission = undefined
-        state.busy = false
       }
-      if (!state.discard) return
+      /** A later pull may already own next; only this unchanged idle credit can drive discard. */
+      if (!state.discard || state.busy || state.seq !== seq + 1) return
     }
   }
 
