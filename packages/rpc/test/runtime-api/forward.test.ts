@@ -57,7 +57,15 @@ import {
 } from '../../src/remote/runtime-api/launch-context.js'
 import { readManagedRuntimeRegistration } from '../../src/remote/runtime-api/managed-peer.js'
 
-it.each(['request', 'notify', 'stream', 'retire', 'missing-order'] as const)(
+it.each([
+  'request',
+  'notify',
+  'stream',
+  'retire',
+  'group-retire',
+  'group-business-cancel',
+  'missing-order'
+] as const)(
   '[A59][A66][A67][A74] managed native relay preserves %s final-owner semantics',
   async (mode) => {
     /** A-to-B uses genuine Host slots; B-to-C is the original managed Worker assembly. */
@@ -70,6 +78,7 @@ it.each(['request', 'notify', 'stream', 'retire', 'missing-order'] as const)(
     const capabilities = [
       ...RUNTIME_API_CAPABILITIES,
       RpcCapability.generation,
+      RpcCapability.group,
       RpcCapability.order,
       RpcCapability.cancelBeforeStart,
       RpcCapability.outcome
@@ -138,6 +147,46 @@ it.each(['request', 'notify', 'stream', 'retire', 'missing-order'] as const)(
           '[A74] a managed downstream cannot silently omit an unsupported order option'
         )
         assert.equal(await direct.request('c', 'count'), 0)
+      } else if (mode === 'group-business-cancel') {
+        /** A live generation's business cancellation is not evidence of native retirement. */
+        const [result] = await caller.group('b', [{ method: 'c.cancelled' }])
+        assert.equal(result?.state, 'failure')
+        if (result?.state !== 'failure') assert.fail('[A65] retain the actual business failure')
+        assert.equal(result.error.code, RpcCoreErrorCode.cancelled)
+        assert.equal(result.error.cause?.code, RpcCoreErrorCode.capabilityUnsupported)
+        assert.equal(await direct.request('c', 'count'), 0)
+      } else if (mode === 'group-retire') {
+        /** One genuine downstream group is captured before its original native generation exits. */
+        holding = caller
+          .group('b', [{ method: 'c.hold' }, { method: 'c.value' }], { orderKey: 'shared' })
+          .catch((error: unknown) => error)
+        await vi.waitFor(async () => assert.equal(await direct.request('c', 'count'), 1))
+        const registration = readManagedRuntimeRegistration(
+          readRuntimeOutletConnection(owners[1].thread, 'c')!.peer
+        )!
+        /** Observe the original leave reason, independently of the pending caller's rejection. */
+        const departed = new Promise<unknown>((resolve) => {
+          const unsubscribe = registration.events.onLeave(
+            registration.events.current().generation,
+            (reason) => {
+              unsubscribe()
+              resolve(reason)
+            }
+          )
+        })
+        unit!.terminate()
+        await unit!.exited
+        const reason = await departed
+        const failure = (await holding) as Error
+        assert.equal(
+          Reflect.get(failure, 'code'),
+          RpcCoreErrorCode.providerGenerationRetired,
+          '[A74] a forwarded group preserves captured native generation retirement'
+        )
+        const cause = Reflect.get(failure, 'cause') as Error
+        assert.ok(cause instanceof Error)
+        assert.equal(cause.message, (reason as Error).message)
+        assert.equal(cause.stack, (reason as Error).stack)
       } else if (mode === 'stream' || mode === 'retire') {
         iterator = caller.stream('b', 'c.values', undefined, {
           orderKey: 'shared',
