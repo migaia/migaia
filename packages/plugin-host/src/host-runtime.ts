@@ -5,7 +5,7 @@ import ERROR_TEXT, {
   createPluginHostTypeError,
   tagPluginHostError
 } from './error-text.js'
-import { issueHostIdentity, type IPluginHostIdentity } from './host-identity.js'
+import { issueHostIdentity, readHostNodeId, type IPluginHostIdentity } from './host-identity.js'
 import {
   preflightPluginDefinitions,
   snapshotPluginDefinitions,
@@ -494,9 +494,14 @@ export class PluginHost<
         }
         return Object.freeze({
           identity: this.identity,
+          nodeId: readHostNodeId(this),
           matchesHost: (host: object) =>
             isManagedHost(host) && openComposition(host) === openComposition(this),
           assertCurrent,
+          readSharedExtension: (key: PropertyKey) => {
+            this.#assertActive()
+            return this.#state.readSharedExtension(key)
+          },
           acquireSharedSlot: (key, family, create) => {
             assertInstall()
             /** Normalize numeric PropertyKey once before entering the canonical ownership map. */

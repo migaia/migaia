@@ -241,7 +241,7 @@ export function defineHost<
         : runtime.readRuntimeSharedExtensionPublic(key)
   })
   /** Identity and managed-host provenance belong to the exact public proxy rather than its target. */
-  const identity = issueHostIdentity(handle, options.host.identity?.name)
+  const identity = issueHostIdentity(handle, options.host.identity?.name, runtime)
   Object.defineProperty(handleSurface, 'identity', {
     value: identity,
     enumerable: true,
