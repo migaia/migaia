@@ -7,6 +7,7 @@ import type { IRuntimePeer, IRuntimePeerSourceResult } from './runtime-api/peer.
 import { readRuntimePeerConnection } from './runtime-api/peer.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
+import { createProviderGenerationRetired } from '../core/internal/provider.js'
 import { RpcAbortError, RpcCoreErrorCode, RpcError, RpcRemoteError } from '../core/errors.js'
 import { nativeReplayReceipt } from '../core/internal/native-replay.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
@@ -91,8 +92,15 @@ export type IRemoteRuntimeRegistration = Pick<
     invokeRequest(
       method: string,
       payload: unknown,
-      options?: IRemoteCallOptions
+      options?: IRemoteCallOptions,
+      mode?: RuntimeApiMode
     ): Promise<IRpcPortableValue>
+    /** Forward streams retain the original generation and iterator lifecycle without replay. */
+    invokeStream(
+      method: string,
+      payload: unknown,
+      options?: IRemoteCallOptions
+    ): AsyncIterableIterator<IRpcPortableValue>
     /** Observe only a genuinely prepared canonical generation, after current pointer publication. */
     onReady(listener: (peer: IRuntimePeer, generation: number) => void): () => void
   }>
@@ -573,7 +581,8 @@ class RemoteRegistration<TUnit, TSpec> {
   invokeRequest(
     method: string,
     params: unknown,
-    options: IRemoteCallOptions = {}
+    options: IRemoteCallOptions = {},
+    mode: RuntimeApiMode = RuntimeApiMode.request
   ): Promise<IRpcPortableValue> {
     /** Direct runtime admission keeps its existing synchronous failure boundary. */
     const runtime = this.#options.prepareRuntime !== undefined
@@ -586,7 +595,7 @@ class RemoteRegistration<TUnit, TSpec> {
           : normalizePortable(params)
         : undefined
     /** The original accepted route index supplies the declaration without a directory query. */
-    const runtimeDeclaration = runtime ? this.#runtimeRequestMethod(method) : undefined
+    const runtimeDeclaration = runtime ? this.#runtimeMethod(method, mode) : undefined
     try {
       const data = runtime ? runtimeData : this.#params(params)
       /** Runtime routes share the accepted cold index, while frozen v1 retains its original lookup. */
@@ -598,7 +607,7 @@ class RemoteRegistration<TUnit, TSpec> {
         this.#current?.number ?? this.#options.binding.supervisor.generation
       this.#options.callGuard?.beforeDispatch({
         method,
-        mode: RemoteMethodMode.request,
+        mode: mode === RuntimeApiMode.notify ? RemoteMethodMode.oneWay : RemoteMethodMode.request,
         generation: observedGeneration
       })
       const active = this.#active()
@@ -678,14 +687,14 @@ class RemoteRegistration<TUnit, TSpec> {
     }
   }
 
-  /** Admit an actual runtime request from the same precompiled index used by direct Peer calls. */
-  #runtimeRequestMethod(method: string) {
+  /** Admit the logical business mode from the same precompiled index used by direct Peer calls. */
+  #runtimeMethod(method: string, mode: RuntimeApiMode) {
     const connection = readRuntimePeerConnection(this.currentPeer())
     if (!connection.description) return undefined
     const declaration = connection.routes.get(method)
     if (!declaration)
       throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
-    if (!declaration.supportedModes.includes(RuntimeApiMode.request))
+    if (!declaration.supportedModes.includes(mode))
       throw new RpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
@@ -754,9 +763,21 @@ class RemoteRegistration<TUnit, TSpec> {
     params: unknown,
     options: IRemoteCallOptions = {}
   ): AsyncIterableIterator<IRpcPortableValue> {
-    const data = this.#params(params)
-    const declaration = this.#method(method)
+    /** Runtime forwarding joins the existing generation owner without another iterator registry. */
+    const runtime = this.#options.prepareRuntime !== undefined
+    const forwarded = isForwardedPayload(options, params)
+    const data = runtime
+      ? forwarded
+        ? (params as IRpcPortableValue)
+        : normalizePortable(params)
+      : this.#params(params)
+    const declaration = runtime
+      ? this.#runtimeMethod(method, RuntimeApiMode.stream)
+      : this.#method(method)
     if (
+      !runtime &&
+      declaration &&
+      'mode' in declaration &&
       declaration.mode !== RemoteMethodMode.generator &&
       declaration.mode !== RemoteMethodMode.asyncGenerator
     )
@@ -765,7 +786,7 @@ class RemoteRegistration<TUnit, TSpec> {
     const observedGeneration = this.#current?.number ?? this.#options.binding.supervisor.generation
     this.#options.callGuard?.beforeDispatch({
       method,
-      mode: declaration.mode,
+      mode: runtime ? RemoteMethodMode.asyncGenerator : (declaration as IRemoteMethodContract).mode,
       generation: observedGeneration
     })
     const active = this.#active()
@@ -774,17 +795,35 @@ class RemoteRegistration<TUnit, TSpec> {
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
-    yield* active.served.stream.open(
-      active.channel.peerId,
-      `${RemoteMethodName.runtimeStreamPrefix}${method}`,
-      data,
-      {
+    /** Departure is published by the original owner before its endpoint terminates this iterator. */
+    let retired: Error | undefined
+    /** Only forwarding observes retirement; ordinary streams retain their original error policy. */
+    const unsubscribe = forwarded
+      ? this.events.onLeave(active.number, (reason) => {
+          retired = createProviderGenerationRetired(reason)
+        })
+      : undefined
+    try {
+      /** Internal options keep the exact admitted payload and signed route through this owner. */
+      const callOptions = retainForwardOptions(options, {
         ...(options.signal ? { signal: options.signal } : {}),
         ...(this.#timeout(options.timeoutMs) === undefined
           ? {}
           : { timeoutMs: this.#timeout(options.timeoutMs) })
-      }
-    )
+      })
+      yield* runtime
+        ? active.runtime!.stream(method, data, callOptions)
+        : active.served.stream.open(
+            active.channel.peerId,
+            `${RemoteMethodName.runtimeStreamPrefix}${method}`,
+            data,
+            callOptions
+          )
+    } catch (error) {
+      throw retired ?? error
+    } finally {
+      unsubscribe?.()
+    }
   }
 
   /** Finds only methods present in the validated description. */
