@@ -689,6 +689,8 @@ export class ProviderExecutor<TTargetId extends string> {
     let sealed = false
     /** Only a real producer terminal can supply the stream's final completion. */
     let streamCompletion: IRpcRuntimeCompletion | undefined
+    /** Started scalar/group cancellation retains its original lease until the handler actually ends. */
+    let cancellationCompletion: IRpcRuntimeCompletion | undefined
     let releaseOrder: (() => void) | undefined
     let finishTask!: () => void
     const finished = new Promise<void>((resolve) => {
@@ -807,13 +809,25 @@ export class ProviderExecutor<TTargetId extends string> {
       await settle(failed(error))
       return
     }
-    /** Remote intent uses the original controller map; it cannot create a facade start decision. */
-    const revoke = (reason?: unknown): void => {
-      if (state === 'terminal' || state === 'cancelled') return
+    /**
+     * Ordinary remote cancellation retains running business; resource retirement revokes its
+     * session.
+     */
+    const revoke = (reason?: unknown, retainStarted = false): void => {
+      if (state === 'terminal') return
+      if (state === 'cancelled') {
+        /** Retiring this exact session still releases its entry after prior ordinary cancellation. */
+        if (!retainStarted && cancellationCompletion) void settle(cancellationCompletion)
+        return
+      }
+      /** A native abort cannot force the already running business Promise to complete. */
+      const started = state === 'started'
       /** A constructed stream retains its lease until original iterator cleanup really ends. */
-      const streamCleanup = state === 'started' ? controller.cancelStream : undefined
+      const streamCleanup = started ? controller.cancelStream : undefined
       state = 'cancelled'
       native.abort(reason)
+      if (deadline) this.options.clearTimeout(deadline)
+      deadline = undefined
       /** Preserve the cancellation's original native source, code, stack and primary reason. */
       const completion = failed(
         reason instanceof RpcTimeoutError ||
@@ -830,6 +844,7 @@ export class ProviderExecutor<TTargetId extends string> {
             return settle(failed(error))
           }
         )
+      else if (started && retainStarted) cancellationCompletion = completion
       else void settle(completion)
     }
     const cancelIntent = (reason?: unknown): void => {
@@ -839,7 +854,7 @@ export class ProviderExecutor<TTargetId extends string> {
         return
       }
       if (state === 'started' && envelope.options.cancel === RpcRuntimeCancel) return
-      revoke(reason)
+      revoke(reason, true)
     }
     const controller: IRpcProviderController = {
       signal: native.signal,
@@ -1027,6 +1042,8 @@ export class ProviderExecutor<TTargetId extends string> {
         }
         const results: IRpcRuntimeStepOutcome[] = []
         for (const [index, step] of steps.entries()) {
+          /** Cancellation cannot start another group member after its current invocation finishes. */
+          if (state !== 'started') return
           if (results.some((result) => result.state === RpcRuntimeStepState.failure)) {
             results.push({ state: RpcRuntimeStepState.notExecuted })
             continue
@@ -1093,6 +1110,9 @@ export class ProviderExecutor<TTargetId extends string> {
       } catch (error) {
         report(error)
         await settle(failed(error))
+      } finally {
+        /** Only real execution completion releases a cancelled started scalar/group FIFO entry. */
+        if (cancellationCompletion) await settle(cancellationCompletion)
       }
     }
     if (state === 'queued') {

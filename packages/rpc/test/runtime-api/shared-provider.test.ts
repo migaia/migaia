@@ -15,6 +15,7 @@ import {
 } from '../../src/remote/runtime-api/peer.js'
 import { runtimeSources } from './fixture.js'
 import type { RpcOutboundAttachment } from '../../src/core/internal/outbound-attachment.js'
+import type { IRpcAbortSignal } from '../../src/core/typing.js'
 
 it('[A73] a custom endpoint cannot advertise shared ordering while returning a different admission owner', async () => {
   const capabilities = [RpcCapability.runtimeApi, RpcCapability.generation, RpcCapability.order]
@@ -74,7 +75,12 @@ async function sharedProvider(provide: IRuntimePeerProvide) {
     readRpcSingleFrameFacts(messageFramerV1.accept, messageFramerV1.frame)!.maxConcurrentMessages
   )
   /** Both source offers exercise real authenticated-generation and ordering ports. */
-  const capabilities = [RpcCapability.runtimeApi, RpcCapability.generation, RpcCapability.order]
+  const capabilities = [
+    RpcCapability.runtimeApi,
+    RpcCapability.generation,
+    RpcCapability.order,
+    RpcCapability.abort
+  ]
   /** No fixture dispatcher or provider queue substitutes for either actual endpoint. */
   const channels = [
     runtimeSources(capabilities, capabilities),
@@ -220,52 +226,67 @@ it('[A75] calls without U25 options keep the original per-endpoint quota and do 
   }
 })
 
-it('[A60][A61] closing one connection releases only its member and cannot clear another connection queue', async () => {
-  let finish!: () => void
-  const held = new Promise<void>((resolve) => {
-    finish = resolve
-  })
-  const effects: string[] = []
-  const fixture = await sharedProvider({
-    hold: async () => {
-      effects.push('hold')
-      await held
-      return 1
-    },
-    queued: () => {
-      effects.push('queued')
-      return 2
-    }
-  })
-  const first = fixture.pairs[0]![0]!.request('hold', undefined, { orderKey: 'same' })
-  void first.catch(() => undefined)
-  let queued: Promise<unknown> | undefined
-  let settled = false
-  try {
-    await vi.waitFor(() => assert.deepEqual(effects, ['hold']))
-    queued = fixture.pairs[1]![0]!.request('queued', undefined, { orderKey: 'same' })
-    void queued.catch(() => undefined)
-    void queued.then(
-      () => {
-        settled = true
+it.each([false, true])(
+  '[A60][A61] closing one connection releases only its member after prior cancel=%s and cannot clear another connection queue',
+  async (cancelFirst) => {
+    let finish!: () => void
+    const held = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const effects: string[] = []
+    /** A real received cancellation precedes retirement of the same provider session. */
+    let providerSignal: IRpcAbortSignal | undefined
+    const controller = new AbortController()
+    const fixture = await sharedProvider({
+      hold: async (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+        providerSignal = context.signal
+        effects.push('hold')
+        await held
+        return 1
       },
-      () => {
-        settled = true
+      queued: () => {
+        effects.push('queued')
+        return 2
       }
-    )
-    await vi.waitFor(() => assert.equal(fixture.scope.size, 2))
-    await fixture.pairs[0]![1]!.close()
-    await vi.waitFor(() => assert.equal(settled, true))
-    assert.equal(
-      await queued,
-      2,
-      '[A61] retirement removes the exact head and starts the next actual session'
-    )
-    assert.equal(fixture.scope.size, 0)
-    assert.deepEqual(effects, ['hold', 'queued'])
-  } finally {
-    finish()
-    await fixture.close()
-    await Promise.allSettled([first, queued])
+    })
+    const first = fixture.pairs[0]![0]!.request('hold', undefined, {
+      orderKey: 'same',
+      ...(cancelFirst ? { signal: controller.signal } : {})
+    })
+    void first.catch(() => undefined)
+    let queued: Promise<unknown> | undefined
+    let settled = false
+    try {
+      await vi.waitFor(() => assert.deepEqual(effects, ['hold']))
+      queued = fixture.pairs[1]![0]!.request('queued', undefined, { orderKey: 'same' })
+      void queued.catch(() => undefined)
+      void queued.then(
+        () => {
+          settled = true
+        },
+        () => {
+          settled = true
+        }
+      )
+      await vi.waitFor(() => assert.equal(fixture.scope.size, 2))
+      if (cancelFirst) {
+        controller.abort()
+        await vi.waitFor(() => assert.equal(providerSignal!.aborted, true))
+        assert.equal(fixture.scope.size, 2)
+      }
+      await fixture.pairs[0]![1]!.close()
+      await vi.waitFor(() => assert.equal(settled, true))
+      assert.equal(
+        await queued,
+        2,
+        '[A61] retirement removes the exact head and starts the next actual session'
+      )
+      assert.equal(fixture.scope.size, 0)
+      assert.deepEqual(effects, ['hold', 'queued'])
+    } finally {
+      finish()
+      await fixture.close()
+      await Promise.allSettled([first, queued])
+    }
   }
-})
+)
