@@ -10,6 +10,8 @@
     "coverage:custody": "node scripts/coverage-custody.mjs",
     "test:coverage-custody": "node --test scripts/test/coverage-custody.test.mjs",
     "test:dist-stamp": "node --test scripts/test/dist-stamp.test.mjs",
+    "test:exclusive-window": "node --test scripts/test/exclusive-window.test.mjs",
+    "window": "node scripts/exclusive-window.mjs",
     "registry:write": "node scripts/error-registry.mjs --write && node scripts/public-exports.mjs --write",
     "registry:check": "node scripts/error-registry.mjs --check && node scripts/public-exports.mjs --check",
     "test:tree-shaking": "node scripts/test/package-tree-shaking.test.mjs",
