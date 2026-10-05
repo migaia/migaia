@@ -25,6 +25,12 @@ export type IRpcMessageKind = (typeof RpcMessageKind)[keyof typeof RpcMessageKin
 
 /** Local admission decisions; these values never become protocol errors or wire fields. */
 export const RpcProviderRejectionReason = {
+  /** Waiting plus running ordered work exhausted the original provider quota. */
+  orderedQueueFull: 'orderedQueueFull',
+  /** The complete group could not reserve every member's original provider lease. */
+  groupConcurrency: 'groupConcurrency',
+  /** The complete group could not reserve every member's original replay entry. */
+  groupReplayFull: 'groupReplayFull',
   /** Existing global or verified-peer concurrency capacity refused a provider lease. */
   concurrency: 'concurrency',
   /** The endpoint's bounded request replay ledger could not retain another identity. */

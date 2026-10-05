@@ -220,6 +220,21 @@ function createAuthenticationCapability(
       ? { receiverId, nonce: reply.nonce, challenge: reply.state.replyChallenge }
       : undefined
   }
+  /** Both semantic profiles use the same resident receiver challenge and reverse reply facts. */
+  const outboundFields = (
+    remote: ReturnType<typeof outgoingFor>,
+    receiverId: string | undefined
+  ): IAuthenticationChallengeFields | undefined => {
+    if (!remote) return undefined
+    if (!remote.challenge)
+      throw authenticationChallengeRejection(RpcAuthenticationRejectionReason.challengeInvalid)
+    return {
+      challenge: remote.challenge,
+      receiverId: remote.receiverId,
+      replyChallenge: issue(remote.nonce),
+      replyReceiverId: receiverId
+    }
+  }
   /** A signed failure has no business settlement authority and only invalidates this cached value. */
   const forget = (receiverId: string, senderNonce: string): void => {
     if (senderNonce !== nonce) return
@@ -239,6 +254,8 @@ function createAuthenticationCapability(
       /** Semantic facts come from the original sender, never a caller-visible context property. */
       const frame = facts?.frame
       let fields: IAuthenticationChallengeFields | undefined = facts?.fields
+      if (!fields && facts?.runtimeRoute)
+        fields = outboundFields(outgoingFor(facts.runtimeRoute.receiverId), facts.receiverId)
       if (!fields && frame) {
         const response = readAuthenticationChallengeProof(frame.data)
         if (response?.control === RpcAuthenticationControl.response)
@@ -256,18 +273,7 @@ function createAuthenticationCapability(
               : frame.kind === RpcEnvelopeKind.stream
                 ? outgoingFor(frame.data.route.targetId, true)
                 : undefined
-          if (remote) {
-            if (!remote.challenge)
-              throw authenticationChallengeRejection(
-                RpcAuthenticationRejectionReason.challengeInvalid
-              )
-            fields = {
-              challenge: remote.challenge,
-              receiverId: remote.receiverId,
-              replyChallenge: issue(remote.nonce),
-              replyReceiverId: facts!.receiverId
-            }
-          }
+          fields = outboundFields(remote, facts!.receiverId)
         }
       }
       const bound = wrapAuthenticationEnvelope(value, nonce, ++counter, fields)

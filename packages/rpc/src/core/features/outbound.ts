@@ -1,4 +1,5 @@
 import { RpcOutboundAttachment } from '../internal/outbound-attachment.js'
+import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { registerEndpointDebugSnapshot } from '../internal/test-observer.js'
@@ -52,7 +53,7 @@ export const createOutboundFeature = (
       {
         publicKeys: ['send', 'sendAll', 'dispatch', 'dispatchAll'],
         claims: {
-          routes: ['response', 'variation'],
+          routes: ['response', 'variation', RpcRuntimeKind.control, RpcRuntimeKind.outcome],
           provides: ['inbound-identity', 'variation-coordinator'],
           consumes: [],
           publicKeys: ['send', 'sendAll', 'dispatch', 'dispatchAll'],
@@ -149,7 +150,8 @@ function createOutboundSharedPorts(
   const admit: IRpcVariationCoordinatorPort['admit'] = (value: IRpcVariationAdmissionRequest) => {
     if (value.operation === 'register')
       return owner.variations.register(value.variation, value.handler)
-    if (value.operation === 'consumeAbort') return owner.variations.consumeAbort(value.key)
+    if (value.operation === 'consumeAbort')
+      return owner.variations.consumeAbort(value.key, value.association)
     if (value.operation === 'abort')
       return owner.variations.abort(value.key, value.controller, value.expiresAt, value.reason)
     return undefined

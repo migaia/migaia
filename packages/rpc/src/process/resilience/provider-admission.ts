@@ -1,4 +1,9 @@
-import { retainProviderPreflight } from '../../core/internal/provider.js'
+import {
+  attachProviderBulkAdmission,
+  retainProviderPreflight,
+  wrapProviderStreamAdmission,
+  type IProviderBulkAdmission
+} from '../../core/internal/provider.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { portableBytes } from '../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
@@ -100,6 +105,41 @@ export function createProcessProviderAdmission(
     callsInWindow += 1
   }
 
+  /** Group reservations share these original counters, including ordinary concurrent calls. */
+  const bulkAdmission: IProviderBulkAdmission = {
+    reserveMany(payloads) {
+      /** Advance the same original rate window before validating the entire member set. */
+      const now = scheduler.now()
+      if (now - windowStart >= RATE_WINDOW_MS) {
+        windowStart = now
+        callsInWindow = 0
+      }
+      if (
+        callsInWindow + payloads.length > options.maxCallsPerMinute ||
+        payloads.some(
+          (payload) => portableBytes(payload as IRpcPortableValue) > options.maxPayloadBytes
+        )
+      ) {
+        violate()
+        throw createProcessError(RpcProcessErrorCode.connectionLimit)
+      }
+      callsInWindow += payloads.length
+      /** Unexecuted members retain reserved credit until cancellation, refusal, or terminal. */
+      let remaining = payloads.length
+      /** Rollback cannot subtract unused credit from a subsequent minute's original bucket. */
+      const reservedWindow = windowStart
+      return {
+        consume() {
+          if (remaining > 0) remaining -= 1
+        },
+        release() {
+          if (windowStart === reservedWindow) callsInWindow -= remaining
+          remaining = 0
+        }
+      }
+    }
+  }
+
   /** Observe deadlines at abort time; settlement only releases activity and resets successful work. */
   const track = (context: IRpcContext): ((succeeded: boolean) => void) => {
     /** One operation contributes at most one deadline, including after a late settlement. */
@@ -139,9 +179,9 @@ export function createProcessProviderAdmission(
   }
 
   /** Preserve the provider's native result and Promise identity while tracking its activity. */
-  const guarded = (provider: IRpcProvider): IRpcProvider =>
-    retainProviderPreflight(provider, (context: IRpcContext) => {
-      admit(context)
+  const guarded = (provider: IRpcProvider): IRpcProvider => {
+    /** Ordinary and prepaid invocation share the original activity/deadline tracking body. */
+    const invoke: IRpcProvider = (context) => {
       /** The deadline subscription preserves the provider's returned Promise identity. */
       const settle = track(context)
       let result: IRpcProviderResult | Promise<IRpcProviderResult>
@@ -156,7 +196,15 @@ export function createProcessProviderAdmission(
         () => settle(false)
       )
       return result
-    })
+    }
+    return attachProviderBulkAdmission(
+      retainProviderPreflight(provider, (context: IRpcContext) => {
+        admit(context)
+        return invoke(context)
+      }),
+      { admission: bulkAdmission, invoke }
+    )
+  }
 
   return Object.freeze({
     /** Preserve the caller's limits and observer while linking canonical concurrency refusals. */
@@ -215,20 +263,33 @@ export function createProcessProviderAdmission(
                 method,
                 retainProviderPreflight(
                   run,
-                  (params: unknown, streamContext: Parameters<typeof run>[1]) =>
-                    (async function* () {
-                      const context = streamContext.context
+                  wrapProviderStreamAdmission(
+                    run,
+                    (params: unknown, streamContext: Parameters<typeof run>[1]) =>
+                      (async function* () {
+                        const context = streamContext.context
+                        if (context.targetGeneration === undefined) admit(context)
+                        /** Stream cancellation uses the same single deadline observer as requests. */
+                        const settle =
+                          context.targetGeneration === undefined ? track(context) : undefined
+                        let succeeded = false
+                        try {
+                          /**
+                           * Preserve the same iterator's actual terminal value through native
+                           * policy.
+                           */
+                          const result = yield* run(params, streamContext)
+                          succeeded = true
+                          return context.targetGeneration === undefined ? undefined : result
+                        } finally {
+                          settle?.(succeeded)
+                        }
+                      })(),
+                    (context) => {
                       admit(context)
-                      /** Stream cancellation uses the same single deadline observer as requests. */
-                      const settle = track(context)
-                      let succeeded = false
-                      try {
-                        yield* run(params, streamContext)
-                        succeeded = true
-                      } finally {
-                        settle(succeeded)
-                      }
-                    })()
+                      return track(context)
+                    }
+                  )
                 )
               )
           })

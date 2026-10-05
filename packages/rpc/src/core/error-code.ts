@@ -11,6 +11,11 @@ export const ERROR_SOURCE = '@migaia/rpc/core'
  * 本表只保留有实际抛出点的码；迁移时删除的历史预留码记录在 `rpc-layering.sdd.md` R2。
  */
 export const RpcCoreErrorCode = {
+  /**
+   * The selected authenticated provider/caller generation no longer matches this task; select
+   * again.
+   */
+  providerGenerationMismatch: 'PROVIDER_GENERATION_MISMATCH',
   /** U38 retires an admitted forward execution with its exact generation; never replay it. */
   providerGenerationRetired: 'PROVIDER_GENERATION_RETIRED',
   /**

@@ -1,6 +1,8 @@
 import { normalizeRpcEnvelope, RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
 import type { IRpcPortableValue } from '../../contract/types.js'
 import type { IRpcContext } from '../typing.js'
+import { readProviderRuntimeOperation } from './provider.js'
+import type { IRpcRuntimeOptions } from '../../contract/runtime-api/types.js'
 
 /**
  * Private options provenance is minted only by the compiled forwarding provider, never a public
@@ -14,18 +16,34 @@ const forwardedRoute = Symbol('rpc-forwarded-route')
 export function createForwardOptions(
   context: IRpcContext,
   route?: readonly string[]
-): Readonly<{
-  signal: IRpcContext['signal']
-  timeoutMs?: number
-  [forwardedPayload]: unknown
-  [forwardedRoute]?: readonly string[]
-}> {
+): IRpcRuntimeOptions &
+  Readonly<{
+    signal: IRpcContext['signal']
+    timeoutMs?: number
+    [forwardedPayload]: unknown
+    [forwardedRoute]?: readonly string[]
+  }> {
+  /** Opt-in relays preserve the final provider's selected semantics; ordinary metadata stays absent. */
+  const runtime = readProviderRuntimeOperation(context)
   return {
+    ...(runtime && 'options' in runtime ? runtime.options : {}),
     signal: context.signal,
     ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs }),
     [forwardedPayload]: context.data,
     ...(route === undefined ? {} : { [forwardedRoute]: route })
   }
+}
+
+/** New-profile headers reuse the exact same canonical private route provenance as ordinary forwards. */
+export function readForwardRoute(options: unknown): readonly string[] | undefined {
+  return typeof options === 'object' && options !== null
+    ? Reflect.get(options, forwardedRoute)
+    : undefined
+}
+
+/** A read-only forwarded query carries only the canonical signed route, with no business payload. */
+export function createForwardQueryOptions(route: readonly string[] | undefined): object {
+  return route === undefined ? {} : { [forwardedRoute]: route }
 }
 
 /**

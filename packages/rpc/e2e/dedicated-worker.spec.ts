@@ -58,7 +58,7 @@ test('DedicatedWorker supports concurrent RPC and terminal convergence', async (
 })
 
 // Existing dedicated-worker.spec.ts receives this required C3 case; no new test infrastructure.
-test('[A2][A17] actual Web Worker adopts library bootstrap and executes a reverse request', async ({
+test('[A2][A17][A65][A67][A74] actual Web Worker adopts library bootstrap and executes reverse and atomic operations', async ({
   page
 }) => {
   /** A real browser context independently observes script exceptions. */
@@ -73,6 +73,15 @@ test('[A2][A17] actual Web Worker adopts library bootstrap and executes a revers
     failures: string[]
     exited: boolean
     resources: { status: string; reason: string }
+    atomic: {
+      group: string[]
+      replayed: unknown[]
+      sealed: { state: string }
+      notified: { state: string }
+      first: { done: boolean; value: number }
+      terminal: { done: boolean; value: number }
+      streamed: { state: string; outcome: { completion: unknown } }
+    }
   }
   expect(receipt.result.value, '[A2] actual child business').toBe('browser-ready')
   expect(receipt.result.self.name, '[A17] actual launcher name').toBe('browser-automatic-child')
@@ -81,6 +90,16 @@ test('[A2][A17] actual Web Worker adopts library bootstrap and executes a revers
   )
   expect(receipt.result.parent, '[A2] genuine reverse business').toBe('browser-automatic-parent')
   expect(receipt.reverseCalls, '[A2] exact parent dispatch count').toBe(1)
+  expect(receipt.atomic.group).toEqual(['success', 'failure', 'not-executed'])
+  expect(receipt.atomic.replayed).toEqual([2, 2])
+  expect(receipt.atomic.sealed.state).toBe('done')
+  expect(receipt.atomic.notified.state).toBe('done')
+  expect(receipt.atomic.first).toEqual({ done: false, value: 1 })
+  expect(receipt.atomic.terminal).toEqual({ done: true, value: 99 })
+  expect(receipt.atomic.streamed).toMatchObject({
+    state: 'done',
+    outcome: { completion: { ok: true, result: 99 } }
+  })
   expect(receipt.exited, '[A3] unsupported actual exit is never fabricated').toBe(false)
   expect(
     receipt.resources,

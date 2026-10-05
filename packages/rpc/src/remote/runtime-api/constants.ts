@@ -155,7 +155,13 @@ export const RUNTIME_API_CAPABILITIES = Object.freeze([
   RpcCapability.stream,
   RpcCapability.batch,
   RpcCapability.runtimeApi,
-  RpcCapability.forwardRoute
+  RpcCapability.forwardRoute,
+  RpcCapability.generation,
+  RpcCapability.order,
+  RpcCapability.group,
+  RpcCapability.cancelBeforeStart,
+  RpcCapability.outcome,
+  RpcCapability.deadline
 ])
 
 /** Recent lifecycle summaries have the design's fixed 100-record capacity per original owner. */

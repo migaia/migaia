@@ -1,5 +1,7 @@
 import type { IFeatureOutput, IFeatureRecord, IPluginConstraint } from '@migaia/plugin-host'
 import type { IRemoteCallOptions } from '../types.js'
+import type { IRpcRuntimeSendOptions } from '../../core/internal/outbound-attachment.js'
+import type { IRpcRuntimeStepOutcome } from '../../contract/runtime-api/types.js'
 import type { IRuntimePeer as IRuntimePeerHandle } from './peer.js'
 
 /** Explicit dynamic invocation is opt-in and still checked against the accepted runtime catalog. */
@@ -144,12 +146,25 @@ type IRuntimeStreamKeys<S> = string extends keyof S
 /** Awaiting a scalar call preserves its concrete application result. */
 type IRuntimeResult<F> = F extends (...args: any[]) => infer R ? Awaited<R> : never
 
+/** Every group member is correlated to one scalar method and its actual payload contract. */
+type IRuntimeGroupStep<S> = {
+  [M in Extract<IRuntimeScalarKeys<S>, string>]: Readonly<
+    { method: M } & (undefined extends IRuntimePayload<S[M]>[0]
+      ? { payload?: IRuntimePayload<S[M]>[0] }
+      : { payload: IRuntimePayload<S[M]>[0] })
+  >
+}[Extract<IRuntimeScalarKeys<S>, string>]
+
 /** Public Peer calls require an explicit remote surface; no generic means no callable methods. */
 export type IRuntimeTypedPeer<TRemote = Record<never, never>, S = IRuntimeFlatten<TRemote>> = Pick<
   IRuntimePeerHandle,
-  'self' | 'describe' | 'close'
+  'self' | 'describe' | 'close' | 'outcome'
 > &
   Readonly<{
+    group<Steps extends readonly IRuntimeGroupStep<S>[]>(
+      steps: Steps,
+      options?: IRpcRuntimeSendOptions
+    ): Promise<readonly IRpcRuntimeStepOutcome[]>
     request<M extends Extract<IRuntimeScalarKeys<S>, string>>(
       method: M,
       ...args: [...IRuntimePayload<S[M]>, options?: IRemoteCallOptions]
@@ -204,6 +219,20 @@ type IRuntimeOutletCalls<
   Readonly<{
     /** Local query retains the same format overloads regardless of erased remote surface. */
     list: import('./outlet.js').IRuntimeOutlet['list']
+    /** Every group selects one registered surface and preserves each member's payload correlation. */
+    group<
+      N extends IRuntimeNames<P, K>,
+      Steps extends readonly IRuntimeGroupStep<IRuntimeRemote<P, K, N>>[]
+    >(
+      target: IRuntimeTarget<N>,
+      steps: Steps,
+      options?: IRpcRuntimeSendOptions
+    ): Promise<readonly IRpcRuntimeStepOutcome[]>
+    /** Queries address the same exact registered target, independent of business method names. */
+    outcome<N extends IRuntimeNames<P, K>>(
+      target: IRuntimeTarget<N>,
+      idempotencyKey: string
+    ): ReturnType<IRuntimePeerHandle['outcome']>
     request<
       N extends IRuntimeNames<P, K>,
       M extends Extract<IRuntimeScalarKeys<IRuntimeRemote<P, K, N>>, string>

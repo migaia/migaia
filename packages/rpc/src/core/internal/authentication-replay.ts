@@ -64,6 +64,8 @@ const contexts = new WeakMap<
     active?: () => boolean
     challenge?: IAuthenticationChallengeContext
     frame?: IRpcEnvelope
+    /** New-profile routing is captured by the same sender, without embedding a legacy envelope. */
+    runtimeRoute?: import('../../contract/runtime-api/types.js').IRpcRuntimeRoute
     receiverId?: string
     fields?: IAuthenticationChallengeFields
   }
@@ -135,11 +137,13 @@ export function authenticationChallengeRejection(
 /** Checks discovery semantics only after the original framer and codec have completed. */
 export function assertAuthenticationChallengeEnvelope(
   context: IRpcAuthenticationContext,
-  envelope: IRpcEnvelope
+  envelope: IRpcEnvelope | import('../../contract/runtime-api/types.js').IRpcRuntimeEnvelope
 ): void {
   /** Verified physical proof cannot be supplied by semantic payload fields. */
   const proof = verifiedContexts.get(context)
   if (!proof || proof === true || proof.control === undefined) return
+  if ('profile' in envelope)
+    throw authenticationChallengeRejection(RpcAuthenticationRejectionReason.challengeInvalid)
   /** Complete semantic routing is validated before any identity/provider admission. */
   const route = envelope.data.route
   if (
@@ -208,9 +212,10 @@ export function bindAuthenticationOutboundFrame(
   context: IRpcAuthenticationContext,
   frame: IRpcEnvelope | undefined,
   receiverId: string,
-  fields?: IAuthenticationChallengeFields
+  fields?: IAuthenticationChallengeFields,
+  runtimeRoute?: import('../../contract/runtime-api/types.js').IRpcRuntimeRoute
 ): void {
-  contexts.set(context, { frame, receiverId, fields })
+  contexts.set(context, { frame, receiverId, fields, runtimeRoute })
 }
 
 /** Records completed physical authentication before the receiver decodes any semantic member. */

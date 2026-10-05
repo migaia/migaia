@@ -1,7 +1,10 @@
 import { createComposedEndpoint } from '../composed.js'
 import { createCanonicalChunkFeature } from '../features/canonical-chunk.js'
 import { createOutboundFeature, type IOutboundSurface } from '../features/outbound.js'
-import { createProviderFeature, type IProviderRegistrationSurface } from '../features/provider.js'
+import {
+  createProviderFeatureWithScope,
+  type IProviderRegistrationSurface
+} from './provider-feature.js'
 import { createOneWayFeature, type IOneWaySurface } from '../features/one-way.js'
 import { createDiscoveryFeature, type IDiscoverySurface } from '../features/discovery.js'
 import { createControlFeature, type IControlSurface } from '../features/control.js'
@@ -13,6 +16,7 @@ import {
 import type { IRpcFactoryConfig } from '../typing.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
+import type { ProviderAdmissionRegistry } from './provider-admission.js'
 
 /** Reject an unavailable runtime operation at its canonical capability/error owner. */
 export function rejectRuntimeApiCapability(): never {
@@ -36,14 +40,15 @@ export type IRuntimeApiEndpoint = IOutboundSurface &
 export function createRuntimeApiEndpoint(
   config: IRpcFactoryConfig,
   capability: IRpcStreamCapabilityPort,
-  nativeControl = false
+  nativeControl = false,
+  admission?: ProviderAdmissionRegistry
 ): Promise<IRuntimeApiEndpoint> {
   /** The canonical chunk dependency remains the sole framing/reassembly owner. */
   const chunk = createCanonicalChunkFeature()
   /** Request, response, notify and stream share one sender and inbound identity owner. */
   const outbound = createOutboundFeature(chunk)
   /** Stream and scalar routes remain in the original provider namespace/registry. */
-  const provider = createProviderFeature(outbound)
+  const provider = createProviderFeatureWithScope(outbound, admission)
   /** Only an actual native capability intersection installs original discovery/control resources. */
   const discovery = nativeControl ? createDiscoveryFeature(outbound) : undefined
   /** Channel Features join the same explicit root batch rather than the user Feature tuple overload. */

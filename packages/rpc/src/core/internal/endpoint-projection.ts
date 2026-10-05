@@ -13,6 +13,18 @@ const identities = new WeakMap<
   Readonly<{ identity: string; kernel?: IEndpointKernelHost }>
 >()
 
+/** Cold internal assembly reads the original kernel table through canonical projection provenance. */
+export function readEndpointOwner<T extends object>(endpoint: object, key: string): T | undefined {
+  /** Admission views inherit the exact prepared projection; no independent owner registry exists. */
+  let projection: object | null = endpoint
+  while (projection !== null) {
+    const kernel = identities.get(projection)?.kernel
+    if (kernel) return kernel.readOwner(key) as T | undefined
+    projection = Object.getPrototypeOf(projection)
+  }
+  return undefined
+}
+
 /** Read construction identity without adding a public endpoint member or reflecting user data. */
 export function readEndpointIdentity(endpoint: object): string {
   /** Existing admission and drain views inherit from the original canonical projection. */

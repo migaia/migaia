@@ -19,6 +19,11 @@ import {
   DEFAULT_UNHANDLED_LIMIT
 } from './constants.js'
 import type { IProcessResilienceOptions, IProcessSessionIdentity } from './types.js'
+import { retainRuntimeIdempotencyScope } from '../../core/internal/provider.js'
+import {
+  createProviderAdmissionScope,
+  type IProviderAdmissionScope
+} from '../../core/internal/provider-admission.js'
 
 /** One admitted physical connection is released exactly once after transfer or rollback. */
 export type IProcessConnectionLease = Readonly<{ release(): void }>
@@ -26,6 +31,8 @@ export type IProcessConnectionLease = Readonly<{ release(): void }>
 /** The session manager owns only quotas, the shared store, and per-principal scope derivation. */
 export type IProcessSessionManager = Readonly<{
   readonly options: IRequiredProcessResilienceOptions
+  /** New runtime sessions share the final provider's existing admission class, not per-socket FIFOs. */
+  readonly runtimeAdmission: IProviderAdmissionScope
   claimConnection(): IProcessConnectionLease
   sessionOptions(identity: IProcessSessionIdentity): Readonly<{
     idempotency: IRpcIdempotencyConfig
@@ -118,10 +125,13 @@ export function createProcessSessionManager(
   const options = normalizeProcessResilienceOptions(input)
   const store: IRpcIdempotencyStore = input.idempotencyStore ?? createRpcIdempotencyStore()
   const scopePrefix = defaultRpcId()
+  /** The same service manager owns cold cross-session preparation alongside its existing store. */
+  const runtimeAdmission = createProviderAdmissionScope()
   let active = 0
   let closed = false
   return Object.freeze({
     options,
+    runtimeAdmission,
     claimConnection(): IProcessConnectionLease {
       if (closed) throw createProcessError(RpcProcessErrorCode.channelClosed)
       if (active >= options.maxConnections)
@@ -144,7 +154,10 @@ export function createProcessSessionManager(
       return Object.freeze({
         idempotency: Object.freeze({
           store,
-          scope: () => `${scopePrefix}:${identity.principalId}`
+          scope: retainRuntimeIdempotencyScope(
+            () => `${scopePrefix}:${identity.principalId}`,
+            identity.principalId
+          )
         }),
         limits: Object.freeze({
           maxGlobal: options.maxConcurrentCallsPerConnection,
@@ -154,6 +167,7 @@ export function createProcessSessionManager(
     },
     close(): void {
       closed = true
+      runtimeAdmission.clear()
     }
   })
 }

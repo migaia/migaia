@@ -18,6 +18,7 @@ import type { IVariationHandler } from './variation-coordinator.js'
 import type { RpcControl } from '../../contract/index.js'
 import type { IRpcEnvelope } from '../../contract/index.js'
 import type { IAbortSignal } from './async-control.js'
+import type { IRpcRuntimeTask } from '../../contract/runtime-api/types.js'
 
 /** Typed outbound owner port consumed by dependent feature descriptors. */
 export type IRpcOutboundAttachmentPort = IOutboundAttachmentHost
@@ -48,6 +49,16 @@ export type IRpcPortName = (typeof RpcPortName)[keyof typeof RpcPortName]
 /** Native or lazily materialized provider signal; variation owns only its cancellation command. */
 export type IRpcProviderController = {
   readonly signal: IRpcAbortSignal
+  /** Only opted-in controllers carry their original complete mode/method/generation association. */
+  readonly runtimeTask?: IRpcRuntimeTask
+  /** Only a runtime task distinguishes caller start intent from resource/lifetime revocation. */
+  readonly cancelIntent?: (reason?: unknown) => void
+  /** Opted-in producer controls enter the original stream owner after exact task fencing. */
+  streamIntent?: (
+    payload: import('../../contract/runtime-api/types.js').IRpcRuntimeStream
+  ) => Promise<void>
+  /** Ordinary runtime stream cancellation waits for the original iterator cleanup and terminal. */
+  cancelStream?: (reason?: unknown) => Promise<void>
   abort(reason?: unknown): void
 }
 
@@ -205,7 +216,7 @@ export type IRpcVariationAdmissionRequest =
       readonly variation: RpcControl | string
       readonly handler: IVariationHandler
     }
-  | { readonly operation: 'consumeAbort'; readonly key: string }
+  | { readonly operation: 'consumeAbort'; readonly key: string; readonly association?: string }
   | {
       readonly operation: 'abort'
       readonly key: string

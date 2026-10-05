@@ -2,6 +2,8 @@ import { ThreadBootstrap, ThreadEvent, THREAD_RUNTIME_API_VERSION } from './cons
 import { RpcWireLimit } from '../contract/wire-constants.js'
 import type { IRuntimePeerIdentity } from '../remote/runtime-api/description.js'
 import type { IRuntimePeerSourceContext } from '../remote/runtime-api/peer.js'
+import type { IRpcRuntimeGeneration } from '../contract/runtime-api/types.js'
+import { normalizeRuntimeGeneration } from '../contract/runtime-api/normalize.js'
 import { normalizePortable } from '../contract/normalize.js'
 import type { IRpcPortableValue } from '../contract/types.js'
 import type { IThreadWebPort } from './types.js'
@@ -17,6 +19,8 @@ export type IThreadRuntimeBootstrap = Readonly<{
   self: IRuntimePeerIdentity
   parent: IRuntimePeerIdentity
   capabilities: readonly string[]
+  /** Native launch metadata supplies a stable namespace and accepted execution ordinal. */
+  generation?: IRpcRuntimeGeneration
 }>
 
 /** Keep private identity within the canonical handshake identifier bound. */
@@ -77,17 +81,30 @@ export function readThreadRuntimeBootstrap(value: unknown): IThreadRuntimeBootst
     return invalidThreadConfig('runtimeApi', ThreadErrorText.bootstrapFailed)
   /** Exact fields prevent private metadata from acquiring extra public ownership. */
   const runtime = value.runtimeApi as Record<string, unknown>
-  if (Object.keys(runtime).length !== 4 || runtime.version !== THREAD_RUNTIME_API_VERSION)
+  if (
+    Object.keys(runtime).length !== (runtime.generation === undefined ? 4 : 5) ||
+    runtime.version !== THREAD_RUNTIME_API_VERSION
+  )
     return invalidThreadConfig('runtimeApi', ThreadErrorText.bootstrapFailed)
   /** The child address must be exactly the original launcher's immutable fingerprint. */
   const self = runtimeIdentity(runtime.self)
   if (self.instanceId !== original.peerId)
     return invalidThreadConfig('runtimeApi', ThreadErrorText.bootstrapFailed)
+  /** This is private launcher metadata, never a business claim or ownership upgrade. */
+  let generation: IRpcRuntimeGeneration | undefined
+  if (runtime.generation !== undefined) {
+    try {
+      generation = normalizeRuntimeGeneration(runtime.generation)
+    } catch {
+      return invalidThreadConfig('runtimeApi', ThreadErrorText.bootstrapFailed)
+    }
+  }
   return Object.freeze({
     version: THREAD_RUNTIME_API_VERSION,
     self,
     parent: runtimeIdentity(runtime.parent),
-    capabilities: threadCapabilityOffer(runtime.capabilities)
+    capabilities: threadCapabilityOffer(runtime.capabilities),
+    ...(generation ? { generation } : {})
   })
 }
 
@@ -95,7 +112,7 @@ export function readThreadRuntimeBootstrap(value: unknown): IThreadRuntimeBootst
 export function createThreadRuntimeBootstrap(
   name: string,
   fingerprint: string,
-  context: IRuntimePeerSourceContext
+  context: IRuntimePeerSourceContext & Readonly<{ generation?: IRpcRuntimeGeneration }>
 ): IThreadRuntimeBootstrap {
   return readThreadRuntimeBootstrap({
     kind: ThreadBootstrap.data,
@@ -104,7 +121,8 @@ export function createThreadRuntimeBootstrap(
       version: THREAD_RUNTIME_API_VERSION,
       self: { name, instanceId: fingerprint },
       parent: context.self,
-      capabilities: context.capabilities
+      capabilities: context.capabilities,
+      ...(context.generation ? { generation: context.generation } : {})
     }
   })
 }

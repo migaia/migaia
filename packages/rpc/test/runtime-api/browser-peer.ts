@@ -64,7 +64,47 @@ globalThis.runAutomaticThreadScenario = async () => {
     }
     /** This genuine Web Worker has no supported local isolate sampler; no parent values substitute. */
     const resources = (await parent.describe()).connections[0]!.resources
+    /** The real Web Worker accepts the implemented profile through independent native offers. */
+    const group = await parent.group(
+      [{ method: 'value' }, { method: 'fail' }, { method: 'value' }],
+      { orderKey: 'group' }
+    )
+    const replayed = [
+      await parent.request('value', undefined, { orderKey: 'value', idempotencyKey: 'sealed' }),
+      await parent.request('value', undefined, { orderKey: 'value', idempotencyKey: 'sealed' })
+    ]
+    await parent.notify('value', undefined, {
+      orderKey: 'notify',
+      cancel: 'before-start',
+      idempotencyKey: 'notify'
+    })
+    /** A physical notify completion is followed by a read-only observation of real final settlement. */
+    let notified = await parent.outcome('notify')
+    for (let attempt = 0; notified.state !== 'done' && attempt < 100; attempt++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1))
+      notified = await parent.outcome('notify')
+    }
+    const controller = new AbortController()
+    const stream = parent.stream('values', undefined, {
+      orderKey: 'stream',
+      cancel: 'before-start',
+      signal: controller.signal,
+      idempotencyKey: 'stream'
+    })
+    const first = await stream.next()
+    controller.abort()
+    const terminal = await stream.return!()
+    const atomic = {
+      group: group.map((step) => step.state),
+      replayed,
+      sealed: await parent.outcome('sealed'),
+      notified,
+      first,
+      terminal,
+      streamed: await parent.outcome('stream')
+    }
     return {
+      atomic,
       result,
       reverseCalls,
       fingerprint: handle!.identity.fingerprint,

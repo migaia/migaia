@@ -10,6 +10,12 @@ type IReplayEntry = {
   readonly releaseCount: () => void
 }
 
+/** Exact group entries either roll back before execution or settle under the original replay mode. */
+export type IReplayReservation = Readonly<{
+  rollback(): void
+  release(now: number): void
+}>
+
 /** Non-evicting replay ledger for business requests. */
 export class RequestReplayLedger {
   /** Accepted requests retain monotonic admission times in insertion order until TTL expiry. */
@@ -123,6 +129,81 @@ export class RequestReplayLedger {
     return (now) => {
       if (entry && this.#active.get(key) === entry) this.releaseActive(key, now)
     }
+  }
+
+  /** Reserve the complete member set synchronously; refusal cannot create rejected tombstones. */
+  reserveMany(
+    keys: readonly string[],
+    peerKey: string,
+    now: number,
+    activeOverride?: boolean
+  ): IReplayReservation | undefined {
+    /** The same lifecycle/mode barrier applies to every member, including reentrant retain hooks. */
+    const mode = this.#activeOnly()
+    if (mode === undefined) return undefined
+    const generation = this.#generation
+    const active = activeOverride ?? mode
+    this.#purge(now)
+    if (
+      keys.length === 0 ||
+      new Set(keys).size !== keys.length ||
+      this.size + keys.length > this.#maxEntries ||
+      this.#peerCounts.count(peerKey) + keys.length > this.#maxEntriesPerPeer ||
+      keys.some(
+        (key) => this.#completed.has(key) || this.#active.has(key) || this.#rejected.has(key)
+      )
+    )
+      return undefined
+    /** Identity retention is rolled back before any group entry becomes visible on refusal. */
+    const entries: IReplayEntry[] = []
+    const releasePrepared = (): void => {
+      for (const entry of entries) {
+        entry.releaseCount()
+        this.#release?.(entry.peerKey)
+      }
+      entries.length = 0
+    }
+    try {
+      for (const _key of keys) {
+        if (this.#retain && !this.#retain(peerKey)) {
+          releasePrepared()
+          return undefined
+        }
+        if (generation !== this.#generation || this.#activeOnly() === undefined) {
+          this.#release?.(peerKey)
+          releasePrepared()
+          return undefined
+        }
+        entries.push({ peerKey, at: now, active, releaseCount: this.#peerCounts.retain(peerKey) })
+      }
+    } catch (error) {
+      releasePrepared()
+      throw error
+    }
+    for (let index = 0; index < keys.length; index++)
+      this.#active.set(keys[index]!, entries[index]!)
+    /** One terminal decision prevents a late rollback from erasing executed replay history. */
+    let settled = false
+    return Object.freeze({
+      rollback: () => {
+        if (settled) return
+        settled = true
+        for (let index = 0; index < keys.length; index++) {
+          const entry = entries[index]!
+          if (this.#active.get(keys[index]!) !== entry) continue
+          this.#active.delete(keys[index]!)
+          entry.releaseCount()
+          this.#release?.(peerKey)
+        }
+      },
+      release: (at: number) => {
+        if (settled) return
+        settled = true
+        for (let index = 0; index < keys.length; index++)
+          if (this.#active.get(keys[index]!) === entries[index])
+            this.releaseActive(keys[index]!, at)
+      }
+    })
   }
 
   /** Settles the current active entry; callers observe physical ownership before invoking this. */

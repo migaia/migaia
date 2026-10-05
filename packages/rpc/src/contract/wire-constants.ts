@@ -36,6 +36,28 @@ export const RpcCapability = {
   runtimeApi: 'runtime-api@1',
   /** Independently negotiates signed Host routes and synchronous transparent-forward loop checks. */
   forwardRoute: 'forward-route@1',
+  /**
+   * Runtime tasks fence the accepted execution/session generation; declaration alone never enables
+   * it.
+   */
+  generation: 'generation@1',
+  /**
+   * Provider-owned arrival ordering is available only after the complete shared admission port is
+   * installed.
+   */
+  order: 'order@1',
+  /**
+   * A single task reserves all request steps before any provider starts; physical batch is
+   * independent.
+   */
+  group: 'group@1',
+  /**
+   * The final provider arbitrates cancellation before its actual execution start in every supported
+   * mode.
+   */
+  cancelBeforeStart: 'cancel-before-start@1',
+  /** The final provider's original idempotency store exposes read-only pending/done/unknown lookup. */
+  outcome: 'outcome@1',
   /** Optional physical grouping; it never introduces a semantic envelope kind. */
   batch: 'batch@1'
 } as const

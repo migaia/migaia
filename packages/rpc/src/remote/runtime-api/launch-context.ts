@@ -1,5 +1,7 @@
 import type { IRuntimePeerSourceContext, IRuntimePeerProvide, IRuntimePeer } from './peer.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
+import type { IProviderAdmissionScope } from '../../core/internal/provider-admission.js'
 
 /** Original Host operation and resource ownership travel only through exact internal options. */
 export type IRuntimePreparationContext = Readonly<{
@@ -7,6 +9,8 @@ export type IRuntimePreparationContext = Readonly<{
   selfDefaulted?: boolean
   /** Adapter-independent node identity is minted by the original Host, never a physical generation. */
   nodeId?: string
+  /** All adapter families on this genuine Host borrow the original logical-provider scope. */
+  providerAdmission?: Pick<IProviderAdmissionScope, 'prepare'>
   initialSignal: IAbortSignal
   lifecycleSignal: IAbortSignal
   own(dispose: () => Promise<void>): void
@@ -41,7 +45,12 @@ export async function withRuntimePreparationContext<T>(
 }
 
 /** A supervised process has its existing local unit label in addition to the parent's safe offer. */
-type IRuntimeLaunchContext = IRuntimePeerSourceContext & Readonly<{ childName?: string }>
+type IRuntimeLaunchContext = IRuntimePeerSourceContext &
+  Readonly<{
+    childName?: string
+    /** Original native supervisor reserves this execution ordinal in one stable provider namespace. */
+    generation?: IRpcRuntimeGeneration
+  }>
 
 /**
  * Exact original launch-request identity carries only cold bootstrap metadata, never lifetime

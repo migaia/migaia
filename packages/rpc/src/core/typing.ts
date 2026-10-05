@@ -17,6 +17,10 @@ export type IRpcProviderResult =
   | { readonly ok: true; readonly data?: unknown; readonly transfer?: readonly unknown[] }
   | { readonly ok: false; readonly message: string; readonly code: string }
 export type IRpcContext = {
+  /** Present only after generation@1 directory admission for this actual runtime-profile task. */
+  readonly callerGeneration?: import('../contract/runtime-api/types.js').IRpcRuntimeGeneration
+  /** The final provider fence is the selected accepted identity, never an attempt counter. */
+  readonly targetGeneration?: import('../contract/runtime-api/types.js').IRpcRuntimeGeneration
   readonly data: unknown
   readonly signal: IRpcAbortSignal
   /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */

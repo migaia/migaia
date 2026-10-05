@@ -209,7 +209,10 @@ export function runtimeConnectionDetail(
   const supervisor = facts?.supervisor
   return Object.freeze({
     identity: directory.description
-      ? runtimeIdentity(directory.description.self)
+      ? runtimeIdentity({
+          name: directory.description.self.name,
+          instanceId: directory.description.self.instanceId
+        })
       : runtimeUnavailable(RuntimeQueryReason.owner),
     kind: directory.kind,
     direction: directory.direction,
@@ -272,7 +275,7 @@ export function runtimeDetail(
   counters?: IRuntimeCounters
 ): IRuntimeDetail {
   /** The public projection uses the same safe own-data identity shape as the configured Peer. */
-  const self = runtimeIdentity(local.self)
+  const self = runtimeIdentity({ name: local.self.name, instanceId: local.self.instanceId })
   return Object.freeze({
     identity: self,
     self,

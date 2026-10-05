@@ -1,5 +1,7 @@
 import { normalizePortable } from '../../contract/normalize.js'
 import { RpcWireLimit } from '../../contract/wire-constants.js'
+import { normalizeRuntimeGeneration } from '../../contract/runtime-api/normalize.js'
+import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
 import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'
 import { RemoteCatalogLimit, REMOTE_NAME_PATTERN } from '../contract.js'
 import {
@@ -25,7 +27,7 @@ export type IRuntimeMethodDescription = Readonly<{
 /** The new application description travels on an ordinary request after runtime-api agreement. */
 export type IRuntimePeerDescription = Readonly<{
   schemaVersion: 2
-  self: IRuntimePeerIdentity
+  self: IRuntimePeerIdentity & Readonly<{ generation?: IRpcRuntimeGeneration }>
   methods: readonly IRuntimeMethodDescription[]
   /** Exchanged only after both actual offers negotiate forward-route@1. */
   nodeId?: string
@@ -70,6 +72,15 @@ export function runtimeIdentity(value: unknown): IRuntimePeerIdentity {
       invalid()
   }
   return Object.freeze({ name: identity.name as string, instanceId: identity.instanceId as string })
+}
+
+/** Generation is accepted only inside the authenticated directory's identity projection. */
+function directoryIdentity(value: unknown): IRuntimePeerDescription['self'] {
+  const identity = record(value, ['name', 'instanceId', 'generation'])
+  const self = runtimeIdentity({ name: identity.name, instanceId: identity.instanceId })
+  return identity.generation === undefined
+    ? self
+    : Object.freeze({ ...self, generation: normalizeRuntimeGeneration(identity.generation) })
 }
 
 /**
@@ -148,7 +159,7 @@ export function normalizeRuntimeDescription(value: unknown): IRuntimePeerDescrip
     /** Portable normalization owns the existing recursive value budget even on the cold exchange. */
     return normalizePortable({
       schemaVersion: RUNTIME_API_SCHEMA_VERSION,
-      self: runtimeIdentity(description.self),
+      self: directoryIdentity(description.self),
       ...(description.nodeId === undefined ? {} : { nodeId: description.nodeId }),
       methods
     }) as unknown as IRuntimePeerDescription

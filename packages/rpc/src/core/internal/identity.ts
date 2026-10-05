@@ -1,6 +1,7 @@
 import { RpcCoreErrorText } from '../error-text.js'
 import { tupleKey } from './safe-value.js'
 import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
+import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
 
 /** Owns verified source bindings and issues unique, non-cryptographic identifiers. */
 export class VerifiedPeerRegistry {
@@ -12,6 +13,8 @@ export class VerifiedPeerRegistry {
       readonly createdAt: number
       readonly verifiedAt: number
       readonly refs: number
+      /** Only authenticated describe binds this optional identity fact; normal bindings omit it. */
+      readonly generation?: IRpcRuntimeGeneration
     }
   >()
   readonly #maxBindings: number
@@ -138,6 +141,28 @@ export class VerifiedPeerRegistry {
       return false
     }
     return true
+  }
+
+  /** Clears source bindings during endpoint disposal. */
+  bindGeneration(token: string, generation: IRpcRuntimeGeneration): boolean {
+    for (const [key, entry] of this.#bindings) {
+      if (entry.token !== token) continue
+      if (entry.generation)
+        return (
+          entry.generation.kind === generation.kind &&
+          entry.generation.value === generation.value &&
+          entry.generation.providerId === generation.providerId
+        )
+      this.#bindings.set(key, { ...entry, generation })
+      return true
+    }
+    return false
+  }
+
+  /** Read only the generation bound to this exact verified token, never a sender-name replacement. */
+  readGeneration(token: string): IRpcRuntimeGeneration | undefined {
+    for (const entry of this.#bindings.values()) if (entry.token === token) return entry.generation
+    return undefined
   }
 
   /** Clears source bindings during endpoint disposal. */

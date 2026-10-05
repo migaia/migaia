@@ -6,7 +6,8 @@ import { runtimeSources, runtimeTestHost } from './fixture.js'
 import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
 import {
   readRuntimePeerEndpoint,
-  readRuntimePeerConnection
+  readRuntimePeerConnection,
+  prepareRuntimePeerEndpoint
 } from '../../src/remote/runtime-api/peer.js'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
@@ -36,6 +37,810 @@ import {
 } from '../../src/core/middleware/authentication-envelope.js'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '../../src/remote/types.js'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
+import { RpcCapability } from '../../src/contract/wire-constants.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from './fixture.js'
+import { readRuntimeCarrier } from '../../src/contract/runtime-api/carrier.js'
+import type { RpcOutboundSender } from '../../src/core/internal/outbound-sender.js'
+import { readEndpointOwner } from '../../src/core/internal/endpoint-projection.js'
+import type { IRuntimeOutlet } from '../../src/remote/runtime-api/outlet.js'
+import type { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
+import type { IRpcAbortSignal } from '../../src/core/typing.js'
+import { RpcError, RpcCoreErrorCode } from '../../src/core/errors.js'
+import { RpcCoreErrorText } from '../../src/core/error-text.js'
+import type { IRpcRuntimeEnvelope } from '../../src/contract/runtime-api/types.js'
+import { createProcessProviderAdmission } from '../../src/process/resilience/provider-admission.js'
+import { normalizeProcessResilienceOptions } from '../../src/process/resilience/session.js'
+import { createRemoteBindingDrain } from '../../src/remote/internal/binding-drain.js'
+
+it.each(['quota', 'drain'] as const)(
+  '[A60][A67][A114] original native %s owns a forwarded stream before C open',
+  async (policy) => {
+    /** Genuine Host slots compile the relay; native policy wraps that same registered callback. */
+    const owners = [owner(), owner(), owner()] as const
+    const carriers: ReturnType<typeof runtimeSources>[] = []
+    const capabilities = [
+      ...RUNTIME_API_CAPABILITIES,
+      RpcCapability.generation,
+      RpcCapability.order,
+      RpcCapability.cancelBeforeStart
+    ].filter((value) => value !== RpcCapability.close)
+    /** C's real iterator construction can precede its first pull and has a visible business effect. */
+    let constructed = 0
+    let finish!: () => void
+    const held = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    /** A held original C open write exposes B's preparation lifetime without pulling an item. */
+    let openSeen = false
+    let releaseOpen!: () => void
+    const openHeld = new Promise<void>((resolve) => {
+      releaseOpen = resolve
+    })
+    /** Native quota clock moves only after the actual describe exchange has completed. */
+    let offset = 0
+    const scheduler = { ...systemScheduler, now: () => systemScheduler.now() + offset }
+    const drain = createRemoteBindingDrain(scheduler, () => undefined)
+    let governor: ReturnType<typeof createProcessProviderAdmission> | undefined
+    let restoreSend: (() => void) | undefined
+    let pending: Promise<unknown> | undefined
+    /** Native policy and physical preparation failures stay visible throughout the fixture. */
+    const failures: unknown[] = []
+    try {
+      carriers.push(
+        await attach(
+          owners[1],
+          owners[2],
+          'c',
+          'b',
+          {},
+          {
+            report: (error) => failures.push(error),
+            provide: {
+              values: () => {
+                constructed++
+                return (async function* () {
+                  await held
+                  yield 1
+                  return 42
+                })()
+              }
+            }
+          },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      /** Borrow the genuine shared Host class; a custom endpoint cannot replace its ownership. */
+      const admission = readEndpointOwner<ProviderAdmissionRegistry>(
+        readRuntimePeerConnection(readRuntimeOutletConnection(owners[1].thread, 'c')!.peer)
+          .endpoint,
+        'provider-admission'
+      )!
+      if (policy === 'drain') {
+        const sender = readEndpointOwner<RpcOutboundSender>(
+          readRuntimePeerConnection(readRuntimeOutletConnection(owners[2].thread, 'b')!.peer)
+            .endpoint,
+          'outbound-pipeline'
+        )!
+        const original = sender.transport.send
+        const spy = vi.spyOn(sender.transport, 'send').mockImplementation(async (frame) => {
+          const envelope = readRuntimeCarrier(frame)?.frame as
+            | { kind?: string; stream?: { event?: string } }
+            | undefined
+          if (envelope?.kind === 'runtime-control' && envelope.stream?.event === 'open') {
+            openSeen = true
+            await openHeld
+          }
+          /** Kernel.send is a native method; preserve its exact receiver without mutable bind. */
+          return Reflect.apply(original, sender.transport, [frame])
+        })
+        restoreSend = () => spy.mockRestore()
+      }
+      carriers.push(
+        await attach(
+          owners[0],
+          owners[1],
+          'b',
+          'a',
+          {},
+          {
+            expose: ['c'],
+            report: (error) => failures.push(error),
+            provide: { baseline: () => 7 },
+            endpointFactory: async (channel, signal) => {
+              /** The original quota and drain owners retain all scalar and streaming registrations. */
+              const endpoint = await prepareRuntimePeerEndpoint(
+                { self: { name: 'a', instanceId: 'a-caller' }, report: () => undefined },
+                channel,
+                signal,
+                {},
+                admission
+              )
+              governor = createProcessProviderAdmission(
+                channel,
+                normalizeProcessResilienceOptions({
+                  scheduler,
+                  report: () => undefined,
+                  maxCallsPerMinute: policy === 'quota' ? 1 : 100,
+                  idleTimeoutMs: 600_000
+                }),
+                scheduler,
+                async () => undefined,
+                () => undefined
+              )
+              return drain.wrap(channel, governor.wrap(endpoint))
+            }
+          },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      offset = 60_000
+      const outlet = owners[0].thread as unknown as IRuntimeOutlet
+      if (policy === 'quota') assert.equal(await outlet.request('b', 'baseline'), 7)
+      const iterator = outlet.stream('b', 'c.values', undefined, {
+        orderKey: 'same',
+        cancel: 'before-start'
+      })
+      pending = iterator.next()
+      void pending.catch(() => undefined)
+      if (policy === 'quota') {
+        await assert.rejects(pending)
+        assert.equal(
+          constructed,
+          0,
+          '[A60] B quota refusal must precede actual C iterator construction'
+        )
+      } else {
+        await vi.waitFor(() => assert.equal(openSeen, true))
+        assert.equal(constructed, 1)
+        let drained = false
+        const draining = drain.drainCurrent().then(() => {
+          drained = true
+        })
+        await new Promise<void>((resolve) => setImmediate(resolve))
+        assert.equal(
+          drained,
+          false,
+          '[A67] actual C preparation already occupies B original drain lifetime'
+        )
+        releaseOpen()
+        finish()
+        /** Observe actual settlement separately from the drain barrier to locate any lost terminal. */
+        let first: unknown
+        void pending.then(
+          (result) => {
+            first = result
+          },
+          (error) => {
+            first = error
+          }
+        )
+        await vi.waitFor(() =>
+          assert.deepEqual({ first, failures }, { first: { done: false, value: 1 }, failures: [] })
+        )
+        let final: unknown
+        const returning = iterator.return!().then((result) => {
+          final = result
+        })
+        await vi.waitFor(() => assert.deepEqual(final, { done: true, value: 42 }))
+        await returning
+        await vi.waitFor(() => assert.equal(drained, true))
+        await draining
+      }
+    } finally {
+      releaseOpen()
+      finish()
+      restoreSend?.()
+      governor?.close()
+      for (const host of owners) await host.dispose()
+      for (const carrier of carriers) carrier.close()
+      await pending?.catch(() => undefined)
+    }
+  }
+)
+
+it.each(['mixed', 'multiple', 'failure', 'keyed-local', 'lookup'] as const)(
+  '[A62][A65][A69][A114] forwarded group namespace %s preserves one final provider and explicit query refusal',
+  async (policy) => {
+    /** Four original Hosts provide two distinct downstream targets and B's actual local route. */
+    const owners = [owner(), owner(), owner(), owner()] as const
+    const carriers: ReturnType<typeof runtimeSources>[] = []
+    /** Only final business execution changes this list; validation and lookup have no effects. */
+    const effects: string[] = []
+    const capabilities = [
+      ...RUNTIME_API_CAPABILITIES,
+      RpcCapability.generation,
+      RpcCapability.group,
+      RpcCapability.order,
+      RpcCapability.outcome
+    ]
+    try {
+      carriers.push(
+        await attach(
+          owners[1],
+          owners[2],
+          'c',
+          'b',
+          {},
+          {
+            provide: {
+              first: () => {
+                effects.push('first')
+                return 1
+              },
+              fail: () => {
+                effects.push('fail')
+                throw new RpcError(
+                  RpcCoreErrorCode.capabilityUnsupported,
+                  RpcCoreErrorText.capabilityUnsupported
+                )
+              },
+              last: () => {
+                effects.push('last')
+                return 3
+              }
+            }
+          },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      if (policy === 'multiple')
+        carriers.push(
+          await attach(
+            owners[1],
+            owners[3],
+            'd',
+            'b',
+            {},
+            {
+              provide: {
+                first: () => {
+                  effects.push('d')
+                  return 4
+                }
+              }
+            },
+            runtimeSources(capabilities, capabilities)
+          )
+        )
+      carriers.push(
+        await attach(
+          owners[0],
+          owners[1],
+          'b',
+          'a',
+          {},
+          {
+            expose: policy === 'multiple' ? ['c', 'd'] : ['c'],
+            ...(policy === 'mixed' || policy === 'keyed-local' || policy === 'lookup'
+              ? {
+                  provide: {
+                    local: () => {
+                      effects.push('local')
+                      return 5
+                    }
+                  }
+                }
+              : {})
+          },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      const upstream = owners[0].thread as unknown as IRuntimeOutlet
+      const sender = readEndpointOwner<RpcOutboundSender>(
+        readRuntimePeerConnection(readRuntimeOutletConnection(owners[1].thread, 'c')!.peer)
+          .endpoint,
+        'outbound-pipeline'
+      )!
+      const send = vi.spyOn(sender.transport, 'send')
+      try {
+        if (policy === 'failure') {
+          const result = await upstream.group(
+            'b',
+            [{ method: 'c.first' }, { method: 'c.fail' }, { method: 'c.last' }],
+            { idempotencyKey: 'forward-group' }
+          )
+          assert.deepEqual(
+            result.map((step) => step.state),
+            ['success', 'failure', 'not-executed']
+          )
+          assert.deepEqual(effects, ['first', 'fail'])
+          if (result[1]!.state !== 'failure')
+            assert.fail('[A65] actual C failure must stay in complete group report')
+          assert.equal(result[1]!.error.code, RpcCoreErrorCode.capabilityUnsupported)
+          assert.ok(result[1]!.error.stack)
+          assert.equal((await upstream.outcome('b', 'forward-group')).state, 'done')
+          const groups = send.mock.calls
+            .map((args) => readRuntimeCarrier(args[0])?.frame as { kind?: string } | undefined)
+            .filter((frame) => frame?.kind === 'runtime-group')
+          assert.equal(groups.length, 1)
+        } else {
+          await assert.rejects(
+            async () =>
+              policy === 'lookup'
+                ? upstream.outcome('b', 'unclaimed')
+                : policy === 'keyed-local'
+                  ? upstream.request('b', 'local', undefined, {
+                      orderKey: 'same',
+                      idempotencyKey: 'ambiguous'
+                    })
+                  : upstream.group('b', [
+                      { method: 'c.first' },
+                      { method: policy === 'multiple' ? 'd.first' : 'local' }
+                    ]),
+            {
+              code:
+                policy === 'lookup' || policy === 'keyed-local'
+                  ? RpcCoreErrorCode.capabilityUnsupported
+                  : RpcCoreErrorCode.invalidConfig
+            }
+          )
+          assert.deepEqual(effects, [])
+          assert.equal(send.mock.calls.length, 0)
+        }
+      } finally {
+        send.mockRestore()
+      }
+    } finally {
+      for (const host of owners) await host.dispose()
+      for (const carrier of carriers) carrier.close()
+    }
+  }
+)
+
+it('[A59][A61][A114] forwarded order-only notify holds B original lease until C business completion', async () => {
+  /** Forwarding uses the actual three Host scopes and compiled provider callbacks. */
+  const owners = [owner(), owner(), owner()] as const
+  const carriers: ReturnType<typeof runtimeSources>[] = []
+  /** C's business completion stays separate from A's successful physical notification. */
+  let started = false
+  let release!: () => void
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const capabilities = [...RUNTIME_API_CAPABILITIES, RpcCapability.generation, RpcCapability.order]
+  try {
+    carriers.push(
+      await attach(
+        owners[1],
+        owners[2],
+        'c',
+        'b',
+        {},
+        {
+          provide: {
+            service: {
+              value: async () => {
+                started = true
+                await held
+                return 42
+              }
+            }
+          }
+        },
+        runtimeSources(capabilities, capabilities)
+      )
+    )
+    carriers.push(
+      await attach(
+        owners[0],
+        owners[1],
+        'b',
+        'a',
+        {},
+        { expose: ['c'] },
+        runtimeSources(capabilities, capabilities)
+      )
+    )
+    const upstream = owners[0].thread as unknown as IRuntimeOutlet
+    await upstream.notify('b', 'c.service.value', undefined, { orderKey: 'same' })
+    await vi.waitFor(() => assert.equal(started, true))
+    const admission = readEndpointOwner<ProviderAdmissionRegistry>(
+      readRuntimePeerConnection(readRuntimeOutletConnection(owners[1].thread, 'a')!.peer).endpoint,
+      'provider-admission'
+    )!
+    /** Allow original completed physical-send cleanup to run while C remains held. */
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    assert.equal(
+      admission.size,
+      1,
+      '[A61] physical notify completion cannot release B business lease'
+    )
+    release()
+    await vi.waitFor(() => assert.equal(admission.size, 0))
+  } finally {
+    release()
+    for (const host of owners) await host.dispose()
+    for (const carrier of carriers) carrier.close()
+  }
+})
+
+it.each(['request', 'group', 'notify', 'stream'] as const)(
+  '[A66][A67][A69][A114] C %s start wins over forwarded cancellation and stream finish retains the true final result',
+  async (mode) => {
+    /** Three independent Hosts exercise the actual forwarding registration and C's executor. */
+    const owners = [owner(), owner(), owner()] as const
+    const carriers: ReturnType<typeof runtimeSources>[] = []
+    /** C holds its actual business completion after its start point. */
+    let signal: IRpcAbortSignal | undefined
+    let effects = 0
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const capabilities = [
+      ...RUNTIME_API_CAPABILITIES,
+      RpcCapability.generation,
+      RpcCapability.order,
+      RpcCapability.group,
+      RpcCapability.cancelBeforeStart,
+      RpcCapability.outcome
+    ]
+    /** A terminal result must survive an intent that arrives after C really started. */
+    let operation: Promise<unknown> | undefined
+    /** Original physical-send observation is restored even when an assertion fails. */
+    let restoreSend: (() => void) | undefined
+    try {
+      carriers.push(
+        await attach(
+          owners[1],
+          owners[2],
+          'c',
+          'b',
+          {},
+          {
+            provide: {
+              service: {
+                value: async (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+                  effects++
+                  signal = context.signal
+                  await held
+                  assert.equal(
+                    context.signal.aborted,
+                    false,
+                    '[A66] cancellation cannot abort running C business'
+                  )
+                  return 42
+                },
+                values: (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+                  effects++
+                  signal = context.signal
+                  return (async function* () {
+                    await held
+                    assert.equal(
+                      context.signal.aborted,
+                      false,
+                      '[A66] cancellation cannot abort running C generator'
+                    )
+                    yield 1
+                    yield 2
+                    assert.equal(
+                      context.signal.aborted,
+                      false,
+                      '[A67] discard must complete the same C generator'
+                    )
+                    return 42
+                  })()
+                }
+              }
+            }
+          },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      carriers.push(
+        await attach(
+          owners[0],
+          owners[1],
+          'b',
+          'a',
+          {},
+          { expose: ['c'] },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      const upstream = owners[0].thread as unknown as IRuntimeOutlet
+      const downstream = owners[1].thread as unknown as IRuntimeOutlet
+      const sender = readEndpointOwner<RpcOutboundSender>(
+        readRuntimePeerConnection(readRuntimeOutletConnection(owners[1].thread, 'c')!.peer)
+          .endpoint,
+        'outbound-pipeline'
+      )!
+      const send = vi.spyOn(sender.transport, 'send')
+      restoreSend = () => send.mockRestore()
+      const cancel = new AbortController()
+      const options = {
+        orderKey: 'same',
+        cancel: 'before-start' as const,
+        idempotencyKey: 'started-forward',
+        signal: cancel.signal
+      }
+      const iterator =
+        mode === 'stream' ? upstream.stream('b', 'c.service.values', undefined, options) : undefined
+      operation =
+        mode === 'request'
+          ? upstream.request('b', 'c.service.value', undefined, options)
+          : mode === 'group'
+            ? upstream.group('b', [{ method: 'c.service.value' }], options)
+            : mode === 'notify'
+              ? upstream.notify('b', 'c.service.value', undefined, options)
+              : iterator!.next()
+      void operation.catch(() => undefined)
+      await vi.waitFor(() => assert.ok(signal))
+      const forwarded = send.mock.calls
+        .map((args) => readRuntimeCarrier(args[0])?.frame as IRpcRuntimeEnvelope | undefined)
+        .find(
+          (frame) =>
+            (frame?.kind === 'runtime-call' || frame?.kind === 'runtime-group') &&
+            frame.task.mode === mode
+        )
+      assert.deepEqual(
+        forwarded?.route.forwardRoute,
+        [await nodeOf(owners[0], 'b'), await nodeOf(owners[1], 'c')],
+        '[A111] each new-profile mode retains the authenticated loop/hop route'
+      )
+      cancel.abort()
+      assert.equal(signal!.aborted, false, '[A66] C owns the actual start decision')
+      assert.equal((await upstream.outcome('b', 'started-forward')).state, 'pending')
+      if (mode === 'notify') assert.equal(await operation, undefined)
+      release()
+      if (mode === 'request') assert.equal(await operation, 42)
+      else if (mode === 'group')
+        assert.deepEqual(await operation, [{ state: 'success', result: 42 }])
+      else if (mode === 'stream') {
+        assert.deepEqual(await operation, { done: false, value: 1 })
+        assert.deepEqual(await iterator!.return!(), { done: true, value: 42 })
+      }
+      await vi.waitFor(async () =>
+        assert.equal((await downstream.outcome('c', 'started-forward')).state, 'done')
+      )
+      assert.deepEqual(
+        await upstream.outcome('b', 'started-forward'),
+        await downstream.outcome('c', 'started-forward')
+      )
+      assert.equal(effects, 1)
+      /**
+       * Original stream scope is released after true terminal; scalar native signals stay
+       * unchanged.
+       */
+      assert.equal(signal!.aborted, mode === 'stream')
+    } finally {
+      release()
+      restoreSend?.()
+      for (const host of owners) await host.dispose()
+      for (const carrier of carriers) carrier.close()
+      await operation?.catch(() => undefined)
+    }
+  }
+)
+
+it.each(['request', 'group', 'notify', 'stream'] as const)(
+  '[A66][A69][A114] forwarded %s cancellation is decided at C and outcome reads only C',
+  async (mode) => {
+    /** Original slots and lifetime scopes exist on three independent Hosts. */
+    const owners = [owner(), owner(), owner()] as const
+    const carriers: ReturnType<typeof runtimeSources>[] = []
+    /** The actual final provider owns this held key; B cannot mistake its own entry for final start. */
+    let started = false
+    let effects = 0
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const capabilities = [
+      ...RUNTIME_API_CAPABILITIES,
+      RpcCapability.generation,
+      RpcCapability.order,
+      RpcCapability.group,
+      RpcCapability.cancelBeforeStart,
+      RpcCapability.outcome
+    ]
+    let holding: Promise<unknown> | undefined
+    let operation: Promise<unknown> | undefined
+    try {
+      carriers.push(
+        await attach(
+          owners[1],
+          owners[2],
+          'c',
+          'b',
+          {},
+          {
+            provide: {
+              service: {
+                hold: async () => {
+                  started = true
+                  await held
+                  return 1
+                },
+                value: () => {
+                  effects++
+                  return 42
+                },
+                values: () => {
+                  effects++
+                  return (async function* () {
+                    yield 1
+                    return 42
+                  })()
+                }
+              }
+            }
+          },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      carriers.push(
+        await attach(
+          owners[0],
+          owners[1],
+          'b',
+          'a',
+          {},
+          { expose: ['c'] },
+          runtimeSources(capabilities, capabilities)
+        )
+      )
+      const downstream = owners[1].thread as unknown as IRuntimeOutlet
+      const upstream = owners[0].thread as unknown as IRuntimeOutlet
+      holding = downstream.request('c', 'service.hold', undefined, { orderKey: 'same' })
+      void holding.catch(() => undefined)
+      await vi.waitFor(() => assert.equal(started, true))
+      const cancel = new AbortController()
+      const options = {
+        orderKey: 'same',
+        cancel: 'before-start' as const,
+        idempotencyKey: 'forward-key',
+        signal: cancel.signal
+      }
+      operation = (
+        mode === 'request'
+          ? upstream.request('b', 'c.service.value', undefined, options)
+          : mode === 'group'
+            ? upstream.group('b', [{ method: 'c.service.value' }], options)
+            : mode === 'notify'
+              ? upstream.notify('b', 'c.service.value', undefined, options)
+              : upstream.stream('b', 'c.service.values', undefined, options).next()
+      ).catch((error: unknown) => error)
+      const admission = readEndpointOwner<ProviderAdmissionRegistry>(
+        readRuntimePeerConnection(readRuntimeOutletConnection(owners[2].thread, 'b')!.peer)
+          .endpoint,
+        'provider-admission'
+      )!
+      await vi.waitFor(() => assert.equal(admission.size, 2))
+      const pending = await downstream.outcome('c', 'forward-key')
+      assert.equal(pending.state, 'pending')
+      assert.deepEqual(
+        await upstream.outcome('b', 'forward-key'),
+        pending,
+        '[A69] B cannot substitute its own store or claim C work'
+      )
+      cancel.abort()
+      await vi.waitFor(
+        async () =>
+          assert.equal(
+            (await downstream.outcome('c', 'forward-key')).state,
+            'done',
+            '[A66] real C store observes final queued cancellation'
+          ),
+        { timeout: 1000 }
+      )
+      if (mode === 'notify') assert.equal(await operation, undefined)
+      else assert.equal(Reflect.get((await operation) as object, 'code'), 'CANCELLED')
+      await vi.waitFor(async () =>
+        assert.equal((await downstream.outcome('c', 'forward-key')).state, 'done')
+      )
+      assert.deepEqual(
+        await upstream.outcome('b', 'forward-key'),
+        await downstream.outcome('c', 'forward-key')
+      )
+      assert.equal(effects, 0)
+      release()
+      assert.equal(await holding, 1)
+    } finally {
+      release()
+      for (const host of owners) await host.dispose()
+      for (const carrier of carriers) carrier.close()
+      await holding?.catch(() => undefined)
+      await operation
+    }
+  }
+)
+
+it('[A65][A114] the Host facade forwards one complete group and final provider refuses the whole group before any effect', async () => {
+  /** Three real Hosts retain their original current slots, scopes and authenticated identity facts. */
+  const owners = [owner(), owner(), owner()] as const
+  const carriers: ReturnType<typeof runtimeSources>[] = []
+  /** Actual final business invocations expose any forbidden partial forwarding admission. */
+  const effects: string[] = []
+  /** New profile offers are explicit fixture inputs, independent of production default declarations. */
+  const capabilities = [
+    ...RUNTIME_API_CAPABILITIES,
+    RpcCapability.generation,
+    RpcCapability.order,
+    RpcCapability.group,
+    RpcCapability.cancelBeforeStart,
+    RpcCapability.outcome
+  ]
+  try {
+    carriers.push(
+      await attach(
+        owners[1],
+        owners[2],
+        'c',
+        'b',
+        {},
+        {
+          providerLimits: { maxGlobal: 1, maxPerPeer: 1 },
+          provide: {
+            service: {
+              one: () => {
+                effects.push('one')
+                return 1
+              },
+              two: () => {
+                effects.push('two')
+                return 2
+              }
+            }
+          }
+        },
+        runtimeSources(capabilities, capabilities)
+      )
+    )
+    carriers.push(
+      await attach(
+        owners[0],
+        owners[1],
+        'b',
+        'a',
+        {},
+        { expose: ['c'] },
+        runtimeSources(capabilities, capabilities)
+      )
+    )
+    /** This is the actual Host facade; the temporary shape only permits the missing-port RED. */
+    const outlet = owners[0].thread as unknown as IRuntimeOutlet
+    assert.equal(
+      typeof Reflect.get(outlet, 'group'),
+      'function',
+      '[A114] group belongs to the original target-selection facade'
+    )
+    const endpoint = readRuntimePeerConnection(
+      readRuntimeOutletConnection(owners[1].thread, 'c')!.peer
+    ).endpoint
+    const sender = readEndpointOwner<RpcOutboundSender>(endpoint, 'outbound-pipeline')!
+    const send = vi.spyOn(sender.transport, 'send')
+    try {
+      await assert.rejects(
+        async () =>
+          Reflect.get(outlet, 'group')('b', [
+            { method: 'c.service.one' },
+            { method: 'c.service.two' }
+          ]),
+        { code: 'OVERLOADED' },
+        '[A114] C must reserve the whole group before executing its first step'
+      )
+      assert.deepEqual(effects, [])
+      const groups = send.mock.calls
+        .map(
+          (args) =>
+            readRuntimeCarrier(args[0])?.frame as { kind?: string; steps?: unknown } | undefined
+        )
+        .filter((frame) => frame?.kind === 'runtime-group')
+      assert.equal(
+        groups.length,
+        1,
+        '[A65] B sends one group rather than scalar calls or JSON-RPC batch'
+      )
+      assert.deepEqual(groups[0]!.steps, [{ method: 'service.one' }, { method: 'service.two' }])
+    } finally {
+      send.mockRestore()
+    }
+  } finally {
+    for (const host of owners) await host.dispose()
+    for (const carrier of carriers) carrier.close()
+  }
+})
 
 /** Read the original handshake's actual Host node, independently of an observed business route. */
 async function nodeOf(host: ReturnType<typeof owner>, connection: string): Promise<string> {

@@ -1,4 +1,8 @@
-import { selectedJsonObjectPort, type IRpcJsonObjectPort } from './json-object-port.js'
+import {
+  selectedJsonObjectPort,
+  jsonObjectCandidate,
+  type IRpcJsonObjectPort
+} from './json-object-port.js'
 import {
   isAuthenticationCounterExhaustion,
   bindAuthenticationOutboundFrame,
@@ -8,7 +12,9 @@ import {
   RpcAuthenticationError,
   RpcLifecycleError,
   RpcSerializationError,
-  RpcTransportError
+  RpcTransportError,
+  RpcError,
+  RpcCoreErrorCode
 } from '../errors.js'
 import type {
   IRpcAuthenticationCapability,
@@ -32,6 +38,14 @@ import {
 import { resolveAbortReason } from './async-control.js'
 import { isOutboundEnvelope, outboundJsonByteUpperBound } from './outbound-envelope.js'
 import type { IAuthenticationChallengeFields } from './authentication-replay.js'
+import {
+  normalizeRuntimeEnvelope,
+  runtimeOperationCapabilities,
+  wrapRuntimeCarrier
+} from '../../contract/runtime-api/index.js'
+import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
+import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
 
 /** One logical settlement remains owned until its actual physical write completes. */
 type IQueuedEnvelope = {
@@ -81,6 +95,8 @@ export class RpcOutboundSender {
   readonly #gate: IRpcOutboundGate | undefined
   /** Once-selected private data port; public transport and descriptor snapshots remain unchanged. */
   readonly #objectPort: IRpcJsonObjectPort | undefined
+  /** Genuine bridge identity survives an optional object-port optimization falling back to strings. */
+  readonly #bridge: boolean
   /** Existing endpoint diagnostics observe genuine local counter exhaustion before rejection. */
   readonly #reportConfiguration: ((error: unknown) => void) | undefined
   /** Exact endpoint proof bypasses generic fanout only for ordinary request/response envelopes. */
@@ -120,6 +136,7 @@ export class RpcOutboundSender {
     this.id = id
     this.components = components
     this.#objectPort = selectedJsonObjectPort(components)
+    this.#bridge = jsonObjectCandidate(components) !== undefined
     this.authentication = authentication
     this.#transportEncodedType = transport.encodedType
     this.#gate = gate
@@ -161,6 +178,101 @@ export class RpcOutboundSender {
     return this.#prepareTransportValue(value, undefined, false, generation, context).then(
       (protectedValue) => this.#sendPreparedTransport(protectedValue, undefined, generation)
     )
+  }
+
+  /** Prepare one opt-in semantic frame through the original codec/framer/auth/write owners. */
+  async sendRuntime(
+    message: IRpcRuntimeEnvelope,
+    capabilities: readonly string[],
+    admission?: IRpcOutboundAdmission,
+    onStarted?: () => void,
+    onPrepared?: () => Promise<void>
+  ): Promise<void> {
+    /** All permission-bearing fields are snapshotted before any async signature or gate handoff. */
+    const envelope = normalizeRuntimeEnvelope(message)
+    /** These labels come from the accepted channel intersection, never from one-sided offers. */
+    const required = runtimeOperationCapabilities(
+      envelope.task.mode,
+      'options' in envelope ? envelope.options : {}
+    )
+    if (
+      required.some((capability) => !capabilities.includes(capability)) ||
+      (this.#bridge && envelope.kind === RpcRuntimeKind.group)
+    )
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    /** The selected private/public frame pair must have actual first-party whole-accept facts. */
+    const framer = this.#objectPort?.framer ?? this.components.framer
+    /** No opaque callable is invoked merely to guess whether it fragments. */
+    const facts = readRpcSingleFrameFacts(framer.accept, framer.frame)
+    if (!facts)
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    /** Capture exact endpoint lifetime before queueing, never retarget a late prepared frame. */
+    const generation = this.#lifecycle?.generation
+    this.#lifecycle?.assertActive(generation)
+    /** This whole byte bound already includes the original channel framing overhead. */
+    const limit = Math.min(RpcBatchPhysical.maxBytes, this.#physicalLimit, facts.maxMessageBytes)
+    /** The original gate owns physical FIFO/capacity; this branch never enters batch/chunk queues. */
+    const write = async (): Promise<void> => {
+      this.#lifecycle?.assertActive(generation)
+      admission?.assertCanSend()
+      /** Codec descriptors encode data; this independent normalized union is never a legacy wrapper. */
+      let encoded: unknown
+      try {
+        encoded = (this.#objectPort?.codec ?? this.components.codec).encode(
+          envelope as unknown as IRpcEnvelope
+        )
+        if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
+      } catch (cause) {
+        throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+      }
+      assertRpcPhysicalFrameSize(encoded, limit)
+      /** Native framing runs once; multiple fragments are refused before protection or host send. */
+      const frames = framer.frame(encoded, { source: this.id, messageId: envelope.id })
+      if (frames.length !== 1)
+        throw new RpcError(
+          RpcCoreErrorCode.capabilityUnsupported,
+          RpcCoreErrorText.capabilityUnsupported
+        )
+      /** Receiver freshness is selected by the same original auth context owner for either profile. */
+      const context = { ...this.#authenticationContext }
+      bindAuthenticationOutboundFrame(
+        context,
+        undefined,
+        this.#receiverId,
+        undefined,
+        envelope.route
+      )
+      /** Complete protection and selector construction precede the sole physical write. */
+      const protectedValue = await this.#prepareTransportValue(
+        frames[0],
+        undefined,
+        false,
+        generation,
+        context
+      )
+      /** Selector overhead is charged after auth, without splitting or re-signing this frame. */
+      const carrier = wrapRuntimeCarrier(protectedValue)
+      assertRpcPhysicalFrameSize(carrier, limit)
+      /** The original result owner can seal only this fully valid frame, before physical commit. */
+      await onPrepared?.()
+      return this.#sendPreparedTransport(
+        carrier,
+        undefined,
+        generation,
+        () => {
+          admission?.assertCanSend()
+          onStarted?.()
+        },
+        true
+      )
+    }
+    return this.#gate ? this.#gate.run(envelope, write, admission) : write()
   }
 
   /**

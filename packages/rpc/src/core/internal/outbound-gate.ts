@@ -1,4 +1,4 @@
-import type { IRpcEnvelope } from '../../contract/index.js'
+import type { IRpcEnvelope, IRpcRuntimeEnvelope } from '../../contract/index.js'
 import type { IRpcAbortSignal } from '../typing.js'
 import { tagRpcError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
@@ -15,7 +15,7 @@ export type IRpcOutboundAdmission = Readonly<{
 /** Minimal port needed by core; capacity and reporting remain in the optional IPC plugin. */
 export type IRpcOutboundGate = Readonly<{
   run(
-    envelope: IRpcEnvelope,
+    envelope: IRpcEnvelope | IRpcRuntimeEnvelope,
     sendNow: () => void | Promise<void>,
     admission?: IRpcOutboundAdmission
   ): Promise<void>

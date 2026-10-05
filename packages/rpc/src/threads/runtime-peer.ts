@@ -1,4 +1,5 @@
 import type { IThreadHandle } from '@migaia/supervision/threads'
+import { RpcRuntimeGenerationKind } from '../contract/runtime-api/constants.js'
 import { defaultRpcId } from '../core/internal/id.js'
 import { RpcError, RpcCoreErrorCode } from '../core/errors.js'
 import {
@@ -51,6 +52,8 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
    * core.
    */
   const context = prepareRuntimePeerSourceContext(self)
+  /** Stable provider identity belongs to this original factory, not to a Worker launch attempt. */
+  const providerId = defaultRpcId()
   /**
    * Wrapping launch preserves the original context, actual lease and caller-selected
    * implementation.
@@ -60,7 +63,18 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
     launcher: {
       ...source.launcher,
       launch: (spec, request) =>
-        withRuntimeLaunchContext(request, context, () => source.launcher.launch(spec, request))
+        withRuntimeLaunchContext(
+          request,
+          {
+            ...context,
+            generation: {
+              kind: RpcRuntimeGenerationKind.restart,
+              value: request.executionGeneration!,
+              providerId
+            }
+          },
+          () => source.launcher.launch(spec, request)
+        )
     }
   })
   return createManagedRuntimePeer(

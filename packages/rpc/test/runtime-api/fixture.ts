@@ -19,6 +19,18 @@ import { createCanonicalChunkFeature } from '../../src/core/features/canonical-c
 import { createOutboundFeature } from '../../src/core/features/outbound.js'
 import { createProviderFeature } from '../../src/core/features/provider.js'
 import { connect } from '../../src/core/middleware/connect.js'
+import { RpcCapability } from '../../src/contract/wire-constants.js'
+
+/** Independent narrow offers keep explicit capability-AND tests separate from production defaults. */
+export const RUNTIME_API_FIXTURE_BASE_CAPABILITIES = Object.freeze([
+  RpcCapability.ping,
+  RpcCapability.close,
+  RpcCapability.abort,
+  RpcCapability.stream,
+  RpcCapability.batch,
+  RpcCapability.runtimeApi,
+  RpcCapability.forwardRoute
+])
 
 /** Native fixture messages are local test data, with one owner and unchanged RED spellings. */
 export const RuntimeApiFixtureText = {
@@ -100,9 +112,9 @@ export function runtimeSources(
     if (offers[0] && offers[1]) accept()
     await agreed
     /** The fixture intentionally lets one side omit a capability to test the genuine AND boundary. */
-    const left = leftCapabilities ?? offers[0]!.capabilities
+    const left = leftCapabilities ?? RUNTIME_API_FIXTURE_BASE_CAPABILITIES
     /** The remote side's actual offer is independent from the local side. */
-    const right = rightCapabilities ?? offers[1]!.capabilities
+    const right = rightCapabilities ?? RUNTIME_API_FIXTURE_BASE_CAPABILITIES
     /** Static platform agreement enters the original sender/receiver capability owner as well. */
     const capabilities = left.filter((value) => right.includes(value))
     registerBatchAgreement(transports[index]!, capabilities)

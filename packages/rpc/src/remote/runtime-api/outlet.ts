@@ -31,6 +31,12 @@ import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
 import type { IRemoteCallOptions } from '../types.js'
 import type { IRuntimePeerDescription, IRuntimePeerIdentity } from './description.js'
 import type { IRuntimePeer } from './peer.js'
+import type {
+  IRpcRuntimeStep,
+  IRpcRuntimeStepOutcome,
+  IRpcRuntimeOutcomeResult
+} from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeSendOptions } from '../../core/internal/outbound-attachment.js'
 import { RuntimeApiErrorText } from './constants.js'
 
 /** The publisher lives on the same original facade and never in a second connection registry. */
@@ -177,6 +183,17 @@ export type IRuntimeOutlet = Pick<IRuntimeEventPublisher, 'on' | 'watch'> &
       payload?: unknown,
       options?: IRemoteCallOptions
     ): AsyncIterableIterator<IRpcPortableValue>
+    /** Complete groups keep one exact target receipt through the original Peer operation. */
+    group(
+      target: IRuntimeTarget<string>,
+      steps: readonly IRpcRuntimeStep[],
+      options?: IRpcRuntimeSendOptions
+    ): Promise<readonly IRpcRuntimeStepOutcome[]>
+    /** Read the selected provider's original result store without admission or execution. */
+    outcome(
+      target: IRuntimeTarget<string>,
+      idempotencyKey: string
+    ): Promise<IRpcRuntimeOutcomeResult>
     /** Read current canonical contributions without selecting a business target. */
     list: IRuntimeListQuery
     get: IRuntimeTargetQuery
@@ -259,6 +276,8 @@ export function createRuntimeOutlet(
       selected(target).peer.notify(method, payload, options),
     stream: (target, method, payload, options) =>
       selected(target).peer.stream(method, payload, options),
+    group: (target, steps, options) => selected(target).peer.group(steps, options),
+    outcome: (target, idempotencyKey) => selected(target).peer.outcome(idempotencyKey),
     list: (async (options?: IRuntimeListOptions) => {
       validateFilter(options?.filter)
       /** This is the original committed reservation inventory, independent from readiness indexes. */
