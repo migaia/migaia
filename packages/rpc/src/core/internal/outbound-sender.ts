@@ -1,7 +1,8 @@
 import { selectedJsonObjectPort, type IRpcJsonObjectPort } from './json-object-port.js'
 import {
   isAuthenticationCounterExhaustion,
-  bindAuthenticationOutboundFrame
+  bindAuthenticationOutboundFrame,
+  readAuthenticationChallengePort
 } from './authentication-replay.js'
 import {
   RpcAuthenticationError,
@@ -163,11 +164,12 @@ export class RpcOutboundSender {
   }
 
   /**
-   * Exclusive transforms reuse their exact stable context; multiplexed facts use one owned
-   * snapshot.
+   * Original sourceful/exclusive transforms reuse their stable context; only admitted challenge
+   * facts require a receiver-specific snapshot.
    */
   #frameContext(frame: IRpcEnvelope): IRpcAuthenticationContext {
-    if (this.transport.topology === 'exclusive') return this.#authenticationContext
+    if (!readAuthenticationChallengePort(this.authentication)?.contextNeeded(frame))
+      return this.#authenticationContext
     const context = { ...this.#authenticationContext }
     bindAuthenticationOutboundFrame(context, frame, this.#receiverId)
     return context
@@ -295,10 +297,10 @@ export class RpcOutboundSender {
         group = []
       } else {
         if (
-          this.authentication &&
-          this.transport.topology !== 'exclusive' &&
           group.length &&
-          group[0]!.message.data.route.receiverId !== entry.message.data.route.receiverId
+          group[0]!.message.data.route.receiverId !== entry.message.data.route.receiverId &&
+          (readAuthenticationChallengePort(this.authentication)?.contextNeeded(group[0]!.message) ||
+            readAuthenticationChallengePort(this.authentication)?.contextNeeded(entry.message))
         ) {
           groups.push(group)
           group = []

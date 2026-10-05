@@ -12,6 +12,14 @@ import { RpcCoreErrorCode, RpcTransportError } from '../../../src/core/errors.js
 import { RpcOutboundSender } from '../../../src/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../../src/core/internal/endpoint-options.js'
 import { createIpcSendQueueFeature } from '../../../src/core/plugins/send-queue.js'
+import { authentication } from '../../../src/core/middleware/authentication.js'
+import { installPlugin } from '../middleware/helpers.js'
+import { readAuthenticationEnvelope } from '../../../src/core/middleware/authentication-envelope.js'
+import { bindAuthenticationReplayContext } from '../../../src/core/internal/authentication-replay.js'
+import type {
+  IRpcAuthenticationCapability,
+  IRpcAuthenticationContext
+} from '../../../src/core/typing.js'
 
 /** Canonical components preserve real encoding, sizing and gate settlement ownership. */
 const components: IRpcSelectedComponents = {
@@ -23,7 +31,7 @@ const components: IRpcSelectedComponents = {
 }
 
 /** Ordinary requests retain their semantic identities inside a physical batch. */
-function request(id: string, payload: unknown = id): IRpcEnvelope {
+function request(id: string, payload: unknown = id, receiverId = 'b'): IRpcEnvelope {
   return normalizeRpcEnvelope({
     kind: 'request',
     id,
@@ -35,7 +43,7 @@ function request(id: string, payload: unknown = id): IRpcEnvelope {
         applicationVersion: '1',
         senderId: 'a',
         targetId: 'b',
-        receiverId: 'b',
+        receiverId,
         sentAt: 0
       },
       payload
@@ -44,6 +52,85 @@ function request(id: string, payload: unknown = id): IRpcEnvelope {
 }
 
 describe('custody physical sender settlements', () => {
+  it('[A37] sourceful multiplexed receivers retain one batch and one physical authentication counter', async () => {
+    /** Real transport backpressure puts both distinct destinations into the canonical FIFO. */
+    let release!: () => void
+    /** Holds only the initial accepted write, without changing the production batch owner. */
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    /** Captures actual physical values rather than logical request settlements. */
+    const frames: unknown[] = []
+    /** Sourceful signing must retain the original single immutable transform context. */
+    const contexts: IRpcAuthenticationContext[] = []
+    /** A genuine installed middleware allocates the nonce and monotonically increasing counters. */
+    const capability = installPlugin(
+      authentication({
+        sign: (value, context) => {
+          contexts.push(context)
+          return value
+        },
+        verify: (value) => value
+      })
+    ).get('authenticationCapability') as IRpcAuthenticationCapability
+    /** This physical source proof never creates a source-less challenge binding. */
+    const source = {}
+    /** The original sender owns both physical grouping and authentication invocation. */
+    const sender = new RpcOutboundSender(
+      {
+        platform: 'Memory',
+        topology: 'multiplexed',
+        sourceProof: (value) => value === source,
+        send(value) {
+          frames.push(value)
+          if (frames.length === 1) return held
+        }
+      },
+      'a',
+      components,
+      capability,
+      'Memory',
+      undefined,
+      undefined,
+      false,
+      true
+    )
+    /** Wait until asynchronous signing reaches the real host write before enqueueing siblings. */
+    const first = sender.send(request('first'))
+    await vi.waitFor(() => expect(frames).toHaveLength(1))
+    /** Distinct receiver identities are legal members of one sourceful physical batch. */
+    const one = sender.send(request('one', 'one', 'b:one'))
+    /** Logical settlements remain separate even though the protected representation is shared. */
+    const two = sender.send(request('two', 'two', 'b:two'))
+    release()
+    await Promise.all([first, one, two])
+    expect(frames).toHaveLength(2)
+    expect(frames.map((frame) => readAuthenticationEnvelope(frame).counter)).toEqual(['1', '2'])
+    expect(readAuthenticationEnvelope(frames[1]).payload).toMatchObject({
+      kind: 'batch',
+      envelopes: [{ id: 'one' }, { id: 'two' }]
+    })
+    expect(contexts).toHaveLength(2)
+    expect(contexts[1]).toBe(contexts[0])
+    /** Both receivers authenticate the same batch against their genuine physical source session. */
+    for (const receiverId of ['b:one', 'b:two']) {
+      /** Independent installed verification owners preserve the old sourceful replay windows. */
+      const receiver = installPlugin(
+        authentication({ sign: (value) => value, verify: (value) => value })
+      ).get('authenticationCapability') as IRpcAuthenticationCapability
+      /** Only the private physical owner can bind this source to authentication. */
+      const context: IRpcAuthenticationContext = {
+        direction: 'inbound',
+        endpointId: receiverId,
+        platform: 'Memory'
+      }
+      bindAuthenticationReplayContext(context, source)
+      expect(await receiver.unprotect(frames[1], context)).toBe(
+        readAuthenticationEnvelope(frames[1]).payload
+      )
+    }
+  })
+
   it('[A26] failed queued authentication rejects only its group and continues the next physical boundary', async () => {
     /** Genuine protection completion is independent of the initial held host write. */
     let release!: () => void
