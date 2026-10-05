@@ -101,6 +101,10 @@ const localize = (_zh: string, en: string): string => `${PREFIX}${en}`
 
 /** PluginHost 错误与诊断文本集中维护处，便于调用方和维护者查找。 */
 const ERROR_TEXT = {
+  /** Host node identity requires cryptographic entropy; no process id or weak fallback is admitted. */
+  get HOST_IDENTITY_ENTROPY() {
+    return localize('宿主节点身份缺少安全随机源', 'host node identity requires secure randomness')
+  },
   /** Stable validation text for the optional human-readable Host identity name. */
   get HOST_IDENTITY_NAME() {
     return localize('宿主身份名称必须为非空字符串', 'host identity name must be a non-empty string')

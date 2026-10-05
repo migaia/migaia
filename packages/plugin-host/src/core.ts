@@ -39,10 +39,14 @@ export type IPluginRuntimeFeatureSnapshot = Readonly<{
 /** A canonical install core exposes only Host identity, Feature reads and shared publication. */
 export type IPluginRuntimeIntegration = Readonly<{
   readonly identity: Readonly<{ name: string; id: string }>
+  /** One private runtime node fact is shared by every adapter installed on this Host. */
+  readonly nodeId: string
   /** Query only the original managed-host authority; this confers no mutation permission. */
   matchesHost(host: object): boolean
   /** Reuse original Host/registration admission for explicitly exposed reserved controls. */
   assertCurrent(): void
+  /** Read an already committed facade without acquiring ownership or creating another slot. */
+  readSharedExtension(key: PropertyKey): object | undefined
   acquireSharedSlot<TFacade extends object>(
     key: PropertyKey,
     family: object,
