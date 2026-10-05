@@ -4,6 +4,12 @@ export const RUNTIME_API_SCHEMA_VERSION = 2
 /** Only simple runtime request/stream calls inherit this deadline; core defaults stay unchanged. */
 export const RUNTIME_API_DEFAULT_TIMEOUT_MS = 30_000
 
+/** Cold accepted-directory observations use the existing reporter, not a thrown error code. */
+export const RuntimeReportKind = {
+  /** A replacement changed actual installed routes on the same logical connection. */
+  contractDiff: 'runtime-contract-diff'
+} as const
+
 /** Automatic provide descriptor errors are stable, non-reflecting configuration diagnostics. */
 export const RuntimeApiErrorText = {
   /** Factory admission rejects this value before bootstrap or physical resource acquisition. */
