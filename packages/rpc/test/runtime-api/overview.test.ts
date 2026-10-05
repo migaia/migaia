@@ -14,6 +14,40 @@ import {
   type INodeThreadHandle
 } from '../../src/threads/adapters/node.js'
 import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
+import { RpcCapability } from '../../src/contract/wire-constants.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from './fixture.js'
+
+it.each([true, false])(
+  '[A71][A72] Peer detail reports the accepted remote generation or explicit unavailability (%s)',
+  async (negotiated) => {
+    /** Only the actual intersection decides whether the peer has a generation identity. */
+    const capabilities = [
+      ...RUNTIME_API_FIXTURE_BASE_CAPABILITIES,
+      ...(negotiated ? [RpcCapability.generation] : [])
+    ]
+    const fixture = await connected({}, { echo: () => 42 }, capabilities, capabilities)
+    try {
+      assert.equal(await fixture.peers[0].request('echo'), 42)
+      const accepted = readRuntimePeerConnection(fixture.peers[0]).description!.self.generation
+      const detail = await fixture.peers[0].describe()
+      const generation = Reflect.get(detail.connections[0]!, 'generation')
+      if (negotiated) {
+        assert.ok(accepted)
+        assert.deepEqual(
+          generation,
+          accepted,
+          '[A71] local detail must retain the exact authenticated restart/session identity'
+        )
+      } else
+        assert.ok(
+          generation && Reflect.get(generation, 'status') === 'unavailable',
+          '[A72] missing generation proof is explicit, never omitted or inferred from unit attempts'
+        )
+    } finally {
+      await fixture.close()
+    }
+  }
+)
 
 it('[A24] describe projects local identity and connection facts without another request', async () => {
   /** Existing business works before the missing management projection is asserted. */

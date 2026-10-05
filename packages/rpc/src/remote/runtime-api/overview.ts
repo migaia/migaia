@@ -1,5 +1,6 @@
 import { emitOutput, type ISerializeTextFormat } from '@migaia/serialize'
 import type { ISupervisorSnapshot } from '@migaia/supervision'
+import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
 import { readEndpointClientCounters } from '../../core/internal/endpoint-projection.js'
 import {
   runtimeIdentity,
@@ -86,6 +87,8 @@ export type IRuntimeRecent = Readonly<{
 /** Connection state and unit state remain separate owner facts. */
 export type IRuntimeConnectionDetail = Readonly<{
   identity: IRuntimePeerIdentity | IRuntimeUnavailable
+  /** Accepted remote identity is distinct from the local supervisor's physical attempt number. */
+  generation: IRpcRuntimeGeneration | IRuntimeUnavailable
   kind: RuntimeSourceKind
   direction: RuntimeConnectionDirection
   carrier: string
@@ -214,6 +217,8 @@ export function runtimeConnectionDetail(
           instanceId: directory.description.self.instanceId
         })
       : runtimeUnavailable(RuntimeQueryReason.owner),
+    generation:
+      directory.description?.self.generation ?? runtimeUnavailable(RuntimeQueryReason.owner),
     kind: directory.kind,
     direction: directory.direction,
     carrier: directory.carrier,

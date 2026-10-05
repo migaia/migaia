@@ -100,6 +100,13 @@ it.each(['memory', 'external'] as const)(
       assert.equal(before.state, 'done')
       assert.equal(before.store.kind, kind)
       assert.equal(before.store.continuity, 'retained')
+      /** Public cold queries use the accepted directory, not the supervisor's attempt counter. */
+      const initialGeneration = Reflect.get(await host.thread!.get('store-child'), 'generation')
+      assert.deepEqual(
+        { ...(initialGeneration as object) },
+        before.state === 'done' && before.outcome.targetGeneration,
+        '[A71] Host get exposes the actual first accepted restart identity'
+      )
       const oldInstance = readRuntimeOutletConnection(host.thread, 'store-child')!.instanceId
       await host.thread!.restart('store-child')
       await vi.waitFor(() => {
@@ -148,6 +155,11 @@ it.each(['memory', 'external'] as const)(
       if (done.state !== 'done') assert.fail('[A71] current generation owns its new completion')
       assert.equal(done.outcome.targetGeneration.kind, 'restart')
       assert.equal(done.outcome.targetGeneration.value, 1)
+      assert.deepEqual(
+        { ...(Reflect.get(await host.thread!.get('store-child'), 'generation') as object) },
+        done.outcome.targetGeneration,
+        '[A72] Host get reports the replacement identity rather than an attempt number'
+      )
       assert.equal(before.state === 'done' && before.outcome.targetGeneration.value, 0)
     } finally {
       await host.dispose()
