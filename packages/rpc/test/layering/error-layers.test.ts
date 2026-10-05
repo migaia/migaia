@@ -31,6 +31,12 @@ function declaredCodes(layer: 'contract' | 'core'): Map<string, string> {
   for (const statement of source.statements) {
     if (!ts.isVariableStatement(statement)) continue
     for (const declaration of statement.declarationList.declarations) {
+      /** Scenario reasons refine a code; only the canonical code table declares top-level codes. */
+      if (
+        declaration.name.getText(source) !==
+        (layer === 'core' ? 'RpcCoreErrorCode' : 'RpcContractErrorCode')
+      )
+        continue
       if (!declaration.initializer || !ts.isAsExpression(declaration.initializer)) continue
       const table = declaration.initializer.expression
       if (!ts.isObjectLiteralExpression(table)) continue

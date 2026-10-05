@@ -1,5 +1,8 @@
 import { selectedJsonObjectPort, type IRpcJsonObjectPort } from './json-object-port.js'
-import { isAuthenticationCounterExhaustion } from './authentication-replay.js'
+import {
+  isAuthenticationCounterExhaustion,
+  bindAuthenticationOutboundFrame
+} from './authentication-replay.js'
 import {
   RpcAuthenticationError,
   RpcLifecycleError,
@@ -27,6 +30,7 @@ import {
 } from '../../contract/batch-frame.js'
 import { resolveAbortReason } from './async-control.js'
 import { isOutboundEnvelope, outboundJsonByteUpperBound } from './outbound-envelope.js'
+import type { IAuthenticationChallengeFields } from './authentication-replay.js'
 
 /** One logical settlement remains owned until its actual physical write completes. */
 type IQueuedEnvelope = {
@@ -108,7 +112,8 @@ export class RpcOutboundSender {
     reportConfiguration?: (error: unknown) => void,
     fast = false,
     batch = false,
-    physicalLimit = RpcBatchPhysical.maxBytes
+    physicalLimit = RpcBatchPhysical.maxBytes,
+    receiverId = id
   ) {
     this.transport = transport
     this.id = id
@@ -121,6 +126,7 @@ export class RpcOutboundSender {
     this.#fast = fast && authentication === undefined
     this.#batch = batch
     this.#physicalLimit = physicalLimit
+    this.#receiverId = receiverId
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
       typeof lifecycle.assertActive === 'function' && typeof lifecycle.generation === 'number'
@@ -135,6 +141,37 @@ export class RpcOutboundSender {
 
   /** Stable context passed to every outbound authentication transform. */
   readonly #authenticationContext: IRpcAuthenticationContext
+  /** Original outbound identity supplies reverse freshness without another discovery round trip. */
+  readonly #receiverId: string
+
+  /** Protects a payload-free rejection through the existing physical sender and error policy. */
+  sendAuthenticationControl(fields: IAuthenticationChallengeFields): Promise<void> {
+    /** A late signature cannot send through a replacement endpoint generation. */
+    const generation = this.#lifecycle?.generation
+    const context = { ...this.#authenticationContext }
+    bindAuthenticationOutboundFrame(context, undefined, this.#receiverId, fields)
+    /** Control protection retains the category required by the existing codec/carrier pair. */
+    const encodedType =
+      this.#transportEncodedType === 'any' || this.#transportEncodedType === undefined
+        ? this.components.codec.encodedType
+        : this.#transportEncodedType
+    const value =
+      encodedType === 'uint8array' ? new Uint8Array() : encodedType === 'string' ? '' : undefined
+    return this.#prepareTransportValue(value, undefined, false, generation, context).then(
+      (protectedValue) => this.#sendPreparedTransport(protectedValue, undefined, generation)
+    )
+  }
+
+  /**
+   * Exclusive transforms reuse their exact stable context; multiplexed facts use one owned
+   * snapshot.
+   */
+  #frameContext(frame: IRpcEnvelope): IRpcAuthenticationContext {
+    if (this.transport.topology === 'exclusive') return this.#authenticationContext
+    const context = { ...this.#authenticationContext }
+    bindAuthenticationOutboundFrame(context, frame, this.#receiverId)
+    return context
+  }
 
   /** Encodes one semantic envelope once, then protects and sends each selected physical frame. */
   send(
@@ -256,7 +293,18 @@ export class RpcOutboundSender {
         if (group.length) groups.push(group)
         groups.push([entry])
         group = []
-      } else group.push(entry)
+      } else {
+        if (
+          this.authentication &&
+          this.transport.topology !== 'exclusive' &&
+          group.length &&
+          group[0]!.message.data.route.receiverId !== entry.message.data.route.receiverId
+        ) {
+          groups.push(group)
+          group = []
+        }
+        group.push(entry)
+      }
     }
     if (group.length) groups.push(group)
     /** Encode whole groups; authentication below follows the actual physical invocation order. */
@@ -387,7 +435,13 @@ export class RpcOutboundSender {
       }
       if (this.authentication) {
         /** Protection and any membership rebuild finish before the next frame consumes a counter. */
-        void this.#prepareTransportValue(frame.value, frame.entries[0]!.transfer)
+        void this.#prepareTransportValue(
+          frame.value,
+          frame.entries[0]!.transfer,
+          undefined,
+          undefined,
+          this.#frameContext(frame.entries[0]!.message)
+        )
           .then((value) => {
             const current = this.#admitBatch(frame.entries, false)
             if (current.length !== frame.entries.length) {
@@ -550,9 +604,21 @@ export class RpcOutboundSender {
           true
         )
       }
-      return this.#prepareTransportValue(frames[0], transfer, hasTransfer, generation).then(write)
+      return this.#prepareTransportValue(
+        frames[0],
+        transfer,
+        hasTransfer,
+        generation,
+        this.#frameContext(message)
+      ).then(write)
     }
-    return this.#prepareFrames(frames, transfer, hasTransfer, generation).then((preparedFrames) => {
+    return this.#prepareFrames(
+      frames,
+      transfer,
+      hasTransfer,
+      generation,
+      this.authentication ? this.#frameContext(message) : undefined
+    ).then((preparedFrames) => {
       this.#lifecycle?.assertActive(generation)
       return gated || admission !== undefined
         ? this.#sendPreparedFramesGated(preparedFrames, transfer, generation, admission, onStarted)
@@ -621,20 +687,25 @@ export class RpcOutboundSender {
     frames: readonly unknown[],
     transfer: readonly unknown[] | undefined,
     hasTransfer: boolean,
-    generation: number | undefined
+    generation: number | undefined,
+    authenticationContext?: IRpcAuthenticationContext
   ): Promise<readonly unknown[]> {
     let hasFailure = false
     let firstFailure: unknown
     const preparations = frames.map((frame) =>
-      this.#prepareTransportValue(frame, transfer, hasTransfer, generation).catch(
-        (error: unknown) => {
-          if (!hasFailure) {
-            hasFailure = true
-            firstFailure = error
-          }
-          throw error
+      this.#prepareTransportValue(
+        frame,
+        transfer,
+        hasTransfer,
+        generation,
+        authenticationContext
+      ).catch((error: unknown) => {
+        if (!hasFailure) {
+          hasFailure = true
+          firstFailure = error
         }
-      )
+        throw error
+      })
     )
     return Promise.all(
       preparations.map((preparation) =>
@@ -708,7 +779,8 @@ export class RpcOutboundSender {
     value: unknown,
     transfer?: readonly unknown[],
     hasTransfer = transfer !== undefined && transfer.length > 0,
-    generation?: number
+    generation?: number,
+    authenticationContext = this.#authenticationContext
   ): Promise<unknown> {
     if (this.authentication && hasTransfer)
       return Promise.reject(
@@ -730,7 +802,7 @@ export class RpcOutboundSender {
     return Promise.resolve()
       .then(() => {
         this.#lifecycle?.assertActive(generation)
-        return authentication.protect(value, this.#authenticationContext)
+        return authentication.protect(value, authenticationContext)
       })
       .catch((cause) => {
         if (isAuthenticationCounterExhaustion(cause)) {

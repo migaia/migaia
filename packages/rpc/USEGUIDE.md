@@ -420,7 +420,15 @@ authentication({
 
 **成对校验规则（构造期强制，均抛 `INVALID_CONFIG`）**：`sign`/`verify` 必须同时提供；配置加密时 `encrypt`/`decrypt` 也必须成对，只有加密而没有签名会被拒绝。出站先包入版本、安全 128-bit nonce、uint64 计数器与载荷，再 `encrypt`、`sign`；入站先 `verify`、`decrypt`，再检查绑定及所属物理会话，与配置字段顺序无关。transform 的输入类别仍为原 string/Uint8Array/object，但其内容已包含绑定，必须完整保护及还原，不能仅签原业务载荷。旧格式、无绑定、畸形绑定及无可信会话来源均为 `AUTHENTICATION_FAILED`，不退回旧认证路径。
 
-每个接收会话固定首个通过验证的 nonce，并用 64 槽窗口接受乱序的未见计数器；同计数器、窗口外计数器及同会话换 nonce 均拒绝。不同物理会话互相隔离，退休会话晚返回的 verify 不进入 provider；这种隔离不声明新会话首帧的密码学 freshness。签名计数器耗尽按 `INVALID_CONFIG`、稳定文本 `Authentication replay counter is exhausted` 报告并拒绝，不回绕；安全随机源不可用或抛错时不降级弱随机，原错误保留在 cause。其他 transform 异常保持 `RpcAuthenticationError`（`AUTHENTICATION_FAILED`）包装。
+独占载体（包括 MessagePort）以及有真实 source 的 multiplexed 载体，每个接收会话固定首个通过验证的 nonce，并用 64 槽窗口接受乱序的未见计数器；同计数器、窗口外计数器及同会话换 nonce 均拒绝。不同物理会话互相隔离，退休会话晚返回的 verify 不进入 provider；这种隔离不声明新会话首帧的密码学 freshness。
+
+非独占且没有 source 的载体（包括 BroadcastChannel）通过已有 discovery query/response 建立接收方 challenge，不增加往返。多个合法客户端各用自己的 nonce 和窗口；重启客户端通过发现建立新会话。自选 Feature 的 composed endpoint 必须同时选择原 discovery Feature。业务帧和反向回复都签入接收方 challenge；接收方最多保存 64 个会话，淘汰后旧 challenge 不会重建，重放旧业务帧不能执行 provider。
+
+会话表采用 SIEVE：通过验证和计数窗口检查的业务帧只设置 visited，发现查询不保活。SIEVE keeps sessions that send business frames at least once per (64 − active sessions) new sessions; beyond that, eviction costs one rediscovery and never causes execution. 因此，48 个活跃会话在每 16 次新会话插入之间各发送至少一帧时保持驻留；满 64 个活跃会话或长期空闲时仍可能淘汰合法会话。
+
+未知或已淘汰的 challenge 在业务解码前被拒绝，接收方报告 `AUTHENTICATION_FAILED` / reason `SESSION_UNKNOWN`，并发送签名的 `session-unknown` 控制帧。该控制帧只使发送方丢弃对应 challenge；下一次新调用重新发现，任何已发出的帧都不会自动重发。notify 保留 report 行为，stream 沿原 iterator 的终止行为；真实托管资源离开时，非幂等在飞请求由原 retry owner 结算为 `REMOTE_RESULT_UNKNOWN`，显式 idempotencyKey 沿原重试、取消和截止时间处理。裸 endpoint 没有托管资源离开信号时，仍按原取消/截止时间结束。控制帧不会伪造资源离开，也不能证明旧接收方未执行过某帧。原样重放控制帧最多使随后新调用重新发现，不能触发业务执行。绑定格式或方向非法报告同一错误码 / reason `CHALLENGE_INVALID`。
+
+签名计数器耗尽按 `INVALID_CONFIG`、稳定文本 `Authentication replay counter is exhausted` 报告并拒绝，不回绕；安全随机源不可用或抛错时不降级弱随机，原错误保留在 cause。其他 transform 异常保持 `RpcAuthenticationError`（`AUTHENTICATION_FAILED`）包装。
 
 #### 3.5 `framer(descriptor?)`
 

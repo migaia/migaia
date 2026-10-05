@@ -19,7 +19,8 @@ import type {
   IRpcPlatform,
   IRpcConnectCapability,
   IRpcHookEvent,
-  IRpcUuidConfig
+  IRpcUuidConfig,
+  IRpcAuthenticationCapability
 } from '../typing.js'
 import {
   RpcRouteProfile,
@@ -45,6 +46,12 @@ import { safeRead, tupleKey, type IRpcPropertyReadReporter } from './safe-value.
 import { raceWithAsyncControl } from './async-control.js'
 import type { IRpcDiscoveryCleanupFaults } from './test-observer.js'
 import { allocateRpcId } from './id.js'
+import {
+  readAuthenticationChallengePort,
+  readAuthenticationChallengeProof,
+  retainAuthenticationChallengeResponse,
+  RpcAuthenticationControl
+} from './authentication-replay.js'
 
 /** Narrow ports consumed by the native discovery attachment. */
 type IDiscoveryPorts = {
@@ -85,6 +92,8 @@ type IAutomaticDiscoveryWaiter = {
 
 /** Inbound manual query data owned by the discovery attachment until expiry or settlement. */
 type IManualInboundQuery = {
+  /** Original query ownership retains signed nonce only until its application decision settles. */
+  readonly authenticationNonce?: string
   readonly queryId: string
   readonly senderId: string
   readonly targetId: string
@@ -124,6 +133,8 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   readonly #applicationVersion: string
   /** Compatible versions retained for discovery negotiation envelopes. */
   readonly #acceptVersions: readonly string[]
+  /** Freshness is owned by the installed authentication capability, alongside its counter windows. */
+  readonly #authentication: IRpcAuthenticationCapability | undefined
   /** Last receiver identity snapshot reported for one target. */
   readonly #multipleReceiverSnapshots = new Map<TTargetId, string>()
   /** Manual query listeners are discovery-owner state, not endpoint state. */
@@ -166,6 +177,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#mode = prepared.options.connect?.discoveryMode ?? 'automatic'
     this.#maxIdentifierLength = prepared.options.contract?.maxIdentifierLength ?? 128
     this.#uuid = Object.freeze({ ...prepared.options.uuid })
+    this.#authentication = prepared.options.authentication
     this.#receiverSelector = prepared.options.connect?.receiverSelector
     this.#applicationVersion = prepared.options.contract?.version ?? '1.0.0'
     this.#acceptVersions = Object.freeze([
@@ -176,7 +188,11 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         retain: (token) => this.#retainIdentity(token),
         release: (token) => this.#releaseIdentity(token)
       },
-      (error) => this.#report(error)
+      (error) => this.#report(error),
+      (value) =>
+        readAuthenticationChallengePort(this.#authentication)?.release(
+          (value as IRpcServerMetadata<TTargetId>).receiverId
+        )
     )
     this.#replay = new RequestReplayLedger(4096, 1024, 310_000, {
       retain: (token) => this.#retainIdentity(token),
@@ -575,7 +591,14 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   ): Promise<void> {
     this.#assertActive()
     if (this.#kernel.topology === 'exclusive') return
-    if (this.getServerList(targetId).some((entry) => entry.status === 'active')) return
+    if (
+      this.getServerList(targetId).some(
+        (entry) =>
+          entry.status === 'active' &&
+          !readAuthenticationChallengePort(this.#authentication)?.needed(entry.receiverId)
+      )
+    )
+      return
     await this.#automaticDiscovery(targetId, timeoutMs, signal)
   }
 
@@ -588,7 +611,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   async resolveReceiver(targetId: TTargetId): Promise<IOutboundReceiver> {
     const pinned = this.#registry.getPin(targetId)
     let entries = this.#activeReceivers(targetId, pinned)
-    if (entries.length === 0) {
+    if (
+      entries.length === 0 ||
+      readAuthenticationChallengePort(this.#authentication)?.needed(entries[0]!.receiverId)
+    ) {
       await this.#automaticDiscovery(targetId, false)
       entries = this.#activeReceivers(targetId, pinned)
     }
@@ -651,7 +677,22 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   ): Promise<void> {
     this.#assertActive()
     const key = String(targetId)
-    const existing = this.#registry.getWaiter<IAutomaticDiscoveryWaiter>(key)
+    let existing = this.#registry.getWaiter<IAutomaticDiscoveryWaiter>(key)
+    /** A cached completed discovery cannot satisfy the next send after freshness was invalidated. */
+    if (
+      existing?.settled &&
+      this.getServerList(targetId).some((entry) =>
+        readAuthenticationChallengePort(this.#authentication)?.needed(entry.receiverId)
+      )
+    ) {
+      this.#registry.deleteWaiter(key)
+      if (existing.taskId !== undefined) {
+        this.#clearAutomaticTimer(existing.taskId, existing)
+        this.#registry.deleteTask(existing.taskId)
+        this.#registry.deleteResponseCount(existing.taskId)
+      }
+      existing = undefined
+    }
     if (existing) {
       if (timeoutMs !== false) {
         const deadline = this.#ports.time.now() + timeoutMs
@@ -969,6 +1010,15 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         RpcCoreErrorText.remoteDiscoveryTargetLimitExceeded
       )
     candidateRecord.registered = true
+    const authenticationProof = readAuthenticationChallengeProof(candidate)
+    if (authenticationProof?.challenge)
+      readAuthenticationChallengePort(this.#authentication)?.remember(
+        candidate.receiverId,
+        authenticationProof.nonce,
+        authenticationProof.challenge,
+        false,
+        candidate.targetId
+      )
     if (previous?.status !== 'active')
       this.#emit({
         name: 'connect.receiver-registered',
@@ -1129,6 +1179,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
               )
             : route.payload
         this.#registry.setInboundQuery(queryKey, {
+          authenticationNonce: readAuthenticationChallengeProof(envelope)?.nonce,
           queryId: envelope.id,
           senderId: route.route.senderId,
           targetId: route.route.targetId,
@@ -1173,19 +1224,27 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         route.route.senderId,
         envelope.id
       )
-      if (this.#replay.has(replayKey, this.#kernel.time.scheduler.now())) {
+      const challengeProof = readAuthenticationChallengeProof(envelope)
+      const residentQuery = this.#replay.has(replayKey, this.#kernel.time.scheduler.now())
+      if (residentQuery && !challengeProof) {
         this.#emit({ name: 'authentication.rejected', code: 'DISCOVERY_QUERY_REPLAY' })
         return
       }
-      if (!this.#replay.canAdmit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())) {
+      if (
+        !residentQuery &&
+        !this.#replay.canAdmit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
+      ) {
         this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
         return
       }
-      if (!this.#admitAutomaticDiscovery(verifiedPeerKey, replayKey)) {
+      if (!residentQuery && !this.#admitAutomaticDiscovery(verifiedPeerKey, replayKey)) {
         this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
         return
       }
-      if (!this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())) {
+      if (
+        !residentQuery &&
+        !this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
+      ) {
         this.#registry.deleteAdmission(replayKey)
         this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
         return
@@ -1206,6 +1265,16 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         ...(this.#uniqueTargetId === undefined
           ? {}
           : { payload: { __unique_id__: this.#uniqueTargetId } })
+      }
+      if (challengeProof) {
+        const owner = readAuthenticationChallengePort(this.#authentication)!
+        retainAuthenticationChallengeResponse(response, {
+          nonce: challengeProof.nonce,
+          control: RpcAuthenticationControl.response,
+          echoNonce: challengeProof.nonce,
+          challenge: owner.issue(challengeProof.nonce),
+          receiverId
+        })
       }
       void this.#sendFrame(envelope.id, response).catch((error: unknown) =>
         this.#emit({ name: 'transport.failure', code: RpcCoreErrorCode.transport, error })
@@ -1288,6 +1357,9 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       waiter.candidateKeys.add(candidateKey)
       waiter.candidatePeerCounts.set(verifiedPeerKey, peerCandidateCount + 1)
       waiter.candidates.push(candidate)
+      const proof = readAuthenticationChallengeProof(envelope)
+      if (proof?.control === RpcAuthenticationControl.response && proof.challenge)
+        retainAuthenticationChallengeResponse(candidate, proof)
       this.#registry.setCandidate(
         candidate,
         {
@@ -1399,6 +1471,15 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#emit({ name: 'connect.receiver-announcement.failure', code: 'DISCOVERY_LIMIT' })
       return
     }
+    const challengeProof = readAuthenticationChallengeProof(envelope)
+    if (challengeProof?.control === RpcAuthenticationControl.response && challengeProof.challenge)
+      readAuthenticationChallengePort(this.#authentication)?.remember(
+        receiverId,
+        challengeProof.nonce,
+        challengeProof.challenge,
+        false,
+        resolvedTargetId
+      )
     this.diagnoseMultipleReceivers(resolvedTargetId as TTargetId)
     this.#registry.resolveAutomatic(targetId, (onExpire) =>
       this.#ports.time.setTimeout(onExpire, 1000)
@@ -1457,7 +1538,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
               : { value: acceptedData }),
             __unique_id__: this.#uniqueTargetId
           }
-    await this.#sendFrame(query.queryId, {
+    const response: IRpcEnvelopeData = {
       route: {
         profile: RpcRouteProfile,
         type: RpcRouteType.discoveryResponse,
@@ -1474,7 +1555,18 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         ...(reason === undefined ? {} : { message: reason })
       },
       ...(accepted ? { payload: controlData as IRpcPortableValue } : {})
-    })
+    }
+    if (query.authenticationNonce)
+      retainAuthenticationChallengeResponse(response, {
+        nonce: query.authenticationNonce,
+        control: RpcAuthenticationControl.response,
+        echoNonce: query.authenticationNonce,
+        challenge: readAuthenticationChallengePort(this.#authentication)!.issue(
+          query.authenticationNonce
+        ),
+        receiverId: receiverId ?? this.#identity.receiverId
+      })
+    await this.#sendFrame(query.queryId, response)
     return true
   }
 
@@ -1561,7 +1653,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       return
     if (!record.admission) return
-    if (route.route.manual) {
+    if (route.route.manual || readAuthenticationChallengeProof(envelope)) {
       await this.handleInboundDiscovery(envelope, route, record.admission.token, record.inbound)
       return
     }
@@ -1612,7 +1704,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       return
     if (!record.admission) return
-    if (route.route.manual) {
+    if (route.route.manual || readAuthenticationChallengeProof(envelope)) {
       await this.handleInboundDiscovery(envelope, route, record.admission.token, record.inbound)
       return
     }
@@ -1698,15 +1790,19 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Sends discovery through the canonical semantic envelope and WebRPC route profile. */
   #sendFrame(id: string, route: IRpcEnvelopeData): Promise<void> {
+    /** Canonical normalization may copy data, so the original owner transfers only private proof. */
+    const message = createOutboundEnvelope({
+      kind: 'discovery',
+      id,
+      version: this.#applicationVersion,
+      acceptVersions: this.#acceptVersions,
+      data: route
+    })
+    const proof = readAuthenticationChallengeProof(route)
+    if (proof) retainAuthenticationChallengeResponse(message.data, proof)
     return this.#ports.outboundOperations.send({
       kind: 'frame',
-      message: createOutboundEnvelope({
-        kind: 'discovery',
-        id,
-        version: this.#applicationVersion,
-        acceptVersions: this.#acceptVersions,
-        data: route
-      })
+      message
     })
   }
 

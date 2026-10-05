@@ -1,5 +1,6 @@
 import { RpcAuthenticationError, RpcConfigurationError } from '../errors.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
+import type { IAuthenticationChallengeFields } from '../internal/authentication-replay.js'
 
 /** Stable inner framing distinguishes authenticated replay bindings in every supported category. */
 export const RpcAuthenticationEnvelope = {
@@ -14,7 +15,7 @@ export const RpcAuthenticationEnvelope = {
 } as const
 
 /** The signed inner envelope is private and restores the original transform value category. */
-export type IAuthenticationEnvelope = {
+export type IAuthenticationEnvelope = IAuthenticationChallengeFields & {
   readonly authentication: typeof RpcAuthenticationEnvelope.kind
   readonly version: typeof RpcAuthenticationEnvelope.version
   readonly nonce: string
@@ -39,7 +40,8 @@ export function createAuthenticationNonce(): string {
 export function wrapAuthenticationEnvelope(
   value: unknown,
   nonce: string,
-  counter: bigint
+  counter: bigint,
+  fields?: IAuthenticationChallengeFields
 ): unknown {
   /** Byte payloads are represented portably inside JSON and reconstructed only after validation. */
   const envelope: IAuthenticationEnvelope = {
@@ -47,6 +49,7 @@ export function wrapAuthenticationEnvelope(
     version: RpcAuthenticationEnvelope.version,
     nonce,
     counter: counter.toString(),
+    ...fields,
     payload: value instanceof Uint8Array ? Array.from(value) : value
   }
   if (typeof value !== 'string' && !(value instanceof Uint8Array)) return envelope
@@ -69,7 +72,8 @@ export function readAuthenticationEnvelope(value: unknown): IAuthenticationEnvel
   if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded))
     throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
   /** Each binding field is read once before grammar checks or counter arithmetic. */
-  const { authentication, version, nonce, counter, payload } = decoded as IAuthenticationEnvelope
+  const { authentication, version, nonce, counter, payload, ...fields } =
+    decoded as IAuthenticationEnvelope
   if (
     authentication !== RpcAuthenticationEnvelope.kind ||
     version !== RpcAuthenticationEnvelope.version ||
@@ -91,6 +95,7 @@ export function readAuthenticationEnvelope(value: unknown): IAuthenticationEnvel
     version,
     nonce,
     counter,
+    ...fields,
     payload: bytes ? new Uint8Array(payload as number[]) : payload
   }
 }

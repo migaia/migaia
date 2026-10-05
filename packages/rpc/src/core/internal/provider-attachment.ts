@@ -33,7 +33,10 @@ import { ProviderExecutor } from './provider-executor.js'
 import { ProviderRegistry } from './provider.js'
 import { RequestReplayLedger } from './request-replay-ledger.js'
 import { nativeReplayReceipt } from './native-replay.js'
-import { hasAuthenticationReplayBinding } from './authentication-replay.js'
+import {
+  hasAuthenticationReplayBinding,
+  authenticationReplyReceiverId
+} from './authentication-replay.js'
 import { NativeDefaultIdText } from './native-default-id-text.js'
 import { tupleKey } from './safe-value.js'
 import { createRpcIdempotencyStore } from '../idempotency-store.js'
@@ -203,7 +206,9 @@ export class RpcProviderAttachment {
           readonly found: boolean
           readonly reason: unknown
         },
-      responseReceiverId: (request) => request.route.route.senderId
+      /** Source-less authentication binds the response to the exact admitted client receiver. */
+      responseReceiverId: (request) =>
+        authenticationReplyReceiverId(request.envelope) ?? request.route.route.senderId
     })
     /** Physical retirement drops only this provider's ledger before any late cleanup can return. */
     const native = nativeReplayReceipt(kernel.transport)

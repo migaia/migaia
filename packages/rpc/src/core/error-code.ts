@@ -213,4 +213,15 @@ export const RpcCoreErrorCode = {
   stringConversionFailed: 'STRING_CONVERSION_FAILED'
 } as const
 
+/** U40 refines the existing authentication failure without creating another top-level code. */
+export const RpcAuthenticationRejectionReason = {
+  /** Receiver discarded or never issued this challenge; discard the cached challenge only. */
+  sessionUnknown: 'SESSION_UNKNOWN',
+  /** Signed challenge fields have invalid grammar or direction; repair the frame contract. */
+  challengeInvalid: 'CHALLENGE_INVALID'
+} as const
+
+export type RpcAuthenticationRejectionReason =
+  (typeof RpcAuthenticationRejectionReason)[keyof typeof RpcAuthenticationRejectionReason]
+
 export type IRpcCoreErrorCode = (typeof RpcCoreErrorCode)[keyof typeof RpcCoreErrorCode]
