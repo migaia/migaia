@@ -57,6 +57,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     | Readonly<{
         assertActive(): void
         publish(key: PropertyKey): void
+        report(error: unknown): void
       }>
     | undefined
   /** Live definition lanes, written only through the composition entry. */
@@ -82,6 +83,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     publication: Readonly<{
       assertActive(): void
       publish(key: PropertyKey): void
+      report(error: unknown): void
     }>
   ): void {
     this.#sharedPublication = publication
@@ -140,10 +142,15 @@ export class PluginHostState<TDomainCore extends object, TValue> {
             facade: {},
             retired: false,
             contributions: new Set(),
-            registrations: new Set(),
+            registrations: new Map(),
             names: new Map(),
             instanceIds: new Map()
           }
+    /** Metadata remains on the original candidate reservation, invisible until install commit. */
+    const reservation = registration.sharedSlots?.find((entry) => entry.slot === slot) ?? {
+      slot,
+      value: undefined as object | undefined
+    }
     /** Writes are exact-registration scoped; facade reads require committed slot identity. */
     const view: IPluginRuntimeSharedSlot<TFacade> = Object.freeze({
       get facade() {
@@ -168,6 +175,20 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         this.extensionOwners.get(key) === slot
           ? [...slot.contributions.values()].map((receipt) => receipt.value)
           : [],
+      registered: (): readonly object[] => {
+        if (slot.retired || this.extensionOwners.get(key) !== slot) return []
+        /** Cold enumeration includes suspended/non-ready units, but never candidates or old owners. */
+        return Array.from(slot.registrations, ([owner, entry]) =>
+          this.registrations.get(owner.name) === owner ? entry.value : undefined
+        ).filter((value): value is object => value !== undefined)
+      },
+      register: (value: object, onCommit?: () => void): void => {
+        assertContribution()
+        if (typeof value !== 'object' || value === null)
+          throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
+        reservation.value = value
+        reservation.onCommit = onCommit
+      },
       contribute: (value: object, instanceId: string): (() => void) => {
         assertContribution()
         if (
@@ -203,7 +224,8 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
     }
     batch.extensionOwners.set(key, slot)
-    if (!registration.sharedSlots?.includes(slot)) (registration.sharedSlots ??= []).push(slot)
+    if (!registration.sharedSlots?.includes(reservation))
+      (registration.sharedSlots ??= []).push(reservation)
     return view
   }
 
@@ -285,12 +307,16 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     for (const [key, owner] of batch.extensionOwners)
       if (
         !isSharedExtensionSlot(owner) ||
-        installed.some((registration) => registration.sharedSlots?.includes(owner))
+        installed.some((registration) =>
+          registration.sharedSlots?.some((entry) => entry.slot === owner)
+        )
       )
         this.extensionOwners.set(key, owner)
     for (const registration of installed)
-      for (const slot of registration.sharedSlots ?? []) {
-        slot.registrations.add(registration)
+      for (const reservation of registration.sharedSlots ?? []) {
+        /** Publication still occurs once in the original install commit, not in register(). */
+        const slot = reservation.slot
+        slot.registrations.set(registration, reservation)
         this.#sharedPublication?.publish(slot.key)
       }
     for (const receipt of batch.sharedContributions) {
@@ -299,6 +325,14 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     for (const registration of installed) this.lanes.bindOwner(registration)
     batch.committed = true
     this.commit()
+    for (const registration of installed)
+      for (const reservation of registration.sharedSlots ?? []) {
+        try {
+          reservation.onCommit?.()
+        } catch (error) {
+          this.#sharedPublication?.report(error)
+        }
+      }
   }
 
   /**
@@ -326,7 +360,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   ): void {
     for (const receipt of registration.sharedContributions ?? [])
       this.#updateSharedContribution(receipt, false)
-    for (const slot of registration.sharedSlots ?? []) {
+    for (const { slot } of registration.sharedSlots ?? []) {
       slot.registrations.delete(registration)
       if (
         slot.registrations.size === 0 &&

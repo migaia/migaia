@@ -58,7 +58,7 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   /** Candidate and committed shared receipts belong to this exact registration generation. */
   sharedContributions?: ISharedExtensionContribution<TDomainCore, TValue>[]
   /** Original registration reservations retain a facade while native generations rebind. */
-  sharedSlots?: ISharedExtensionSlot<TDomainCore, TValue>[]
+  sharedSlots?: ISharedExtensionReservation<TDomainCore, TValue>[]
   pipelineDisposers: IPluginDisposer[]
   /** Stages registered by this exact generation, not keyed by function identity. */
   stageEntries: IStageEntry<TValue>[]
@@ -120,9 +120,20 @@ export type ISharedExtensionSlot<TDomainCore extends object, TValue> = {
   retired: boolean
   /** Ready physical sessions and live registrations remain separate canonical membership facts. */
   readonly contributions: Set<ISharedExtensionContribution<TDomainCore, TValue>>
-  readonly registrations: Set<IRegistration<TDomainCore, TValue>>
+  readonly registrations: Map<
+    IRegistration<TDomainCore, TValue>,
+    ISharedExtensionReservation<TDomainCore, TValue>
+  >
   readonly names: Map<string, ISharedExtensionBucket<TDomainCore, TValue>>
   readonly instanceIds: Map<string, ISharedExtensionBucket<TDomainCore, TValue>>
+}
+
+/** One original reservation owns its cold metadata across ready receipt withdrawal and rebind. */
+export type ISharedExtensionReservation<TDomainCore extends object, TValue> = {
+  readonly slot: ISharedExtensionSlot<TDomainCore, TValue>
+  value?: object
+  /** Native adapters publish initial readiness only after this original reservation commits. */
+  onCommit?: () => void
 }
 
 /** The canonical bucket caches its sole receipt so hot lookup never allocates an iterator. */
