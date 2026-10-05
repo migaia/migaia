@@ -89,6 +89,7 @@ import {
 } from './catalog.js'
 import {
   attachProviderPreflight,
+  retainProviderPreflight,
   readProviderInvocation,
   readProviderIdentity,
   readProviderRuntimeRelay,
@@ -366,8 +367,8 @@ export async function createRuntimePeer(
   let remoteNodeId: string | undefined
   /** This cold read reaches only the genuine kernel/attachment retained by canonical projection. */
   let runtimeOutbound: RpcOutboundAttachment | undefined
-  /** Attach policy only to forward entries in the same ordinary provider namespace. */
-  const guardForward = <T extends Function>(entry: IRuntimeMethodEntry, provider: T): T =>
+  /** Preserve local Host permission or forwarding policy on the actual canonical provider. */
+  const guardMethod = <T extends Function>(entry: IRuntimeMethodEntry, provider: T): T =>
     entry.kind === 'forward'
       ? attachProviderPreflight(provider, (route) => {
           try {
@@ -380,7 +381,7 @@ export async function createRuntimePeer(
             )
           }
         })
-      : provider
+      : retainProviderPreflight(entry.method, provider)
   /** Delegate the original lazy iterator and retain known route facts on terminal business errors. */
   const forwardStream = async function* (
     entry: IRuntimeForwardMethodEntry,
@@ -434,7 +435,7 @@ export async function createRuntimePeer(
       : describeProvider
     for (const entry of methods) {
       if (entry.supportedModes?.every((mode) => mode === RuntimeApiMode.stream)) continue
-      providers[entry.name] = guardForward(entry, async (context: Parameters<IRpcProvider>[0]) => {
+      providers[entry.name] = guardMethod(entry, async (context: Parameters<IRpcProvider>[0]) => {
         if (entry.kind === 'forward') {
           const relay = readProviderRuntimeRelay(context)
           if (relay) return context.success(await relay.execute(context))
@@ -650,7 +651,7 @@ export async function createRuntimePeer(
         if (!entry.supportedModes || entry.supportedModes.includes(RuntimeApiMode.stream))
           endpoint.stream!.provide(
             `${RemoteMethodName.runtimeStreamPrefix}${entry.name}`,
-            guardForward(
+            guardMethod(
               entry,
               (payload: unknown, { context }: Parameters<IRpcStreamRun>[1]) =>
                 (entry.kind === 'forward'

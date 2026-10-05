@@ -5,7 +5,15 @@ import { it } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import type { IRuntimeThreadPluginOptions } from '../../src/threads/plugin.js'
-import { runtimeSources } from './fixture.js'
+import { runtimeSources, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from './fixture.js'
+import { RpcCapability } from '../../src/contract/wire-constants.js'
+import { PluginHostErrorCode } from '@migaia/plugin-host'
+import { readRuntimePeerConnection } from '../../src/remote/runtime-api/peer.js'
+import { readEndpointOwner } from '../../src/core/internal/endpoint-projection.js'
+import type { RequestReplayLedger } from '../../src/core/internal/request-replay-ledger.js'
+import type { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
+import { EndpointOwnerKey } from '../../src/core/endpoint-kernel.js'
+import { vi } from 'vitest'
 
 /** Each acceptance uses the original Host mutation and disposal scopes. */
 function managedHost() {
@@ -37,10 +45,11 @@ function math(answer: number, calls: string[]) {
 /** Start the other genuine endpoint only after configuration admits the first physical source. */
 async function attach(
   owners: readonly [ReturnType<typeof managedHost>, ReturnType<typeof managedHost>],
-  options: Omit<IRuntimeThreadPluginOptions, 'name' | 'connect' | 'report'>
+  options: Omit<IRuntimeThreadPluginOptions, 'name' | 'connect' | 'report'>,
+  capabilities?: readonly string[]
 ) {
   /** The existing memory source carries actual envelopes without a replacement dispatcher. */
-  const carrier = runtimeSources()
+  const carrier = runtimeSources(capabilities, capabilities)
   /** A configuration rejection before opening must leave the opposite Host untouched. */
   let opposite: Promise<unknown> | undefined
   try {
@@ -196,6 +205,80 @@ it('[A101] Plugin provide uses the Peer method builder and rejects an exposure c
     while (error && typeof error === 'object' && Reflect.get(error, 'code') !== 'INVALID_CONFIG')
       error = Reflect.get(error, 'cause')
     assert.equal(Reflect.get(error as object, 'code'), 'INVALID_CONFIG')
+  } finally {
+    for (const owner of owners) await owner.dispose()
+    carrier?.close()
+  }
+})
+
+it('[A62] a disabled exposed Feature refuses the complete group before any business or lease commit', async () => {
+  /** Two genuine Host registrations supply independently counted group members. */
+  const owners = [managedHost(), managedHost()] as const
+  /** Invocation is observed at the business boundary, independently of returned step states. */
+  const calls: string[] = []
+  /** The original negotiated connection remains ready across disable and enable. */
+  let carrier: ReturnType<typeof runtimeSources> | undefined
+  try {
+    await owners[0].use(math(42, calls))
+    await owners[0].use(
+      definePlugin({
+        name: 'other',
+        features: {
+          operations: defineFeature(() => ({
+            value: () => {
+              calls.push('other')
+              return 84
+            }
+          }))
+        },
+        install: () => ({})
+      })
+    )
+    carrier = await attach(owners, { expose: ['math', 'other'] }, [
+      ...RUNTIME_API_FIXTURE_BASE_CAPABILITIES,
+      RpcCapability.generation,
+      RpcCapability.group
+    ])
+    /** Read only the actual provider attachment owners already created by this connection. */
+    const endpoint = readRuntimePeerConnection(
+      readRuntimeOutletConnection(owners[0].thread, 'remote')!.peer
+    ).endpoint
+    /** No fixture ledger can stand in for the canonical retained tombstones. */
+    const replay = readEndpointOwner<RequestReplayLedger>(endpoint, 'request-replay')!
+    /** The genuine shared admission owner proves zero net business reservations. */
+    const admission = readEndpointOwner<ProviderAdmissionRegistry>(
+      endpoint,
+      EndpointOwnerKey.providerAdmission
+    )!
+    await vi.waitFor(() => assert.equal(admission.size, 0))
+    /** Describe setup can retain legacy entries; admission refusal must not increase them. */
+    const before = replay.size
+    /** Original Host permission is already denied before the physical group is sent. */
+    const disabled = await owners[0].plugin.disable('other')
+    /** Collect the actual terminal first, so provider-zero is independently checked on RED. */
+    const outcome = await owners[1]
+      .thread!.group('remote', [{ method: 'math.add' }, { method: 'other.value' }])
+      .then(
+        (result) => ({ result }),
+        (error: unknown) => ({ error })
+      )
+    assert.deepEqual(calls, [], '[A62] an unavailable second Feature cannot execute the first')
+    assert.ok('error' in outcome, '[A62] permission refusal rejects the whole group')
+    assert.equal(Reflect.get(outcome.error as object, 'source'), '@migaia/plugin-host')
+    assert.equal(Reflect.get(outcome.error as object, 'code'), PluginHostErrorCode.pluginDisabled)
+    await vi.waitFor(() => assert.equal(admission.size, 0))
+    assert.equal(replay.size, before, '[A62] permission refusal allocates no replay tombstones')
+    await disabled.token.enable()
+    /** The same live reader admits its re-enabled owner without replacing the RPC connection. */
+    const accepted = await owners[1].thread!.group('remote', [
+      { method: 'math.add' },
+      { method: 'other.value' }
+    ])
+    assert.deepEqual(
+      accepted.map((step) => step.state),
+      ['success', 'success']
+    )
+    assert.deepEqual(calls, ['add', 'other'])
   } finally {
     for (const owner of owners) await owner.dispose()
     carrier?.close()

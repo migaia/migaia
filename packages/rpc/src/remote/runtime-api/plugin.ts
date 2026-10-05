@@ -51,6 +51,7 @@ import { RuntimeApiMode } from './constants.js'
 import { withRuntimePreparationContext } from './launch-context.js'
 import { readManagedRuntimeRegistration } from './managed-peer.js'
 import { createProviderAdmissionScope } from '../../core/internal/provider-admission.js'
+import { attachProviderPreflight } from '../../core/internal/provider.js'
 
 /** A private extension uses the original atomic shared-slot owner across both adapter families. */
 const providerAdmissionSlot = Symbol('runtime-provider-admission')
@@ -79,7 +80,8 @@ function exposedMethod(
   feature: string,
   key: string
 ): IRuntimePeerMethod {
-  return (payload, context) => {
+  /** Both whole-group admission and invocation consult the same live Host permission owner. */
+  const current = () => {
     /** Replacement may change output identity; no physical generation preparation reads it. */
     const receiver = snapshot.readCurrent(feature)
     /** Only a current enumerable data method can satisfy the already compiled whitelist. */
@@ -90,8 +92,18 @@ function exposedMethod(
       typeof descriptor.value !== 'function'
     )
       throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
-    return Reflect.apply(descriptor.value, receiver, [payload, context])
+    return { receiver, method: descriptor.value }
   }
+  return attachProviderPreflight(
+    (payload, context) => {
+      /** A lifecycle change after admission still obeys the original invocation-time guard. */
+      const { receiver, method } = current()
+      return Reflect.apply(method, receiver, [payload, context])
+    },
+    () => {
+      current()
+    }
+  )
 }
 
 /** Compile only explicitly exposed real Feature methods, flattening away their local Feature name. */
