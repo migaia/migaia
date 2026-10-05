@@ -147,7 +147,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
       isForwardedPayload(callOptions, payload)
         ? registration.invokeStream(method, payload, callOptions)
         : registration.currentPeer().stream(method, payload, callOptions),
-    group: (steps, callOptions) => registration.currentPeer().group(steps, callOptions),
+    group: (steps, callOptions) => registration.invokeGroup(steps, callOptions),
     outcome: (key) => registration.currentPeer().outcome(key),
     describe: runtimeQuery(() => registration.inspectRuntime()),
     close

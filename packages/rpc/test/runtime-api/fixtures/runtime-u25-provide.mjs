@@ -1,4 +1,4 @@
-import { RpcError, RpcCoreErrorCode } from '../../../dist/core/errors.js'
+import { RpcError, RpcAbortError, RpcCoreErrorCode } from '../../../dist/core/errors.js'
 import { RpcCoreErrorText } from '../../../dist/core/error-text.js'
 
 /** Actual child business invocations remain independent of caller-side request counts. */
@@ -13,6 +13,13 @@ export const provide = {
     throw new RpcError(
       RpcCoreErrorCode.capabilityUnsupported,
       RpcCoreErrorText.capabilityUnsupported
+    )
+  },
+  cancelled: () => {
+    throw new RpcAbortError(
+      undefined,
+      undefined,
+      new RpcError(RpcCoreErrorCode.capabilityUnsupported, RpcCoreErrorText.capabilityUnsupported)
     )
   },
   hold: async () => {

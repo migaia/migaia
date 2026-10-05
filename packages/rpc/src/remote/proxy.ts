@@ -21,7 +21,11 @@ import {
 import type { IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizePortable } from '../contract/normalize.js'
-import { isForwardedPayload, retainForwardOptions } from '../core/internal/outbound-envelope.js'
+import {
+  isForwardedPayload,
+  isForwardedOperation,
+  retainForwardOptions
+} from '../core/internal/outbound-envelope.js'
 import type { IRpcPortableValue } from '../contract/types.js'
 import type { IRuntimePeer, IRuntimePeerSourceResult } from './runtime-api/peer.js'
 import { readRuntimePeerConnection } from './runtime-api/peer.js'
@@ -122,6 +126,8 @@ export type IRemoteRuntimeRegistration = Pick<
     /** Passive lifecycle observers read the same original supervisor, including local connections. */
     readonly supervisor: ISupervisor<unknown, unknown>
     currentPeer(): IRuntimePeer
+    /** Whole forwarded groups retain the original accepted generation and leave reason. */
+    invokeGroup(...args: Parameters<IRuntimePeer['group']>): ReturnType<IRuntimePeer['group']>
     /** Read original native state and bounded safe lifecycle history without preparing a generation. */
     inspectRuntime(): Promise<IRuntimeDetail>
     /** Logical runtime calls reuse the original retry/key/deadline dispatch below. */
@@ -651,6 +657,37 @@ class RemoteRegistration<TUnit, TSpec> {
     const active = this.#active()
     if (!active.runtime) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     return active.runtime
+  }
+
+  /** Send one whole group through its captured original generation, without retry or retargeting. */
+  invokeGroup(
+    ...[steps, options]: Parameters<IRuntimePeer['group']>
+  ): ReturnType<IRuntimePeer['group']> {
+    const active = this.#active()
+    if (!active.runtime) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+    if (!isForwardedOperation(options)) return active.runtime.group(steps, options)
+    /** Only this original registration's leave fact can reclassify the captured operation. */
+    let retired: Error | undefined
+    const unsubscribe = this.events.onLeave(active.number, (reason) => {
+      retired = createProviderGenerationRetired(reason)
+    })
+    try {
+      return active.runtime
+        .group(steps, options)
+        .then(
+          (result) => {
+            if (retired) throw retired
+            return result
+          },
+          (error: unknown) => {
+            throw retired ?? error
+          }
+        )
+        .finally(unsubscribe)
+    } catch (error) {
+      unsubscribe()
+      throw retired ?? error
+    }
   }
 
   /** Query the same canonical supervisor and accepted directory even between generations. */
