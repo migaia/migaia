@@ -107,7 +107,11 @@ for (const mode of ['peer', 'plugin'] as const) {
           })
         )
         assert.equal(replacement.getFeature('data').echo(), 84)
-        assert.equal(((await request('current-output')) as { parent: number }).parent, 84)
+        assert.equal(
+          ((await request('current-output')) as { parent: number }).parent,
+          84,
+          '[A117] an already prepared connection follows the current same-name Feature'
+        )
       }
       /** Genuine native departure is the sole authorization for the original supervisor restart. */
       handles[0]!.terminate()
@@ -134,7 +138,7 @@ for (const mode of ['peer', 'plugin'] as const) {
       assert.equal(
         second.parent,
         mode === 'plugin' ? 84 : 42,
-        '[A34] a genuine replacement generation compiles the current original Feature output'
+        '[A117] a genuine replacement generation compiles the current original Feature output'
       )
       assert.equal(second.value, 'replacement')
       assert.notEqual(second.self.instanceId, first.self.instanceId)
