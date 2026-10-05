@@ -713,6 +713,17 @@ export class ProviderExecutor<TTargetId extends string> {
     }
     const settle = async (completion: IRpcRuntimeCompletion, delivered = false): Promise<void> => {
       if (state === 'terminal') return
+      if (
+        envelope.kind === RpcRuntimeKind.group &&
+        completion.ok &&
+        Array.isArray(completion.result)
+      ) {
+        /** A genuine final or cached report proves the same unused suffix on every physical task. */
+        const firstUnused = completion.result.findIndex(
+          (step) => safeRead(step, 'state') === RpcRuntimeStepState.notExecuted
+        )
+        if (firstUnused >= 0) invokedMembers = firstUnused
+      }
       state = 'terminal'
       if (deadline) this.options.clearTimeout(deadline)
       try {
@@ -1008,13 +1019,6 @@ export class ProviderExecutor<TTargetId extends string> {
               RpcCoreErrorText.providerDidNotSettle
             )
           if (!response.ok) throw new RpcRemoteError(response.code, response.message)
-          /** Only C's genuine fail-stop report can prove that a forwarded suffix never executed. */
-          const firstUnused = Array.isArray(response.data)
-            ? response.data.findIndex(
-                (step) => safeRead(step, 'state') === RpcRuntimeStepState.notExecuted
-              )
-            : -1
-          if (firstUnused >= 0) invokedMembers = firstUnused
           await settle({
             ok: true,
             ...(response.data === undefined ? {} : { result: normalizePortable(response.data) })
