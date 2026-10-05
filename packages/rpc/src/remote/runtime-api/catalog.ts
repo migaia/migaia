@@ -56,6 +56,16 @@ export type IRuntimeForwardMethodEntry = Readonly<{
 /** One method table holds both captured local callables and explicit transparent forward routes. */
 export type IRuntimeMethodEntry = IRuntimeLocalMethodEntry | IRuntimeForwardMethodEntry
 
+/** Keep the authenticated native prefix for diagnostics even when the terminal omits extensions. */
+export function runtimeForwardDiagnosticRoute(
+  entry: IRuntimeForwardMethodEntry,
+  incoming: readonly string[] | undefined,
+  origin: string | undefined
+): readonly string[] | undefined {
+  const route = incoming ?? (origin === undefined ? undefined : [origin])
+  return route ? Object.freeze([...route, entry.nodeId]) : undefined
+}
+
 /** Check the same current slot both before provider admission and immediately before sending. */
 export function runtimeForwardRoute(
   entry: IRuntimeForwardMethodEntry,
@@ -77,7 +87,7 @@ export function runtimeForwardRoute(
       RpcCoreErrorCode.capabilityUnsupported,
       RuntimeApiErrorText.forwardOriginUnavailable
     )
-  return Object.freeze([...route, entry.nodeId])
+  return runtimeForwardDiagnosticRoute(entry, route, origin)
 }
 
 /** Cold compilation metadata belongs to the same root object, never a second provider registry. */
