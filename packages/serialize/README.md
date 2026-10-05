@@ -6,6 +6,8 @@
 
 **适用**：需要持久化/传输任意值，且格式可能不止一种（JSON 之外还想接 CBOR/MessagePack）、可能升级（旧存档要继续读得出来）、体量可能很大（导出百万行不能卡主线程）、或者需要给第三方 parser 一个不会被注入攻击的安全接入点。
 
+安全管理投影可通过主入口 `emitOutput(value, 'json' | 'yaml' | 'toml')` 输出完整文本；默认 JSON 沿现有 parser，YAML/TOML 不引入第三方运行时。仅接受可移植 own-data 输入，TOML 根必须为对象且任意层 `null` 都拒绝。详见 [USEGUIDE 的 Portable text output](./USEGUIDE.md#portable-text-output)。
+
 **不适用**：只是简单地 `JSON.stringify`/`JSON.parse` 一次性用完，不需要格式可插拔、不需要流式、不需要多格式共存——直接用原生 API 更省事。本包不是 JSON 的替代品，也不提供存储/Worker/SSR 的具体落地实现（那是上层 `store-*` 系列包的事），只提供协议与编解码原语。
 
 ## 安装

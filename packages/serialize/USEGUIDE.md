@@ -936,3 +936,17 @@ shape and retains the `identityCodecV1` compatibility alias. New version-specifi
 preserves the input value's concrete type through `encode` and `decode`. Format implementations are intentionally split:
 `codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the
 generic or identity path does not load binary format runtimes.
+
+## Portable text output
+
+`emitOutput(value, format?)` synchronously returns a complete JSON, YAML or TOML string. The default format is `json`; JSON uses the existing `jsonParser`. YAML and TOML are output-only implementations with no third-party runtime dependency.
+
+```ts
+import { emitOutput } from '@migaia/serialize'
+
+const detail = { name: 'worker', methods: ['read'], available: true }
+const yaml = emitOutput(detail, 'yaml')
+const toml = emitOutput(detail, 'toml')
+```
+
+Input must contain finite numbers, strings, booleans, arrays and plain own-data records. Enumerable accessors, cycles, unsupported values and sparse arrays reject with a native `TypeError` carrying `source: '@migaia/serialize'` and `code: 'INVALID_OPTION'`; getters are not evaluated and diagnostics do not echo input. JSON and YAML accept `null`. TOML requires an object root and rejects `null` at every depth and strings containing unpaired surrogates. Keys and strings are quoted; nested collections retain their structure. The emitter returns no partial text on failure.

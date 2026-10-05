@@ -6,6 +6,7 @@
 export * from './core.js'
 export * from './plugins.js'
 export type { ICodec, ICodecValue } from './codec.js'
+export { emitOutput } from './output.js'
 export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.js'
 export type {
   ISerializeCleanupError,
@@ -15,12 +16,14 @@ export type {
 export {
   SerializeChunkKind,
   SerializeOutput,
+  SerializeTextFormat,
   SerializePhase,
   SerializeCleanupPolicy,
   SerializeCleanupKind,
   SerializePluginType,
   type ISerializeChunkKind,
   type ISerializeOutputFormat,
+  type ISerializeTextFormat,
   type ISerializePhase,
   type ISerializeCleanupPolicy,
   type ISerializeCleanupKind,

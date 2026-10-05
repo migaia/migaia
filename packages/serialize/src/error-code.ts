@@ -54,6 +54,7 @@ export const SerializeErrorCode = {
    *
    * 调用方修正参数；具体是哪个参数见消息文案。
    */
+  /** Text emitters also reject nonportable own data and values the selected format cannot express. */
   invalidOption: 'INVALID_OPTION',
 
   /**
