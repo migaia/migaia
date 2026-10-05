@@ -253,6 +253,13 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
       true,
       '[A2] full native listener grammar installs after ordinary authenticated socket business'
     )
+    /** No accepted session exists yet; the actual listener still owns one committed cold record. */
+    const empty = await host.process!.list({ filter: { kind: 'listen', direction: 'listen' } })
+    assert.equal(empty.connections.length, 1, '[A41] a zero-session listener remains queryable')
+    assert.equal((await host.process!.get('listener')).kind, 'listen')
+    await assert.rejects(host.process!.get('client-1'), { code: 'TARGET_UNKNOWN' })
+    for (const command of ['stop', 'kill', 'restart', 'replace'] as const)
+      assert.throws(() => host.process![command]('listener'), { code: 'CAPABILITY_CONFLICT' })
     for (const index of [0, 1]) {
       const peer = await createProcessPeer<IRuntimeDynamicSurface>({
         self: { name: 'same-client', instanceId: `client-${index + 1}` },
@@ -307,6 +314,11 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
         ['listen', 'listen']
       ]
     )
+    await assert.rejects(host.process!.get('listener'), { code: 'CAPABILITY_CONFLICT' })
+    assert.deepEqual((await host.process!.get('client-1')).identity, {
+      name: 'same-client',
+      instanceId: 'client-1'
+    })
     assert.throws(
       () => host.process!.request('listener', 'child.echo'),
       (error: { code?: string }) => error.code === 'CAPABILITY_CONFLICT'

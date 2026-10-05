@@ -1,4 +1,6 @@
-import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
+import type { IThreadHandle, IThreadLauncher, IThreadUsage } from '@migaia/supervision/threads'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { ERROR_SOURCE, RpcThreadErrorCode } from '../error-code.js'
 import { parentPort } from 'node:worker_threads'
 import {
   registerLazyNativeReplayOwner,
@@ -141,6 +143,8 @@ export function createNodeThreadLauncher(
       }
       /** The original launcher retains termination/exit while preparation holds one cold message. */
       let preparation: INodeThreadHandle['runtimeApi']
+      /** The launch-only abort listener is withdrawn when the exact handle is handed off. */
+      let detachLaunchAbort: (() => void) | undefined
       /** Concurrent supervisor requests terminate this actual Worker at most once. */
       const terminate = (): void => {
         if (terminating) return
@@ -193,6 +197,7 @@ export function createNodeThreadLauncher(
           terminate()
         }
         context.signal.addEventListener('abort', abort, { once: true })
+        detachLaunchAbort = () => context.signal.removeEventListener('abort', abort)
         if (context.signal.aborted) abort()
         void exited.then(() => context.signal.removeEventListener('abort', abort))
         // The open consumer owns this rejection; this observer prevents late unhandled rejection.
@@ -204,13 +209,48 @@ export function createNodeThreadLauncher(
         alive: () => !terminating && worker.threadId !== -1,
         exclusive: () => worker.listenerCount('message') <= 1
       })
+      detachLaunchAbort?.()
       return {
         identity,
         /** Worker emits exit, whereas core's borrowed MessagePort transport observes close. */
         port,
         ...(preparation ? { runtimeApi: preparation } : {}),
         exited,
-        terminate
+        terminate,
+        /** Native methods address only this Worker isolate, never process memory or aggregate CPU. */
+        async sampleUsage(): Promise<IThreadUsage> {
+          if (worker.threadId === -1) return {}
+          try {
+            /** Missing APIs remain absent; only supported native reads run in this cold query. */
+            const [heap, cpu] = await Promise.all([
+              typeof worker.getHeapStatistics === 'function'
+                ? worker.getHeapStatistics()
+                : undefined,
+              typeof worker.cpuUsage === 'function' ? worker.cpuUsage() : undefined
+            ])
+            if (worker.threadId === -1) return {}
+            /** Shared PID is identity only; ELU has an independently labelled activity unit. */
+            const elu =
+              typeof worker.performance?.eventLoopUtilization === 'function'
+                ? worker.performance.eventLoopUtilization()
+                : undefined
+            return {
+              sharedPid: process.pid,
+              ...(heap
+                ? { heapUsedBytes: heap.used_heap_size, heapTotalBytes: heap.total_heap_size }
+                : {}),
+              ...(cpu ? { cpuUserMicros: cpu.user, cpuSystemMicros: cpu.system } : {}),
+              ...(elu
+                ? { elu: { active: elu.active, idle: elu.idle, utilization: elu.utilization } }
+                : {})
+            }
+          } catch (cause) {
+            throw attachErrorIdentity(new Error(ThreadErrorText.usageSampleFailed, { cause }), {
+              source: ERROR_SOURCE,
+              code: RpcThreadErrorCode.usageSampleFailed
+            })
+          }
+        }
       }
     }
   }
@@ -235,6 +275,8 @@ export function createNodeThreadChannelFactory(
           )
         } catch (error) {
           handle.runtimeApi.handoff.close()
+          /** Incomplete native preparation rolls back through the handle's original force owner. */
+          handle.terminate()
           throw error
         }
       }

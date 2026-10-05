@@ -62,7 +62,16 @@ globalThis.runAutomaticThreadScenario = async () => {
       self: { name: string; instanceId: string }
       parent: string
     }
-    return { result, reverseCalls, fingerprint: handle!.identity.fingerprint, failures, exited }
+    /** This genuine Web Worker has no supported local isolate sampler; no parent values substitute. */
+    const resources = (await parent.describe()).connections[0]!.resources
+    return {
+      result,
+      reverseCalls,
+      fingerprint: handle!.identity.fingerprint,
+      failures,
+      exited,
+      resources
+    }
   } finally {
     try {
       await parent?.close()

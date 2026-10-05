@@ -72,6 +72,7 @@ test('[A2][A17] actual Web Worker adopts library bootstrap and executes a revers
     fingerprint: string
     failures: string[]
     exited: boolean
+    resources: { status: string; reason: string }
   }
   expect(receipt.result.value, '[A2] actual child business').toBe('browser-ready')
   expect(receipt.result.self.name, '[A17] actual launcher name').toBe('browser-automatic-child')
@@ -81,6 +82,13 @@ test('[A2][A17] actual Web Worker adopts library bootstrap and executes a revers
   expect(receipt.result.parent, '[A2] genuine reverse business').toBe('browser-automatic-parent')
   expect(receipt.reverseCalls, '[A2] exact parent dispatch count').toBe(1)
   expect(receipt.exited, '[A3] unsupported actual exit is never fabricated').toBe(false)
+  expect(
+    receipt.resources,
+    '[A45][A55] unsupported local Web Worker resources are explicit'
+  ).toMatchObject({ status: 'unavailable' })
+  expect('rssBytes' in receipt.resources, '[A45] parent process RSS is never a Worker sample').toBe(
+    false
+  )
   expect(receipt.failures).toEqual([])
   expect(pageErrors).toEqual([])
 })

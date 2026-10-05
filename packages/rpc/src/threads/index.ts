@@ -30,3 +30,11 @@ export type {
   IRuntimeOverview,
   IRuntimeRecent
 } from '../remote/runtime-api/overview.js'
+
+export type {
+  IRuntimeListFilter,
+  IRuntimeListOptions,
+  IRuntimeThreadStopOptions
+} from '../remote/runtime-api/outlet.js'
+export type { IRuntimeEvent } from '../remote/runtime-api/events.js'
+export type { RuntimeEventName } from '../remote/runtime-api/constants.js'

@@ -1,3 +1,4 @@
+import { runtimeUnavailable, runtimeErrorIdentity } from './overview.js'
 import {
   definePlugin,
   PluginHostError,
@@ -13,6 +14,7 @@ import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
 import {
   createRuntimeOutlet,
   readRuntimeOutletConnection,
+  readRuntimeOutletEvents,
   type IRuntimeOutlet,
   type IRuntimePluginConnection
 } from './outlet.js'
@@ -20,7 +22,10 @@ import {
   RuntimeApiErrorText,
   RuntimePluginFamily,
   RuntimePluginKey,
-  RuntimePluginExpose
+  RuntimePluginExpose,
+  RuntimeEventName,
+  RuntimeQueryClock,
+  RuntimeQueryReason
 } from './constants.js'
 import {
   createRuntimePeer,
@@ -316,7 +321,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         (shared) =>
           createRuntimeOutlet(
             shared,
-            Object.freeze({ name: integration.identity.name, instanceId: integration.identity.id })
+            Object.freeze({ name: integration.identity.name, instanceId: integration.identity.id }),
+            kind
           )
       )
       /**
@@ -333,9 +339,12 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         provide
       }
       /** Each genuine prepared session contributes one exact receipt through this original slot. */
+      /** Actual listener commits can publish ready after this registration becomes visible. */
+      let publishReady: ((prepared: IRuntimePeer, generation?: number) => void) | undefined
       const publishPeer = (
         prepared: IRuntimePeer,
-        routedPeer: IRuntimePeer = prepared
+        routedPeer: IRuntimePeer = prepared,
+        generation?: number
       ): (() => void) => {
         const accepted = readRuntimePeerConnection(prepared)
         const connection: IRuntimePluginConnection = Object.freeze({
@@ -346,7 +355,9 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
           peer: routedPeer,
           report: accepted.report
         })
-        return slot.contribute(connection, connection.instanceId)
+        const withdraw = slot.contribute(connection, connection.instanceId)
+        publishReady?.(prepared, generation)
+        return withdraw
       }
       /** Original scope owns native cleanup before any launcher or cold channel preparation. */
       const peer = await withRuntimePreparationContext(
@@ -382,10 +393,88 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         }
         throw error
       }
+      /** Metadata and event lifetime remain scoped to this original committed reservation. */
+      const record = Object.freeze({
+        name,
+        peer,
+        execution: registration?.execution,
+        instanceIds: (): readonly string[] =>
+          registration
+            ? registration.runtimeInstanceIds()
+            : (readRuntimePeerSessions(peer) ?? [peer]).map(
+                (current) => readRuntimePeerConnection(current).peerId
+              )
+      })
+      /** The same actual shared facade owns every passive listener and watch. */
+      const events = readRuntimeOutletEvents(slot.facade)
+      /** Initial accepted readiness is published only after its original Host reservation commits. */
+      const ready = (prepared: IRuntimePeer, generation?: number): void => {
+        if (!slot.registered().includes(record)) return
+        const accepted = readRuntimePeerConnection(prepared)
+        events.publish(
+          Object.freeze({
+            type: RuntimeEventName.ready,
+            name,
+            instanceId: accepted.peerId,
+            generation: generation ?? runtimeUnavailable(RuntimeQueryReason.owner),
+            timestamp: accepted.channel.scheduler.now(),
+            clock: RuntimeQueryClock.scheduler
+          }),
+          accepted.report
+        )
+      }
+      publishReady = ready
+      slot.register(record, () => {
+        if (listenerSource) {
+          for (const session of readRuntimePeerSessions(peer)!) ready(session)
+        } else if (!registration || registration.events.current().active)
+          ready(peer, registration?.events.current().generation)
+      })
+      /** Logical owner close settles idle watch reads even if no native exit can be observed. */
+      const closeEvents = (): void => {
+        if (slot.registered().length === 0) events.close()
+      }
+      core.lifecycle.signal.addEventListener('abort', closeEvents, { once: true })
+      core.onDispose(() => core.lifecycle.signal.removeEventListener('abort', closeEvents))
+      if (registration)
+        core.onDispose(
+          registration.supervisor.subscribe((event) => {
+            if (!slot.registered().includes(record)) return
+            if (
+              event.type !== RuntimeEventName.exit &&
+              event.type !== RuntimeEventName.restart &&
+              event.type !== RuntimeEventName.degraded
+            )
+              return
+            events.publish(
+              Object.freeze({
+                type: event.type,
+                name,
+                generation: event.generation,
+                instanceId: registration.runtimeInstanceId(event.generation),
+                timestamp: event.observedAt ?? runtimeUnavailable(RuntimeQueryReason.owner),
+                clock: RuntimeQueryClock.scheduler,
+                ...(event.type === RuntimeEventName.exit
+                  ? {
+                      reason: event.reason,
+                      code: event.status?.code ?? runtimeUnavailable(RuntimeQueryReason.native),
+                      signal: event.status?.signal ?? runtimeUnavailable(RuntimeQueryReason.native),
+                      ...(event.error === undefined
+                        ? {}
+                        : { error: runtimeErrorIdentity(event.error, options.report) })
+                    }
+                  : event.type === RuntimeEventName.restart
+                    ? { count: event.count }
+                    : { degraded: Object.freeze([...event.degraded]) })
+              }),
+              options.report
+            )
+          })
+        )
       /** Accepted remote metadata is read from the genuine Peer, without reflecting local describe. */
       /** Each actual prepared generation publishes an exact receipt through the canonical slot. */
       const publish = (prepared: IRuntimePeer, generation?: number): void => {
-        const withdraw = publishPeer(prepared, peer)
+        const withdraw = publishPeer(prepared, peer, generation)
         if (registration && generation !== undefined)
           registration.events.onLeave(generation, withdraw)
       }

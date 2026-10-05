@@ -4,6 +4,7 @@ import { RpcProcessErrorText } from './error-text.js'
 
 /** One stable text is assigned to each process code at its single construction site. */
 const TEXT_BY_CODE: Readonly<Record<IRpcProcessErrorCode, string>> = {
+  [RpcProcessErrorCode.usageSampleFailed]: RpcProcessErrorText.usageSampleFailed,
   [RpcProcessErrorCode.hostInvalidOption]: RpcProcessErrorText.hostInvalidOption,
   [RpcProcessErrorCode.hostClosed]: RpcProcessErrorText.hostClosed,
   [RpcProcessErrorCode.handshakeTimeout]: RpcProcessErrorText.handshakeTimeout,

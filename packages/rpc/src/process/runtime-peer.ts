@@ -124,7 +124,8 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
       {
         kind: spawn ? RuntimeSourceKind.spawn : RuntimeSourceKind.connect,
         direction: spawn ? RuntimeConnectionDirection.spawned : RuntimeConnectionDirection.connect
-      }
+      },
+      spawn !== undefined
     )
   /** The canonical binding's native health and drain are kept, rather than disabled for v2. */
   return spawn

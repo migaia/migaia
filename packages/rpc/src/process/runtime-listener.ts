@@ -1,10 +1,16 @@
-import { runtimeQuery, runtimeDetail } from '../remote/runtime-api/overview.js'
+import {
+  runtimeQuery,
+  runtimeDetail,
+  runtimeConnectionDetail
+} from '../remote/runtime-api/overview.js'
 import { normalizeRuntimeDescription } from '../remote/runtime-api/description.js'
 import {
   RuntimeSourceKind,
   RuntimeConnectionDirection,
+  RuntimeQueryStatus,
   RUNTIME_API_SCHEMA_VERSION
 } from '../remote/runtime-api/constants.js'
+import { ProcessPluginChannelKind } from './plugin/constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
@@ -131,7 +137,19 @@ export async function createProcessListenerPeer(
       )
       return runtimeDetail(
         local,
-        details.flatMap((detail) => detail.connections),
+        details.length
+          ? details.flatMap((detail) => detail.connections)
+          : [
+              runtimeConnectionDetail(
+                {
+                  localDescription: local,
+                  carrier: ProcessPluginChannelKind.byte,
+                  kind: RuntimeSourceKind.listen,
+                  direction: RuntimeConnectionDirection.listen
+                },
+                sessions.closed() ? RuntimeQueryStatus.closed : RuntimeQueryStatus.ready
+              )
+            ],
         [],
         methods.map((method) => method.name)
       )

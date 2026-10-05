@@ -1,3 +1,4 @@
+import { RemoteMethodName } from '../../src/remote/constants.js'
 import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
@@ -172,11 +173,15 @@ it('[A11][A14] default empty exposure keeps the connection ready, hides business
     calls = 0
     connection = await attach(hosts, [{ name: 'remote' }, { name: 'remote' }])
     /** A committed ready contribution exists even though its accepted directory is empty. */
-    const child = hosts[0].thread!.get('remote')
-    assert.equal(child.host, undefined, '[A14] empty expose cannot create a mutable Host facet')
+    const child = await hosts[0].thread!.get('remote')
+    assert.equal(
+      Object.hasOwn(child, 'host'),
+      false,
+      '[A14] empty expose cannot create a mutable Host facet'
+    )
     for (const mode of ['request', 'notify', 'stream'] as const)
       assert.throws(
-        () => child[mode]('service.read'),
+        () => hosts[0].thread![mode]('remote', 'service.read'),
         { code: 'PROVIDER_NOT_FOUND' },
         '[A11] hidden methods reject before transport dispatch'
       )
@@ -332,17 +337,24 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
       }
     ])
     /** Only explicitly negotiated reserved methods create this facet. */
-    const child = hosts[0].thread!.get('remote')
-    assert.ok(child.host, '[A14] explicit Host exposure publishes actual control operations')
+    const child = await hosts[0].thread!.get('remote')
+    assert.deepEqual(
+      child.methods,
+      [RemoteMethodName.hostUse, RemoteMethodName.hostUnUse, RemoteMethodName.hostInspect],
+      '[A14] explicit Host exposure advertises the actual reserved control operations'
+    )
     assert.equal(hosts[1].revision, 1)
-    await assert.rejects(child.host.unUse('added'), (error: unknown) => {
-      assert.equal((error as { code?: string }).code, 'REMOTE_HOST_NOT_ADOPTED')
-      return true
-    })
+    await assert.rejects(
+      hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added']),
+      (error: unknown) => {
+        assert.equal((error as { code?: string }).code, 'REMOTE_HOST_NOT_ADOPTED')
+        return true
+      }
+    )
     assert.equal(hosts[1].revision, 1, '[A15] unadopted removal mutates zero times')
     assert.equal(resolved, 0)
     assert.deepEqual(
-      await child.host.use('added', { answer: 42 }),
+      await hosts[0].thread!.request('remote', RemoteMethodName.hostUse, ['added', { answer: 42 }]),
       Object.assign(Object.create(null), {
         name: 'added',
         state: 'enabled',
@@ -352,7 +364,7 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
     )
     assert.equal(resolved, 1)
     assert.deepEqual(
-      await child.host.inspect(),
+      await hosts[0].thread!.request('remote', RemoteMethodName.hostInspect, []),
       Object.assign(Object.create(null), {
         revision: 2,
         plugins: [
@@ -365,16 +377,21 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
         ]
       })
     )
-    await child.host.unUse('added', { dryRun: true })
+    await hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, [
+      'added',
+      { dryRun: true }
+    ])
     assert.equal(hosts[1].revision, 2, '[A15] dryRun leaves the adopted registration intact')
     assert.deepEqual(
-      await child.host.unUse('added'),
+      await hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added']),
       Object.assign(Object.create(null), { ok: true })
     )
     assert.equal(hosts[1].revision, 3)
     assert.equal(
-      hosts[1].thread!.get('remote').host,
-      undefined,
+      (await hosts[1].thread!.get('remote')).methods.some(
+        (method) => method === RemoteMethodName.hostUse
+      ),
+      false,
       '[A14] the reverse empty exposure has no control grant'
     )
   } finally {

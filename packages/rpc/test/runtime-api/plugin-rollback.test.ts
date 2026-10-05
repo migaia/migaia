@@ -70,6 +70,9 @@ it('[A33][A34] a real prepared shared-slot candidate rolls back without revoking
     ])
     /** The first facade was genuinely committed before this failing candidate was admitted. */
     const outlet = owner.thread!
+    /** A later candidate must never leak readiness through the already committed facade. */
+    const ready: string[] = []
+    outlet.on('ready', (event) => ready.push(event.name))
     assert.equal(await outlet.request('first', 'service.read'), 42)
     /** Candidate construction uses the true public Peer through the ordinary managed definition. */
     const candidate = createThreadPlugin({
@@ -113,7 +116,8 @@ it('[A33][A34] a real prepared shared-slot candidate rolls back without revoking
     assert.equal((rejection as Error).cause, primary)
     assert.equal(closes, 1)
     assert.equal(owner.thread, outlet, '[A34] candidate rollback cannot retire the existing slot')
-    assert.throws(() => outlet.get('candidate'), { code: 'TARGET_UNKNOWN' })
+    assert.deepEqual(ready, [], '[A52] rollback publishes no candidate ready event')
+    await assert.rejects(outlet.get('candidate'), { code: 'TARGET_UNKNOWN' })
     assert.equal(await outlet.request('first', 'service.read'), 42)
     /** The original Host diagnostic contains cleanup through its existing aggregate/detail shape. */
     assert.ok(

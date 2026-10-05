@@ -1,3 +1,4 @@
+import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
 import type { IRuntimeTestRegistry } from './fixture.js'
 import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
@@ -107,8 +108,11 @@ it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact tar
     /** Both contributions share one actual class descriptor and retain distinct target receipts. */
     const outlet = owner.thread!
     /** An old child is bound to the exact first contribution, never a later same-name candidate. */
-    const first = outlet.get('connection-0')
-    assert.equal(await first.request('service.read'), 43)
+    const first = {
+      name: 'connection-0',
+      instanceId: readRuntimeOutletConnection(outlet, 'connection-0')!.instanceId
+    }
+    assert.equal(await outlet.request(first, 'service.read'), 43)
     assert.equal(await outlet.request('connection-1', 'service.read'), 44)
     assert.equal(await remote[0].thread!.request('connection-0', 'service.read'), 42)
     for (const state of ['disabled', 'suspended'] as const) {
@@ -119,7 +123,7 @@ it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact tar
           : await owner.plugin.disable('gate', { policy: 'suspend' })
       calls.length = 0
       reports.length = 0
-      assert.throws(() => first.request('service.read'), { code: 'TARGET_UNKNOWN' })
+      assert.throws(() => outlet.request(first, 'service.read'), { code: 'TARGET_UNKNOWN' })
       await assert.rejects(remote[0].thread!.request('connection-0', 'service.read'), (error) =>
         permission(error, state === 'disabled' ? 'PLUGIN_DISABLED' : 'PLUGIN_SUSPENDED')
       )
@@ -168,7 +172,7 @@ it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact tar
       (error) => permission(error, 'PLUGIN_DUPLICATE')
     )
     assert.equal(sourceCalls, 0)
-    assert.equal(await first.request('service.read'), 43)
+    assert.equal(await outlet.request(first, 'service.read'), 43)
     await owner.replace('service', service('replacement', 45))
     calls.length = 0
     assert.equal(await remote[0].thread!.request('connection-0', 'service.read'), 45)
@@ -179,7 +183,7 @@ it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact tar
     )
     await owner.unUse('connection-0')
     assert.equal(owner.thread, outlet, '[A34] first removal retains the shared facade')
-    assert.throws(() => first.request('service.read'), { code: 'TARGET_UNKNOWN' })
+    assert.throws(() => outlet.request(first, 'service.read'), { code: 'TARGET_UNKNOWN' })
     assert.equal(await outlet.request('connection-1', 'service.read'), 44)
     await owner.unUse('connection-1')
     assert.equal(owner.thread, undefined, '[A34] the final contribution retires publication')
@@ -252,9 +256,14 @@ it('[A34][A118] a different same-name plugin follows the frozen whitelist withou
      * Connection children retain the exact original contribution, unlike live by-name Feature
      * routing.
      */
-    const capturedConnection = owners[1].thread!.get('connection')
+    /** The retained canonical facade keeps exact receipt admission after its Host slot disappears. */
+    const capturedOutlet = owners[1].thread!
+    const capturedConnection = {
+      name: 'connection',
+      instanceId: readRuntimeOutletConnection(owners[1].thread, 'connection')!.instanceId
+    }
     await owners[1].unUse('connection')
-    assert.throws(() => capturedConnection.request('service.read'), {
+    assert.throws(() => capturedOutlet.request(capturedConnection, 'service.read'), {
       source: '@migaia/rpc/core',
       code: RpcCoreErrorCode.targetUnknown
     })
@@ -390,7 +399,9 @@ it('[A18][A19] real broadcast snapshots three targets and reports a send failure
     /** The committed original slot contains three independently authenticated directory receipts. */
     const outlet = owner.thread!
     /** Keep accepted instance order before the third receipt is retired during physical send. */
-    const ids = targets.map((_target, index) => outlet.get(`connection-${index}`).instanceId)
+    const ids = targets.map(
+      (_target, index) => readRuntimeOutletConnection(outlet, `connection-${index}`)!.instanceId
+    )
     await outlet.notify('connection-0', 'service.read')
     await vi.waitFor(() => assert.deepEqual(invoked, [1, 0, 0]))
     invoked.fill(0)

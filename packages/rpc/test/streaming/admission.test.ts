@@ -17,6 +17,7 @@ function streamPorts(rejectFrame?: (command: IRpcOutboundCommand) => unknown) {
   let accept!: (message: unknown) => void | Promise<void>
   let closed = false
   const kernel = {
+    registerOwner: () => undefined,
     generation: 0,
     closingSignal: new AbortController().signal,
     state: 'active',

@@ -17,7 +17,7 @@ export const DEFAULT_HEALTH_FAILURE_THRESHOLD = 3
 /** No inbound frames or in-flight work for this period makes a session idle. */
 export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
 /** Close control gives existing requests time to settle before physical release. */
-export const DEFAULT_DRAIN_MS = 5_000
+export { DEFAULT_DRAIN_MS } from '../../remote/constants.js'
 /** Diagnostic reports are relative to each entry into terminal. */
 export const DEFAULT_REPORT_AT_MS = Object.freeze([0, 60_000, 300_000, 900_000])
 /** The fourth unhandled report starts liquidation under the default policy. */

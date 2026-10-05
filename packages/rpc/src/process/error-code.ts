@@ -3,6 +3,8 @@ export const ERROR_SOURCE = '@migaia/rpc/process'
 
 /** Process boundary failures; callers close or recreate the affected connection. */
 export const RpcProcessErrorCode = {
+  /** D23: native PID sampling failed; report its cause and display unavailable without retrying. */
+  usageSampleFailed: 'PROCESS_USAGE_SAMPLE_FAILED',
   /** Host options violate R1/R2 before launch; callers must correct the named field. */
   hostInvalidOption: 'PROCESS_HOST_INVALID_OPTION',
   /** Facade release has begun; callers must create a new facade instead of enqueueing work. */

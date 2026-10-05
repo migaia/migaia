@@ -76,9 +76,10 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
       callDeadlineCapMs: source.spec.limits?.callWallTimeMs
     },
     binding,
-    undefined,
+    binding.bindEndpoint,
     readRuntimePreparationContext(options),
     undefined,
-    { kind: RuntimeSourceKind.spawn, direction: RuntimeConnectionDirection.spawned }
+    { kind: RuntimeSourceKind.spawn, direction: RuntimeConnectionDirection.spawned },
+    true
   )
 }

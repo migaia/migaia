@@ -14,6 +14,7 @@ function streamOwner(id: string) {
   let route!: IEndpointKernelRoute
   let accept!: (message: unknown) => void | Promise<void>
   const kernel = {
+    registerOwner: () => undefined,
     generation: 0,
     closingSignal: new AbortController().signal,
     state: 'active',

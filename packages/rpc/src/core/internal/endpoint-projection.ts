@@ -1,9 +1,17 @@
 import { RpcError, RpcCoreErrorCode, RpcLifecycleError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { registerComposedDisposalPromises } from './composed-disposal-observer.js'
+import {
+  EndpointOwnerKey,
+  EndpointKernelState,
+  type IEndpointKernelHost
+} from '../endpoint-kernel.js'
 
 /** Canonical projections retain construction identity without adding a public endpoint member. */
-const identities = new WeakMap<object, string>()
+const identities = new WeakMap<
+  object,
+  Readonly<{ identity: string; kernel?: IEndpointKernelHost }>
+>()
 
 /** Read construction identity without adding a public endpoint member or reflecting user data. */
 export function readEndpointIdentity(endpoint: object): string {
@@ -11,16 +19,46 @@ export function readEndpointIdentity(endpoint: object): string {
   let projection: object | null = endpoint
   while (projection !== null) {
     const identity = identities.get(projection)
-    if (identity !== undefined) return identity
+    if (identity !== undefined) return identity.identity
     projection = Object.getPrototypeOf(projection)
   }
   throw projectionError()
+}
+
+/** Read O(1) sizes from the original client request and stream registries, never provider execution. */
+export function readEndpointClientCounters(
+  endpoint: object
+): Readonly<{ inFlight: number; observedAt: number }> | undefined {
+  /** Original admission views inherit canonical projection provenance and share these same owners. */
+  let projection: object | null = endpoint
+  while (projection !== null) {
+    /** This is the existing identity record, extended with its actual composition kernel. */
+    const kernel = identities.get(projection)?.kernel
+    if (kernel) {
+      if (kernel.state === EndpointKernelState.disposed) return undefined
+      /** A missing outbound owner cannot be represented as a fabricated zero. */
+      const requests = kernel.readOwner(EndpointOwnerKey.pendingRegistry) as
+        | { readonly size: number }
+        | undefined
+      /** Missing optional stream capability contributes no streams, rather than provider counts. */
+      const streams = kernel.readOwner(EndpointOwnerKey.streamConsumerRegistry) as
+        | { readonly size: number }
+        | undefined
+      return requests
+        ? { inFlight: requests.size + (streams?.size ?? 0), observedAt: kernel.time.now() }
+        : undefined
+    }
+    projection = Object.getPrototypeOf(projection)
+  }
+  return undefined
 }
 
 /** Inputs owned by the composition shell for one immutable public endpoint projection. */
 export type IEndpointProjectionOptions = {
   /** Original prepared endpoint identity; omitted only by standalone projection fixtures. */
   readonly identity?: string
+  /** Retains only the canonical kernel for local cold reads; no new projection registry is added. */
+  readonly kernel?: IEndpointKernelHost
   readonly host: object
   readonly publicKeys: readonly string[]
   readonly exposedKeys: readonly string[]
@@ -128,7 +166,8 @@ export function createEndpointProjection(
           : value
     )
   }
-  if (options.identity) identities.set(target, options.identity)
+  if (options.identity)
+    identities.set(target, { identity: options.identity, kernel: options.kernel })
   return Object.freeze(target)
 }
 

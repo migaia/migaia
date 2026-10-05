@@ -2,6 +2,7 @@ import {
   runtimeConnectionDetail,
   runtimeDetail,
   runtimeQuery,
+  runtimeCounters,
   type IRuntimeQuery,
   type IRuntimeDetail,
   type IRuntimeConnectionDirectory,
@@ -564,9 +565,20 @@ export async function createRuntimePeer(
             : channel.transport.closed
               ? RuntimeQueryStatus.closed
               : RuntimeQueryStatus.ready
-        return runtimeDetail(localDescription!, [
-          runtimeConnectionDetail(readRuntimePeerConnection(peer).directory, state)
-        ])
+        /** One canonical endpoint owns both the self and connection client count denominator. */
+        const counters = runtimeCounters(ready)
+        return runtimeDetail(
+          localDescription!,
+          [
+            runtimeConnectionDetail(readRuntimePeerConnection(peer).directory, state, {
+              counters,
+              report
+            })
+          ],
+          [],
+          undefined,
+          counters
+        )
       }),
       close: () =>
         (closing ??= (async () => {

@@ -10,7 +10,10 @@ import { normalizeRemoteContract } from '../../remote/contract.js'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
 import type { IProcessByteChannel, IProcessByteListener, IProcessMessageChannel } from '../types.js'
 import { defaultRpcId } from '../../core/internal/id.js'
-import { createProcessBindingDrain, type IProcessBindingDrain } from '../resilience/drain.js'
+import {
+  createRemoteBindingDrain,
+  type IRemoteBindingDrain
+} from '../../remote/internal/binding-drain.js'
 import { createProcessSessionManager, type IProcessConnectionLease } from '../resilience/session.js'
 import { createProcessProviderAdmission } from '../resilience/provider-admission.js'
 import {
@@ -57,6 +60,8 @@ type IProcessRuntimeSessionPublication = Readonly<{
 /** Private service reads use the original session Set, without another listener registry. */
 export type IProcessSessionsHandle = Readonly<{
   close(): Promise<void>
+  /** Read original closure state without a separate listener availability flag. */
+  closed(): boolean
   services(): readonly IRemoteServePluginHandle[]
   current(): IRemoteServePluginHandle | null | undefined
 }>
@@ -75,7 +80,7 @@ function createSession(
   service: IRemoteServePluginHandle,
   sessions: Set<IProcessServeSession>,
   report: (error: unknown) => void,
-  drain: IProcessBindingDrain,
+  drain: IRemoteBindingDrain,
   lease: IProcessConnectionLease,
   closeAdmission: () => void,
   identity: IProcessSessionIdentity,
@@ -302,7 +307,7 @@ export async function serveProcessSessions(
               await fallback?.ready()
               const fallbackVersion = fallback?.version
               const sessionOptions = resilience.sessionOptions(identity)
-              const drain = createProcessBindingDrain(
+              const drain = createRemoteBindingDrain(
                 channel.scheduler,
                 (error) => reportSafely(report, error),
                 manager.options.drainMs
@@ -423,7 +428,7 @@ export async function serveProcessSessions(
       }
       throw error
     }
-    return Object.freeze({ close, services, current })
+    return Object.freeze({ close, closed: () => closePromise !== undefined, services, current })
   }
 
   const guard = createParentLossGuard({
@@ -484,7 +489,7 @@ export async function serveProcessSessions(
     await fallback?.ready()
     const fallbackVersion = fallback?.version
     const sessionOptions = resilience.sessionOptions(identity)
-    const drain = createProcessBindingDrain(
+    const drain = createRemoteBindingDrain(
       channel.scheduler,
       (error) => reportSafely(report, error),
       manager.options.drainMs
@@ -545,7 +550,7 @@ export async function serveProcessSessions(
     lease = undefined
     closeAdmission = undefined
     removeParentClose = raw.onClose((reason) => guard.trigger(reason))
-    return Object.freeze({ close, services, current })
+    return Object.freeze({ close, closed: () => closePromise !== undefined, services, current })
   } catch (error) {
     closeAdmission?.()
     if (candidateService) {

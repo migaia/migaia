@@ -38,6 +38,7 @@ function heldOpen() {
   const closing = new AbortController()
   let now = 0
   const kernel = {
+    registerOwner: () => undefined,
     generation: 0,
     closingSignal: closing.signal,
     state: 'active',

@@ -25,7 +25,8 @@ describe('Web Worker platform error cancellation', () => {
           hostAlive: true,
           preventCalls: [1],
           reports: 1,
-          termination: 'unsupported'
+          termination: 'unsupported',
+          resourceSampler: 'undefined'
         })
         expect(receipt.nativePosts).toBeGreaterThan(0)
         if (runtime === 'deno') expect(receipt.prevented).toEqual([true])

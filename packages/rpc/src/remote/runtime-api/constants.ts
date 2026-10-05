@@ -33,6 +33,14 @@ export const RuntimeApiErrorText = {
   targetUnknown: 'Runtime outlet target is not a live connection',
   /** Canonical indexes preserve all matches and reject ambiguity instead of selecting one. */
   targetAmbiguous: 'Runtime outlet target identifies multiple connections',
+  /** Passive subscriptions admit only the five declared lifecycle events and actual callbacks. */
+  eventInvalid: 'Runtime event subscription is invalid',
+  /** Native mutations require an original spawn/create lease, never a local channel ownership claim. */
+  controlBorrowed: 'Runtime target does not own native execution',
+  /** Invalid grace or platform signal is rejected before command queue admission. */
+  stopInvalid: 'Runtime stop configuration is invalid',
+  /** Filters use only canonical states, source kinds and one explicit name discriminator. */
+  filterInvalid: 'Runtime query filter is invalid',
   /** Host controls require the original catalog, synchronous resolver and this exact managed Host. */
   hostControlInvalid: 'Runtime host exposure requires its managed Host catalog and resolver'
 } as const
@@ -93,11 +101,48 @@ export const RuntimeQueryReason = {
   health: 'native-health-fact-not-available',
   restarts: 'restart-count-not-observed',
   counters: 'canonical-counter-not-available',
-  resources: 'native-resource-sampling-not-connected'
+  resources: 'native-resource-sampling-not-connected',
+  /** The query's exact native unit left while its asynchronous sampler was running. */
+  retired: 'selected-execution-unit-retired',
+  /** Missing native APIs and OS permissions cannot be replaced with parent aggregate values. */
+  native: 'native-resource-fact-not-available'
+} as const
+
+/** The native process handle exposes only the existing graceful SIGTERM operation. */
+export const RuntimeProcessSignal = { graceful: 'SIGTERM' } as const
+
+/** Native CPU time and event-loop utilization are distinct public resource dimensions. */
+export const RuntimeResourceKind = { cpuTime: 'cpu-time', elu: 'elu' } as const
+
+/** Metric denominators remain explicit instead of silently attributing endpoint totals to a peer. */
+export const RuntimeMetricScope = {
+  client: 'endpoint-client',
+  unit: 'execution-unit',
+  process: 'process',
+  thread: 'thread'
+} as const
+/** CPU microseconds and ELU milliseconds remain separate dimensions; ratios are never CPU time. */
+export const RuntimeMetricUnit = {
+  calls: 'calls',
+  bytes: 'bytes',
+  microseconds: 'microseconds',
+  milliseconds: 'milliseconds',
+  ratio: 'ratio',
+  checks: 'checks',
+  restarts: 'restarts'
 } as const
 
 /** Registration departure is a channel fact; it does not fabricate a native exit status. */
 export const RuntimeRecentKind = { departed: 'departed' } as const
+/** Passive management events come only from original lifecycle and successful liquidation facts. */
+export const RuntimeEventName = {
+  ready: 'ready',
+  exit: 'exit',
+  degraded: 'degraded',
+  restart: 'restart',
+  liquidated: 'liquidated'
+} as const
+export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName]
 /** Original scheduler timestamps are monotonic milliseconds, not wall-clock epoch time. */
 export const RuntimeQueryClock = { scheduler: 'scheduler' } as const
 import { RpcCapability } from '../../contract/wire-constants.js'

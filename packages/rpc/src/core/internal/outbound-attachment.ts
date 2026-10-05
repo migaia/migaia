@@ -56,7 +56,7 @@ import {
 import { createRpcUnknownFieldWarner } from '../../contract/unknown-field.js'
 import { deserializeRpcError, serializeRpcError } from '../../contract/error.js'
 import { RpcProtocolEvent } from '../protocol-constants.js'
-import type { IEndpointKernelHost } from '../endpoint-kernel.js'
+import { EndpointOwnerKey, type IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcInboundMessage } from '../transport.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import { HookRegistry } from './hooks.js'
@@ -352,7 +352,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         })
       )
     kernel.registerOwner('outbound-pipeline', this.#pipeline)
-    kernel.registerOwner('pending-registry', this.#pending)
+    kernel.registerOwner(EndpointOwnerKey.pendingRegistry, this.#pending)
     kernel.registerOwner('replay-window', this.#replay)
     kernel.registerOwner('hook-registry', this.#hooks)
     kernel.registerOwner('inbound-identity', this.inboundIdentity)

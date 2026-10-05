@@ -1,3 +1,4 @@
+import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
 import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
@@ -123,7 +124,7 @@ for (const mode of ['peer', 'plugin'] as const) {
           assert.notEqual(
             mode === 'peer'
               ? readRuntimePeerConnection(peer!).peerId
-              : host.thread!.get('bridge').instanceId,
+              : readRuntimeOutletConnection(host.thread, 'bridge')!.instanceId,
             first.self.instanceId
           )
         },

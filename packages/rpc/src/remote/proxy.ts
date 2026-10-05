@@ -1,16 +1,22 @@
+import { SupervisorState, type ISupervisor } from '@migaia/supervision'
 import {
   runtimeConnectionDetail,
   runtimeDetail,
   runtimeErrorIdentity,
+  runtimeCounters,
+  runtimeUnavailable,
   type IRuntimeDetail,
   type IRuntimeConnectionDirectory,
-  type IRuntimeRecent
+  type IRuntimeRecent,
+  type IRuntimeUnavailable
 } from './runtime-api/overview.js'
+import { runtimeResources, type IRuntimeNativeUnit } from './runtime-api/resources.js'
 import {
   RuntimeQueryStatus,
   RuntimeRecentKind,
   RuntimeQueryClock,
-  RuntimeQueryLimit
+  RuntimeQueryLimit,
+  RuntimeQueryReason
 } from './runtime-api/constants.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -58,6 +64,8 @@ type IRemoteGeneration = Readonly<{
   channel: IRemoteChannel
   served: IRemoteServeEndpoint
   runtime?: IRuntimePeer
+  /** Only the original current receipt retains its exact native unit for local cold sampling. */
+  unit: unknown
   close(): Promise<void>
 }>
 
@@ -101,9 +109,17 @@ export type IRemoteRuntimeRegistration = Pick<
   'events' | 'prepareGeneration' | 'whenClosed' | 'release' | 'revoke' | 'departedReasonCount'
 > &
   Readonly<{
+    /** Exact native execution authority is present only for the original spawn/create factory path. */
+    /** Identity reads keep late exit facts bound to their exact original native generation. */
+    /** Cold target selection reads only the retained safe directory, without native sampling. */
+    runtimeInstanceIds(): readonly string[]
+    runtimeInstanceId(generation: number): string | IRuntimeUnavailable
+    readonly execution: ISupervisor<unknown, unknown> | undefined
+    /** Passive lifecycle observers read the same original supervisor, including local connections. */
+    readonly supervisor: ISupervisor<unknown, unknown>
     currentPeer(): IRuntimePeer
     /** Read original native state and bounded safe lifecycle history without preparing a generation. */
-    inspectRuntime(): IRuntimeDetail
+    inspectRuntime(): Promise<IRuntimeDetail>
     /** Logical runtime calls reuse the original retry/key/deadline dispatch below. */
     invokeRequest(
       method: string,
@@ -127,6 +143,8 @@ export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = Omit<
   'contract' | 'endpointFactory'
 > &
   Readonly<{
+    /** Private native factory provenance; local connection ownership cannot set execution authority. */
+    ownsExecution?: boolean
     prepareRuntime(channel: IRemoteChannel, signal: IAbortSignal): Promise<IRuntimePeer>
     readRuntimeEndpoint(peer: IRuntimePeer): IRemoteServeEndpoint
     /** Original native drain completes before this registration disposes its current endpoint. */
@@ -139,6 +157,7 @@ type IRemoteRegistrationOptions<TUnit, TSpec> = Omit<
   'contract' | 'endpointFactory'
 > &
   Readonly<{
+    ownsExecution?: boolean
     contract?: IRemoteContract | IRemoteHostCatalog
     endpointFactory?: IRemoteProxyOptions<TUnit, TSpec>['endpointFactory']
     prepareRuntime?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['prepareRuntime']
@@ -278,6 +297,13 @@ class RemoteRegistration<TUnit, TSpec> {
       })
     this.#unsubscribe = options.binding.supervisor.subscribe((event) => {
       if (event.type === 'exit') this.#leave(event.generation, event.error)
+      if (
+        event.type === 'state' &&
+        (event.to === SupervisorState.stopped || event.to === SupervisorState.disposed)
+      ) {
+        const generation = this.#current?.number
+        if (generation !== undefined) this.#leave(generation, undefined)
+      }
       if (event.type === 'switched') this.#leave(event.from, undefined)
       if (event.type === 'terminal') {
         const generation = this.#current?.number
@@ -540,6 +566,7 @@ class RemoteRegistration<TUnit, TSpec> {
     /** Close endpoint before channel regardless of who owns the registration. */
     const generation: IRemoteGeneration = Object.freeze({
       number: outcome.generation,
+      unit: outcome.unit,
       channel,
       served,
       ...(runtime ? { runtime } : {}),
@@ -578,6 +605,34 @@ class RemoteRegistration<TUnit, TSpec> {
     })
   }
 
+  /** The original accepted directory keeps target identity while its owned unit is not ready. */
+  runtimeInstanceIds(): readonly string[] {
+    return this.#runtimeDirectory?.description
+      ? [this.#runtimeDirectory.description.self.instanceId]
+      : []
+  }
+
+  /** Current receipt and original bounded departures identify one exact native generation. */
+  runtimeInstanceId(generation: number): string | IRuntimeUnavailable {
+    if (this.#current?.number === generation && this.#runtimeDirectory?.description)
+      return this.#runtimeDirectory.description.self.instanceId
+    for (let index = this.#runtimeRecent.length - 1; index >= 0; index -= 1) {
+      const recent = this.#runtimeRecent[index]!
+      if (recent.generation === generation && recent.identity) return recent.identity.instanceId
+    }
+    return runtimeUnavailable(RuntimeQueryReason.owner)
+  }
+
+  /** Native commands use the exact original supervisor, never a channel ownership flag. */
+  get execution(): ISupervisor<unknown, unknown> | undefined {
+    return this.#options.ownsExecution ? this.supervisor : undefined
+  }
+
+  /** Passive event subscription shares the canonical generation and teardown owner. */
+  get supervisor(): ISupervisor<unknown, unknown> {
+    return this.#options.binding.supervisor as ISupervisor<unknown, unknown>
+  }
+
   /** Return only the current original generation, never a cached same-name successor handle. */
   currentPeer(): IRuntimePeer {
     const active = this.#active()
@@ -586,22 +641,51 @@ class RemoteRegistration<TUnit, TSpec> {
   }
 
   /** Query the same canonical supervisor and accepted directory even between generations. */
-  inspectRuntime(): IRuntimeDetail {
+  async inspectRuntime(): Promise<IRuntimeDetail> {
     if (!this.#runtimeDirectory) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+    /** Capture one exact receipt and supervisor snapshot before any asynchronous resource read. */
+    const current = this.#current
+    /** Safe directory identity remains the selected generation even when that generation exits. */
+    const directory = this.#runtimeDirectory
+    /** Canonical unit and health facts are read without preparing or restarting a generation. */
+    const supervisor = this.#options.binding.supervisor.inspect()
+    /** Counters read only the actual current endpoint's original registries. */
+    const counters = current ? runtimeCounters(current.served.endpoint) : undefined
+    /** Snapshot history before waiting; query does not promise an atomic cross-owner view. */
+    const recent = [...this.#runtimeRecent]
+    /** The same receipt retains the exact native handle; missing ports are explicit absence. */
+    const sampled = current
+      ? await runtimeResources(
+          current.unit as IRuntimeNativeUnit,
+          supervisor.kind,
+          () => this.#options.binding.scheduler.now(),
+          this.#options.report
+        )
+      : runtimeUnavailable(RuntimeQueryReason.resources)
+    /** Never resample a successor after exit or replacement during the asynchronous read. */
+    const resources =
+      current && this.#current !== current
+        ? runtimeUnavailable(RuntimeQueryReason.retired)
+        : sampled
     return runtimeDetail(
-      this.#runtimeDirectory.localDescription,
+      directory.localDescription,
       [
         runtimeConnectionDetail(
-          this.#runtimeDirectory,
-          this.#current ? RuntimeQueryStatus.ready : RuntimeQueryStatus.departed,
+          directory,
+          current ? RuntimeQueryStatus.ready : RuntimeQueryStatus.departed,
           {
-            supervisor: this.#options.binding.supervisor.inspect(),
-            recent: this.#runtimeRecent,
+            supervisor,
+            recent,
+            counters,
+            resources,
+            observedAt: this.#options.binding.scheduler.now(),
             report: this.#options.report
           }
         )
       ],
-      this.#runtimeRecent
+      recent,
+      undefined,
+      counters
     )
   }
 
