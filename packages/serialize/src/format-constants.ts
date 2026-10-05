@@ -12,6 +12,10 @@ export const SerializeOutput = {
   binary: 'binary'
 } as const
 
+/** Portable management projections choose an output-only text format, never a parser plugin. */
+export const SerializeTextFormat = { json: 'json', yaml: 'yaml', toml: 'toml' } as const
+export type ISerializeTextFormat = (typeof SerializeTextFormat)[keyof typeof SerializeTextFormat]
+
 /** Instrumentation phases emitted while encoding or decoding. */
 export const SerializePhase = { encode: 'encode', decode: 'decode' } as const
 
