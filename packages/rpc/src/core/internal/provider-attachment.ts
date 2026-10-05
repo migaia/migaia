@@ -46,6 +46,7 @@ import { createRpcIdempotencyStore } from '../idempotency-store.js'
 import type { RpcOutboundAttachment } from './outbound-attachment.js'
 import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
 import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/runtime-api/constants.js'
+import type { IRpcEarlyProviderIntent } from './variation-coordinator.js'
 import {
   readSelectedFramerChunks,
   RpcDebugProperty,
@@ -217,10 +218,11 @@ export class RpcProviderAttachment {
             (!this.#authenticated || hasAuthenticationReplayBinding(request.envelope))
         ),
       consumePendingAbort: (key, association) =>
-        this.#variations.admit({ operation: 'consumeAbort', key, association }) as {
-          readonly found: boolean
-          readonly reason: unknown
-        },
+        this.#variations.admit({
+          operation: 'consumeAbort',
+          key,
+          association
+        }) as IRpcEarlyProviderIntent,
       /** Source-less authentication binds the response to the exact admitted client receiver. */
       responseReceiverId: (request) =>
         authenticationReplyReceiverId(request.envelope) ?? request.route.route.senderId
@@ -493,11 +495,18 @@ export class RpcProviderAttachment {
     if (envelope.operation === RpcRuntimeOperation.stream) {
       if (controller?.streamIntent) await controller.streamIntent(envelope.stream)
       else if (envelope.stream.event === 'finish-without-items') {
-        /**
-         * Unknown finish cannot prove an admitted before-start option; lazy early return uses
-         * cancel.
-         */
-        throw invalidRpcStream(RpcStreamViolation.event, '/stream/event')
+        /** The original bounded intent slot waits for the call's authenticated before-start option. */
+        if (envelope.stream.seq !== 0) throw invalidRpcStream(RpcStreamViolation.seq, '/stream/seq')
+        outbound.variations.abort(
+          key,
+          undefined,
+          this.#kernel.time.now() + 310_000,
+          envelope.stream.reason === undefined
+            ? undefined
+            : deserializeRpcError(envelope.stream.reason),
+          association,
+          true
+        )
       }
       return
     }

@@ -116,10 +116,7 @@ type IProviderExecutorOptions<TTargetId extends string> = {
   readonly consumePendingAbort?: (
     key: string,
     association?: string
-  ) => {
-    readonly found: boolean
-    readonly reason: unknown
-  }
+  ) => import('./variation-coordinator.js').IRpcEarlyProviderIntent
   readonly admission: IProviderAdmission
   /** Local owner notification for the three canonical admission refusals. */
   readonly onRejected?: (rejection: IRpcProviderRejection) => void | Promise<void>
@@ -844,7 +841,15 @@ export class ProviderExecutor<TTargetId extends string> {
       controllerKey,
       runtimeTaskKey(envelope.task)
     )
-    if (pendingAbort?.found) cancelIntent(pendingAbort.reason)
+    if (pendingAbort?.found) {
+      if (!pendingAbort.finish || envelope.options.cancel === RpcRuntimeCancel)
+        cancelIntent(pendingAbort.reason)
+      else {
+        /** A forged early finish cannot opt an order-only stream into discard or cancellation. */
+        report(invalidRpcStream(RpcStreamViolation.event, '/stream/event'))
+        if (pendingAbort.cancelReason) cancelIntent(pendingAbort.cancelReason.value)
+      }
+    }
     if (envelope.options.timeoutMs === 0) cancelIntent(new RpcTimeoutError())
     else if (envelope.options.timeoutMs !== undefined && state === 'queued')
       deadline = this.options.setTimeout(

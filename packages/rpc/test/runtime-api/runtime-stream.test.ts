@@ -297,79 +297,140 @@ it('[A67] concurrent next/return shares one producer credit and returns the actu
   }
 })
 
-it('[A66] cancel intent overtakes a physically started stream write before final provider start', async () => {
-  /** Only actual run construction counts execution, independent of transport send admission. */
-  let constructed = 0
-  /** The actual physical write can be in progress while control frames continue on the same owner. */
-  let writing = false
-  /** Fixture releases the already started write without replacing any RPC protocol owner. */
-  let finish!: () => void
-  /** One original physical send remains unfinished until its real payload is delivered. */
-  const held = new Promise<void>((resolve) => {
-    finish = resolve
-  })
-  /** Both Peers use the genuine source offer and accepted generation bindings. */
-  const fixture = await connected(
-    {},
-    {
-      values: () => {
-        constructed += 1
-        return (async function* () {
-          yield 1
-          return 2
-        })()
+it.each(['cancel', 'return', 'throw', 'forged-order-only', 'forged-order-only-cancel'] as const)(
+  '[A66] %s intent overtakes a physically started stream write before final provider start',
+  async (intent) => {
+    /** Only actual run construction counts execution, independent of transport send admission. */
+    let constructed = 0
+    /** The actual physical write can be in progress while control frames continue on the same owner. */
+    let writing = false
+    /** Fixture releases the already started write without replacing any RPC protocol owner. */
+    let finish!: () => void
+    /** One original physical send remains unfinished until its real payload is delivered. */
+    const held = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    /** Both Peers use the genuine source offer and accepted generation bindings. */
+    const fixture = await connected(
+      {},
+      {
+        values: () => {
+          constructed += 1
+          return (async function* () {
+            yield 1
+            return 2
+          })()
+        },
+        other: () => 9
       },
-      other: () => 9
-    },
-    capabilities,
-    capabilities
-  )
-  /** The original send still delivers every actual frame after this one delayed write. */
-  const sender = readEndpointOwner<RpcOutboundSender>(
-    readRuntimePeerConnection(fixture.peers[0]).endpoint,
-    'outbound-pipeline'
-  )!
-  /** Only this exact existing transport emits the tested stream task. */
-  const original = sender.transport.send
-  /** Only the first stream-open physical write pauses; subsequent authenticated control is genuine. */
-  const send = vi.spyOn(sender.transport, 'send').mockImplementationOnce(async (...args) => {
-    writing = true
-    await held
-    return Reflect.apply(original, sender.transport, args)
-  })
-  /** The caller's intent belongs to the original stream operation and generation tuple. */
-  const cancel = new AbortController()
-  /** Lazy first next initiates the one real stream task. */
-  const iterator = fixture.peers[0].stream('values', undefined, {
-    cancel: 'before-start',
-    signal: cancel.signal
-  })
-  /** Capture terminal or item immediately so fixture failures cannot become unhandled rejections. */
-  const next = iterator.next().catch((error: unknown) => error)
-  try {
-    await vi.waitFor(() => assert.equal(writing, true))
-    cancel.abort()
-    assert.equal(await fixture.peers[0].request('other'), 9)
-    assert.equal(constructed, 0)
-    finish()
-    /**
-     * Preserve the full actual failure classification while distinguishing fixture transport
-     * errors.
-     */
-    const result = await next
-    assert.equal(
-      Reflect.get(result as object, 'code'),
-      RpcCoreErrorCode.cancelled,
-      `[A66] original result: ${String(result)}; cause: ${String(Reflect.get(result as object, 'cause'))}`
+      capabilities,
+      capabilities
     )
-    assert.equal(constructed, 0)
-  } finally {
-    finish()
-    await fixture.close()
-    await next
-    send.mockRestore()
+    /** The original send still delivers every actual frame after this one delayed write. */
+    const sender = readEndpointOwner<RpcOutboundSender>(
+      readRuntimePeerConnection(fixture.peers[0]).endpoint,
+      'outbound-pipeline'
+    )!
+    /** Only this exact existing transport emits the tested stream task. */
+    const original = sender.transport.send
+    /** Only the first stream-open physical write pauses; subsequent task-bound control is genuine. */
+    const send = vi.spyOn(sender.transport, 'send').mockImplementationOnce(async (...args) => {
+      writing = true
+      await held
+      return Reflect.apply(original, sender.transport, args)
+    })
+    /** The caller's intent belongs to the original stream operation and generation tuple. */
+    const cancel = new AbortController()
+    /** Lazy first next initiates the one real stream task. */
+    const iterator = fixture.peers[0].stream('values', undefined, {
+      ...(intent.startsWith('forged-order-only') ? {} : { cancel: 'before-start' as const }),
+      orderKey: 'early-intent',
+      signal: cancel.signal
+    })
+    /** Capture terminal or item immediately so fixture failures cannot become unhandled rejections. */
+    const next = iterator.next().catch((error: unknown) => error)
+    /**
+     * The original final result is observed immediately even when the initial open is still
+     * pending.
+     */
+    let returned: Promise<unknown> | undefined
+    try {
+      await vi.waitFor(() => assert.equal(writing, true))
+      if (intent.startsWith('forged-order-only')) {
+        /** A real accepted task can carry an invalid finish while its call remains in ingress. */
+        const opened = readRuntimeCarrier(send.mock.calls[0]![0])!.frame as IRpcRuntimeEnvelope
+        const outbound = readEndpointOwner<RpcOutboundAttachment>(
+          readRuntimePeerConnection(fixture.peers[0]).endpoint,
+          'outbound-attachment'
+        )!
+        await outbound.sendRuntimeFrame({
+          profile: opened.profile,
+          kind: 'runtime-control',
+          operation: 'stream',
+          id: opened.id,
+          task: opened.task,
+          route: opened.route,
+          stream: { event: 'finish-without-items', seq: 0 }
+        })
+        if (intent === 'forged-order-only-cancel') cancel.abort()
+      } else if (intent === 'cancel') cancel.abort()
+      else
+        returned = (
+          intent === 'return'
+            ? iterator.return!()
+            : iterator.throw!(new Error('early stream throw'))
+        ).catch((error: unknown) => error)
+      assert.equal(await fixture.peers[0].request('other'), 9)
+      assert.equal(constructed, 0)
+      finish()
+      /** Original write completion and a genuine later reply prove the open passed ingress. */
+      await send.mock.results[0]!.value
+      assert.equal(await fixture.peers[0].request('other'), 9)
+      if (intent === 'forged-order-only') {
+        assert.equal(constructed, 1, '[A67] unselected early finish cannot cancel a valid stream')
+        assert.deepEqual(await next, { done: false, value: 1 })
+        assert.deepEqual(await iterator.next(), { done: true, value: 2 })
+        assert.ok(
+          fixture.failures.some(
+            (error) => Reflect.get(error as object, 'code') === RpcContractErrorCode.invalidStream
+          )
+        )
+        return
+      }
+      assert.equal(constructed, 0, '[A66] early return must cancel before provider construction')
+      /**
+       * Preserve the full actual failure classification while distinguishing fixture transport
+       * errors.
+       */
+      const result = await next
+      assert.equal(
+        Reflect.get(result as object, 'code'),
+        RpcCoreErrorCode.cancelled,
+        `[A66] original result: ${String(result)}; cause: ${String(Reflect.get(result as object, 'cause'))}`
+      )
+      if (returned) {
+        /** Finish must settle on the actual cancellation before fixture close can clean anything up. */
+        const terminal = await returned
+        if (intent === 'throw') {
+          assert.ok(terminal instanceof AggregateError)
+          assert.ok(
+            terminal.errors.some(
+              (error: unknown) =>
+                Reflect.get(error as object, 'code') === RpcCoreErrorCode.cancelled
+            )
+          )
+        } else assert.equal(Reflect.get(terminal as object, 'code'), RpcCoreErrorCode.cancelled)
+      }
+      assert.equal(constructed, 0)
+    } finally {
+      finish()
+      await fixture.close()
+      await next
+      await returned
+      send.mockRestore()
+    }
   }
-})
+)
 
 it('[A59][A67] ordered stream keeps ordinary return cleanup and its key lease until cleanup finishes', async () => {
   /** The original generator finally block owns its actual asynchronous cleanup. */
