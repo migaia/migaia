@@ -59,6 +59,8 @@ type IManagedSlot<
   readonly monitors: ILifecycleScope
   readonly unitController: IAbortController
   readonly runtime: IUnitRuntime
+  /** Candidate execution ordinal is reused after failure and committed only on promotion. */
+  readonly executionGeneration: number
   failureReason?: 'startup-timeout' | 'launch-failed' | 'unhealthy' | 'resource-violation'
   failureError?: unknown
   exitEmitted: boolean
@@ -108,6 +110,8 @@ export function createSupervisor<
   let abandoned = 0
   /** Lifetime restart successes are independent of attempt generation and failure-window trimming. */
   let restartCount = 0
+  /** Successful execution commits start at zero; attempts and rejected replacements do not count. */
+  let executionGeneration = -1
   let pendingStart: Promise<IReadyOutcome<THandle>> | undefined
   let pendingStop: Promise<void> | undefined
   let pendingDispose: Promise<void> | undefined
@@ -397,6 +401,7 @@ export function createSupervisor<
     })
     const slot = {
       generation: request.generation,
+      executionGeneration: executionGeneration + 1,
       kind: options.profile.kind,
       profile: options.profile,
       scheduler,
@@ -499,7 +504,7 @@ export function createSupervisor<
     slot.monitors.own(timer, { force: () => timer.cancel() })
     let phase: 'launch' | 'attach' | 'ready' = 'launch'
     try {
-      const base = { signal: request.signal }
+      const base = { signal: request.signal, executionGeneration: slot.executionGeneration }
       const context = options.profile.launchContext?.(base, slot.runtime) ?? (base as TContext)
       slot.launch = taken
         ? Promise.resolve(taken.handle)
@@ -548,6 +553,7 @@ export function createSupervisor<
       if (!attempts.isCurrent(request.token)) throw request.signal.reason
       timer.cancel()
       if (promote) {
+        executionGeneration = slot.executionGeneration
         active = slot
         candidate = undefined
         if (
@@ -804,6 +810,7 @@ export function createSupervisor<
         })
       }
       if (strategy === ReplaceStrategy.startThenSwitch) {
+        executionGeneration = result.slot.executionGeneration
         active = result.slot
         candidate = undefined
         emit({

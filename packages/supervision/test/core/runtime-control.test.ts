@@ -4,6 +4,46 @@ import { createSupervisor, createUnitBudget } from '../../src/index.js'
 import { createMemoryLauncher, deferred, type IMemoryHandle } from '../support/memory-launcher.js'
 import { createMemoryProfile } from '../support/memory-profile.js'
 
+it('[A71] launch metadata counts accepted executions from zero and failed replacements reuse the next ordinal', async () => {
+  const native = createMemoryLauncher()
+  const ordinals: unknown[] = []
+  let rejectNext = false
+  const budget = createUnitBudget({ kind: 'memory', maxUnits: 2, launchRate: false })
+  const supervisor = createSupervisor({
+    id: 'runtime-execution-generation',
+    spec: 'unit',
+    budget,
+    launcher: {
+      ...native,
+      launch: async (spec, context) => {
+        ordinals.push(Reflect.get(context, 'executionGeneration'))
+        if (rejectNext) {
+          rejectNext = false
+          throw new Error('fixture rejected execution')
+        }
+        return native.launch(spec, context)
+      }
+    },
+    profile: createMemoryProfile({ autoExitOnTerminate: true }),
+    report: () => undefined
+  })
+  try {
+    await supervisor.start()
+    expect(ordinals, '[A71] first genuine execution is generation zero').toEqual([0])
+    rejectNext = true
+    expect((await supervisor.replace({ strategy: 'start-then-switch' })).kind).toBe('failed')
+    expect((await supervisor.replace({ strategy: 'start-then-switch' })).kind).toBe('replaced')
+    await supervisor.restart()
+    expect(ordinals, '[A71] rejection is an attempt, not an accepted execution').toEqual([
+      0, 1, 1, 2
+    ])
+    expect(supervisor.generation).toBeGreaterThan(3)
+  } finally {
+    await supervisor.dispose()
+  }
+  expect(budget.inUse).toBe(0)
+})
+
 /** Advances only the existing lifecycle release reactions, without advancing their deadlines. */
 async function flush(): Promise<void> {
   for (let index = 0; index < 40; index++) await Promise.resolve()

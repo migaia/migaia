@@ -22,7 +22,11 @@ export type IUnitHandle<TExit> = {
   readonly exited: Promise<TExit>
 }
 /** Attempt-scoped cancellation; active units own a separate runtime signal. */
-export type ILaunchContext = { readonly signal: IAbortSignal }
+export type ILaunchContext = {
+  readonly signal: IAbortSignal
+  /** Cold ordinal reserved by the original supervisor; only a ready promotion advances it. */
+  readonly executionGeneration?: number
+}
 /** Unit-specific launcher with declared capability strengths. */
 export type IUnitLauncher<TSpec, THandle, TContext extends ILaunchContext = ILaunchContext> = {
   readonly capabilities: Readonly<Record<string, CapabilityLevel>>
