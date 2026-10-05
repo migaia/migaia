@@ -16,6 +16,85 @@ import { EndpointOwnerKey } from '../../src/core/endpoint-kernel.js'
 import type { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
 import { runtimeSources, runtimeTestHost } from './fixture.js'
 
+it('[A60][A74] default custom factory retains ordinary Host calls without declaring unavailable shared ordering', async () => {
+  /** The fixture joins both actual default source contexts rather than supplying stronger tags. */
+  const offers: string[][] = [[], []]
+  const channel = runtimeSources(offers[0], offers[1])
+  const sources = channel.sources.map(
+    (source, index) => async (context: Parameters<typeof source>[0]) => {
+      offers[index]!.push(...context.capabilities)
+      return source(context)
+    }
+  )
+  /** This real Host owns the original shared slot; the unchanged factory API cannot read its scope. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  const failures: unknown[] = []
+  const cancel = new AbortController()
+  const preparing = createRuntimePeer(
+    {
+      report: (error) => {
+        failures.push(error)
+      }
+    },
+    {
+      self: { name: 'caller', instanceId: 'custom-caller-1' },
+      source: sources[1]!,
+      signal: cancel.signal
+    }
+  )
+  void preparing.catch(() => undefined)
+  let caller: IRuntimePeer | undefined
+  let preparationFailure: unknown
+  try {
+    try {
+      await host.use(
+        createProcessPlugin({
+          name: 'custom-source',
+          self: { name: 'provider', instanceId: 'custom-provider-1' },
+          connect: sources[0]!,
+          provide: { baseline: () => 42 },
+          endpointFactory: (selected, signal) =>
+            prepareRuntimePeerEndpoint(
+              {
+                self: { name: 'provider', instanceId: 'custom-provider-1' },
+                report: (error) => {
+                  failures.push(error)
+                }
+              },
+              selected,
+              signal
+            ),
+          report: (error) => {
+            failures.push(error)
+          }
+        })
+      )
+    } catch (error) {
+      preparationFailure = error
+    }
+    assert.equal(
+      preparationFailure,
+      undefined,
+      '[A60] ordinary custom factory must prepare on its truthful default offer'
+    )
+    caller = await preparing
+    assert.equal(await caller.request('baseline'), 42)
+    assert.throws(
+      () => caller!.request('baseline', undefined, { orderKey: 'unavailable' }),
+      (error: unknown) => Reflect.get(error as object, 'code') === 'CAPABILITY_UNSUPPORTED'
+    )
+    assert.equal(failures.length, 0)
+  } finally {
+    cancel.abort()
+    await caller?.close()
+    await host.dispose()
+    channel.close()
+    await preparing.catch(() => undefined)
+  }
+})
+
 it('[A59][A60] genuine process and thread Plugin installs share one final Host provider key owner', async () => {
   const capabilities = [RpcCapability.runtimeApi, RpcCapability.generation, RpcCapability.order]
   const channels = [

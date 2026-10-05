@@ -147,15 +147,20 @@ export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEve
 export const RuntimeQueryClock = { scheduler: 'scheduler' } as const
 import { RpcCapability } from '../../contract/wire-constants.js'
 
-/** Only these genuinely composed shared endpoint capabilities enter native bootstrap offers. */
-export const RUNTIME_API_CAPABILITIES = Object.freeze([
+/** Existing custom roots can offer ordinary calls without promising a private Host admission scope. */
+export const RUNTIME_API_BASE_CAPABILITIES = Object.freeze([
   RpcCapability.ping,
   RpcCapability.close,
   RpcCapability.abort,
   RpcCapability.stream,
   RpcCapability.batch,
   RpcCapability.runtimeApi,
-  RpcCapability.forwardRoute,
+  RpcCapability.forwardRoute
+])
+
+/** Atomic semantics are offered by the canonical assembly that actually borrows the Host owner. */
+export const RUNTIME_API_CAPABILITIES = Object.freeze([
+  ...RUNTIME_API_BASE_CAPABILITIES,
   RpcCapability.generation,
   RpcCapability.order,
   RpcCapability.group,

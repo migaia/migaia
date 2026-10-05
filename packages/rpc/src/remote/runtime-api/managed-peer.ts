@@ -54,7 +54,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
 ): Promise<IRuntimePeer> {
   compileRuntimeMethods(options.provide, options.contract)
   /** Safe configuration admission precedes supervisor.start and any native launcher side effect. */
-  const context = prepareRuntimePeerSourceContext(options.self)
+  const context = prepareRuntimePeerSourceContext(options.self, !options.endpointFactory)
   /** This is the original canonical current/leave/ready owner, shared with existing remote facades. */
   const registration = createRemoteRuntimeRegistration({
     binding,

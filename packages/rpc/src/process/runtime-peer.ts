@@ -65,7 +65,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
       ? { name: options.self?.name ?? RuntimePluginKey.process, instanceId: listen.offer.peer.id }
       : (options.self ?? { name: RuntimePluginKey.process, instanceId: defaultRpcId() })
   /** The actual default offer names exactly the endpoint roots implemented by the shared owner. */
-  const context = prepareRuntimePeerSourceContext(self)
+  const context = prepareRuntimePeerSourceContext(self, !options.endpointFactory)
   /**
    * Source objects retain authentication, codecs, budgets and their caller-selected supervision
    * policy.
