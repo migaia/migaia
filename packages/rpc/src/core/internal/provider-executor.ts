@@ -778,6 +778,8 @@ export class ProviderExecutor<TTargetId extends string> {
           throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
       }
     } catch (error) {
+      /** Store refusal precedes task admission; preserve no tombstones for uncommitted members. */
+      reserved.rollback()
       report(error)
       await settle(failed(error))
       return
