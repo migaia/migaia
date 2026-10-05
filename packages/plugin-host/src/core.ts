@@ -24,6 +24,13 @@ export type IPluginRuntimeSharedSlot<TFacade extends object = object> = Readonly
   /** An absent target returns undefined; duplicated instance identity returns null. */
   find(target: string): object | null | undefined
   values(): readonly object[]
+  /**
+   * Cold inventory reads every committed reservation, including registrations without ready
+   * sessions.
+   */
+  registered(): readonly object[]
+  /** Annotates this exact original reservation; metadata is published only with its install commit. */
+  register(value: object, onCommit?: () => void): void
   /** Withdraw only this exact ready contribution; the live registration retains its shared slot. */
   contribute(value: object, instanceId: string): () => void
 }>

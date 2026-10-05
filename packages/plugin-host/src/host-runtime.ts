@@ -57,7 +57,7 @@ import { executePluginHostPipeline } from './pipeline-runtime.js'
 import { PluginHostRemovalRuntime } from './removal-runtime.js'
 import { PluginHostReplaceRuntime } from './replace-runtime.js'
 import { PluginHostResumeRuntime } from './resume-runtime.js'
-import { bindTerminalSink, reportDiagnostic } from './diagnostic-report.js'
+import { bindTerminalSink, reportDiagnostic, reportTerminalFailure } from './diagnostic-report.js'
 import { PluginHostOperationRuntime } from './operation-runtime.js'
 import {
   createPipeline,
@@ -578,6 +578,7 @@ export class PluginHost<
     })
     this.#state.configureSharedPublication({
       assertActive: () => this.#assertActive(),
+      report: (error) => reportTerminalFailure(error, this.#diagnostic),
       publish: (key) => {
         // The canonical owner retains this immutable getter across final withdrawal and reuse.
         if (Object.hasOwn(this, key)) return
