@@ -745,6 +745,13 @@ export class ProviderExecutor<TTargetId extends string> {
           } catch (failureError) {
             report(failureError)
           }
+        } else if (envelope.kind === RpcRuntimeKind.group && !sealed) {
+          /** Preparation refusal cannot make completed business eligible for another key claim. */
+          try {
+            await seal(completion)
+          } catch (sealError) {
+            report(sealError)
+          }
         }
       } finally {
         if (claim?.status === 'claimed') claim.release()
