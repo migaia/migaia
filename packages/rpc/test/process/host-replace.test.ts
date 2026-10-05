@@ -147,7 +147,7 @@ describe('process Host replacement publication', () => {
             endpoint: {
               ...served.endpoint,
               async send<T>(...input: Parameters<IRpcEndpoint['send']>) {
-                if (ordinal === 2 && input[1] === RemoteMethodName.describe) {
+                if (ordinal === 2 && input[1] === RemoteMethodName.runtimeDescribe) {
                   entered()
                   await gate
                   throw primary
@@ -352,7 +352,7 @@ describe('process Host replacement publication', () => {
               ...served.endpoint,
               async send<T>(...args: Parameters<IRpcEndpoint['send']>) {
                 const [peer, method, params, context] = args
-                if (ordinal === 2 && method === RemoteMethodName.describe) {
+                if (ordinal === 2 && method === RemoteMethodName.runtimeDescribe) {
                   entered()
                   await held
                 }
@@ -469,7 +469,7 @@ describe('process Host replacement publication', () => {
     })
     const send = fixture.send.getMockImplementation()!
     fixture.send.mockImplementation(async (peer, method) => {
-      if (method === 'migaia.remote.describe' && fixture.launch.mock.calls.length === 2)
+      if (method === 'migaia.remote.runtime.describe' && fixture.launch.mock.calls.length === 2)
         await described
       return send(peer, method)
     })
@@ -515,7 +515,7 @@ describe('process Host replacement publication', () => {
       entered = resolve
     })
     fixture.send.mockImplementation(async (peer, method) => {
-      if (method === 'migaia.remote.describe' && fixture.launch.mock.calls.length > 1) {
+      if (method === 'migaia.remote.runtime.describe' && fixture.launch.mock.calls.length > 1) {
         entered()
         return new Promise<never>((_resolve, reject) => {
           const signal = candidateSignal!

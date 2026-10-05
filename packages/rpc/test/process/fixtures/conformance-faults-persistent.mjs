@@ -129,7 +129,7 @@ await createServeProcessPlugin({
         offer: createNativeProcessOffer({
           peer: { id: 'ts-peer', runtime: 'node' },
           stream: true,
-          capabilities: ['abort@1', 'wire-error@1']
+          capabilities: ['abort@1', 'wire-error@1', 'runtime-api@1']
         }),
         auth: { mode: 'required', verify: options.verify },
         scheduler: options.scheduler,

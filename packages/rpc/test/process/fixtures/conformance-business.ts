@@ -19,8 +19,6 @@ import type { IRemoteContract, IRemoteServeEndpoint } from '@migaia/rpc/remote'
 import { endpointFor, bridgeEndpointFor } from '../peers/ts/runtime.js'
 import { fdLauncher } from '../../bridge/fixtures/jsonrpc-process.js'
 import { createJsonRpcRemoteChannel } from '@migaia/rpc/bridge/jsonrpc'
-import { RpcError, RpcCoreErrorCode } from '@migaia/rpc/core'
-import { RpcCoreErrorText } from '../../../src/core/error-text.js'
 import { createProcessPeer } from '../../../src/process/adapters/node-peer.js'
 import {
   readRuntimePeerConnection,
@@ -110,7 +108,7 @@ type IBusinessFeature = {
 const offer = createNativeProcessOffer({
   peer: { id: 'caller', runtime: 'node' },
   stream: true,
-  capabilities: ['abort@1', 'wire-error@1']
+  capabilities: ['runtime-api@1', 'abort@1', 'wire-error@1']
 })
 /** Deployment creation retains actual handles and raw outputs for release and error attribution. */
 function deployment(
@@ -121,12 +119,6 @@ function deployment(
   bridge = false,
   budget?: IUnitBudget<'process'>
 ) {
-  /** Independent U36 peers removed RPC bridge support; never launch their obsolete profile. */
-  if (bridge && ['python', 'go', 'rust'].includes(peer.language))
-    throw new RpcError(
-      RpcCoreErrorCode.capabilityUnsupported,
-      RpcCoreErrorText.capabilityUnsupported
-    )
   const handles: IProcessHandle[] = []
   const output: Uint8Array[] = []
   const stdout: Uint8Array[] = []
@@ -192,6 +184,8 @@ function deployment(
         codecs: ['json'],
         capabilities: [
           'jsonrpc-bridge@1',
+          'runtime-api@1',
+          'batch@1',
           'abort@1',
           'wire-error@1',
           'deadline@1',
@@ -466,7 +460,9 @@ function bridgeFrames(chunks: readonly Uint8Array[]) {
     expect(end).toBeGreaterThan(-1)
     const length = Number(/Content-Length: (\d+)/i.exec(bytes.subarray(0, end).toString())![1])
     expect(bytes.length).toBeGreaterThanOrEqual(end + 4 + length)
-    messages.push(JSON.parse(bytes.subarray(end + 4, end + 4 + length).toString()))
+    /** Logical assertions keep order while the bridge owns the negotiated physical batch. */
+    const physical = JSON.parse(bytes.subarray(end + 4, end + 4 + length).toString())
+    messages.push(...(Array.isArray(physical) ? physical : [physical]))
     bytes = bytes.subarray(end + 4 + length)
   }
   return messages

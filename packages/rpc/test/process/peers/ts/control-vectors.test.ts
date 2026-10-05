@@ -16,7 +16,7 @@ import {
 
 /** Schema and vectors are language-neutral artifacts owned by the contract package. */
 const schemaRoot = join(import.meta.dirname, '../../../../schema')
-/** The same cases are copied verbatim to frozen/1.0 at the protocol cutover. */
+/** Current baseline vectors share one canonical directory and explicit digest manifest. */
 const vectorRoot = join(schemaRoot, 'vectors')
 
 /** Read one checked-in JSON artifact without importing runtime internals. */
@@ -38,7 +38,7 @@ function envelopeFailure(value: unknown): {
   throw new Error('expected an invalid vector')
 }
 
-describe('protocol 1.0 schemas and frozen vectors (A9)', () => {
+describe('current protocol schemas and baseline vectors (A9)', () => {
   it('keeps the schema field rows, route keys, validation order and wire limits aligned', () => {
     const schema = readJson(join(schemaRoot, 'envelope.schema.json'))
     expect(schema['x-migaia-limits']).toEqual(RpcWireLimit)
@@ -159,16 +159,23 @@ describe('protocol 1.0 schemas and frozen vectors (A9)', () => {
       )
   })
 
-  it('checks each frozen vector digest against the checked-in manifest', () => {
-    const frozen = join(vectorRoot, 'frozen/1.0')
-    const checksums = readFileSync(join(frozen, 'SHA256SUMS'), 'utf8').trim().split('\n')
-    expect(checksums).toHaveLength(3)
+  it('checks each current baseline vector digest against the checked-in manifest', () => {
+    const baseline = readJson(join(vectorRoot, 'protocol-baseline.json')) as {
+      selftestVectors: string[]
+      contractVectors: string[]
+    }
+    const expectedFiles = [
+      'protocol-baseline.json',
+      ...baseline.selftestVectors,
+      ...baseline.contractVectors
+    ]
+    const checksums = readFileSync(join(vectorRoot, 'SHA256SUMS'), 'utf8').trim().split('\n')
+    const files = checksums.map((row) => row.split('  ')[1])
+    expect(files).toEqual(expectedFiles)
     for (const row of checksums) {
       const [digest, filename] = row.split('  ')
-      expect(['envelope.json', 'control.json', 'handshake.json']).toContain(filename)
-      const contents = readFileSync(join(frozen, filename!))
+      const contents = readFileSync(join(vectorRoot, filename!))
       expect(createHash('sha256').update(contents).digest('hex')).toBe(digest)
-      expect(contents.equals(readFileSync(join(vectorRoot, filename!)))).toBe(true)
     }
   })
 })

@@ -183,25 +183,28 @@ async function endpointFactory(channel) {
   const provide = endpoint.provide
   /** Canonical disposal remains the single endpoint cleanup owner. */
   const dispose = endpoint.dispose
-  return {
-    endpoint: {
-      ...endpoint,
-      provide: (method, handler) =>
+  /** Preserve the canonical projection ancestry that owns the authenticated v2 identity. */
+  const observed = Object.create(endpoint)
+  Object.defineProperties(observed, {
+    provide: {
+      value: (method, handler) =>
         provide(method, async (context) => {
-          if (method === 'migaia.remote.describe') {
+          if (method === 'migaia.remote.runtime.describe') {
             mark('describe-entered')
             await gate(process.env.RPC_DESCRIBE_GATE)
           }
           return handler(context)
-        }),
-      dispose: async () => {
+        })
+    },
+    dispose: {
+      value: async () => {
         mark('endpoint-dispose')
         if (process.env.RPC_PARENT_LOSS === 'hung') await new Promise(() => {})
         return dispose()
       }
-    },
-    stream: endpoint.stream
-  }
+    }
+  })
+  return { endpoint: Object.freeze(observed), stream: endpoint.stream }
 }
 
 /** One responder port delays the actual hello handling until the parent opens the gate. */
@@ -214,7 +217,11 @@ const ingress = process.env.RPC_SOCKET
         if (actual !== token) throw new Error('fixture auth rejected')
         return 'fixture-principal'
       },
-      offer: createNativeProcessOffer({ peer: { id: 'child', runtime: 'node' }, stream: true }),
+      offer: createNativeProcessOffer({
+        peer: { id: 'child', runtime: 'node' },
+        stream: true,
+        capabilities: ['runtime-api@1']
+      }),
       createConnectionContext: () => {
         const id = crypto.randomUUID()
         return { peerId: 'parent', ipc: { connectionId: id, sessionId: id, log: () => undefined } }
@@ -242,7 +249,11 @@ const ingress = process.env.RPC_SOCKET
         await gate(process.env.RPC_HANDSHAKE_GATE)
         return createProcessTransport(opened.channel, {
           role: 'responder',
-          offer: createNativeProcessOffer({ peer: { id: 'child', runtime: 'node' }, stream: true }),
+          offer: createNativeProcessOffer({
+            peer: { id: 'child', runtime: 'node' },
+            stream: true,
+            capabilities: ['runtime-api@1']
+          }),
           auth: { mode: 'required', verify: context.verify },
           peerId: 'parent',
           scheduler: context.scheduler,

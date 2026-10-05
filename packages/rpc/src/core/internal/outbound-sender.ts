@@ -26,7 +26,7 @@ import {
   rejectRpcPhysicalFrameSize
 } from '../../contract/batch-frame.js'
 import { resolveAbortReason } from './async-control.js'
-import { outboundJsonByteUpperBound } from './outbound-envelope.js'
+import { isOutboundEnvelope, outboundJsonByteUpperBound } from './outbound-envelope.js'
 
 /** One logical settlement remains owned until its actual physical write completes. */
 type IQueuedEnvelope = {
@@ -519,7 +519,10 @@ export class RpcOutboundSender {
     if (hasTransfer && frames.length !== 1)
       throw new RpcSerializationError(RpcCoreErrorText.transferUnsupportedForChunking)
     if (immediate) {
-      this.#assertPhysicalSize(frames[0])
+      /** Private JSON materialization preserves the original owned snapshot's byte bound. */
+      this.#assertPhysicalSize(
+        this.#objectPort && isOutboundEnvelope(message) ? message : frames[0]
+      )
       /** Canonical whole-frame components retain their original encode/framing/protection owners. */
       const write = (value: unknown) => {
         this.#assertPhysicalSize(value)

@@ -5,6 +5,7 @@ import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { serveRemotePlugin, type IRemoteServePluginHandle } from '../../remote/serve-plugin.js'
+import type { IRuntimePeerSourceResult } from '../../remote/runtime-api/peer.js'
 import { normalizeRemoteContract } from '../../remote/contract.js'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
 import type { IProcessByteChannel, IProcessByteListener, IProcessMessageChannel } from '../types.js'
@@ -343,6 +344,7 @@ export async function serveProcessSessions(
                 identity,
                 signal: controller.signal
               }))
+              ;(channel as IRuntimePeerSourceResult).activateReceive?.()
               if (controller.signal.aborted)
                 throw createProcessError(RpcProcessErrorCode.channelClosed)
               await fallback?.ready()
@@ -521,6 +523,7 @@ export async function serveProcessSessions(
       identity,
       signal: controller.signal
     }))
+    ;(channel as IRuntimePeerSourceResult).activateReceive?.()
     if (controller.signal.aborted) throw createProcessError(RpcProcessErrorCode.channelClosed)
     await fallback?.ready()
     if (controller.signal.aborted) throw createProcessError(RpcProcessErrorCode.channelClosed)

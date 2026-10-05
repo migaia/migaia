@@ -17,9 +17,9 @@ describe('thread Plugin facade', () => {
       expect(await stream.next()).toMatchObject({ value: 'stream item', done: false })
       await stream.return?.(undefined)
       const requests = fixture.frames.filter(({ message }) => message.kind === 'request')
-      expect(requests[0]?.message.method).toBe('migaia.remote.describe')
+      expect(requests[0]?.message.method).toBe('migaia.remote.runtime.describe')
       expect(
-        requests.filter(({ message }) => message.method === 'migaia.remote.describe')
+        requests.filter(({ message }) => message.method === 'migaia.remote.runtime.describe')
       ).toHaveLength(1)
       expect(
         fixture.frames

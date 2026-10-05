@@ -821,9 +821,8 @@ fn run() -> io::Result<()> {
             "--bare-jsonrpc" => bare_profile = true,
             "--host" => host_profile = true,
             "--bootstrap" => bootstrap_stdin = arguments.next().as_deref() == Some("stdin"),
-            // Deployment callers may still supply this path; U36 never reads a v1 contract.
-            "--contract" => {
-                arguments.next();
+            "--non-idempotent-request" => {
+                business::REQUEST_IDEMPOTENT.store(false, std::sync::atomic::Ordering::Relaxed)
             }
             "--stdio" => {}
             "--listen-unix" => listener_path = arguments.next().map(PathBuf::from),
@@ -941,6 +940,9 @@ fn run() -> io::Result<()> {
     let mut output = io::stdout().lock();
     if business_profile && bootstrap_stdin {
         auth = Some(business::bootstrap(&mut input)?);
+    }
+    if business_profile && bridge_profile && role == "initiator" {
+        return business::initiate_bridge(&mut input, &mut output, auth.as_deref());
     }
     if business_profile {
         // This real child is owned through EOF and reaped before the peer returns.

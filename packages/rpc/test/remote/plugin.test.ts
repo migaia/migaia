@@ -12,7 +12,7 @@ import type { IRpcEndpoint } from '../../src/core/typing.js'
 import { RpcCoreErrorCode, RpcError } from '../../src/core/errors.js'
 import { RpcCoreErrorText } from '../../src/core/error-text.js'
 import { vi } from 'vitest'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from './fixture.js'
+import { REMOTE_FIXTURE_CONTRACT, remoteHarness, remoteDescription } from './fixture.js'
 
 describe('remote PluginHost assembly', () => {
   it('keeps internal metadata on the trusted frozen definition', async () => {
@@ -111,10 +111,12 @@ describe('remote PluginHost assembly', () => {
         ...fixture.served,
         endpoint: {
           async send() {
-            return {
-              ...REMOTE_FIXTURE_CONTRACT,
-              features: { f: { methods: { request: { mode: 'request', idempotent: true } } } }
-            }
+            return remoteDescription([
+              {
+                ...REMOTE_FIXTURE_CONTRACT,
+                features: { f: { methods: { request: { mode: 'request', idempotent: true } } } }
+              }
+            ])
           },
           async dispose() {
             fixture.calls.push('endpoint.dispose')
@@ -176,7 +178,7 @@ describe('remote PluginHost assembly', () => {
           ? fixture.calls.length
           : fixture.calls.indexOf('endpoint.dispose')
       )
-      expect(fixture.sends[0]?.method).toBe('migaia.remote.describe')
+      expect(fixture.sends[0]?.method).toBe('migaia.remote.runtime.describe')
       expect(fixture.sends[1]?.method).toBe('p.f.request')
     } finally {
       await host.dispose()

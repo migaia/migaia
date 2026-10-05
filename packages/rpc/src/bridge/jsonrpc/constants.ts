@@ -14,6 +14,8 @@ export const JsonRpcProfile = {
 /** Only capabilities with a mapping in this initiator profile may be advertised. */
 export const JSONRPC_REQUIRED_CAPABILITIES = [
   JsonRpcProfile.capability,
+  RpcCapability.runtimeApi,
+  RpcCapability.batch,
   RpcCapability.abort,
   JsonRpcProfile.wireError
 ] as const
@@ -22,8 +24,7 @@ export const JSONRPC_ALLOWED_CAPABILITIES: readonly string[] = [
   ...JSONRPC_REQUIRED_CAPABILITIES,
   RpcCapability.deadline,
   RpcCapability.idempotency,
-  RpcCapability.trace,
-  RpcCapability.batch
+  RpcCapability.trace
 ]
 /** The responder must register all four extension methods before it can become usable. */
 export const JSONRPC_REQUIRED_METHODS = [

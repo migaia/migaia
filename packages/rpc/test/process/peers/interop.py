@@ -33,18 +33,27 @@ def relay(source, destination):
             pass
 
 
-def pair(initiator_name, responder_name):
+def pair(initiator_name, responder_name, bridge=False):
     """Return one verdict with fixed markers and process codes, never frame data."""
-    initiator = subprocess.Popen(
-        COMMANDS[initiator_name] + ["--stdio", "--role", "initiator"],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        cwd=PEERS,
-    )
-    responder = subprocess.Popen(
-        COMMANDS[responder_name] + ["--stdio", "--role", "responder"],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        cwd=PEERS,
-    )
+    # Each physical bridge endpoint receives the same secret through its own inherited pipe.
+    token = os.urandom(24).hex().encode()
+    def launch(name, role):
+        auth_read, auth_write = os.pipe()
+        try:
+            os.write(auth_write, token)
+        finally:
+            os.close(auth_write)
+        try:
+            extra = ["--business", "--jsonrpc", "--auth-fd", str(auth_read)] if bridge else []
+            return subprocess.Popen(
+                COMMANDS[name] + ["--stdio", "--role", role] + extra,
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                cwd=PEERS, pass_fds=(auth_read,) if bridge else (),
+            )
+        finally:
+            os.close(auth_read)
+    initiator = launch(initiator_name, "initiator")
+    responder = launch(responder_name, "responder")
     assert initiator.stdout and initiator.stdin and initiator.stderr
     assert responder.stdout and responder.stdin and responder.stderr
     forwards = [
@@ -74,7 +83,7 @@ def pair(initiator_name, responder_name):
         and b"RESULT ok" in init_err
     )
     return {
-        "initiator": initiator_name, "responder": responder_name,
+        "initiator": initiator_name, "responder": responder_name, "wire": "jsonrpc" if bridge else "native",
         "ok": ok, "initiatorExit": initiator.returncode, "responderExit": responder.returncode,
         "initiatorStatus": "RESULT ok" if b"RESULT ok" in init_err else "missing result",
     }
@@ -83,8 +92,11 @@ def pair(initiator_name, responder_name):
 def main():
     """Print a JSON matrix and fail when any ordered language pair fails."""
     rows = [pair(left, right) for left in COMMANDS for right in COMMANDS if left != right]
-    print(json.dumps({"passed": sum(row["ok"] for row in rows), "total": len(rows), "pairs": rows}))
-    return 0 if all(row["ok"] for row in rows) else 1
+    bridges = [pair(left, right, True) for left in COMMANDS if left != "ts-reference"
+               for right in COMMANDS if right != "ts-reference" and left != right]
+    print(json.dumps({"passed": sum(row["ok"] for row in rows), "total": len(rows), "pairs": rows,
+                     "bridgePassed": sum(row["ok"] for row in bridges), "bridgeTotal": len(bridges), "bridgePairs": bridges}))
+    return 0 if all(row["ok"] for row in rows + bridges) else 1
 
 
 if __name__ == "__main__":

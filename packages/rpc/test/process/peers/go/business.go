@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -266,7 +267,7 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 				}
 			}
 		}
-		return errors.New("UNSUPPORTED")
+		return serveBridge(reader, writer, host, token)
 	}
 	hello, err := receive(reader, true)
 	if err != nil {
@@ -389,8 +390,215 @@ func bridgeWriteBody(writer io.Writer, body []byte) error {
 	return writeAll(writer, body)
 }
 
+// bridgeSend serializes a single response or its ordered JSON-RPC batch on the same physical carrier.
+func bridgeSend(writer io.Writer, message any) error {
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+	return bridgeWriteBody(writer, body)
+}
+
+// serveBridge shares real business state while exposing only the negotiated bridge extension surface.
+func serveBridge(reader io.Reader, writer io.Writer, host bool, token string) error {
+	b := businessState{host: host, installed: !host, received: []any{}, aborts: []any{}, waiting: map[string]record{}, streams: map[string]*businessStream{}}
+	authenticated := false
+	for {
+		body, err := bridgeBody(reader)
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		var physical any
+		decoder := json.NewDecoder(bytes.NewReader(body))
+		decoder.UseNumber()
+		if err := decoder.Decode(&physical); err != nil {
+			return err
+		}
+		members, batched := physical.([]any)
+		if batched {
+			if !authenticated || len(members) == 0 {
+				return errors.New("invalid bridge batch")
+			}
+		} else {
+			members = []any{physical}
+		}
+		replies := []any{}
+		for _, member := range members {
+			message, valid := member.(map[string]any)
+			if !valid || message["jsonrpc"] != "2.0" {
+				if batched {
+					fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+					continue
+				}
+				return errors.New("invalid bridge envelope")
+			}
+			params := field(message["params"])
+			var result any
+			var failure record
+			switch message["method"] {
+			case "migaia.hello":
+				var hello record
+				decoder := json.NewDecoder(strings.NewReader(params["hello"].(string)))
+				decoder.UseNumber()
+				if err := decoder.Decode(&hello); err != nil {
+					return err
+				}
+				remote, err := parseHello(hello)
+				if err != nil {
+					return err
+				}
+				local := localOffer()
+				local.Capabilities = []string{runtimeCapability, batchCapability, "abort@1", "jsonrpc-bridge@1", "wire-error@1", "deadline@1", "trace@1", "idempotency@1"}
+				chosen, ok := negotiate(remote, local)
+				authenticated = ok && baselineAgreement(chosen) && token != "" && hello["auth"] == token
+				reply := rejectRecord("AUTH_REJECTED", "authentication rejected")
+				if !ok || !baselineAgreement(chosen) {
+					reply = rejectRecord("HANDSHAKE_INCOMPATIBLE", "rpc handshake incompatible: version")
+				}
+				if authenticated {
+					reply = acceptRecord(chosen, local)
+				}
+				bytes, err := json.Marshal(reply)
+				if err != nil {
+					return err
+				}
+				result = record{"reply": string(bytes), "methods": []string{"migaia.hello", "migaia.describe", "migaia.invoke", "migaia.cancel"}}
+			case "migaia.cancel":
+				if !authenticated {
+					return fmt.Errorf("authentication required")
+				}
+				id, _ := params["id"].(string)
+				if _, ok := b.waiting[id]; ok {
+					delete(b.waiting, id)
+					b.aborts = append(b.aborts, params["reason"])
+					replies = append(replies, record{"jsonrpc": "2.0", "id": id, "result": "late-after-cancel"})
+				}
+				continue
+			case "migaia.describe":
+				if !authenticated {
+					return fmt.Errorf("authentication required")
+				}
+				result, failure = b.invoke(runtimeDescribeMethod, []any{}, nil)
+				description := field(result)
+				methods := []any{}
+				for _, raw := range entries(description["methods"]) {
+					name := stringField(field(raw), "name")
+					if name != "peer.pause" && name != "peer.busy" && name != "peer.crash" {
+						methods = append(methods, raw)
+					}
+				}
+				description["methods"] = methods
+			case "migaia.invoke":
+				if !authenticated {
+					return fmt.Errorf("authentication required")
+				}
+				called, _ := params["method"].(string)
+				args, _ := params["args"].([]any)
+				if called == "peer.wait" || called == "p.f.request" && len(args) == 1 && args[0] == "__wait" {
+					b.waiting[message["id"].(string)] = message
+					continue
+				}
+				result, failure = b.invoke(called, args, field(params["meta"])["trace"])
+			default:
+				failure = wireError("METHOD_NOT_FOUND", "bridge peer method unavailable")
+			}
+			if id, exists := message["id"]; exists {
+				reply := record{"jsonrpc": "2.0", "id": id}
+				if failure == nil {
+					reply["result"] = result
+				} else {
+					reply["error"] = record{"code": -32000, "message": failure["message"], "data": record{"migaiaWireError": failure}}
+				}
+				replies = append(replies, reply)
+			}
+		}
+		if len(replies) > 0 {
+			var response any = replies
+			if !batched {
+				response = replies[0]
+			}
+			if err := bridgeSend(writer, response); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// bridgeReceive reuses the exact Content-Length owner for single or batch responses.
+func bridgeReceive(reader io.Reader) (any, error) {
+	body, err := bridgeBody(reader)
+	if err != nil {
+		return nil, err
+	}
+	var value any
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	err = decoder.Decode(&value)
+	return value, err
+}
+
+// initiateBridge proves v2 identity and ordered batch isolation using the existing bridge profile.
+func initiateBridge(reader io.Reader, writer io.Writer, token string) error {
+	if token == "" {
+		return errors.New("AUTH_REQUIRED")
+	}
+	offer := localOffer()
+	offer.Capabilities = []string{runtimeCapability, batchCapability, "jsonrpc-bridge@1", "abort@1", "wire-error@1"}
+	hello := helloRecord(offer)
+	hello["auth"] = token
+	encoded, _ := json.Marshal(hello)
+	if err := bridgeSend(writer, record{"jsonrpc": "2.0", "id": "hello", "method": "migaia.hello", "params": record{"hello": string(encoded)}}); err != nil {
+		return err
+	}
+	reply, err := bridgeReceive(reader)
+	if err != nil {
+		return err
+	}
+	var accepted record
+	if json.Unmarshal([]byte(stringField(field(field(reply)["result"]), "reply")), &accepted) != nil || accepted["step"] != "accept" {
+		return errors.New("HANDSHAKE_INCOMPATIBLE")
+	}
+	caps := stringSlice(accepted["capabilities"])
+	if !slices.Contains(caps, runtimeCapability) || !slices.Contains(caps, batchCapability) {
+		return errors.New("HANDSHAKE_INCOMPATIBLE")
+	}
+	if err := bridgeSend(writer, record{"jsonrpc": "2.0", "id": "directory", "method": "migaia.describe", "params": record{"args": []any{}}}); err != nil {
+		return err
+	}
+	reply, err = bridgeReceive(reader)
+	if err != nil {
+		return err
+	}
+	directory := field(field(reply)["result"])
+	if integerField(directory, "schemaVersion") != 2 || field(directory["self"])["instanceId"] != field(accepted["peer"])["id"] {
+		return errors.New("CONTRACT_INVALID")
+	}
+	request := func(id, method string, args []any) record {
+		return record{"jsonrpc": "2.0", "id": id, "method": "migaia.invoke", "params": record{"method": method, "args": args}}
+	}
+	if err := bridgeSend(writer, []any{request("first", "echo", []any{"bridge-first"}), request("missing", "absent", []any{}), request("last", "echo", []any{"bridge-last"})}); err != nil {
+		return err
+	}
+	reply, err = bridgeReceive(reader)
+	if err != nil {
+		return err
+	}
+	replies := entries(reply)
+	if len(replies) != 3 || field(replies[0])["id"] != "first" || field(replies[1])["id"] != "missing" || field(replies[2])["id"] != "last" || !reflect.DeepEqual(field(replies[0])["result"], []any{"bridge-first"}) || !reflect.DeepEqual(field(replies[2])["result"], []any{"bridge-last"}) || field(field(field(replies[1])["error"])["data"])["migaiaWireError"] == nil {
+		return errors.New("INVALID_ENVELOPE")
+	}
+	if field(field(field(field(replies[1])["error"])["data"])["migaiaWireError"])["code"] != "PROVIDER_NOT_FOUND" {
+		return errors.New("INVALID_ENVELOPE")
+	}
+	fmt.Fprintln(os.Stderr, "RESULT ok")
+	return nil
+}
+
 // runBusiness selects real owned stdio or a borrowed listener; only inherited/bootstrap bytes carry auth.
-func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, bridge, bare, descendant bool) error {
+func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD int, bridge, bare, descendant bool, initiator bool) error {
 	token := ""
 	if authFD >= 0 {
 		auth := os.NewFile(uintptr(authFD), "auth")
@@ -418,6 +626,9 @@ func runBusiness(stdio bool, address string, host bool, bootstrap string, authFD
 			defer func() { _ = child.Process.Kill(); _ = child.Wait() }()
 		}
 		fmt.Fprintf(os.Stderr, "READY pid=%d\n", os.Getpid())
+		if bridge && initiator {
+			return initiateBridge(os.Stdin, os.Stdout, token)
+		}
 		return serveBusiness(os.Stdin, os.Stdout, host, token, bridge, bare)
 	}
 	if address == "" || token == "" {

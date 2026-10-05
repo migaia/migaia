@@ -306,11 +306,11 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
         response(
           request,
           undefined,
-          wireError(message.error, request.method === RemoteMethodName.describe)
+          wireError(message.error, request.method === RemoteMethodName.runtimeDescribe)
         )
       else {
-        if (request.method === RemoteMethodName.describe)
-          validateJsonRpcDescription(options.target, message.result)
+        if (request.method === RemoteMethodName.runtimeDescribe)
+          validateJsonRpcDescription(message.result)
         response(request, message.result)
       }
     } catch (cause) {
@@ -416,7 +416,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     /** Metadata projection reads only the normalized request routing contract. */
     const route = envelope.data.route
     /** Remote describe is the only reserved method translated to a distinct extension. */
-    const describe = envelope.method === RemoteMethodName.describe
+    const describe = envelope.method === RemoteMethodName.runtimeDescribe
     /** Dispatch ownership, rather than contract lookup, decides whether an id is emitted. */
     const oneWay = route.dispatchOnly === true
     if (!oneWay && pending.has(envelope.id))

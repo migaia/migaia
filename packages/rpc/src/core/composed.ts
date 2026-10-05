@@ -411,6 +411,7 @@ async function createComposedEndpointRuntime<
   let endpointHostDispose: Promise<void> | undefined
   try {
     publicSurface = createEndpointProjection({
+      identity: prepared!.id,
       // 投影的来源是 view 的 extensions;没有 view 就没有任何可投影的成员。此处曾回退到宿主本身,
       // 那只在宿主是类实例（方法都在原型上、自有键为空）时碰巧等价——宿主改为句柄后就不再成立。
       host: hostExtensions ?? {},

@@ -19,11 +19,14 @@ METHODS = {
     "echo": ["request", "notify"], "peer.echo": ["request", "notify"],
     "peer.received": ["request"], "peer.aborts": ["request"], "peer.stats": ["request"],
     "peer.trace": ["request"], "peer.error": ["request"], "peer.wait": ["request"],
+    "peer.pause": ["request"], "peer.busy": ["request"], "peer.crash": ["request"],
     "peer.finish": ["request"], "peer.reverse": ["request"], "p.f.request": ["request"], "p.f.oneWay": ["notify"],
     "p.f.generator": ["stream"], "p.f.asyncGenerator": ["stream"]
 }
 HOST_METHODS = ["migaia.remote.host.use", "migaia.remote.host.unUse", "migaia.remote.host.inspect"]
 ERROR_SOURCE = "@migaia/rpc/core"
+# CLI fixes the actual provider declaration once, before this process accepts any session.
+REQUEST_IDEMPOTENT = True
 
 
 def error_graph() -> dict[str, Any]:
@@ -79,6 +82,8 @@ class Business:
         self.capabilities = set(peer.CAPABILITIES)
         self.remote_id = ""
         self.reverse = None
+        # Only an admitted fault provider can stop this reader after its ACK is flushed.
+        self.pending_fault = None
         # Registered providers alone can be invoked; the directory derives from this same whitelist.
         self.providers = {name: (lambda payload, trace, method=name: self.invoke(method, payload, trace))
                           for name in [DESCRIBE, *METHODS, *(HOST_METHODS if host else [])]}
@@ -93,7 +98,8 @@ class Business:
         if self.host:
             methods.update({name: ["request"] for name in HOST_METHODS})
         return {"schemaVersion": 2, "self": {"name": "python-peer", "instanceId": "python-peer"},
-                "methods": [{"name": name, "supportedModes": modes, "modeSource": "declared"}
+                "methods": [{"name": name, "supportedModes": modes, "modeSource": "declared",
+                             **({"idempotent": REQUEST_IDEMPOTENT} if name == "p.f.request" else {})}
                             for name, modes in methods.items()]}
 
     def item(self) -> dict[str, Any]:
@@ -130,6 +136,9 @@ class Business:
             return trace, None
         if method == "peer.error":
             return None, error_graph()
+        if method in ("peer.pause", "peer.busy", "peer.crash"):
+            self.pending_fault = method
+            return "ACK", None
         if method.startswith("p.f.") and not self.installed:
             return None, {**peer.wire_error("REMOTE_CLOSED", "remote is closed"), "source": "@migaia/rpc/remote"}
         if method == "p.f.request":
@@ -235,7 +244,8 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bri
                 encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
                 bridge_write_body(writer, encoded)
             return
-        raise peer.PeerFailure("CAPABILITY_UNSUPPORTED")
+        serve_bridge(reader, writer, host, token)
+        return
     raw = peer.read_frame(reader, peer.MAX_HANDSHAKE)
     if raw is None:
         raise peer.PeerFailure("HANDSHAKE_INVALID")
@@ -290,6 +300,9 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bri
                     raise peer.PeerFailure("INVALID_ENVELOPE")
                 for reply in business.native(message):
                     peer.write_json(writer, reply)
+                if business.pending_fault is not None:
+                    fault, business.pending_fault = business.pending_fault, None
+                    perform_fault(fault)
                 if business.closing and not business.waiting:
                     business.streams.clear()
                     return
@@ -336,9 +349,119 @@ def bridge_write(writer: BinaryIO, message: Any) -> None:
     bridge_write_body(writer, body)
 
 
+# The bridge keeps the installed request/notification profile and the required U36 baseline.
+BRIDGE_METHODS = ["migaia.hello", "migaia.describe", "migaia.invoke", "migaia.cancel"]
+BRIDGE_CAPABILITIES = ["runtime-api@1", "batch@1", "abort@1", "jsonrpc-bridge@1",
+                       "wire-error@1", "deadline@1", "trace@1", "idempotency@1"]
+
+
+def perform_fault(method: str) -> None:
+    """After flushing ACK, stop, spin or exit the actual provider PID as the original fixture did."""
+    import signal
+    if method == "peer.crash":
+        peer.os._exit(17)
+    if method == "peer.pause":
+        peer.os.kill(peer.os.getpid(), signal.SIGSTOP)
+    else:
+        while True:
+            pass
+
+
+def serve_bridge(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None) -> None:
+    """Use the session's original providers over Content-Length, with v2 and ordered batch arrays."""
+    business = Business(host)
+    business.capabilities = set(BRIDGE_CAPABILITIES)
+    # Reverse and stream owners require native frames and are not installed by this bridge profile.
+    business.providers.pop("peer.reverse")
+    authenticated = False
+    while (physical := bridge_read(reader)) is not None:
+        batched = isinstance(physical, list)
+        if batched and (not authenticated or not physical):
+            raise peer.PeerFailure("INVALID_ENVELOPE")
+        replies = []
+        for message in physical if batched else [physical]:
+            if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
+                if batched:
+                    print("PEER_ERROR PROTOCOL_INVALID", file=peer.sys.stderr, flush=True)
+                    continue
+                raise peer.PeerFailure("INVALID_ENVELOPE")
+            method, params, identifier = message.get("method"), message.get("params", {}), message.get("id")
+            if method == "migaia.hello":
+                hello = peer.decode_frame(params["hello"].encode("utf-8"))
+                local = {**peer.own_offer("python-peer"), "capabilities": BRIDGE_CAPABILITIES}
+                agreed = peer.negotiate(hello, local)
+                baseline = agreed is not None and agreed["major"] == 1 and agreed["minor"] == 1 and {
+                    "runtime-api@1", "batch@1"} <= set(agreed["capabilities"])
+                authenticated = baseline and token is not None and hello.get("auth") == token
+                reply = {"kind": "handshake", "step": "accept", "protocol": peer.PROTOCOL, **agreed,
+                         "peer": local["peer"]} if authenticated else {
+                    "kind": "handshake", "step": "reject", "protocol": peer.PROTOCOL,
+                    "error": peer.wire_error("AUTH_REJECTED" if baseline else "HANDSHAKE_INCOMPATIBLE",
+                                             "authentication rejected" if baseline else "rpc handshake incompatible: version")}
+                result, error = {"reply": json.dumps(reply, separators=(",", ":")), "methods": BRIDGE_METHODS}, None
+            elif not authenticated:
+                raise peer.PeerFailure("AUTH_REQUIRED")
+            elif method == "migaia.cancel":
+                if business.waiting.pop(params.get("id"), None) is not None:
+                    business.aborts.append(params.get("reason"))
+                    replies.append({"jsonrpc": "2.0", "id": params["id"], "result": "late-after-cancel"})
+                continue
+            elif method == "migaia.describe":
+                result, error = business.description(), None
+                result["methods"] = [entry for entry in result["methods"] if entry["name"] in business.providers]
+            elif method == "migaia.invoke":
+                called, args = params["method"], params["args"]
+                if called == "peer.wait" or called == "p.f.request" and args == ["__wait"]:
+                    business.waiting[identifier] = message
+                    continue
+                provider = business.providers.get(called)
+                result, error = provider(args, params.get("meta", {}).get("trace")) if provider else (
+                    None, peer.wire_error("PROVIDER_NOT_FOUND", "Runtime method is not provided by this peer"))
+            else:
+                result, error = None, peer.wire_error("METHOD_NOT_FOUND", "bridge peer method unavailable")
+            if identifier is not None:
+                replies.append({"jsonrpc": "2.0", "id": identifier, **({"result": result} if error is None else {
+                    "error": {"code": -32000, "message": error["message"], "data": {"migaiaWireError": error}}})})
+            if business.pending_fault is not None:
+                if replies:
+                    bridge_write(writer, replies if batched else replies[0])
+                    replies.clear()
+                fault, business.pending_fault = business.pending_fault, None
+                perform_fault(fault)
+        if replies:
+            bridge_write(writer, replies if batched else replies[0])
+
+
+
+def initiate_bridge(reader: BinaryIO, writer: BinaryIO, token: str | None) -> None:
+    """Initiate the existing bridge profile through its original framing and strict JSON owners."""
+    if token is None:
+        raise peer.PeerFailure("AUTH_REQUIRED")
+    hello = {**peer.own_offer("python-peer"), "auth": token, "capabilities": BRIDGE_CAPABILITIES}
+    bridge_write(writer, {"jsonrpc": "2.0", "id": "hello", "method": "migaia.hello", "params": {"hello": json.dumps(hello)}})
+    reply = bridge_read(reader)
+    accepted = json.loads(reply["result"]["reply"])
+    if accepted.get("step") != "accept" or not {"runtime-api@1", "batch@1"} <= set(accepted["capabilities"]):
+        raise peer.PeerFailure("HANDSHAKE_INCOMPATIBLE")
+    bridge_write(writer, {"jsonrpc": "2.0", "id": "directory", "method": "migaia.describe", "params": {"args": []}})
+    directory = bridge_read(reader)["result"]
+    if directory.get("schemaVersion") != 2 or directory["self"]["instanceId"] != accepted["peer"]["id"]:
+        raise peer.PeerFailure("CONTRACT_INVALID")
+    bridge_write(writer, [
+        {"jsonrpc": "2.0", "id": "first", "method": "migaia.invoke", "params": {"method": "echo", "args": ["bridge-first"]}},
+        {"jsonrpc": "2.0", "id": "missing", "method": "migaia.invoke", "params": {"method": "absent", "args": []}},
+        {"jsonrpc": "2.0", "id": "last", "method": "migaia.invoke", "params": {"method": "echo", "args": ["bridge-last"]}}
+    ])
+    replies = bridge_read(reader)
+    if not isinstance(replies, list) or [x["id"] for x in replies] != ["first", "missing", "last"] or replies[0]["result"] != ["bridge-first"] or replies[2]["result"] != ["bridge-last"] or replies[1]["error"]["data"]["migaiaWireError"]["code"] != "PROVIDER_NOT_FOUND":
+        raise peer.PeerFailure("INVALID_ENVELOPE")
+    print("RESULT ok", file=peer.sys.stderr, flush=True)
+
 
 def run_business(args: Any) -> int:
     """Select existing framing over true owned stdio or borrowed reusable Unix listener."""
+    global REQUEST_IDEMPOTENT
+    REQUEST_IDEMPOTENT = not args.non_idempotent_request
     import os
     import socket
     import sys
@@ -356,7 +479,10 @@ def run_business(args: Any) -> int:
         child = subprocess.Popen(["/bin/sleep", "600"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) if args.descendant else None
         print(f"READY pid={os.getpid()}", file=sys.stderr, flush=True)
         try:
-            serve(sys.stdin.buffer, sys.stdout.buffer, args.host, token, args.jsonrpc, args.bare_jsonrpc)
+            if args.jsonrpc and args.role == "initiator":
+                initiate_bridge(sys.stdin.buffer, sys.stdout.buffer, token)
+            else:
+                serve(sys.stdin.buffer, sys.stdout.buffer, args.host, token, args.jsonrpc, args.bare_jsonrpc)
         finally:
             if child is not None:
                 child.terminate()

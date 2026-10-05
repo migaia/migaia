@@ -9,6 +9,9 @@ use std::{
     collections::HashMap,
     io::{self, Read, Write},
 };
+/// The executable fixes its actual request declaration before accepting any business session.
+pub static REQUEST_IDEMPOTENT: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(true);
 
 /// Read absent portable values as null; validated business inputs carry concrete fields.
 fn value<'a>(input: &'a Value, key: &str) -> &'a Value {
@@ -112,14 +115,14 @@ impl Business {
             ("peer.busy", &["request", "notify"]),
             ("peer.pause", &["request", "notify"]),
             ("peer.crash", &["request", "notify"]),
-            ("p.f.request", &["request", "notify"]),
-            ("p.f.oneWay", &["request", "notify"]),
+            ("p.f.request", &["request"]),
+            ("p.f.oneWay", &["notify"]),
         ];
         if self.host {
             methods.extend([
-                ("migaia.remote.host.use", &["request", "notify"][..]),
-                ("migaia.remote.host.unUse", &["request", "notify"][..]),
-                ("migaia.remote.host.inspect", &["request", "notify"][..]),
+                ("migaia.remote.host.use", &["request"][..]),
+                ("migaia.remote.host.unUse", &["request"][..]),
+                ("migaia.remote.host.inspect", &["request"][..]),
             ]);
         }
         if self.streams_supported {
@@ -128,7 +131,25 @@ impl Business {
                 ("p.f.asyncGenerator", &["stream"][..]),
             ]);
         }
-        runtime_description(&methods)
+        let mut description = runtime_description(&methods);
+        if let Some(Value::Array(entries)) = match &mut description {
+            Value::Object(fields) => fields
+                .iter_mut()
+                .find(|(name, _)| name == "methods")
+                .map(|(_, value)| value),
+            _ => None,
+        } {
+            for entry in entries {
+                if value(entry, "name").as_str() == Some("p.f.request") {
+                    set(
+                        entry,
+                        "idempotent",
+                        Value::Bool(REQUEST_IDEMPOTENT.load(std::sync::atomic::Ordering::Relaxed)),
+                    );
+                }
+            }
+        }
+        description
     }
     /// Project the actual locally resolved definition without executable code or client config.
     fn item(&self) -> Value {
@@ -369,10 +390,7 @@ pub fn serve(
             }
             return Ok(());
         }
-        return Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "CAPABILITY_UNSUPPORTED",
-        ));
+        return serve_bridge(input, output, host, auth);
     }
     let hello = read_json(input)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "HANDSHAKE_INVALID"))?;
@@ -522,10 +540,364 @@ fn bridge_body(input: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
     Ok(Some(body))
 }
 /// One physical writer is reused by bare echoes and encoded RPC replies.
-fn bridge_write_body(output: &mut impl Write, body: &[u8]) -> io::Result<()> {
+pub(super) fn bridge_write_body(output: &mut impl Write, body: &[u8]) -> io::Result<()> {
     write!(output, "Content-Length: {}\r\n\r\n", body.len())?;
     output.write_all(body)?;
     output.flush()
+}
+/// Read a single or batch response with the bridge's original framing and strict JSON codec.
+pub(super) fn bridge_read(input: &mut impl Read) -> io::Result<Value> {
+    let body = bridge_body(input)?
+        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "BRIDGE_RESPONSE"))?;
+    json::parse(&body).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_RESPONSE"))
+}
+
+/// Initiate the restored bridge profile and require an authenticated v2 directory and batch isolation.
+pub fn initiate_bridge(
+    input: &mut impl Read,
+    output: &mut impl Write,
+    auth: Option<&str>,
+) -> io::Result<()> {
+    if auth.is_none() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "AUTH_REQUIRED",
+        ));
+    }
+    let mut hello = crate::hello(auth);
+    set(
+        &mut hello,
+        "capabilities",
+        Value::Array(
+            [
+                "runtime-api@1",
+                "batch@1",
+                "jsonrpc-bridge@1",
+                "abort@1",
+                "wire-error@1",
+            ]
+            .iter()
+            .map(|v| string(v))
+            .collect(),
+        ),
+    );
+    let request = |id: &str, method: &str, params: Value| {
+        object(&[
+            ("jsonrpc", string("2.0")),
+            ("id", string(id)),
+            ("method", string(method)),
+            ("params", params),
+        ])
+    };
+    bridge_write_body(
+        output,
+        request(
+            "hello",
+            "migaia.hello",
+            object(&[("hello", string(&hello.text()))]),
+        )
+        .text()
+        .as_bytes(),
+    )?;
+    let response = bridge_read(input)?;
+    let accepted = json::parse(
+        value(value(&response, "result"), "reply")
+            .as_str()
+            .unwrap_or("")
+            .as_bytes(),
+    )
+    .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_HELLO"))?;
+    if value(&accepted, "step").as_str() != Some("accept") || !baseline_agreed(&accepted) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "HANDSHAKE_INCOMPATIBLE",
+        ));
+    }
+    bridge_write_body(
+        output,
+        request(
+            "directory",
+            "migaia.describe",
+            object(&[("args", Value::Array(vec![]))]),
+        )
+        .text()
+        .as_bytes(),
+    )?;
+    let response = bridge_read(input)?;
+    let directory = value(&response, "result");
+    if value(directory, "schemaVersion").as_u64() != Some(2)
+        || value(value(directory, "self"), "instanceId") != value(value(&accepted, "peer"), "id")
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "CONTRACT_INVALID",
+        ));
+    }
+    let invoke = |id: &str, method: &str, args: Vec<Value>| {
+        request(
+            id,
+            "migaia.invoke",
+            object(&[("method", string(method)), ("args", Value::Array(args))]),
+        )
+    };
+    let batch = Value::Array(vec![
+        invoke("first", "echo", vec![string("bridge-first")]),
+        invoke("missing", "absent", vec![]),
+        invoke("last", "echo", vec![string("bridge-last")]),
+    ]);
+    bridge_write_body(output, batch.text().as_bytes())?;
+    let response = bridge_read(input)?;
+    let replies = response.as_array().unwrap_or(&[]);
+    if replies.len() != 3
+        || value(&replies[0], "id").as_str() != Some("first")
+        || value(&replies[1], "id").as_str() != Some("missing")
+        || value(&replies[2], "id").as_str() != Some("last")
+        || value(&replies[0], "result").as_array() != Some(&[string("bridge-first")][..])
+        || value(&replies[2], "result").as_array() != Some(&[string("bridge-last")][..])
+        || value(
+            value(
+                value(value(&replies[1], "error"), "data"),
+                "migaiaWireError",
+            ),
+            "code",
+        )
+        .as_str()
+            != Some("PROVIDER_NOT_FOUND")
+    {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_BATCH"));
+    }
+    eprintln!("RESULT ok");
+    Ok(())
+}
+
+/// Bridge extensions share the independent local business owner and explicitly exclude streams.
+pub(super) fn serve_bridge(
+    input: &mut impl Read,
+    output: &mut impl Write,
+    host: bool,
+    auth: Option<&str>,
+) -> io::Result<()> {
+    let mut business = Business {
+        host,
+        installed: !host,
+        closing: false,
+        revision: 0,
+        pongs: 0,
+        closes: 0,
+        received: vec![],
+        aborts: vec![],
+        waiting: HashMap::new(),
+        streams: HashMap::new(),
+        streams_supported: false,
+    };
+    let mut authenticated = false;
+    while let Some(body) = bridge_body(input)? {
+        let physical = json::parse(&body)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_JSON"))?;
+        let batched = matches!(physical, Value::Array(_));
+        let messages = match physical {
+            Value::Array(items) if authenticated && !items.is_empty() => items,
+            Value::Array(_) => {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_BATCH"))
+            }
+            message => vec![message],
+        };
+        let mut replies = vec![];
+        for message in messages {
+            if value(&message, "jsonrpc").as_str() != Some("2.0") {
+                if batched {
+                    eprintln!("PEER_ERROR PROTOCOL_INVALID");
+                    continue;
+                }
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "BRIDGE_ENVELOPE",
+                ));
+            }
+            let params = value(&message, "params");
+            let (result, failure) = match value(&message, "method").as_str() {
+                Some("migaia.hello") => {
+                    let hello =
+                        json::parse(value(params, "hello").as_str().unwrap_or("").as_bytes())
+                            .map_err(|_| {
+                                io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_HELLO")
+                            })?;
+                    let mut agreed = negotiate(&hello)
+                        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_HELLO"))?;
+                    let baseline = baseline_agreed(&agreed);
+                    authenticated =
+                        baseline && auth.is_some() && value(&hello, "auth").as_str() == auth;
+                    if authenticated {
+                        set(
+                            &mut agreed,
+                            "capabilities",
+                            Value::Array(
+                                value(&hello, "capabilities")
+                                    .as_array()
+                                    .unwrap_or(&[])
+                                    .iter()
+                                    .filter(|cap| {
+                                        matches!(
+                                            cap.as_str(),
+                                            Some(
+                                                "runtime-api@1"
+                                                    | "batch@1"
+                                                    | "abort@1"
+                                                    | "jsonrpc-bridge@1"
+                                                    | "wire-error@1"
+                                                    | "deadline@1"
+                                                    | "trace@1"
+                                                    | "idempotency@1"
+                                            )
+                                        )
+                                    })
+                                    .cloned()
+                                    .collect(),
+                            ),
+                        );
+                        set(&mut agreed, "kind", string("handshake"));
+                        set(&mut agreed, "step", string("accept"));
+                        set(&mut agreed, "protocol", string("migaia.rpc"));
+                        set(
+                            &mut agreed,
+                            "peer",
+                            object(&[("id", string("rust-peer")), ("runtime", string("rust"))]),
+                        );
+                    } else {
+                        agreed = object(&[
+                            ("kind", string("handshake")),
+                            ("step", string("reject")),
+                            ("protocol", string("migaia.rpc")),
+                            (
+                                "error",
+                                wire_error(
+                                    "@migaia/rpc/process",
+                                    if baseline {
+                                        "AUTH_REJECTED"
+                                    } else {
+                                        "HANDSHAKE_INCOMPATIBLE"
+                                    },
+                                    if baseline {
+                                        "authentication rejected"
+                                    } else {
+                                        "rpc handshake incompatible: version"
+                                    },
+                                ),
+                            ),
+                        ]);
+                    }
+                    (
+                        object(&[
+                            ("reply", string(&agreed.text())),
+                            (
+                                "methods",
+                                Value::Array(
+                                    [
+                                        "migaia.hello",
+                                        "migaia.describe",
+                                        "migaia.invoke",
+                                        "migaia.cancel",
+                                    ]
+                                    .iter()
+                                    .map(|name| string(name))
+                                    .collect(),
+                                ),
+                            ),
+                        ]),
+                        None,
+                    )
+                }
+                _ if !authenticated => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::PermissionDenied,
+                        "AUTH_REQUIRED",
+                    ));
+                }
+                Some("migaia.describe") => {
+                    let mut description = business.description();
+                    let methods = value(&description, "methods")
+                        .as_array()
+                        .unwrap_or(&[])
+                        .iter()
+                        .filter(|method| {
+                            !matches!(
+                                value(method, "name").as_str(),
+                                Some("peer.pause" | "peer.busy" | "peer.crash")
+                            )
+                        })
+                        .cloned()
+                        .collect();
+                    set(&mut description, "methods", Value::Array(methods));
+                    (description, None)
+                }
+                Some("migaia.cancel") => {
+                    if let Some(id) = value(params, "id").as_str() {
+                        if business.waiting.remove(id).is_some() {
+                            business.aborts.push(value(params, "reason").clone());
+                            replies.push(object(&[
+                                ("jsonrpc", string("2.0")),
+                                ("id", string(id)),
+                                ("result", string("late-after-cancel")),
+                            ]));
+                        }
+                    }
+                    continue;
+                }
+                Some("migaia.invoke") => {
+                    let called = value(params, "method").as_str().unwrap_or("");
+                    let args = value(params, "args");
+                    if called == "peer.wait"
+                        || called == "p.f.request"
+                            && args.as_array() == Some(&[string("__wait")][..])
+                    {
+                        business.waiting.insert(
+                            value(&message, "id").as_str().unwrap_or("").to_owned(),
+                            message,
+                        );
+                        continue;
+                    }
+                    business.invoke(called, args, value(value(params, "meta"), "trace"))
+                }
+                _ => (
+                    Value::Null,
+                    Some(wire_error(
+                        "@migaia/rpc/core",
+                        "METHOD_NOT_FOUND",
+                        "bridge peer method unavailable",
+                    )),
+                ),
+            };
+            if message.has("id") {
+                let mut reply = object(&[
+                    ("jsonrpc", string("2.0")),
+                    ("id", value(&message, "id").clone()),
+                ]);
+                if let Some(error) = failure {
+                    set(
+                        &mut reply,
+                        "error",
+                        object(&[
+                            ("code", Value::Number("-32000".into())),
+                            ("message", value(&error, "message").clone()),
+                            ("data", object(&[("migaiaWireError", error)])),
+                        ]),
+                    );
+                } else {
+                    set(&mut reply, "result", result);
+                }
+                replies.push(reply);
+            }
+        }
+        if !replies.is_empty() {
+            let reply = if batched {
+                Value::Array(replies)
+            } else {
+                replies.remove(0)
+            };
+            bridge_write_body(output, reply.text().as_bytes())?;
+        }
+    }
+    Ok(())
 }
 /// Read native stdin bootstrap with the existing bounded length reader before starting hello.
 pub fn bootstrap(input: &mut impl Read) -> io::Result<String> {

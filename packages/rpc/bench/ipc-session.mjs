@@ -403,9 +403,6 @@ export async function createIpcSession({ carrier, side, payload, wire, peerRunti
 async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
   /** Both sides run this exact executable, argument profile and byte framing. */
   const peerRoot = new URL('../test/process/peers/', import.meta.url)
-  const contractPath = fileURLToPath(
-    new URL('../schema/vectors/remote-contract.json', import.meta.url)
-  )
   let command, args, id
   if (peerRuntime === 'python') {
     command = 'python3'
@@ -417,7 +414,7 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
       [fileURLToPath(new URL(`${peerRuntime}/run.sh`, peerRoot)), '--executable'],
       { encoding: 'utf8' }
     ).trim()
-    args = ['--business', '--contract', contractPath]
+    args = ['--business']
     id = `${peerRuntime}-peer`
   } else throw new Error(IpcBenchErrorText.bridgeRuntime)
   /** This is the actual spawned executable, independently hashed from the immutable peer sources. */

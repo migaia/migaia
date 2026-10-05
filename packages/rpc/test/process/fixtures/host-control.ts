@@ -4,7 +4,7 @@ import type { IProcessHandle } from '@migaia/supervision/process'
 import type { IRpcEndpoint } from '../../../src/core/typing.js'
 import type { IProcessHostOptions } from '../../../src/process/host/types.js'
 import type { IRemoteHostCatalog } from '../../../src/remote/contract.js'
-import { remoteHarness } from '../../remote/fixture.js'
+import { remoteHarness, remoteDescription } from '../../remote/fixture.js'
 
 /** The neutral control harness still validates a real catalog with no fabricated local Host state. */
 export const catalog: IRemoteHostCatalog = {
@@ -54,8 +54,8 @@ export function hostFixture() {
     return handle
   })
   const send = vi.fn(async (_peer: string, method: string) =>
-    method === 'migaia.remote.describe'
-      ? { schemaVersion: 1, catalog }
+    method === 'migaia.remote.runtime.describe'
+      ? remoteDescription(Object.values(catalog), 'peer', true)
       : method === 'migaia.remote.host.inspect'
         ? { revision: 0, plugins: [] }
         : method === 'migaia.remote.host.unUse'

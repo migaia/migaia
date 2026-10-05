@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { evidence, peers } from './fixtures/conformance-business.js'
@@ -8,20 +8,12 @@ import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc/pr
 import { createNodeProcessLauncher } from '@migaia/rpc/process/adapters/node-child-process'
 import { endpointFor } from './peers/ts/runtime.js'
 
-/** These published vector groups are the precise R2 independent-evaluation scope. */
-const vectorFiles = [
-  'frozen/1.0/handshake.json',
-  'frozen/1.0/control.json',
-  'frozen/1.0/envelope.json',
-  'handshake.json',
-  'control.json',
-  'envelope.json',
-  'stream.json',
-  'error-chain.json',
-  'remote-contract.json',
-  'remote-host-control.json',
-  'stream-framing.json'
-]
+/** U36 baseline selects current independent oracles; retired facade declarations are local only. */
+const baseline = JSON.parse(
+  readFileSync(new URL('../../schema/vectors/protocol-baseline.json', import.meta.url), 'utf8')
+) as { selftestVectors: string[] }
+/** Every selected group remains mandatory; this list comes from the current contract artifact. */
+const vectorFiles = baseline.selftestVectors
 /** Every applicable case ID must appear in a real independent selftest receipt. */
 const requiredIds = [
   ...new Set(
@@ -80,7 +72,7 @@ describe('[A2] published vectors evaluated by independent language owners', () =
           ...createNativeProcessOffer({
             peer: { id: 'caller', runtime: 'node' },
             stream: false,
-            capabilities: ['abort@1', 'wire-error@1']
+            capabilities: ['abort@1', 'wire-error@1', 'runtime-api@1']
           }),
           auth: token
         },
@@ -124,9 +116,14 @@ describe('[A2] published vectors evaluated by independent language owners', () =
       expect(output).not.toMatch(/^FAIL /m)
       expect(output).toMatch(/failed=0/)
       const rows = output.split('\n')
+      const warningGroups = vectorFiles.filter(
+        (file) =>
+          JSON.parse(readFileSync(new URL(`../../schema/vectors/${file}`, import.meta.url), 'utf8'))
+            .warnings
+      )
       expect(
         rows.filter((line) => line.startsWith('PASS ') && line.endsWith('/warnings/sequence'))
-      ).toHaveLength(2)
+      ).toHaveLength(warningGroups.length)
       for (const id of requiredIds)
         expect(
           rows.some(
@@ -153,7 +150,10 @@ describe('[A2] published vectors evaluated by independent language owners', () =
       { encoding: 'utf8', timeout: 30000 }
     )
     writeFileSync(join(evidence, 'vectors-typescript.log'), output)
-    expect(output).toMatch(/Test Files\s+5 passed/)
+    const owners = readdirSync(new URL('./peers/ts', import.meta.url)).filter((file) =>
+      file.endsWith('-vectors.test.ts')
+    )
+    expect(output).toMatch(new RegExp(`Test Files\\s+${owners.length} passed`))
     expect(output).not.toMatch(/Tests\s+\d+ failed/)
   }, 30000)
 })

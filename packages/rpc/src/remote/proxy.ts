@@ -2,7 +2,7 @@ import type { IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizePortable } from '../contract/normalize.js'
 import type { IRpcPortableValue } from '../contract/types.js'
-import type { IRuntimePeer } from './runtime-api/peer.js'
+import type { IRuntimePeer, IRuntimePeerSourceResult } from './runtime-api/peer.js'
 import { readRuntimePeerConnection } from './runtime-api/peer.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
@@ -16,12 +16,13 @@ import {
   normalizeRemoteControlShape,
   normalizeRemoteHostCatalog,
   RemoteMethodMode,
-  sameRemoteContract,
   type IRemoteContract,
   type IRemoteControlDefinition,
   type IRemoteHostCatalog,
   type IRemoteMethodContract
 } from './contract.js'
+import { normalizeRuntimeDescription } from './runtime-api/description.js'
+import { describeRemoteMethods } from './serve-methods.js'
 import { ERROR_SOURCE, RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
 import { RpcRemoteLayerErrorText } from './error-text.js'
@@ -442,25 +443,45 @@ class RemoteRegistration<TUnit, TSpec> {
         RpcRemoteLayerErrorText.streamUnavailable
       )
     if (!runtime) {
+      /** Legacy facade assembly now publishes v2 routes before releasing the same native reader. */
+      ;(channel as IRuntimePeerSourceResult).activateReceive?.()
       const description = await served.endpoint.send(
         channel.peerId,
-        RemoteMethodName.describe,
+        RemoteMethodName.runtimeDescribe,
         [],
         {
           signal
         }
       )
-      if (this.#catalog) {
-        const envelope = normalizeRemoteControlShape('describeHost', description) as {
-          readonly catalog: IRemoteHostCatalog
-        }
-        if (
-          JSON.stringify(this.#catalog) !==
-          JSON.stringify(normalizeRemoteHostCatalog(envelope.catalog))
-        )
-          throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-      } else if (
-        !sameRemoteContract(this.contract as IRemoteContract, normalizeRemoteContract(description))
+      /**
+       * Local advanced declarations select facade methods; the remote v2 whitelist is
+       * authoritative.
+       */
+      const remote = normalizeRuntimeDescription(description)
+      const expected = describeRemoteMethods(contracts, remote.self, this.#catalog !== undefined)
+      const names = new Set(contracts.map((contract) => contract.plugin))
+      const selected = remote.methods.filter(
+        (method) =>
+          names.has(method.name.split('.')[0]!) ||
+          (this.#catalog !== undefined &&
+            [
+              RemoteMethodName.hostUse,
+              RemoteMethodName.hostUnUse,
+              RemoteMethodName.hostInspect
+            ].includes(method.name as never))
+      )
+      if (
+        remote.self.instanceId !== channel.peerId ||
+        selected.length !== expected.methods.length ||
+        expected.methods.some((method) => {
+          const actual = selected.find((candidate) => candidate.name === method.name)
+          return (
+            !actual ||
+            actual.supportedModes.length !== method.supportedModes.length ||
+            actual.supportedModes.some((mode) => !method.supportedModes.includes(mode)) ||
+            (actual.idempotent ?? false) !== (method.idempotent ?? false)
+          )
+        })
       )
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
     }
@@ -728,12 +749,17 @@ class RemoteRegistration<TUnit, TSpec> {
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
-    yield* active.served.stream.open(active.channel.peerId, method, data, {
-      ...(options.signal ? { signal: options.signal } : {}),
-      ...(this.#timeout(options.timeoutMs) === undefined
-        ? {}
-        : { timeoutMs: this.#timeout(options.timeoutMs) })
-    })
+    yield* active.served.stream.open(
+      active.channel.peerId,
+      `${RemoteMethodName.runtimeStreamPrefix}${method}`,
+      data,
+      {
+        ...(options.signal ? { signal: options.signal } : {}),
+        ...(this.#timeout(options.timeoutMs) === undefined
+          ? {}
+          : { timeoutMs: this.#timeout(options.timeoutMs) })
+      }
+    )
   }
 
   /** Finds only methods present in the validated description. */

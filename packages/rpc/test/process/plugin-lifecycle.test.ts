@@ -106,9 +106,9 @@ describe('process plugin generation lifetime', () => {
       expect(launch).toHaveBeenCalledTimes(2)
       expect(enable).toHaveBeenCalledTimes(1)
       expect(await feature.request(['second'])).toBe('result')
-      expect(fixture.sends.filter((send) => send.method === 'migaia.remote.describe')).toHaveLength(
-        2
-      )
+      expect(
+        fixture.sends.filter((send) => send.method === 'migaia.remote.runtime.describe')
+      ).toHaveLength(2)
     } finally {
       await host.dispose()
     }

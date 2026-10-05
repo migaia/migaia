@@ -1,5 +1,5 @@
 import portableVectors from '../../schema/vectors/portable-values.json'
-import frozenWireVectors from '../../schema/vectors/frozen/1.0/envelope.json'
+import wireVectors from '../../schema/vectors/envelope.json'
 import remoteVectors from '../../schema/vectors/remote-contract.json'
 import { objectDeepValue } from './json-object-fixture.js'
 
@@ -23,10 +23,10 @@ export function objectGoldenPayload(index: number): unknown[] {
 /** One legal business exchange keeps positional request args while varying the result's domain. */
 export type IObjectGoldenCase = Readonly<{ args: unknown[]; result: unknown; alias?: boolean }>
 
-/** Frozen protocol/remote vectors precede independently seeded graph shapes in the same corpus. */
-const frozenValues: readonly unknown[] = [
+/** Canonical protocol/remote vectors precede independently seeded graph shapes in the same corpus. */
+const canonicalValues: readonly unknown[] = [
   ...portableVectors.cases.map((vector) => vector.value),
-  ...frozenWireVectors.valid.map((vector) => vector.value),
+  ...wireVectors.valid.map((vector) => vector.value),
   ...remoteVectors.contracts
     .filter((vector) => vector.schemaValid && vector.semanticValid)
     .map((vector) => vector.value)
@@ -34,8 +34,8 @@ const frozenValues: readonly unknown[] = [
 
 /** Fixed seed varies domains, widths and depths without ambient randomness or unsupported values. */
 export function objectGoldenCase(index: number): IObjectGoldenCase {
-  if (index < frozenValues.length)
-    return { args: [frozenValues[index]], result: frozenValues[index] }
+  if (index < canonicalValues.length)
+    return { args: [canonicalValues[index]], result: canonicalValues[index] }
   if (index % 997 === 0) return { args: [], result: null }
   if (index % 991 === 0) return { args: [objectDeepValue(48)], result: objectDeepValue(48) }
   if (index % 983 === 0)

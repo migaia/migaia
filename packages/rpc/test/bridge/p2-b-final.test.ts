@@ -11,12 +11,12 @@ import {
 
 describe('negotiated JSON-RPC physical batching', () => {
   it('[A28] uses actual hello intersection and isolates invalid array response members', async () => {
-    /** The independent peer advertises optional batching through the unchanged hello fields. */
+    /** The independent peer advertises mandatory batching through the unchanged hello fields. */
     const fixture = bridgeFixture({
       responder(message) {
         if (message.method !== 'migaia.hello') return undefined
         const answer = acceptRpcHandshake(
-          { ...BRIDGE_PEER_OFFER, capabilities: [...BRIDGE_PEER_OFFER.capabilities, 'batch@1'] },
+          BRIDGE_PEER_OFFER,
           (message.params as { hello: string }).hello
         )
         return {

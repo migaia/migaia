@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { acceptRpcHandshake } from '../../src/contract/handshake.js'
 import { createRemotePlugin } from '../../src/remote/plugin.js'
 import { createRemoteHost } from '../../src/remote/host.js'
-import { remoteHarness } from '../remote/fixture.js'
+import { remoteHarness, remoteDescription } from '../remote/fixture.js'
 import {
   BRIDGE_CONTRACT,
   BRIDGE_METHODS,
@@ -45,7 +45,7 @@ describe('JSON-RPC remote assembly', () => {
               id: message.id,
               error: { code: -32601, message: 'describe unavailable' }
             }
-          : responder({ schemaVersion: 1, catalog: { p: BRIDGE_CONTRACT } })(message)
+          : responder(remoteDescription([BRIDGE_CONTRACT], 'peer', true))(message)
     })
     const neutral = remoteHarness()
     const remote = createRemoteHost({
@@ -77,7 +77,7 @@ describe('JSON-RPC remote assembly', () => {
     expect(fixture.closes).toBe(1)
   })
   it('[A5] carries Host controls and their results through the real remote facade', async () => {
-    const description = { schemaVersion: 1, catalog: { p: BRIDGE_CONTRACT } }
+    const description = remoteDescription([BRIDGE_CONTRACT], 'peer', true)
     const entry = { name: 'p', state: 'enabled', revision: 1, features: ['f'] }
     const fixture = bridgeFixture({
       responder: (message) => {
@@ -127,7 +127,7 @@ describe('JSON-RPC remote assembly', () => {
     }
   })
   it('[A2/A5] gates real PluginHost preparation on one describe and carries the automatic key', async () => {
-    const fixture = bridgeFixture({ responder: responder(BRIDGE_CONTRACT) })
+    const fixture = bridgeFixture({ responder: responder(remoteDescription([BRIDGE_CONTRACT])) })
     const neutral = remoteHarness()
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -233,7 +233,9 @@ describe('JSON-RPC remote assembly', () => {
   ])(
     '[A3] rolls back real PluginHost before publishing a %s description',
     async (_kind, description, code) => {
-      const fixture = bridgeFixture({ responder: responder(description) })
+      const fixture = bridgeFixture({
+        responder: responder(remoteDescription([description as typeof BRIDGE_CONTRACT]))
+      })
       const neutral = remoteHarness()
       const host = new PluginHost<Record<string, never>>({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -266,27 +268,28 @@ describe('JSON-RPC remote assembly', () => {
     }
   )
   it.each([
-    ['valid', { schemaVersion: 1, catalog: { p: BRIDGE_CONTRACT } }, undefined],
-    ['bare contract', BRIDGE_CONTRACT, 'REMOTE_CONTRACT_INVALID'],
+    ['valid', remoteDescription([BRIDGE_CONTRACT], 'peer', true), undefined],
+    ['retired v1 contract', BRIDGE_CONTRACT, 'JSONRPC_PROFILE_INVALID'],
     [
       'wrong catalog',
-      { schemaVersion: 1, catalog: { q: { ...BRIDGE_CONTRACT, plugin: 'q' } } },
+      remoteDescription([{ ...BRIDGE_CONTRACT, plugin: 'q' }], 'peer', true),
       'REMOTE_CONTRACT_INVALID'
     ],
     [
       'stream catalog',
-      {
-        schemaVersion: 1,
-        catalog: {
-          p: {
+      remoteDescription(
+        [
+          {
             ...BRIDGE_CONTRACT,
             features: { f: { methods: { stream: { mode: 'generator', idempotent: false } } } }
           }
-        }
-      },
+        ],
+        'peer',
+        true
+      ),
       'JSONRPC_UNSUPPORTED_MODE'
     ]
-  ])('[A3] describes a Host using its catalog wrapper: %s', async (_kind, description, code) => {
+  ])('[A3] validates the Host v2 directory: %s', async (_kind, description, code) => {
     const fixture = bridgeFixture({ responder: responder(description) })
     const neutral = remoteHarness()
     const remote = createRemoteHost({
@@ -301,7 +304,13 @@ describe('JSON-RPC remote assembly', () => {
       report: () => undefined
     })
     try {
-      if (code) await expect(remote.ready()).rejects.toMatchObject({ code })
+      if (code)
+        await expect(remote.ready()).rejects.toMatchObject({
+          code,
+          ...(_kind === 'retired v1 contract'
+            ? { cause: { code: 'JSONRPC_PROFILE_INVALID', cause: { code: 'CONTRACT_INVALID' } } }
+            : {})
+        })
       else await expect(remote.ready()).resolves.toBeUndefined()
       expect(
         fixture.messages.filter((message) => message.method === 'migaia.describe')

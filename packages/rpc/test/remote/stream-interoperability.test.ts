@@ -11,7 +11,7 @@ describe('A9 remote stream dispatch', () => {
       expect(fixture.calls).not.toContain('stream.open')
       await expect(iterator.next()).resolves.toEqual({ value: 'item', done: false })
       expect(fixture.calls.filter((call) => call === 'stream.open')).toHaveLength(1)
-      expect(fixture.sends.map((entry) => entry.method)).toEqual(['migaia.remote.describe'])
+      expect(fixture.sends.map((entry) => entry.method)).toEqual(['migaia.remote.runtime.describe'])
     }
   )
 

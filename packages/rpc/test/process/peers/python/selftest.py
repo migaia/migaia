@@ -453,12 +453,9 @@ def check_stream(results: Results, data: dict[str, Any]) -> None:
     def reclassified() -> None:
         case = data["envelope"]
         normalize_envelope(case["valid"], 1)
-        frozen = {"kind": "stream", "id": "req-1", "data": {"route": {"profile": "migaia.rpc.route", "type": "request", "applicationVersion": "1", "senderId": "caller", "targetId": "provider", "sentAt": 0}}}
         expected = case["reclassified"]
-        expect_failure(lambda: normalize_envelope(frozen, 1), expected["violation"], expected["pointer"])
-        expect(data["handshake"]["newVersion"]["minor"], 1)
-        expect(min(data["handshake"]["newVersion"]["minor"], data["handshake"]["oldVersion"]["minor"]), data["handshake"]["negotiatedMinor"])
-    results.check("stream/envelope/reclassified-1.1", reclassified)
+        expect_failure(lambda: normalize_envelope(expected["value"], 1), expected["violation"], expected["pointer"])
+    results.check("stream/envelope/" + data["envelope"]["reclassified"]["id"], reclassified)
 
 
 def credit(frame: dict[str, Any], expected_seq: int) -> None:
@@ -632,6 +629,14 @@ def run_selftest(path: str | None = None) -> int:
     except (ValueError, KeyError, TypeError):
         results.failed += 1
         print("FAIL behavior-harness")
+    baseline = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve().parents[1] / "baseline_check.py"), "--language", "python"], capture_output=True, text=True, check=False)
+    def baseline_receipt() -> None:
+        summary = json.loads(baseline.stdout.strip())
+        expect(baseline.returncode, 0)
+        expect(summary["passed"], summary["total"])
+        expect({row.get("id") for row in summary["rows"] if "id" in row},
+               {case["id"] for case in json.loads((root / "protocol-baseline.json").read_text())["handshake"]})
+    results.check("protocol-baseline/real-handshake-offers", baseline_receipt)
     print(f"SUMMARY passed={results.passed} failed={results.failed} pending={results.pending} skipped={results.skipped}")
     return 1 if results.failed else 0
 

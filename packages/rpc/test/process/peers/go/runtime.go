@@ -22,6 +22,9 @@ const (
 // An unnegotiated optional profile is reported without executing it or retiring unrelated baseline calls.
 var errUnsupportedRuntimeProfile = errors.New("unsupported runtime profile")
 
+// CLI freezes this conservative declaration before any business session is admitted.
+var businessRequestIdempotent = true
+
 // baselineAgreement admits only the implemented network baseline; the pure negotiation oracle stays unchanged.
 func baselineAgreement(chosen agreement) bool {
 	return chosen.Major == 1 && chosen.Minor == 1 && chosen.Codec == "json" && slices.Contains(chosen.Capabilities, runtimeCapability) && slices.Contains(chosen.Capabilities, batchCapability)
@@ -48,10 +51,17 @@ func runtimeDescription(business, host, stream bool) record {
 	methods := make([]any, 0, len(names)+2)
 	for _, name := range names {
 		modes := []string{"request", "notify"}
-		if name == "peer.wait" {
+		if name == "peer.wait" || name == "p.f.request" || strings.HasPrefix(name, "migaia.remote.host.") {
 			modes = []string{"request"}
 		}
-		methods = append(methods, record{"name": name, "supportedModes": modes, "modeSource": "declared"})
+		if name == "p.f.oneWay" {
+			modes = []string{"notify"}
+		}
+		method := record{"name": name, "supportedModes": modes, "modeSource": "declared"}
+		if name == "p.f.request" {
+			method["idempotent"] = businessRequestIdempotent
+		}
+		methods = append(methods, method)
 	}
 	if business && stream {
 		for _, name := range []string{"p.f.generator", "p.f.asyncGenerator"} {

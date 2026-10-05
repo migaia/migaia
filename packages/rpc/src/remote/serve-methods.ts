@@ -4,6 +4,54 @@ import { RemoteMethodMode, type IRemoteContract } from './contract.js'
 import { RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
 import type { IRemoteServeEndpoint } from './types.js'
+import { RemoteMethodName } from './constants.js'
+import {
+  normalizeRuntimeDescription,
+  type IRuntimePeerDescription,
+  type IRuntimePeerIdentity
+} from './runtime-api/description.js'
+import { RuntimeApiMode } from './runtime-api/constants.js'
+
+/**
+ * The advanced declaration still supplies the installed legacy facade providers until C7 removes
+ * those APIs. Its wire directory uses the same v2 baseline as every Runtime Peer.
+ */
+export function describeRemoteMethods(
+  contracts: readonly IRemoteContract[],
+  self: IRuntimePeerIdentity,
+  host = false
+): IRuntimePeerDescription {
+  /** Only routes actually registered below enter the directory; no v1 description travels. */
+  const methods = contracts.flatMap((contract) =>
+    Object.entries(contract.features).flatMap(([featureName, feature]) =>
+      Object.entries(feature.methods).map(([methodName, declaration]) => ({
+        name: `${contract.plugin}.${featureName}.${methodName}`,
+        supportedModes: [
+          declaration.mode === RemoteMethodMode.request
+            ? RuntimeApiMode.request
+            : declaration.mode === RemoteMethodMode.oneWay
+              ? RuntimeApiMode.notify
+              : RuntimeApiMode.stream
+        ],
+        modeSource: 'declared' as const,
+        idempotent: declaration.idempotent
+      }))
+    )
+  )
+  if (host)
+    for (const name of [
+      RemoteMethodName.hostUse,
+      RemoteMethodName.hostUnUse,
+      RemoteMethodName.hostInspect
+    ])
+      methods.push({
+        name,
+        supportedModes: [RuntimeApiMode.request],
+        modeSource: 'declared',
+        idempotent: false
+      })
+  return normalizeRuntimeDescription({ schemaVersion: 2, self, methods })
+}
 
 /** Stream capability is required if any declared method opens a stream. */
 export function contractRequiresStream(contract: IRemoteContract): boolean {
@@ -59,12 +107,15 @@ export function registerRemoteMethods(
         method.mode === RemoteMethodMode.asyncGenerator
       ) {
         streamReleases.push(
-          endpoint.stream!.provide(fullName, (params, { context }) => {
-            const selected = selectedMethod(getFeature(featureName), methodName, isDisabled())
-            const args = requestParams(params)
-            const invocation = invocationContext?.(context)
-            return selected(...args, ...(invocationContext ? [invocation] : [])) as never
-          })
+          endpoint.stream!.provide(
+            `${RemoteMethodName.runtimeStreamPrefix}${fullName}`,
+            (params, { context }) => {
+              const selected = selectedMethod(getFeature(featureName), methodName, isDisabled())
+              const args = requestParams(params)
+              const invocation = invocationContext?.(context)
+              return selected(...args, ...(invocationContext ? [invocation] : [])) as never
+            }
+          )
         )
         continue
       }

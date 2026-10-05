@@ -34,7 +34,7 @@ JSON syntax, or bytes marker keys. The sender replaces lone surrogates and marks
 receiver rejects them. Child admission counts only the child's five fields before `data` and
 descendants. `cause` precedes `errors`, and cleanup errors append to `errors` in source order.
 
-`envelope.json` records valid 1.0 kinds, invalid values with the first `violation` and `pointer`,
+`envelope.json` records current envelope kinds, invalid values with the first `violation` and `pointer`,
 unknown-field callback order, validation order, and per-connection warning keys. An invalid case
 marked `evolvable` may become valid in a later negotiated minor version. `control.json` records
 the four initial variation subtypes, their payloads, and expected actions; its unknown subtype is
@@ -42,7 +42,17 @@ also evolvable. `handshake.json` records offer pairs, negotiated values, invalid
 and accept values outside an offer. These vectors contain JSON values and protocol text only; they
 do not depend on JavaScript error prototypes.
 
-Protocol 1.0 is frozen from the first commit that adds `frozen/1.0/SHA256SUMS`. The three vector
-files in `frozen/1.0/` are exact copies of the live files at that cutover, and the manifest records
-their SHA-256 digests. Future implementation changes must preserve every non-evolvable outcome;
-new minor versions can extend the live vectors without rewriting the frozen copies.
+U36 replaces the unpublished frozen 1.0/1.1 snapshots with `protocol-baseline.json` and the
+current vector files named by it. `SHA256SUMS` covers that baseline, its independent selftest
+groups, and the v2 directory and batch contracts. There is one canonical copy of each group.
+Network peers require protocol 1.1, `runtime-api@1`, `batch@1` and v2 describe; missing baseline
+capabilities are rejected during handshake. Native batches use the existing `batch` envelope;
+bridge batches use JSON-RPC 2.0 arrays. Neither path falls back to v1 describe or single-frame-only
+operation. Generic highest-common-version negotiation vectors still test the pure contract
+functions; they do not authorize an older network baseline.
+
+The obsolete frozen-file identity assertions are replaced by checks of this manifest. First
+violations, JSON pointers, wire-error graphs, warning order, framing bytes and stream credit
+assertions remain. V1 remote-contract and Host-control vectors remain local advanced facade
+configuration until C7 removes those APIs; foreign network selftests do not interpret them as
+describe responses.

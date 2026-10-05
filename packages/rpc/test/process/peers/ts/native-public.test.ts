@@ -31,7 +31,7 @@ mkdirSync(evidence, { recursive: true })
 const offer = createNativeProcessOffer({
   peer: { id: 'caller', runtime: 'node' },
   stream: true,
-  capabilities: ['abort@1', 'wire-error@1']
+  capabilities: ['runtime-api@1', 'abort@1', 'wire-error@1']
 })
 
 /** Shared behavioral oracles keep each actual peer result distinct from successful transport writes. */
@@ -50,14 +50,35 @@ const vectors = JSON.parse(
 async function business(channel: IRemoteChannel, hostProfile: boolean): Promise<void> {
   /** Core performs discovery and supplies receiverId before admitting each business call. */
   const runtime = await endpointFor(channel, 'caller')
+  /** Caller providers are ready; release the U36 channel's existing deferred receive owner. */
+  ;(channel as IRemoteChannel & { activateReceive?: () => void }).activateReceive?.()
   try {
     /** Describe is a real reserved RPC method rather than a local fixture read. */
-    const description = await runtime.endpoint.send('ts-peer', RemoteMethodName.describe, [])
-    expect(description).toMatchObject(
-      hostProfile
-        ? { schemaVersion: 1, catalog: { p: { plugin: 'p' } } }
-        : { schemaVersion: 1, plugin: 'p' }
+    const description = (await runtime.endpoint.send(
+      'ts-peer',
+      RemoteMethodName.runtimeDescribe,
+      []
+    )) as {
+      schemaVersion: number
+      self: { instanceId: string }
+      methods: { name: string; supportedModes: string[] }[]
+    }
+    expect(description.schemaVersion).toBe(2)
+    expect(description.self.instanceId).toBe('ts-peer')
+    expect(description.methods).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'p.f.request', supportedModes: ['request'] }),
+        expect.objectContaining({ name: 'p.f.oneWay', supportedModes: ['notify'] }),
+        expect.objectContaining({ name: 'p.f.generator', supportedModes: ['stream'] }),
+        expect.objectContaining({ name: 'p.f.asyncGenerator', supportedModes: ['stream'] })
+      ])
     )
+    for (const name of [
+      RemoteMethodName.hostUse,
+      RemoteMethodName.hostUnUse,
+      RemoteMethodName.hostInspect
+    ])
+      expect(description.methods.some((method) => method.name === name)).toBe(hostProfile)
     if (hostProfile) {
       expect(
         await runtime.endpoint.send('ts-peer', RemoteMethodName.hostUse, [
@@ -80,7 +101,11 @@ async function business(channel: IRemoteChannel, hostProfile: boolean): Promise<
     for (const method of ['p.f.generator', 'p.f.asyncGenerator']) {
       /** Three distinct values prove generator order and termination over the real transport. */
       const observed: unknown[] = []
-      for await (const value of runtime.stream!.open('ts-peer', method, [vectors.generator.input]))
+      for await (const value of runtime.stream!.open(
+        'ts-peer',
+        `${RemoteMethodName.runtimeStreamPrefix}${method}`,
+        [vectors.generator.input]
+      ))
         observed.push(value)
       expect(observed).toEqual(vectors.generator.expected)
     }
@@ -233,6 +258,8 @@ describe('public TS native peer', () => {
           if (index === 0) await business(channel, hostProfile)
           else {
             const runtime = await endpointFor(channel, 'caller')
+            /** The second caller also releases its own negotiated channel receive queue. */
+            ;(channel as IRemoteChannel & { activateReceive?: () => void }).activateReceive?.()
             expect(await runtime.endpoint.send('ts-peer', PeerMethod.echo, 'second-session')).toBe(
               'second-session'
             )
