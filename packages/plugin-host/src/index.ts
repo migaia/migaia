@@ -14,7 +14,7 @@ type IRuntimeHostConstructor = new <
 >(
   options: IPluginHostOptions,
   trustedDefinitionReader?: ConstructorParameters<typeof RuntimePluginHost>[1]
-) => RuntimePluginHost<TDomainCore, TValue, TInstalled> & IPluginHostRuntimeExtensions
+) => RuntimePluginHost<TDomainCore, TValue, TInstalled> & IPluginHostRuntimeExtensions<TInstalled>
 
 /** The value is the same runtime constructor; this type adds no wrapper or phantom instance state. */
 const RuntimeHost: IRuntimeHostConstructor = RuntimePluginHost

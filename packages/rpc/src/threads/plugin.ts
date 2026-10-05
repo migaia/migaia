@@ -1,3 +1,8 @@
+import type {
+  IRuntimePluginTyping,
+  IRuntimeExpose,
+  IRuntimeRegistry
+} from '../remote/runtime-api/typing.js'
 import type { IThreadHandle } from '@migaia/supervision/threads'
 import { createRemotePlugin, type IRemotePluginDefinition } from '../remote/plugin.js'
 import { createThreadBinding } from './binding.js'
@@ -14,14 +19,35 @@ export function createThreadPlugin<THandle extends IThreadHandle>(
   options: IThreadPluginOptions<THandle>
 ): IRemotePluginDefinition
 /** Install a symmetric connection into the original canonical thread slot. */
-export function createThreadPlugin(
-  options: IRuntimeThreadPluginOptions
-): ReturnType<typeof createRuntimePlugin>
+export function createThreadPlugin<
+  TRemote = Record<never, never>,
+  const TProvide extends import('../remote/runtime-api/catalog.js').IRuntimePeerProvide = Record<
+    never,
+    never
+  >,
+  const TName extends string = string,
+  const TExpose extends readonly string[] = readonly [],
+  THost = unknown
+>(
+  options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> &
+    Readonly<{
+      name: TName
+      provide?: TProvide
+      expose?: TExpose &
+        (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[])
+    }>
+): ReturnType<typeof createRuntimePlugin> &
+  IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>
 /** Legacy declarations remain only until the registered C7 consumer migration removes this branch. */
 export function createThreadPlugin<THandle extends IThreadHandle>(
   options: IThreadPluginOptions<THandle> | IRuntimeThreadPluginOptions
 ): IRemotePluginDefinition | ReturnType<typeof createRuntimePlugin> {
-  if (!('spec' in options)) return createRuntimePlugin(options, 'thread', createThreadPeer)
+  if (!('spec' in options))
+    return createRuntimePlugin(
+      options,
+      'thread',
+      createThreadPeer as Parameters<typeof createRuntimePlugin>[2]
+    )
   return createRemotePlugin({
     name: options.name,
     contract: options.contract,

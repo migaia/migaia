@@ -1,3 +1,4 @@
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IRuntimePeer } from '../../src/remote/runtime-api/peer.js'
 import { createThreadPeer } from '../../src/threads/index.js'
@@ -21,7 +22,7 @@ globalThis.runAutomaticThreadScenario = async () => {
   /** Unsupported actual exit must remain unresolved rather than being guessed from terminate. */
   let exited = false
   try {
-    parent = await createThreadPeer({
+    parent = await createThreadPeer<IRuntimeDynamicSurface>({
       self: { name: 'browser-parent', instanceId: 'browser-automatic-parent' },
       provide: {
         parentEcho: () => {

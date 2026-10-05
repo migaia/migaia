@@ -54,3 +54,9 @@ export type {
   IProcessMessageOptions,
   IProcessPendingByteConnection
 } from './types.js'
+
+export type {
+  IRuntimeSurface,
+  IRuntimeDynamicSurface,
+  IRuntimeTypedPeer
+} from '../remote/runtime-api/typing.js'

@@ -15,3 +15,9 @@ export type {
   IThreadWebPort
 } from './types.js'
 export type { IThreadBootstrapData } from './bootstrap.js'
+
+export type {
+  IRuntimeSurface,
+  IRuntimeDynamicSurface,
+  IRuntimeTypedPeer
+} from '../remote/runtime-api/typing.js'

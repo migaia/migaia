@@ -1,3 +1,8 @@
+import type {
+  IRuntimePluginTyping,
+  IRuntimeExpose,
+  IRuntimeRegistry
+} from '../../remote/runtime-api/typing.js'
 import { createProcessResilience } from '../resilience/index.js'
 import type { IProcessRegistration } from '../resilience/types.js'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
@@ -67,14 +72,35 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle>
 ): IProcessPlugin
 /** Adds one symmetric connection to the canonical process slot. */
-export function createProcessPlugin(
-  options: IRuntimeProcessPluginOptions
-): ReturnType<typeof createRuntimePlugin>
+export function createProcessPlugin<
+  TRemote = Record<never, never>,
+  const TProvide extends import('../../remote/runtime-api/catalog.js').IRuntimePeerProvide = Record<
+    never,
+    never
+  >,
+  const TName extends string = string,
+  const TExpose extends readonly string[] = readonly [],
+  THost = unknown
+>(
+  options: Omit<IRuntimeProcessPluginOptions, 'name' | 'provide' | 'expose'> &
+    Readonly<{
+      name: TName
+      provide?: TProvide
+      expose?: TExpose &
+        (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[])
+    }>
+): ReturnType<typeof createRuntimePlugin> &
+  IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'process'>
 /** Route the four-factory migration through one symmetric builder without copying platform owners. */
 export function createProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle> | IRuntimeProcessPluginOptions
 ): IProcessPlugin | ReturnType<typeof createRuntimePlugin> {
-  if (!('deployment' in options)) return createRuntimePlugin(options, 'process', createProcessPeer)
+  if (!('deployment' in options))
+    return createRuntimePlugin(
+      options,
+      'process',
+      createProcessPeer as Parameters<typeof createRuntimePlugin>[2]
+    )
   return assembleProcessPlugin(options)
 }
 

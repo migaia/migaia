@@ -1,7 +1,9 @@
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
+import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
-import { defineHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpoint } from '../../src/core/index.js'
@@ -160,7 +162,7 @@ it('[A2][A16] runtime byte identity is the actual authenticated peer before read
 it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual sessions through the original shared slot', async () => {
   await ordinaryNativeSocket()
   /** Real Host Feature authority is established before the public listener assertion. */
-  const host = defineHost({
+  const host = runtimeTestHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Actual listener bind reports the OS-selected loopback address. */
@@ -252,7 +254,7 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
       '[A2] full native listener grammar installs after ordinary authenticated socket business'
     )
     for (const index of [0, 1]) {
-      const peer = await createProcessPeer({
+      const peer = await createProcessPeer<IRuntimeDynamicSurface>({
         self: { name: 'same-client', instanceId: `client-${index + 1}` },
         provide: {
           child: {
@@ -401,7 +403,7 @@ it('[A9][A33] full owned Worker source uses the caller-selected original endpoin
         return { endpoint: Object.freeze(view), oneWay: endpoint, stream: endpoint.stream }
       }
     }
-    peer = await createThreadPeer(options)
+    peer = await createThreadPeer<IRuntimeDynamicSurface>(options)
     assert.equal(((await peer.request('probe', 'ordinary')) as { parent: number }).parent, 42)
     assert.equal(
       constructed,

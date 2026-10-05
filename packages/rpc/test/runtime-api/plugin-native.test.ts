@@ -1,7 +1,8 @@
+import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { fileURLToPath } from 'node:url'
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createUnitBudget } from '@migaia/supervision'
 import { createThreadPlugin } from '../../src/threads/index.js'
@@ -32,7 +33,7 @@ for (const kind of ['process', 'thread'] as const) {
         committed = resolve
       })
       /** This managed Host owns the Plugin resource scope and shared publication. */
-      const host = defineHost({
+      const host = runtimeTestHost({
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })
       /** Original launcher handles retain native termination and the only real exit observation. */

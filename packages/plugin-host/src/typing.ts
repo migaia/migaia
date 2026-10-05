@@ -22,7 +22,13 @@ export type IPluginResource =
 export type IPluginHostErrorDetail = Readonly<Record<string, unknown>>
 
 /** Interface semantics are required only for adapter-owned module augmentation of Host outlets. */
-export interface IPluginHostRuntimeExtensions {}
+export interface IPluginHostRuntimeExtensions<
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly [],
+  _TCandidate = unknown
+> {
+  /** Type-only installed inventory; the canonical runtime state remains the authority. */
+  readonly __installedPlugins?: TInstalled
+}
 
 /**
  * Structured install-failure detail. Synchronous installation publishes an immutable snapshot; its
@@ -397,8 +403,20 @@ export type IPluginDependencyPlan = Readonly<{
   }>[]
 }>
 
-/** Validates every candidate against its own Feature/expose shape and the Host core. */
-export type IPluginConstraintTuple<TCore, TPlugins extends readonly unknown[]> = {
+/** Runtime adapters may narrow a candidate using only the already declared installed inventory. */
+type IPluginRuntimeConstraint<TAvailable extends readonly IPluginConstraint<any>[], _TCandidate> =
+  IPluginHostRuntimeExtensions<TAvailable, _TCandidate> extends {
+    readonly __pluginConstraint?: infer C
+  }
+    ? C
+    : unknown
+
+/** Validate the original core/Feature contract and adapter type-only exposure at installation. */
+export type IPluginConstraintTuple<
+  TCore,
+  TPlugins extends readonly IPluginConstraint<any>[],
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
+> = {
   readonly [K in keyof TPlugins]: [TPlugins[K]] extends [never]
     ? IPluginConstraint<TCore>
     : IPluginConstraint<
@@ -406,6 +424,7 @@ export type IPluginConstraintTuple<TCore, TPlugins extends readonly unknown[]> =
         IPluginConstraintFeatures<TPlugins[K]>,
         IPluginConstraintExpose<TPlugins[K]>
       > &
+        IPluginRuntimeConstraint<readonly [...TInstalled, ...TPlugins], TPlugins[K]> &
         (TPlugins[K] extends { readonly [definedPluginBrand]: { readonly core: infer TRequired } }
           ? TRequired extends Record<string, never>
             ? unknown

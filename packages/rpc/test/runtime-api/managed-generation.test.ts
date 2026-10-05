@@ -1,7 +1,9 @@
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
+import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createThreadPeer, createThreadPlugin } from '../../src/threads/index.js'
@@ -30,7 +32,7 @@ for (const mode of ['peer', 'plugin'] as const) {
     /** Original channel construction keeps its runtime offer and receive handoff. */
     const factory = createNodeThreadChannelFactory({ scheduler: systemScheduler })
     /** The true Host remains the only Feature/publication authority in Plugin mode. */
-    const host = defineHost({
+    const host = runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     /** Direct Peer mode owns the same native registration without a Host publication. */
@@ -68,7 +70,7 @@ for (const mode of ['peer', 'plugin'] as const) {
     }
     try {
       if (mode === 'peer')
-        peer = await createThreadPeer({
+        peer = await createThreadPeer<IRuntimeDynamicSurface>({
           spawn,
           provide: { parent: { echo: () => 42 } },
           report: () => undefined
@@ -154,7 +156,7 @@ for (const mode of ['peer', 'plugin'] as const) {
 
 it('[A3][A34] Host startup cancellation reaches the original owned source before publication', async () => {
   /** The original Host operation timeout supplies the actual cancellation reason. */
-  const host = defineHost({
+  const host = runtimeTestHost({
     host: { execution: { mutationTimeoutMs: 1000, pipelineDrainTimeoutMs: false } }
   })
   /** The independent lease records resource ownership while endpoint preparation is pending. */
@@ -265,7 +267,7 @@ for (const idempotent of [false, true]) {
     /** Cleanup closes the canonical generation holder and actual native unit. */
     let peer: IRuntimePeer | undefined
     try {
-      peer = await createThreadPeer({
+      peer = await createThreadPeer<IRuntimeDynamicSurface>({
         self: { name: 'retry-parent', instanceId: 'retry-parent' },
         provide: { parent: { echo: () => 42, started: () => started() } },
         report: () => undefined,

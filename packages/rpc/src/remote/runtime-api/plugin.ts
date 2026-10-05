@@ -33,7 +33,11 @@ import { createRemoteHostControl, type IRemoteHostControlOptions } from '../serv
 import { createRemoteLayerError } from '../error.js'
 import { RpcRemoteLayerErrorCode } from '../error-code.js'
 import { RemoteMethodName } from '../constants.js'
-import { registerRuntimeControlMethods, type IRuntimeMethodEntry } from './catalog.js'
+import {
+  compileRuntimeMethods,
+  registerRuntimePluginMethods,
+  type IRuntimeMethodEntry
+} from './catalog.js'
 import { RuntimeApiMode } from './constants.js'
 import { withRuntimePreparationContext } from './launch-context.js'
 import { readManagedRuntimeRegistration } from './managed-peer.js'
@@ -43,7 +47,7 @@ export type IRuntimePluginOptions<
   TSpawn = IRuntimePeerSource,
   TConnect = IRuntimePeerSource,
   TListen = IRuntimePeerSource
-> = Omit<IRuntimePeerOptions, 'provide' | 'spawn' | 'connect' | 'listen'> &
+> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> &
   Readonly<{
     spawn?: TSpawn
     connect?: TConnect
@@ -84,15 +88,29 @@ function exposedProvide(
 ): IRuntimePeerProvide {
   /** One group per Plugin gives the stable plugin.method public namespace. */
   const provide: Record<string, IRuntimePeerProvide> = Object.create(null)
-  for (const name of expose) {
+  /** Overlapping whole/single entries share one cold inventory and one callable per Feature path. */
+  const snapshots = new Map<string, IPluginRuntimeFeatureSnapshot>()
+  /** Same-name methods from different Features remain an actual ambiguity, rather than a union. */
+  const owners = new Map<string, string>()
+  for (const path of expose) {
+    /** The first segment owns the Plugin; a local single-method entry selects the remaining name. */
+    const separator = path.indexOf('.')
+    /** A whole Plugin has no method selector; forwarding may later contain further remote segments. */
+    const name = separator < 0 ? path : path.slice(0, separator)
+    /** Local method spelling is checked against descriptors, never a mutable property lookup. */
+    const selectedMethod = separator < 0 ? undefined : path.slice(separator + 1)
     /** Both connection permission and output identity come from the original managed Host. */
-    const snapshot = read(name)
+    const snapshot = snapshots.get(name) ?? read(name)
+    snapshots.set(name, snapshot)
     /** Repeated method names across Features reject before any source or resource is acquired. */
-    const group: Record<string, IRuntimePeerMethod> = Object.create(null)
+    const group = (provide[name] ?? Object.create(null)) as Record<string, IRuntimePeerMethod>
+    /** An explicit missing method rejects configuration rather than silently reducing the whitelist. */
+    let found = selectedMethod === undefined
     for (const [feature, output] of Object.entries(snapshot.outputs)) {
       /** Descriptor inspection never evaluates an application getter while building authority. */
       const descriptors = Object.getOwnPropertyDescriptors(output)
       for (const key of Reflect.ownKeys(descriptors)) {
+        if (selectedMethod !== undefined && key !== selectedMethod) continue
         /** Symbol/accessor paths cannot silently enter the public callable directory. */
         const descriptor = descriptors[key as string]
         if (
@@ -103,16 +121,23 @@ function exposedProvide(
         )
           throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
         if (typeof descriptor.value !== 'function') continue
-        if (Object.hasOwn(group, key))
+        /** A same-Feature overlap is a union; a distinct Feature remains an ambiguous public method. */
+        const fullName = `${name}.${key}`
+        if (owners.has(fullName) && owners.get(fullName) !== feature)
           throw new RpcError(
             RpcCoreErrorCode.capabilityConflict,
             RuntimeApiErrorText.featureConflict
           )
-        group[key] = exposedMethod(snapshot, feature, key)
+        found = true
+        if (!Object.hasOwn(group, key)) group[key] = exposedMethod(snapshot, feature, key)
+        owners.set(fullName, feature)
       }
     }
-    provide[name] = Object.freeze(group)
+    if (!found)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
+    provide[name] = group
   }
+  for (const group of Object.values(provide)) Object.freeze(group)
   return Object.freeze(provide)
 }
 
@@ -139,6 +164,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.exposeInvalid)
   /** The immutable whitelist owns only names, never caller-owned objects or Host fields. */
   const expose = Object.freeze([...input])
+  /** Own methods share the Peer descriptor builder and compile before source effects. */
+  const ownMethods = compileRuntimeMethods(options.provide)
   /** Platform source selection and safe identity continue through the same public Peer factory. */
   const peerOptions: IRuntimePeerOptions = Object.freeze({
     self: options.self,
@@ -163,6 +190,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         expose.filter((target) => target !== RuntimePluginExpose.host),
         (target) => integration.readFeatureOutputs(target)
       )
+      /** Reserved Host operations are additional canonical entries, not an authority bypass. */
+      let controls: readonly IRuntimeMethodEntry[] = []
       if (expose.includes(RuntimePluginExpose.host)) {
         if (!options.host || !options.catalog || typeof options.resolvePlugin !== 'function')
           throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.hostControlInvalid)
@@ -182,7 +211,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
          * Reserved scalar routes preserve original request/one-way registration, without stream
          * aliases.
          */
-        const controls: readonly IRuntimeMethodEntry[] = [
+        controls = [
           [RemoteMethodName.hostUse, control.use],
           [RemoteMethodName.hostUnUse, control.unUse],
           [RemoteMethodName.hostInspect, control.inspect]
@@ -190,6 +219,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
           Object.freeze({
             name: name as string,
             receiver: control,
+            reserved: true,
             supportedModes: Object.freeze([RuntimeApiMode.request, RuntimeApiMode.notify]),
             method: (payload: unknown) => {
               integration.assertCurrent()
@@ -197,8 +227,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
             }
           })
         )
-        registerRuntimeControlMethods(provide, controls)
       }
+      registerRuntimePluginMethods(provide, [...ownMethods, ...controls])
       /** Later same-family installs reuse this facade while retaining separate endpoint owners. */
       const slot = integration.acquireSharedSlot<IRuntimeOutlet>(
         RuntimePluginKey[kind],
