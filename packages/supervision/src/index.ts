@@ -25,6 +25,8 @@ export type {
   ILaunchContext,
   IUnitLauncher,
   IExitClassification,
+  IUnitExitStatus,
+  ISupervisorStopOptions,
   IUnitRuntime,
   IUnitProfile,
   IUnitLease,
@@ -37,6 +39,7 @@ export type {
   IReadyOutcome,
   IReplaceOutcome,
   ISupervisorSnapshot,
+  IHealthSnapshot,
   ISupervisorEvent,
   ISupervisor
 } from './types.js'

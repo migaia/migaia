@@ -3,7 +3,8 @@ import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { SupervisionErrorCode } from './error-code.js'
 import { SupervisionErrorText } from './error-text.js'
 import { createSupervisionError } from './errors.js'
-import type { ISupervisorBaseOptions } from './types.js'
+import { HealthState } from './constants.js'
+import type { IHealthSnapshot, ISupervisorBaseOptions } from './types.js'
 
 /** Starts serialized periodic checks and owns all active timers through the monitor scope. */
 export function startHealth<THandle>(
@@ -14,7 +15,7 @@ export function startHealth<THandle>(
   scheduler: IScheduler,
   fail: (error: Error) => void,
   report: (error: unknown) => void
-): void {
+): () => IHealthSnapshot | undefined {
   const intervalMs = health.intervalMs ?? 5_000
   const timeoutMs = health.timeoutMs ?? 2_000
   const threshold = health.failureThreshold ?? 3
@@ -24,10 +25,16 @@ export function startHealth<THandle>(
   let interval: IScheduledTask | undefined
   let deadline: IScheduledTask | undefined
   let controller = createAbortController()
+  /** Last observed monitor phase, never inferred from unit readiness. */
+  let state: HealthState = HealthState.pending
+  /** Only an actual check transition supplies the scheduler observation time. */
+  let observedAt: number | undefined
 
   /** Counts one rejected or timed out check and ends the unit at the configured threshold. */
   const recordFailure = (cause: unknown, timedOut: boolean): void => {
     failures++
+    state = HealthState.unhealthy
+    observedAt = scheduler.now()
     if (failures < threshold || closed) return
     fail(
       createSupervisionError(
@@ -45,6 +52,8 @@ export function startHealth<THandle>(
       schedule()
       if (running || closed) return
       running = true
+      state = HealthState.checking
+      observedAt = scheduler.now()
       controller = createAbortController()
       const checkController = controller
       let decided = false
@@ -61,7 +70,11 @@ export function startHealth<THandle>(
         .then(
           () => {
             const current = !decided
-            if (current && !closed) failures = 0
+            if (current && !closed) {
+              failures = 0
+              state = HealthState.healthy
+              observedAt = scheduler.now()
+            }
             decided = true
             if (current) running = false
             checkDeadline.cancel()
@@ -91,4 +104,13 @@ export function startHealth<THandle>(
     }
   )
   schedule()
+  /** A cold read neither schedules work nor retains a retired unit in the public snapshot. */
+  return () =>
+    closed
+      ? undefined
+      : {
+          state,
+          failures,
+          ...(observedAt === undefined ? {} : { observedAt })
+        }
 }

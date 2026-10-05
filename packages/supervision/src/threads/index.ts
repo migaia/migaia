@@ -6,6 +6,7 @@ export type {
   IThreadExitStatus,
   IThreadIdentity,
   IThreadHandle,
+  IThreadUsage,
   IThreadLauncher,
   IThreadBudget,
   IThreadSupervisorOptions,

@@ -5,6 +5,7 @@ import type {
   BudgetRejection,
   CapabilityLevel,
   ExitReason,
+  HealthState,
   IsolationMode,
   LaunchCause,
   ReplaceStrategy,
@@ -33,6 +34,10 @@ export type IExitClassification = {
   readonly detail?: Readonly<Record<string, unknown>>
   readonly cause?: unknown
 }
+/** Native exit facts are projected by the owning profile, without arbitrary status reflection. */
+export type IUnitExitStatus = Readonly<{ code: number | null; signal?: string | null }>
+/** A per-command grace only bounds the existing application drain phase. */
+export type ISupervisorStopOptions = Readonly<{ graceMs?: number }>
 /** Unit resource scopes: monitors release before the unit and attachments afterwards. */
 export type IUnitRuntime = {
   readonly generation: number
@@ -54,6 +59,8 @@ export type IUnitProfile<
   launchContext?(base: ILaunchContext, unit: IUnitRuntime): TContext
   terminate(handle: THandle, mode: TerminationMode): void
   classifyExit(status: TExit): IExitClassification
+  /** Preserve actual native status even for a manually stopped or force-retired unit. */
+  exitStatus?(status: TExit): IUnitExitStatus
 }
 /** Idempotent ownership of one occupied budget slot. */
 export type IUnitLease = { release(): void }
@@ -162,7 +169,11 @@ export type ISupervisorBaseOptions<THandle> = {
    */
   readonly stop?: {
     /** Optional cancellable drain callback invoked before profile-specific termination. */
-    readonly beforeTerminate?: (unit: THandle, signal: IAbortSignal) => PromiseLike<void>
+    readonly beforeTerminate?: (
+      unit: THandle,
+      signal: IAbortSignal,
+      remainingMs: () => number
+    ) => PromiseLike<void>
     /** Maximum application drain time before termination proceeds; defaults to 5000 milliseconds. */
     readonly drainTimeoutMs?: number
     /** Maximum wait for graceful actual exit before hard termination; defaults to 5000 milliseconds. */
@@ -232,16 +243,28 @@ export type IReplaceOutcome =
   | { readonly kind: 'rejected'; readonly reason: BudgetRejection | 'terminal' | 'stopped' }
   | { readonly kind: 'failed'; readonly error: unknown }
 /** Read-only view of current supervisor state and diagnostics. */
+export type IHealthSnapshot = Readonly<{
+  state: HealthState
+  failures: number
+  observedAt?: number
+}>
+/** Read-only view of current supervisor state and diagnostics. */
 export type ISupervisorSnapshot = {
   readonly kind: string
   readonly state: SupervisorState
   readonly generation: number
   readonly identity?: IUnitIdentity
   readonly failuresInWindow: number
+  /** Lifetime successful restart causes, excluding initial start and replacement. */
+  readonly restartCount?: number
+  /** Absent without a current monitor; pending does not claim a successful check. */
+  readonly health?: IHealthSnapshot
   readonly lastExit?: {
     readonly generation: number
     readonly reason: ExitReason
     readonly error?: unknown
+    readonly status?: IUnitExitStatus
+    readonly observedAt?: number
   }
   readonly terminalError?: unknown
   readonly terminalEntries: number
@@ -262,6 +285,8 @@ export type ISupervisorEvent<THandle> =
       readonly generation: number
       readonly reason: ExitReason
       readonly error?: unknown
+      readonly status?: IUnitExitStatus
+      readonly observedAt?: number
     }
   | { readonly type: 'terminal'; readonly error: unknown; readonly entry: number }
   | {
@@ -270,13 +295,27 @@ export type ISupervisorEvent<THandle> =
       readonly to: number
       readonly unit: THandle
     }
+  | {
+      readonly type: 'restart'
+      readonly generation: number
+      readonly count: number
+      readonly observedAt: number
+    }
+  | {
+      readonly type: 'degraded'
+      readonly generation: number
+      readonly degraded: readonly string[]
+      readonly observedAt: number
+    }
 /** Public command and inspection surface of a supervisor. */
 export type ISupervisor<THandle, TSpec> = {
   readonly state: SupervisorState
   readonly generation: number
   start(): Promise<IReadyOutcome<THandle>>
   whenReady(signal?: IAbortSignal): Promise<IReadyOutcome<THandle>>
-  stop(): Promise<void>
+  stop(options?: ISupervisorStopOptions): Promise<void>
+  /** Immediately upgrades the original slot teardown; joiners retain the pending stop promise. */
+  kill(): Promise<void>
   restart(): Promise<IReadyOutcome<THandle>>
   replace(options?: {
     readonly strategy?: ReplaceStrategy

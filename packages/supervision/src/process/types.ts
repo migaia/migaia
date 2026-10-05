@@ -56,7 +56,13 @@ export type IProcessSpec = {
   readonly bootstrap?: IProcessBootstrap
 }
 /** Optional usage fields supplied by an adapter. */
-export type IProcessUsage = { readonly rssBytes?: number; readonly cpuTimeMs?: number }
+export type IProcessUsage = {
+  readonly rssBytes?: number
+  readonly cpuTimeMs?: number
+  /** Cumulative CPU for this actual PID, independent of parent and descendant CPU. */
+  readonly cpuUserMicros?: number
+  readonly cpuSystemMicros?: number
+}
 /** Native termination status returned after all launcher resources have closed. */
 export type IProcessExitStatus = { readonly code: number | null; readonly signal: string | null }
 /** Fingerprint distinguishes repeated use of one pid across parent runs. */

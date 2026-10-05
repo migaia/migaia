@@ -55,7 +55,9 @@ describe('A1 runtime-neutral boundary', () => {
             '@migaia/lifecycle',
             '@migaia/lifecycle/scheduler',
             '@migaia/utils/scheduler',
-            '@migaia/utils/error'
+            '@migaia/utils/error',
+            // U24 D27 reuses the canonical runtime-neutral thenable observer for passive listeners.
+            '@migaia/utils/function'
           ]).toContain(specifier)
         }
       }

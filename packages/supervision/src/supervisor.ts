@@ -12,6 +12,7 @@ import {
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import { attachSecondaryErrors } from '@migaia/utils/error'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { admitCapabilities } from './admission.js'
 import {
   ExitReason,
@@ -19,6 +20,7 @@ import {
   ReplaceStrategy,
   RestartMode,
   SupervisorState,
+  SupervisorEventType,
   type BudgetRejection,
   type LaunchCause as ILaunchCause,
   type SupervisorState as ISupervisorState
@@ -27,16 +29,19 @@ import { SupervisionErrorCode } from './error-code.js'
 import { SupervisionErrorText } from './error-text.js'
 import { createSupervisionError } from './errors.js'
 import { startHealth } from './health.js'
-import { validateSupervisorOptions } from './options.js'
+import { invalidOption, validateSupervisorOptions } from './options.js'
 import { forceAndReap, releaseWhenGone, teardownUnit, type IUnitSlot } from './unit-teardown.js'
 import type {
   ILaunchContext,
+  IHealthSnapshot,
   IReadyOutcome,
   IReplaceOutcome,
   ISupervisor,
   ISupervisorEvent,
   ISupervisorOptions,
   ISupervisorSnapshot,
+  ISupervisorStopOptions,
+  IUnitExitStatus,
   IUnitHandle,
   IUnitRuntime
 } from './types.js'
@@ -58,6 +63,12 @@ type IManagedSlot<
   failureError?: unknown
   exitEmitted: boolean
   retired: boolean
+  /** Actual native exit projection is captured before classification or teardown publication. */
+  exitStatus?: IUnitExitStatus
+  /** Original scheduler time of the actual exited fulfillment. */
+  exitObservedAt?: number
+  /** Reads the active unit's original health monitor without running a check. */
+  readHealth?: () => IHealthSnapshot | undefined
 }
 
 /** Creates a runtime-neutral supervisor around one profile and its shared budget. */
@@ -95,6 +106,8 @@ export function createSupervisor<
   let terminalError: unknown
   let terminalEntries = 0
   let abandoned = 0
+  /** Lifetime restart successes are independent of attempt generation and failure-window trimming. */
+  let restartCount = 0
   let pendingStart: Promise<IReadyOutcome<THandle>> | undefined
   let pendingStop: Promise<void> | undefined
   let pendingDispose: Promise<void> | undefined
@@ -112,9 +125,13 @@ export function createSupervisor<
 
   /** Isolates listener failures and keeps every subscriber observable. */
   const emit = (event: ISupervisorEvent<THandle>): void => {
-    for (const listener of listeners) {
+    /** Mutations during callbacks affect only later events, including nested publication. */
+    const snapshot = Array.from(listeners)
+    for (const listener of snapshot) {
       try {
-        listener(event)
+        /** Observe only this callback's result; publishing remains synchronous and passive. */
+        const result: unknown = listener(event)
+        observeThenableRejection(result, inspectThenable(result), options.report)
       } catch (error) {
         options.report(error)
       }
@@ -156,7 +173,7 @@ export function createSupervisor<
     error: unknown,
     slot: IManagedSlot<TSpec, THandle, TExit, TContext>
   ): unknown => attachSecondaryErrors(error, slot.secondaryErrors)
-  /** Publishes exactly one exit observation for a unit generation. */
+  /** Publishes one diagnostic classification; only an actual exited fulfillment emits exit. */
   const publishExit = (
     slot: IManagedSlot<TSpec, THandle, TExit, TContext>,
     reason: (typeof ExitReason)[keyof typeof ExitReason],
@@ -164,13 +181,24 @@ export function createSupervisor<
   ): void => {
     if (slot.exitEmitted) return
     slot.exitEmitted = true
-    lastExit = { generation: slot.generation, reason, ...(error === undefined ? {} : { error }) }
-    emit({
-      type: 'exit',
+    /** Older units may settle after replacement; their facts cannot overwrite the newer record. */
+    const observation = {
       generation: slot.generation,
       reason,
-      ...(error === undefined ? {} : { error })
-    })
+      ...(error === undefined ? {} : { error }),
+      ...(slot.exitStatus ? { status: slot.exitStatus } : {}),
+      ...(slot.exitObservedAt === undefined ? {} : { observedAt: slot.exitObservedAt })
+    }
+    if (!lastExit || lastExit.generation <= slot.generation) lastExit = observation
+    if (slot.exitObservedAt !== undefined)
+      emit({
+        type: 'exit',
+        generation: slot.generation,
+        reason,
+        ...(error === undefined ? {} : { error }),
+        ...(slot.exitStatus ? { status: slot.exitStatus } : {}),
+        ...(slot.exitObservedAt === undefined ? {} : { observedAt: slot.exitObservedAt })
+      })
   }
   /** Terminates after the allowed failure window and optionally arms one cooldown. */
   const enterTerminal = (lastError: unknown, lastRejection?: BudgetRejection): void => {
@@ -238,6 +266,12 @@ export function createSupervisor<
     reason?: IManagedSlot<TSpec, THandle, TExit, TContext>['failureReason'],
     error?: unknown
   ): Promise<void> => {
+    if (mode === 'force') {
+      slot.mode = mode
+      slot.requestForce()
+      if (slot.retired && slot.handle && !slot.disappeared)
+        void forceAndReap(slot, slot.handle).catch(options.report)
+    }
     if (slot.retired) return slot.scope.dispose().then(() => undefined)
     slot.retired = true
     slot.mode = mode
@@ -249,7 +283,31 @@ export function createSupervisor<
   /** Converts a fulfilled exit into its profile classification and releases the slot. */
   const onExit = (slot: IManagedSlot<TSpec, THandle, TExit, TContext>, status: TExit): void => {
     slot.markGone()
-    if (slot.abandoned) return
+    slot.exitObservedAt = scheduler.now()
+    try {
+      slot.exitStatus = options.profile.exitStatus?.(status)
+    } catch (error) {
+      options.report(error)
+    }
+    if (slot.abandoned) {
+      /** The deadline retained the lease; now the original native promise supplies real exit. */
+      const error = lastExit?.generation === slot.generation ? lastExit.error : undefined
+      if (lastExit?.generation === slot.generation)
+        lastExit = {
+          ...lastExit,
+          ...(slot.exitStatus ? { status: slot.exitStatus } : {}),
+          observedAt: slot.exitObservedAt
+        }
+      emit({
+        type: SupervisorEventType.exit,
+        generation: slot.generation,
+        reason: ExitReason.abandoned,
+        ...(error === undefined ? {} : { error }),
+        ...(slot.exitStatus ? { status: slot.exitStatus } : {}),
+        observedAt: slot.exitObservedAt
+      })
+      return
+    }
     if (slot.retired) {
       const reason =
         slot.failureReason ??
@@ -331,6 +389,12 @@ export function createSupervisor<
     const gone = new Promise<void>((resolve) => {
       markGone = resolve
     })
+    /** Kill wakes only this slot's original graceful phases; resolution is naturally idempotent. */
+    let requestForce: () => void = () => undefined
+    /** No second stop queue is introduced; teardown waits on this exact force signal. */
+    const forceRequested = new Promise<void>((resolve) => {
+      requestForce = resolve
+    })
     const slot = {
       generation: request.generation,
       kind: options.profile.kind,
@@ -352,7 +416,14 @@ export function createSupervisor<
       drained: options.stop?.beforeTerminate === undefined,
       abandoned: false,
       gone,
-      markGone,
+      markGone: () => {
+        slot.disappeared = true
+        markGone()
+      },
+      disappeared: false,
+      forceRequested,
+      requestForce,
+      forcing: undefined,
       teardown: undefined,
       secondaryErrors: [],
       request,
@@ -403,8 +474,8 @@ export function createSupervisor<
       return { outcome: { state: 'stopped', rejection: budget.reason }, rejection: budget.reason }
     }
     const slot = createSlot(request, budget.lease)
-    if (!promote) candidate = slot
-    else transition(SupervisorState.starting)
+    candidate = slot
+    if (promote) transition(SupervisorState.starting)
     let rejectWait: (reason: unknown) => void = () => undefined
     const cancelled = new Promise<never>((_, reject) => {
       rejectWait = reject
@@ -478,10 +549,29 @@ export function createSupervisor<
       timer.cancel()
       if (promote) {
         active = slot
+        candidate = undefined
+        if (
+          cause === LaunchCause.restart ||
+          cause === LaunchCause.backoff ||
+          cause === LaunchCause.cooldown
+        )
+          restartCount += 1
         transition(SupervisorState.ready)
+        if (
+          cause === LaunchCause.restart ||
+          cause === LaunchCause.backoff ||
+          cause === LaunchCause.cooldown
+        ) {
+          emit({
+            type: SupervisorEventType.restart,
+            generation: slot.generation,
+            count: restartCount,
+            observedAt: scheduler.now()
+          })
+        }
       }
       if (options.health)
-        startHealth(
+        slot.readHealth = startHealth(
           slot.monitors,
           handle,
           options.profile.kind,
@@ -580,7 +670,22 @@ export function createSupervisor<
     )
   }
   /** Stops the current attempt and unit once, keeping the promise identity for joiners. */
-  const stop = (): Promise<void> => {
+  const stop = (
+    stopOptions?: ISupervisorStopOptions,
+    mode: 'stop' | 'force' = 'stop'
+  ): Promise<void> => {
+    /** Configuration is rejected before superseding an attempt or touching a native handle. */
+    const graceMs = stopOptions?.graceMs
+    if (
+      graceMs !== undefined &&
+      (typeof graceMs !== 'number' || !Number.isFinite(graceMs) || graceMs < 0)
+    )
+      invalidOption('stop.graceMs', RangeError)
+    if (mode === 'force') {
+      attempts.supersede()
+      for (const slot of [candidate, active])
+        if (slot) void retire(slot, 'force').catch(options.report)
+    }
     if (pendingDispose) return pendingDispose
     if (pendingStop) return pendingStop
     attempts.supersede()
@@ -591,11 +696,13 @@ export function createSupervisor<
         clearTimers()
         transition(SupervisorState.stopping)
         if (candidate) {
-          await retire(candidate, 'stop')
+          if (graceMs !== undefined && !candidate.retired) candidate.drainTimeoutMs = graceMs
+          await retire(candidate, mode)
           candidate = undefined
         }
         if (active) {
-          await retire(active, 'stop')
+          if (graceMs !== undefined && !active.retired) active.drainTimeoutMs = graceMs
+          await retire(active, mode)
           active = undefined
         }
         transition(SupervisorState.stopped)
@@ -684,7 +791,18 @@ export function createSupervisor<
           : { kind: 'failed', error: result.error }
       }
       spec = nextSpec
-      degraded = nextDegraded
+      if (
+        degraded.length !== nextDegraded.length ||
+        degraded.some((value, index) => value !== nextDegraded[index])
+      ) {
+        degraded = nextDegraded
+        emit({
+          type: SupervisorEventType.degraded,
+          generation: result.slot.generation,
+          degraded,
+          observedAt: scheduler.now()
+        })
+      }
       if (strategy === ReplaceStrategy.startThenSwitch) {
         active = result.slot
         candidate = undefined
@@ -783,10 +901,13 @@ export function createSupervisor<
     },
     whenReady,
     stop,
+    kill: () => stop(undefined, 'force'),
     restart: restartCommand,
     replace,
     inspect() {
       trimFailures()
+      /** Capture one consistent cold health read from the current monitor. */
+      const health = active?.readHealth?.()
       return {
         kind: options.profile.kind,
         state,
@@ -795,6 +916,8 @@ export function createSupervisor<
           ? { identity: active.handle.identity, unit: options.hooks?.inspectUnit?.(active.handle) }
           : {}),
         failuresInWindow: failures.length,
+        restartCount,
+        ...(health ? { health } : {}),
         ...(lastExit ? { lastExit } : {}),
         ...(terminalError === undefined ? {} : { terminalError }),
         terminalEntries,

@@ -127,6 +127,10 @@ export function createCoroutineLauncher<TPort>(
           return heartbeatAt
         }
       }
+      /** Cooperative cancellation must abort the task before natural exit can bypass teardown. */
+      context.signal.addEventListener('abort', stop, { once: true })
+      if (context.signal.aborted) stop()
+      void exited.then(() => context.signal.removeEventListener('abort', stop))
       termination.set(handle, stop)
       return handle
     }

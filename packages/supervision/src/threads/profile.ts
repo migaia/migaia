@@ -48,6 +48,7 @@ export function createThreadProfile<THandle extends IThreadHandle>(): IUnitProfi
         : ['termination', ThreadCapability.heapLimit],
     validateSpec: validateThreadSpec,
     terminate: (handle) => handle.terminate(),
+    exitStatus: (status) => ({ code: status.code }),
     classifyExit: (status) => {
       if (status.limit === ThreadLimit.heapBytes)
         return {

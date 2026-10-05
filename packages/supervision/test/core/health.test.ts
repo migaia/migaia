@@ -10,6 +10,56 @@ async function flush(): Promise<void> {
 }
 
 describe('A7 periodic health', () => {
+  it('[A52] cold inspection exposes actual checks without launching another check', async () => {
+    /** The original monitor remains the only clock and check owner. */
+    const scheduler = createManualScheduler()
+    /** Completion separates a pending check from an observed healthy result. */
+    const checking = deferred<void>()
+    /** Querying cannot run health work or manufacture a healthy state at readiness. */
+    let checks = 0
+    /** The canonical supervisor supplies both the unit and its existing monitor. */
+    const supervisor = createSupervisor({
+      id: 'health-detail',
+      spec: 'a',
+      launcher: createMemoryLauncher(),
+      profile: createMemoryProfile({ autoExitOnTerminate: true }),
+      budget: createUnitBudget({ kind: 'memory', maxUnits: 1, launchRate: false, scheduler }),
+      scheduler,
+      report: () => undefined,
+      health: {
+        intervalMs: 10,
+        timeoutMs: 5,
+        check: () => {
+          checks++
+          return checking.promise
+        }
+      }
+    })
+    try {
+      await supervisor.start()
+      expect(supervisor.inspect().health, '[A52] unobserved health is explicit').toEqual({
+        state: 'pending',
+        failures: 0
+      })
+      expect(checks).toBe(0)
+      scheduler.advance(10)
+      await flush()
+      expect(supervisor.inspect().health).toEqual({
+        state: 'checking',
+        failures: 0,
+        observedAt: 10
+      })
+      checking.resolve()
+      await flush()
+      expect(supervisor.inspect().health).toEqual({ state: 'healthy', failures: 0, observedAt: 10 })
+      expect(checks).toBe(1)
+      await supervisor.stop()
+      expect(supervisor.inspect().health).toBeUndefined()
+    } finally {
+      checking.resolve()
+      await supervisor.dispose()
+    }
+  })
   it.each(['stop', 'dispose'] as const)(
     '[K247] clears timers when %s precedes a queued health failure continuation',
     async (operation) => {

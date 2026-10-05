@@ -24,6 +24,7 @@ export function createProcessProfile<THandle extends IProcessHandle>(
     validateSpec: validateProcessSpec,
     launchContext,
     terminate: (handle, mode) => handle.terminate(mode),
+    exitStatus: (status) => ({ code: status.code, signal: status.signal }),
     classifyExit: (status) => ({
       reason: status.code === 0 && status.signal === null ? 'exited' : 'crashed',
       detail: { code: status.code, signal: status.signal }
