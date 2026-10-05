@@ -60,6 +60,15 @@ import {
 /** Only an original opt-in consumer exposes its existing lazy open/ready boundary to a relay. */
 const runtimeStreamReady = Symbol('rpc-runtime-stream-ready')
 
+/** Keep the existing managed facade's preparation tied to its sole original downstream consumer. */
+export function retainRuntimeStreamPreparation<T extends AsyncIterableIterator<IRpcPortableValue>>(
+  facade: T,
+  prepare: () => Promise<void>
+): T {
+  Object.defineProperty(facade, runtimeStreamReady, { value: prepare })
+  return facade
+}
+
 /** Prepare the same downstream consumer without issuing a pull or creating another iterator. */
 export function prepareRuntimeStreamConsumer(
   iterator: AsyncIterableIterator<IRpcPortableValue>
@@ -1340,7 +1349,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         try {
           await state.iterator.return?.()
         } catch (cleanupError) {
-          failure = new AggregateError([error, cleanupError], RpcStreamErrorText.cleanupFailed)
+          /** A runtime relay can observe the same terminal twice; preserve its original code/cause. */
+          if (!state.runtime || cleanupError !== error)
+            failure = new AggregateError([error, cleanupError], RpcStreamErrorText.cleanupFailed)
         }
         await this.#sendFailure(
           senderId,

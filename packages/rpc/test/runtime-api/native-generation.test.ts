@@ -171,6 +171,86 @@ it.each(['memory', 'external'] as const)(
 /** These facts are launcher metadata, independent of safe instance IDs and physical attempt numbers. */
 const generation = { kind: 'restart', value: 2, providerId: 'logical-child' } as const
 
+it.each(['signal', 'deadline'] as const)(
+  '[A66] managed Worker retains a started request terminal after its start %s',
+  async (intent) => {
+    /** A real managed source exercises the registration's original retry and terminal owners. */
+    const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
+    const peer = await createThreadPeer<IRuntimeDynamicSurface>({
+      spawn: {
+        spec: {
+          entry: fileURLToPath(new URL('./fixtures/runtime-u25-worker.mjs', import.meta.url))
+        },
+        budget,
+        scheduler: systemScheduler,
+        launcher: createNodeThreadLauncher(),
+        channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+        report: () => undefined
+      },
+      report: () => undefined
+    })
+    assert.equal(await peer.request('count'), 0)
+    const cancel = new AbortController()
+    /** A failure before the real start barrier keeps its package/code classification visible. */
+    let rejected: unknown
+    let settled = false
+    const pending = peer
+      .request('hold', undefined, {
+        cancel: 'before-start',
+        idempotencyKey: 'managed-start-winner',
+        ...(intent === 'signal' ? { signal: cancel.signal } : { timeoutMs: 1500 })
+      })
+      .then(
+        (value) => {
+          settled = true
+          return value
+        },
+        (error: unknown) => {
+          rejected = error
+          settled = true
+          return error
+        }
+      )
+    try {
+      await vi.waitFor(
+        async () =>
+          assert.equal(
+            await peer.request('count'),
+            1,
+            rejected instanceof Error
+              ? JSON.stringify({
+                  source: Reflect.get(rejected, 'source'),
+                  code: Reflect.get(rejected, 'code'),
+                  name: rejected.name,
+                  message: rejected.message
+                })
+              : '[A66] the real provider reaches its start barrier'
+          ),
+        { timeout: 3000 }
+      )
+      if (intent === 'signal') cancel.abort(new Error('late start intent'))
+      else await new Promise<void>((resolve) => setTimeout(resolve, 1750))
+      assert.equal(await peer.request('count'), 1)
+      assert.equal(
+        settled,
+        false,
+        '[A66] the managed wrapper cannot suppress the final provider start winner'
+      )
+      assert.equal(await peer.request('release'), 7)
+      assert.equal(await pending, 42)
+      const outcome = await peer.outcome('managed-start-winner')
+      assert.equal(outcome.state, 'done')
+      if (outcome.state === 'done')
+        assert.deepEqual(outcome.outcome.completion, { ok: true, result: 42 })
+    } finally {
+      await peer.request('release').catch(() => undefined)
+      await peer.close()
+      await pending
+    }
+    assert.equal(budget.inUse, 0)
+  }
+)
+
 it('[A71] original registration increments the accepted session only after publication and not after failed preparation', async () => {
   const fixture = remoteHarness()
   const ordinals: unknown[] = []
