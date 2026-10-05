@@ -4,6 +4,7 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { createThreadPlugin, type IRuntimeThreadPluginOptions } from '../../src/threads/plugin.js'
 import { runtimeSources, runtimeTestHost } from './fixture.js'
 import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
+import { readRuntimePeerEndpoint } from '../../src/remote/runtime-api/peer.js'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -158,6 +159,124 @@ it('[A104/A105] two forward Hosts preserve a notify-only terminal and await its 
     for (const carrier of carriers) carrier.close()
   }
 })
+
+for (const mode of ['tell', 'values'] as const) {
+  it(`[A108] forwarded native ${mode} retires once without replay and a fresh call uses replacement`, async () => {
+    /** A uses a real original carrier; B owns the actual supervised native Worker C. */
+    const owners = [owner(), owner()] as const
+    /** The original unit budget witnesses release of both native generations. */
+    const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
+    /** Native handles are the authoritative execution and exit receipts. */
+    const launcher = createNodeThreadLauncher()
+    /** Final cleanup includes every acquired generation even after a failed assertion. */
+    const handles: INodeThreadHandle[] = []
+    /** A-to-B ownership is independent of the supervisor's channel resources. */
+    const carriers: ReturnType<typeof runtimeSources>[] = []
+    /** Parent providers count actual old and new business entry, never send promises. */
+    const calls = { old: 0, fresh: 0 }
+    /** The real provider must enter before this test terminates its execution. */
+    let enter!: () => void
+    /** Original reverse RPC supplies a deterministic business-entry barrier. */
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve
+    })
+    /** Notify failures are observed on B's canonical provider endpoint. */
+    const failures: any[] = []
+    /** The ordinary upstream stream owns its iterator and cleanup. */
+    let iterator: AsyncIterableIterator<unknown> | undefined
+    try {
+      await owners[1].use(
+        definePlugin({
+          name: 'parent',
+          features: {
+            data: defineFeature(() => ({
+              started: () => {
+                calls.old += 1
+                enter()
+              },
+              fresh: () => {
+                calls.fresh += 1
+              }
+            }))
+          },
+          install: () => ({})
+        })
+      )
+      await owners[1].use(
+        createThreadPlugin({
+          name: 'c',
+          expose: ['parent'],
+          report: () => undefined,
+          spawn: {
+            spec: {
+              entry: fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url)),
+              data: { lifecycleMode: mode }
+            },
+            budget,
+            scheduler: systemScheduler,
+            launcher: {
+              ...launcher,
+              launch: async (...args: Parameters<typeof launcher.launch>) => {
+                const handle = await launcher.launch(...args)
+                handles.push(handle)
+                return handle
+              }
+            },
+            channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+            supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
+            report: () => undefined
+          }
+        })
+      )
+      carriers.push(await attach(owners[0], owners[1], 'b', 'a', {}, { expose: ['c'] }))
+      ;(
+        readRuntimePeerEndpoint(readRuntimeOutletConnection(owners[1].thread, 'a')!.peer)
+          .endpoint as unknown as IRpcEndpoint
+      ).hooks.on((event) => {
+        if (event.name === 'failure') failures.push(event.error)
+      })
+      /** Replacement identity must differ; the old logical execution must not enter it. */
+      const first = owners[1].thread!.get('c').instanceId
+      /** Catch is attached immediately so a real transport failure cannot become unhandled. */
+      const pending =
+        mode === 'tell'
+          ? (await owners[0].thread!.notify('b', 'c.service.data.tell', 'hold'), undefined)
+          : ((iterator = owners[0].thread!.stream('b', 'c.service.data.values', 'hold')),
+            iterator.next().catch((error) => error))
+      await entered
+      handles[0]!.terminate()
+      await handles[0]!.exited
+      /** Notify has no upstream result; the original provider failure channel is its outcome. */
+      if (mode === 'tell') await vi.waitFor(() => assert.ok(failures.length > 0))
+      const failure = mode === 'tell' ? failures[0] : await pending
+      assert.equal(failure.code, 'PROVIDER_GENERATION_RETIRED')
+      assert.equal(failure.source, '@migaia/rpc/core')
+      assert.ok(failure.cause instanceof Error, '[A108] native departure remains reachable')
+      await vi.waitFor(() => assert.notEqual(owners[1].thread!.get('c').instanceId, first), {
+        timeout: 3000
+      })
+      assert.equal(calls.old, 1, '[A108] retired work is never replayed')
+      if (mode === 'tell') {
+        await owners[0].thread!.notify('b', 'c.service.data.tell', 'replacement')
+        await vi.waitFor(() => assert.equal(calls.fresh, 1))
+      } else {
+        const fresh = owners[0].thread!.stream('b', 'c.service.data.values', 'replacement')
+        assert.deepEqual(await fresh.next(), { done: false, value: 'replacement' })
+        await fresh.return!(undefined)
+        assert.equal(calls.fresh, 1)
+        assert.deepEqual(await iterator!.return!(undefined), { done: true, value: undefined })
+      }
+      assert.equal(handles.length, 2)
+    } finally {
+      await iterator?.return?.(undefined)
+      for (const host of owners) await host.dispose()
+      for (const carrier of carriers) carrier.close()
+      for (const handle of handles) handle.terminate()
+      await Promise.all(handles.map((handle) => handle.exited))
+    }
+    assert.equal(budget.inUse, 0)
+  }, 15_000)
+}
 
 it('[A102/A104] one explicit connection method forwards through B with B as the direct caller', async () => {
   /** Three independent Hosts distinguish the original caller from the forwarding authority. */

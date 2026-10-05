@@ -6,15 +6,32 @@ const data = readThreadBootstrap(workerData).data ?? {}
 /** Native automatic bootstrap supplies this generation's actual identity and parent route. */
 let prepared
 prepared = createThreadPeer({
-  ...(data.advanced
+  ...(data.lifecycleMode
     ? {
         contract: {
           schemaVersion: 1,
           plugin: 'service',
-          features: { data: { methods: { read: { mode: 'request', idempotent: true } } } }
+          features: {
+            data: {
+              methods: {
+                [data.lifecycleMode]: {
+                  mode: data.lifecycleMode === 'tell' ? 'one-way' : 'async-generator',
+                  idempotent: false
+                }
+              }
+            }
+          }
         }
       }
-    : {}),
+    : data.advanced
+      ? {
+          contract: {
+            schemaVersion: 1,
+            plugin: 'service',
+            features: { data: { methods: { read: { mode: 'request', idempotent: true } } } }
+          }
+        }
+      : {}),
   provide: {
     probe: async (value) => {
       const peer = await prepared
@@ -27,6 +44,17 @@ prepared = createThreadPeer({
     },
     service: {
       data: {
+        tell: async (value) => {
+          const peer = await prepared
+          await peer.request(value === 'hold' ? 'parent.started' : 'parent.fresh')
+          if (value === 'hold') return new Promise(() => undefined)
+        },
+        async *values(value) {
+          const peer = await prepared
+          await peer.request(value === 'hold' ? 'parent.started' : 'parent.fresh')
+          if (value === 'hold') await new Promise(() => undefined)
+          yield value
+        },
         read: async (value) => {
           if (value === 'ordinary') {
             const peer = await prepared

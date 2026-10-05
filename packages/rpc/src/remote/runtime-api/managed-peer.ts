@@ -14,6 +14,8 @@ import {
 } from '../proxy.js'
 import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
 import type { IRuntimePreparationContext } from './launch-context.js'
+import { isForwardedPayload } from '../../core/internal/outbound-envelope.js'
+import { RuntimeApiMode } from './constants.js'
 import { compileRuntimeMethods } from './catalog.js'
 import {
   createRuntimePeer,
@@ -124,9 +126,15 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     request: (method, payload, callOptions) =>
       registration.invokeRequest(method, payload, callOptions),
     notify: (method, payload, callOptions) =>
-      registration.currentPeer().notify(method, payload, callOptions),
+      isForwardedPayload(callOptions, payload)
+        ? registration
+            .invokeRequest(method, payload, callOptions, RuntimeApiMode.notify)
+            .then(() => undefined)
+        : registration.currentPeer().notify(method, payload, callOptions),
     stream: (method, payload, callOptions) =>
-      registration.currentPeer().stream(method, payload, callOptions),
+      isForwardedPayload(callOptions, payload)
+        ? registration.invokeStream(method, payload, callOptions)
+        : registration.currentPeer().stream(method, payload, callOptions),
     describe: () => registration.currentPeer().describe(),
     close
   })
