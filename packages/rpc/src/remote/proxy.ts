@@ -21,6 +21,8 @@ import {
 } from './runtime-api/constants.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
+import { hostRethrowReporter } from '@migaia/utils/promise'
+import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { normalizePortable } from '../contract/normalize.js'
 import {
   isForwardedPayload,
@@ -52,7 +54,7 @@ import {
   type IRemoteHostCatalog,
   type IRemoteMethodContract
 } from './contract.js'
-import { normalizeRuntimeDescription } from './runtime-api/description.js'
+import { normalizeRuntimeDescription, runtimeDirectoryDiff } from './runtime-api/description.js'
 import { describeRemoteMethods } from './serve-methods.js'
 import { ERROR_SOURCE, RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
@@ -601,8 +603,23 @@ class RemoteRegistration<TUnit, TSpec> {
       throw error
     }
     if (runtime) this.#runtimeSession = sessionGeneration
+    /** Only the accepted replacement is compared with the original last-admitted directory. */
+    const directory = runtime ? readRuntimePeerConnection(runtime).directory : undefined
+    /** First acceptance and identical route sets produce no artificial diff. */
+    const diff =
+      this.#runtimeDirectory?.description && directory?.description
+        ? runtimeDirectoryDiff(this.#runtimeDirectory.description, directory.description)
+        : undefined
     this.#current = generation
-    if (runtime) this.#runtimeDirectory = readRuntimePeerConnection(runtime).directory
+    if (directory) this.#runtimeDirectory = directory
+    if (diff) {
+      try {
+        this.#options.report(diff)
+      } catch (failure) {
+        /** Reporting cannot turn an already accepted pointer into a failed/leaked candidate. */
+        hostRethrowReporter(failure, IpcReporterContext)
+      }
+    }
     if (runtime)
       for (const listener of this.#runtimeReadyListeners) {
         try {

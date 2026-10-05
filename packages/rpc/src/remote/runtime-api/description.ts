@@ -8,6 +8,7 @@ import {
   RuntimeApiErrorText,
   RuntimeApiMode,
   RuntimeApiModeSource,
+  RuntimeReportKind,
   RUNTIME_API_SCHEMA_VERSION
 } from './constants.js'
 
@@ -32,6 +33,64 @@ export type IRuntimePeerDescription = Readonly<{
   /** Exchanged only after both actual offers negotiate forward-route@1. */
   nodeId?: string
 }>
+
+/** A safe local report compares two accepted generations without retaining either endpoint. */
+export type IRuntimeDirectoryDiff = Readonly<{
+  type: typeof RuntimeReportKind.contractDiff
+  previous: IRuntimePeerDescription['self']
+  current: IRuntimePeerDescription['self']
+  added: readonly string[]
+  removed: readonly string[]
+  modeChanged: readonly Readonly<{
+    name: string
+    previous: readonly RuntimeApiMode[]
+    current: readonly RuntimeApiMode[]
+  }>[]
+}>
+
+/** Compare actual route sets only at accepted replacement; erased TS signatures cannot participate. */
+export function runtimeDirectoryDiff(
+  previous: IRuntimePeerDescription,
+  current: IRuntimePeerDescription
+): IRuntimeDirectoryDiff | undefined {
+  /** Both bounded directories have already passed canonical cold description admission. */
+  const before = new Map(previous.methods.map((method) => [method.name, method]))
+  /** The replacement's method index exists only for this cold comparison, never dispatch. */
+  const after = new Map(current.methods.map((method) => [method.name, method]))
+  /** Reports contain safe method names, not handlers, payloads or native configuration. */
+  const added = [...after.keys()].filter((name) => !before.has(name)).sort()
+  /** Removed routes remain an observation; the new accepted whitelist rejects their actual use. */
+  const removed = [...before.keys()].filter((name) => !after.has(name)).sort()
+  /** Mode order is immaterial: only an actual set difference is an incompatible route change. */
+  const modeChanged: IRuntimeDirectoryDiff['modeChanged'][number][] = []
+  for (const name of [...after.keys()].sort()) {
+    /** Missing old entries are additions rather than changed modes. */
+    const old = before.get(name)
+    /** This name comes from the admitted replacement index. */
+    const next = after.get(name)!
+    if (
+      old &&
+      (old.supportedModes.length !== next.supportedModes.length ||
+        old.supportedModes.some((mode) => !next.supportedModes.includes(mode)))
+    )
+      modeChanged.push(
+        Object.freeze({
+          name,
+          previous: Object.freeze([...old.supportedModes].sort()),
+          current: Object.freeze([...next.supportedModes].sort())
+        })
+      )
+  }
+  if (!added.length && !removed.length && !modeChanged.length) return undefined
+  return Object.freeze({
+    type: RuntimeReportKind.contractDiff,
+    previous: previous.self,
+    current: current.self,
+    added: Object.freeze(added),
+    removed: Object.freeze(removed),
+    modeChanged: Object.freeze(modeChanged)
+  })
+}
 
 /** Reject a malformed directory without copying untrusted keys or values into public diagnostics. */
 function invalid(cause?: unknown): never {
