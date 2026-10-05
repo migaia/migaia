@@ -386,6 +386,17 @@ function createAuthenticationCapability(
     counter = value
   })
   registerAuthenticationChallengePort(capability, {
+    contextNeeded: (frame) => {
+      if (
+        readAuthenticationChallengeProof(frame.data)?.control === RpcAuthenticationControl.response
+      )
+        return true
+      const receiverId = frame.data.route.receiverId
+      return receiverId !== undefined
+        ? outgoingFor(receiverId) !== undefined
+        : frame.kind === RpcEnvelopeKind.stream &&
+            outgoingFor(frame.data.route.targetId, true) !== undefined
+    },
     issue,
     remember,
     forget,

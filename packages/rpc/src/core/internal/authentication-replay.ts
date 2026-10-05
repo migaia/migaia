@@ -35,6 +35,8 @@ export type IAuthenticationChallengeContext = {
 
 /** One installed authentication owner supplies challenge freshness to existing discovery. */
 export type IAuthenticationChallengePort = {
+  /** Only privately admitted challenge facts require a per-frame outbound context. */
+  readonly contextNeeded: (frame: IRpcEnvelope) => boolean
   readonly issue: (nonce: string) => string
   readonly needed: (receiverId: string) => boolean
   readonly remember: (
