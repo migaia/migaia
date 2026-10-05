@@ -101,3 +101,31 @@ describe('host identity', () => {
     await host.dispose()
   })
 })
+
+it('[A24] public Host identity and genuine integration port share the canonical issuing identity', async () => {
+  /** Both public entries represent exactly one canonical Host and perform actual installation. */
+  const hosts = [new Host({ execution }), defineHost({ host: { execution } })]
+  try {
+    for (const host of hosts) {
+      /**
+       * Real Plugin installation obtains the original provenance-checked port after business
+       * admission.
+       */
+      let observed: unknown
+      await host.use(
+        definePlugin({
+          name: 'identity-query',
+          install: (core) => {
+            observed = getPluginRuntimeIntegration(core).identity
+            return {}
+          }
+        })
+      )
+      expect(observed, '[A24] Host query identity must equal the public Host identity').toBe(
+        host.identity
+      )
+    }
+  } finally {
+    for (const host of hosts) await host.dispose()
+  }
+})
