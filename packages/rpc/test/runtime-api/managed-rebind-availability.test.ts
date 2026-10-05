@@ -150,13 +150,48 @@ for (const unavailable of [
        */
       await vi.waitFor(() => assert.ok(constructed === 2 || reports.length > 0), { timeout: 3000 })
       calls = 0
-      const denied = await Promise.resolve()
-        .then(() => host.thread!.request('bridge', 'probe', 'unavailable'))
-        .then(
-          () => undefined,
-          (error: unknown) => error
-        )
-      assert.ok(denied instanceof Error)
+      /** Local outlet denial and inbound Feature denial must retain their exact registered owner. */
+      const expected = unavailable.startsWith('connection-')
+        ? { source: '@migaia/rpc/core', code: 'TARGET_UNKNOWN' }
+        : {
+            source: '@migaia/plugin-host',
+            code:
+              unavailable === 'exposed-unloaded'
+                ? 'PLUGIN_NOT_INSTALLED'
+                : unavailable === 'exposed-suspended'
+                  ? 'PLUGIN_SUSPENDED'
+                  : 'PLUGIN_DISABLED'
+          }
+      /** Endpoint construction precedes publication; wait for the original owner's exact denial. */
+      await vi.waitFor(
+        async () => {
+          const denied = await Promise.resolve()
+            .then(() => host.thread!.request('bridge', 'probe', 'unavailable'))
+            .then(
+              () => undefined,
+              (error: unknown) => error
+            )
+          /** Serialized wrappers keep the original permission error on their bounded cause chain. */
+          let original = denied
+          for (let depth = 0; depth < 8 && original && typeof original === 'object'; depth += 1) {
+            if (
+              Reflect.get(original, 'source') === expected.source &&
+              Reflect.get(original, 'code') === expected.code
+            )
+              break
+            original = Reflect.get(original, 'cause')
+          }
+          assert.ok(original && typeof original === 'object')
+          assert.equal(Reflect.get(original, 'source'), expected.source)
+          assert.equal(Reflect.get(original, 'code'), expected.code)
+        },
+        { timeout: 3000 }
+      )
+      assert.equal(
+        reports.length,
+        0,
+        '[A13] availability denial is per call, never a rebind failure'
+      )
       assert.equal(calls, 0, '[A13] unavailable exposed provider executes zero times')
       if (disabled) await disabled.token.enable()
       else await host.use(parent)

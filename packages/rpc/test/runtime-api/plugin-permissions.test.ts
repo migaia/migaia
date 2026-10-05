@@ -8,11 +8,14 @@ import { runtimeSources } from './fixture.js'
 import { RpcCoreErrorCode } from '../../src/core/errors.js'
 
 /** Rejection checks retain the canonical wrapper while requiring the original permission code. */
-function permission(error: unknown, code: string): boolean {
+function permission(error: unknown, code: string, source = '@migaia/plugin-host'): boolean {
   /** Core may retain the original package error on its bounded serialized cause chain. */
   let current = error
   for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth += 1) {
-    if (Reflect.get(current, 'code') === code) return true
+    if (Reflect.get(current, 'code') === code) {
+      assert.equal(Reflect.get(current, 'source'), source)
+      return true
+    }
     current = Reflect.get(current, 'cause')
   }
   assert.fail(`expected original permission code ${code}`)
@@ -25,7 +28,7 @@ function host() {
   })
 }
 
-it('[A12][A13][A34] genuine connections revoke inbound modes and exact target receipts without affecting a sibling', async () => {
+it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact target receipts without affecting a sibling', async () => {
   /** This supported class entry also exercises static typing of its actual published slot. */
   const owner = new PluginHost<Record<string, never>, never, IRuntimeTestRegistry>({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -172,7 +175,7 @@ it('[A12][A13][A34] genuine connections revoke inbound modes and exact target re
     assert.equal(
       calls.length,
       1,
-      '[A34] the original Host guard selects the current same-name Feature'
+      '[A117] the original Host guard selects the current same-name Feature'
     )
     await owner.unUse('connection-0')
     assert.equal(owner.thread, outlet, '[A34] first removal retains the shared facade')
@@ -184,6 +187,80 @@ it('[A12][A13][A34] genuine connections revoke inbound modes and exact target re
     await owner.dispose()
     for (const target of remote) await target.dispose()
     for (const carrier of carriers) carrier.close()
+  }
+})
+
+it('[A34][A118] a different same-name plugin follows the frozen whitelist without reviving captured authority', async () => {
+  /** Each real Host owns its original registrations; the carrier supplies only physical messages. */
+  const owners = [host(), host()] as const
+  /** The first directory remains frozen throughout unload and a different installation. */
+  const carrier = runtimeSources()
+  /** Only the current plugin's business increments this counter. */
+  let successorCalls = 0
+  try {
+    const [captured] = await owners[0].use(
+      definePlugin({
+        name: 'service',
+        features: { data: defineFeature(() => ({ read: () => 42, removed: () => 43 })) },
+        install: () => ({})
+      })
+    )
+    /** A captured output can retain old local business, but cannot acquire its successor's output. */
+    const output = captured.getFeature('data')
+    await Promise.all(
+      owners.map((owner, index) =>
+        owner.use(
+          createThreadPlugin({
+            name: 'connection',
+            expose: index === 0 ? ['service'] : [],
+            connect: carrier.sources[index]!,
+            report: () => undefined
+          })
+        )
+      )
+    )
+    assert.equal(await owners[1].thread!.request('connection', 'service.read'), 42)
+    await owners[0].unUse('service')
+    await owners[0].use(
+      definePlugin({
+        name: 'service',
+        features: {
+          data: defineFeature(() => ({
+            read: () => {
+              successorCalls += 1
+              return 84
+            },
+            added: () => {
+              successorCalls += 1
+              return 85
+            }
+          }))
+        },
+        install: () => ({})
+      })
+    )
+    assert.equal(output.read(), 42, '[A34] captured output never invokes the successor')
+    assert.equal(successorCalls, 0)
+    assert.equal(await owners[1].thread!.request('connection', 'service.read'), 84)
+    for (const method of ['service.removed', 'service.added'])
+      await assert.rejects(
+        Promise.resolve().then(() => owners[1].thread!.request('connection', method)),
+        (error) => permission(error, RpcCoreErrorCode.providerNotFound, '@migaia/rpc/core')
+      )
+    assert.equal(successorCalls, 1, '[A118] neither a removed key nor an unadvertised key executes')
+    /**
+     * Connection children retain the exact original contribution, unlike live by-name Feature
+     * routing.
+     */
+    const capturedConnection = owners[1].thread!.get('connection')
+    await owners[1].unUse('connection')
+    assert.throws(() => capturedConnection.request('service.read'), {
+      source: '@migaia/rpc/core',
+      code: RpcCoreErrorCode.targetUnknown
+    })
+  } finally {
+    for (const owner of owners) await owner.dispose()
+    carrier.close()
   }
 })
 
