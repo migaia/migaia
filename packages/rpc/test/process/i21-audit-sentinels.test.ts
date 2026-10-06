@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import { createProcessHost } from '../../src/process/host/client.js'
+import { createProcessPlugin } from '../../src/process/plugin/client.js'
+import { runtimeTestHost } from '../runtime-api/fixture.js'
 import { parseProcessPluginDescriptor } from '../../src/process/plugin/descriptor.js'
 import { serializeRpcError } from '../../src/contract/error.js'
 import { createNodeProcessLauncher } from '../../src/process/adapters/node-child-process.js'
@@ -24,13 +25,17 @@ function privateProjection(value: string, marker: string): void {
 describe('I21 EQ4 historical Host and descriptor sentinel replay', () => {
   it.each(['getter', 'proxy'] as const)(
     'Host %s keeps original cause local and never serializes it',
-    (kind) => {
+    async (kind) => {
       /** A synthetic random marker prevents an incidental stable text match. */
       const marker = randomUUID()
       /** The precise original instance remains reachable only for local diagnosis. */
       const original = new Error(marker)
       /** No deployment starts after hostile catalog admission fails. */
       const fixture = hostFixture()
+      /** Actual PluginHost installation owns the cold catalog admission before source effects. */
+      const host = runtimeTestHost({
+        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+      })
       /** Retain both historical failure shapes without exercising unrelated lifecycle probes. */
       const catalog =
         kind === 'getter'
@@ -51,9 +56,22 @@ describe('I21 EQ4 historical Host and descriptor sentinel replay', () => {
       /** Capture current native error instead of using the old expected-leak assertion. */
       let caught: unknown
       try {
-        createProcessHost({ ...fixture.options, catalog })
+        await host.use(
+          createProcessPlugin({
+            name: 'private-admission',
+            host,
+            expose: ['host'],
+            catalog,
+            resolvePlugin: () => undefined as never,
+            spawn: fixture.options.deployment as never,
+            report: fixture.report
+          })
+        )
       } catch (error) {
-        caught = error
+        expect(error).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
+        caught = (error as Error).cause
+      } finally {
+        await host.dispose()
       }
       expect(caught).toBeInstanceOf(TypeError)
       expect(caught).toMatchObject({
