@@ -107,7 +107,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     }
   })
   /** Every startup/rebind disposer joins the original holder's exact generation resource group. */
-  const holder = createRemoteGenerationHolder(registration, options.report)
+  const holder = createRemoteGenerationHolder(registration, options.report, true)
   /** A standalone Peer uses the original lifecycle signal domain without Host mutation metadata. */
   const signal: IAbortSignal = preparation?.initialSignal ?? createAbortController().signal
   /** The original observer is canceled before the canonical holder releases its generation. */
@@ -145,7 +145,12 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     self: context.self,
     request: (method, payload, callOptions) => {
       assertRuntimeTransferFamily(family, callOptions)
-      return registration.invokeRequest(method, payload, callTimeout(callOptions))
+      /** Logical retry settlement must finish before native drain can retire its generation. */
+      return binding.trackRequest
+        ? binding.trackRequest(() =>
+            registration.invokeRequest(method, payload, callTimeout(callOptions))
+          )
+        : registration.invokeRequest(method, payload, callTimeout(callOptions))
     },
     notify: (method, payload, callOptions) => {
       assertRuntimeTransferFamily(family, callOptions)

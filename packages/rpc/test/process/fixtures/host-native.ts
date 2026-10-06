@@ -13,6 +13,11 @@ import type { IProcessHostOptions } from '../../../src/process/host/types.js'
 import type { IRemoteHostCatalog } from '../../../src/remote/contract.js'
 import { nativeEndpoint } from './native-runtime.js'
 import type { IProcessHandle } from '@migaia/supervision/process'
+import {
+  createProcessPlugin,
+  type IRuntimeProcessPluginOptions
+} from '../../../src/process/plugin/client.js'
+import { runtimeTestHost } from '../../runtime-api/fixture.js'
 
 /** The real peer's contract is frozen in one data fixture rather than duplicated per transport. */
 export const nativeHostCatalog = JSON.parse(
@@ -96,6 +101,40 @@ export function nativeHostOptions(value = 'initial', maxUnits = 2) {
     }
   }
   return { options, handles, reports }
+}
+
+/** One actual local Host installs a symmetric connection and retains its original native handles. */
+export function nativeHostFixture(value = 'initial', maxUnits = 2) {
+  /** Reuse the original real launcher, byte authentication, spec, budget and PID observations. */
+  const fixture = nativeHostOptions(value, maxUnits)
+  /** This fixture owns its local Host; no remote control facade or lifecycle state is simulated. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  /** The native fixture always supplies a spawn deployment; the type preserves the original union. */
+  const deployment = fixture.options.deployment
+  if (deployment.kind !== 'spawn') throw new TypeError('native fixture requires spawn')
+  /** The explicit offer names the endpoint roots selected by this custom native composition. */
+  const spawn = {
+    ...deployment,
+    offer: createNativeProcessOffer({
+      peer: { id: 'host-parent', runtime: 'node' },
+      auth: nativeHostToken,
+      stream: true,
+      capabilities: RUNTIME_API_BASE_CAPABILITIES
+    })
+  }
+  /** The returned definition is the public factory's actual Plugin, installed by each assertion. */
+  const options = {
+    name: 'child',
+    self: { name: 'host-parent', instanceId: 'host-parent' },
+    spawn,
+    endpointFactory: fixture.options.endpointFactory,
+    report: fixture.options.report
+  } satisfies IRuntimeProcessPluginOptions
+  /** Factory construction remains lazy until the genuine Host installs this definition. */
+  const plugin = createProcessPlugin<IRuntimeDynamicSurface>(options)
+  return { ...fixture, options, host, plugin, close: () => host.dispose() }
 }
 
 /** Borrow an independent Node listener with the exact same endpoint and authenticated contract. */
