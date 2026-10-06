@@ -102,6 +102,7 @@ describe('process Host replacement publication', () => {
     try {
       await fixture.host.use(createProcessPlugin(options))
       const outlet = fixture.host.process!
+      await fixture.ready(fixture.handles[0]!)
       await outlet.request('child', RemoteMethodName.hostUse, ['p'])
       /** The actual old receipt remains captured so a stale call cannot select its successor. */
       const oldPeer = readRuntimeOutletConnection(outlet, 'child')!.peer
@@ -116,6 +117,7 @@ describe('process Host replacement publication', () => {
       await drainStarted
       scheduler.advance(DEFAULT_DRAIN_MS)
       await replacing
+      await fixture.ready()
       expect((await outcome)[0]).toMatchObject({
         status: 'rejected',
         reason: { code: 'REMOTE_RESULT_UNKNOWN' }
@@ -173,6 +175,7 @@ describe('process Host replacement publication', () => {
       try {
         await fixture.host.use(createProcessPlugin(options))
         const outlet = fixture.host.process!
+        await fixture.ready(fixture.handles[0]!)
         await outlet.request('child', RemoteMethodName.hostUse, ['p'])
         const old = fixture.handles[0]!
         const candidate = createProcessPlugin(options)
@@ -212,6 +215,7 @@ describe('process Host replacement publication', () => {
         }
         if (strategy === 'start-then-switch') await outlet.stop('child')
         await fixture.host.replace('child', createProcessPlugin(options))
+        await fixture.ready()
         expect(fixture.host.process).toBe(outlet)
         await outlet.request('child', RemoteMethodName.hostUse, ['p'])
         expect(await outlet.request('child', 'p.request', 'recovered')).toMatchObject({
@@ -468,6 +472,7 @@ describe('process Host replacement publication', () => {
       try {
         await fixture.host.use(createProcessPlugin(options))
         const outlet = fixture.host.process!
+        await fixture.ready(fixture.handles[0]!)
         await outlet.request('child', RemoteMethodName.hostUse, ['p'])
         const old = fixture.handles[0]!
         const spec = {
@@ -508,6 +513,7 @@ describe('process Host replacement publication', () => {
         }
         allow()
         await replacing
+        await fixture.ready()
         expect(fixture.host.process).toBe(outlet)
         await prepared
         expect(await outlet.request('child', RemoteMethodName.hostInspect, [])).toMatchObject({
@@ -557,6 +563,7 @@ describe('process Host replacement publication', () => {
       expect(fixture.handles).toHaveLength(1)
       expect(budget.inUse).toBe(1)
       const outlet = fixture.host.process!
+      await fixture.ready(fixture.handles[0]!)
       await outlet.request('child', RemoteMethodName.hostUse, ['p'])
       expect(await outlet.request('child', 'p.request', 'live')).toMatchObject({
         pid: fixture.handles[0]!.identity.pid

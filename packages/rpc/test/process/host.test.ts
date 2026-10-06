@@ -78,6 +78,7 @@ describe('process Host facade admission and ownership', () => {
     try {
       await fixture.host.use(plugin)
       const outlet = fixture.host.process!
+      await fixture.ready()
       await outlet.request('child', RemoteMethodName.hostUse, ['p'])
       const request = outlet.request('child', 'p.request', [])
       expect(request).toBe(pending)
@@ -135,6 +136,7 @@ describe('process Host facade admission and ownership', () => {
     try {
       await fixture.host.use(plugin)
       const outlet = fixture.host.process!
+      await fixture.ready()
       await outlet.request('child', RemoteMethodName.hostUse, ['p'])
       await outlet.request('child', 'p.request', 'deadline', { timeoutMs: 120 })
       expect(sends.at(-1)?.[3]).toMatchObject({ timeoutMs: 60 })
@@ -177,6 +179,7 @@ describe('process Host facade admission and ownership', () => {
     try {
       await fixture.host.use(plugin)
       const outlet = fixture.host.process!
+      await fixture.ready()
       await outlet.request('child', RemoteMethodName.hostUse, ['p'])
       const request = outlet.request('child', 'p.request', 'delay')
       /** Observe any cleanup rejection immediately while preserving the actual request Promise. */
@@ -208,6 +211,7 @@ describe('process Host facade admission and ownership', () => {
       expect(fixture.handles).toHaveLength(0)
       await fixture.host.use(fixture.plugin)
       const outlet = fixture.host.process!
+      await fixture.ready()
       expect(await outlet.request('child', RemoteMethodName.hostInspect, [])).toMatchObject({
         plugins: []
       })

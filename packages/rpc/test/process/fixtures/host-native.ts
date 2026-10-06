@@ -18,6 +18,12 @@ import {
   type IRuntimeProcessPluginOptions
 } from '../../../src/process/plugin/client.js'
 import { runtimeTestHost } from '../../runtime-api/fixture.js'
+import { createProcessError } from '../../../src/process/error.js'
+import { RpcProcessErrorCode } from '../../../src/process/error-code.js'
+import {
+  readRuntimeLaunchContext,
+  withRuntimeLaunchContext
+} from '../../../src/remote/runtime-api/launch-context.js'
 
 /** The real peer's contract is frozen in one data fixture rather than duplicated per transport. */
 export const nativeHostCatalog = JSON.parse(
@@ -32,12 +38,18 @@ export const nativeHostChildPath = fileURLToPath(
 )
 /** Bootstrap data is fixture input and never enters diagnostics or process descriptors. */
 export const nativeHostToken = 'host-fixture-secret'
+/** Actual child Host commit is independent of its earlier bidirectional directory response. */
+const readyText = JSON.parse(
+  readFileSync(new URL('./host-ready.json', import.meta.url), 'utf8')
+) as { committed: string }
 
 /** Assemble real process bindings while retaining actual handles for PID and exit assertions. */
 export function nativeHostFixture(value = 'initial', maxUnits = 2) {
   const launcher = createNodeProcessLauncher()
   const handles: IProcessHandle[] = []
   const reports: unknown[] = []
+  /** Each actual native launch owns one stderr readiness Promise, never a business retry. */
+  const readiness = new Map<IProcessHandle, Promise<void>>()
   /** Retain the canonical two-argument factory type even though this native owner ignores signal. */
   const endpointFactory: IRemoteEndpointFactory = (channel) =>
     nativeEndpoint(channel, 'host-parent')
@@ -78,8 +90,29 @@ export function nativeHostFixture(value = 'initial', maxUnits = 2) {
         launcher: {
           ...launcher,
           async launch(spec, context) {
-            const handle = await launcher.launch(spec, context)
+            /** Attach before launch so a fast child cannot publish before its caller subscribes. */
+            let status = ''
+            /** The child emits only after its real host.use transaction commits. */
+            let committed!: () => void
+            const ready = new Promise<void>((resolve) => {
+              committed = resolve
+            })
+            /** The output observer must retain the exact private bootstrap from the original owner. */
+            const observed = {
+              ...context,
+              output: (...[stream, chunk]: Parameters<typeof context.output>) => {
+                context.output(stream, chunk)
+                if (stream !== 'stderr') return
+                status += new TextDecoder().decode(chunk)
+                if (status.includes(readyText.committed)) committed()
+              }
+            }
+            const bootstrap = readRuntimeLaunchContext(context)
+            const handle = await (bootstrap
+              ? withRuntimeLaunchContext(observed, bootstrap, () => launcher.launch(spec, observed))
+              : launcher.launch(spec, observed))
             handles.push(handle)
+            readiness.set(handle, ready)
             return handle
           }
         }
@@ -112,7 +145,22 @@ export function nativeHostFixture(value = 'initial', maxUnits = 2) {
   })
   /** Factory construction remains lazy until the genuine Host installs this definition. */
   const plugin = createProcessPlugin<IRuntimeDynamicSurface>(options)
-  return { options, handles, reports, host, plugin, close: () => host.dispose() }
+  return {
+    options,
+    handles,
+    reports,
+    host,
+    plugin,
+    /** Join exact native readiness or fail on its real exit; no polling or extra grace is added. */
+    ready: (handle = handles.at(-1)!): Promise<void> =>
+      Promise.race([
+        readiness.get(handle)!,
+        handle.exited.then(() => {
+          throw createProcessError(RpcProcessErrorCode.channelClosed)
+        })
+      ]),
+    close: () => host.dispose()
+  }
 }
 
 /** Borrow an independent Node listener with the exact same endpoint and authenticated contract. */
