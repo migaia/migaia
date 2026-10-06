@@ -2,13 +2,25 @@ import { createHash } from 'node:crypto'
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { performance } from 'node:perf_hooks'
+import { IpcBenchControl } from './text.mjs'
 
 /** Actual loaded dist bytes are retained per isolate; formal execution never applies an overlay. */
 const loaded = []
 /** Each child owns its out-of-band snapshot sequence, outside measured exchanges. */
 let sequence = 0
 /** Snapshot files belong to the selected side's serial measurement window. */
-const stem = workerData?.benchStem ?? process.env.IPC_BENCH_STEM
+const stem = workerData?.benchStem ?? workerData?.data?.benchStem ?? process.env.IPC_BENCH_STEM
+/** Genuine runtime launchers keep portable data separate from the transferred observation port. */
+let observationReady = Promise.resolve()
+
+/**
+ * Join cold observation-port transfer before installing the real automatic Worker endpoint.
+ *
+ * @returns {Promise<void>} The separate port is ready; no RPC message or timing counter is added.
+ */
+export function waitForObservation() {
+  return observationReady
+}
 
 /**
  * Record exactly the loader-supplied module bytes, without changing their runtime contents.
@@ -86,6 +98,20 @@ export function snapshot() {
 
 if (parentPort) {
   workerData?.benchPort?.on('message', () => workerData.benchPort.postMessage(snapshot()))
+  if (workerData?.data?.observation)
+    observationReady = new Promise((resolve) => {
+      /** Consume before the runtime factory starts its bounded receive handoff. */
+      const receive = (message) => {
+        if (message?.kind !== IpcBenchControl.observation) return
+        parentPort.off('message', receive)
+        /** Only the already-transferred separate port receives out-of-band snapshot requests. */
+        const port = message.port
+        port.on('message', () => port.postMessage(snapshot()))
+        port.postMessage(IpcBenchControl.ready)
+        resolve()
+      }
+      parentPort.on('message', receive)
+    })
 } else if (process.argv.includes('--child')) {
   process.on('SIGUSR2', () => {
     /** Publish only a complete boundary snapshot; existence is the parent's ready signal. */

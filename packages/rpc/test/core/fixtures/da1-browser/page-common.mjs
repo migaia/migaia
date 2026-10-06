@@ -5,7 +5,7 @@ import { BrowserBenchText } from './text.mjs'
  *
  * @param {string} workerPath Side-specific Worker bundle, with RPC absent from the bare bundle.
  * @param {(
- *   worker: Worker,
+ *   createWorker: () => Worker,
  *   payload: string,
  *   classification: object
  * ) => Promise<() => Promise<void>>} activate
@@ -22,16 +22,22 @@ export function installPage(workerPath, activate) {
   /** Complete error classifications are retained, with absent semantic reasons explicit. */
   const classification = { failures: [], rejections: [] }
   globalThis.benchPrepare = async (payloadBytes) => {
-    worker = new Worker(workerPath, { type: 'module' })
     /** The control port is set before the provider is constructed or readiness is acknowledged. */
     const channel = new MessageChannel()
     control = channel.port1
+    /** Both sides allocate through this original page owner; RPC supplies it to its launcher. */
+    let createWorker
     const ready = new Promise((resolve, reject) => {
       control.onmessage = () => resolve()
-      worker.onerror = (event) => reject(new Error(event.message))
+      /** Real allocation remains here; the RPC launcher calls this before its private bootstrap. */
+      createWorker = () => {
+        worker = new Worker(workerPath, { type: 'module' })
+        worker.onerror = (event) => reject(new Error(event.message))
+        worker.postMessage({ port: channel.port2 }, [channel.port2])
+        return worker
+      }
     })
-    worker.postMessage({ port: channel.port2 }, [channel.port2])
-    exchange = await activate(worker, 'x'.repeat(payloadBytes), classification)
+    exchange = await activate(createWorker, 'x'.repeat(payloadBytes), classification)
     await ready
     await exchange()
   }

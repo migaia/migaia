@@ -1,5 +1,7 @@
 import { IpcBenchErrorText } from './error-text.mjs'
 import './observe.mjs'
+import { snapshot, waitForObservation } from './observe.mjs'
+import { IpcBenchControl } from './text.mjs'
 import { createHash } from 'node:crypto'
 import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
@@ -50,12 +52,15 @@ function rejected(event) {
 function report(error) {
   classification.reports.push(classify(error))
 }
-/** Worker memory/CPU snapshots use a separate control port and never an RPC envelope. */
+/** Node and bare Worker memory/CPU snapshots use their original separate control port. */
 let snapshotPort
+/** Bun's native Web Worker exposes its real isolate snapshot outside the measured request window. */
+let snapshotPeer
 /** Each native child has an ordered out-of-band snapshot file sequence. */
 let snapshotSequence = 0
 /** Native peers share SIGUSR2 control; foreign peers have only native PID observations. */
 async function peerSnapshot(peerPid) {
+  if (snapshotPeer) return snapshotPeer()
   if (snapshotPort)
     return new Promise((resolve) => {
       snapshotPort.once('message', resolve)
@@ -73,17 +78,27 @@ const entry = fileURLToPath(import.meta.url)
 const readyText = 'IPC_READY\n'
 /** Native proposal uses production grammar and JSON codec. */
 let offer
-/** Load the production endpoint graph only on RPC sides; bare RSS must not include it. */
+/** Load the delivered public Peer graph only on RPC sides; bare RSS must not include it. */
 async function rpcApi() {
   const processApi = await import('@migaia/rpc/process')
-  const { loadEndpointFixture } = await import('./fd-fixture-loader.mjs')
-  const { endpointFor } = await loadEndpointFixture()
-  const { createNodeThreadChannel } = await import('@migaia/rpc/threads')
-  offer = (id) => processApi.createNativeProcessOffer({ peer: { id, runtime: 'node' } })
-  return { ...processApi, endpointFor, createNodeThreadChannel }
+  const threads = await import('@migaia/rpc/threads')
+  const threadAdapters = await import('@migaia/rpc/threads/adapters/node')
+  const bunAdapters = process.versions.bun
+    ? await import('@migaia/rpc/threads/adapters/bun')
+    : undefined
+  /** Capability declarations come from the actual factory source context, never a fixture guess. */
+  offer = (id, capabilities) => ({
+    ...processApi.createNativeProcessOffer({
+      peer: { id, runtime: process.versions.bun ? 'bun' : 'node' }
+    }),
+    capabilities
+  })
+  return { ...processApi, ...threads, ...threadAdapters, ...bunAdapters }
 }
 /** Fixed benchmark method has no side effect besides returning its portable input. */
 const echoMethod = 'bench.echo'
+/** Both public provider factories compile the same nested tree into the original echo wire name. */
+const echoProvide = { bench: { echo: (payload) => payload } }
 /**
  * Explicit sampling capacity accommodates warmup/1000 raw-Worker echoes; product default is
  * unchanged.
@@ -146,18 +161,23 @@ async function serveBare(raw) {
 }
 
 /**
- * Build a production endpoint on a prepared channel and provide an exact echo.
+ * Build the public process Peer on the original physical source and provide an exact echo.
  *
- * @param {import('@migaia/rpc/remote').IRemoteChannel} channel Public negotiated/static channel.
- * @returns {Promise<void>} Provider installed before peer readiness.
+ * @param {import('../dist/remote/runtime-api/peer.js').IRuntimePeerSource} source Original channel
+ *   negotiation receives the actual factory identity and installed capability offer.
+ * @returns {Promise<import('../dist/remote/runtime-api/peer.js').IRuntimePeer>} Real public Peer.
  */
-async function serveRpc(channel) {
-  const { endpointFor } = await rpcApi()
-  const runtime = await endpointFor(channel, 'peer', nativeProviderLimits)
-  runtime.endpoint.provide(echoMethod, (context) => context.success(context.data))
-  channel.transport.onTransportError?.(() => {
-    void runtime.endpoint.dispose().catch((error) => process.stderr.write(String(error)))
+async function serveRpc(source) {
+  const { createProcessPeer } = await rpcApi()
+  /** The public factory owns the directory, provider and exact accepted endpoint lifecycle. */
+  const runtime = await createProcessPeer({
+    self: { name: 'peer', instanceId: 'peer' },
+    provide: echoProvide,
+    providerLimits: nativeProviderLimits,
+    connect: source,
+    report
   })
+  return runtime
 }
 
 /**
@@ -175,7 +195,7 @@ export async function createIpcSession({ carrier, side, payload, wire, peerRunti
   let raw
   /** Worker carrier shares parent PID; other carriers retain distinct peer PID. */
   let peerPid
-  /** RPC runtime is public endpoint ownership; bare waits for one byte/message echo. */
+  /** RPC runtime is the public Peer owner; bare waits for one unchanged byte/message echo. */
   let runtime
   /** Stdio ready marker is observed by the launcher before any warmup or PID baseline. */
   let resolvePeerReady
@@ -189,59 +209,136 @@ export async function createIpcSession({ carrier, side, payload, wire, peerRunti
   const api = side === 'rpc' ? await rpcApi() : undefined
   try {
     if (carrier === 'worker') {
-      const controls = new MessageChannel()
-      snapshotPort = controls.port1
-      cleanup.push(() => {
-        controls.port1.close()
-      })
-      const worker = new Worker(entry, {
-        workerData: {
-          side,
-          carrier,
-          child: true,
-          benchPort: controls.port2,
-          benchStem: process.env.IPC_BENCH_STEM
-        },
-        transferList: [controls.port2]
-      })
-      const exited = once(worker, 'exit')
-      cleanup.push(async () => {
-        await worker.terminate()
-        await exited
-      })
-      await new Promise((resolve, reject) => {
-        worker.once('message', (value) =>
-          value === readyText ? resolve() : reject(new Error('Worker readiness invalid'))
-        )
-        worker.once('error', reject)
-      })
-      peerPid = process.pid
-      if (side === 'rpc')
-        runtime = await api.endpointFor(
-          api.createNodeThreadChannel(worker, 'peer', { scheduler: systemScheduler }),
-          'parent',
-          nativeProviderLimits
-        )
-      else {
-        /** Bare replies settle one FIFO waiter per physical message, including concurrent lanes. */
-        const waiting = []
-        worker.on('message', (value) => {
-          const waiter = waiting.shift()
-          if (value === payload) waiter?.resolve()
-          else waiter?.reject(new Error('Bare worker mismatch'))
+      if (side === 'rpc' && process.versions.bun) {
+        runtime = await api.createThreadPeer({
+          self: { name: 'parent', instanceId: 'parent' },
+          providerLimits: nativeProviderLimits,
+          report,
+          spawn: async (context) => {
+            /** The Bun adapter supplies real Web bootstrap and retains unsupported exit semantics. */
+            const launcher = api.createBunThreadLauncher({ runtimeApi: context, report })
+            const handle = await launcher.launch(
+              { entry: import.meta.url, name: 'peer' },
+              { signal: new AbortController().signal }
+            )
+            cleanup.push(() => handle.terminate())
+            return api
+              .createBunThreadChannelFactory({ scheduler: systemScheduler })
+              .open(handle, new AbortController().signal)
+          }
         })
-        return {
-          peerPid,
-          peerSnapshot: () => peerSnapshot(peerPid),
-          classification: () => classification,
-          ready: async () => undefined,
-          exchange: () =>
-            new Promise((resolve, reject) => {
-              waiting.push({ resolve, reject })
-              worker.postMessage(payload, undefined)
-            }),
-          close: async () => {
-            for (const close of cleanup.reverse()) await close()
+        /** This extra control operation is outside timing and is reported separately from bare OOB. */
+        snapshotPeer = () => runtime.request(IpcBenchControl.snapshot)
+        peerPid = process.pid
+      } else {
+        const controls = new MessageChannel()
+        snapshotPort = controls.port1
+        cleanup.push(() => {
+          controls.port1.close()
+        })
+        if (side === 'rpc') {
+          /** The actual library launcher supplies the bootstrap accepted by the automatic child. */
+          const launcher = api.createNodeThreadLauncher()
+          /** Owned Worker execution retains the original supervision lease and close owner. */
+          const { createUnitBudget } = await import('@migaia/supervision')
+          runtime = await api.createThreadPeer({
+            self: { name: 'parent', instanceId: 'parent' },
+            providerLimits: nativeProviderLimits,
+            report,
+            spawn: {
+              spec: {
+                entry,
+                name: 'peer',
+                data: {
+                  side,
+                  carrier,
+                  child: true,
+                  benchStem: process.env.IPC_BENCH_STEM,
+                  observation: true
+                }
+              },
+              launcher: {
+                ...launcher,
+                async launch(spec, context) {
+                  /** Preserve the original private launch context and real native handle. */
+                  const handle = await launcher.launch(spec, context)
+                  /** Observation setup completes before the channel factory consumes the child ACK. */
+                  const observed = new Promise((resolve, reject) => {
+                    controls.port1.once('message', (message) =>
+                      message === IpcBenchControl.ready
+                        ? resolve()
+                        : reject(new Error(IpcBenchErrorText.workerObservation))
+                    )
+                  })
+                  try {
+                    handle.port.postMessage(
+                      { kind: IpcBenchControl.observation, port: controls.port2 },
+                      [controls.port2]
+                    )
+                    await Promise.race([
+                      observed,
+                      handle.exited.then(() => {
+                        throw new Error(IpcBenchErrorText.workerObservationExit)
+                      })
+                    ])
+                  } catch (primary) {
+                    handle.terminate()
+                    await handle.exited
+                    throw primary
+                  }
+                  return handle
+                }
+              },
+              budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
+              scheduler: systemScheduler,
+              channelFactory: api.createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+              report
+            }
+          })
+          peerPid = process.pid
+        } else {
+          const worker = new Worker(entry, {
+            workerData: {
+              side,
+              carrier,
+              child: true,
+              benchPort: controls.port2,
+              benchStem: process.env.IPC_BENCH_STEM
+            },
+            transferList: [controls.port2]
+          })
+          const exited = once(worker, 'exit')
+          cleanup.push(async () => {
+            await worker.terminate()
+            await exited
+          })
+          await new Promise((resolve, reject) => {
+            worker.once('message', (value) =>
+              value === readyText ? resolve() : reject(new Error('Worker readiness invalid'))
+            )
+            worker.once('error', reject)
+          })
+          peerPid = process.pid
+          /** Bare replies settle one FIFO waiter per physical message, including concurrent lanes. */
+          const waiting = []
+          worker.on('message', (value) => {
+            const waiter = waiting.shift()
+            if (value === payload) waiter?.resolve()
+            else waiter?.reject(new Error('Bare worker mismatch'))
+          })
+          return {
+            peerPid,
+            peerSnapshot: () => peerSnapshot(peerPid),
+            classification: () => classification,
+            ready: async () => undefined,
+            exchange: () =>
+              new Promise((resolve, reject) => {
+                waiting.push({ resolve, reject })
+                worker.postMessage(payload, undefined)
+              }),
+            close: async () => {
+              for (const close of cleanup.reverse()) await close()
+            }
           }
         }
       }
@@ -257,7 +354,10 @@ export async function createIpcSession({ carrier, side, payload, wire, peerRunti
           signal: new AbortController().signal,
           output: (stream, chunk) => {
             if (stream !== 'stderr') return
-            status += Buffer.from(chunk).toString()
+            /** Child startup failures remain attached to the real side's retained stderr receipt. */
+            const text = Buffer.from(chunk).toString().replaceAll('bench-local', '[REDACTED_AUTH]')
+            process.stderr.write(text)
+            status += text
             if (status.includes(readyText)) resolvePeerReady()
           }
         }
@@ -286,20 +386,25 @@ export async function createIpcSession({ carrier, side, payload, wire, peerRunti
       raw = await dialProcessByteChannel({ address })
     } else throw new Error(IpcBenchErrorText.carrier(carrier))
     if (raw && side === 'rpc') {
-      const channel = await api.createProcessTransport(raw, {
-        role: 'initiator',
-        peerId: 'peer',
-        offer: { ...offer('parent'), auth: 'bench-local' },
-        report,
-        ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
+      runtime = await api.createProcessPeer({
+        self: { name: 'parent', instanceId: 'parent' },
+        providerLimits: nativeProviderLimits,
+        connect: (context) =>
+          api.createProcessTransport(raw, {
+            role: 'initiator',
+            peerId: 'peer',
+            offer: { ...offer('parent', context.capabilities), auth: 'bench-local' },
+            report,
+            ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
+          }),
+        report
       })
-      runtime = await api.endpointFor(channel, 'parent', nativeProviderLimits)
-      cleanup.push(() => channel.close())
     }
     if (runtime) {
-      cleanup.push(() => runtime.endpoint.dispose())
-      await runtime.endpoint.send('peer', echoMethod, payload)
+      cleanup.push(() => runtime.close())
+      await runtime.request(echoMethod, payload)
       return {
+        facade: runtime,
         peerPid,
         peerSnapshot: () => peerSnapshot(peerPid),
         classification: () => classification,
@@ -307,7 +412,7 @@ export async function createIpcSession({ carrier, side, payload, wire, peerRunti
         ready: async () => undefined,
         exchange: async () => {
           try {
-            if ((await runtime.endpoint.send('peer', echoMethod, payload)) !== payload)
+            if ((await runtime.request(echoMethod, payload)) !== payload)
               throw new Error(IpcBenchErrorText.echo)
           } catch (error) {
             classification.failures.push(classify(error))
@@ -484,8 +589,9 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
     cleanup.push(() => raw.close())
     if (side === 'rpc') {
       const { createJsonRpcRemoteChannel } = await import('@migaia/rpc/bridge/jsonrpc')
-      const { loadEndpointFixture } = await import('./fd-fixture-loader.mjs')
-      const { bridgeEndpointFor } = await loadEndpointFixture()
+      const { createProcessPeer } = await import('@migaia/rpc/process')
+      /** Only capabilities with actual mappings in the canonical bridge profile are offered. */
+      const { JSONRPC_ALLOWED_CAPABILITIES } = await import('../dist/bridge/jsonrpc/constants.js')
       /** Contract describes the same request echo already proved by the conformance facade cases. */
       const contract = {
         schemaVersion: 1,
@@ -499,24 +605,30 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
           }
         }
       }
-      const channel = await createJsonRpcRemoteChannel({
-        byte: raw,
-        peerId: id,
-        target: { kind: 'plugin', contract },
-        offer: {
-          versions: [{ major: 1, minor: 1 }],
-          capabilities: [],
-          peer: { id: 'parent', runtime: process.versions.bun ? 'bun' : 'node' }
-        },
-        token,
-        scheduler: systemScheduler,
-        wallClock: { timestamp: () => Date.now() },
-        ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined },
+      runtime = await createProcessPeer({
+        self: { name: 'parent', instanceId: 'parent' },
+        providerLimits: nativeProviderLimits,
+        connect: (context) =>
+          createJsonRpcRemoteChannel({
+            byte: raw,
+            peerId: id,
+            target: { kind: 'plugin', contract },
+            offer: {
+              versions: [{ major: 1, minor: 1 }],
+              capabilities: context.capabilities.filter((value) =>
+                JSONRPC_ALLOWED_CAPABILITIES.includes(value)
+              ),
+              peer: { id: 'parent', runtime: process.versions.bun ? 'bun' : 'node' }
+            },
+            token,
+            scheduler: systemScheduler,
+            wallClock: { timestamp: () => Date.now() },
+            ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined },
+            report
+          }),
         report
       })
-      cleanup.push(() => channel.close())
-      runtime = await bridgeEndpointFor(channel, 'parent')
-      cleanup.push(() => runtime.endpoint.dispose())
+      cleanup.push(() => runtime.close())
     }
     /** The bare peer parses and serializes this JSON payload once without RPC business dispatch. */
     const body = Buffer.from(JSON.stringify(payload)),
@@ -550,7 +662,7 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
       side === 'rpc'
         ? async () => {
             try {
-              if ((await runtime.endpoint.send(id, 'p.f.request', [payload])) !== payload)
+              if ((await runtime.request('p.f.request', [payload])) !== payload)
                 throw new Error(IpcBenchErrorText.bridgeEcho)
             } catch (error) {
               classification.failures.push(classify(error))
@@ -578,6 +690,7 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
       if (failures.length) throw new AggregateError(failures, IpcBenchErrorText.bridgeCleanup)
     }
     return {
+      ...(runtime ? { facade: runtime } : {}),
       peerPid,
       encodedBytes: body.length,
       ready: exchange,
@@ -618,10 +731,12 @@ async function childMain(side, carrier, address) {
         parentPort.postMessage(JSON.parse(JSON.stringify(value)), undefined)
       )
     else
-      await serveRpc(
-        api.createNodeThreadChannel(parentPort, 'parent', { scheduler: systemScheduler })
-      )
-    parentPort.postMessage(readyText, undefined)
+      await api.createThreadPeer({
+        provide: process.versions.bun ? { bench: { ...echoProvide.bench, snapshot } } : echoProvide,
+        providerLimits: nativeProviderLimits,
+        report
+      })
+    if (side === 'bare') parentPort.postMessage(readyText, undefined)
     return
   }
   if (carrier === 'socket-framed') {
@@ -652,13 +767,15 @@ async function childMain(side, carrier, address) {
         },
         report,
         onConnection: async (pending) => {
-          const admitted = await pending.accept({
-            peerId: 'parent',
-            offer: offer('peer'),
-            report,
-            ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
+          await serveRpc(async (context) => {
+            const admitted = await pending.accept({
+              peerId: 'parent',
+              offer: offer('peer', context.capabilities),
+              report,
+              ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
+            })
+            return admitted.channel
           })
-          await serveRpc(admitted.channel)
         }
       })
     process.stderr.write(readyText)
@@ -669,22 +786,29 @@ async function childMain(side, carrier, address) {
     process.stderr.write(readyText)
     await serveBare(raw)
   } else {
-    const channel = await api.createProcessTransport(raw, {
-      role: 'responder',
-      peerId: 'parent',
-      offer: offer('peer'),
-      auth: { mode: 'none' },
-      report,
-      ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
-    })
-    await serveRpc(channel)
+    await serveRpc((context) =>
+      api.createProcessTransport(raw, {
+        role: 'responder',
+        peerId: 'parent',
+        offer: offer('peer', context.capabilities),
+        auth: { mode: 'none' },
+        report,
+        ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
+      })
+    )
     process.stderr.write(readyText)
   }
 }
 
 if (parentPort) {
   const { workerData } = await import('node:worker_threads')
-  await childMain(workerData.side, workerData.carrier)
+  await waitForObservation()
+  /** The canonical launcher retains portable spec data under its original bootstrap data field. */
+  const input = workerData?.data ?? workerData
+  if (input?.child) await childMain(input.side, input.carrier)
+  else if (process.versions.bun && Bun.isMainThread === false) await childMain('rpc', 'worker')
+} else if (process.versions.bun && Bun.isMainThread === false) {
+  await childMain('rpc', 'worker')
 } else if (process.argv.includes('--child')) {
   await childMain(...process.argv.slice(process.argv.indexOf('--child') + 1))
 }

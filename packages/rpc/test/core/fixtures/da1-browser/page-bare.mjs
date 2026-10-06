@@ -1,7 +1,9 @@
 import { installPage } from './page-common.mjs'
 import { BrowserBenchText } from './text.mjs'
 
-installPage('/worker-bare.js', async (worker, payload) => {
+installPage('/worker-bare.js', async (createWorker, payload) => {
+  /** The original raw Worker, codec and physical echo loop remain unchanged. */
+  const worker = createWorker()
   /** Every bare postMessage resolves exactly once from its own physical echo. */
   let waiting
   worker.onmessage = (event) => {

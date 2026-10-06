@@ -12,6 +12,14 @@ Native bare peers parse and serialize the payload once, as required by the
 Rust uses release `opt-level = 3`, Go its optimized build, and public TS peers
 execute emitted JavaScript. Build time is outside formal timing.
 
+RPC business runs through the shipped `createProcessPeer` or `createThreadPeer`
+and their `request` method, including foreign bridge cells. Native Node Workers
+use the original owned launcher and binding; Bun uses its actual Web Worker
+adapter and keeps actual-exit capabilities unsupported. Chromium uses the same
+public Thread Peer on both sides. Preparation tests verify real accepted Peer
+provenance after completing ordinary echoes; an endpoint-shaped fixture cannot
+satisfy that check. Bare carriers and echo work remain independent of RPC.
+
 ```bash
 # Frozen inventory without launching measurements.
 pnpm --filter @migaia/rpc run bench:ipc --list
@@ -42,8 +50,10 @@ DA1 uses medians of all three RPC/bare ratios. Small cells (64 B and 1 KiB)
 require wall <=4, p99 <=5 and CPU <=5 for every independent PID role. Large
 cells (64 KiB and 1 MiB) require p99 <=3, throughput >=0.5, CPU <=3 and absolute
 RSS <=2 for every independent PID role. Aggregate CPU/RSS are descriptive and
-cannot hide a failing endpoint. Concurrency 16/64 uses the exact six
-`throughputFloor` values in the inventory. Historical `IpcBenchThreshold` and
+cannot hide a failing endpoint. U33 keeps the six concurrency 16/64
+`throughputFloor` values as tracking targets only. Missing a target reports
+`未达跟踪目标`; it does not replace a separate frozen regression verdict.
+Historical `IpcBenchThreshold` and
 `judgePairs` remain available for historical oracle checks; their aggregate
 budgets are not DA1.
 
@@ -57,7 +67,8 @@ each of four representatives, with both RPC and bare observations retained.
 Its `p50RatioNoiseBand` is the largest observed absolute change of the normalized
 ratio. A missing calibration is an error, never a no-regression verdict.
 
-Chromium uses the canonical browser Worker adapter and static batch agreement.
+Chromium uses the canonical browser launcher, automatic child bootstrap and
+the public Peer's bilateral capability and v2 directory agreement.
 Bare uses a separate pure postMessage echo graph. All 1000 round trips are timed
 inside one page evaluation; Node driver CPU and control round trips are excluded.
 A separate pre-window trace maps actual page/Worker PID and thread IDs. CPU
@@ -75,6 +86,13 @@ default-capacity sustained operation. Native receipts distinguish actual loaded
 SHA from disk SHA; formal timing has no counter overlay. Diagnostics remain
 separate. Foreign peers retain optimized executable and source identities;
 their JavaScript heap/thread fields are explicitly unavailable.
+
+Node and bare Worker snapshots use the original separate observation port.
+Bun RPC Worker isolate snapshots use the private fixture method `bench.snapshot`
+at boundaries outside formal timing; that diagnostic route is included in its
+real directory. These reads perform RPC allocation and are not described as
+equivalent to the bare out-of-band snapshot cost. Formal echo samples contain
+no snapshot calls, counters, debugger or profile overlay.
 
 The six sustained >=400-second cells run separately with the replay fixture's
 full records and classifications. A native send/receive change requires fresh

@@ -50,6 +50,10 @@ export const IpcBenchErrorText = Object.freeze({
   bridgePreparation: 'Bridge IPC preparation failed',
   /** This fixture's explicit local authentication token is checked before native readiness. */
   authentication: 'Benchmark authentication failed',
+  /** The out-of-band observation handshake must complete before Worker RPC startup. */
+  workerObservation: 'Worker observation readiness invalid',
+  /** A genuine Worker exit during cold observation setup invalidates preparation. */
+  workerObservationExit: 'Worker exited before observation readiness',
   /**
    * Raw side stderr stays attached to its actual exit rather than becoming a ratio failure.
    *
