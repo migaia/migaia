@@ -25,6 +25,15 @@ export type IRuntimePeerProvide = Readonly<{
   [name: string]: IRuntimePeerMethod | IRuntimePeerProvide
 }>
 
+/** The existing advanced declaration selects the same operation mode in both directory builders. */
+export function runtimeModeForDeclaration(mode: RemoteMethodMode): RuntimeApiMode {
+  return mode === RemoteMethodMode.request
+    ? RuntimeApiMode.request
+    : mode === RemoteMethodMode.oneWay
+      ? RuntimeApiMode.notify
+      : RuntimeApiMode.stream
+}
+
 /** Captured receiver/function identity makes runtime calls independent of later object mutation. */
 type IRuntimeLocalMethodEntry = Readonly<{
   kind?: 'local'
@@ -190,12 +199,7 @@ export function compileRuntimeMethods(
         const entry = methods.get(fullName) ?? methods.get(`${contract.plugin}.${methodName}`)
         if (!entry || declared.has(entry.name)) invalid()
         /** Explicit legacy declarations narrow only the selected runtime operation. */
-        const mode =
-          declaration.mode === RemoteMethodMode.request
-            ? RuntimeApiMode.request
-            : declaration.mode === RemoteMethodMode.oneWay
-              ? RuntimeApiMode.notify
-              : RuntimeApiMode.stream
+        const mode = runtimeModeForDeclaration(declaration.mode)
         declared.set(
           entry.name,
           Object.freeze({ ...entry, declaration, supportedModes: Object.freeze([mode]) })

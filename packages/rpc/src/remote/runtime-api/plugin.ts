@@ -43,6 +43,7 @@ import { RpcRemoteLayerErrorCode } from '../error-code.js'
 import { RemoteMethodName } from '../constants.js'
 import {
   compileRuntimeMethods,
+  runtimeModeForDeclaration,
   registerRuntimePluginMethods,
   type IRuntimeForwardMethodEntry,
   type IRuntimeMethodEntry
@@ -75,25 +76,35 @@ export type IRuntimePluginOptions<
     resolvePlugin?: IRemoteHostControlOptions['resolvePlugin']
   }>
 
-/** A cold method whitelist resolves current Feature availability through the original Host owner. */
+/** An absent ordinary exposed method keeps the existing runtime whitelist error. */
+function unavailableExposedMethod(): never {
+  throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+}
+
+/** Original catalog serving rejects unavailable or unadopted outputs with the same remote code. */
+function closedCatalogMethod(): never {
+  throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+}
+
+/** A cold method whitelist resolves current Feature availability through its original Host owner. */
 function exposedMethod(
-  snapshot: IPluginRuntimeFeatureSnapshot,
-  feature: string,
-  key: string
+  readCurrent: () => object | undefined,
+  key: string,
+  unavailable: () => never = unavailableExposedMethod
 ): IRuntimePeerMethod {
   /** Both whole-group admission and invocation consult the same live Host permission owner. */
   const current = () => {
     /** Replacement may change output identity; no physical generation preparation reads it. */
-    const receiver = snapshot.readCurrent(feature)
+    const receiver = readCurrent()
     /** Only a current enumerable data method can satisfy the already compiled whitelist. */
-    const descriptor = Object.getOwnPropertyDescriptor(receiver, key)
+    const descriptor = receiver && Object.getOwnPropertyDescriptor(receiver, key)
     if (
       !descriptor?.enumerable ||
       !('value' in descriptor) ||
       typeof descriptor.value !== 'function'
     )
-      throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
-    return { receiver, method: descriptor.value }
+      unavailable()
+    return { receiver: receiver!, method: descriptor.value }
   }
   return attachProviderPreflight(
     (payload, context) => {
@@ -210,7 +221,8 @@ function exposedProvide(
             RuntimeApiErrorText.featureConflict
           )
         found = true
-        if (!Object.hasOwn(group, key)) group[key] = exposedMethod(snapshot, feature, key)
+        if (!Object.hasOwn(group, key))
+          group[key] = exposedMethod(() => snapshot.readCurrent(feature), key)
         owners.set(fullName, feature)
       }
     }
@@ -220,6 +232,68 @@ function exposedProvide(
   }
   for (const group of Object.values(provide)) Object.freeze(group)
   return Object.freeze(provide)
+}
+
+/**
+ * Compile only explicitly exposed catalog methods; the existing control owner retains installation,
+ * exact adoption, current output identity and disabled-target authority for every invocation.
+ */
+function exposedCatalogMethods(
+  control: ReturnType<typeof createRemoteHostControl>,
+  expose: readonly string[],
+  assertCurrent: () => void
+): readonly IRuntimeMethodEntry[] {
+  /** Whole-plugin and individual-method permissions form one cold union, matching local exposure. */
+  const methods = new Map<string, IRuntimeMethodEntry>()
+  /** Different Features cannot silently share a folded public method. */
+  const owners = new Map<string, string>()
+  for (const path of expose) {
+    /** Catalog exposure uses the same plugin.method spelling as real local Feature exposure. */
+    const separator = path.indexOf('.')
+    /** The normalized catalog owns this Plugin name independently of installation state. */
+    const name = separator < 0 ? path : path.slice(0, separator)
+    /** An explicit selector must match a declared method; whole Plugin exposure is a union. */
+    const selected = separator < 0 ? undefined : path.slice(separator + 1)
+    /** The original control constructor already normalized this exact declaration. */
+    const contract = control.catalog[name]!
+    /** Missing explicit methods fail cold rather than silently shrinking authority. */
+    let found = selected === undefined
+    for (const [feature, definition] of Object.entries(contract.features)) {
+      for (const [key, declaration] of Object.entries(definition.methods)) {
+        if (selected !== undefined && selected !== key) continue
+        /** BC3 folds the Feature segment while retaining the declared method's owner. */
+        const fullName = `${name}.${key}`
+        if (owners.has(fullName) && owners.get(fullName) !== feature)
+          throw new RpcError(
+            RpcCoreErrorCode.capabilityConflict,
+            RuntimeApiErrorText.featureConflict
+          )
+        found = true
+        if (!methods.has(fullName))
+          methods.set(
+            fullName,
+            Object.freeze({
+              name: fullName,
+              receiver: control,
+              declaration,
+              supportedModes: Object.freeze([runtimeModeForDeclaration(declaration.mode)]),
+              method: exposedMethod(
+                () => {
+                  assertCurrent()
+                  return control.liveFeature(name, feature)
+                },
+                key,
+                closedCatalogMethod
+              )
+            })
+          )
+        owners.set(fullName, feature)
+      }
+    }
+    if (!found)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
+  }
+  return Object.freeze([...methods.values()])
 }
 
 /**
@@ -287,14 +361,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
       }
       /** This cold union compiles into the existing method table and owns no live connection state. */
       const forwards = new Map<string, IRuntimeForwardMethodEntry>()
-      /** Validate Feature permissions and collisions before acquiring the physical source. */
-      const provide = exposedProvide(
-        expose.filter((target) => target !== RuntimePluginExpose.host),
-        (target) => integration.readFeatureOutputs(target),
-        resolve,
-        forwards,
-        integration.nodeId
-      )
+      /** The original catalog/adopter owner exists before validating explicitly exposed paths. */
+      let control: ReturnType<typeof createRemoteHostControl> | undefined
       /** Reserved Host operations are additional canonical entries, not an authority bypass. */
       let controls: readonly IRuntimeMethodEntry[] = []
       if (expose.includes(RuntimePluginExpose.host)) {
@@ -306,24 +374,26 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
          * Resolver, install coalescing and adopter records remain in the original Host-control
          * owner.
          */
-        const control = createRemoteHostControl({
+        control = createRemoteHostControl({
           host: options.host,
           catalog: options.catalog,
           resolvePlugin: options.resolvePlugin,
           report: options.report
         })
+        /** Reserved callbacks capture this exact immutable adopter owner, never a later binding. */
+        const authority = control
         /**
          * Reserved scalar routes preserve original request/one-way registration, without stream
          * aliases.
          */
         controls = [
-          [RemoteMethodName.hostUse, control.use],
-          [RemoteMethodName.hostUnUse, control.unUse],
-          [RemoteMethodName.hostInspect, control.inspect]
+          [RemoteMethodName.hostUse, authority.use],
+          [RemoteMethodName.hostUnUse, authority.unUse],
+          [RemoteMethodName.hostInspect, authority.inspect]
         ].map(([name, operation]) =>
           Object.freeze({
             name: name as string,
-            receiver: control,
+            receiver: authority,
             reserved: true,
             supportedModes: Object.freeze([RuntimeApiMode.request, RuntimeApiMode.notify]),
             method: (payload: unknown) => {
@@ -333,7 +403,34 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
           })
         )
       }
-      registerRuntimePluginMethods(provide, [...ownMethods, ...controls, ...forwards.values()])
+      /** Explicit catalog exposure is distinct from ordinary live Feature or connection exposure. */
+      const catalogPaths = control
+        ? expose.filter(
+            (path) =>
+              path !== RuntimePluginExpose.host &&
+              Object.hasOwn(control!.catalog, path.split('.')[0]!)
+          )
+        : []
+      /** Ordinary exposure keeps the same true Feature snapshots and forwarding authority. */
+      const provide = exposedProvide(
+        expose.filter(
+          (target) => target !== RuntimePluginExpose.host && !catalogPaths.includes(target)
+        ),
+        (target) => integration.readFeatureOutputs(target),
+        resolve,
+        forwards,
+        integration.nodeId
+      )
+      /** The same compiled table holds dynamic catalog methods; no second provider is registered. */
+      const catalogMethods = control
+        ? exposedCatalogMethods(control, catalogPaths, () => integration.assertCurrent())
+        : []
+      registerRuntimePluginMethods(provide, [
+        ...ownMethods,
+        ...controls,
+        ...catalogMethods,
+        ...forwards.values()
+      ])
       /** Later same-family installs reuse this facade while retaining separate endpoint owners. */
       const slot = integration.acquireSharedSlot<IRuntimeOutlet>(
         RuntimePluginKey[kind],

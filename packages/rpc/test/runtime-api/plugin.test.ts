@@ -399,3 +399,134 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
     connection?.channels.close()
   }
 })
+
+it('[A14][A15][A25] explicit catalog methods prepare before local installation and remain adopter guarded', async () => {
+  /** Both callers and the empty destination use genuine managed Host transactions. */
+  const hosts = [managedHost(), managedHost()] as const
+  /** One original reference carrier is borrowed by the genuine opposing registrations. */
+  const channels = runtimeSources()
+  /** Business execution is distinct from successful catalog preparation or Host mutation. */
+  let calls = 0
+  /** Resolver calls occur only after an explicitly permitted Host use operation. */
+  let resolved = 0
+  /** These definitions remain local; only catalog names and portable configs cross the channel. */
+  const definition = definePlugin({
+    name: 'added',
+    features: {
+      data: defineFeature(() => ({
+        read: () => ++calls,
+        hidden: () => {
+          assert.fail('[A25] an unexposed catalog method cannot execute')
+        }
+      }))
+    },
+    install: () => ({})
+  })
+  const catalog = {
+    added: {
+      schemaVersion: 1 as const,
+      plugin: 'added',
+      features: {
+        data: {
+          methods: {
+            read: { mode: 'request' as const, idempotent: false },
+            hidden: { mode: 'request' as const, idempotent: false }
+          }
+        }
+      }
+    }
+  }
+  /** A cold source checkpoint distinguishes a supported pending installation from an early reject. */
+  let entered!: () => void
+  const sourceEntered = new Promise<{ entered: true }>((resolve) => {
+    entered = () => resolve({ entered: true })
+  })
+  /**
+   * Observe the exact original rejection immediately; an invalid candidate cannot leave a peer
+   * wait.
+   */
+  const service = hosts[1]
+    .use(
+      createThreadPlugin({
+        name: 'remote',
+        expose: ['host', 'added.read'],
+        host: hosts[1],
+        catalog,
+        resolvePlugin: () => {
+          resolved += 1
+          return definition
+        },
+        connect: async (context) => {
+          entered()
+          return channels.sources[1](context)
+        },
+        report: () => undefined
+      })
+    )
+    .then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error })
+    )
+  try {
+    const starting = await Promise.race([sourceEntered, service])
+    assert.equal(
+      'entered' in starting,
+      true,
+      '[A25] an explicitly exposed catalog method must not require its target to be installed'
+    )
+    await hosts[0].use(
+      createThreadPlugin({ name: 'remote', connect: channels.sources[0], report: () => undefined })
+    )
+    const prepared = await service
+    if ('error' in prepared) throw prepared.error
+    await assert.rejects(hosts[0].thread!.request('remote', 'added.read'), {
+      code: 'REMOTE_CLOSED'
+    })
+    assert.equal(calls, 0)
+    assert.equal(resolved, 0)
+    assert.throws(() => hosts[0].thread!.request('remote', 'added.hidden'), {
+      code: 'PROVIDER_NOT_FOUND'
+    })
+    await hosts[0].thread!.request('remote', RemoteMethodName.hostUse, ['added'])
+    assert.equal(resolved, 1)
+    assert.equal(await hosts[0].thread!.request('remote', 'added.read'), 1)
+    hosts[1].plugin.disable('added')
+    await assert.rejects(hosts[0].thread!.request('remote', 'added.read'), {
+      code: 'REMOTE_CLOSED'
+    })
+    assert.equal(calls, 1)
+    hosts[1].plugin.enable('added')
+    assert.equal(await hosts[0].thread!.request('remote', 'added.read'), 2)
+    await hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added'])
+    await assert.rejects(hosts[0].thread!.request('remote', 'added.read'), {
+      code: 'REMOTE_CLOSED'
+    })
+    assert.equal(calls, 2)
+    await hosts[0].thread!.request('remote', RemoteMethodName.hostUse, ['added'])
+    assert.equal(await hosts[0].thread!.request('remote', 'added.read'), 3)
+    /** An external same-name replacement cannot inherit this connection's captured adoption. */
+    let replacementCalls = 0
+    await hosts[1].replace(
+      'added',
+      definePlugin({
+        name: 'added',
+        features: { data: defineFeature(() => ({ read: () => ++replacementCalls })) },
+        install: () => ({})
+      })
+    )
+    await assert.rejects(hosts[0].thread!.request('remote', 'added.read'), {
+      code: 'REMOTE_CLOSED'
+    })
+    await assert.rejects(
+      hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added']),
+      {
+        code: 'REMOTE_HOST_NOT_ADOPTED'
+      }
+    )
+    assert.equal(calls, 3)
+    assert.equal(replacementCalls, 0)
+  } finally {
+    for (const host of hosts) await host.dispose()
+    channels.close()
+  }
+})
