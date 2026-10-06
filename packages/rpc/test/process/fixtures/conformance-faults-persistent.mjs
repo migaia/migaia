@@ -12,9 +12,14 @@ import { createOneWayFeature } from '@migaia/rpc/core/features/one-way'
 import {
   createNativeProcessOffer,
   createProcessTransport,
-  createServeProcessPlugin
+  createProcessResilience
 } from '@migaia/rpc/process'
 import { openProcessStdioChannel } from '@migaia/rpc/process/adapters/node-child-process'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import {
+  serveProcessSessions,
+  createProcessSessionService
+} from '../../../dist/process/plugin/serve.js'
 
 /** Bootstrap ownership starts before asynchronous Host installation, keeping the real pipe alive. */
 const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
@@ -103,7 +108,7 @@ await host.use(
   })
 )
 process.stderr.write('INSTALLED\n')
-await createServeProcessPlugin({
+const options = {
   host,
   contract,
   createSharedTarget: async () => undefined,
@@ -182,7 +187,19 @@ await createServeProcessPlugin({
     )
     return { endpoint, stream: endpoint.stream }
   }
-}).catch((error) => {
+}
+/** The original session manager supplies trusted identity, capacity and owned governor release. */
+const resilience = createProcessResilience({ scheduler: systemScheduler, report: options.report })
+await serveProcessSessions(
+  options.ingress,
+  options.endpointFactory,
+  createProcessSessionService(options),
+  resilience,
+  options.report,
+  undefined,
+  systemScheduler,
+  { release: () => resilience.close() }
+).catch((error) => {
   process.stderr.write(`SETUP_FAILED ${String(error?.code ?? 'UNKNOWN')}\n`)
   process.exit(1)
 })

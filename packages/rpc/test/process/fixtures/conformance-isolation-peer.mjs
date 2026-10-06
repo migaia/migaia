@@ -4,13 +4,17 @@ import { serializeRpcError } from '@migaia/rpc/contract'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
-  createServeProcessPlugin,
   createProcessResilience,
   createNativeProcessOffer,
   createProcessTransport
 } from '@migaia/rpc/process'
 import { listenProcessByteChannel } from '@migaia/rpc/process/adapters/node-socket'
 import { openProcessStdioChannel } from '@migaia/rpc/process/adapters/node-child-process'
+import {
+  serveProcessSessions,
+  createProcessSessionService
+} from '../../../dist/process/plugin/serve.js'
+import { createProcessInstanceFallback } from '../../../dist/process/resilience/fallback.js'
 import { createComposedEndpoint } from '@migaia/rpc/core/composed'
 import { codec, framer, abort, connect, ping, RpcTimeoutError } from '@migaia/rpc/core'
 import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc/core/stream'
@@ -186,7 +190,7 @@ function target() {
 
 await host.use(target())
 /** Production serve owns handshake admission, connection scope, provider limits and fallback. */
-const service = await createServeProcessPlugin({
+const options = {
   host,
   contract,
   instanceMode: mode === 'per-connection' ? 'per-connection' : 'shared',
@@ -228,7 +232,8 @@ const service = await createServeProcessPlugin({
             scheduler: context.scheduler,
             offer: createNativeProcessOffer({
               peer: { id: 'ts-peer', runtime: 'node' },
-              stream: true
+              stream: true,
+              capabilities: ['runtime-api@1']
             }),
             auth: { mode: 'required', verify: context.verify },
             ipc: { ...context.session, log: () => undefined },
@@ -239,7 +244,11 @@ const service = await createServeProcessPlugin({
         kind: 'listener',
         address,
         listen: listenProcessByteChannel,
-        offer: createNativeProcessOffer({ peer: { id: 'ts-peer', runtime: 'node' }, stream: true }),
+        offer: createNativeProcessOffer({
+          peer: { id: 'ts-peer', runtime: 'node' },
+          stream: true,
+          capabilities: ['runtime-api@1']
+        }),
         verify: (auth) => {
           if (auth === credentials.alice) return 'alice'
           if (auth === credentials.bob) return 'bob'
@@ -255,7 +264,28 @@ const service = await createServeProcessPlugin({
           }
         })
       }
+}
+/** Original recovery and target selectors are shared with retained advanced service consumers. */
+const fallback = createProcessInstanceFallback({
+  mode: options.instanceMode,
+  targetName: contract.plugin,
+  host,
+  createSharedTarget: options.createSharedTarget,
+  onInstanceUnhealthy: options.onInstanceUnhealthy,
+  report
 })
+/** Only a default governor is service-owned; the flood governor remains caller-owned. */
+const governor = resilience ?? createProcessResilience({ scheduler: systemScheduler, report })
+const service = await serveProcessSessions(
+  options.ingress,
+  endpointFactory,
+  createProcessSessionService(options),
+  governor,
+  report,
+  fallback,
+  systemScheduler,
+  resilience ? undefined : { release: () => governor.close() }
+)
 /** Fixed readiness output is the only startup receipt; no token or fabricated trace appears. */
 process.stderr.write(`ISOLATION_READY:${process.pid}\n`)
 /** Fixture shutdown closes production session and governor owners before its target Host. */
