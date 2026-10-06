@@ -244,6 +244,10 @@ export async function runBrowserSide(unit, side, options) {
     })
     /** Every settled raw latency is retained without replacing slow samples. */
     const samples = measured.latenciesNs.length
+    /** Preparation checks real factory provenance after ordinary echoes; formal timing omits it. */
+    const facadeProof = options.check
+      ? await page.evaluate(() => globalThis.benchRuntimeProof?.() ?? null)
+      : undefined
     return {
       type: options.check ? 'ipc-preparation' : 'ipc-side',
       ...measured,
@@ -251,6 +255,7 @@ export async function runBrowserSide(unit, side, options) {
       side,
       samples,
       echoes: options.check ? 3 : undefined,
+      ...(options.check ? { facadeProof } : {}),
       warmup: options.check ? 0 : 100,
       encodedBytes: Buffer.byteLength(JSON.stringify('x'.repeat(unit.payloadBytes))),
       concurrency: 1,

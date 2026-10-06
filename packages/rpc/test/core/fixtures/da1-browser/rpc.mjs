@@ -1,28 +1,13 @@
-import { createEndpoint, connect, abort } from '@migaia/rpc/core'
-import { identityCodecV1 } from '@migaia/serialize/codecs/identity'
-import { messageFramer as messageFramerV1 } from '@migaia/rpc/contract/framing/v1'
-import { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'
 import { BrowserBenchText } from './text.mjs'
 
 /**
- * Compose the actual static Worker adapter, keeping all protocol and lifecycle ownership in RPC.
+ * Supply the original sampling-only provider policy to both real public Thread Peers.
  *
- * @param {object} port Actual Worker or DedicatedWorkerGlobalScope.
- * @param {string} id This deployment endpoint.
- * @param {string} peerId The jointly deployed endpoint.
- * @param {object} classification Existing provider-rejection observations.
- * @returns {Promise<object>} Public endpoint with explicit sampling-only replay capacity.
+ * @param {{ failures: object[]; rejections: object[] }} classification Existing receipt owner.
+ * @returns {object} Provider policy and full coded report classifier; no new production diagnostic.
  */
-export async function endpointFor(port, id, peerId, classification) {
-  /** The canonical factory alone establishes the static batch agreement. */
-  const transport = createWebWorkerTransport(port, { peerId })
-  return createEndpoint({
-    id,
-    targetIds: [peerId],
-    transport,
-    codec: identityCodecV1,
-    framer: messageFramerV1,
-    middlewares: [abort(), connect({ transport })],
+export function peerOptions(classification) {
+  return {
     providerLimits: {
       maxReplayEntriesPerPeer: 1200,
       onRejected: (event) =>
@@ -35,6 +20,14 @@ export async function endpointFor(port, id, peerId, classification) {
           message: BrowserBenchText.rejected,
           classificationSource: 'existing onRejected; name not supplied'
         })
-    }
-  })
+    },
+    report: (error) =>
+      classification.failures.push({
+        source: error?.source ?? null,
+        code: error?.code ?? null,
+        name: error?.name ?? typeof error,
+        reason: error?.reason ?? null,
+        message: String(error?.message ?? error).replace(/x{16,}/g, '[REDACTED_PAYLOAD]')
+      })
+  }
 }
