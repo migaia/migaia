@@ -99,19 +99,21 @@ describe('process Host facade admission and ownership', () => {
   })
 
   it('[A1] forwards the process call wall cap through the existing remote dispatcher', async () => {
-    /** The neutral endpoint records the effective deadline rather than waiting on real time. */
-    const fixture = hostFixture()
-    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
+    /** A real native endpoint records the effective deadline selected by its canonical dispatcher. */
+    const fixture = nativeHostFixture()
+    /** The unchanged exact 60ms oracle uses the original unadvanced manual dispatch clock. */
+    const scheduler = createManualScheduler()
     /** One typed observer preserves every endpoint argument at the canonical dispatch boundary. */
     const sends: unknown[][] = []
     const original = fixture.options.endpointFactory
-    const host = createProcessHost({
+    const plugin = createProcessPlugin({
       ...fixture.options,
-      deployment: {
-        ...fixture.options.deployment,
+      spawn: {
+        ...fixture.options.spawn,
         supervision: {
-          ...fixture.options.deployment.supervision,
-          spec: { ...fixture.options.deployment.supervision.spec, limits: { callWallTimeMs: 60 } }
+          ...fixture.options.spawn.supervision,
+          scheduler,
+          spec: { ...fixture.options.spawn.supervision.spec, limits: { callWallTimeMs: 60 } }
         }
       },
       endpointFactory: async (...args) => {
@@ -129,11 +131,13 @@ describe('process Host facade admission and ownership', () => {
       }
     })
     try {
-      const features = await host.use('p')
-      await features.f!.m!([], { timeoutMs: 120 })
+      await fixture.host.use(plugin)
+      const outlet = fixture.host.process!
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+      await outlet.request('child', 'p.request', 'deadline', { timeoutMs: 120 })
       expect(sends.at(-1)?.[3]).toMatchObject({ timeoutMs: 60 })
     } finally {
-      await host.release()
+      await fixture.close()
     }
   })
   it('[A1] announces one close and waits for the real in-flight request before child exit', async () => {
