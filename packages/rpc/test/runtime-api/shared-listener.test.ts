@@ -98,6 +98,11 @@ it('[A59][A60] the real authenticated process listener injects one logical provi
       '[A24][D17] listener methods use the same local name-array contract before any accept'
     )
     assert.equal(accepted, 0)
+    assert.throws(
+      () => readRuntimePeerConnection(server),
+      { code: 'TARGET_UNKNOWN' },
+      '[A24] an empty listener cannot publish a guessed accepted connection'
+    )
     for (const index of [1, 2]) {
       const peer = await createRuntimePeer({
         self: { name: `caller-${index}`, instanceId: `socket-caller-${index}` },
@@ -127,7 +132,18 @@ it('[A59][A60] the real authenticated process listener injects one logical provi
       })
       clients.push(peer)
       assert.equal(await peer.request('baseline'), 42)
+      if (index === 1)
+        assert.equal(
+          readRuntimePeerConnection(server).peerId,
+          'socket-caller-1',
+          '[A24] a sole accepted connection retains its genuine route identity'
+        )
     }
+    assert.throws(
+      () => readRuntimePeerConnection(server),
+      { code: 'CAPABILITY_CONFLICT' },
+      '[A24] multiple accepted sessions cannot silently select one target'
+    )
     const first = clients[0]!.request('first', undefined, { orderKey: 'same' })
     calls.push(first)
     void first.catch((error: unknown) => {
