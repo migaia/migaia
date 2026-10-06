@@ -2,14 +2,15 @@ import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
-import { createThreadHost } from '../../src/threads/host.js'
+import { createThreadPeer } from '../../src/threads/peer.js'
+import { runtimeTestHost } from '../runtime-api/fixture.js'
 import { createDenoThreadLauncher } from '../../src/threads/adapters/deno.js'
 import { createBunThreadLauncher } from '../../src/threads/adapters/bun.js'
 import { createBrowserThreadLauncher } from '../../src/threads/adapters/browser.js'
 import { createElectronRendererThreadLauncher } from '../../src/threads/adapters/electron-renderer.js'
 import { createElectronMainThreadLauncher } from '../../src/threads/adapters/electron-main.js'
 import { createBrowserThreadChannelFactory } from '../../src/threads/adapters/browser.js'
-import { contract, endpointFactory, nativeFixture, nativeWorkerFor } from './fixture.js'
+import { endpointFactory, nativeFixture, nativeWorkerFor } from './fixture.js'
 
 /** Node fixtures cannot establish Web/Bun/Electron actual-exit enforcement. */
 describe('platform capability admission', () => {
@@ -20,7 +21,7 @@ describe('platform capability admission', () => {
     ['electron-renderer', createElectronRendererThreadLauncher]
   ] as const)(
     '[A7] %s requires health and rejects default isolation before Worker construction',
-    (_platform, factory) => {
+    async (_platform, factory) => {
       const constructor = vi.fn()
       const Worker = class {
         constructor() {
@@ -43,45 +44,67 @@ describe('platform capability admission', () => {
         endpointFactory,
         report: vi.fn()
       }
+      const host = runtimeTestHost({
+        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+      })
       expect(launcher.capabilities).toMatchObject({
         termination: 'unsupported',
         'exit-observation': 'unsupported'
       })
-      for (const build of [
-        () =>
-          createThreadPlugin({
-            ...common,
-            name: 'p',
-            contract,
-            host: { disable: vi.fn(), enable: vi.fn() }
-          }),
-        () => createThreadHost({ ...common, catalog: { p: contract } })
-      ])
-        expect(build).toThrow(
-          expect.objectContaining({
-            code: 'INVALID_OPTION',
-            detail: expect.objectContaining({ field: 'health' })
-          })
-        )
-      const health = { check: vi.fn(async () => undefined) }
-      expect(() =>
-        createThreadPlugin({
-          ...common,
-          health,
-          name: 'p',
-          contract,
-          host: { disable: vi.fn(), enable: vi.fn() }
+      try {
+        for (const build of [
+          () =>
+            host.use(
+              createThreadPlugin({
+                name: 'p',
+                spawn: common,
+                endpointFactory,
+                report: vi.fn()
+              })
+            ),
+          () => createThreadPeer({ spawn: common, endpointFactory, report: vi.fn() })
+        ])
+          await expect(build()).rejects.toSatisfy(
+            (error: {
+              code?: string
+              cause?: { code?: string; detail?: { field?: string } }
+              detail?: { field?: string }
+            }) => {
+              const native = error.code === 'PLUGIN_INSTALL_FAILED' ? error.cause : error
+              expect(native).toMatchObject({
+                code: 'INVALID_OPTION',
+                detail: expect.objectContaining({ field: 'health' })
+              })
+              return true
+            }
+          )
+        const health = { check: vi.fn(async () => undefined) }
+        await expect(
+          host.use(
+            createThreadPlugin({
+              name: 'p',
+              spawn: { ...common, health },
+              endpointFactory,
+              report: vi.fn()
+            })
+          )
+        ).rejects.toMatchObject({
+          code: 'PLUGIN_INSTALL_FAILED',
+          cause: { code: 'CAPABILITY_UNSUPPORTED' }
         })
-      ).toThrow(expect.objectContaining({ code: 'CAPABILITY_UNSUPPORTED' }))
-      const host = createThreadHost({
-        ...common,
-        health,
-        supervisor: { isolation: 'best-effort' },
-        catalog: { p: contract }
-      })
-      void host.release()
-      expect(constructor).not.toHaveBeenCalled()
-      expect(budget.inUse).toBe(0)
+        /** A valid uninstalled definition stays lazy, matching the original unstarted Host case. */
+        createThreadPlugin({
+          name: 'p',
+          spawn: { ...common, health, supervisor: { isolation: 'best-effort' } },
+          endpointFactory,
+          report: vi.fn()
+        })
+        await host.dispose()
+        expect(constructor).not.toHaveBeenCalled()
+        expect(budget.inUse).toBe(0)
+      } finally {
+        await host.dispose()
+      }
     }
   )
   it('[A7] Electron main retains independent unsupported evidence until an Electron fixture runs', () => {

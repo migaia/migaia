@@ -6,14 +6,15 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { createNodeThreadChannel, createWebThreadChannel } from '../../src/threads/channel.js'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
-import { createThreadHost } from '../../src/threads/host.js'
+import { createThreadPeer } from '../../src/threads/peer.js'
+import { runtimeTestHost } from '../runtime-api/fixture.js'
 import {
   createBrowserThreadLauncher,
   createBrowserThreadChannelFactory
 } from '../../src/threads/adapters/browser.js'
 import { receiveThreadData } from '../../src/threads/bootstrap.js'
 import type { IThreadWebPort } from '../../src/threads/types.js'
-import { nativeFixture, contract, endpointFactory } from './fixture.js'
+import { nativeFixture, endpointFactory } from './fixture.js'
 
 /** EventTarget peer keeps private bootstrap separate from transport subscriptions. */
 function webPair() {
@@ -57,20 +58,25 @@ describe('thread channel ownership and portable boundary', () => {
       expect(await feature.read([{ value: 1 }])).toEqual({ value: 1 })
       const before = fixture.frames.length
       for (const value of [() => undefined, cycle, ports.port1, new SharedArrayBuffer(8)])
-        await expect(feature.read([value])).rejects.toMatchObject({
-          code: 'REMOTE_CONTRACT_INVALID',
-          cause: { source: '@migaia/rpc/contract' }
-        })
+        expect(() => feature.read([value])).toThrow(
+          expect.objectContaining({
+            code: 'INVALID_ENVELOPE',
+            source: '@migaia/rpc/contract'
+          })
+        )
       expect(fixture.frames).toHaveLength(before)
       /** A controlled Contract failure crosses the boundary as code/text without local causes. */
       const remoteError = await feature.bad([]).catch((error: unknown) => error)
       expect(remoteError).toMatchObject({
         source: '@migaia/rpc/core',
-        code: 'INVALID_ENVELOPE',
-        message: 'rpc envelope is invalid',
+        code: 'PAYLOAD_INVALID',
+        message: 'Runtime request result must be portable',
         stack: expect.any(String)
       })
-      expect((remoteError as Error).cause).toBeUndefined()
+      expect((remoteError as Error).cause).toMatchObject({
+        source: '@migaia/rpc/contract',
+        code: 'INVALID_ENVELOPE'
+      })
       expect(fixture.frames.every(({ transfer }) => transfer === undefined)).toBe(true)
     } finally {
       ports.port1.close()
@@ -80,7 +86,7 @@ describe('thread channel ownership and portable boundary', () => {
   })
   it.each([() => undefined, new SharedArrayBuffer(8)])(
     '[A9] rejects facade spec.data synchronously without a Worker',
-    (data) => {
+    async (data) => {
       const launch = vi.fn()
       const common = {
         spec: { entry: 'file:///worker.mjs', data },
@@ -97,29 +103,38 @@ describe('thread channel ownership and portable boundary', () => {
         endpointFactory,
         report: vi.fn()
       }
-      for (const build of [
-        () =>
-          createThreadPlugin({
-            ...common,
-            name: 'p',
-            contract,
-            host: { disable: vi.fn(), enable: vi.fn() }
-          }),
-        () => createThreadHost({ ...common, catalog: { p: contract } })
-      ]) {
-        try {
-          build()
-          expect.unreachable()
-        } catch (error) {
-          expect(error).toBeInstanceOf(TypeError)
-          expect(error).toMatchObject({
+      const host = runtimeTestHost({
+        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+      })
+      try {
+        for (const build of [
+          () =>
+            host.use(
+              createThreadPlugin({
+                name: 'p',
+                spawn: common,
+                endpointFactory,
+                report: vi.fn()
+              })
+            ),
+          () => createThreadPeer({ spawn: common, endpointFactory, report: vi.fn() })
+        ]) {
+          const failure = await build().catch((error: unknown) => error)
+          const native =
+            (failure as { code?: string }).code === 'PLUGIN_INSTALL_FAILED'
+              ? (failure as { cause: unknown }).cause
+              : failure
+          expect(native).toBeInstanceOf(TypeError)
+          expect(native).toMatchObject({
             code: 'INVALID_CONFIG',
             detail: { field: 'spec.data' },
             cause: { source: '@migaia/rpc/contract' }
           })
         }
+        expect(launch).not.toHaveBeenCalled()
+      } finally {
+        await host.dispose()
       }
-      expect(launch).not.toHaveBeenCalled()
     }
   )
   it('[A9] consumes and removes Web bootstrap before acknowledging and installing client transport', async () => {

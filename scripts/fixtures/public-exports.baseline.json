@@ -593,9 +593,6 @@
       ],
       "./threads": [
         "createNodeThreadChannel",
-        "createServeThreadHost",
-        "createServeThreadPlugin",
-        "createThreadHost",
         "createThreadPeer",
         "createThreadPlugin",
         "createWebThreadChannel",

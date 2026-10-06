@@ -1,16 +1,11 @@
-import { parentPort, workerData as bootstrap } from 'node:worker_threads'
+import { workerData as bootstrap } from 'node:worker_threads'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import {
-  createNodeThreadChannel,
-  createServeThreadPlugin,
-  createServeThreadHost,
-  readThreadBootstrap
-} from '../../../dist/threads/index.js'
+import { createThreadPlugin, readThreadBootstrap } from '../../../dist/threads/index.js'
 import { createComposedEndpoint } from '../../../dist/core/composed.js'
 import { createCanonicalChunkFeature } from '../../../dist/core/features/canonical-chunk.js'
 import { createOutboundFeature } from '../../../dist/core/features/outbound.js'
 import { createProviderFeature } from '../../../dist/core/features/provider.js'
+import { createOneWayFeature } from '../../../dist/core/features/one-way.js'
 import { createStreamFeature } from '../../../dist/core/features/stream.js'
 import { createControlFeature } from '../../../dist/core/features/control.js'
 import { createDiscoveryFeature } from '../../../dist/core/features/discovery.js'
@@ -54,8 +49,6 @@ const target = definePlugin({
   install: () => ({})
 })
 if (!workerData.hostMode) await host.use(target)
-/** Node data bypasses the RPC message channel entirely. */
-const channel = createNodeThreadChannel(parentPort, 'client', { scheduler: systemScheduler })
 /** Every feature is installed in one endpoint construction batch. */
 async function endpointFactory(channel) {
   const chunk = createCanonicalChunkFeature()
@@ -65,6 +58,7 @@ async function endpointFactory(channel) {
   const endpoint = await createComposedEndpoint(
     {
       id: peerId,
+      targetIds: [channel.peerId],
       transport: channel.transport,
       scheduler: channel.scheduler,
       middlewares: [
@@ -79,29 +73,30 @@ async function endpointFactory(channel) {
       'first-party-chunk': chunk,
       'first-party-outbound': outbound,
       'first-party-provider': provider,
+      'first-party-one-way': createOneWayFeature(outbound),
       'first-party-discovery': discovery,
       'first-party-control': createControlFeature(outbound, discovery),
       'first-party-stream': createStreamFeature(outbound, provider)
     }
   )
-  return { endpoint, stream: endpoint.stream }
+  return { endpoint, oneWay: endpoint, stream: endpoint.stream }
 }
 /** Diagnostics use raw stderr so subprocess failures remain observable. */
 const report = (error) => process.stderr.write(`${error?.stack ?? String(error)}\n`)
-if (workerData.hostMode)
-  await createServeThreadHost({
-    host,
-    catalog: { p: workerData.contract },
-    resolvePlugin: () => target,
-    channel,
-    endpointFactory,
-    report
-  })
-else
-  await createServeThreadPlugin({
-    host,
+/** Both directions install the same public Plugin; Host control stays explicitly catalog guarded. */
+await host.use(
+  createThreadPlugin({
+    name: 'parent',
+    expose: workerData.hostMode ? ['host', 'p'] : ['p'],
+    ...(workerData.hostMode
+      ? {
+          host,
+          catalog: { p: workerData.contract },
+          resolvePlugin: () => target
+        }
+      : {}),
     contract: workerData.contract,
-    channel,
     endpointFactory,
     report
   })
+)

@@ -15,6 +15,8 @@ export function createThreadBinding<THandle extends IThreadHandle>(
 ): IRemoteBinding<THandle, IThreadSpec> &
   Readonly<{
     bindEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
+    /** Explicit runtime release drains this original endpoint before its generation is retired. */
+    drainCurrent(): Promise<void>
   }> {
   /** Admission snapshots data before constructing any lifecycle owner. */
   const spec = portableThreadSpec(options.spec)
@@ -43,6 +45,7 @@ export function createThreadBinding<THandle extends IThreadHandle>(
     ownership: 'owned',
     bindEndpoint: drain.wrap,
     trackRequest: drain.trackCurrent,
+    drainCurrent: drain.drainCurrent,
     supervisor,
     scheduler: options.scheduler,
     openChannel: (handle, signal) => options.channelFactory.open(handle, signal)

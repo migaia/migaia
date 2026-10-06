@@ -95,7 +95,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
     binding,
     binding.bindEndpoint,
     readRuntimePreparationContext(options),
-    undefined,
+    binding.drainCurrent,
     { kind: RuntimeSourceKind.spawn, direction: RuntimeConnectionDirection.spawned },
     true
   )

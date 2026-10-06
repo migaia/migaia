@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/scheduler'
-import * as remotePlugin from '../../src/remote/plugin.js'
+import * as remoteProxy from '../../src/remote/proxy.js'
 import * as threadSupervision from '@migaia/supervision/threads'
 import { createNodeThreadChannelFactory } from '../../src/threads/adapters/node.js'
 import { nativeFixture } from './fixture.js'
@@ -25,7 +25,7 @@ describe('thread Plugin facade', () => {
         fixture.frames
           .filter(({ message }) => message.kind !== 'request' && message.kind !== 'stream')
           .map(({ message }) => message.kind)
-      ).toEqual(['discovery'])
+      ).toEqual(['discovery', 'discovery', 'response'])
       expect(fixture.frames.some(({ message }) => message.kind === 'handshake')).toBe(false)
       expect(fixture.frames.every(({ transfer }) => transfer === undefined)).toBe(true)
       expect(fixture.budget.inUse).toBe(1)
@@ -38,7 +38,7 @@ describe('thread Plugin facade', () => {
   })
   it('[A1] prepares a dependent install and preserves scheduler identity at every boundary', async () => {
     const scheduler = createManualScheduler()
-    const assembly = vi.spyOn(remotePlugin, 'createRemotePlugin')
+    const assembly = vi.spyOn(remoteProxy, 'createRemoteRuntimeRegistration')
     /** The supervisor receives the exact same clock as binding and channel construction. */
     const supervision = vi.spyOn(threadSupervision, 'createThreadSupervisor')
     const fixture = nativeFixture({ scheduler })
@@ -46,15 +46,10 @@ describe('thread Plugin facade', () => {
     const dependent = definePlugin({
       name: 'dependent',
       features: {
-        use: defineFeature(
-          (_core, dependencies) => {
-            firstCall = (dependencies.thread as { read(params: unknown[]): Promise<unknown> }).read(
-              ['install call']
-            )
-            return {}
-          },
-          { thread: fixture.plugin.getFeature('f') }
-        )
+        use: defineFeature(() => {
+          firstCall = fixture.host.thread!.request('p', 'p.read', 'install call')
+          return {}
+        })
       },
       install: () => ({})
     })
@@ -63,7 +58,7 @@ describe('thread Plugin facade', () => {
       await fixture.host.use(dependent)
       expect(await firstCall).toBe('install call')
       const options = assembly.mock.calls.at(-1)![0]
-      expect(Object.hasOwn(options, 'retryPort')).toBe(false)
+      expect(Object.hasOwn(fixture.pluginOptions, 'retryPort')).toBe(false)
       expect(options.binding.scheduler).toBe(scheduler)
       expect(supervision.mock.calls[0]![0].scheduler).toBe(scheduler)
       const controller = new AbortController()
@@ -97,7 +92,7 @@ describe('thread Plugin facade', () => {
       await fixture.close()
     }
   })
-  it('[A1] rejects missing stream capability before endpoint creation or business frame', async () => {
+  it('[A1][A31] rejects an explicitly narrowed missing baseline before endpoint creation or business frame', async () => {
     const { createNodeThreadChannelFactory } = await import('../../src/threads/adapters/node.js')
     const { systemScheduler } = await import('@migaia/utils/scheduler')
     const fixture = nativeFixture({
@@ -109,7 +104,7 @@ describe('thread Plugin facade', () => {
     try {
       await expect(fixture.install()).rejects.toMatchObject({
         code: 'PLUGIN_INSTALL_FAILED',
-        cause: { code: 'CAPABILITY_CONFLICT' }
+        cause: { code: 'CAPABILITY_UNSUPPORTED' }
       })
       expect(fixture.frames).toHaveLength(0)
       expect(fixture.budget.inUse).toBe(0)
