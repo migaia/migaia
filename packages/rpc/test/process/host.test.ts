@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { createProcessHost } from '../../src/process/host/client.js'
-import { hostFixture } from './fixtures/host-control.js'
+import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
+import * as bindingModule from '../../src/process/plugin/binding.js'
 import { nativeHostFixture } from './fixtures/host-native.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
@@ -232,34 +233,46 @@ describe('process Host facade admission and ownership', () => {
     }
   })
   it('[A1] stays lazy, delegates catalog control and gates release synchronously', async () => {
-    const fixture = hostFixture()
-    const host = createProcessHost(fixture.options)
-    expect(fixture.launch).not.toHaveBeenCalled()
-    await host.ready()
-    expect(host.inspectRegistration()).toMatchObject({ state: 'ready', health: 'custom' })
-    await host.use('p')
-    await host.inspect()
-    await host.unUse('p')
-    expect(fixture.send.mock.calls.map((row) => row[1])).toEqual([
-      'migaia.remote.runtime.describe',
-      'migaia.remote.host.use',
-      'migaia.remote.host.inspect',
-      'migaia.remote.host.unUse'
-    ])
-    const release = host.release()
-    expect(host.release()).toBe(release)
-    for (const operation of [
-      () => host.ready(),
-      () => host.use('p'),
-      () => host.inspect(),
-      () => host.unUse('p'),
-      () => host.restart(),
-      () => host.replace()
-    ])
-      expect(operation).toThrow(expect.objectContaining({ code: 'PROCESS_HOST_CLOSED' }))
-    await release
-    expect(fixture.terminate).toHaveBeenCalledTimes(1)
-    expect(fixture.upstream.calls.filter((value) => value === 'endpoint.dispose')).toHaveLength(1)
+    const fixture = runtimeHostFixture()
+    /** The observer calls the original binding constructor and exposes its actual health policy. */
+    const binding = vi.spyOn(bindingModule, 'createSpawnProcessBinding')
+    try {
+      expect(fixture.launch).not.toHaveBeenCalled()
+      await fixture.host.use(fixture.plugin)
+      const outlet = fixture.host.process!
+      expect((await outlet.get('child')).unit).toMatchObject({
+        state: 'ready'
+      })
+      expect(binding.mock.results[0]?.value).toMatchObject({ health: 'custom' })
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+      await outlet.request('child', RemoteMethodName.hostInspect, [])
+      await outlet.request('child', RemoteMethodName.hostUnUse, ['p'])
+      expect(fixture.send.mock.calls.map((row) => row[1])).toEqual([
+        'migaia.remote.runtime.describe',
+        'migaia.remote.host.use',
+        'migaia.remote.host.inspect',
+        'migaia.remote.host.unUse'
+      ])
+      const release = fixture.close()
+      expect(fixture.close()).toBe(release)
+      for (const operation of [
+        () => outlet.request('child', 'p.f.m', []),
+        () => outlet.request('child', RemoteMethodName.hostUse, ['p']),
+        () => outlet.request('child', RemoteMethodName.hostInspect, []),
+        () => outlet.request('child', RemoteMethodName.hostUnUse, ['p']),
+        () => outlet.restart('child'),
+        () => outlet.replace('child')
+      ])
+        expect(operation).toThrow(
+          expect.objectContaining({ source: '@migaia/plugin-host', code: 'HOST_DISPOSING' })
+        )
+      await release
+      expect(fixture.terminate).toHaveBeenCalledTimes(1)
+      expect(fixture.upstream.calls.filter((value) => value === 'endpoint.dispose')).toHaveLength(1)
+    } finally {
+      await fixture.close()
+      binding.mockRestore()
+    }
   })
 
   it('[A2/A4] rejects borrowed strategy and scheduler mismatch before dial or launch', () => {

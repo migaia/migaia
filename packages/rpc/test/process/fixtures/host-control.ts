@@ -5,6 +5,10 @@ import type { IRpcEndpoint } from '../../../src/core/typing.js'
 import type { IProcessHostOptions } from '../../../src/process/host/types.js'
 import type { IRemoteHostCatalog } from '../../../src/remote/contract.js'
 import { remoteHarness, remoteDescription } from '../../remote/fixture.js'
+import { runtimeTestHost } from '../../runtime-api/fixture.js'
+import { createProcessPlugin } from '../../../src/process/plugin/client.js'
+import type { IRuntimeDynamicSurface } from '../../../src/remote/runtime-api/typing.js'
+import type { IRemoteEndpointFactory } from '../../../src/remote/types.js'
 
 /** The neutral control harness still validates a real catalog with no fabricated local Host state. */
 export const catalog: IRemoteHostCatalog = {
@@ -100,4 +104,36 @@ export function hostFixture() {
     }
   }
   return { options, launch, terminate, send, upstream, scheduler, report, handles, order, crashes }
+}
+
+/** Retain the neutral platform ports while using a genuine symmetric PluginHost registration. */
+export function runtimeHostFixture() {
+  /** The original launcher, supervisor clock, exit promises and frame spies remain the oracle. */
+  const fixture = hostFixture()
+  /** This fixture always owns a spawn profile; it never invents a borrowed process identity. */
+  const spawn = fixture.options.deployment
+  if (spawn.kind !== 'spawn') throw new TypeError('control fixture requires spawn')
+  /** Actual Host resource ownership and publication replace the retired directional facade. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  /** Existing neutral roots supply stream/one-way ports; this endpoint records scalar dispatch. */
+  const endpointFactory: IRemoteEndpointFactory = async (...args) => {
+    /** The original mocked endpoint remains the single send/disposal observation boundary. */
+    const served = await fixture.options.endpointFactory(...args)
+    /** This neutral endpoint accepts provider registration without another provider implementation. */
+    const endpoint: IRpcEndpoint = { ...served.endpoint, provide: () => endpoint }
+    return { ...fixture.upstream.served, endpoint }
+  }
+  /** Only modern source fields reach the public factory; no old Host methods are recreated. */
+  const options = {
+    name: 'child',
+    self: { name: 'parent', instanceId: 'parent' },
+    spawn,
+    endpointFactory,
+    report: fixture.report
+  }
+  /** The actual lazy definition is installed explicitly by each migrated scenario. */
+  const plugin = createProcessPlugin<IRuntimeDynamicSurface>(options)
+  return { ...fixture, options, host, plugin, close: () => host.dispose() }
 }
