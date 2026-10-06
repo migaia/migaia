@@ -51,6 +51,57 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
   })
 }
 
+for (const carrier of ['stdio-framed', 'worker'] as const) {
+  it(`[A37][D19] Deno ${carrier} keeps scalar dispatch outside binary and materialization work`, async () => {
+    const result = await execute('deno', ['run', '-A', entry, carrier], {
+      env: { ...process.env, IPC_BENCH_STEM: `/tmp/rpc-deno-facade-${randomUUID()}` }
+    })
+    /** Loaded witnesses prove the zero counters belong to present, instrumented owner functions. */
+    const observed = JSON.parse(result.stdout) as {
+      requests: number
+      payloadValue: number
+      requestClosure: number
+      runtimeEnvelope: number
+      binaryPrepare: number
+      materialize: number
+      loaded: {
+        url: string
+        diskSHA256: string
+        loadedSHA256: string
+        diagnosticOverlay: boolean
+      }[]
+    }
+    assert.equal(observed.requests, 20)
+    assert.equal(observed.payloadValue, 0, '[D19] Deno does not add facade payload walks')
+    assert.equal(observed.requestClosure, 0, '[R15] Deno uses the original cold dispatcher')
+    assert.equal(
+      observed.runtimeEnvelope,
+      40,
+      '[D19] only outgoing and untrusted incoming admission'
+    )
+    assert.equal(observed.binaryPrepare, 0, '[K272] scalar calls do not prepare binary manifests')
+    assert.equal(
+      observed.materialize,
+      0,
+      '[K273] scalar runtime calls do not materialize JSON again'
+    )
+    for (const suffix of [
+      '/remote/runtime-api/peer.js',
+      '/contract/runtime-api/normalize.js',
+      '/contract/runtime-api/binary.js',
+      '/core/internal/outbound-envelope.js'
+    ]) {
+      const witness = observed.loaded.find((row) => row.url.endsWith(suffix))
+      assert.ok(witness, `[D19] actual loader witness required for ${suffix}`)
+      assert.equal(witness.diagnosticOverlay, true)
+      assert.notEqual(witness.loadedSHA256, witness.diskSHA256)
+    }
+    assert.ok(
+      observed.loaded.some((row) => row.url.endsWith('/remote/runtime-api/managed-peer.js'))
+    )
+  })
+}
+
 it('[A37][R15] managed request retains native drain without a per-call facade closure', async () => {
   const result = await execute(process.execPath, [entry, 'worker'], {
     env: { ...process.env, IPC_BENCH_STEM: `/tmp/rpc-facade-closure-${randomUUID()}` }
