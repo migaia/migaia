@@ -11,6 +11,7 @@ import {
   type IRuntimePeerIdentity
 } from './runtime-api/description.js'
 import { RuntimeApiMode } from './runtime-api/constants.js'
+import { runtimeModeForDeclaration } from './runtime-api/catalog.js'
 
 /**
  * The advanced declaration still supplies the installed legacy facade providers until C7 removes
@@ -26,13 +27,7 @@ export function describeRemoteMethods(
     Object.entries(contract.features).flatMap(([featureName, feature]) =>
       Object.entries(feature.methods).map(([methodName, declaration]) => ({
         name: `${contract.plugin}.${featureName}.${methodName}`,
-        supportedModes: [
-          declaration.mode === RemoteMethodMode.request
-            ? RuntimeApiMode.request
-            : declaration.mode === RemoteMethodMode.oneWay
-              ? RuntimeApiMode.notify
-              : RuntimeApiMode.stream
-        ],
+        supportedModes: [runtimeModeForDeclaration(declaration.mode)],
         modeSource: 'declared' as const,
         idempotent: declaration.idempotent
       }))
