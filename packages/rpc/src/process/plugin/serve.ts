@@ -599,6 +599,94 @@ export async function serveProcessSessions(
   }
 }
 
+/** Only target selection and its existing remote/Host cleanup belong to this internal owner. */
+export type IProcessSessionServiceOptions = Readonly<{
+  host: import('../../remote/serve-plugin.js').IRemoteServePluginOptions['host']
+  contract: import('../../remote/contract.js').IRemoteContract
+  report(error: unknown): void
+  instanceMode?: 'shared' | 'per-connection'
+  createSessionHost?(
+    session: IProcessSessionIdentity
+  ):
+    | Promise<
+        import('../../remote/serve-plugin.js').IRemoteServePluginOptions['host'] &
+          Readonly<{ dispose(): Promise<unknown> }>
+      >
+    | (import('../../remote/serve-plugin.js').IRemoteServePluginOptions['host'] &
+        Readonly<{ dispose(): Promise<unknown> }>)
+}>
+
+/** Validate target authority cold, then adopt each endpoint through the original remote service. */
+export function createProcessSessionService(
+  options: IProcessSessionServiceOptions
+): (session: IProcessReadySession) => Promise<IRemoteServePluginHandle> {
+  /**
+   * Only the target selection mode is retained here; native ingress remains with
+   * serveProcessSessions.
+   */
+  const mode = options.instanceMode ?? 'shared'
+  if (mode === 'per-connection') {
+    if (typeof options.createSessionHost !== 'function') invalidOption('createSessionHost')
+  } else if (mode !== 'shared') invalidOption('instanceMode')
+  /** The existing normalizer validates the one contract before any native listener binds. */
+  const contract = normalizeRemoteContract(options.contract)
+  return async ({ endpoint, identity }) => {
+    let targetHost: IProcessSessionServiceOptions['host'] | undefined
+    let closeTarget: (() => Promise<unknown>) | undefined
+    let transferred = false
+    try {
+      if (mode === 'per-connection') {
+        const ownedTarget = await options.createSessionHost!(identity)
+        targetHost = ownedTarget
+        closeTarget = () => ownedTarget.dispose()
+      } else targetHost = options.host
+      transferred = true
+      const service = await serveRemotePlugin({
+        host: targetHost,
+        contract,
+        endpoint,
+        report: options.report,
+        invocationContext: (context) => Object.freeze({ session: identity, signal: context.signal })
+      })
+      return {
+        close: async () => {
+          const errors: unknown[] = []
+          try {
+            await service.close()
+          } catch (error) {
+            errors.push(error)
+          }
+          if (mode === 'per-connection') {
+            try {
+              await closeTarget?.()
+            } catch (error) {
+              errors.push(error)
+            }
+          }
+          if (errors.length === 1) throw errors[0]
+          if (errors.length > 1) throw cleanupFailure(errors)
+        }
+      }
+    } catch (error) {
+      if (!transferred) {
+        try {
+          await endpoint.endpoint.dispose()
+        } catch (cleanupError) {
+          reportSafely(options.report, cleanupError)
+        }
+      }
+      if (mode === 'per-connection' && targetHost) {
+        try {
+          await closeTarget?.()
+        } catch (cleanupError) {
+          reportSafely(options.report, cleanupError)
+        }
+      }
+      throw error
+    }
+  }
+}
+
 /** Add Plugin instance recovery and invocation context to the shared process session owner. */
 export async function createServeProcessPlugin(
   options: IProcessServePluginOptions
@@ -620,6 +708,7 @@ export async function createServeProcessPlugin(
     )
       invalidOption('createSharedTarget/onInstanceUnhealthy')
   } else invalidOption('instanceMode')
+  const service = createProcessSessionService(options)
   const contract = normalizeRemoteContract(options.contract)
   const resilience =
     options.resilience ??
@@ -642,62 +731,7 @@ export async function createServeProcessPlugin(
     const sessions = await serveProcessSessions(
       options.ingress,
       options.endpointFactory,
-      async ({ endpoint, identity }) => {
-        let targetHost: IProcessServePluginOptions['host'] | undefined
-        let closeTarget: (() => Promise<unknown>) | undefined
-        let transferred = false
-        try {
-          if (mode === 'per-connection') {
-            const ownedTarget = await options.createSessionHost!(identity)
-            targetHost = ownedTarget
-            closeTarget = () => ownedTarget.dispose()
-          } else targetHost = options.host
-          transferred = true
-          const service = await serveRemotePlugin({
-            host: targetHost,
-            contract,
-            endpoint,
-            report: options.report,
-            invocationContext: (context) =>
-              Object.freeze({ session: identity, signal: context.signal })
-          })
-          return {
-            close: async () => {
-              const errors: unknown[] = []
-              try {
-                await service.close()
-              } catch (error) {
-                errors.push(error)
-              }
-              if (mode === 'per-connection') {
-                try {
-                  await closeTarget?.()
-                } catch (error) {
-                  errors.push(error)
-                }
-              }
-              if (errors.length === 1) throw errors[0]
-              if (errors.length > 1) throw cleanupFailure(errors)
-            }
-          }
-        } catch (error) {
-          if (!transferred) {
-            try {
-              await endpoint.endpoint.dispose()
-            } catch (cleanupError) {
-              reportSafely(options.report, cleanupError)
-            }
-          }
-          if (mode === 'per-connection' && targetHost) {
-            try {
-              await closeTarget?.()
-            } catch (cleanupError) {
-              reportSafely(options.report, cleanupError)
-            }
-          }
-          throw error
-        }
-      },
+      service,
       resilience,
       options.report,
       fallback

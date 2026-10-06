@@ -1,9 +1,20 @@
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import type { IRemoteChannel } from '../../src/remote/types.js'
-import { createServeProcessPlugin } from '../../src/process/plugin/serve.js'
+import {
+  createProcessSessionService,
+  serveProcessSessions
+} from '../../src/process/plugin/serve.js'
+import { serveRemotePlugin } from '../../src/remote/serve-plugin.js'
+import { createProcessResilience } from '../../src/process/resilience/index.js'
+import { createProcessInstanceFallback } from '../../src/process/resilience/fallback.js'
+import type {
+  IProcessServeChildIngress,
+  IProcessServeListenerIngress,
+  IProcessServeEndpointFactory
+} from '../../src/process/plugin/types.js'
 import type { IProcessPendingByteConnection } from '../../src/process/types.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
 import type { IProcessSessionIdentity } from '../../src/process/resilience/types.js'
@@ -15,11 +26,12 @@ const contract = {
   features: { f: { methods: { request: { mode: 'request' as const, idempotent: false } } } }
 }
 
-/** Existing shared fixtures declare their recovery ports before accepting a connection. */
-const sharedRecovery = {
-  createSharedTarget: async () => undefined,
-  onInstanceUnhealthy: () => () => undefined
-}
+/** Neutral session setup carries only the original ingress, endpoint and report ports. */
+type ISessionFixtureOptions = Readonly<{
+  ingress: IProcessServeChildIngress | IProcessServeListenerIngress
+  endpointFactory: IProcessServeEndpointFactory
+  report(error: unknown): void
+}>
 
 /** Creates a target that remote services may reference without owning it. */
 async function targetHost() {
@@ -86,17 +98,21 @@ describe('process plugin service ingress', () => {
         dispose: vi.fn(async () => undefined)
       } as unknown as IRpcEndpoint
     }))
-    const serving = await createServeProcessPlugin({
+    /** Original fallback owns health event serialization and exact Host replacement. */
+    const recovery = createProcessInstanceFallback({
+      mode: 'shared',
+      targetName: contract.plugin,
       host,
-      contract,
       createSharedTarget,
       onInstanceUnhealthy(listener) {
         unhealthy = listener
         return () => undefined
       },
-      endpointFactory,
-      report,
-      ingress: {
+      report
+    })
+    const resilience = createProcessResilience({ scheduler: systemScheduler, report })
+    const serving = await serveProcessSessions(
+      {
         kind: 'listener',
         address: 'fixture',
         verify: () => 'principal',
@@ -114,8 +130,23 @@ describe('process plugin service ingress', () => {
           onConnection = callback
           return { address: 'fixture', close: async () => undefined }
         }
-      }
-    })
+      },
+      endpointFactory,
+      ({ endpoint, identity }) =>
+        serveRemotePlugin({
+          host,
+          contract,
+          endpoint,
+          report,
+          invocationContext: (context) =>
+            Object.freeze({ session: identity, signal: context.signal })
+        }),
+      resilience,
+      report,
+      recovery,
+      systemScheduler,
+      { release: () => resilience.close() }
+    )
     const firstPending: IProcessPendingByteConnection = {
       accept: async () => ({ channel: physical.channel, principalId: 'alice' }),
       close: async () => undefined
@@ -129,7 +160,7 @@ describe('process plugin service ingress', () => {
       close: async () => undefined
     }
     try {
-      expect(serving.inspectRecovery()).toEqual({ recoverable: true, fused: false })
+      expect(recovery.inspect()).toEqual({ recoverable: true, fused: false })
       await onConnection(firstPending)
       await onConnection(secondPending)
       expect(targetHandle.extensions.version()).toBe(1)
@@ -140,7 +171,7 @@ describe('process plugin service ingress', () => {
       })
       expect(createSharedTarget).toHaveBeenCalledOnce()
       await vi.waitFor(() => expect(targetHandle.extensions.version()).toBe(2))
-      expect(serving.inspectRecovery()).toEqual({ recoverable: true, fused: false })
+      expect(recovery.inspect()).toEqual({ recoverable: true, fused: false })
       expect(report).toHaveBeenCalledTimes(0)
       await onConnection(thirdPending)
       expect(endpointFactory).toHaveBeenCalledTimes(3)
@@ -159,17 +190,21 @@ describe('process plugin service ingress', () => {
     let unhealthy: (event: { targetName: string; reason: unknown }) => void = () => undefined
     const createSharedTarget = vi.fn(async () => definePlugin({ name: 'p', install: () => ({}) }))
     try {
-      const serving = await createServeProcessPlugin({
+      /** The existing fallback reports absent Host replacement before binding the listener. */
+      const recovery = createProcessInstanceFallback({
+        mode: 'shared',
+        targetName: contract.plugin,
         host: narrow,
-        contract,
         createSharedTarget,
         onInstanceUnhealthy(listener) {
           unhealthy = listener
           return () => undefined
         },
-        endpointFactory: vi.fn(),
-        report,
-        ingress: {
+        report
+      })
+      const resilience = createProcessResilience({ scheduler: systemScheduler, report })
+      const serving = await serveProcessSessions(
+        {
           kind: 'listener',
           address: 'fixture',
           verify: () => 'principal',
@@ -179,18 +214,25 @@ describe('process plugin service ingress', () => {
             ipc: { connectionId: 'c', sessionId: 's', log: () => undefined }
           }),
           listen
-        }
-      })
+        },
+        vi.fn(),
+        ({ endpoint }) => serveRemotePlugin({ host: narrow, contract, endpoint, report }),
+        resilience,
+        report,
+        recovery,
+        systemScheduler,
+        { release: () => resilience.close() }
+      )
       try {
         expect(report).toHaveBeenCalledTimes(1)
         expect(report.mock.calls[0]?.[0]).toMatchObject({
           code: 'PROCESS_INSTANCE_UNHEALTHY',
           detail: { field: 'host.replace' }
         })
-        expect(serving.inspectRecovery()).toEqual({ recoverable: false, fused: false })
+        expect(recovery.inspect()).toEqual({ recoverable: false, fused: false })
         unhealthy({ targetName: 'p', reason: new Error('instance failed') })
-        await vi.waitFor(() => expect(serving.inspectRecovery().fused).toBe(true))
-        expect(serving.inspectRecovery().recoverable).toBe(false)
+        await vi.waitFor(() => expect(recovery.inspect().fused).toBe(true))
+        expect(recovery.inspect().recoverable).toBe(false)
         expect(report).toHaveBeenCalledTimes(1)
         expect(createSharedTarget).not.toHaveBeenCalled()
       } finally {
@@ -205,26 +247,14 @@ describe('process plugin service ingress', () => {
     const { host } = await targetHost()
     const listen = vi.fn()
     try {
-      await expect(
-        createServeProcessPlugin({
+      expect(() =>
+        createProcessSessionService({
           host,
           contract,
           instanceMode: 'per-connection',
-          endpointFactory: vi.fn(),
-          report: vi.fn(),
-          ingress: {
-            kind: 'listener',
-            address: 'fixture',
-            verify: () => 'principal',
-            offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
-            createConnectionContext: () => ({
-              peerId: 'peer',
-              ipc: { connectionId: 'c', sessionId: 's', log: () => undefined }
-            }),
-            listen
-          }
+          report: vi.fn()
         })
-      ).rejects.toMatchObject({ detail: { field: 'createSessionHost' } })
+      ).toThrow(expect.objectContaining({ detail: { field: 'createSessionHost' } }))
       expect(listen).not.toHaveBeenCalled()
     } finally {
       await host.dispose()
@@ -242,18 +272,17 @@ describe('process plugin service ingress', () => {
       created.push(next)
       return next.host
     })
-    const serving = await createServeProcessPlugin({
-      host: fallback,
-      contract,
-      instanceMode: 'per-connection',
-      createSessionHost,
+    /** Existing governance owns connection quotas; each authenticated callback owns one real Host. */
+    const report = vi.fn()
+    const resilience = createProcessResilience({ scheduler: systemScheduler, report })
+    const options: ISessionFixtureOptions = {
       endpointFactory: async () => ({
         endpoint: {
           provide: vi.fn(),
           dispose: vi.fn(async () => undefined)
         } as unknown as IRpcEndpoint
       }),
-      report: vi.fn(),
+      report,
       ingress: {
         kind: 'listener',
         address: 'fixture',
@@ -272,7 +301,23 @@ describe('process plugin service ingress', () => {
           return { address: 'fixture', close: async () => undefined }
         }
       }
-    })
+    }
+    const serving = await serveProcessSessions(
+      options.ingress,
+      options.endpointFactory,
+      createProcessSessionService({
+        host: fallback,
+        contract,
+        instanceMode: 'per-connection',
+        createSessionHost,
+        report
+      }),
+      resilience,
+      report,
+      undefined,
+      systemScheduler,
+      { release: () => resilience.close() }
+    )
     const firstPending: IProcessPendingByteConnection = {
       accept: async () => ({ channel: first.channel, principalId: 'alice' }),
       close: async () => undefined
@@ -309,21 +354,43 @@ describe('process plugin service ingress', () => {
     const endpointFactory = vi.fn()
     try {
       await expect(
-        createServeProcessPlugin({
-          host,
-          contract,
-          ...sharedRecovery,
-          endpointFactory,
-          report: () => undefined,
-          ingress: {
-            kind: 'listener',
-            address: 'fixture',
-            verify: undefined as never,
-            offer: {} as never,
-            createConnectionContext: () => ({ peerId: 'peer', ipc: {} as never }),
-            listen
+        (() => {
+          /** This original governor and session owner jointly release this listener scope. */
+          const options: ISessionFixtureOptions = {
+            endpointFactory,
+            report: () => undefined,
+            ingress: {
+              kind: 'listener',
+              address: 'fixture',
+              verify: undefined as never,
+              offer: {} as never,
+              createConnectionContext: () => ({ peerId: 'peer', ipc: {} as never }),
+              listen
+            }
           }
-        })
+          const resilience = createProcessResilience({
+            scheduler: systemScheduler,
+            report: options.report
+          })
+          return serveProcessSessions(
+            options.ingress,
+            options.endpointFactory,
+            ({ endpoint, identity }) =>
+              serveRemotePlugin({
+                host,
+                contract,
+                endpoint,
+                report: options.report,
+                invocationContext: (context) =>
+                  Object.freeze({ session: identity, signal: context.signal })
+              }),
+            resilience,
+            options.report,
+            undefined,
+            systemScheduler,
+            { release: () => resilience.close() }
+          )
+        })()
       ).rejects.toMatchObject({ code: 'PROCESS_PLUGIN_INVALID_OPTION' })
       expect(listen).not.toHaveBeenCalled()
       expect(endpointFactory).not.toHaveBeenCalled()
@@ -340,29 +407,51 @@ describe('process plugin service ingress', () => {
     const exit = vi.fn()
     try {
       await expect(
-        createServeProcessPlugin({
-          host,
-          contract,
-          ...sharedRecovery,
-          endpointFactory,
-          report: () => undefined,
-          ingress: {
-            kind: 'child',
-            channelKind: 'byte',
-            openRaw: async () => ({
-              raw: {
-                kind: 'byte',
-                write: async () => undefined,
-                onData: () => () => undefined,
-                onClose: () => () => undefined,
-                close: rawClose
-              },
-              bootstrap: new Uint8Array([1])
-            }),
-            establish,
-            parentLoss: { exit }
+        (() => {
+          /** This original governor and session owner jointly release this listener scope. */
+          const options: ISessionFixtureOptions = {
+            endpointFactory,
+            report: () => undefined,
+            ingress: {
+              kind: 'child',
+              channelKind: 'byte',
+              openRaw: async () => ({
+                raw: {
+                  kind: 'byte',
+                  write: async () => undefined,
+                  onData: () => () => undefined,
+                  onClose: () => () => undefined,
+                  close: rawClose
+                },
+                bootstrap: new Uint8Array([1])
+              }),
+              establish,
+              parentLoss: { exit }
+            }
           }
-        })
+          const resilience = createProcessResilience({
+            scheduler: systemScheduler,
+            report: options.report
+          })
+          return serveProcessSessions(
+            options.ingress,
+            options.endpointFactory,
+            ({ endpoint, identity }) =>
+              serveRemotePlugin({
+                host,
+                contract,
+                endpoint,
+                report: options.report,
+                invocationContext: (context) =>
+                  Object.freeze({ session: identity, signal: context.signal })
+              }),
+            resilience,
+            options.report,
+            undefined,
+            systemScheduler,
+            { release: () => resilience.close() }
+          )
+        })()
       ).rejects.toMatchObject({ code: 'PROCESS_PLUGIN_INVALID_OPTION' })
       await settle()
       expect(rawClose).toHaveBeenCalledTimes(1)
@@ -397,31 +486,53 @@ describe('process plugin service ingress', () => {
     })
     const report = vi.fn()
     try {
-      const serving = await createServeProcessPlugin({
-        host,
-        contract,
-        ...sharedRecovery,
-        endpointFactory,
-        report,
-        ingress: {
-          kind: 'listener',
-          address: 'fixture',
-          verify: () => 'principal',
-          offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
-          createConnectionContext: (pending) => ({
-            peerId: pending === firstPending ? 'first' : 'second',
-            ipc: {
-              connectionId: pending === firstPending ? 'connection-1' : 'connection-2',
-              sessionId: pending === firstPending ? 'session-1' : 'session-2',
-              log: () => undefined
+      const serving = await (() => {
+        /** This original governor and session owner jointly release this listener scope. */
+        const options: ISessionFixtureOptions = {
+          endpointFactory,
+          report,
+          ingress: {
+            kind: 'listener',
+            address: 'fixture',
+            verify: () => 'principal',
+            offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+            createConnectionContext: (pending) => ({
+              peerId: pending === firstPending ? 'first' : 'second',
+              ipc: {
+                connectionId: pending === firstPending ? 'connection-1' : 'connection-2',
+                sessionId: pending === firstPending ? 'session-1' : 'session-2',
+                log: () => undefined
+              }
+            }),
+            listen: async ({ onConnection: callback }) => {
+              onConnection = callback
+              return { address: 'fixture', close: listenerClose }
             }
-          }),
-          listen: async ({ onConnection: callback }) => {
-            onConnection = callback
-            return { address: 'fixture', close: listenerClose }
           }
         }
-      })
+        const resilience = createProcessResilience({
+          scheduler: systemScheduler,
+          report: options.report
+        })
+        return serveProcessSessions(
+          options.ingress,
+          options.endpointFactory,
+          ({ endpoint, identity }) =>
+            serveRemotePlugin({
+              host,
+              contract,
+              endpoint,
+              report: options.report,
+              invocationContext: (context) =>
+                Object.freeze({ session: identity, signal: context.signal })
+            }),
+          resilience,
+          options.report,
+          undefined,
+          systemScheduler,
+          { release: () => resilience.close() }
+        )
+      })()
       /** Distinct ready channels model two independently authenticated sessions. */
       const firstPending: IProcessPendingByteConnection = {
         accept: vi.fn(async () => ({ channel: first.channel, principalId: 'first-principal' })),
@@ -500,27 +611,49 @@ describe('process plugin service ingress', () => {
     let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
     const endpointFactory = vi.fn()
     const report = vi.fn()
-    const serving = await createServeProcessPlugin({
-      host,
-      contract,
-      ...sharedRecovery,
-      endpointFactory,
-      report,
-      ingress: {
-        kind: 'listener',
-        address: 'fixture',
-        verify: () => 'principal',
-        offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
-        createConnectionContext: () => ({
-          peerId: 'late',
-          ipc: { connectionId: 'late', sessionId: 'late', log: () => undefined }
-        }),
-        listen: async ({ onConnection: callback }) => {
-          onConnection = callback
-          return { address: 'fixture', close: async () => undefined }
+    const serving = await (() => {
+      /** This original governor and session owner jointly release this listener scope. */
+      const options: ISessionFixtureOptions = {
+        endpointFactory,
+        report,
+        ingress: {
+          kind: 'listener',
+          address: 'fixture',
+          verify: () => 'principal',
+          offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+          createConnectionContext: () => ({
+            peerId: 'late',
+            ipc: { connectionId: 'late', sessionId: 'late', log: () => undefined }
+          }),
+          listen: async ({ onConnection: callback }) => {
+            onConnection = callback
+            return { address: 'fixture', close: async () => undefined }
+          }
         }
       }
-    })
+      const resilience = createProcessResilience({
+        scheduler: systemScheduler,
+        report: options.report
+      })
+      return serveProcessSessions(
+        options.ingress,
+        options.endpointFactory,
+        ({ endpoint, identity }) =>
+          serveRemotePlugin({
+            host,
+            contract,
+            endpoint,
+            report: options.report,
+            invocationContext: (context) =>
+              Object.freeze({ session: identity, signal: context.signal })
+          }),
+        resilience,
+        options.report,
+        undefined,
+        systemScheduler,
+        { release: () => resilience.close() }
+      )
+    })()
     try {
       const pending: IProcessPendingByteConnection = {
         accept: () => authenticated,
@@ -554,27 +687,49 @@ describe('process plugin service ingress', () => {
     let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
     const endpointFactory = vi.fn(() => prepared)
     const report = vi.fn()
-    const serving = await createServeProcessPlugin({
-      host,
-      contract,
-      ...sharedRecovery,
-      endpointFactory,
-      report,
-      ingress: {
-        kind: 'listener',
-        address: 'fixture',
-        verify: () => 'principal',
-        offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
-        createConnectionContext: () => ({
-          peerId: 'late-endpoint',
-          ipc: { connectionId: 'late', sessionId: 'late', log: () => undefined }
-        }),
-        listen: async ({ onConnection: callback }) => {
-          onConnection = callback
-          return { address: 'fixture', close: async () => undefined }
+    const serving = await (() => {
+      /** This original governor and session owner jointly release this listener scope. */
+      const options: ISessionFixtureOptions = {
+        endpointFactory,
+        report,
+        ingress: {
+          kind: 'listener',
+          address: 'fixture',
+          verify: () => 'principal',
+          offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+          createConnectionContext: () => ({
+            peerId: 'late-endpoint',
+            ipc: { connectionId: 'late', sessionId: 'late', log: () => undefined }
+          }),
+          listen: async ({ onConnection: callback }) => {
+            onConnection = callback
+            return { address: 'fixture', close: async () => undefined }
+          }
         }
       }
-    })
+      const resilience = createProcessResilience({
+        scheduler: systemScheduler,
+        report: options.report
+      })
+      return serveProcessSessions(
+        options.ingress,
+        options.endpointFactory,
+        ({ endpoint, identity }) =>
+          serveRemotePlugin({
+            host,
+            contract,
+            endpoint,
+            report: options.report,
+            invocationContext: (context) =>
+              Object.freeze({ session: identity, signal: context.signal })
+          }),
+        resilience,
+        options.report,
+        undefined,
+        systemScheduler,
+        { release: () => resilience.close() }
+      )
+    })()
     try {
       const accepting = onConnection({
         accept: async () => ({ channel: accepted.channel, principalId: 'principal' }),
@@ -609,34 +764,56 @@ describe('process plugin service ingress', () => {
       throw channelError
     })
     let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
-    const serving = await createServeProcessPlugin({
-      host,
-      contract,
-      ...sharedRecovery,
-      report,
-      endpointFactory: async () => ({
-        endpoint: { provide: vi.fn(), dispose } as unknown as IRpcEndpoint
-      }),
-      ingress: {
-        kind: 'listener',
-        address: 'fixture',
-        verify: () => 'principal',
-        offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
-        createConnectionContext: () => ({
-          peerId: 'cleanup',
-          ipc: { connectionId: 'cleanup', sessionId: 'cleanup', log: () => undefined }
+    const serving = await (() => {
+      /** This original governor and session owner jointly release this listener scope. */
+      const options: ISessionFixtureOptions = {
+        report,
+        endpointFactory: async () => ({
+          endpoint: { provide: vi.fn(), dispose } as unknown as IRpcEndpoint
         }),
-        listen: async ({ onConnection: callback }) => {
-          onConnection = callback
-          return {
-            address: 'fixture',
-            close: async () => {
-              throw listenerError
+        ingress: {
+          kind: 'listener',
+          address: 'fixture',
+          verify: () => 'principal',
+          offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
+          createConnectionContext: () => ({
+            peerId: 'cleanup',
+            ipc: { connectionId: 'cleanup', sessionId: 'cleanup', log: () => undefined }
+          }),
+          listen: async ({ onConnection: callback }) => {
+            onConnection = callback
+            return {
+              address: 'fixture',
+              close: async () => {
+                throw listenerError
+              }
             }
           }
         }
       }
-    })
+      const resilience = createProcessResilience({
+        scheduler: systemScheduler,
+        report: options.report
+      })
+      return serveProcessSessions(
+        options.ingress,
+        options.endpointFactory,
+        ({ endpoint, identity }) =>
+          serveRemotePlugin({
+            host,
+            contract,
+            endpoint,
+            report: options.report,
+            invocationContext: (context) =>
+              Object.freeze({ session: identity, signal: context.signal })
+          }),
+        resilience,
+        options.report,
+        undefined,
+        systemScheduler,
+        { release: () => resilience.close() }
+      )
+    })()
     try {
       await onConnection({
         accept: async () => ({
