@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defineHost, definePlugin, type IHostDomainCoreRequest } from '../src/index.js'
 import { isManagedHost, openComposition } from '../src/composition-entry.js'
+import { readHostIdentity } from '../src/host-identity.js'
 
 const hostOptions = {
   execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
@@ -10,6 +11,107 @@ const hostOptions = {
 const plugin = (name: string) => definePlugin({ name, install: () => ({}) })
 
 describe('defineHost', () => {
+  it('rejects an empty identity label and admits only identities issued for an exact Host', async () => {
+    expect(() => defineHost({ host: { ...hostOptions, identity: { name: '' } } })).toThrow(
+      expect.objectContaining({ source: '@migaia/plugin-host', code: 'INVALID_OPTION' })
+    )
+    const host = defineHost({ host: hostOptions })
+    try {
+      expect(readHostIdentity(host)).toBe(host.identity)
+      for (const value of [null, undefined, 'DEFAULT', 0, () => undefined, {}])
+        expect(readHostIdentity(value)).toBeUndefined()
+      expect(readHostIdentity({ ...host })).toBeUndefined()
+    } finally {
+      await host.dispose()
+    }
+  })
+
+  it('keeps dry-run removal observational and preserves cleanup causes', async () => {
+    /** A dry-run reaches the same dependency owner without releasing the live registration. */
+    const host = defineHost({ host: hostOptions })
+    const [registered] = await host.use(plugin('planned'))
+    const revision = host.revision
+    const plan = await host.unUse('planned', { dryRun: true })
+    expect(plan.order).toEqual(['planned'])
+    expect(host.revision).toBe(revision)
+    expect(registered.name).toBe('planned')
+    expect(await host.unUse('planned')).toMatchObject({ ok: true })
+    await host.dispose()
+
+    /** Functional disposal reports the same original resource failure without rerunning cleanup. */
+    const original = new RangeError('functional-host cleanup failure')
+    const failing = defineHost({ host: hostOptions })
+    await failing.use(
+      definePlugin({
+        name: 'cleanup',
+        install: (core) => {
+          core.onDispose(() => {
+            throw original
+          })
+          return {}
+        }
+      })
+    )
+    const closing = failing.dispose()
+    expect(failing.dispose()).toBe(closing)
+    const result = await closing
+    expect(result.logicalTerminal).toBe(true)
+    expect(result.cleanupErrors).toHaveLength(1)
+    expect((result.cleanupErrors[0] as Error).cause).toBe(original)
+  })
+
+  it('keeps owner pipeline dispatch, synchronous registration and snapshots on the original runtime', async () => {
+    /** The functional owner uses the same registration transaction and revision as the class. */
+    const sync = defineHost<Record<string, never>, number>({
+      host: { ...hostOptions, pipeline: { mode: 'sync' } }
+    })
+    try {
+      expect(sync.revision).toBe(0)
+      expect(sync.pipelineMode).toBe('sync')
+      expect(sync.config).toBeDefined()
+      const [registered] = sync.useSync(plugin('sync'))
+      expect(registered.name).toBe('sync')
+      expect(sync.revision).toBeGreaterThan(0)
+      expect(sync.usePipeline((value, next) => next(value + 1))).toBe(sync)
+      let delivered = 0
+      await sync.runPipeline(41, (value) => {
+        delivered = value
+      })
+      expect(delivered).toBe(42)
+    } finally {
+      await sync.dispose()
+    }
+    /** All supported modes retain their original completion and same handle chaining. */
+    for (const mode of ['async', 'generator', 'async-generator'] as const) {
+      const host = defineHost<Record<string, never>, number>({
+        host: { ...hostOptions, pipeline: { mode } }
+      })
+      try {
+        if (mode === 'async')
+          expect(host.useAsyncPipeline(async (value, next) => next(value + 1))).toBe(host)
+        else if (mode === 'generator')
+          expect(
+            host.useGeneratorPipeline(function* (value) {
+              return value + 1
+            })
+          ).toBe(host)
+        else
+          expect(
+            host.useAsyncGeneratorPipeline(async function* (value) {
+              return value + 1
+            })
+          ).toBe(host)
+        let delivered = 0
+        await host.runPipeline(41, (value) => {
+          delivered = value
+        })
+        expect(delivered).toBe(42)
+      } finally {
+        await host.dispose()
+      }
+    }
+  })
+
   it('domain core contract: one request per registration, indexed within its batch', async () => {
     const requests: IHostDomainCoreRequest[] = []
     const host = defineHost({
