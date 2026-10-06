@@ -98,3 +98,30 @@ The six sustained >=400-second cells run separately with the replay fixture's
 full records and classifications. A native send/receive change requires fresh
 records from that code version. B0 is historical wall-budget tracking only.
 Summed isolated gains cannot replace an actual complete-stack reference pair.
+
+Supplemental runtime paths use `runtime-units.json` and the original side,
+100/1000 sampling loop and native PID observer:
+
+```bash
+node bench/runtime.mjs --prepare --output /absolute/fresh-preparation
+node bench/runtime.mjs --output /absolute/fresh-runtime-raw
+```
+
+The managed cell calls the actual committed `host.thread` outlet. One-hop cells
+use a process relay with its real Host, an owned Worker leaf, and the compiled
+`leaf.bench.echo` expose route at concurrency 1/16. Their physical carrier is
+stdio plus Worker messaging; they are not labelled as a two-Worker path. Strict
+automatic-parent versus explicit same-family source conflicts remain enforced.
+The relay's real leaf registration is withdrawn before its process is stopped.
+
+The reverse cell runs warmup and all 1000 timed requests inside the actual
+Worker. The parent's single trigger and raw-result transfer are outside that
+loop. Shared PID CPU is charged once; both isolate snapshots retain real
+thread IDs and loaded bytes. No parent round-trip clock stands in for the
+initiator's measurement.
+
+These cells retain RPC-only observations with status `unfrozen` until C7 freezes
+the final I28 source and installs their relative guards. No old bare denominator
+or historical W3 value is invented for a new topology. Relay own-thread CPU
+between boundary snapshots includes diagnostic RPC work; three empty snapshot
+pairs are retained separately. It is not reported as exact business-only CPU.

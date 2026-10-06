@@ -1,7 +1,7 @@
 import { IpcBenchErrorText } from './error-text.mjs'
 import './observe.mjs'
 import { snapshot, waitForObservation } from './observe.mjs'
-import { IpcBenchControl } from './text.mjs'
+import { IpcBenchControl, RuntimeBench } from './text.mjs'
 import { createHash } from 'node:crypto'
 import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
@@ -96,7 +96,7 @@ async function rpcApi() {
   return { ...processApi, ...threads, ...threadAdapters, ...bunAdapters }
 }
 /** Fixed benchmark method has no side effect besides returning its portable input. */
-const echoMethod = 'bench.echo'
+const echoMethod = RuntimeBench.echo
 /** Both public provider factories compile the same nested tree into the original echo wire name. */
 const echoProvide = { bench: { echo: (payload) => payload } }
 /**
@@ -187,7 +187,26 @@ async function serveRpc(source) {
  * @returns {Promise<object>} Owned peer, exchange, readiness and close ports.
  * @throws {Error} Preparation failure never becomes a ratio assertion.
  */
-export async function createIpcSession({ carrier, side, payload, wire, peerRuntime }) {
+export async function createIpcSession({
+  carrier,
+  side,
+  payload,
+  wire,
+  peerRuntime,
+  topology,
+  direction
+}) {
+  if (topology || direction === RuntimeBench.reverse) {
+    const { createRuntimeSession } = await import('./runtime-session.mjs')
+    return createRuntimeSession(
+      { carrier, side, payload, topology: topology ?? RuntimeBench.reverse },
+      {
+        classification,
+        providerLimits: nativeProviderLimits,
+        report
+      }
+    )
+  }
   if (wire === 'jsonrpc') return createBridgeIpcSession({ carrier, side, payload, peerRuntime })
   /** Owned cleanup actions are registered before the next fallible preparation step. */
   const cleanup = []
@@ -805,10 +824,27 @@ if (parentPort) {
   await waitForObservation()
   /** The canonical launcher retains portable spec data under its original bootstrap data field. */
   const input = workerData?.data ?? workerData
-  if (input?.child) await childMain(input.side, input.carrier)
+  if (input?.topology) {
+    const { serveRuntimeWorker } = await import('./runtime-session.mjs')
+    await serveRuntimeWorker(input, {
+      classification,
+      providerLimits: nativeProviderLimits,
+      report
+    })
+  } else if (input?.child) await childMain(input.side, input.carrier)
   else if (process.versions.bun && Bun.isMainThread === false) await childMain('rpc', 'worker')
 } else if (process.versions.bun && Bun.isMainThread === false) {
   await childMain('rpc', 'worker')
+} else if (process.argv.includes('--runtime-child')) {
+  const { serveRuntimeWorker } = await import('./runtime-session.mjs')
+  await serveRuntimeWorker(
+    { topology: 'relay' },
+    {
+      classification,
+      providerLimits: nativeProviderLimits,
+      report
+    }
+  )
 } else if (process.argv.includes('--child')) {
   await childMain(...process.argv.slice(process.argv.indexOf('--child') + 1))
 }

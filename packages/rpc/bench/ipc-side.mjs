@@ -37,43 +37,62 @@ export async function runIpcSide(unit, side, options = {}) {
   let receipt
   try {
     await session.ready()
-    observer = await createMacPidObserver([process.pid, session.peerPid])
-    if (options.check) {
-      const first = await observer.read()
-      for (let index = 0; index < 3; index++) await session.exchange()
-      const last = await observer.read()
-      receipt = {
-        type: 'ipc-preparation',
-        echoes: 3,
-        first,
-        last,
-        parentSnapshot: snapshot(),
-        peerSnapshot: process.env.IPC_BENCH_STEM ? await session.peerSnapshot() : null
-      }
+    if (session.runInInitiator && !options.check) {
+      /** Reverse raw samples and clock come from the actual Worker, not a parent-trigger latency. */
+      receipt = await session.runInInitiator(unit, options)
     } else {
-      /** Warmup and control snapshots remain outside the formal measurement window. */
-      for (let index = 0; index < (options.warmup ?? 100); index++) await session.exchange()
-      /** Each native JS isolate retains its own heap and actual loaded bytes. */
-      const peerBefore = await session.peerSnapshot()
-      /** Parent snapshot excludes the warmup but does not instrument request execution. */
-      const parentBefore = snapshot()
-      receipt = {
-        type: 'ipc-side',
-        ...(await measureBare({
-          ...session,
-          observer,
-          ...options,
-          concurrency: unit.concurrency,
-          warmup: 0
-        })),
-        parentBefore,
-        peerBefore,
-        parentAfter: snapshot(),
-        peerAfter: await session.peerSnapshot(),
-        classification: session.classification(),
-        samplingMaxReplayEntriesPerPeer: 1200,
-        providerConcurrency: 'NOT_INSTRUMENTED_FORMAL; separate I26 diagnostics',
-        gcStatus: 'NOT_COLLECTED_FORMAL_TIMING'
+      observer = await createMacPidObserver([process.pid, session.peerPid])
+      if (options.check) {
+        const first = await observer.read()
+        for (let index = 0; index < 3; index++) await session.exchange()
+        const last = await observer.read()
+        receipt = {
+          type: 'ipc-preparation',
+          echoes: 3,
+          first,
+          last,
+          parentSnapshot: snapshot(),
+          peerSnapshot: process.env.IPC_BENCH_STEM ? await session.peerSnapshot() : null
+        }
+      } else {
+        /** Warmup and control snapshots remain outside the formal measurement window. */
+        for (let index = 0; index < (options.warmup ?? 100); index++) await session.exchange()
+        /** Relay CPU capture overhead is observed separately, without business or formal samples. */
+        const relayControlPairs = []
+        if (unit.topology === 'one-hop')
+          for (let index = 0; index < 3; index++)
+            relayControlPairs.push([await session.peerSnapshot(), await session.peerSnapshot()])
+        /** Each native JS isolate retains its own heap and actual loaded bytes. */
+        const peerBefore = await session.peerSnapshot()
+        /** Parent snapshot excludes the warmup but does not instrument request execution. */
+        const parentBefore = snapshot()
+        receipt = {
+          type: 'ipc-side',
+          ...(await measureBare({
+            ...session,
+            observer,
+            ...options,
+            concurrency: unit.concurrency,
+            warmup: 0
+          })),
+          parentBefore,
+          peerBefore,
+          parentAfter: snapshot(),
+          peerAfter: await session.peerSnapshot(),
+          classification: session.classification(),
+          samplingMaxReplayEntriesPerPeer: 1200,
+          providerConcurrency: 'NOT_INSTRUMENTED_FORMAL; separate I26 diagnostics',
+          gcStatus: 'NOT_COLLECTED_FORMAL_TIMING',
+          ...(relayControlPairs.length
+            ? {
+                relayCpuDiagnostic: {
+                  controlPairs: relayControlPairs,
+                  scope:
+                    'relay own native thread CPU between peerBefore/peerAfter; includes boundary snapshot RPC and leaf snapshot work; empty-control pairs retained separately, not a clean formal business-only CPU claim'
+                }
+              }
+            : {})
+        }
       }
     }
     receipt = {
