@@ -1,7 +1,8 @@
 import { PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
-import { createServeProcessPlugin } from '../../src/process/plugin/serve.js'
+import { serveProcessSessions } from '../../src/process/plugin/serve.js'
+import { serveRemotePlugin } from '../../src/remote/serve-plugin.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
 import { RpcCapability } from '../../src/contract/wire-constants.js'
 import {
@@ -110,15 +111,13 @@ describe('I15 real failure and rollback matrix', () => {
       const establish = vi.fn()
       const endpointFactory = vi.fn()
       const exit = vi.fn()
+      const resilience = createProcessResilience({
+        scheduler: test.scheduler,
+        report: (error) => test.reports.push(error)
+      })
       try {
-        const error = await createServeProcessPlugin({
-          host: test.host,
-          contract: MATRIX_CONTRACT,
-          createSharedTarget: async () => undefined,
-          onInstanceUnhealthy: () => () => undefined,
-          endpointFactory,
-          report: (error) => test.reports.push(error),
-          ingress: {
+        const error = await serveProcessSessions(
+          {
             kind: 'child',
             channelKind: 'byte',
             openRaw: async () =>
@@ -131,8 +130,20 @@ describe('I15 real failure and rollback matrix', () => {
             },
             establish,
             parentLoss: { exit }
-          }
-        }).catch((error: unknown) => error)
+          },
+          endpointFactory,
+          ({ endpoint }) =>
+            serveRemotePlugin({
+              host: test.host,
+              contract: MATRIX_CONTRACT,
+              endpoint,
+              report: (error) => test.reports.push(error)
+            }),
+          resilience,
+          (error) => test.reports.push(error),
+          undefined,
+          test.scheduler
+        ).catch((error: unknown) => error)
         if (phase === 'verifier') expect(reachable(error, primary)).toBe(true)
         else
           expect(error).toMatchObject({
@@ -144,6 +155,7 @@ describe('I15 real failure and rollback matrix', () => {
         expect(endpointFactory).not.toHaveBeenCalled()
         expect(test.business).toBe(0)
       } finally {
+        await resilience.close()
         await handle.terminate('force')
         await handle.exited
         await test.cleanup()
@@ -236,15 +248,8 @@ describe('I15 real failure and rollback matrix', () => {
       let pending!: IProcessPendingByteConnection
       let accepting!: Promise<void>
       let closeCount = 0
-      const listener = await createServeProcessPlugin({
-        host,
-        contract: MATRIX_CONTRACT,
-        createSharedTarget: async () => undefined,
-        onInstanceUnhealthy: () => () => undefined,
-        endpointFactory: factory,
-        report,
-        resilience,
-        ingress: {
+      const listener = await serveProcessSessions(
+        {
           kind: 'listener',
           address: `${test.directory}/late.sock`,
           scheduler: test.scheduler,
@@ -283,8 +288,20 @@ describe('I15 real failure and rollback matrix', () => {
                 return accepting
               }
             })
-        }
-      })
+        },
+        factory,
+        ({ endpoint }) =>
+          serveRemotePlugin({
+            host,
+            contract: MATRIX_CONTRACT,
+            endpoint,
+            report
+          }),
+        resilience,
+        report,
+        undefined,
+        test.scheduler
+      )
       let raw: Awaited<ReturnType<typeof dialProcessByteChannel>> | undefined
       try {
         raw = await dialProcessByteChannel({ address: `${test.directory}/late.sock` })
