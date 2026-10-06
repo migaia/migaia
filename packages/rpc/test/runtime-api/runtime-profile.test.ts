@@ -106,6 +106,72 @@ function common(mode = 'request') {
   }
 }
 
+it('[A62][A68][A73][A75] correlated group terminals reject contradictory outcomes and cannot resume after failure', () => {
+  /** A genuine serialized provider failure is the same graph admitted by production completion. */
+  const failure = serializeRpcError(
+    new RpcError(RpcCoreErrorCode.capabilityUnsupported, RpcCoreErrorText.capabilityUnsupported),
+    {
+      report: ({ error }) => {
+        throw error
+      }
+    }
+  )
+  /** The group terminal reports the full ordered result without rolling back the successful prefix. */
+  const terminal = {
+    ...common('group'),
+    kind: 'runtime-control',
+    operation: 'terminal',
+    completion: {
+      ok: true,
+      result: [
+        { state: 'success', result: 42 },
+        { state: 'failure', error: failure },
+        { state: 'not-executed' }
+      ]
+    }
+  }
+  const normalize = parser()
+  assert.deepEqual(normalize(terminal), terminal)
+  /** Supported untrusted wire inputs must never turn contradictory data into an execution receipt. */
+  const invalidResults = [
+    null,
+    [],
+    [{ state: 'failure' }],
+    [{ state: 'failure', error: failure, result: 42 }],
+    [{ state: 'success', error: failure }],
+    [{ state: 'not-executed' }],
+    [
+      { state: 'failure', error: failure },
+      { state: 'success', result: 42 }
+    ],
+    [
+      { state: 'failure', error: failure },
+      { state: 'not-executed', result: 42 }
+    ]
+  ]
+  for (const result of invalidResults)
+    assert.throws(() => normalize({ ...terminal, completion: { ok: true, result } }), {
+      source: '@migaia/rpc/contract',
+      code: 'INVALID_ENVELOPE'
+    })
+  for (const completion of [
+    { ok: false },
+    { ok: false, error: failure, result: 42 },
+    { ok: true, error: failure },
+    { ok: 'true', result: 42 }
+  ])
+    assert.throws(() => normalize({ ...terminal, completion }), { code: 'INVALID_ENVELOPE' })
+  /** Closed task/option fields reject malformed runtime calls before owner mutation. */
+  const call = { ...common(), kind: 'runtime-call', options: {} }
+  for (const value of [
+    { ...call, task: { ...call.task, mode: 'unknown-mode' } },
+    { ...call, options: { cancel: 'ordinary' } },
+    { ...call, options: { idempotencyKey: '' } },
+    { ...call, route: { ...call.route, sentAt: -1 } }
+  ])
+    assert.throws(() => normalize(value), { code: 'INVALID_ENVELOPE' })
+})
+
 it('[A73][A75] the four closed runtime envelopes preserve their distinct task and completion semantics', () => {
   const normalize = parser()
   for (const value of [
