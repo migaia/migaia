@@ -1,5 +1,4 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
-import type { IHostHandle, IPluginConstraint } from '@migaia/plugin-host'
 import type { IProcessHandle, IProcessSupervisorOptions } from '@migaia/supervision/process'
 import type { IProcessSpec } from '@migaia/supervision/process'
 import type { ISupervisorBaseOptions } from '@migaia/supervision'
@@ -13,7 +12,6 @@ import type {
 } from '../../remote/types.js'
 import type { IRemoteContract } from '../../remote/contract.js'
 import type { IRemotePluginDefinition } from '../../remote/plugin.js'
-import type { IRemoteServePluginOptions } from '../../remote/serve-plugin.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import type {
   IListenProcessByteChannel,
@@ -154,13 +152,6 @@ export type IProcessServeListenerIngress = Readonly<{
   }>
 }>
 
-/** A serve handle owns its sessions while the caller retains the target Host. */
-export type IProcessPluginServeHandle = Readonly<{
-  close(): Promise<void>
-  /** Show whether instance recovery is available and whether a failed target is fenced. */
-  inspectRecovery(): Readonly<{ recoverable: boolean; fused: boolean }>
-}>
-
 /** Session configuration is supplied after authentication and before endpoint construction. */
 export type IProcessServeEndpointFactory = (
   channel: IRemoteChannel,
@@ -171,36 +162,3 @@ export type IProcessServeEndpointFactory = (
     limits: IRpcProviderLimits
   }>
 ) => Promise<IRemoteServeEndpoint>
-
-/** The service facade delegates method registration to the remote owner. */
-export type IProcessServePluginOptions = Readonly<{
-  host: IRemoteServePluginOptions['host'] &
-    Readonly<{
-      /** A real Host can replace a trusted target after an explicit instance fault. */
-      replace?: IHostHandle<object, unknown, readonly IPluginConstraint<any>[]>['replace']
-    }>
-  contract: IRemoteContract
-  ingress: IProcessServeChildIngress | IProcessServeListenerIngress
-  endpointFactory: IProcessServeEndpointFactory
-  report(error: unknown): void
-  /** Shared targets recover inside one process; per-connection targets own separate Hosts. */
-  instanceMode?: 'shared' | 'per-connection'
-  /** A caller-owned governor replaces the default bounded session owner. */
-  resilience?: IProcessResilience
-  /** Required by per-connection mode before opening the ingress. */
-  createSessionHost?(
-    session: IProcessSessionIdentity
-  ):
-    | Promise<IRemoteServePluginOptions['host'] & Readonly<{ dispose(): Promise<unknown> }>>
-    | (IRemoteServePluginOptions['host'] & Readonly<{ dispose(): Promise<unknown> }>)
-  /** Required by shared mode so instance replacement can rebuild a healthy candidate. */
-  createSharedTarget?(
-    input: Readonly<{ reason: unknown; signal: IAbortSignal }>
-  ): Promise<unknown> | unknown
-  /** Required by shared mode to distinguish instance faults from call failures. */
-  onInstanceUnhealthy?(
-    listener: (
-      event: Readonly<{ targetName: string; connectionId?: string; reason: unknown }>
-    ) => void
-  ): () => void
-}>

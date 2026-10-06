@@ -20,11 +20,8 @@ import {
   type IProcessSessionManager
 } from '../resilience/session.js'
 import { createProcessProviderAdmission } from '../resilience/provider-admission.js'
-import {
-  createProcessInstanceFallback,
-  type IProcessInstanceFallback
-} from '../resilience/fallback.js'
-import { createProcessResilience, processSessionManager } from '../resilience/index.js'
+import type { IProcessInstanceFallback } from '../resilience/fallback.js'
+import { processSessionManager } from '../resilience/index.js'
 import type { IProcessResilience } from '../resilience/types.js'
 import { RpcCapability } from '../../contract/wire-constants.js'
 import type { IProcessServeListenerIngress, IProcessServeEndpointFactory } from './types.js'
@@ -34,11 +31,7 @@ import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IProcessSessionIdentity } from '../resilience/types.js'
 import { invalidOption, reportSafely } from './binding.js'
 import { ProcessPluginChannelKind } from './constants.js'
-import type {
-  IProcessPluginServeHandle,
-  IProcessServeChildIngress,
-  IProcessServePluginOptions
-} from './types.js'
+import type { IProcessServeChildIngress } from './types.js'
 
 /** A ready session is independently owned by its remote service registration and channel. */
 type IProcessServeSession = Readonly<{
@@ -684,88 +677,5 @@ export function createProcessSessionService(
       }
       throw error
     }
-  }
-}
-
-/** Add Plugin instance recovery and invocation context to the shared process session owner. */
-export async function createServeProcessPlugin(
-  options: IProcessServePluginOptions
-): Promise<IProcessPluginServeHandle> {
-  if (
-    !options ||
-    !options.ingress ||
-    typeof options.report !== 'function' ||
-    typeof options.endpointFactory !== 'function'
-  )
-    invalidOption('serve')
-  const mode = options.instanceMode ?? 'shared'
-  if (mode === 'per-connection') {
-    if (typeof options.createSessionHost !== 'function') invalidOption('createSessionHost')
-  } else if (mode === 'shared') {
-    if (
-      typeof options.createSharedTarget !== 'function' ||
-      typeof options.onInstanceUnhealthy !== 'function'
-    )
-      invalidOption('createSharedTarget/onInstanceUnhealthy')
-  } else invalidOption('instanceMode')
-  const service = createProcessSessionService(options)
-  const contract = normalizeRemoteContract(options.contract)
-  const resilience =
-    options.resilience ??
-    createProcessResilience({
-      scheduler:
-        options.ingress.kind === 'listener'
-          ? (options.ingress.scheduler ?? systemScheduler)
-          : systemScheduler,
-      report: options.report
-    })
-  const fallback = createProcessInstanceFallback({
-    mode,
-    targetName: contract.plugin,
-    host: options.host,
-    createSharedTarget: options.createSharedTarget,
-    onInstanceUnhealthy: options.onInstanceUnhealthy,
-    report: (error) => reportSafely(options.report, error)
-  })
-  try {
-    const sessions = await serveProcessSessions(
-      options.ingress,
-      options.endpointFactory,
-      service,
-      resilience,
-      options.report,
-      fallback
-    )
-    let closing: Promise<void> | undefined
-    return Object.freeze({
-      inspectRecovery: () => fallback.inspect(),
-      close: () =>
-        (closing ??= (async () => {
-          const errors: unknown[] = []
-          try {
-            await sessions.close()
-          } catch (error) {
-            errors.push(error)
-          }
-          if (!options.resilience) {
-            try {
-              await resilience.close()
-            } catch (error) {
-              errors.push(error)
-            }
-          }
-          if (errors.length === 1) throw errors[0]
-          if (errors.length > 1) throw cleanupFailure(errors)
-        })())
-    })
-  } catch (error) {
-    if (!options.resilience) {
-      try {
-        await resilience.close()
-      } catch (cleanupError) {
-        reportSafely(options.report, cleanupError)
-      }
-    }
-    throw error
   }
 }

@@ -1,17 +1,7 @@
 export { createProcessTransport } from './handshake.js'
 export { createProcessPeer } from './peer.js'
 export { createNativeProcessOffer } from './offer.js'
-export { createProcessHost, createServeProcessHost } from './host/index.js'
-export type {
-  IProcessHost,
-  IProcessHostOptions,
-  IProcessHostReplaceOptions,
-  IProcessHostShutdownSignal,
-  IProcessHostRegistrationApproval,
-  IProcessHostRegistrations,
-  IProcessServeHostOptions,
-  IProcessServeHostHandle
-} from './host/index.js'
+export type { IProcessHostRegistrationApproval, IProcessHostRegistrations } from './host/index.js'
 export { RpcProcessErrorCode } from './error-code.js'
 export { RpcProcessErrorText } from './error-text.js'
 export { createProcessResilience } from './resilience/index.js'
@@ -29,7 +19,6 @@ export type {
 } from './resilience/types.js'
 export {
   createProcessPlugin,
-  createServeProcessPlugin,
   parseProcessPluginDescriptor,
   ProcessPluginWire
 } from './plugin/index.js'
@@ -37,8 +26,6 @@ export type {
   IProcessPluginOptions,
   IProcessPlugin,
   IProcessPluginReplaceResult,
-  IProcessPluginServeHandle,
-  IProcessServePluginOptions,
   IProcessServeChildIngress,
   IProcessServeListenerIngress
 } from './plugin/index.js'

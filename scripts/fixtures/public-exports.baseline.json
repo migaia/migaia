@@ -319,13 +319,10 @@
         "RpcProcessErrorCode",
         "RpcProcessErrorText",
         "createNativeProcessOffer",
-        "createProcessHost",
         "createProcessPeer",
         "createProcessPlugin",
         "createProcessResilience",
         "createProcessTransport",
-        "createServeProcessHost",
-        "createServeProcessPlugin",
         "parseProcessPluginDescriptor"
       ],
       "./process/adapters/node-child-process": [
