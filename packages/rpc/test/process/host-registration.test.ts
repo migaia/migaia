@@ -4,8 +4,8 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { createLifecycleScope } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createServeProcessHost } from '../../src/process/host/serve.js'
 import { createProcessResilience } from '../../src/process/resilience/index.js'
 import { listenProcessByteChannel } from '../../src/process/adapters/node-socket.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
@@ -15,8 +15,11 @@ import type { IProcessRegistrationListener } from '../../src/process/resilience/
 import { nativeEndpoint } from './fixtures/native-runtime.js'
 import { nativeHostCatalog, nativeHostChildPath, nativeHostToken } from './fixtures/host-native.js'
 import { remoteHarness, REMOTE_FIXTURE_CONTRACT } from '../remote/fixture.js'
-import { adoptHostRegistration } from '../../src/process/host/registration.js'
-import type { IProcessServeHostOptions } from '../../src/process/host/types.js'
+import {
+  adoptHostRegistration,
+  type IAdoptedHostRegistration,
+  type IProcessHostAdoptionOptions
+} from '../../src/process/host/registration.js'
 
 /** Cold process connection work stays within the existing 5000ms test envelope. */
 const REGISTRATION_CONNECTION_TIMEOUT_MS = 4000
@@ -116,21 +119,8 @@ describe('process Host reverse native registration', () => {
       signal: controller.signal,
       close: vi.fn(async () => undefined)
     }
-    const definition = definePlugin({ name: 'p', install: () => ({}) })
-    const options: IProcessServeHostOptions = {
-      host: target,
-      catalog: { p: REMOTE_FIXTURE_CONTRACT },
-      resolvePlugin: () => definition,
-      scheduler: fixture.binding.scheduler,
+    const options: IProcessHostAdoptionOptions = {
       report: () => undefined,
-      ingress: {
-        kind: 'listener',
-        address: 'unused',
-        listen: vi.fn(),
-        offer: createNativeProcessOffer({ peer: { id: 'local', runtime: 'fixture' } }),
-        verify: () => 'verified',
-        createConnectionContext: vi.fn()
-      },
       endpointFactory: async () => ({
         ...fixture.served,
         endpoint: {
@@ -143,11 +133,6 @@ describe('process Host reverse native registration', () => {
         }
       }),
       registrations: {
-        address: 'unused',
-        listen: vi.fn(),
-        offer: createNativeProcessOffer({ peer: { id: 'local', runtime: 'fixture' } }),
-        createConnectionContext: vi.fn(),
-        verifyToken: () => 'verified',
         resolveRegistration: () => ({
           targetHost: target,
           name: 'p',
@@ -358,84 +343,82 @@ describe('process Host reverse native registration', () => {
     })
     /** Later duplicate and replacement candidates must not replace the original EOF observer. */
     let observedFirst = false
-    const service = await withinRegistration(
-      createServeProcessHost({
-        host: target,
-        catalog: nativeHostCatalog,
-        resolvePlugin: () => blueprint,
+    /** The canonical adoption owner remains separate from the listener and borrowed governor. */
+    const adoptionOptions: IProcessHostAdoptionOptions = {
+      report,
+      endpointFactory: async (channel, signal, session) => {
+        if (!observedFirst && session?.identity.principalId === 'approved-principal') {
+          observedFirst = true
+          signal.addEventListener('abort', observeFirstLoss, { once: true })
+        }
+        const served = await withinRegistration(
+          nativeEndpoint(channel, 'registration-server', session)
+        )
+        return {
+          ...served,
+          endpoint: {
+            ...served.endpoint,
+            send<T>(...input: Parameters<typeof served.endpoint.send>) {
+              return served.endpoint.send<T>(
+                input[0],
+                input[1],
+                input[2],
+                input[1] === RemoteMethodName.runtimeDescribe
+                  ? { ...input[3], timeoutMs: REGISTRATION_CONNECTION_TIMEOUT_MS }
+                  : input[3]
+              )
+            }
+          }
+        }
+      },
+      registrations: { resolveRegistration }
+    }
+    /** Only committed adoptions are retained; EOF releases them through their original owner. */
+    const adopted = new Set<IAdoptedHostRegistration>()
+    /** Join candidates already entered when the listener closes, without replacing adoption. */
+    const preparing = new Set<Promise<'adopt' | 'reject'>>()
+    /** Existing lifecycle scope owns this test's resources and the stable disposal Promise. */
+    const registrationScope = createLifecycleScope({ scheduler: systemScheduler, report })
+    registrationScope.own(adopted, {
+      async force() {
+        await Promise.allSettled(preparing)
+        await Promise.all([...adopted].map((entry) => entry.close()))
+      }
+    })
+    const registrationListener = await withinRegistration(
+      external.listenRegistrations({
+        listen: listenProcessByteChannel,
+        address,
+        serviceId: 'host-reverse-fixture',
+        offer: createNativeProcessOffer({
+          peer: { id: 'registration-server', runtime: 'node' },
+          stream: true
+        }),
+        createConnectionContext: () => ({
+          peerId: 'registration-peer',
+          ipc: {
+            connectionId: crypto.randomUUID(),
+            sessionId: crypto.randomUUID(),
+            log: () => undefined
+          }
+        }),
+        verifyToken: (token) => {
+          if (token !== nativeHostToken && token !== 'second-reverse-fixture')
+            throw createProcessError(RpcProcessErrorCode.authRejected)
+          if (token === 'second-reverse-fixture') return 'approved-second'
+          return 'approved-principal'
+        },
         scheduler: systemScheduler,
-        report,
-        resilience: external,
-        ingress: {
-          kind: 'listener',
-          address: join(directory, 's'),
-          listen: (options) =>
-            listenProcessByteChannel({ ...options, serviceId: 'host-ingress-fixture' }),
-          offer: createNativeProcessOffer({
-            peer: { id: 'server', runtime: 'node' },
-            stream: true
-          }),
-          verify: () => 'principal',
-          createConnectionContext: () => ({
-            peerId: 'client',
-            ipc: {
-              connectionId: crypto.randomUUID(),
-              sessionId: crypto.randomUUID(),
-              log: () => undefined
-            }
-          })
-        },
-        endpointFactory: async (channel, signal, session) => {
-          if (!observedFirst && session?.identity.principalId === 'approved-principal') {
-            observedFirst = true
-            signal.addEventListener('abort', observeFirstLoss, { once: true })
-          }
-          const served = await withinRegistration(
-            nativeEndpoint(channel, 'registration-server', session)
-          )
-          return {
-            ...served,
-            endpoint: {
-              ...served.endpoint,
-              send<T>(...input: Parameters<typeof served.endpoint.send>) {
-                return served.endpoint.send<T>(
-                  input[0],
-                  input[1],
-                  input[2],
-                  input[1] === RemoteMethodName.runtimeDescribe
-                    ? { ...input[3], timeoutMs: REGISTRATION_CONNECTION_TIMEOUT_MS }
-                    : input[3]
-                )
-              }
-            }
-          }
-        },
-        registrations: {
-          listen: listenProcessByteChannel,
-          address,
-          serviceId: 'host-reverse-fixture',
-          offer: createNativeProcessOffer({
-            peer: { id: 'registration-server', runtime: 'node' },
-            stream: true
-          }),
-          createConnectionContext: () => ({
-            peerId: 'registration-peer',
-            ipc: {
-              connectionId: crypto.randomUUID(),
-              sessionId: crypto.randomUUID(),
-              log: () => undefined
-            }
-          }),
-          verifyToken: (token) => {
-            if (token !== nativeHostToken && token !== 'second-reverse-fixture')
-              throw createProcessError(RpcProcessErrorCode.authRejected)
-            if (token === 'second-reverse-fixture') return 'approved-second'
-            return 'approved-principal'
-          },
-          resolveRegistration
+        wire: 'native',
+        onCandidate(candidate) {
+          /** The listener waits for the original adoption outcome before transferring its lease. */
+          const task = adoptHostRegistration(candidate, adoptionOptions, external, adopted)
+          preparing.add(task)
+          return task.finally(() => preparing.delete(task))
         }
       })
     )
+    registrationScope.own(registrationListener, { force: () => registrationListener.close() })
     const rejected = reversePeer(address, 'wrong-fixture-token')
     await withinRegistration(rejected.exited)
     await withinRegistration(rejectedClosed)
@@ -529,8 +512,8 @@ describe('process Host reverse native registration', () => {
           (newProxy.getFeature('f') as typeof feature).request!(['listener-closed'])
         )
       ).toMatchObject({ pid: replacement.child.pid })
-      const closing = service.close()
-      expect(service.close()).toBe(closing)
+      const closing = registrationScope.dispose()
+      expect(registrationScope.dispose()).toBe(closing)
       await withinRegistration(closing)
       await withinRegistration(replacement.exited)
       await withinRegistration(independent.exited)
@@ -539,7 +522,7 @@ describe('process Host reverse native registration', () => {
       expect(replacement.errors.join('')).not.toContain(nativeHostToken)
       expect(rejectedCandidates).toBe(2)
     } finally {
-      await withinRegistration(service.close())
+      await withinRegistration(registrationScope.dispose())
       await withinRegistration(
         Promise.allSettled([
           first.close(),

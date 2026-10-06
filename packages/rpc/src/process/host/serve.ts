@@ -50,7 +50,12 @@ export async function createServeProcessHost(
         scheduler: options.scheduler,
         wire: 'native',
         onCandidate(candidate) {
-          const task = adoptHostRegistration(candidate, options, resilience, adopted)
+          const task = adoptHostRegistration(
+            candidate,
+            { ...options, registrations: options.registrations! },
+            resilience,
+            adopted
+          )
           preparing.add(task)
           return task.finally(() => preparing.delete(task))
         }

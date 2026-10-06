@@ -13,7 +13,15 @@ import type {
 import { reportSafely } from '../plugin/binding.js'
 import { createAdoptedProcessBinding } from './adopted-binding.js'
 import { hostCleanupFailure, invalidHostOption } from './error.js'
-import type { IProcessServeHostOptions } from './types.js'
+import type { IProcessServeEndpointFactory } from '../plugin/types.js'
+import type { IProcessHostRegistrations } from './types.js'
+
+/** Adoption consumes only verified authority and an endpoint, independently of ordinary ingress. */
+export type IProcessHostAdoptionOptions = Readonly<{
+  endpointFactory: IProcessServeEndpointFactory
+  report(error: unknown): void
+  registrations: Pick<IProcessHostRegistrations, 'resolveRegistration'>
+}>
 
 /** One adopted plugin can be removed without closing any other target Host or connection. */
 export type IAdoptedHostRegistration = Readonly<{ close(): Promise<void> }>
@@ -21,12 +29,12 @@ export type IAdoptedHostRegistration = Readonly<{ close(): Promise<void> }>
 /** Prevalidate the trusted descriptor before installation and transfer one prepared remote owner. */
 export async function adoptHostRegistration(
   candidate: IProcessSessionLease & Readonly<{ signal: IAbortSignal }>,
-  options: IProcessServeHostOptions,
+  options: IProcessHostAdoptionOptions,
   resilience: IProcessResilience,
   adopted: Set<IAdoptedHostRegistration>
 ): Promise<'adopt' | 'reject'> {
   /** Authority is selected only from the verifier's principal, never channel.peerId. */
-  const approval = options.registrations!.resolveRegistration(candidate.identity.principalId)
+  const approval = options.registrations.resolveRegistration(candidate.identity.principalId)
   if (!approval) return 'reject'
   /** Contract normalization preserves remote's original validation codes and causes. */
   const contract = normalizeRemoteContract(approval.contract)
