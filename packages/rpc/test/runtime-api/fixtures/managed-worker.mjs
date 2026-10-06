@@ -50,6 +50,13 @@ prepared = createThreadPeer({
       await new Promise((resolve) => setTimeout(resolve, duration))
       yield 7
     },
+    /** The caller has observed one item before a real native timer holds its next pull. */
+    drainValues: async function* () {
+      yield 'first'
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      yield 'second'
+      return 'terminal'
+    },
     probe: async (value) => {
       const peer = await prepared
       return { value, self: peer.self, parent: await peer.request('parent.echo') }

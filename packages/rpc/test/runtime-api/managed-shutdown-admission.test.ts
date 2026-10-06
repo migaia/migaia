@@ -88,3 +88,41 @@ it('[A3][A9][A68] native drain preserves an already-started whole group through 
     await active.peer.close()
   }
 })
+
+for (const mode of ['default', 'ordered', 'before-start'] as const) {
+  it(`[A3][A9][A69] native drain retains started runtime stream lifetime (${mode})`, async () => {
+    const active = await fixture()
+    /**
+     * All modes use the original iterator; default bilateral binary capability also selects runtime
+     * open.
+     */
+    const iterator = active.peer.stream(
+      'drainValues',
+      undefined,
+      mode === 'default'
+        ? undefined
+        : mode === 'ordered'
+          ? { orderKey: 'drain' }
+          : { cancel: 'before-start' }
+    )
+    let pending: PromiseSettledResult<IteratorResult<unknown>>[] | undefined
+    try {
+      assert.deepEqual(await iterator.next(), { done: false, value: 'first' })
+      /** No scalar request or local inbound provider can mask a missing stream drain lease. */
+      const pulling = Promise.allSettled([iterator.next()])
+      const closing = active.peer.close()
+      assert.equal(active.peer.close(), closing)
+      pending = await pulling
+      assert.deepEqual(
+        pending,
+        [{ status: 'fulfilled', value: { done: false, value: 'second' } }],
+        '[A69] native shutdown must preserve the admitted next item within the original drain budget'
+      )
+      assert.deepEqual(await iterator.next(), { done: true, value: 'terminal' })
+      await closing
+      assert.equal(active.budget.inUse, 0)
+    } finally {
+      await active.peer.close()
+    }
+  })
+}

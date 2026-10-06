@@ -87,6 +87,8 @@ export function prepareRuntimeStreamConsumer(
 type IRuntimeConsumer = {
   readonly task: IRpcRuntimeTask
   readonly options: IRpcRuntimeSendOptions
+  /** The original native binding retains this consumer until its existing terminal selection. */
+  releaseAdmission?: () => void
   /** Retains the actual original receiver-preparation promise, independently of physical completion. */
   prepared?: Promise<IRpcRuntimeEnvelope>
   envelope?: IRpcRuntimeEnvelope
@@ -203,6 +205,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   readonly #releaseTransportFailure: (() => void) | undefined
   /** Prevents new streams during reverse feature disposal. */
   #closed = false
+  /** Native assembly joins runtime consumer lifetime to its existing physical generation drain. */
+  #runtimeConsumerAdmission: (() => () => void) | undefined
 
   /** Installs the stream route and reuses the provider and outbound feature ports. */
   constructor(
@@ -392,6 +396,11 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     this.#earlyCancelOverflow.clear()
   }
 
+  /** Internal native assembly observes the original consumer without wrapping its iterator. */
+  setRuntimeConsumerAdmission(admit: () => () => void): void {
+    this.#runtimeConsumerAdmission = admit
+  }
+
   /** Allocate the sole operation scope and issue the initial request through outbound. */
   #start(
     targetId: string,
@@ -473,6 +482,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       })
     }
     this.#consumers.set(tupleKey(targetId, id), state)
+    if (state.runtime) state.runtime.releaseAdmission = this.#runtimeConsumerAdmission?.()
     state.openSend ??= Promise.resolve().then(() =>
       this.#outbound.send(
         retainForwardOptions(options, {
@@ -567,6 +577,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     this.#consumers.delete(tupleKey(state.targetId, state.id))
     if (state.runtime) {
       this.#runtimeOutbound().releaseRuntimeStream(state.id)
+      state.runtime.releaseAdmission?.()
       if ('error' in terminal) state.runtime.rejectFinal?.(terminal.error)
       else state.runtime.resolveFinal?.({ done: true, value: terminal.value })
     }
