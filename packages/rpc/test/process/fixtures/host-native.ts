@@ -6,7 +6,9 @@ import { createNodeProcessLauncher } from '../../../src/process/adapters/node-ch
 import { dialProcessByteChannel } from '../../../src/process/adapters/node-socket.js'
 import { createProcessTransport } from '../../../src/process/handshake.js'
 import { createNativeProcessOffer } from '../../../src/process/offer.js'
-import { createProcessHost } from '../../../src/process/host/client.js'
+import { createProcessPeer } from '../../../src/process/peer.js'
+import { RUNTIME_API_BASE_CAPABILITIES } from '../../../src/remote/runtime-api/constants.js'
+import type { IRuntimeDynamicSurface } from '../../../src/remote/runtime-api/typing.js'
 import type { IProcessHostOptions } from '../../../src/process/host/types.js'
 import type { IRemoteHostCatalog } from '../../../src/remote/contract.js'
 import { nativeEndpoint } from './native-runtime.js'
@@ -97,12 +99,12 @@ export function nativeHostOptions(value = 'initial', maxUnits = 2) {
 }
 
 /** Borrow an independent Node listener with the exact same endpoint and authenticated contract. */
-export function nativeBorrowedHost(address: string, token = nativeHostToken) {
-  return createProcessHost({
-    catalog: nativeHostCatalog,
+export function nativeBorrowedPeer(address: string, token = nativeHostToken) {
+  return createProcessPeer<IRuntimeDynamicSurface>({
+    self: { name: 'host-parent', instanceId: 'host-parent' },
     report: () => undefined,
     endpointFactory: (channel) => nativeEndpoint(channel, 'host-parent'),
-    deployment: {
+    connect: {
       kind: 'connect',
       address,
       token,
@@ -111,7 +113,8 @@ export function nativeBorrowedHost(address: string, token = nativeHostToken) {
       offer: createNativeProcessOffer({
         peer: { id: 'host-parent', runtime: 'node' },
         auth: token,
-        stream: true
+        stream: true,
+        capabilities: RUNTIME_API_BASE_CAPABILITIES
       }),
       establish: (raw, context) => {
         if (raw.kind !== 'byte') throw new Error('native fixture requires bytes')
