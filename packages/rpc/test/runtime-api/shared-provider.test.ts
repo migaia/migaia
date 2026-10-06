@@ -18,7 +18,12 @@ import type { RpcOutboundAttachment } from '../../src/core/internal/outbound-att
 import type { IRpcAbortSignal } from '../../src/core/typing.js'
 
 it('[A73] a custom endpoint cannot advertise shared ordering while returning a different admission owner', async () => {
-  const capabilities = [RpcCapability.runtimeApi, RpcCapability.generation, RpcCapability.order]
+  const capabilities = [
+    RpcCapability.runtimeApi,
+    RpcCapability.batch,
+    RpcCapability.generation,
+    RpcCapability.order
+  ]
   const channel = runtimeSources(capabilities, capabilities)
   const options = {
     self: { name: 'custom', instanceId: 'custom-provider' },
@@ -79,6 +84,7 @@ async function sharedProvider(provide: IRuntimePeerProvide) {
     /** D40 default request/stream deadlines are genuinely offered by both source owners. */
     RpcCapability.deadline,
     RpcCapability.runtimeApi,
+    RpcCapability.batch,
     RpcCapability.generation,
     RpcCapability.order,
     RpcCapability.abort

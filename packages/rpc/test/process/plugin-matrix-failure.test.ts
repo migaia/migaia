@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { createServeProcessPlugin } from '../../src/process/plugin/serve.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
+import { RpcCapability } from '../../src/contract/wire-constants.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
@@ -181,6 +182,7 @@ describe('I15 real failure and rollback matrix', () => {
                     offer: createNativeProcessOffer({
                       peer: { id: 'bad', runtime: 'node' },
                       auth: 'wrong-fixture-token',
+                      capabilities: [RpcCapability.runtimeApi],
                       stream: true
                     })
                   })

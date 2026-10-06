@@ -16,6 +16,7 @@ import { normalizePortable } from './normalize.js'
 import type { IRpcEnvelopeOptions, IRpcPortableValue, IRpcSerializedError } from './types.js'
 import {
   RpcCodecId,
+  RpcCapability,
   RpcHandshakeReason,
   RpcHandshakeStep,
   RpcHandshakeViolation,
@@ -600,6 +601,25 @@ function incompatible(reason: IRpcHandshakeReason): Readonly<{ error: Error; rep
   }
 }
 
+/**
+ * A declared runtime endpoint has one mandatory network baseline; generic contract negotiation
+ * remains separate.
+ */
+function runtimeBaselineReason(
+  required: boolean,
+  agreement: Pick<IRpcHandshakeAgreement, 'major' | 'minor' | 'capabilities'>
+): IRpcHandshakeReason | undefined {
+  if (!required) return undefined
+  if (agreement.major !== RpcProtocol.major || agreement.minor < RpcProtocol.minor)
+    return RpcHandshakeReason.version
+  if (
+    !agreement.capabilities.includes(RpcCapability.runtimeApi) ||
+    !agreement.capabilities.includes(RpcCapability.batch)
+  )
+    return RpcHandshakeReason.protocol
+  return undefined
+}
+
 /** A responder negotiates the common version and codec; failures omit the received hello. */
 export function acceptRpcHandshake(
   local: IRpcHandshakeOffer,
@@ -641,6 +661,13 @@ export function acceptRpcHandshake(
     peer: remote.peer,
     ...(remote.auth === undefined ? {} : { auth: remote.auth })
   })
+  /** Either runtime offer requires the common baseline; no one-sided offer permits a fallback. */
+  const baselineReason = runtimeBaselineReason(
+    localOffer.capabilities.includes(RpcCapability.runtimeApi) ||
+      remote.capabilities.includes(RpcCapability.runtimeApi),
+    agreement
+  )
+  if (baselineReason !== undefined) return { ok: false, ...incompatible(baselineReason) }
   const reply = JSON.stringify({
     kind: RpcReservedKind.handshake,
     step: RpcHandshakeStep.accept,
@@ -700,6 +727,12 @@ export function completeRpcHandshake(
         localOffer.codecs
       )
     )
+  /** An initiator independently refuses a downgraded accept from a runtime peer. */
+  const baselineReason = runtimeBaselineReason(
+    localOffer.capabilities.includes(RpcCapability.runtimeApi),
+    remote
+  )
+  if (baselineReason !== undefined) throw incompatible(baselineReason).error
   return Object.freeze({
     major: remote.major,
     minor: remote.minor,

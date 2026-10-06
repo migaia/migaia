@@ -98,6 +98,7 @@ it('[A60][A74] default custom factory retains ordinary Host calls without declar
 it('[A59][A60] genuine process and thread Plugin installs share one final Host provider key owner', async () => {
   const capabilities = [
     RpcCapability.runtimeApi,
+    RpcCapability.batch,
     RpcCapability.generation,
     RpcCapability.order,
     RpcCapability.deadline

@@ -2,13 +2,12 @@ import { RpcRuntimeStreamPrefix } from '../contract/runtime-api/constants.js'
 
 /** Reserved method namespace shared by plugin and host remote endpoints. */
 export const RemoteMethodName = {
-  /** Mutually negotiated v2 application directory; the legacy describe route stays separate. */
+  /** Required v2 application directory is generated from the actual registered method routes. */
   runtimeDescribe: 'migaia.remote.runtime.describe',
   /** Distinct internal stream wire routes share the original provider registry with scalar routes. */
   runtimeStreamPrefix: RpcRuntimeStreamPrefix,
   /** Automatic application methods cannot impersonate the reserved library control namespace. */
   runtimeNamespace: 'migaia.remote.',
-  describe: 'migaia.remote.describe',
   hostUse: 'migaia.remote.host.use',
   hostUnUse: 'migaia.remote.host.unUse',
   hostInspect: 'migaia.remote.host.inspect'

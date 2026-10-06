@@ -15,7 +15,12 @@ import type { IRpcRuntimeEnvelope } from '../../src/contract/runtime-api/types.j
 import { RpcRouteProfile } from '../../src/contract/wire-constants.js'
 
 /** Independent source offers explicitly exercise the new profile without changing default offers. */
-const capabilities = [RpcCapability.runtimeApi, RpcCapability.generation, RpcCapability.group]
+const capabilities = [
+  RpcCapability.runtimeApi,
+  RpcCapability.batch,
+  RpcCapability.generation,
+  RpcCapability.group
+]
 
 it('[A64][A68] oversized complete group result fails PAYLOAD_INVALID and seals that failure instead of hanging', async () => {
   /** The group is tiny on input; only the actual provider result exceeds the physical frame ceiling. */

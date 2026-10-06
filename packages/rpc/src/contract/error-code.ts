@@ -22,7 +22,10 @@ export const RpcContractErrorCode = {
   invalidWireError: 'INVALID_WIRE_ERROR',
   /** Malformed UTF-8, JSON, shape, or negotiation fields in a handshake; close this channel. */
   handshakeInvalid: 'HANDSHAKE_INVALID',
-  /** No shared protocol identity or major version; the caller needs a compatible peer. */
+  /**
+   * No shared protocol identity/major version, or a runtime endpoint lacks required protocol 1.1,
+   * v2 directory, or batch reception; the caller needs a compatible peer.
+   */
   handshakeIncompatible: 'HANDSHAKE_INCOMPATIBLE',
   /** The remote peer rejected its handshake; inspect the preserved remote cause. */
   handshakeRejected: 'HANDSHAKE_REJECTED'

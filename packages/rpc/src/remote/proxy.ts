@@ -520,7 +520,7 @@ class RemoteRegistration<TUnit, TSpec> {
       )
       if (removeRetirement) own(async () => removeRetirement())
     }
-    /** Runtime directory preparation and v1 describe share the same exact departure/resource owner. */
+    /** Both runtime and advanced v2 directories share the same exact departure/resource owner. */
     /** Only the eventual original pointer publication commits this reserved session ordinal. */
     const sessionGeneration = this.#runtimeSession + 1
     const runtime = this.#options.prepareRuntime

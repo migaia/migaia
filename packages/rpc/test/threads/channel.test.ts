@@ -1,4 +1,5 @@
 import { MessageChannel } from 'node:worker_threads'
+import { RemoteMethodName } from '../../src/remote/constants.js'
 import { EventEmitter } from 'node:events'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -152,9 +153,11 @@ describe('thread channel ownership and portable boundary', () => {
     expect(pair.messages.every((args) => args[1] === undefined)).toBe(true)
     const rpc = vi.fn()
     const remove = channel.transport.subscribe(rpc)
-    service!.transport.send({ method: 'migaia.remote.describe' })
+    service!.transport.send({ method: RemoteMethodName.runtimeDescribe })
     await Promise.resolve()
-    expect(rpc).toHaveBeenCalledExactlyOnceWith({ data: { method: 'migaia.remote.describe' } })
+    expect(rpc).toHaveBeenCalledExactlyOnceWith({
+      data: { method: RemoteMethodName.runtimeDescribe }
+    })
     remove()
     await channel.close()
     await service!.close()

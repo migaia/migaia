@@ -58,6 +58,69 @@ function ipc(name: string) {
 }
 
 describe('native process handshake', () => {
+  it.each(['minor', 'runtime', 'batch'] as const)(
+    '[A31][U36] runtime network handshake rejects retired %s baseline before activation',
+    async (missing) => {
+      const [initiator, responder] = createBytePair()
+      /** A declared runtime endpoint requires the same v2/batch baseline as its semantic Peer. */
+      const left = createNativeProcessOffer({
+        peer: { id: 'baseline-a', runtime: 'node' },
+        capabilities: [RpcCapability.runtimeApi]
+      })
+      const right = createNativeProcessOffer({
+        peer: { id: 'baseline-b', runtime: 'node' },
+        capabilities: [RpcCapability.runtimeApi]
+      })
+      /**
+       * Only the selected version/capability is removed; ordinary native JSON handshake still
+       * works.
+       */
+      const incompatible = {
+        ...right,
+        ...(missing === 'minor' ? { versions: [{ major: 1, minor: 0 }] } : {}),
+        capabilities: right.capabilities.filter((capability) =>
+          missing === 'runtime'
+            ? capability !== RpcCapability.runtimeApi
+            : missing === 'batch'
+              ? capability !== RpcCapability.batch
+              : true
+        )
+      }
+      const results = await Promise.allSettled([
+        createProcessTransport(initiator, {
+          role: 'initiator',
+          offer: left,
+          peerId: 'baseline-b',
+          report: () => undefined,
+          ipc: ipc('baseline-a')
+        }),
+        createProcessTransport(responder, {
+          role: 'responder',
+          offer: incompatible,
+          peerId: 'baseline-a',
+          auth: { mode: 'none' },
+          report: () => undefined,
+          ipc: ipc('baseline-b')
+        })
+      ])
+      try {
+        for (const [index, result] of results.entries()) {
+          expect(result.status).toBe('rejected')
+          if (result.status === 'rejected') {
+            expect(result.reason.code).toBe(
+              index === 0 ? 'HANDSHAKE_REJECTED' : 'HANDSHAKE_INCOMPATIBLE'
+            )
+            if (index === 0) expect(result.reason.cause.code).toBe('HANDSHAKE_INCOMPATIBLE')
+          }
+        }
+      } finally {
+        await Promise.allSettled(
+          results.flatMap((result) => (result.status === 'fulfilled' ? [result.value.close()] : []))
+        )
+      }
+    }
+  )
+
   it('[H5] rejects a local byte offer without JSON before touching the wire', async () => {
     const [initiator, , writes] = createBytePair()
     const offer = createNativeProcessOffer({ peer: { id: 'node-a', runtime: 'node' } })
