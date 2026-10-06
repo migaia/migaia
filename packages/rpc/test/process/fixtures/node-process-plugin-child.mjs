@@ -2,7 +2,10 @@ import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { openProcessStdioChannel } from '../../../dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../dist/process/offer.js'
-import { createServeProcessPlugin } from '../../../dist/process/plugin/serve.js'
+import { serveProcessSessions } from '../../../dist/process/plugin/serve.js'
+import { createProcessResilience } from '../../../dist/process/resilience/index.js'
+import { serveRemotePlugin } from '../../../dist/remote/serve-plugin.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { createComposedEndpoint } from '../../../dist/core/composed.js'
 import { createCanonicalChunkFeature } from '../../../dist/core/features/canonical-chunk.js'
 import { createControlFeature } from '../../../dist/core/features/control.js'
@@ -65,60 +68,73 @@ function streamRoots() {
   }
 }
 
-/** Bootstrap bytes stay private and only determine the responder verifier. */
-await createServeProcessPlugin({
-  host,
-  contract,
-  createSharedTarget: async () => undefined,
-  onInstanceUnhealthy: () => () => undefined,
-  report: (error) => {
-    process.stderr.write(`${String(error)}\n`)
+/** Reports keep the original native text while bootstrap bytes remain private. */
+const report = (error) => process.stderr.write(`${String(error)}\n`)
+/** The original session governor is owned by this process service, not its borrowed target Host. */
+const resilience = createProcessResilience({ scheduler: systemScheduler, report })
+/** Bootstrap bytes only select the authenticated responder verifier on the original byte ingress. */
+const ingress = {
+  kind: 'child',
+  channelKind: 'byte',
+  openRaw: async () => {
+    const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
+    return { raw: opened.channel, bootstrap: opened.bootstrap }
   },
-  ingress: {
-    kind: 'child',
-    channelKind: 'byte',
-    openRaw: async () => {
-      const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
-      return { raw: opened.channel, bootstrap: opened.bootstrap }
-    },
-    createVerifier: (bootstrap) => {
-      const expected = new TextDecoder().decode(bootstrap)
-      return (actual) => {
-        if (actual !== expected) throw new Error('authentication rejected')
-      }
-    },
-    establish: (raw, options) =>
-      createProcessTransport(raw, {
-        role: options.role,
-        offer: createNativeProcessOffer({ peer: { id: 'child', runtime: 'node' }, stream: true }),
-        auth: { mode: 'required', verify: options.verify },
-        peerId: 'parent',
-        scheduler: options.scheduler,
-        ipc: { ...options.session, log: () => undefined },
-        signal: options.signal,
-        report: () => undefined
-      }),
-    parentLoss: { exit: (code) => process.exit(code) }
+  createVerifier: (bootstrap) => {
+    const expected = new TextDecoder().decode(bootstrap)
+    return (actual) => {
+      if (actual !== expected) throw new Error('authentication rejected')
+    }
   },
-  endpointFactory: async (channel) => {
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'child',
-        transport: channel.transport,
-        middlewares: [
-          codec(channel.pipeline.codec),
-          framer(channel.pipeline.framer),
-          abort(),
-          connect({ transport: channel.transport }),
-          ping()
-        ]
-      },
-      {
-        ...streamRoots(),
-        'channel-ipc-log': channel.features[0],
-        'channel-ipc-gate': channel.features[1]
-      }
-    )
-    return { endpoint, stream: endpoint.stream }
-  }
-})
+  establish: (raw, options) =>
+    createProcessTransport(raw, {
+      role: options.role,
+      offer: createNativeProcessOffer({ peer: { id: 'child', runtime: 'node' }, stream: true }),
+      auth: { mode: 'required', verify: options.verify },
+      peerId: 'parent',
+      scheduler: options.scheduler,
+      ipc: { ...options.session, log: () => undefined },
+      signal: options.signal,
+      report: () => undefined
+    }),
+  parentLoss: { exit: (code) => process.exit(code) }
+}
+/** The original canonical roots remain the sole endpoint and stream owners. */
+const endpointFactory = async (channel) => {
+  const endpoint = await createComposedEndpoint(
+    {
+      id: 'child',
+      transport: channel.transport,
+      middlewares: [
+        codec(channel.pipeline.codec),
+        framer(channel.pipeline.framer),
+        abort(),
+        connect({ transport: channel.transport }),
+        ping()
+      ]
+    },
+    {
+      ...streamRoots(),
+      'channel-ipc-log': channel.features[0],
+      'channel-ipc-gate': channel.features[1]
+    }
+  )
+  return { endpoint, stream: endpoint.stream }
+}
+await serveProcessSessions(
+  ingress,
+  endpointFactory,
+  ({ endpoint, identity }) =>
+    serveRemotePlugin({
+      host,
+      contract,
+      endpoint,
+      report,
+      invocationContext: (context) => Object.freeze({ session: identity, signal: context.signal })
+    }),
+  resilience,
+  report,
+  undefined,
+  systemScheduler,
+  { release: () => resilience.close() }
+)

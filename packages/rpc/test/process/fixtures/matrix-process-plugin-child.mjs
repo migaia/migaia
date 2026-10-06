@@ -1,14 +1,11 @@
 import { access } from 'node:fs/promises'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { openProcessStdioChannel } from '../../../dist/process/adapters/node-child-process.js'
 import { listenProcessByteChannel } from '../../../dist/process/adapters/node-socket.js'
 import { createProcessTransport } from '../../../dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../dist/process/offer.js'
-import {
-  createServeProcessPlugin,
-  serveProcessSessions
-} from '../../../dist/process/plugin/serve.js'
+import { serveProcessSessions } from '../../../dist/process/plugin/serve.js'
 import { createProcessResilience } from '../../../dist/process/resilience/index.js'
 import { serveRemotePlugin } from '../../../dist/remote/serve-plugin.js'
 import { createComposedEndpoint } from '../../../dist/core/composed.js'
@@ -277,7 +274,7 @@ if (scheduler) {
    * extension.
    */
   const resilience = createProcessResilience({
-    scheduler,
+    scheduler: scheduler ?? systemScheduler,
     report: (error) => mark(`report:${error.code}`)
   })
   serving = await serveProcessSessions(
@@ -315,14 +312,27 @@ if (scheduler) {
     mark('clock:100')
   })()
 } else {
-  serving = await createServeProcessPlugin({
-    host,
-    contract,
-    ingress,
-    endpointFactory,
-    createSharedTarget: async () => undefined,
-    onInstanceUnhealthy: () => () => undefined,
+  /** The original session owner retains child bootstrap, listener authentication and rollback. */
+  const resilience = createProcessResilience({
+    scheduler: scheduler ?? systemScheduler,
     report: (error) => mark(`report:${error.code}`)
   })
+  serving = await serveProcessSessions(
+    ingress,
+    endpointFactory,
+    ({ endpoint, identity }) =>
+      serveRemotePlugin({
+        host,
+        contract,
+        endpoint,
+        report: (error) => mark(`report:${error.code}`),
+        invocationContext: (context) => Object.freeze({ session: identity, signal: context.signal })
+      }),
+    resilience,
+    (error) => mark(`report:${error.code}`),
+    undefined,
+    scheduler ?? systemScheduler,
+    { release: () => resilience.close() }
+  )
 }
 mark('serving-ready')
