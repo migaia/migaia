@@ -18,6 +18,9 @@ import {
   rollbackOutboundGate
 } from '../../src/core/internal/outbound-gate.js'
 import type { IRpcTransport } from '../../src/core/transport.js'
+import runtimeVectors from '../../schema/vectors/runtime-api.json'
+import { normalizeRuntimeEnvelope } from '../../src/contract/runtime-api/normalize.js'
+import { RpcRuntimeKind, RpcRuntimeOperation } from '../../src/contract/runtime-api/constants.js'
 
 /** Loads the new deep entry only inside an oracle so the base suite itself can execute. */
 async function queueModule() {
@@ -120,6 +123,67 @@ function variationFrame(id: string, variation: string) {
 }
 
 describe('IPC send queue contract', () => {
+  it.each(['terminal', 'item', 'end', 'fail'] as const)(
+    '[A84][A93] sixteen runtime %s replies retain data capacity and leave cancellation control available',
+    async (kind) => {
+      const queue = await queueModule()
+      expect(queue).not.toBeNull()
+      if (!queue) return
+      /** The original defaults remain data256/control8; replies must not consume the latter. */
+      const installed = queue.createIpcSendQueueFeature({ connectionId: `runtime-${kind}` })
+      /** A held physical write makes the real gate's entire admission cohort observable. */
+      const first = deferredWrite()
+      const example = runtimeVectors.valid.find(
+        (value) =>
+          value.kind === RpcRuntimeKind.control &&
+          'operation' in value &&
+          value.operation === RpcRuntimeOperation.terminal &&
+          value.task.mode === 'request'
+      )!
+      /** Build only valid original contract variants; no test dispatcher or capacity is substituted. */
+      const replies = Array.from({ length: 16 }, (_, index) => {
+        const { completion: _completion, ...base } = example as typeof example & {
+          completion: unknown
+        }
+        const envelope = normalizeRuntimeEnvelope({
+          ...base,
+          id: `REQUEST:caller:${index + 1}`,
+          task: { ...base.task, mode: kind === 'terminal' ? 'request' : 'stream' },
+          ...(kind === 'terminal'
+            ? { operation: 'terminal', completion: { ok: true, result: 1 } }
+            : {
+                operation: 'stream',
+                stream: {
+                  event: kind,
+                  seq: 0,
+                  ...(kind === 'item' ? { value: 1 } : {}),
+                  ...(kind === 'fail'
+                    ? {
+                        error: {
+                          source: 'fixture',
+                          code: 'FAILURE',
+                          name: 'Error',
+                          message: 'stream fixture failure',
+                          stack: 'Error: stream fixture failure'
+                        }
+                      }
+                    : {})
+                }
+              })
+        })
+        return installed.gate.run(envelope, () => (index === 0 ? first.promise : undefined))
+      })
+      /** A genuine cancellation envelope must retain its independent reserved control capacity. */
+      const cancellation = installed.gate.run(
+        variationFrame('cancel-control', 'abort'),
+        () => undefined
+      )
+      first.release()
+      const settled = await Promise.allSettled([...replies, cancellation])
+      expect(settled.map((result) => result.status)).toEqual(Array(17).fill('fulfilled'))
+    }
+  )
+
   it('[A1] bounds whole envelopes before encoding and preserves FIFO through a wrapped endpoint', async () => {
     const queue = await queueModule()
     expect(queue, '[A1] send-queue entry must exist').not.toBeNull()

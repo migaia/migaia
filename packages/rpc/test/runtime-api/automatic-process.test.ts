@@ -116,6 +116,16 @@ it('[A2][A17] framed bootstrap supplies child identity and parent route before a
       false,
       '[A2] bootstrap token stays private'
     )
+    /** Sixteen real bidirectional calls must use data reply capacity on both framed endpoints. */
+    const replies = await Promise.all(
+      Array.from({ length: 16 }, (_, index) => parent!.request('probe', index, { timeoutMs: 2000 }))
+    )
+    assert.deepEqual(
+      replies.map((reply) => (reply as { value: number }).value),
+      Array.from({ length: 16 }, (_, index) => index),
+      '[A84][A93] concurrent process runtime replies must not be shed as control traffic'
+    )
+    assert.equal(reverseCalls, 17, '[A93] all sixteen reverse providers really executed')
   } finally {
     try {
       await parent?.close()
