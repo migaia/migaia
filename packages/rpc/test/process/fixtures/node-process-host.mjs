@@ -23,6 +23,8 @@ import { ping } from '../../../dist/core/middleware/ping.js'
 
 /** One canonical catalog fixture is shared with the real stdio and Unix clients. */
 const catalog = JSON.parse(readFileSync(new URL('./host-catalog.json', import.meta.url), 'utf8'))
+/** The native caller observes true Host commit separately from early protocol directory readiness. */
+const readyText = JSON.parse(readFileSync(new URL('./host-ready.json', import.meta.url), 'utf8'))
 /** This target starts empty; every installed definition must come through the local resolver. */
 const host = new PluginHost({
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -208,5 +210,5 @@ if (process.env.RPC_REGISTRATION_ADDRESS) {
       ...(address ? { listen: ingress } : {})
     })
   )
-  if (address) process.stderr.write('host-listener-ready\n')
+  process.stderr.write(readyText.committed)
 }
