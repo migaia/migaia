@@ -50,3 +50,81 @@ it('[A27-FIX2] DA1 rejects frozen-W3 p50 regression even when absolute budgets p
     '[A27-FIX2] frozen-baseline regression is a failure independent of the absolute budgets'
   )
 })
+
+it('[U33] W3 rejects concurrent throughput loss beyond measured noise while B0 stays tracking', async () => {
+  /** One complete controlled receipt isolates throughput regression from CPU and clock noise. */
+  const unit = {
+    id: 'sdk-concurrency-fixture',
+    codec: 'identity',
+    carrier: 'worker',
+    payloadBytes: 64
+  }
+  /** Only throughput changes; all historical B0 tracking and baseline observation fields stay valid. */
+  const receipt = (throughput: number) => ({
+    unit,
+    samples: 1000,
+    latenciesNs: Array.from({ length: 1000 }, () => 10),
+    p50Ns: 10,
+    p95Ns: 10,
+    p99Ns: 10,
+    elapsedNs: (1000 * 1e9) / throughput,
+    throughputPerSecond: throughput,
+    cpuNsPerRequest: 1,
+    rssAbsolutePeakSumBytes: 20,
+    cpuByPid: [{ pid: 1, cpuNs: 1000 }],
+    rssPeaksByPid: [{ pid: 1, rssBytes: 20 }],
+    parentPid: 1,
+    peerPid: 1,
+    encodedBytes: 66,
+    concurrency: 16,
+    runtime: 'v24.16.0'
+  })
+  const rounds = [0, 1, 2].map((index) => ({
+    order: index % 2 ? ['rpc', 'bare'] : ['bare', 'rpc'],
+    bare: receipt(1000),
+    rpc: receipt(600)
+  }))
+  const bench = await import(/* @vite-ignore */ driverUrl)
+  /** A 25% drop from final SDK 0.8 exceeds 2% A/A; the historical 0.552 floor still passes. */
+  const baseline = { scope: 'paired', metrics: { throughputPerSecond: 0.8 } }
+  const noise = { throughputPerSecond: 0.02 }
+  const old = bench.judgeDa1Pairs(rounds, 'concurrency', 0.552)
+  assert.equal(old.status, 'pass')
+  const judged = bench.judgeSdkRegression ? bench.judgeSdkRegression(rounds, baseline, noise) : old
+  assert.equal(
+    judged.status,
+    'fail',
+    '[U33] final SDK throughput guard must reject the injected loss'
+  )
+  assert.equal(
+    bench.judgeDa1Pairs(rounds, 'concurrency', 0.552, { sdk: { baseline, noise } }).status,
+    'fail',
+    '[U33] the existing DA1/W3 verdict must retain the SDK throughput failure'
+  )
+  assert.equal(
+    bench.judgeSdkRegression(rounds, { ...baseline, metrics: { throughputPerSecond: 0.61 } }, noise)
+      .status,
+    'pass',
+    '[U33] a decrease within the same measured noise band remains accepted'
+  )
+})
+
+it('[A37] Deno SDK guard retains all four relative metrics and rejects p99 regression', async () => {
+  const bench = await import(/* @vite-ignore */ driverUrl)
+  /** Complete paired observations isolate the p99 direction without historical Deno values. */
+  const side = (tail: number) => ({
+    samples: 1000,
+    latenciesNs: Array.from({ length: 1000 }, (_, index) => (index < 980 ? 10 : tail)),
+    throughputPerSecond: 1000
+  })
+  const rounds = [0, 1, 2].map(() => ({ bare: side(20), rpc: side(40) }))
+  const baseline = {
+    scope: 'paired',
+    metrics: { p50Ns: 1, p95Ns: 1, p99Ns: 1, throughputPerSecond: 1 }
+  }
+  const noise = { p50Ns: 0.05, p95Ns: 0.05, p99Ns: 0.05, throughputPerSecond: 0.05 }
+  const judged = bench.judgeSdkRegression(rounds, baseline, noise)
+  assert.equal(judged.status, 'fail')
+  assert.deepEqual(judged.failedMetrics, ['p99Ns'])
+  assert.deepEqual(Object.keys(judged.metrics), Object.keys(baseline.metrics))
+})

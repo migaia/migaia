@@ -1,5 +1,6 @@
 {
   "revision": "I28-deno-supplement",
+  "frozen": true,
   "units": [
     {
       "id": "deno:stdio-framed:64",
@@ -9,7 +10,9 @@
       "carrier": "stdio-framed",
       "codec": "json",
       "payloadBytes": 64,
-      "concurrency": 1
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "deno-bench.test.ts: real Command/std-stream public Peer, native PID and loaded-byte proof"
     },
     {
       "id": "deno:worker:64",
@@ -19,7 +22,9 @@
       "carrier": "worker",
       "codec": "identity",
       "payloadBytes": 64,
-      "concurrency": 1
+      "concurrency": 1,
+      "status": "supported",
+      "evidence": "deno-bench.test.ts: actual Web Worker public Peer, shared PID and loaded-byte proof"
     }
   ]
 }

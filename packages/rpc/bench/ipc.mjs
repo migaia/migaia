@@ -51,7 +51,8 @@ export const Da1ConcurrencyTrackingStatus = Object.freeze({
  * @param {{ order: string[]; bare: object; rpc: object }[]} rounds Complete original receipts.
  * @param {'small' | 'large' | 'concurrency'} scenario Registered budget domain.
  * @param {number} floor Historical B0 throughput tracking target for concurrency only.
- * @param {{ baseline: object; noiseBand: number }} [guard] Frozen W3 p50 and same-window A/A noise.
+ * @param {{ baseline?: object; noiseBand?: number; sdk?: { baseline: object; noise: object } }} *
+ *   [guard] Original W3 p50 and independently frozen final SDK metrics with same-window A/A noise.
  * @returns {object} Median ratios, every round and exact threshold disposition.
  * @throws {Error} Incomplete measurements or absent PID denominators.
  */
@@ -130,8 +131,15 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
       for (const [role, ratio] of Object.entries(ratios[key]))
         if (ratio > thresholds[key]) failedMetrics.push(key + '.' + role)
   /** Relative p50 regression is judged separately from the unchanged absolute DA1 budgets. */
-  const regression = guard ? judgeW3Regression(rounds, guard.baseline, guard.noiseBand) : undefined
+  const regression = guard?.baseline
+    ? judgeW3Regression(rounds, guard.baseline, guard.noiseBand)
+    : undefined
   if (regression?.status === 'fail') failedMetrics.push('w3.p50')
+  /** Final SDK concurrency/Deno guards coexist with the immutable pre-program p50 comparison. */
+  const sdkRegression = guard?.sdk
+    ? judgeSdkRegression(rounds, guard.sdk.baseline, guard.sdk.noise)
+    : undefined
+  for (const metric of sdkRegression?.failedMetrics ?? []) failedMetrics.push('w3.sdk.' + metric)
   /** Historical targets stay visible in each complete concurrency receipt without gating it. */
   const tracking =
     scenario === 'concurrency'
@@ -156,7 +164,8 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
     endpointRatiosByRound: byRound,
     samples: original.samples,
     ...(tracking ? { tracking } : {}),
-    ...(regression ? { regression } : {})
+    ...(regression ? { regression } : {}),
+    ...(sdkRegression ? { sdkRegression } : {})
   }
 }
 
@@ -192,6 +201,76 @@ export function judgeW3Regression(rounds, baseline, noiseBand) {
     relativeChange,
     noiseBand,
     ratiosByRound
+  }
+}
+
+/**
+ * Compare final SDK metrics using all three actual rounds and each metric's own A/A band.
+ *
+ * @param {object[]} rounds Three complete paired receipts, or RPC-only supplemental rounds.
+ * @param {{ scope: 'paired' | 'rpc'; metrics: Record<string, number> }} baseline Frozen
+ *   final-source metrics; paired values are RPC/bare, while RPC-only values retain their actual
+ *   units.
+ * @param {Record<string, number>} noise Current-window relative A/A band for every frozen metric.
+ * @returns {object} Independent metric verdicts, raw round values and overall regression status.
+ * @throws {Error} Missing or nonpositive metrics, incomplete rounds, or unavailable A/A noise.
+ */
+export function judgeSdkRegression(rounds, baseline, noise) {
+  if (rounds.length !== 3 || !['paired', 'rpc'].includes(baseline?.scope))
+    throw new Error(IpcBenchErrorText.paired)
+  /** These existing side fields are the only latency/throughput observations the SDK guard uses. */
+  const quantiles = { p50Ns: 0.5, p95Ns: 0.95, p99Ns: 0.99 }
+  /** The original nearest-rank calculation preserves full sample data, without interpolating. */
+  const read = (side, metric) => {
+    if (side?.latenciesNs?.length !== side?.samples) throw new Error(IpcBenchErrorText.paired)
+    const value =
+      metric === 'throughputPerSecond'
+        ? side.throughputPerSecond
+        : metric in quantiles
+          ? nearestRank(side.latenciesNs, quantiles[metric])
+          : undefined
+    if (!(value > 0) || !Number.isFinite(value)) throw new Error(IpcBenchErrorText.paired)
+    return value
+  }
+  /** Each frozen metric retains its own direction and noise; no favorable metric hides a failure. */
+  const metrics = Object.fromEntries(
+    Object.entries(baseline.metrics).map(([metric, frozen]) => {
+      /** A/A belongs to this metric; latency noise never substitutes for throughput noise. */
+      const band = noise?.[metric]
+      if (!(frozen > 0) || !Number.isFinite(frozen) || !Number.isFinite(band) || band < 0)
+        throw new Error(IpcBenchErrorText.paired)
+      /** Every actual pair contributes, including the least favorable retained round. */
+      const valuesByRound = rounds.map((round) =>
+        baseline.scope === 'paired'
+          ? read(round.rpc, metric) / read(round.bare, metric)
+          : read(round, metric)
+      )
+      /** The same three-round median as original W3 never selects a replacement measurement. */
+      const candidate = [...valuesByRound].sort((a, b) => a - b)[1]
+      /** Lower throughput is worse; latency has the opposite direction. */
+      const relativeChange =
+        metric === 'throughputPerSecond' ? 1 - candidate / frozen : candidate / frozen - 1
+      return [
+        metric,
+        {
+          status: relativeChange > band ? 'fail' : 'pass',
+          baseline: frozen,
+          candidate,
+          relativeChange,
+          noiseBand: band,
+          valuesByRound
+        }
+      ]
+    })
+  )
+  if (!Object.keys(metrics).length) throw new Error(IpcBenchErrorText.paired)
+  /** Any independently regressed metric keeps the complete guard red. */
+  const failedMetrics = Object.keys(metrics).filter((metric) => metrics[metric].status === 'fail')
+  return {
+    status: failedMetrics.length ? 'fail' : 'pass',
+    scope: baseline.scope,
+    metrics,
+    failedMetrics
   }
 }
 
@@ -515,6 +594,8 @@ async function pairedMain() {
   let output
   /** The serial window supplies its own W3/W3 calibration; historical noise is never substituted. */
   let noisePath
+  /** Candidate collection precedes the one final SDK freeze; it never claims a relative PASS. */
+  let freezeSdk = false
   /** Preparation checks capabilities before freezing the formal inventory. */
   let prepare = false
   /** Listing never starts a measured side. */
@@ -524,6 +605,7 @@ async function pairedMain() {
     else if (args[index] === '--unit') selectedId = args[++index]
     else if (args[index] === '--output') output = args[++index]
     else if (args[index] === '--noise') noisePath = args[++index]
+    else if (args[index] === '--freeze-sdk') freezeSdk = true
     else if (args[index] === '--prepare') prepare = true
     else if (args[index] === '--list') list = true
     else throw new Error(IpcBenchErrorText.inventory)
@@ -534,11 +616,13 @@ async function pairedMain() {
   const { tmpdir } = await import('node:os')
   const { createHash } = await import('node:crypto')
   /** Inventory bytes and selected IDs are preserved before a subprocess launches. */
-  const inventoryBytes = await readFile(new URL('./support-units.json', import.meta.url))
+  const inventoryBytes = await readFile(
+    new URL(scenario === 'deno' ? './deno-units.json' : './support-units.json', import.meta.url)
+  )
   const inventory = JSON.parse(inventoryBytes)
   /** Concurrent floors are already registered alongside their exact carriers and payloads. */
   const candidates = scenario === 'concurrency' ? inventory.concurrentUnits : inventory.units
-  if (!['sequential', 'concurrency'].includes(scenario) || !candidates?.length)
+  if (!['sequential', 'concurrency', 'deno'].includes(scenario) || !candidates?.length)
     throw new Error(IpcBenchErrorText.inventory)
   /** A selected missing ID is a configuration failure, never an empty successful matrix. */
   const units = selectedId ? candidates.filter((unit) => unit.id === selectedId) : candidates
@@ -559,11 +643,22 @@ async function pairedMain() {
   const baseline = prepare
     ? undefined
     : JSON.parse(await readFile(new URL('./w3-baseline.json', import.meta.url)))
+  /** New final-source values live separately from the immutable 76-cell pre-program baseline. */
+  const needsSdk = scenario === 'concurrency' || scenario === 'deno'
+  const sdkBaseline =
+    needsSdk && !prepare && !freezeSdk
+      ? JSON.parse(await readFile(new URL('./w3-sdk-baseline.json', import.meta.url)))
+      : undefined
   /** A missing current-window calibration cannot yield a no-regression claim. */
   const noise = prepare ? undefined : noisePath ? JSON.parse(await readFile(noisePath)) : undefined
   if (
     !prepare &&
     (!noise || noise.sourceCommit !== baseline.sourceCommit || noise.representatives?.length !== 4)
+  )
+    throw new Error(IpcBenchErrorText.paired)
+  if (
+    sdkBaseline &&
+    units.some((unit) => !sdkBaseline.cells[unit.id] || !noise.sdkCells?.[unit.id])
   )
     throw new Error(IpcBenchErrorText.paired)
   if (
@@ -587,6 +682,7 @@ async function pairedMain() {
         ? join(output, unit.id.replaceAll(':', '-') + '-' + round + '-' + side)
         : undefined
       const command = [
+        ...(unit.executableArgs ?? []),
         fileURLToPath(new URL('./ipc-side.mjs', import.meta.url)),
         JSON.stringify({ unit, side, options: { check: prepare, samples: 1000, warmup: 100 } })
       ]
@@ -654,8 +750,20 @@ async function pairedMain() {
                 : 'large',
             unit.throughputFloor,
             {
-              baseline: { ...baseline.cells[unit.id], sourceCommit: baseline.sourceCommit },
-              noiseBand: noise.p50RatioNoiseBand
+              ...(scenario === 'deno'
+                ? {}
+                : {
+                    baseline: { ...baseline.cells[unit.id], sourceCommit: baseline.sourceCommit },
+                    noiseBand: noise.p50RatioNoiseBand
+                  }),
+              ...(sdkBaseline
+                ? {
+                    sdk: {
+                      baseline: sdkBaseline.cells[unit.id],
+                      noise: noise.sdkCells[unit.id]
+                    }
+                  }
+                : {})
             }
           )
       const result = {
@@ -663,6 +771,7 @@ async function pairedMain() {
         type: 'bench-unit',
         unit,
         rounds,
+        ...(needsSdk && freezeSdk && !prepare ? { sdkFreeze: 'unfrozen-candidate' } : {}),
         inventorySHA256: createHash('sha256').update(inventoryBytes).digest('hex')
       }
       if (output)
