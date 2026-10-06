@@ -77,6 +77,27 @@ describe('byte primitives', () => {
     expect([...streamBase64Chunks(bytes, 3)].join('')).toBe(bytesToBase64(bytes))
   })
 
+  it('decodes into the supplied final backing without a temporary output allocation', () => {
+    /** The extended decoder must retain the caller-owned destination view's real offset. */
+    const backing = new Uint8Array(5)
+    const target = backing.subarray(3)
+    /** Older code accepts a second JavaScript argument but ignores it; this assertion proves RED. */
+    const decode: (value: string, target: Uint8Array) => Uint8Array = base64ToBytes
+    expect(decode('AQI=', target)).toBe(target)
+    expect([...backing]).toEqual([0, 0, 0, 1, 2])
+  })
+
+  it('rejects a destination with the wrong decoded length before writing', () => {
+    const target = new Uint8Array([9])
+    expect(() => base64ToBytes('AQI=', target)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/utils',
+        code: 'INVALID_ARGUMENT'
+      })
+    )
+    expect([...target]).toEqual([9])
+  })
+
   it('rejects noncanonical input', () => {
     expect(() => base64ToBytes(' AA==')).toThrow()
   })
