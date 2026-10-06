@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import { createMutationQueue, type IAbortSignal } from '@migaia/lifecycle'
-import { createProcessHost } from '../../src/process/host/client.js'
-import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
+import { catalog, hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
 import { nativeHostFixture } from './fixtures/host-native.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import * as processPeerModule from '../../src/process/peer.js'
@@ -12,6 +11,7 @@ import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet
 import { createSpawnProcessBinding } from '../../src/process/plugin/binding.js'
 import { createProcessResilience } from '../../src/process/resilience/index.js'
 import { createRemoteHost } from '../../src/remote/host.js'
+import { remoteDescription } from '../remote/fixture.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createPrewarmPool } from '@migaia/supervision/process'
@@ -276,7 +276,7 @@ describe('process Host replacement publication', () => {
   })
 
   it('[A4] consumes a parsed Host descriptor and preserves its default switch strategy', async () => {
-    const fixture = hostFixture()
+    const fixture = runtimeHostFixture()
     const vectors = JSON.parse(
       readFileSync(
         new URL('../../schema/vectors/process-plugin-descriptor.json', import.meta.url),
@@ -286,26 +286,36 @@ describe('process Host replacement publication', () => {
     const base = vectors.cases.find((row: { id: string }) => row.id === 'host-spawn').value
     const descriptor = parseProcessPluginDescriptor({
       ...base,
-      catalog: fixture.options.catalog,
+      catalog: catalog,
       replaceStrategy: 'start-then-switch'
     })
     if (descriptor.target !== 'host') throw new Error('host descriptor required')
-    expect(() =>
-      parseProcessPluginDescriptor({ ...base, catalog: { wrong: fixture.options.catalog.p } })
-    ).toThrow()
-    const host = createProcessHost({
-      ...fixture.options,
-      catalog: descriptor.catalog,
-      replaceStrategy: descriptor.replaceStrategy
-    })
+    expect(() => parseProcessPluginDescriptor({ ...base, catalog: { wrong: catalog.p } })).toThrow()
+    /** The descriptor's original contract owns the same actual accepted directory declarations. */
+    fixture.send.mockImplementation(async (_peer, method) =>
+      method === RemoteMethodName.runtimeDescribe
+        ? remoteDescription(Object.values(descriptor.catalog), 'peer', true)
+        : method === RemoteMethodName.hostInspect
+          ? { revision: 0, plugins: [] }
+          : method === RemoteMethodName.hostUnUse
+            ? { ok: true }
+            : { name: 'p', state: 'enabled', revision: 1, features: ['f'] }
+    )
     try {
-      await host.ready()
-      expect(await host.replace()).toBe(host)
+      await fixture.host.use(fixture.plugin)
+      const outlet = fixture.host.process!
+      expect(descriptor.replaceStrategy).toBe('start-then-switch')
+      await fixture.host.replace('child', createProcessPlugin(fixture.options))
+      expect(fixture.host.process).toBe(outlet)
       expect(fixture.order).toEqual(['launch:1', 'launch:2', 'exit:1'])
-      const features = await host.use('p')
-      expect(Object.keys(features.f!)).toEqual(['m'])
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+      expect(
+        readRuntimeOutletConnection(outlet, 'child')!
+          .description!.methods.filter((method) => method.name.startsWith('p.f.'))
+          .map((method) => method.name.slice('p.f.'.length))
+      ).toEqual(['m'])
     } finally {
-      await host.release()
+      await fixture.close()
     }
   })
   it.each([true, false])(
