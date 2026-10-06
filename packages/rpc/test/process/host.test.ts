@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
-import { createProcessHost } from '../../src/process/host/client.js'
 import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
 import * as bindingModule from '../../src/process/plugin/binding.js'
 import { nativeHostFixture } from './fixtures/host-native.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
+import { createRemoteHost } from '../../src/remote/host.js'
+import { runtimeSources, runtimeTestHost } from '../runtime-api/fixture.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
 import type { IRemoteRetryPort } from '../../src/remote/types.js'
 import { createLifecycleScope, type IAbortSignal } from '@migaia/lifecycle'
@@ -275,37 +276,54 @@ describe('process Host facade admission and ownership', () => {
     }
   })
 
-  it('[A2/A4] rejects borrowed strategy and scheduler mismatch before dial or launch', () => {
+  it('[A2/A4] rejects borrowed strategy and scheduler mismatch before dial or launch', async () => {
     const fixture = hostFixture()
     const dial = vi.fn()
-    expect(() =>
-      createProcessHost({ ...fixture.options, scheduler: createManualScheduler() })
-    ).toThrow(
-      expect.objectContaining({
-        code: 'PROCESS_HOST_INVALID_OPTION',
-        detail: { field: 'scheduler' }
+    /** Canonical remote clock admission observes the original supervisor without native acquisition. */
+    const mismatched = createRemoteHost({
+      catalog: fixture.options.catalog,
+      binding: {
+        ...fixture.upstream.binding,
+        scheduler: createManualScheduler()
+      },
+      endpointFactory: fixture.options.endpointFactory,
+      report: fixture.report
+    })
+    try {
+      await expect(mismatched.ready()).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+      expect(fixture.launch).not.toHaveBeenCalled()
+      expect(dial).not.toHaveBeenCalled()
+    } finally {
+      await mismatched.release()
+    }
+    /** Real symmetric registrations borrow only their original memory ports, never a native PID. */
+    const channels = runtimeSources()
+    const hosts = [0, 1].map(() =>
+      runtimeTestHost({
+        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })
     )
-    expect(() =>
-      createProcessHost({
-        ...fixture.options,
-        replaceStrategy: 'start-then-switch',
-        deployment: {
-          kind: 'connect',
-          address: 'fixture',
-          token: 'fixture-secret',
-          dial,
-          establish: async () => fixture.upstream.channel
-        }
-      })
-    ).toThrow(
-      expect.objectContaining({
-        code: 'PROCESS_HOST_INVALID_OPTION',
-        detail: { field: 'replaceStrategy' }
-      })
-    )
-    expect(fixture.launch).not.toHaveBeenCalled()
-    expect(dial).not.toHaveBeenCalled()
+    try {
+      await Promise.all(
+        hosts.map((host, index) =>
+          host.use(
+            createProcessPlugin({
+              name: 'borrowed',
+              connect: channels.sources[index]!,
+              report: fixture.report
+            })
+          )
+        )
+      )
+      expect(() => hosts[0]!.process!.replace('borrowed')).toThrow(
+        expect.objectContaining({ code: 'CAPABILITY_CONFLICT' })
+      )
+      expect(fixture.launch).not.toHaveBeenCalled()
+      expect(dial).not.toHaveBeenCalled()
+    } finally {
+      await Promise.all(hosts.map((host) => host.dispose()))
+      channels.close()
+    }
   })
 
   it('[A1] escalates a second signal once while awaiting the owned exit and unsubscribes', async () => {
