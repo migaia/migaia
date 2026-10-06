@@ -29,6 +29,7 @@ import { identityCodecV1 } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { IRpcTransport } from '@migaia/rpc/core'
+import { createPeerPair } from '@migaia/rpc/testing'
 
 declare const semantic: IRpcTransport<IRpcEnvelope>
 declare const opaque: IRpcTransport<unknown>
@@ -47,6 +48,37 @@ function config(id: string) {
 }
 
 async function verifyPackedContracts(): Promise<void> {
+  /** The tarball's testing declarations must infer the opposite side's complete surface. */
+  const pair = await createPeerPair({
+    a: { provide: { double: (value: number) => value * 2 } },
+    b: {
+      provide: {
+        echo: (value: ArrayBuffer) => value,
+        values: async function* (value: number) {
+          yield value
+        }
+      }
+    }
+  })
+  /** Native binary result types survive package resolution instead of widening to wire markers. */
+  const binary: ArrayBuffer = await pair.a.request('echo', new ArrayBuffer(1))
+  /** Reverse-side inference comes from A, independently of B's method set. */
+  const doubled: number = await pair.b.request('double', 2)
+  /** Stream yield inference must also survive the packed declaration boundary. */
+  const streamed = await pair.a.stream('values', 2).next()
+  if (!streamed.done) {
+    /** A yielded item is a number; the generator's terminal void remains a separate branch. */
+    const yielded: number = streamed.value
+    void yielded
+  }
+  void [binary, doubled]
+  // @ts-expect-error A calls B, so A's own provider is not a remote method.
+  pair.a.request('double', 2)
+  // @ts-expect-error B's binary payload cannot be replaced with a number.
+  pair.a.request('echo', 2)
+  // @ts-expect-error B's scalar route is not a typed stream producer.
+  pair.a.stream('echo', new ArrayBuffer(1))
+  await Promise.all([pair.a.close(), pair.b.close()])
   const encodedProcessFrame: Uint8Array = encodeRpcStreamFrame(new Uint8Array([1]))
   void encodedProcessFrame
   const processChannel = await createProcessTransport(processByteChannel, processByteOptions)

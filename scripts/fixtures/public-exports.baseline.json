@@ -625,6 +625,9 @@
       "./threads/adapters/browser": [
         "createBrowserThreadChannelFactory",
         "createBrowserThreadLauncher"
+      ],
+      "./testing": [
+        "createPeerPair"
       ]
     },
     "@migaia/serialize": {

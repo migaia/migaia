@@ -805,6 +805,39 @@ async function expectNotExported(specifier) {
 ${publicImports}
 ${obsoleteImports}
 process.stdout.write('CHECK obsolete-subpaths PASS\\n');
+const assert = (await import('node:assert/strict')).default;
+const { createPeerPair } = await import('@migaia/rpc/testing');
+const pairReports = [];
+let pairEffects = 0;
+const pair = await createPeerPair({
+  a: { provide: { double: (value) => value * 2 } },
+  b: { provide: { echo: (value) => value, count: () => ++pairEffects } },
+  report: (error) => pairReports.push(error)
+});
+try {
+  assert.equal(await pair.b.request('double', 2), 4);
+  const backing = new Uint8Array([9, 1, 2, 8]).buffer;
+  const copied = await pair.a.request('echo', { backing, view: new Uint8Array(backing, 1, 2) });
+  assert.ok(copied.backing instanceof ArrayBuffer);
+  assert.ok(copied.view instanceof Uint8Array);
+  assert.notEqual(copied.backing, backing);
+  assert.equal(copied.view.byteOffset, 1);
+  assert.deepEqual([...copied.view], [1, 2]);
+  assert.equal(backing.byteLength, 4);
+  await assert.rejects(pair.a.request('echo', backing, { transfer: [backing] }), { code: 'CAPABILITY_UNSUPPORTED' });
+  assert.equal(backing.byteLength, 4);
+  const steps = [{ method: 'count' }, { method: 'count' }];
+  const grouped = await pair.a.group(steps, { idempotencyKey: 'packed-pair-group' });
+  assert.deepEqual(grouped.map((step) => step.state), ['success', 'success']);
+  assert.equal((await pair.a.outcome('packed-pair-group')).state, 'done');
+  await pair.a.group(steps, { idempotencyKey: 'packed-pair-group' });
+  assert.equal(pairEffects, 2);
+  assert.equal((await pair.a.describe()).connections[0].carrier, 'Memory');
+  assert.deepEqual(pairReports, []);
+} finally {
+  await Promise.all([pair.a.close(), pair.b.close()]);
+}
+process.stdout.write('CHECK runtime-peer-pair PASS\\n');
 try {
   await expectNotExported('@migaia/rpc/not-a-legacy-subpath');
   throw new Error('Unrelated import failure was accepted as a legacy subpath');
