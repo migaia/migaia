@@ -6,6 +6,9 @@ import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { RpcCapability } from '../../contract/wire-constants.js'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '../types.js'
 import type { IRpcEndpoint } from '../../core/typing.js'
+import { EndpointOwnerKey } from '../../core/endpoint-kernel.js'
+import { readEndpointOwner } from '../../core/internal/endpoint-projection.js'
+import type { RpcStreamOwner } from '../../core/internal/stream/owner.js'
 import { DEFAULT_DRAIN_MS } from '../constants.js'
 
 /** A generation retains only the calls started on its own endpoint. */
@@ -91,6 +94,17 @@ export function createRemoteBindingDrain(
         pending: 0,
         announced: false
       }
+      /** Runtime opens bypass the legacy facade, so the original consumer supplies settlement. */
+      readEndpointOwner<RpcStreamOwner>(
+        endpoint.endpoint,
+        EndpointOwnerKey.streamOwner
+      )?.setRuntimeConsumerAdmission(() => {
+        generation.pending += 1
+        return () => {
+          generation.pending -= 1
+          finish(generation)
+        }
+      })
       /** Own properties shadow the frozen endpoint's methods without violating Proxy invariants. */
       const trackedEndpoint: IRpcEndpoint = Object.create(endpoint.endpoint)
       Object.defineProperties(trackedEndpoint, {
