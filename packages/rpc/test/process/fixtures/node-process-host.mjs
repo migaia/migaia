@@ -10,6 +10,8 @@ import { createProcessTransport } from '../../../dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../dist/process/offer.js'
 import { serveRemotePlugin } from '../../../dist/remote/serve-plugin.js'
 import { createServeProcessHost } from '../../../dist/process/host/serve.js'
+import { createProcessPlugin } from '../../../dist/process/index.js'
+import { RUNTIME_API_BASE_CAPABILITIES } from '../../../dist/remote/runtime-api/constants.js'
 import { RpcProcessErrorCode } from '../../../dist/process/error-code.js'
 import { createProcessError } from '../../../dist/process/error.js'
 import { createComposedEndpoint } from '../../../dist/core/composed.js'
@@ -78,7 +80,8 @@ const report = (error) => process.stderr.write(`${String(error)}\n`)
 /** Both ingress modes use the same native offer and process session owner. */
 const offer = createNativeProcessOffer({
   peer: { id: 'host-child', runtime: 'node' },
-  stream: true
+  stream: true,
+  ...(process.env.RPC_HOST_ADDRESS ? { capabilities: RUNTIME_API_BASE_CAPABILITIES } : {})
 })
 /** A listener fixture runs independently of every borrowed client connection. */
 const address = process.env.RPC_HOST_ADDRESS
@@ -206,8 +209,8 @@ if (process.env.RPC_REGISTRATION_ADDRESS) {
   })
   process.stderr.write('registration-peer-ready\n')
 } else {
-  /** The process Host facade receives only local executable ports; definitions never cross the wire. */
-  await createServeProcessHost({
+  /** Both transports use the same trusted local resolver; definitions never cross the wire. */
+  const options = {
     host,
     catalog,
     ingress,
@@ -228,6 +231,20 @@ if (process.env.RPC_REGISTRATION_ADDRESS) {
       return definition
     },
     endpointFactory: (channel, _signal, session) => createEndpoint(channel, session)
-  })
+  }
+  if (address)
+    await host.use(
+      createProcessPlugin({
+        name: 'listener',
+        host,
+        self: { name: 'host-child', instanceId: 'host-child' },
+        expose: ['host', 'p'],
+        catalog,
+        resolvePlugin: options.resolvePlugin,
+        report,
+        listen: ingress
+      })
+    )
+  else await createServeProcessHost(options)
   if (address) process.stderr.write('host-listener-ready\n')
 }
