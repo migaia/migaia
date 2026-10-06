@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { openProcessStdioChannel } from '../../../dist/process/adapters/node-child-process.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
@@ -9,10 +8,8 @@ import {
 import { createProcessTransport } from '../../../dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../dist/process/offer.js'
 import { serveRemotePlugin } from '../../../dist/remote/serve-plugin.js'
-import { createServeProcessHost } from '../../../dist/process/host/serve.js'
 import { createProcessPlugin } from '../../../dist/process/index.js'
 import { RUNTIME_API_BASE_CAPABILITIES } from '../../../dist/remote/runtime-api/constants.js'
-import { PROCESS_RUNTIME_API_ENV } from '../../../dist/process/constants.js'
 import { RpcProcessErrorCode } from '../../../dist/process/error-code.js'
 import { createProcessError } from '../../../dist/process/error.js'
 import { createComposedEndpoint } from '../../../dist/core/composed.js'
@@ -82,11 +79,11 @@ const report = (error) => process.stderr.write(`${String(error)}\n`)
 const offer = createNativeProcessOffer({
   peer: { id: 'host-child', runtime: 'node' },
   stream: true,
-  ...(process.env.RPC_HOST_ADDRESS ? { capabilities: RUNTIME_API_BASE_CAPABILITIES } : {})
+  capabilities: RUNTIME_API_BASE_CAPABILITIES
 })
 /** A listener fixture runs independently of every borrowed client connection. */
 const address = process.env.RPC_HOST_ADDRESS
-/** Child mode reads its secret through the actual launcher bootstrap prefix. */
+/** Only an explicit socket supplies a listener; child stdio uses verified automatic bootstrap. */
 const ingress = address
   ? {
       kind: 'listener',
@@ -106,35 +103,10 @@ const ingress = address
         }
       }
     }
-  : {
-      kind: 'child',
-      channelKind: 'byte',
-      openRaw: async () => {
-        const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
-        return { raw: opened.channel, bootstrap: opened.bootstrap }
-      },
-      createVerifier: (bootstrap) => {
-        const expected = new TextDecoder().decode(bootstrap)
-        return (actual) => {
-          if (actual !== expected) throw createProcessError(RpcProcessErrorCode.authRejected)
-        }
-      },
-      establish: (raw, options) =>
-        createProcessTransport(raw, {
-          role: 'responder',
-          offer,
-          auth: { mode: 'required', verify: options.verify },
-          peerId: 'host-parent',
-          scheduler: options.scheduler,
-          signal: options.signal,
-          ipc: { ...options.session, log: () => undefined },
-          report
-        }),
-      parentLoss: { exit: (code) => process.exit(code) }
-    }
+  : undefined
 
 /**
- * Compose the same actual core endpoint for Host ingress and reverse Plugin registration.
+ * Compose the actual core endpoint retained by reverse Plugin registration.
  *
  * @param {import('../../../dist/remote/types.js').IRemoteChannel} channel
  * @param {Parameters<
@@ -210,42 +182,31 @@ if (process.env.RPC_REGISTRATION_ADDRESS) {
   })
   process.stderr.write('registration-peer-ready\n')
 } else {
-  /** Both transports use the same trusted local resolver; definitions never cross the wire. */
-  const options = {
-    host,
-    catalog,
-    ingress,
-    scheduler: systemScheduler,
-    report,
-    resolvePlugin: (_name, config) => {
-      resolutions += 1
-      if (process.env.RPC_RESOLVER_MODE === 'wrong-name')
-        return definePlugin({ name: 'wrong', install: () => ({}) })
-      if (process.env.RPC_RESOLVER_MODE === 'promise') return Promise.resolve(definition)
-      if (process.env.RPC_RESOLVER_MODE === 'invalid') return null
-      if (process.env.RPC_RESOLVER_MODE === 'throw')
-        throw createProcessError(
-          RpcProcessErrorCode.hostInvalidOption,
-          createProcessError(RpcProcessErrorCode.channelClosed)
-        )
-      portableConfig = config ?? null
-      return definition
-    },
-    endpointFactory: (channel, _signal, session) => createEndpoint(channel, session)
-  }
-  if (address || process.env[PROCESS_RUNTIME_API_ENV])
-    await host.use(
-      createProcessPlugin({
-        name: address ? 'listener' : 'parent',
-        host,
-        ...(address ? { self: { name: 'host-child', instanceId: 'host-child' } } : {}),
-        expose: ['host', 'p'],
-        catalog,
-        resolvePlugin: options.resolvePlugin,
-        report,
-        ...(address ? { listen: ingress } : {})
-      })
-    )
-  else await createServeProcessHost(options)
+  /** Both sources use the same trusted local resolver; executable definitions stay local. */
+  await host.use(
+    createProcessPlugin({
+      name: address ? 'listener' : 'parent',
+      host,
+      ...(address ? { self: { name: 'host-child', instanceId: 'host-child' } } : {}),
+      expose: ['host', 'p'],
+      catalog,
+      report,
+      resolvePlugin: (_name, config) => {
+        resolutions += 1
+        if (process.env.RPC_RESOLVER_MODE === 'wrong-name')
+          return definePlugin({ name: 'wrong', install: () => ({}) })
+        if (process.env.RPC_RESOLVER_MODE === 'promise') return Promise.resolve(definition)
+        if (process.env.RPC_RESOLVER_MODE === 'invalid') return null
+        if (process.env.RPC_RESOLVER_MODE === 'throw')
+          throw createProcessError(
+            RpcProcessErrorCode.hostInvalidOption,
+            createProcessError(RpcProcessErrorCode.channelClosed)
+          )
+        portableConfig = config ?? null
+        return definition
+      },
+      ...(address ? { listen: ingress } : {})
+    })
+  )
   if (address) process.stderr.write('host-listener-ready\n')
 }
