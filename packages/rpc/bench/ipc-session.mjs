@@ -320,7 +320,7 @@ export async function createIpcSession({
                   side,
                   carrier,
                   child: true,
-                  benchStem: process.env.IPC_BENCH_STEM,
+                  ...(process.env.IPC_BENCH_STEM ? { benchStem: process.env.IPC_BENCH_STEM } : {}),
                   observation: true
                 }
               },
