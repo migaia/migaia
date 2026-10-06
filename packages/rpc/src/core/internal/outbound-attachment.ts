@@ -1,4 +1,10 @@
-import { createOutboundEnvelope, readForwardRoute } from './outbound-envelope.js'
+import {
+  createOutboundEnvelope,
+  createRuntimeOutboundEnvelope,
+  createRuntimeRequestOutboundEnvelope,
+  isRuntimeRequestInput,
+  readForwardRoute
+} from './outbound-envelope.js'
 import { hasFastEndpoint, hasFastComponents } from './fast-path.js'
 import {
   hasBatchAgreement,
@@ -1070,7 +1076,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     try {
       const receiver = await this.resolveReceiver(targetId)
       operation.assertActive(this.kernel.generation)
-      envelope = normalizeRuntimeEnvelope({
+      /** A logical preflight already owns this exact payload; header and task admission stay full. */
+      const preparedInput = mode !== RpcRuntimeMode.group && isRuntimeRequestInput(input)
+      const message = {
         profile: RpcRuntimeProfile,
         kind:
           mode === RpcRuntimeMode.group
@@ -1095,10 +1103,13 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         },
         ...(mode === RpcRuntimeMode.group
           ? { steps: input.steps }
-          : input.payload === undefined
+          : preparedInput || input.payload === undefined
             ? {}
             : { payload: input.payload })
-      })
+      }
+      envelope = preparedInput
+        ? createRuntimeRequestOutboundEnvelope(message, input as { method: string })
+        : createRuntimeOutboundEnvelope(message)
     } catch (error) {
       this.#replay.releaseId(taskId)
       operation.finish()

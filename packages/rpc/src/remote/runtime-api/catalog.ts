@@ -121,7 +121,8 @@ function invalid(cause?: unknown): never {
  */
 export function compileRuntimeMethods(
   input: IRuntimePeerProvide = {},
-  advanced?: IRemoteContract
+  advanced?: IRemoteContract,
+  retainIndex?: (index: ReadonlyMap<string, IRuntimeMethodEntry>) => void
 ): readonly IRuntimeMethodEntry[] {
   /** Only active ancestors identify a cycle; independent groups may reuse the same handler. */
   const active = new Set<object>()
@@ -209,7 +210,9 @@ export function compileRuntimeMethods(
     /** Explicit Host controls keep their independent actual permission and scalar modes. */
     for (const entry of runtimePluginEntries.get(input) ?? [])
       if (entry.reserved) declared.set(entry.name, entry)
+    retainIndex?.(declared)
     return Object.freeze([...declared.values()])
   }
+  retainIndex?.(methods)
   return Object.freeze([...methods.values()])
 }

@@ -59,7 +59,7 @@ export type IProcessPluginBinding<TUnit extends object, TSpec> = IRemoteBinding<
     /** Owned bindings alone can escalate a live handle during shutdown. */
     forceCurrent?(): void
     /** Preserve logical request Promise identity while joining the canonical drain barrier. */
-    trackRequest<T>(operation: () => Promise<T>): Promise<T>
+    trackRequest: NonNullable<IRemoteBinding<TUnit, TSpec>['trackRequest']>
     bindEndpoint(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
     drainCurrent(options?: Readonly<{ hostRemainingMs?: number; drainMs?: number }>): Promise<void>
   }>

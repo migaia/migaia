@@ -22,6 +22,7 @@ import { assertRuntimeTransferFamily } from './transfer.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
 import { RpcRuntimeGenerationKind } from '../../contract/runtime-api/constants.js'
 import { compileRuntimeMethods } from './catalog.js'
+import type { IRuntimeCallOptions } from './typing.js'
 import {
   createRuntimePeer,
   prepareRuntimePeerSourceContext,
@@ -140,6 +141,9 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   }
   /** Only the true accepted generation supplies identity and directory metadata for publication. */
   registration.currentPeer()
+  /** One cold dispatcher keeps drain admission ahead of dispatch without a per-call facade closure. */
+  const request = (method: string, payload: unknown, callOptions: IRuntimeCallOptions) =>
+    registration.invokeRequest(method, payload, callOptions)
   /** Calls preserve the original current-generation operation Promise and stream iterator. */
   const peer: IRuntimePeer = Object.freeze({
     self: context.self,
@@ -147,10 +151,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
       assertRuntimeTransferFamily(family, callOptions)
       /** Logical retry settlement must finish before native drain can retire its generation. */
       return binding.trackRequest
-        ? binding.trackRequest(() =>
-            registration.invokeRequest(method, payload, callTimeout(callOptions))
-          )
-        : registration.invokeRequest(method, payload, callTimeout(callOptions))
+        ? binding.trackRequest(request, method, payload, callTimeout(callOptions))
+        : request(method, payload, callTimeout(callOptions))
     },
     notify: (method, payload, callOptions) => {
       assertRuntimeTransferFamily(family, callOptions)

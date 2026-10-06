@@ -28,6 +28,10 @@ import {
   normalizeRuntimePortable,
   hasRpcPortableBinary
 } from '../contract/normalize.js'
+import {
+  createRuntimeRequestInput,
+  retainRuntimeRequestInput
+} from '../core/internal/outbound-envelope.js'
 import { RpcCapability } from '../contract/wire-constants.js'
 import {
   isForwardedPayload,
@@ -844,12 +848,10 @@ class RemoteRegistration<TUnit, TSpec> {
     const runtime = this.#options.prepareRuntime !== undefined
     /** The portable runtime payload is normalized once before dispatch allocates any work. */
     const forwarded = isForwardedPayload(options, params)
-    const runtimeData =
-      runtime && params !== undefined
-        ? forwarded
-          ? (params as IRpcPortableValue)
-          : normalizeRuntimePortable(params)
-        : undefined
+    const preparedInput = runtime
+      ? createRuntimeRequestInput(method, params, true, options)
+      : undefined
+    const runtimeData = preparedInput?.payload
     /** The original accepted route index supplies the declaration without a directory query. */
     const runtimeDeclaration = runtime ? this.#runtimeMethod(method, mode) : undefined
     try {
@@ -889,6 +891,7 @@ class RemoteRegistration<TUnit, TSpec> {
             ...(key === undefined ? {} : { idempotencyKey: key })
           })
         )
+        if (preparedInput) retainRuntimeRequestInput(callOptions, preparedInput)
         /** This is the actual downstream result, without the legacy retry timer or abort winner. */
         /** The accepted runtime is captured before a tracking callback can observe replacement. */
         const runtimePeer = active.runtime
@@ -965,6 +968,7 @@ class RemoteRegistration<TUnit, TSpec> {
               : { timeoutMs: input.remainingMs }),
             ...(key === undefined ? {} : { idempotencyKey: key })
           })
+          if (preparedInput) retainRuntimeRequestInput(sendOptions, preparedInput)
           /** Native results can be returned without native input; this retains the same retry owner. */
           const result =
             live.runtime &&

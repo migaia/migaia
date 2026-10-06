@@ -37,6 +37,8 @@ export const EndpointOwnerKey = {
   outboundAttachment: 'outbound-attachment',
   /** The same provider attachment retains runtime execution and cancellation authority. */
   providerAttachment: 'provider-attachment',
+  /** Cold construction and contract tests read the original provider namespace owner. */
+  providerRegistry: 'provider-registry',
   /** All opt-in ingress and execution share the original logical provider's admission owner. */
   providerAdmission: 'provider-admission',
   /** The canonical stream owner alone handles new-profile credit and terminal state. */

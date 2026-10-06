@@ -9,6 +9,18 @@ import type { IRpcStreamRuntime } from '../core/features/stream.js'
 import type { IRpcEndpoint, IRpcAbortSignal } from '../core/typing.js'
 import type { IRpcTransport } from '../core/transport.js'
 import type { IRemoteContract, IRemoteHostCatalog, RemoteMethodMode } from './contract.js'
+import type { IRuntimeCallOptions } from './runtime-api/typing.js'
+
+/** Native drain invokes one cold dispatcher or the unchanged zero-argument legacy operation. */
+export type IRemoteRequestTracker = {
+  <T>(operation: () => Promise<T>): Promise<T>
+  <T>(
+    operation: (method: string, payload: unknown, options: IRuntimeCallOptions) => Promise<T>,
+    method: string,
+    payload: unknown,
+    options: IRuntimeCallOptions
+  ): Promise<T>
+}
 
 /** A channel presents the complete negotiated pipeline to one endpoint factory. */
 export type IRemoteChannel = Readonly<{
@@ -35,7 +47,7 @@ export type IRemoteBinding<TUnit, TSpec> = Readonly<{
   scheduler: IScheduler
   openChannel(unit: TUnit, signal: IAbortSignal): Promise<IRemoteChannel>
   /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */
-  trackRequest?<T>(operation: () => Promise<T>): Promise<T>
+  trackRequest?: IRemoteRequestTracker
 }>
 
 /** Endpoint assembly must install channel features in the same construction batch. */

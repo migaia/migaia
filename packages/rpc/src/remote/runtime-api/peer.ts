@@ -12,6 +12,10 @@ import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
 import { normalizePortable, hasRpcPortableBinary } from '../../contract/normalize.js'
 import {
+  createRuntimeRequestInput,
+  retainRuntimeRequestInput
+} from '../../core/internal/outbound-envelope.js'
+import {
   normalizeRuntimeGeneration,
   normalizeRuntimeSteps
 } from '../../contract/runtime-api/normalize.js'
@@ -42,6 +46,7 @@ import {
   RpcSerializationError,
   RpcRemoteError
 } from '../../core/errors.js'
+import { completeProviderReturn } from '../../core/internal/provider.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { abort } from '../../core/middleware/abort.js'
 import { codec } from '../../core/middleware/codec.js'
@@ -306,8 +311,12 @@ export async function createRuntimePeer(
 ): Promise<IRuntimePeer> {
   /** Invalid timeout configuration cannot consume bootstrap or acquire a physical channel. */
   const callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
+  /** The compiler retains its original whitelist index; relay dispatch creates no second table. */
+  let methodIndex!: ReadonlyMap<string, IRuntimeMethodEntry>
   /** Method descriptors are compiled once; no dispatch searches the application object. */
-  const methods = compileRuntimeMethods(options.provide, options.contract)
+  const methods = compileRuntimeMethods(options.provide, options.contract, (index) => {
+    methodIndex = index
+  })
   /** A platform automatic source and an explicit source can never compete for one Peer. */
   const sources = [options.spawn, options.connect, options.listen].filter(
     (source) => source !== undefined
@@ -375,6 +384,33 @@ export async function createRuntimePeer(
   }
   /** Core owns provider dispatch and all admission/replay/cancellation leases. */
   const providers: Record<string, IRpcProvider> = Object.create(null)
+  /** One cold completion adapter keeps D47 normalization outside handler and context failures. */
+  const completeScalar = (
+    result: unknown,
+    context: Parameters<IRpcProvider>[0]
+  ): ReturnType<Parameters<IRpcProvider>[0]['success']> => {
+    if (result === undefined) return context.success()
+    /** Only failed normalization opts in to the payload code and bounded cause transfer. */
+    let portable: IRpcPortableValue
+    try {
+      portable = normalizePortable(
+        result,
+        0,
+        new Set<object>(),
+        supportsBinary || rejectRuntimeApiCapability
+      )
+    } catch (cause) {
+      const failure = new RpcSerializationError(RuntimeApiErrorText.resultInvalid, cause)
+      registerLocalErrorWireSummary(
+        failure,
+        RpcCoreErrorCode.payloadInvalid,
+        RuntimeApiErrorText.resultInvalid,
+        { preserveSerializedError: true }
+      )
+      throw failure
+    }
+    return context.success(portable)
+  }
   /** Registration completes before the platform hands cold business receive to the endpoint. */
   let localDescription: IRuntimePeerDescription | undefined
   /** The existing directory handshake binds a remote node before either side sends business. */
@@ -449,6 +485,17 @@ export async function createRuntimePeer(
       : describeProvider
     for (const entry of methods) {
       if (entry.supportedModes?.every((mode) => mode === RuntimeApiMode.stream)) continue
+      if (entry.kind !== 'forward') {
+        /** The original provider owner maps actual async results; the scalar facade is synchronous. */
+        providers[entry.name] = guardMethod(entry, (context: Parameters<IRpcProvider>[0]) =>
+          completeProviderReturn(
+            Reflect.apply(entry.method, entry.receiver, [context.data, context]),
+            context,
+            completeScalar
+          )
+        )
+        continue
+      }
       providers[entry.name] = guardMethod(entry, async (context: Parameters<IRpcProvider>[0]) => {
         if (entry.kind === 'forward') {
           const relay = readProviderRuntimeRelay(context)
@@ -472,30 +519,7 @@ export async function createRuntimePeer(
             )
           }
         }
-        /** Handler failure stays outside the scalar result validation error boundary. */
-        const result = await Reflect.apply(entry.method, entry.receiver, [context.data, context])
-        if (result === undefined) return context.success()
-        /** Only failed normalization opts in to the payload code and bounded cause transfer. */
-        let portable: IRpcPortableValue
-        try {
-          portable = normalizePortable(
-            result,
-            0,
-            new Set<object>(),
-            supportsBinary || rejectRuntimeApiCapability
-          )
-        } catch (cause) {
-          /** Business RpcSerializationError instances never receive this local trusted summary. */
-          const failure = new RpcSerializationError(RuntimeApiErrorText.resultInvalid, cause)
-          registerLocalErrorWireSummary(
-            failure,
-            RpcCoreErrorCode.payloadInvalid,
-            RuntimeApiErrorText.resultInvalid,
-            { preserveSerializedError: true }
-          )
-          throw failure
-        }
-        return context.success(portable)
+        return context.success()
       })
     }
   }
@@ -557,7 +581,10 @@ export async function createRuntimePeer(
          * The canonical provider registry stores only a cold resolver into its existing compiled
          * entries.
          */
-        const registry = readEndpointOwner<ProviderRegistry>(endpoint, 'provider-registry')!
+        const registry = readEndpointOwner<ProviderRegistry>(
+          endpoint,
+          EndpointOwnerKey.providerRegistry
+        )!
         /**
          * Without a method on lookup, only one unambiguous forward-only logical namespace is
          * selectable.
@@ -597,7 +624,7 @@ export async function createRuntimePeer(
             envelope.kind === RpcRuntimeKind.group
               ? envelope.steps
               : [{ method: envelope.task.method! }]
-          ).map((step) => methods.find((entry) => entry.name === step.method))
+          ).map((step) => methodIndex.get(step.method))
           const first = entries[0]
           if (!entries.some((entry) => entry?.kind === 'forward')) return undefined
           if (
@@ -768,17 +795,28 @@ export async function createRuntimePeer(
             channel.peerId,
             remote.self.generation,
             'request',
-            { method, payload: payloadValue(payload, supportsBinary) },
+            createRuntimeRequestInput(
+              method,
+              payload,
+              supportsBinary || rejectRuntimeApiCapability,
+              callOptions
+            ),
             callOptions
           ) as Promise<IRpcPortableValue | undefined>
         }
+        /** Original legacy framing retains its depth-two payload boundary without a facade walk. */
+        const input = createRuntimeRequestInput(
+          method,
+          payload,
+          supportsBinary || rejectRuntimeApiCapability,
+          callOptions,
+          2
+        )
         const result = ready.send<IRpcPortableValue | undefined>(
           channel.peerId,
           method,
-          isForwardedPayload(callOptions, payload)
-            ? (payload as IRpcPortableValue | undefined)
-            : payloadValue(payload, supportsBinary),
-          callOptions
+          input.payload,
+          retainRuntimeRequestInput({ ...callOptions }, input)
         )
         return routes.get(method)?.forwardedVia || isForwardedPayload(callOptions, payload)
           ? result.catch(restoreForwardError)

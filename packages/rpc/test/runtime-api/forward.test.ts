@@ -725,6 +725,70 @@ it('[A59][A61][A114] forwarded order-only notify holds B original lease until C 
   }
 })
 
+it('[A37][R15] admitted runtime relay uses its compiled index without scanning the catalog', async () => {
+  /** Actual Host-owned peers establish both independent hops before dispatch is observed. */
+  const owners = [owner(), owner(), owner()] as const
+  const carriers: ReturnType<typeof runtimeSources>[] = []
+  const capabilities = [...RUNTIME_API_CAPABILITIES, RpcCapability.generation, RpcCapability.order]
+  try {
+    carriers.push(
+      await attach(
+        owners[1],
+        owners[2],
+        'c',
+        'b',
+        {},
+        {
+          provide: { value: (payload) => payload }
+        },
+        runtimeSources(capabilities, capabilities)
+      )
+    )
+    carriers.push(
+      await attach(
+        owners[0],
+        owners[1],
+        'b',
+        'a',
+        {},
+        { expose: ['c'] },
+        runtimeSources(capabilities, capabilities)
+      )
+    )
+    const upstream = owners[0].thread as unknown as IRuntimeOutlet
+    /** Count only scans of actual compiled forwarding entries, leaving every native lookup intact. */
+    const scans = vi.spyOn(Array.prototype, 'find')
+    try {
+      for (let index = 0; index < 20; index++)
+        assert.equal(
+          await upstream.request('b', 'c.value', index, { orderKey: 'same', timeoutMs: false }),
+          index
+        )
+      const catalogScans = scans.mock.contexts.filter(
+        (value: unknown) =>
+          Array.isArray(value) &&
+          value.some(
+            (entry: unknown) =>
+              typeof entry === 'object' &&
+              entry !== null &&
+              Reflect.get(entry, 'kind') === 'forward' &&
+              Reflect.get(entry, 'name') === 'c.value'
+          )
+      )
+      assert.equal(
+        catalogScans.length,
+        0,
+        '[R15] the real relay cannot scan its compiled catalog per call'
+      )
+    } finally {
+      scans.mockRestore()
+    }
+  } finally {
+    for (const host of owners) await host.dispose()
+    for (const carrier of carriers) carrier.close()
+  }
+})
+
 it.each(['request', 'group', 'notify', 'stream'] as const)(
   '[A66][A67][A69][A114] C %s start wins over forwarded cancellation and stream finish retains the true final result',
   async (mode) => {
