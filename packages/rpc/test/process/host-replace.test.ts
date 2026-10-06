@@ -4,7 +4,8 @@ import type { IAbortSignal } from '@migaia/lifecycle'
 import { createProcessHost } from '../../src/process/host/client.js'
 import * as remoteHostModule from '../../src/remote/host.js'
 import { hostFixture } from './fixtures/host-control.js'
-import { nativeHostOptions } from './fixtures/host-native.js'
+import { nativeHostFixture, nativeHostOptions } from './fixtures/host-native.js'
+import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
@@ -409,36 +410,39 @@ describe('process Host replacement publication', () => {
   )
 
   it('[A4] rejects a real overlapping candidate at a one-unit budget and preserves the old PID', async () => {
-    const fixture = nativeHostOptions()
-    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
+    const fixture = nativeHostFixture()
     const budget = createUnitBudget({
       kind: 'process',
       maxUnits: 1,
       overflow: 'reject',
       scheduler: systemScheduler
     })
-    const host = createProcessHost({
+    /** Both genuine definitions borrow the same one-unit native admission owner. */
+    const options = {
       ...fixture.options,
-      deployment: {
-        ...fixture.options.deployment,
+      spawn: {
+        ...fixture.options.spawn,
         supervision: {
-          ...fixture.options.deployment.supervision,
+          ...fixture.options.spawn.supervision,
           budget,
-          restart: { mode: 'on-failure', maxRestarts: 0 }
+          restart: { mode: 'on-failure' as const, maxRestarts: 0 }
         }
       }
-    })
+    }
     try {
-      await host.ready()
-      await expect(host.replace({ strategy: 'start-then-switch' })).rejects.toBeDefined()
+      await fixture.host.use(createProcessPlugin(options))
+      await expect(
+        fixture.host.replace('child', createProcessPlugin(options))
+      ).rejects.toBeDefined()
       expect(fixture.handles).toHaveLength(1)
       expect(budget.inUse).toBe(1)
-      const feature = await host.use('p')
-      expect(await feature.f!.request!(['live'])).toMatchObject({
+      const outlet = fixture.host.process!
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+      expect(await outlet.request('child', 'p.request', 'live')).toMatchObject({
         pid: fixture.handles[0]!.identity.pid
       })
     } finally {
-      await host.release()
+      await fixture.close()
     }
     expect(budget.inUse).toBe(0)
   })
